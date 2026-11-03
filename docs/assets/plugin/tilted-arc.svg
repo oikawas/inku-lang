@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="260" viewBox="0 0 660 260" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <rect width="660" height="260" fill="#ffffff"/>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker></defs>
+  <!-- 1: made flat at the center; its box center is the canvas center -->
+  <text x="14" y="20" fill="#333">1  emit at (0.5, 0.5 + s/2)</text>
+  <rect x="10" y="40" width="200" height="200" fill="none" stroke="#999"/>
+  <path d="M50 150 A100 100 0 0 1 170 150" fill="none" stroke="#2c3e8f" stroke-width="3"/>
+  <rect x="50" y="130" width="120" height="20" fill="none" stroke="#c0392b" stroke-dasharray="4 3"/>
+  <circle cx="110" cy="140" r="4" fill="#c0392b"/><text x="116" y="170" fill="#c0392b">C</text>
+  <!-- 2: scaled and turned about C -->
+  <text x="234" y="20" fill="#333">2  scale_x, scale_y, rotate_degrees</text>
+  <rect x="230" y="40" width="200" height="200" fill="none" stroke="#999"/>
+  <g transform="rotate(-50 330 140)">
+    <path d="M270 150 A100 100 0 0 1 390 150" fill="none" stroke="#2c3e8f" stroke-width="3"/>
+    <rect x="270" y="130" width="120" height="20" fill="none" stroke="#c0392b" stroke-dasharray="4 3"/>
+  </g>
+  <circle cx="330" cy="140" r="4" fill="#c0392b"/><text x="338" y="160" fill="#c0392b">C</text>
+  <path d="M392 150 A62 62 0 0 0 372 96" fill="none" stroke="#555" marker-end="url(#a)"/><text x="398" y="118" fill="#555">θ</text>
+  <!-- 3: moved -->
+  <text x="454" y="20" fill="#333">3  translate_x, translate_y</text>
+  <rect x="450" y="40" width="200" height="200" fill="none" stroke="#999"/>
+  <circle cx="550" cy="140" r="4" fill="none" stroke="#999"/>
+  <line x1="550" y1="140" x2="586" y2="180" stroke="#555" marker-end="url(#a)"/>
+  <g transform="translate(260 45) rotate(-50 330 140)">
+    <path d="M270 150 A100 100 0 0 1 390 150" fill="none" stroke="#2c3e8f" stroke-width="3"/>
+  </g>
+  <circle cx="590" cy="185" r="4" fill="#c0392b"/>
+</svg>

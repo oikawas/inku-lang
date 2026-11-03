@@ -246,9 +246,28 @@ uv run inku-cli replay WORK_ID --save-child
 |---|---|
 | `plugin list` | ロード済み／拒否された v2 パッケージ、namespace、version、拒否理由を JSON で取得する |
 | `plugin validate FILE` | ローカルの v2 JSON または zip を管理 API の三段階の検査へ送る |
+| `plugin preview FILE` | ローカルのプラグインのファイルを導入せずに描き、SVG と並べて見る `index.html` を書く（下） |
 | `reference [--md \| --json] [-o FILE]` | 実装内の語彙・定数テーブルの機械生成ダンプ。既定はMarkdown |
 
-`plugin validate` は管理者セッション、`plugin list` と `reference` はログイン済みセッションを必要とします。
+`plugin validate` は管理者セッション、`plugin list`・`plugin preview`・`reference` はログイン済みセッションを必要とします。
+
+`plugin preview` は、作者が見た目を確かめるための試し描きです（[PLUGIN §3.10](../../PLUGIN.ja.md)）。FILE は v2 のパッケージ（`package.json` か zip）、v2 の定義一つ、v2 の書き出しファイルのどれでもよく、その定義を書き出しファイルを読み込んだときと同じく、その描画だけに渡して `/api/compose` で描きます。Server には導入しません。
+
+| 旗 | 内容 |
+|---|---|
+| `--ddl TEXT` / `--ddl-file FILE` | 描く DDL。無ければ各語の例文（`--lang` の言語）を描く。例文の無い語は `｛主の名｝。`、物の語は `｛主の名｝を置く。`。書き出しファイルはそれ自身の DDL |
+| `--before TEXT` | 各 DDL の前に置く DDL。地を決めるときに使う（例：`和紙。`） |
+| `--lang {ja,en}` | 例文と note の言語。既定は `ja` |
+| `--seed SEED` | 構図の種。繰り返して複数。既定は 1 2 3 4 |
+| `--out-dir DIR` | SVG と `index.html` の置き場。既定は `plugin-preview` |
+| `--png` | PNG も書く。共有 core の wheel が要る |
+| `--canvas-aspect ID` / `--color-catalog ID` | 紙の比と色カタログ |
+| `--strict` | どれかの描画に診断があれば終了コード 1 |
+
+描画ごとに、語、種、結果（`ok`・`diagnostics`・`failed`）、図形の指示の数（物の中身の数も）、診断の理由を一行ずつ出します。描けなかった描画があれば終了コード 1 です。
+
+    uv run inku-cli plugin preview docs/plugins/akikusa-nihonga.zip --before 和紙。
+    uv run inku-cli plugin preview my-word.json --ddl '右端に大きな｛石｝を置く。' --seed 1 --seed 2 --png
 
 ## 奥書
 

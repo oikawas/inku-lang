@@ -1,0 +1,5635 @@
+{
+  "schema": "inku.plugin-package.v2",
+  "namespace": "Akikusa",
+  "name": "nihonga",
+  "version": "1.0.0",
+  "description_ja": "琳派の秋草図や武蔵野図を参考にした秋草の語。すすき・尾花（物）と、すすき原（情景）。物の語は色の語で穂の色が替わる（黄色で夕日の金、暗い地に白で抱一の白い穂）。",
+  "description_en": "Autumn grasses after Rinpa autumn-grass screens and the Musashino screens: silver grass and a silver grass plume (objects) and a silver grass field (scene). A colour word recolours the objects' ears.",
+  "license": "MIT",
+  "words": [
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Akikusa",
+        "id": "Susuki",
+        "names": {
+          "ja": [
+            "すすき",
+            "芒"
+          ],
+          "en": [
+            "silver grass",
+            "susuki"
+          ]
+        },
+        "kind": "object",
+        "aspect": "1:1",
+        "counter": "long",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 86.05
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.0049
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.1883
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.525"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.581"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.050"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pen"
+                  },
+                  "thinness": {
+                    "expr": "semantic_ref",
+                    "category": "thinness",
+                    "id": "fine"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -90.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0664
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2169
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.526"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.234"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.051"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -83.63
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0546
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2378
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.530"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.271"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.060"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -76.97
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0384
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2498
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.532"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.293"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.064"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -70.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0205
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2523
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.533"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.300"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.066"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -63.63
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0039
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2454
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.532"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.293"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.064"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -56.97
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.0088
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2297
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.530"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.271"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.060"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -50.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.0149
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2065
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.526"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.234"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.051"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 100.62
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.0846
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.1646
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.525"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.651"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.050"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pen"
+                  },
+                  "thinness": {
+                    "expr": "semantic_ref",
+                    "category": "thinness",
+                    "id": "fine"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -82.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1095
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2874
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.527"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.250"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.055"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -75.63
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1251
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.3077
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.532"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.289"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.064"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -68.97
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.144
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.318
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.534"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.312"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.069"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -62.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1632
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.318
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.535"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.320"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.070"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -55.63
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1798
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.3082
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.534"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.312"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.069"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -48.97
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1908
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2897
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.532"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.289"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.064"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -42.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1938
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2643
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.527"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.250"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.055"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 71.57
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0563
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.2321
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.525"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.506"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.050"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pen"
+                  },
+                  "thinness": {
+                    "expr": "semantic_ref",
+                    "category": "thinness",
+                    "id": "fine"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -94.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1898
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.0994
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.522"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.203"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.045"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -87.63
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1809
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.1183
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.526"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.235"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.052"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -80.97
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1676
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.1296
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.528"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.254"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.056"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -74.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1524
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.1329
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.529"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.260"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.057"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -67.63
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1375
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.1279
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.528"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.254"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.056"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -60.97
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1256
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.1151
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.526"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.235"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.052"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -54.3
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1189
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.0954
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.522"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.203"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.045"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 43.45
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1556
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.2637
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.550"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.523"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.100"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "gouache"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -34.99
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1742
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.3031
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.545"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.488"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.090"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "gouache"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 109.44
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1436
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.1483
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.525"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.721"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.050"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "gouache"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 21.8
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1407
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.3968
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.525"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.323"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.050"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "yellow"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "gouache"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -107.88
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1238
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.1777
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.525"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.651"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.050"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "gouache"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "note_ja": "風に靡くすすきの株。銀の穂を付けた茎三本と、根元から弧を描く葉。色の語で穂の色が替わる。",
+      "note_en": "A clump of silver grass in the wind: three stems with silvery ears and arching blades.",
+      "example_ja": "3本の｛すすき｝を下に並べる。",
+      "example_en": "Line up 3 {silver grass} at the bottom.",
+      "preview": "previews/susuki.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Akikusa",
+        "id": "Obana",
+        "names": {
+          "ja": [
+            "尾花"
+          ],
+          "en": [
+            "silver grass plume",
+            "obana"
+          ]
+        },
+        "kind": "object",
+        "aspect": "1:1",
+        "counter": "long",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 83.88
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0451
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.1973
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.525"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.563"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.050"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pen"
+                  },
+                  "thinness": {
+                    "expr": "semantic_ref",
+                    "category": "thinness",
+                    "id": "fine"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -89.6
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1364
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2363
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.537"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.312"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.075"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -84.8
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1255
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2549
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.541"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.344"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.082"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -80.0
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1115
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.269
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.544"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.368"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.088"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -75.2
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0955
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2784
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.546"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.386"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.093"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -70.4
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0783
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2827
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.548"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.396"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.095"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -65.6
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0611
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.282
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.548"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.400"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.096"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -60.8
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0448
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2763
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.548"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.396"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.095"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -56.0
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0305
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2659
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.546"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.386"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.093"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -51.2
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0191
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2512
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.544"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.368"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.088"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -46.4
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0114
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2329
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.541"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.344"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.082"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -41.6
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.0082
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": -0.2116
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.537"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.312"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.075"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "gray"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "watercolor"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "tightly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "undulating"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": -40.82
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": 0.1506
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.2559
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.545"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.581"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.090"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "gouache"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "transform",
+            "transform": {
+              "rotate_degrees": {
+                "expr": "number",
+                "value": 39.09
+              },
+              "translate_x": {
+                "expr": "number",
+                "value": -0.1811
+              },
+              "translate_y": {
+                "expr": "number",
+                "value": 0.3267
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "fields": {
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "exact_decimal",
+                    "value": "0.530"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.412"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.060"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "yellow"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "gouache"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "note_ja": "すすきの穂ひとつの近景。細い小穂が扇に開き、風下へ弓なりに垂れる。",
+      "note_en": "A close view of one silver grass ear: fine spikelets fanning and bowing downwind.",
+      "example_ja": "中心に大きな｛尾花｝を置く。",
+      "example_en": "Place a large {silver grass plume} at the center.",
+      "preview": "previews/obana.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Akikusa",
+        "id": "SusukiField",
+        "names": {
+          "ja": [
+            "すすき原",
+            "芒原"
+          ],
+          "en": [
+            "silver grass field",
+            "susuki field"
+          ]
+        },
+        "kind": "scene",
+        "version": "1.0.0",
+        "parameters": {
+          "plant_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 8,
+            "omitted": [
+              5,
+              6
+            ],
+            "counter": "long"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "plant_count"
+            },
+            "maximum": 8,
+            "index": "plant_index",
+            "body": [
+              {
+                "op": "transform",
+                "transform": {
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 85.14
+                      },
+                      {
+                        "expr": "number",
+                        "value": 85.6
+                      },
+                      {
+                        "expr": "number",
+                        "value": 84.69
+                      },
+                      {
+                        "expr": "number",
+                        "value": 84.81
+                      },
+                      {
+                        "expr": "number",
+                        "value": 83.83
+                      },
+                      {
+                        "expr": "number",
+                        "value": 86.05
+                      },
+                      {
+                        "expr": "number",
+                        "value": 82.65
+                      },
+                      {
+                        "expr": "number",
+                        "value": 85.43
+                      }
+                    ]
+                  },
+                  "translate_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 0.0049
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.2701
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2849
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.1301
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1449
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.3851
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.4048
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0749
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 0.2529
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2931
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2727
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3227
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3023
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3433
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3318
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.363
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "exact_decimal",
+                        "value": "0.500"
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          }
+                        ]
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.472"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.391"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.432"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.331"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.372"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.291"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.313"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.251"
+                          }
+                        ]
+                      },
+                      "sagitta": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "pen"
+                      },
+                      "thinness": {
+                        "expr": "semantic_ref",
+                        "category": "thinness",
+                        "id": "fine"
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "loosely"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "swaying"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -80.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -84.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -78.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -82.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -76.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -86.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -80.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -74.3
+                      }
+                    ]
+                  },
+                  "translate_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0445
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.3193
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2389
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.1759
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1018
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.4297
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3568
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0434
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0757
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0207
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.0278
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0884
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0402
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1368
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1122
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1802
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "exact_decimal",
+                        "value": "0.500"
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.521"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.517"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.519"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.515"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.517"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.514"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.515"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.513"
+                          }
+                        ]
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.187"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.156"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.172"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.156"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.125"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.133"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.117"
+                          }
+                        ]
+                      },
+                      "sagitta": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.041"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.034"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.038"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.031"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.034"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.027"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.029"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.026"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "watercolor"
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "tightly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "undulating"
+                      },
+                      "ink_spread": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "bleeding"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -72.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -76.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -70.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -74.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -68.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -78.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -72.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -66.3
+                      }
+                    ]
+                  },
+                  "translate_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0293
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.3078
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2535
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.165
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1156
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.421
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3676
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0542
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0956
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0033
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.0456
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0731
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0245
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1226
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0981
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1688
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "exact_decimal",
+                        "value": "0.500"
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.521"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.523"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.519"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.521"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.517"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.518"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.516"
+                          }
+                        ]
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.227"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.189"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.208"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.170"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.189"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.151"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.161"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.142"
+                          }
+                        ]
+                      },
+                      "sagitta": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.042"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.046"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.037"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.042"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.033"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.035"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.031"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "watercolor"
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "tightly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "undulating"
+                      },
+                      "ink_spread": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "bleeding"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -64.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -68.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -62.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -66.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -60.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -70.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -64.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -58.3
+                      }
+                    ]
+                  },
+                  "translate_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0117
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.2935
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2697
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.152
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1304
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.4096
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.38
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0654
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0996
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.001
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.0486
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0696
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0222
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1187
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0953
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1675
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "exact_decimal",
+                        "value": "0.500"
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.526"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.522"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.524"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.520"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.522"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.518"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.519"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.516"
+                          }
+                        ]
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.240"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.180"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.160"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.170"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.150"
+                          }
+                        ]
+                      },
+                      "sagitta": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.053"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.044"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.048"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.040"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.044"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.035"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.037"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.033"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "watercolor"
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "tightly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "undulating"
+                      },
+                      "ink_spread": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "bleeding"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -56.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -60.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -54.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -58.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -52.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -62.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -56.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -50.3
+                      }
+                    ]
+                  },
+                  "translate_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 0.0022
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.2812
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2821
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.1412
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1413
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.3996
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3899
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0733
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0882
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0076
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.0378
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0778
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0325
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1253
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1034
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1755
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "exact_decimal",
+                        "value": "0.500"
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.521"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.523"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.519"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.521"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.517"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.518"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.516"
+                          }
+                        ]
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.227"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.189"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.208"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.170"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.189"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.151"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.161"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.142"
+                          }
+                        ]
+                      },
+                      "sagitta": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.042"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.046"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.037"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.042"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.033"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.035"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.031"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "watercolor"
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "tightly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "undulating"
+                      },
+                      "ink_spread": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "bleeding"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -48.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -52.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -46.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -50.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -44.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -54.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -48.3
+                      },
+                      {
+                        "expr": "number",
+                        "value": -42.3
+                      }
+                    ]
+                  },
+                  "translate_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 0.0069
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.2759
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2856
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.137
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1438
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.3947
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3932
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0746
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -0.0636
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0278
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.0151
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0961
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.0532
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1413
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1208
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1911
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "exact_decimal",
+                        "value": "0.500"
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.521"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.517"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.519"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.515"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.517"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.514"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.515"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.513"
+                          }
+                        ]
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.187"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.156"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.172"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.156"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.125"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.133"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.117"
+                          }
+                        ]
+                      },
+                      "sagitta": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.041"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.034"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.038"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.031"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.034"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.027"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.029"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.026"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "watercolor"
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "tightly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "undulating"
+                      },
+                      "ink_spread": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "bleeding"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -51.34
+                      },
+                      {
+                        "expr": "number",
+                        "value": -51.34
+                      },
+                      {
+                        "expr": "number",
+                        "value": 51.34
+                      },
+                      {
+                        "expr": "number",
+                        "value": -51.34
+                      },
+                      {
+                        "expr": "number",
+                        "value": -51.34
+                      },
+                      {
+                        "expr": "number",
+                        "value": -51.34
+                      },
+                      {
+                        "expr": "number",
+                        "value": 51.34
+                      },
+                      {
+                        "expr": "number",
+                        "value": -51.34
+                      }
+                    ]
+                  },
+                  "translate_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 0.0605
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.2195
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2195
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.0795
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.2005
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.3395
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3395
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.1205
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "plant_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.3744
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "exact_decimal",
+                        "value": "0.500"
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          }
+                        ]
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.256"
+                          }
+                        ]
+                      },
+                      "sagitta": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "plant_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.050"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "gouache"
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "loosely"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "swaying"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "note_ja": "画面の下に並び、風にそろって靡くすすきの群れ。武蔵野図のように。",
+      "note_en": "Silver grass along the bottom of the picture, all bowing together in the wind.",
+      "example_ja": "6本の｛すすき原｝。",
+      "example_en": "6 {silver grass field}.",
+      "preview": "previews/susuki-field.png"
+    }
+  ]
+}

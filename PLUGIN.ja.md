@@ -179,7 +179,7 @@
 | 欄 | 値 | 書くこと |
 |---|---|---|
 | `shape` | `shape`の語 | 必須。§3.5の9つの図形 |
-| `movement` | `movement`の語 | 必須。今の描画に届くのは`place`。`line_up`・`scatter`・`tile`は付録Aの範囲 |
+| `movement` | `movement`の語 | 必須。`place`は一つ置く。`scatter`は`count`の数を散らす（§3.10）。`line_up`・`tile`はこのガイドでは確かめていない |
 | `place` | `place`の語 | `position_x`と`position_y`の組とどちらか一方。`center`・`top`・`bottom`・`left_edge`・`right_edge`・`top_edge`・`bottom_edge`・`corner`。物の語の中身では箱の領域 |
 | `position_x`, `position_y` | `exact_decimal` | 二つ組で書く。情景では画面、物の語の中身では箱に対する割合 |
 | `radius`, `diameter`, `length`, `side`, `width`, `height`, `chord`, `sagitta` | `exact_decimal` | 寸法。`width`と`height`、`chord`と`sagitta`は組で書く。線は`length`、弧は`chord`と`sagitta`、点は`radius`か`diameter` |
@@ -196,7 +196,7 @@
 | `proportion_width_extent`, `proportion_arc_form` | `ratio`の語 | 全幅・半幅、半円・上弦・下弦・三日月 |
 | `shape_form` | `shape_form`の`regular` | 正形 |
 | `sides` | 整数5〜8 | 多角形の辺の数 |
-| `count`, `layout_direction` | 整数、`angle`の語 | 付録Aの範囲。個数は`repeat`で書く |
+| `count`, `layout_direction` | 整数（個数の引数も可）、`angle`の語 | `count`は`scatter`の印の数（§3.10）。一つずつ形を変える個数は`repeat`で書く。`layout_direction`はこのガイドでは確かめていない |
 
 値の分類が欄と合わないと受け付けられない（例: `color`の欄に`touch`の語）。
 書かない欄は、通常のDDLと同じ既定になる。
@@ -233,9 +233,49 @@ productのcheckoutの最上位で走らせる。出力の行頭が`category`、�
 
 | 分類 | 語 |
 |---|---|
-| `thinness` | `fine`, `extra_fine` |
+| `thinness` | `extra_fine`, `fine`, `thick`, `extra_thick`（歳時記 v3。書かなければその画材の普通の太さ） |
 | `relative_scale` | `very_small`, `small`, `slightly_small`, `normal`, `slightly_large`, `large`, `very_large` |
 | `shape_form` | `regular` |
+
+### 3.9 座標と形の図
+
+**図1　弧の基準点。** 弧の`position_x`・`position_y`は弦の中点です。弦は水平に置かれ、弧は上（yの小さい方）へ`sagitta`だけふくらみます。
+`chord`は弦の長さで、半円は`sagitta`が`chord`のちょうど半分です。
+
+<img src="docs/assets/plugin/arc.svg" width="440" alt="水平な弦の中点が position_x・position_y で、弧はそこから sagitta だけ上へふくらむ。弦の長さが chord">
+
+**図2　傾けた弧の作り方。** 任意の二点を結ぶ弧は`transform`で作ります。
+
+1. 画面（物では箱）の中心に、平らな弧として置く。外接矩形の中心Cが画面の中心(0.5, 0.5)になるよう、`position_y`は0.5に矢高の半分を足す。
+2. `scale_x`・`scale_y`・`rotate_degrees`は、まとまりの外接矩形の中心Cのまわりにかかる。
+3. `translate_x`・`translate_y`は、そのあとに全体を動かす（§3.5の単位）。
+
+平らに置いた時点でも画面に収まっている必要があります（§3.10）。長い弧は縮めて置き、`scale_x`・`scale_y`で戻します。
+計算の手本は作例のスクリプトの`Box.arc`（[docs/plugins/scripts/helpers.py](docs/plugins/scripts/helpers.py)）です。
+
+<img src="docs/assets/plugin/tilted-arc.svg" width="660" alt="1 画面の中心に平らな弧を置く。2 外接矩形の中心Cのまわりで縮尺と回転をかける。3 そのあと全体を動かす">
+
+**図3　物の箱の中。** 物の語の中身は見えない箱の中に描きます。位置と`translate_x`・`translate_y`は箱の幅と高さに対する割合、寸法は箱の短い辺に対する割合です（§3.5）。
+
+<img src="docs/assets/plugin/object-box.svg" width="520" alt="画面の中に置かれた箱を拡大すると、左上が(0, 0)、右下が(1, 1)。位置と移動は箱の幅と高さに、寸法は短い辺に対する割合">
+
+### 3.10 作るときの決まり
+
+検査は形と定義の正しさを見ますが、見た目は見ません。次の決まりは、作例（[docs/plugins](docs/plugins/README.ja.md)）を作りながら共有 core で確かめたものです（2026-11-01）。
+
+- **描いて確かめる。** 見た目は描かないと分かりません。`inku-cli plugin preview FILE`は、パッケージ・定義・書き出しファイルを導入せずに、各語の例文を構図の種を変えて描き、SVG と並べて見る`index.html`を書きます（[CLI リファレンス](manual/ja/cli-reference.md)）。Web では、定義を書き出しファイル（`inku.ddl-export.v2`。`plugins`に`{definition, note}`を並べる）に入れ、「指示書を新規作成」の「読み込む」で一つの作品として描けます。管理者は「プラグインを追加」の検査画面でも例文の絵を見られます（「キャンセル」で追加せずに終われます）。
+- **画面に収める。** `transform`の前に画面（物では箱）から出る図形は、その図形だけが`geometry_extent_out_of_bounds`で外れます。いちばん外の`transform`の後に一つでも画面から出る図形があると、そのまとまり全体が描かれません（`numeric_transform_group_position_conflict`）。どの候補を選んでも収まる大きさにします。
+- **丸めに気をつける。** 寸法は`exact_decimal`の値そのままで、半円の矢高が丸めで弦の半分を超えると描けません（`geometry_dimension_mismatch`）。弦は千分の二の倍数にするなど、割り切れる値にします。
+- **条件では分けない。** 回数0の`repeat`（literal の0）は定義全体が受け付けられません。輪や線ごとの違いは`cycle`の表で書きます。
+- **`cycle`の番号は整数。** `vary`の`range`が選ぶ値は小数なので、`cycle`の`index`には使えません。整数の`choices`を`vary`で選び、その値で表を引きます（§3.6の注意も見てください）。
+- **算術の代わりに表。** 定義には算術が無いので、位置・角度・寸法は外で計算して`cycle`の表に書き出します。作例は Python のスクリプトで作っています（[docs/plugins/scripts](docs/plugins/scripts/README.ja.md)）。
+- **散らす。** `movement`を`scatter`にし、`count`（整数か、個数の引数）を添えると、一つの指示で多くの印を散らします。`place`で領域を、`length`・`radius`・`angle`で一つの印の形を決め、`transform`で全体を傾けられます。散らし方は作品の種で決まります。
+- **太さ。** 太さは`thinness`（§3.8の表）で書きます。画材を`cycle`の表で選ぶ場合、太さも別の`cycle`の表で書きます。
+- **揺らぎの見え方の目安。** 形と大きさで変わりますが、`broadly`は大きく、`narrowly`はわずかに揺れます。`loosely`はゆるやかな大きいうねり、`tightly`は細かい縮れ、速さを書かなければその間です。`undulating`は規則的な波、`swaying`は不規則な揺れです。`ink_spread`の`bleeding`は線の周りに柔らかい暈しを足します。
+- **置き場の語。** `place`の語は§3.8の一覧にあるもので、「右下」のような語はありません。
+- **物の箱。** 縦長などの正方形でない箱（`aspect`が`1:2`など）の中で`transform`をかけた図形は、診断なしに描かれませんでした。傾けた弧を使う物は`1:1`の箱にし、形を箱の中ほどに収めます。物の普通の大きさは小さめに描かれるので、例文では「大きな」なども試します。
+- **物の例文には置く動きを。** 物の語は四角と同じく置くので、名だけの`｛石｝。`は何も描きません（`missing_place_action`）。物の例文は`中心に大きな｛石｝を置く。`のように書きます。
+- **物と図形の数。** 物の中身も作品の図形の指示（§8の64）に数えられます。物を含む作品が64を超えると、物が消えるか作品ができないことがありました。数の多い物は、例文の数を抑えます。
 
 ## 4. DDL での呼び方
 

@@ -88,7 +88,8 @@ Compare the exported PNGs under the same viewing conditions. Check the descripti
 
 * **`plugin list`** — Returns loaded and rejected v2 packages with reasons.
 * **`plugin validate <FILE>`** — Sends a local v2 JSON or zip to the management API for all three checks.
-* `plugin validate` requires an administrator session; `plugin list` requires only a signed-in session. Keep test artifacts untracked.
+* **`plugin preview <FILE>`** — Draws a v2 package, definition or DDL export without installing it, writing SVGs and `index.html` to `--out-dir` (`plugin-preview` by default). `--ddl`, `--before`, `--lang`, `--seed` (repeatable; 1 2 3 4 by default), `--png`, `--strict`. Exit 1 when a drawing cannot be made.
+* `plugin validate` requires an administrator session; `plugin list` and `plugin preview` require only a signed-in session. Keep test artifacts untracked.
 
 ### 0.6 `reference`
 

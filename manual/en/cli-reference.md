@@ -247,9 +247,28 @@ somebody else's.
 |---|---|
 | `plugin list` | Report loaded and rejected v2 packages, namespaces, versions, and rejection reasons as JSON |
 | `plugin validate FILE` | Send a local v2 JSON or zip to the administration API for all three checks |
+| `plugin preview FILE` | Draw a local plugin file without installing it, writing SVGs and an `index.html` to view them side by side (below) |
 | `reference [--md \| --json] [-o FILE]` | A machine-generated dump of the implementation vocabulary and constant tables. Markdown by default |
 
-`plugin validate` requires an administrator session; `plugin list` and `reference` run under any signed-in session.
+`plugin validate` requires an administrator session; `plugin list`, `plugin preview` and `reference` run under any signed-in session.
+
+`plugin preview` is a test drawing for authors to see how their words look ([PLUGIN §3.10](../../PLUGIN.md)). FILE may be a v2 package (`package.json` or a zip), a single v2 definition, or a v2 DDL export; its definitions are passed to that drawing only, as loading an export file does, and drawn through `/api/compose`. Nothing is installed on the Server.
+
+| Flag | Contents |
+|---|---|
+| `--ddl TEXT` / `--ddl-file FILE` | DDL to draw. Without it each word's example (in `--lang`) is drawn; a word without one draws `{primary name}.`, an object `Place {primary name}.`; an export file draws its own DDL |
+| `--before TEXT` | DDL put before each drawing's DDL, such as a ground (`Washi.`) |
+| `--lang {ja,en}` | Language of the examples and notes; `ja` by default |
+| `--seed SEED` | Composition seed; repeat for more. 1 2 3 4 by default |
+| `--out-dir DIR` | Where the SVGs and `index.html` go; `plugin-preview` by default |
+| `--png` | Also write PNGs; needs the shared core wheel |
+| `--canvas-aspect ID` / `--color-catalog ID` | Canvas aspect and color catalog |
+| `--strict` | Exit 1 when any drawing reports diagnostics |
+
+Each drawing prints one line: the word, seed, outcome (`ok`, `diagnostics`, `failed`), the number of figure instructions (and those inside objects), and the diagnostic reasons. The exit code is 1 when any drawing could not be made.
+
+    uv run inku-cli plugin preview docs/plugins/akikusa-nihonga.zip --lang en --before Washi.
+    uv run inku-cli plugin preview my-word.json --ddl 'Place a large {stone} at the right edge.' --seed 1 --seed 2 --png
 
 ## Colophon
 

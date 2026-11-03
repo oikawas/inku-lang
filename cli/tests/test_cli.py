@@ -1737,6 +1737,104 @@ def test_plugin_validate_sends_package_body(monkeypatch, tmp_path, capsys):
     assert json.loads(capsys.readouterr().out) == {"valid": True}
 
 
+def _preview_word(word_id, ja, en, kind="scene", **fields):
+    definition = {"schema": "inku.macro-definition.v2", "namespace": "Test", "id": word_id,
+                  "names": {"ja": [ja], "en": [en]}, "kind": kind, "version": "1.0.0",
+                  "parameters": {}, "components": {}, "body": []}
+    if kind == "object":
+        definition["aspect"] = "1:1"
+    return {"definition": definition, **fields}
+
+
+def _preview_client(monkeypatch, responses=None):
+    """Record /api/compose bodies; answer each with an SVG, or with the given result or error."""
+    sent = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            assert (method, path) == ("POST", "/api/compose")
+            sent.append(data)
+            answer = (responses or {}).get(data["ddl"])
+            if isinstance(answer, Exception):
+                raise answer
+            return answer or {"svg": "<svg/>", "score": {"instructions": [{}], "object_templates": []}}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "load_config", lambda: cli.CliConfig())
+    return sent
+
+
+def test_plugin_preview_draws_each_example_with_each_seed(monkeypatch, tmp_path, capsys):
+    package = {"schema": "inku.plugin-package.v2", "namespace": "Test", "name": "p", "version": "1.0.0",
+               "words": [_preview_word("Field", "原", "field", note_ja="原の語", example_ja="3本の｛原｝。"),
+                         _preview_word("Stone", "石", "stone", kind="object", note_en="a stone")]}
+    path = tmp_path / "package.json"
+    path.write_text(json.dumps(package, ensure_ascii=False), encoding="utf-8")
+    sent = _preview_client(monkeypatch)
+    out_dir = tmp_path / "out"
+    args = cli.build_parser().parse_args(
+        ["plugin", "preview", str(path), "--seed", "1", "--seed", "7", "--before", "和紙。", "--out-dir", str(out_dir)])
+    assert cli.command_plugin(args) == 0
+    assert [(body["ddl"], body["composition_seed"]) for body in sent] == [
+        ("和紙。\n3本の｛原｝。", 1), ("和紙。\n3本の｛原｝。", 7),
+        # Without an example an object is placed: its bare name would draw nothing.
+        ("和紙。\n｛石｝を置く。", 1), ("和紙。\n｛石｝を置く。", 7),
+    ]
+    assert sent[0]["imported_plugins"] == [
+        {"definition": package["words"][0]["definition"], "note": "原の語"},
+        {"definition": package["words"][1]["definition"], "note": "a stone"},
+    ]
+    assert sorted(p.name for p in out_dir.iterdir()) == [
+        "01-Field-s1.svg", "01-Field-s7.svg", "02-Stone-s1.svg", "02-Stone-s7.svg", "index.html"]
+    assert "3本の｛原｝" in (out_dir / "index.html").read_text(encoding="utf-8")
+    assert "4 drawings, 0 failed" in capsys.readouterr().out
+
+
+def test_plugin_preview_reads_zips_definitions_and_exports(monkeypatch, tmp_path):
+    import zipfile
+
+    word = _preview_word("Field", "原", "field", example_en="2 {field}.")
+    archive = tmp_path / "p.zip"
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr("package.json", json.dumps({"schema": "inku.plugin-package.v2", "words": [word]}))
+    definition = tmp_path / "definition.json"
+    definition.write_text(json.dumps(word["definition"]), encoding="utf-8")
+    export = tmp_path / "work.ddl.json"
+    export.write_text(json.dumps({"schema": "inku.ddl-export.v2", "language": "ja", "ddl": "｛原｝。",
+                                  "plugins": [{"definition": word["definition"], "note": "n"}]}), encoding="utf-8")
+    sent = _preview_client(monkeypatch)
+    for path, extra in ((archive, ["--lang", "en"]), (definition, []), (export, [])):
+        args = cli.build_parser().parse_args(["plugin", "preview", str(path), "--seed", "1", "--out-dir", str(tmp_path / "o"), *extra])
+        assert cli.command_plugin(args) == 0
+    assert [body["ddl"] for body in sent] == ["2 {field}.", "｛原｝。", "｛原｝。"]
+    assert sent[2]["imported_plugins"] == [{"definition": word["definition"], "note": "n"}]
+
+
+def test_plugin_preview_reports_failures_and_diagnostics(monkeypatch, tmp_path, capsys):
+    path = tmp_path / "definition.json"
+    path.write_text(json.dumps(_preview_word("Field", "原", "field")["definition"]), encoding="utf-8")
+    noted = {"svg": "<svg/>", "score": {"instructions": []},
+             "pipeline_diagnostics": {"upstream_diagnostics": [{"reason": "macro_binding_count_out_of_range"}],
+                                      "render_diagnostics": {"diagnostics": [{"reason": {"type": "geometry_extent_out_of_bounds"}}]}}}
+    _preview_client(monkeypatch, {"｛原｝。": noted, "9本の｛原｝。": cli.CliError("HTTP 422: score not ready")})
+    base = ["plugin", "preview", str(path), "--seed", "1", "--out-dir", str(tmp_path / "o")]
+    assert cli.command_plugin(cli.build_parser().parse_args(base)) == 0
+    assert "macro_binding_count_out_of_range, geometry_extent_out_of_bounds" in capsys.readouterr().out
+    assert cli.command_plugin(cli.build_parser().parse_args([*base, "--strict"])) == 1
+    assert cli.command_plugin(cli.build_parser().parse_args([*base, "--ddl", "9本の｛原｝。"])) == 1
+    assert "1 drawings, 1 failed" in capsys.readouterr().out
+
+
+def test_plugin_preview_refuses_v1_files(tmp_path):
+    path = tmp_path / "package.json"
+    path.write_text('{"schema": "inku.plugin-package.v1"}', encoding="utf-8")
+    with pytest.raises(cli.CliError, match="rewrite the file as v2"):
+        cli.command_plugin(cli.build_parser().parse_args(["plugin", "preview", str(path), "--out-dir", str(tmp_path / "o")]))
+
+
 def test_png_output_records_the_rasterizer_that_produced_it(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
 

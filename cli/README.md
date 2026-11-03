@@ -1317,12 +1317,14 @@ options:
 ```
 usage: inku-cli plugin [-h] [--base-url BASE_URL]
                        [--timeout-seconds TIMEOUT_SECONDS]
-                       {list,validate} ...
+                       {list,validate,preview} ...
 
 positional arguments:
-  {list,validate}
+  {list,validate,preview}
     list                list loaded and rejected plugin packages
     validate            validate a local v2 plugin package on the server
+    preview             draw a local plugin file's words without installing
+                        them
 
 options:
   -h, --help            show this help message and exit
@@ -1352,6 +1354,45 @@ positional arguments:
 
 options:
   -h, --help  show this help message and exit
+
+```
+
+### `inku-cli plugin preview`
+
+```
+usage: inku-cli plugin preview [-h] [--ddl DDL] [--ddl-file DDL_FILE]
+                               [--before BEFORE] [--lang {ja,en}]
+                               [--seed SEED] [--out-dir OUT_DIR] [--png]
+                               [--canvas-aspect CANVAS_ASPECT]
+                               [--color-catalog COLOR_CATALOG] [--strict]
+                               file
+
+Draw a v2 plugin package (JSON or zip), a single v2 definition or a v2 DDL
+export through /api/compose with its definitions imported for the drawing
+only, as loading an export file does. Without --ddl each word's example in
+--lang is drawn (an export file's own DDL for an export). Each drawing is
+written as SVG, with index.html beside them.
+
+positional arguments:
+  file                  package.json, package zip, a definition JSON or a DDL
+                        export JSON
+
+options:
+  -h, --help            show this help message and exit
+  --ddl DDL             DDL to draw instead of the examples
+  --ddl-file DDL_FILE   read the DDL to draw from a UTF-8 file, or '-'
+  --before BEFORE       DDL put before each drawing's DDL, such as a ground
+                        (和紙。)
+  --lang {ja,en}        language of the examples and notes (default: ja)
+  --seed SEED           composition seed; repeat for more (default: 1 2 3 4)
+  --out-dir OUT_DIR     directory for the SVGs and index.html (default:
+                        plugin-preview)
+  --png                 also write each drawing as PNG
+  --canvas-aspect CANVAS_ASPECT
+                        canvas aspect id for the drawings
+  --color-catalog COLOR_CATALOG
+                        color catalog id for the drawings
+  --strict              exit 1 when any drawing reports diagnostics
 
 ```
 

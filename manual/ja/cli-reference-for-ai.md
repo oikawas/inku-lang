@@ -88,7 +88,8 @@ uv run inku-cli lineage show PARENT_ID
 
 * **`plugin list`** — ロード済み／拒否された v2 パッケージと理由を JSON で取得します。
 * **`plugin validate <FILE>`** — ローカルの v2 JSON または zip を管理 API の三段階の検査へ送ります。
-* `plugin validate` は管理者セッション、`plugin list` はログイン済みセッションで実行できます。試験で生成するファイルは Git 追跡しません。
+* **`plugin preview <FILE>`** — v2 のパッケージ・定義・書き出しファイルを導入せずに描き、`--out-dir`（既定 `plugin-preview`）に SVG と `index.html` を書きます。`--ddl`・`--before`・`--lang`・`--seed`（繰り返し、既定 1 2 3 4）・`--png`・`--strict`。描けない描画があると終了コード 1。
+* `plugin validate` は管理者セッション、`plugin list` と `plugin preview` はログイン済みセッションで実行できます。試験で生成するファイルは Git 追跡しません。
 
 ### 0.6 `reference`
 

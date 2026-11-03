@@ -7,6 +7,7 @@ import base64
 import io
 import getpass
 import hashlib
+import html
 import json
 import math
 import os
@@ -18,6 +19,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import zipfile
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -4504,7 +4506,193 @@ def command_api(args: argparse.Namespace) -> int:
     return 0
 
 
+PLUGIN_PACKAGE_SCHEMA = "inku.plugin-package.v2"
+MACRO_DEFINITION_SCHEMA = "inku.macro-definition.v2"
+PLUGIN_PREVIEW_SEEDS = (1, 2, 3, 4)
+
+
+@dataclass
+class _PreviewSource:
+    """What `plugin preview` draws: the definitions to import and the DDL to draw them with."""
+
+    plugins: list[dict[str, Any]]
+    examples: list[tuple[str, str]]  # (label, DDL), one per word in the chosen language
+    ddl: str | None = None  # the DDL an export file carries
+
+
+def _read_plugin_json(path: Path) -> Any:
+    """A plugin file's JSON: a package.json, a definition or an export file, or package.json in a zip."""
+    try:
+        if path.suffix.lower() == ".zip":
+            with zipfile.ZipFile(path) as archive:
+                text = archive.read("package.json").decode("utf-8")
+        else:
+            text = path.read_text(encoding="utf-8")
+        return json.loads(text)
+    except KeyError as exc:
+        raise CliError("the zip has no package.json at its top") from exc
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise CliError(f"cannot read plugin file: {exc}") from exc
+
+
+def _primary_name_call(definition: dict[str, Any], lang: str) -> str:
+    """The call a word without an example is drawn with: its primary name in braces.
+
+    An object is placed like a square, so its bare name draws nothing
+    (missing_place_action); it is placed instead.
+    """
+    names = (definition.get("names") or {}).get(lang) or []
+    if not names:
+        raise CliError(f"{definition.get('id', 'a definition')} has no {lang} name")
+    if definition.get("kind") == "object":
+        return f"｛{names[0]}｝を置く。" if lang == "ja" else f"Place {{{names[0]}}}."
+    return f"｛{names[0]}｝。" if lang == "ja" else f"{{{names[0]}}}."
+
+
+def _plugin_preview_source(path: Path, lang: str) -> _PreviewSource:
+    data = _read_plugin_json(path)
+    schema = data.get("schema") if isinstance(data, dict) else None
+    if schema in ("inku.plugin-package.v1", "inku.macro-definition.v1", "inku.ddl-export.v1"):
+        raise CliError("v1 plugin files are not read; rewrite the file as v2 (PLUGIN §5)")
+    other = "en" if lang == "ja" else "ja"
+    if schema == PLUGIN_PACKAGE_SCHEMA:
+        words = data.get("words")
+        if not isinstance(words, list) or not all(isinstance(w, dict) and isinstance(w.get("definition"), dict) for w in words):
+            raise CliError("the plugin package has no readable words")
+        plugins, examples = [], []
+        for word in words:
+            definition = word["definition"]
+            note = word.get(f"note_{lang}") or word.get(f"note_{other}") or ""
+            plugins.append({"definition": definition, "note": str(note)})
+            example = word.get(f"example_{lang}") or _primary_name_call(definition, lang)
+            examples.append((str(definition.get("id") or "word"), str(example)))
+        return _PreviewSource(plugins, examples)
+    if schema == MACRO_DEFINITION_SCHEMA:
+        return _PreviewSource([{"definition": data, "note": ""}],
+                              [(str(data.get("id") or "word"), _primary_name_call(data, lang))])
+    if schema == DDL_EXPORT_SCHEMA:
+        ddl, plugins = _read_ddl_export(json.dumps(data))
+        return _PreviewSource(plugins, [], ddl=ddl)
+    raise CliError(f"not a v2 plugin package, definition or DDL export: {schema!r}")
+
+
+def _preview_diagnostics(result: dict[str, Any]) -> list[str]:
+    """The reasons a drawing reports, from the shared pipeline and the renderer."""
+    found = result.get("pipeline_diagnostics") or {}
+    entries = []
+    for key in ("upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions"):
+        entries += found.get(key) or []
+    entries += (found.get("render_diagnostics") or {}).get("diagnostics") or []
+    reasons = []
+    for entry in entries:
+        reason = entry.get("reason") if isinstance(entry, dict) else entry
+        if isinstance(reason, dict):
+            reason = reason.get("type") or reason.get("kind") or json.dumps(reason, ensure_ascii=False)
+        reasons.append(str(reason or entry))
+    return reasons
+
+
+def _preview_figures(row: dict[str, Any]) -> str:
+    inner = row.get("object_figures") or 0
+    return f"{row['figures']} figures" + (f", {inner} in objects" if inner else "")
+
+
+def _preview_slug(label: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-") or "ddl"
+
+
+def _write_preview_index(out_dir: Path, rows: list[dict[str, Any]]) -> Path:
+    """One HTML page that shows every drawing beside its DDL, seed, figure count and diagnostics."""
+    cells = []
+    for row in rows:
+        picture = (f'<img src="{html.escape(row["svg"])}" alt="">' if row.get("svg")
+                   else '<div class="failed">not drawn</div>')
+        notes = "".join(f"<li>{html.escape(reason)}</li>" for reason in row["diagnostics"])
+        cells.append(
+            f'<figure>{picture}<figcaption><pre>{html.escape(row["ddl"])}</pre>'
+            f'seed {row["seed"]} · {html.escape(_preview_figures(row))}'
+            f'{"<ul>" + notes + "</ul>" if notes else ""}'
+            f'{"<p class=failed>" + html.escape(row["error"]) + "</p>" if row.get("error") else ""}'
+            "</figcaption></figure>"
+        )
+    page = (
+        "<!doctype html><meta charset=utf-8><title>plugin preview</title>"
+        "<style>body{font:13px sans-serif;margin:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}"
+        "figure{margin:0}img{width:100%;border:1px solid #ccc;background:#fff}pre{white-space:pre-wrap;margin:4px 0}"
+        "ul{color:#b03030;margin:4px 0;padding-left:18px}.failed{color:#b03030}"
+        "div.failed{aspect-ratio:1;border:1px solid #ccc;display:grid;place-items:center}</style>"
+        + "".join(cells)
+    )
+    path = out_dir / "index.html"
+    path.write_text(page, encoding="utf-8")
+    return path
+
+
+def command_plugin_preview(args: argparse.Namespace) -> int:
+    """Draw a plugin file's words without installing them, as a work drawn from an imported export would."""
+    source = _plugin_preview_source(Path(args.file), args.lang)
+    if args.ddl or args.ddl_file:
+        cases = [("ddl", _read_text_argument(args.ddl, args.ddl_file))]
+    elif source.ddl is not None:
+        cases = [("ddl", source.ddl)]
+    else:
+        cases = source.examples
+    if args.before:
+        cases = [(label, f"{args.before.rstrip()}\n{ddl}") for label, ddl in cases]
+    seeds = args.seed or list(PLUGIN_PREVIEW_SEEDS)
+    if args.png and rasterizer_backend() is None:
+        raise CliError("PNG output requires the inku_render core wheel")
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    config = load_config()
+    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=_resolved_timeout_seconds(args, config))
+    rows, failed = [], 0
+    for number, (label, ddl) in enumerate(cases, start=1):
+        for seed in seeds:
+            payload = {"ddl": ddl, "imported_plugins": source.plugins, "composition_seed": seed}
+            if args.canvas_aspect:
+                payload["canvas_aspect"] = args.canvas_aspect
+            if args.color_catalog:
+                payload["catalog_id"] = args.color_catalog
+            row: dict[str, Any] = {"label": label, "ddl": ddl, "seed": seed, "figures": 0, "object_figures": 0,
+                                   "diagnostics": []}
+            try:
+                result, _ = client.request("POST", "/api/compose", data=payload)
+            except CliError as exc:
+                if "not logged in" in str(exc):
+                    raise
+                row["error"] = str(exc)
+                failed += 1
+            else:
+                score = result.get("score") or {}
+                row["figures"] = len(score.get("instructions") or [])
+                # An object's content counts toward the work's figure limit too (PLUGIN §8).
+                row["object_figures"] = sum(len((template.get("body") or {}).get("instructions") or [])
+                                            for template in score.get("object_templates") or [])
+                row["diagnostics"] = _preview_diagnostics(result)
+                stem = f"{number:02d}-{_preview_slug(label)}-s{seed}"
+                svg = result.get("svg") or ""
+                if svg:
+                    (out_dir / f"{stem}.svg").write_text(svg, encoding="utf-8")
+                    row["svg"] = f"{stem}.svg"
+                    if args.png:
+                        (out_dir / f"{stem}.png").write_bytes(_rasterize_png(svg))
+                else:
+                    row["error"] = "the response had no SVG"
+                    failed += 1
+            rows.append(row)
+            state = "failed" if row.get("error") else ("diagnostics" if row["diagnostics"] else "ok")
+            detail = row.get("error") or ", ".join(row["diagnostics"])
+            print(f"{label}\tseed {seed}\t{state}\t{_preview_figures(row)}" + (f"\t{detail}" if detail else ""))
+    index = _write_preview_index(out_dir, rows)
+    print(f"{len(rows)} drawings, {failed} failed: {index}")
+    noted = any(row["diagnostics"] for row in rows)
+    return 1 if failed or (args.strict and noted) else 0
+
+
 def command_plugin(args: argparse.Namespace) -> int:
+    if args.plugin_action == "preview":
+        return command_plugin_preview(args)
     config = load_config()
     client = ApiClient(
         args.base_url or config.base_url,
@@ -5123,6 +5311,30 @@ def build_parser() -> argparse.ArgumentParser:
     plugin_sub.add_parser("list", help="list loaded and rejected plugin packages")
     plugin_validate = plugin_sub.add_parser("validate", help="validate a local v2 plugin package on the server")
     plugin_validate.add_argument("file", help="UTF-8 package.json or package zip")
+    plugin_preview = plugin_sub.add_parser(
+        "preview",
+        help="draw a local plugin file's words without installing them",
+        description=(
+            "Draw a v2 plugin package (JSON or zip), a single v2 definition or a v2 DDL export "
+            "through /api/compose with its definitions imported for the drawing only, as loading an "
+            "export file does. Without --ddl each word's example in --lang is drawn (an export file's "
+            "own DDL for an export). Each drawing is written as SVG, with index.html beside them."
+        ),
+    )
+    plugin_preview.add_argument("file", help="package.json, package zip, a definition JSON or a DDL export JSON")
+    plugin_preview.add_argument("--ddl", help="DDL to draw instead of the examples")
+    plugin_preview.add_argument("--ddl-file", help="read the DDL to draw from a UTF-8 file, or '-'")
+    plugin_preview.add_argument("--before", help="DDL put before each drawing's DDL, such as a ground (和紙。)")
+    plugin_preview.add_argument("--lang", choices=["ja", "en"], default="ja", help="language of the examples and notes (default: ja)")
+    plugin_preview.add_argument(
+        "--seed", type=int, action="append", metavar="SEED",
+        help="composition seed; repeat for more (default: 1 2 3 4)",
+    )
+    plugin_preview.add_argument("--out-dir", default="plugin-preview", help="directory for the SVGs and index.html (default: plugin-preview)")
+    plugin_preview.add_argument("--png", action="store_true", help="also write each drawing as PNG")
+    plugin_preview.add_argument("--canvas-aspect", help="canvas aspect id for the drawings")
+    plugin_preview.add_argument("--color-catalog", help="color catalog id for the drawings")
+    plugin_preview.add_argument("--strict", action="store_true", help="exit 1 when any drawing reports diagnostics")
     plugin_cmd.set_defaults(func=command_plugin)
 
     reference_cmd = subparsers.add_parser(

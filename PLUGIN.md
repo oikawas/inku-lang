@@ -187,7 +187,7 @@ An `emit` may have these fields and no others.
 | Field | Value | Notes |
 |---|---|---|
 | `shape` | a `shape` word | required; one of the nine shapes in §3.5 |
-| `movement` | a `movement` word | required. `place` reaches the drawing today; `line_up`, `scatter`, and `tile` are covered in Appendix A |
+| `movement` | a `movement` word | required. `place` places one; `scatter` scatters `count` of them (§3.10). `line_up` and `tile` are not checked in this guide |
 | `place` | a `place` word | either this or the `position_x` / `position_y` pair: `center`, `top`, `bottom`, `left_edge`, `right_edge`, `top_edge`, `bottom_edge`, `corner`; inside an object it names a box region |
 | `position_x`, `position_y` | `exact_decimal` | written as a pair; fractions of the canvas for a scene or the box inside an object |
 | `radius`, `diameter`, `length`, `side`, `width`, `height`, `chord`, `sagitta` | `exact_decimal` | dimensions. `width` with `height` and `chord` with `sagitta` are pairs. A line takes `length`, an arc `chord` and `sagitta`, a point `radius` or `diameter` |
@@ -204,7 +204,7 @@ An `emit` may have these fields and no others.
 | `proportion_width_extent`, `proportion_arc_form` | a `ratio` word | full or half width; semicircle, waxing, waning, crescent |
 | `shape_form` | `shape_form` `regular` | regular form |
 | `sides` | an integer from 5 to 8 | polygon sides |
-| `count`, `layout_direction` | integer, an `angle` word | covered in Appendix A; write counts with `repeat` |
+| `count`, `layout_direction` | integer (or the count parameter), an `angle` word | `count` is the number of marks of a `scatter` (§3.10); write counts whose members differ in shape with `repeat`. `layout_direction` is not checked in this guide |
 
 A value whose category does not match the field is rejected (for example a `touch` word in `color`). A field
 left out takes the same default as ordinary DDL.
@@ -242,9 +242,49 @@ Three categories outside the Saijiki are closed words defined by the core:
 
 | Category | Words |
 |---|---|
-| `thinness` | `fine`, `extra_fine` |
+| `thinness` | `extra_fine`, `fine`, `thick`, `extra_thick` (Saijiki v3; without one, the tool's normal thickness) |
 | `relative_scale` | `very_small`, `small`, `slightly_small`, `normal`, `slightly_large`, `large`, `very_large` |
 | `shape_form` | `regular` |
+
+### 3.9 Coordinates and shapes, in figures
+
+**Figure 1: an arc's reference point.** An arc's `position_x` and `position_y` are the midpoint of its chord. The chord lies level and the arc bulges up (toward smaller y) by `sagitta`.
+`chord` is the chord's length; a semicircle has `sagitta` exactly half of `chord`.
+
+<img src="docs/assets/plugin/arc.svg" width="440" alt="The midpoint of a level chord is position_x, position_y, and the arc bulges up from it by sagitta. The chord's length is chord">
+
+**Figure 2: making a tilted arc.** An arc between any two points is made with a `transform`.
+
+1. Place it as a flat arc at the center of the canvas (of the box, in an object). For its bounding box's center C to be the canvas center (0.5, 0.5), `position_y` is 0.5 plus half the sagitta.
+2. `scale_x`, `scale_y` and `rotate_degrees` act about C, the center of the group's bounding box.
+3. `translate_x` and `translate_y` then move the whole (in the units of §3.5).
+
+The flat arc must already fit the canvas (§3.10). Place a long arc shrunk and restore it with `scale_x` and `scale_y`.
+For the calculation, see `Box.arc` in the examples' scripts ([docs/plugins/scripts/helpers.py](docs/plugins/scripts/helpers.py)).
+
+<img src="docs/assets/plugin/tilted-arc.svg" width="660" alt="1 a flat arc placed at the canvas center. 2 scaled and turned about C, the center of its bounding box. 3 then the whole is moved">
+
+**Figure 3: inside an object's box.** An object word draws inside an invisible box. Positions and `translate_x`, `translate_y` are fractions of the box's width and height; sizes are fractions of its short side (§3.5).
+
+<img src="docs/assets/plugin/object-box.svg" width="520" alt="Enlarging a box placed on the canvas: top left is (0, 0) and bottom right (1, 1). Positions and moves are fractions of the box's width and height, sizes of its short side">
+
+### 3.10 Rules for making a plugin
+
+The checks look at shape and correctness, not at how a word looks. These rules were confirmed with the shared core while making the examples ([docs/plugins](docs/plugins/README.md)) (2026-11-01).
+
+- **Draw to check.** How a word looks shows only when it is drawn. `inku-cli plugin preview FILE` draws a package, definition or export file without installing it, each word's example across several composition seeds, and writes SVGs with an `index.html` to view them side by side ([CLI reference](manual/en/cli-reference.md)). In the Web, put the definition in an export file (`inku.ddl-export.v2`, with `{definition, note}` entries in `plugins`) and draw it as one work through "Load" in the new instructions. An administrator can also see the example drawings on the "Add a plugin" check screen ("Cancel" ends without adding).
+- **Stay inside the canvas.** A figure outside the canvas (the box, in an object) before a `transform` is dropped alone with `geometry_extent_out_of_bounds`. If any figure is outside the canvas after the outermost `transform`, nothing in that group is drawn (`numeric_transform_group_position_conflict`). Choose sizes that fit for every candidate.
+- **Mind the rounding.** Dimensions are the `exact_decimal` values as written, and a semicircle whose sagitta rounds past half its chord cannot be drawn (`geometry_dimension_mismatch`). Use values that divide cleanly, such as chords in multiples of 0.002.
+- **No branches.** A `repeat` with a count of 0 (a literal 0) makes the whole definition unacceptable. Write per-ring or per-line differences as `cycle` tables.
+- **`cycle` indices are integers.** The value a `vary` `range` chooses is a decimal and cannot be a `cycle` `index`. Choose integer `choices` with `vary` and look the tables up with that value (see also the note in §3.6).
+- **Tables instead of arithmetic.** A definition has no arithmetic, so positions, angles and sizes are computed outside and written as `cycle` tables. The examples are made with Python scripts ([docs/plugins/scripts](docs/plugins/scripts/README.md)).
+- **Scatter.** With `movement` `scatter` and a `count` (an integer or the count parameter), one instruction scatters many marks. `place` sets the region, `length`, `radius` and `angle` the shape of one mark, and a `transform` can tilt the whole. The scattering follows the work's seed.
+- **Thickness.** Write thickness with `thinness` (the table in §3.8). When a `cycle` table chooses the tool, write the thickness as its own `cycle` table too.
+- **How fluctuation looks, roughly.** It depends on the shape and size, but `broadly` sways widely and `narrowly` slightly; `loosely` makes slow broad undulations and `tightly` fine crinkles, with no frequency word in between; `undulating` is a regular wave and `swaying` an irregular sway. `ink_spread` `bleeding` adds a soft haze around the line.
+- **Place words.** `place` words are those in the list of §3.8; there is no word such as "lower right".
+- **Object boxes.** Inside a box that is not square (an `aspect` such as `1:2`), a figure under a `transform` was not drawn, with no diagnostic. An object that uses tilted arcs takes a `1:1` box and keeps its shape in the middle of it. An object's normal size draws small, so try "large" and the like in its example.
+- **Give an object's example a placing verb.** An object is placed like a square, so its bare name `{stone}.` draws nothing (`missing_place_action`). Write an object's example like `Place a large {stone} at the center.`
+- **Objects and the figure count.** An object's content counts toward a work's figure instructions (64, §8). A work with an object that went over 64 lost the object or was not made. Keep the counts in the examples of large objects down.
 
 ## 4. Calling a plugin from DDL
 

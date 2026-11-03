@@ -283,7 +283,7 @@ The checks look at shape and correctness, not at how a word looks. These rules w
 - **How fluctuation looks, roughly.** It depends on the shape and size, but `broadly` sways widely and `narrowly` slightly; `loosely` makes slow broad undulations and `tightly` fine crinkles, with no frequency word in between; `undulating` is a regular wave and `swaying` an irregular sway. `ink_spread` `bleeding` adds a soft haze around the line.
 - **Place words.** `place` words are those in the list of §3.8; there is no word such as "lower right".
 - **Object boxes.** Inside a box that is not square (an `aspect` such as `1:2`), a figure under a `transform` was not drawn, with no diagnostic. An object that uses tilted arcs takes a `1:1` box and keeps its shape in the middle of it. An object's normal size draws small, so try "large" and the like in its example.
-- **Give an object's example a placing verb.** An object is placed like a square, so its bare name `{stone}.` draws nothing (`missing_place_action`). Write an object's example like `Place a large {stone} at the center.`
+- **Give an object's example a placing verb.** An object is placed like a square, so its bare name `{stone}.` draws nothing (`missing_place_action`). An omitted object example is drawn as `Place {stone}.` Write an explicit example like `Place a large {stone} at the center.`
 - **Objects and the figure count.** An object's content counts toward a work's figure instructions (64, §8). A work with an object that went over 64 lost the object or was not made. Keep the counts in the examples of large objects down.
 
 ## 4. Calling a plugin from DDL
@@ -335,7 +335,7 @@ Save this one-word file as `package.json` and choose it in Web settings. To incl
 }
 ```
 
-Top-level fields are `schema`, `namespace`, `name`, `version`, optional `description_ja/en`, `authors`, `license`, and `words`. A word has only `definition`, `note_ja/en`, `example_ja/en`, and `preview`. At least one note is required; each is at most 100 characters, and a missing language uses the other. A missing example defaults to `｛primary name｝。` or `{primary name}.` An explicit example must call the braced primary name. A preview is a PNG within a zip.
+Top-level fields are `schema`, `namespace`, `name`, `version`, optional `description_ja/en`, `authors`, `license`, and `words`. A word has only `definition`, `note_ja/en`, `example_ja/en`, and `preview`. At least one note is required; each is at most 100 characters, and a missing language uses the other. A missing scene example defaults to `｛primary name｝。` or `{primary name}.`; an object defaults to `｛primary name｝を置く。` or `Place {primary name}.` An explicit example must call the braced primary name. A preview is a PNG within a zip.
 
 The checks run in order: file shape, shared-core definition validation, and drawing the Japanese and English examples. All must pass. Administrators can install, replace, disable, delete, replace preview pictures, and export a zip. Installed words enter the catalog for new works and the Saijiki; notes are also used in the underdrawing offer. The bundled `Nature.leaves` is a v2 file in core: it can be disabled but neither deleted nor given custom pictures. APIs include `POST /api/plugins/packages/validate`, `POST /api/plugins/packages`, and `GET /api/plugins/{id}/export`.
 
@@ -371,7 +371,7 @@ Other definition codes: `anchor_requires_one_explicit_position`, `argument_type_
 
 File: `invalid_json`, `package_too_large`, `not_an_object`, `unknown_field`, `wrong_schema`, `rewrite_as_v2`, `definition_requires_v2`, `invalid_identifier`, `invalid_semantic_version`, `not_a_string`, `not_a_list_of_strings`, `text_too_long`, `no_words`, `too_many_words`, `namespace_differs_from_package`, `id_differs_from_directory`, `invalid_package_id`, `bundled_package_id`, `no_note`, `example_without_name`. `rewrite_as_v2` means to rewrite a v1 file as v2 and install it again.
 
-Example: `macro_binding_count_out_of_range`, `macro_resolution_missing_lock`, `compiler_diagnostics`, `example_draws_nothing`, `example_not_drawn`.
+Example: `macro_binding_count_out_of_range`, `macro_resolution_missing_lock`, `compiler_diagnostics`, `example_draws_nothing`, `example_not_drawn`. When a drawing diagnostic is passed as an object, its reason's type name, such as `missing_place_action`, becomes the code; the remaining fields are JSON in the detail.
 
 Picture and zip: `not_a_png`, `image_too_large`, `preview_needs_zip`, `preview_not_found`, `invalid_preview_path`, `invalid_zip`, `not_base64`, `archive_too_large`, `too_many_archive_members`, `archive_without_package_json`, `not_utf8`. `not_base64` comes from the Server's request check.
 

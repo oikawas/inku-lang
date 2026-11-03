@@ -274,7 +274,7 @@ productのcheckoutの最上位で走らせる。出力の行頭が`category`、�
 - **揺らぎの見え方の目安。** 形と大きさで変わりますが、`broadly`は大きく、`narrowly`はわずかに揺れます。`loosely`はゆるやかな大きいうねり、`tightly`は細かい縮れ、速さを書かなければその間です。`undulating`は規則的な波、`swaying`は不規則な揺れです。`ink_spread`の`bleeding`は線の周りに柔らかい暈しを足します。
 - **置き場の語。** `place`の語は§3.8の一覧にあるもので、「右下」のような語はありません。
 - **物の箱。** 縦長などの正方形でない箱（`aspect`が`1:2`など）の中で`transform`をかけた図形は、診断なしに描かれませんでした。傾けた弧を使う物は`1:1`の箱にし、形を箱の中ほどに収めます。物の普通の大きさは小さめに描かれるので、例文では「大きな」なども試します。
-- **物の例文には置く動きを。** 物の語は四角と同じく置くので、名だけの`｛石｝。`は何も描きません（`missing_place_action`）。物の例文は`中心に大きな｛石｝を置く。`のように書きます。
+- **物の例文には置く動きを。** 物の語は四角と同じく置くので、名だけの`｛石｝。`は何も描きません（`missing_place_action`）。例文を省いた物の語は`｛石｝を置く。`で描かれます。明示する例文は`中心に大きな｛石｝を置く。`のように書きます。
 - **物と図形の数。** 物の中身も作品の図形の指示（§8の64）に数えられます。物を含む作品が64を超えると、物が消えるか作品ができないことがありました。数の多い物は、例文の数を抑えます。
 
 ## 4. DDL での呼び方
@@ -326,7 +326,7 @@ Web の歳時記と設定には日英の名・種類・note・例と絵が出る
 }
 ```
 
-ファイルの欄は `schema`、`namespace`、`name`、`version`、任意の `description_ja/en`、`authors`、`license`、`words`。語の欄は `definition`、`note_ja/en`、`example_ja/en`、`preview` だけです。`note` は少なくとも一言語に必要で、100 字まで。無い言語にはもう一方を使います。例文を省くと `｛主の名｝。`／`{primary name}.` を使います。明示した例文には括弧の主の名を入れてください。絵は zip 内の PNG です。
+ファイルの欄は `schema`、`namespace`、`name`、`version`、任意の `description_ja/en`、`authors`、`license`、`words`。語の欄は `definition`、`note_ja/en`、`example_ja/en`、`preview` だけです。`note` は少なくとも一言語に必要で、100 字まで。無い言語にはもう一方を使います。例文を省くと、情景は `｛主の名｝。`／`{primary name}.`、物は `｛主の名｝を置く。`／`Place {primary name}.` を使います。明示した例文には括弧の主の名を入れてください。絵は zip 内の PNG です。
 
 検査はファイルの形、共有 core の定義、日英の例文の描画の三段階です。すべて通るまで導入できません。管理者は追加・置換・無効化・削除・絵の差し替え・zip 書き出しができます。導入した語は新しい作品の目録と歳時記に入り、note が下絵の提示にも使われます。`Nature.leaves` は core 同梱の v2 ファイルで、設定から無効化できますが削除と絵の差し替えはできません。API は `POST /api/plugins/packages/validate`、`POST /api/plugins/packages`、`GET /api/plugins/{id}/export` などです。
 
@@ -362,7 +362,7 @@ Web の歳時記と設定には日英の名・種類・note・例と絵が出る
 
 ファイル: `invalid_json`、`package_too_large`、`not_an_object`、`unknown_field`、`wrong_schema`、`rewrite_as_v2`、`definition_requires_v2`、`invalid_identifier`、`invalid_semantic_version`、`not_a_string`、`not_a_list_of_strings`、`text_too_long`、`no_words`、`too_many_words`、`namespace_differs_from_package`、`id_differs_from_directory`、`invalid_package_id`、`bundled_package_id`、`no_note`、`example_without_name`。`rewrite_as_v2` は v1 ファイルを v2 で書き直して入れ直す意味です。
 
-例文: `macro_binding_count_out_of_range`、`macro_resolution_missing_lock`、`compiler_diagnostics`、`example_draws_nothing`、`example_not_drawn`。
+例文: `macro_binding_count_out_of_range`、`macro_resolution_missing_lock`、`compiler_diagnostics`、`example_draws_nothing`、`example_not_drawn`。描画の診断を物で渡した場合、`missing_place_action` など理由の型名が code となり、残りの欄は detail の JSON に入ります。
 
 絵と zip: `not_a_png`、`image_too_large`、`preview_needs_zip`、`preview_not_found`、`invalid_preview_path`、`invalid_zip`、`not_base64`、`archive_too_large`、`too_many_archive_members`、`archive_without_package_json`、`not_utf8`。`not_base64` は Server の受け取り時に出ます。
 

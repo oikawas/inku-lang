@@ -306,8 +306,14 @@ fn parse(
                     .collect::<String>();
                 let main_ja = names_ja.first().copied().unwrap_or(&id);
                 let main_en = names_en.first().copied().unwrap_or(&id);
-                let default_ja = format!("｛{main_ja}｝。");
-                let default_en = format!("{{{main_en}}}.");
+                let (default_ja, default_en) = if definition["kind"] == "object" {
+                    (
+                        format!("｛{main_ja}｝を置く。"),
+                        format!("Place {{{main_en}}}."),
+                    )
+                } else {
+                    (format!("｛{main_ja}｝。"), format!("{{{main_en}}}."))
+                };
                 if !ex_ja.is_empty()
                     && !names_ja
                         .iter()
@@ -444,6 +450,55 @@ fn start(input: &Value) -> Result<Value, Vec<Value>> {
     )
 }
 
+fn sorted_json(value: &Value) -> String {
+    match value {
+        Value::Object(fields) => {
+            let sorted: BTreeMap<_, _> = fields.iter().collect();
+            let fields: Vec<_> = sorted
+                .into_iter()
+                .map(|(key, value)| format!("{}:{}", json!(key), sorted_json(value)))
+                .collect();
+            format!("{{{}}}", fields.join(","))
+        }
+        Value::Array(items) => format!(
+            "[{}]",
+            items.iter().map(sorted_json).collect::<Vec<_>>().join(",")
+        ),
+        _ => value.to_string(),
+    }
+}
+
+fn reason_parts(reason: &Value) -> Result<(String, String), ()> {
+    match reason {
+        Value::String(code) => Ok((code.clone(), String::new())),
+        Value::Object(fields) => {
+            let discriminator = fields
+                .get("type")
+                .and_then(Value::as_str)
+                .map(|s| ("type", s))
+                .or_else(|| {
+                    fields
+                        .get("kind")
+                        .and_then(Value::as_str)
+                        .map(|s| ("kind", s))
+                });
+            if let Some((key, code)) = discriminator {
+                let mut detail = fields.clone();
+                detail.remove(key);
+                let detail = if detail.is_empty() {
+                    String::new()
+                } else {
+                    sorted_json(&Value::Object(detail))
+                };
+                Ok((code.to_owned(), detail))
+            } else {
+                Ok(("example_not_drawn".to_owned(), sorted_json(reason)))
+            }
+        }
+        _ => Err(()),
+    }
+}
+
 fn finish(input: &Value) -> Result<Value, ()> {
     let state = &input["state"];
     let package = &state["package"];
@@ -470,16 +525,16 @@ fn finish(input: &Value) -> Result<Value, ()> {
                 let drawing = drawings.iter().find(|d| s(&d["id"]) == id).ok_or(())?;
                 let reasons = drawing["reasons"].as_array().ok_or(())?;
                 if !reasons.is_empty() || drawing["marks"].as_u64().unwrap_or(0) == 0 {
-                    let reasons: Vec<&str> = if reasons.is_empty() {
-                        vec!["example_draws_nothing"]
+                    let reasons: Vec<(String, String)> = if reasons.is_empty() {
+                        vec![("example_draws_nothing".to_owned(), String::new())]
                     } else {
-                        reasons.iter().map(s).collect()
+                        reasons.iter().map(reason_parts).collect::<Result<_, _>>()?
                     };
-                    for reason in reasons {
+                    for (code, detail) in reasons {
                         problems.push(problem(
                             &format!("words[{}].example_{lang}", w["index"]),
-                            reason,
-                            "",
+                            &code,
+                            detail,
                         ));
                     }
                 } else if lang == "ja" && picture.is_null() {
@@ -673,6 +728,82 @@ mod tests {
 
     fn call(input: Value) -> Value {
         serde_json::from_slice(&plugin_package(serde_json::to_vec(&input).unwrap())).unwrap()
+    }
+
+    #[test]
+    fn defaults_follow_word_kind_in_draw_requests_and_reports() {
+        let mut document: Value = serde_json::from_str(include_str!(
+            "../../../../docs/plugins/akikusa-nihonga/package.json"
+        ))
+        .unwrap();
+        for word in document["words"].as_array_mut().unwrap() {
+            word.as_object_mut().unwrap().remove("example_ja");
+            word.as_object_mut().unwrap().remove("example_en");
+        }
+        let start =
+            call(json!({"action":"check_start","document":document.to_string(),"taken_names":{}}));
+        assert_eq!(start["outcome"], "ok", "{start}");
+        let expected = [
+            ("｛すすき｝を置く。", "Place {silver grass}."),
+            ("｛尾花｝を置く。", "Place {silver grass plume}."),
+            ("｛すすき原｝。", "{silver grass field}."),
+        ];
+        for (i, (ja, en)) in expected.iter().enumerate() {
+            assert_eq!(start["draw"][i * 2]["ddl"], *ja);
+            assert_eq!(start["draw"][i * 2 + 1]["ddl"], *en);
+        }
+        let drawings: Vec<_> = start["draw"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| json!({"id":d["id"],"marks":0,"reasons":[]}))
+            .collect();
+        let end = call(json!({"action":"check_finish","state":start["state"],"drawings":drawings}));
+        assert_eq!(end["outcome"], "ok", "{end}");
+        for (i, (ja, en)) in expected.iter().enumerate() {
+            assert_eq!(end["report"]["words"][i]["example_ja"], *ja);
+            assert_eq!(end["report"]["words"][i]["example_en"], *en);
+        }
+    }
+
+    #[test]
+    fn finish_preserves_string_and_structured_drawing_reasons() {
+        let mut document: Value = serde_json::from_str(include_str!(
+            "../../../../docs/plugins/akikusa-nihonga/package.json"
+        ))
+        .unwrap();
+        document["words"].as_array_mut().unwrap().truncate(1);
+        document["words"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("preview");
+        let start =
+            call(json!({"action":"check_start","document":document.to_string(),"taken_names":{}}));
+        assert_eq!(start["outcome"], "ok", "{start}");
+        let reasons = json!(["legacy", {"type":"missing_place_action"}, {"type":"some_reason","value":1}, {"type":4,"kind":"other","z":{"y":1,"a":2}}, {"value":2}]);
+        let drawings =
+            json!([{"id":"0:ja","marks":0,"reasons":reasons},{"id":"0:en","marks":0,"reasons":[]}]);
+        let end = call(json!({"action":"check_finish","state":start["state"],"drawings":drawings}));
+        let problems = end["report"]["words"][0]["problems"].as_array().unwrap();
+        let pairs: Vec<_> = problems
+            .iter()
+            .map(|p| (p["code"].as_str().unwrap(), p["detail"].as_str().unwrap()))
+            .collect();
+        assert_eq!(
+            pairs,
+            vec![
+                ("legacy", ""),
+                ("missing_place_action", ""),
+                ("some_reason", "{\"value\":1}"),
+                ("other", "{\"type\":4,\"z\":{\"a\":2,\"y\":1}}"),
+                ("example_not_drawn", "{\"value\":2}"),
+                ("example_draws_nothing", "")
+            ]
+        );
+        let invalid = call(
+            json!({"action":"check_finish","state":start["state"],"drawings":[{"id":"0:ja","marks":0,"reasons":[42]},{"id":"0:en","marks":0,"reasons":[]}]}),
+        );
+        assert_eq!(invalid["error"], "invalid_plugin_package_input");
     }
 
     #[test]

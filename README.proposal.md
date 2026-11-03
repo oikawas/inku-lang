@@ -13,9 +13,9 @@
 inku is an application that turns text or images into editable vector graphics (SVG).
 What the LLM outputs is not an image but **code in DDL, a drawing language people can read**. A typed compiler checks the DDL, and a Rust renderer outputs the SVG. The same input and seed reproduce the same SVG.
 
-<!-- TODO(author): the key visual. Export the SVG of work c0e3251b-5f94-4cec-b752-bef70e99408d (parent 74dbedfe, Build 1385, render engine 96) and place it here -->
+<!-- Key visual: the saved SVG of work c0e3251b-5f94-4cec-b752-bef70e99408d (parent 74dbedfe, Build 1385, render engine 96), rasterized by the core's svg_to_png to a 1000×1000 PNG (I-030: large pictures in the body are still PNGs) -->
 <p align="center">
-  <img src="docs/assets/readme/key-visual.svg" width="560" alt="On a deep blue ground, four long clouds with thin outlines float in the upper half, each with an ocher streak running through it, and thin white wavy lines flow across between them. Below center stands a figure facing forward, with black hair, wide white sleeves spread to the sides, a red sash, and a purple skirt">
+  <img src="docs/assets/readme/key-visual.png" width="560" alt="On a deep blue ground, four long clouds with thin outlines float in the upper half, each with an ocher streak running through it, and thin white wavy lines flow across between them. Below center stands a figure facing forward, with black hair, wide white sleeves spread to the sides, a red sash, and a purple skirt">
 </p>
 
 <p align="center"><sub>
@@ -60,9 +60,9 @@ place one red gouache flat circle diameter 0.018 at horizontal 0.598034, vertica
 
 The compiler turns the DDL into a JSON intermediate representation (the Score), and the renderer outputs the SVG.
 
-<!-- TODO(author): export the SVG of work 86a9a876-1eed-4a71-8955-0c021ed54ae5 (parent 07964592, Build 1385, render engine 96) and place it here -->
+<!-- The saved SVG of work 86a9a876-1eed-4a71-8955-0c021ed54ae5 (parent 07964592, Build 1385, render engine 96), rasterized to a 1000×1000 PNG -->
 <p align="center">
-  <img src="docs/assets/readme/umbrella.en.svg" width="420" alt="On a dark slate ground, a hundred gray watercolor discs with soft, uneven edges are tiled ten by ten like cobblestones, with faint white flecks and thin pale ellipses scattered over them. Right of center lies a large red ellipse, the open umbrella, with thin white ribs running out from a small red hub and a short white handle at its lower right">
+  <img src="docs/assets/readme/umbrella.en.png" width="420" alt="On a dark slate ground, a hundred gray watercolor discs with soft, uneven edges are tiled ten by ten like cobblestones, with faint white flecks and thin pale ellipses scattered over them. Right of center lies a large red ellipse, the open umbrella, with thin white ribs running out from a small red hub and a short white handle at its lower right">
 </p>
 <p align="center"><sub>Model GPT-6.1 Sol · color catalog Weathered Heritage · seed 3886759235775369</sub></p>
 
@@ -72,10 +72,11 @@ DDL is written as short sentences in English or Japanese. It can be read without
 
 The same text, read by a different model, gives a different reading and a different picture. The choice of model is one more variable of expression.
 
-<!-- TODO(author): an animation of the same input text drawn by different models. The first frame is the work above (GPT-6.1 Sol). Put the model name on each frame -->
+<!-- TODO(author): draw the same input text with different models and export 5 works (the first frame is the work above, GPT-6.1 Sol) as "Transition animation". GIF, height 480 px, cut, hold 1.0 s (a 5 s loop, I-030). No labels on the frames; list the model names in order in the note below -->
 <p align="center">
-  <img src="docs/assets/readme/umbrella-models.en.gif" width="420" alt="Pictures of the same red umbrella text, each drawn by a different model, follow one another">
+  <img src="docs/assets/readme/umbrella-models.en.gif" width="420" alt="Pictures of the same red umbrella text, drawn by five models, follow one another, one second each"><!-- TODO(me): once the works are in, add how each frame differs to the alt text -->
 </p>
+<p align="center"><sub>Frames in order: GPT-6.1 Sol → (TODO: model names)</sub></p>
 
 ---
 
@@ -182,7 +183,7 @@ DDL is drawn from the top line down. The animation below shows the picture after
 
 (A tanka by Yosano Akiko, from *Midaregami*, 1901: "To Kiyomizu, crossing Gion on a night of cherry blossoms under the moon — everyone I meet tonight is beautiful." Translation for this README.)
 
-<!-- TODO(author): work ddb757dd-e40c-4245-9931-4b294172a416 (parent 55f5278a, Build 1385, render engine 96), drawn one DDL line at a time. DDL on the left (current line highlighted), SVG on the right -->
+<!-- TODO(author): export work ddb757dd-e40c-4245-9931-4b294172a416 (parent 55f5278a, Build 1385, render engine 96) with the line-by-line animation (after the rework). DDL on the left (current line highlighted), the picture on the right. GIF. Under I-030 the first frame is the finished picture. Size and hold are decided after the rework -->
 <p align="center">
   <img src="docs/assets/readme/tanka-lines.gif" width="720" alt="On the left, lines of DDL appear one by one from the top; on the right, thin white lines, white circles, and clusters of small circles are added in turn on a navy ground">
 </p>
@@ -226,10 +227,11 @@ Change one tool word in the DDL, and the same shapes are drawn another way. In t
 On the night of the blackout, candles flickered to life in the apartment windows, one by one, until an uneven grid of light emerged from the darkness.
 ```
 
-<!-- TODO(author): work 763e2b5a-889d-418a-b896-b6feb6cc3039 (parent 76070056, Build 1385, render engine 96), with every drawing sentence set to one of the 11 tools per frame. The DDL names a tool in only 13 of its 33 drawing sentences (pen 4, watercolor 9), so the other 20 must get the tool word too. Put the tool name on each frame -->
+<!-- TODO(author): open work 763e2b5a-889d-418a-b896-b6feb6cc3039 (parent 76070056, Build 1385, render engine 96), use "Change the touches" → "Same tool for every sentence" to save it in 5 tools, and export 6 works with the original as the first frame as "Transition animation". GIF, height 480 px, cut, hold 0.8 s (a 4.8 s loop, I-030). The DDL names a tool in only 13 of its 33 drawing sentences (pen 4, watercolor 9); "Same tool for every sentence" writes the tool word into the other 20 too. No labels on the frames; list the tools in order in the note below -->
 <p align="center">
-  <img src="docs/assets/readme/candle-touches.en.gif" width="420" alt="The same picture of an apartment block with candles lit in some windows, drawn with a different tool in each frame">
+  <img src="docs/assets/readme/candle-touches.en.gif" width="420" alt="The same picture of an apartment block with candles lit in some windows, drawn with a different tool every 0.8 seconds"><!-- TODO(me): once the works are in, add how each frame's drawing differs to the alt text -->
 </p>
+<p align="center"><sub>Frames in order: the original (pen, watercolor) → (TODO: tools)</sub></p>
 <p align="center"><sub>Model GPT-6.1 Sol · color catalog Lantern &amp; Dew · seed 8069091770428325</sub></p>
 
 In the original picture, a large gray square stands for the apartment block on a black ground, and gray window rectangles are lined up on it, five across and four down. Nine of the windows glow with an orange or yellow oval of light, each with a small candle and a flame inside.

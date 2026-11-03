@@ -234,7 +234,7 @@ pub(crate) fn computer_palette(color: &str, intensity: SurfaceIntensity) -> [Str
             };
             let turn = |target: f64| {
                 let delta = (target - h + 540.0_f64).rem_euclid(360.0) - 180.0;
-                (h + (delta * 0.6).clamp(-70.0, 70.0)).rem_euclid(360.0)
+                (h + (delta * 0.3).clamp(-35.0, 35.0)).rem_euclid(360.0)
             };
             let top = if neutral { 215.0 } else { turn(215.0) };
             let bottom = if neutral { 350.0 } else { turn(350.0) };
@@ -272,6 +272,14 @@ mod computer_palette_tests {
             assert!(l >= 0.510 - 0.04 - 0.003 && c >= 0.09);
         }
         assert!(values[0].2 < values[2].2 && values[4].2 > values[2].2);
+        // The round trip through 8-bit sRGB introduces a small hue error.
+        for (index, target) in [(0, 215.0), (4, 350.0)] {
+            let hue = values[2].2;
+            let delta = (target - hue + 540.0).rem_euclid(360.0) - 180.0;
+            let expected = (hue + (delta * 0.3).clamp(-35.0, 35.0)).rem_euclid(360.0);
+            let error = (values[index].2 - expected + 540.0).rem_euclid(360.0) - 180.0;
+            assert!(error.abs() < 1.5, "hue error {error} for stop {index}");
+        }
     }
 }
 

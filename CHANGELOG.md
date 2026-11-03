@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server and Web: export a single work as a DDL line animation, starting with the finished picture. DDL display is optional; differences from the saved picture and instructions that could not be drawn are reported.
-
-- Shared core: generate SVG frames and source line ranges from saved instructions, revealing one instruction at a time after the ground and reporting equality with the saved SVG. The composition fills the frame height with the image, wraps DDL without splitting words or numbers, and follows the current line in a window. Also supports image-only frames through Python and UniFFI. UniFFI can rasterize SVG text with host-supplied fonts reused across frames; existing host exports are unchanged.
-
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.
 
 - Align macOS automatic catalog selection with color reading and the run seed, showing the selection and prompts in saved works.
@@ -33,10 +29,6 @@ This file records changes chronologically. If a historical note conflicts with t
 - macOS: remove the duplicate stage name and inner box during drawing, and remove the canvas-wide gesture tooltip.
 
 - macOS: regenerate the bundled Web reference from Build 1376 so new works record DDL 30 and DDL engine 76 in their provenance.
-
-### 2026-11-03 — inku-cli gains plugin preview, test drawings of a plugin without installing it
-
-At the author's request, `inku-cli plugin preview FILE` is added. It reads a v2 package (`package.json` or a zip), a single v2 definition or a v2 DDL export, passes its definitions to the drawing only, as loading an export file does, and draws through `/api/compose`. Nothing is installed on the Server, so any signed-in session can use it, not only an administrator. Without `--ddl` it draws each word's example (in `--lang`) for each composition seed (`--seed`, 1 2 3 4 by default), and writes SVGs (PNGs too with `--png`) and an `index.html` showing each drawing with its DDL, seed, figure count and diagnostics to `--out-dir`. `--before` puts DDL such as a ground in front. The exit code is 1 when a drawing cannot be made, and with `--strict` also when one reports diagnostics. An object word without an example is drawn with `Place {primary name}.`, since its bare name draws nothing (`missing_place_action`). It was checked against a local Server with the three example zips, a definition, an export file, and failing and diagnostic cases, and CLI tests were added. PLUGIN §3.10, the CLI reference and the example scripts' README point to it, and PLUGIN now says an object's example needs a placing verb.
 
 ### 2026-11-01 — PLUGIN gains figures of coordinates and shapes, and rules for making a plugin
 
@@ -586,6 +578,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.310 (2026-11-03 / Build 1386)
+
+- Server and Web: export a single work as a DDL line animation, starting with the finished picture. DDL display is optional; differences from the saved picture and instructions that could not be drawn are reported.
+
+- Shared core: generate SVG frames and source line ranges from saved instructions, revealing one instruction at a time after the ground and reporting equality with the saved SVG. The composition fills the frame height with the image, wraps DDL without splitting words or numbers, and follows the current line in a window. Also supports image-only frames through Python and UniFFI. UniFFI can rasterize SVG text with host-supplied fonts reused across frames; existing rasterization entry points are unchanged.
+
+### 2026-11-03 — inku-cli gains plugin preview, test drawings of a plugin without installing it
+
+At the author's request, `inku-cli plugin preview FILE` is added. It reads a v2 package (`package.json` or a zip), a single v2 definition or a v2 DDL export, passes its definitions to the drawing only, as loading an export file does, and draws through `/api/compose`. Nothing is installed on the Server, so any signed-in session can use it, not only an administrator. Without `--ddl` it draws each word's example (in `--lang`) for each composition seed (`--seed`, 1 2 3 4 by default), and writes SVGs (PNGs too with `--png`) and an `index.html` showing each drawing with its DDL, seed, figure count and diagnostics to `--out-dir`. `--before` puts DDL such as a ground in front. The exit code is 1 when a drawing cannot be made, and with `--strict` also when one reports diagnostics. An object word without an example is drawn with `Place {primary name}.`, since its bare name draws nothing (`missing_place_action`). It was checked against a local Server with the three example zips, a definition, an export file, and failing and diagnostic cases, and CLI tests were added. PLUGIN §3.10, the CLI reference and the example scripts' README point to it, and PLUGIN now says an object's example needs a placing verb.
 
 ## v2.15.309 (2026-11-03 / Build 1385)
 

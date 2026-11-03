@@ -115,6 +115,7 @@ Words of judgment or feeling, such as "beautifully" or "sadly", are not in the v
 - **Generative art and creative coding** — generative works written in sentences instead of code. Seed-driven sway, a brush engine that draws 11 tools (pencil, watercolor, oil paint, etching, and more), 7 paper and canvas grounds, and 13 color catalogs
 - **Language implementation and compilers** — a natural-language DSL that can be written in English or Japanese. A typed semantic representation that keeps source positions, and error recovery that does not guess at a clause it cannot read but drops only that clause, with a diagnostic. → [SPEC.md](SPEC.md)
 - **LLM applications and agent development** — a design that alternates nondeterministic LLM steps with deterministic programs. Structured output under a JSON Schema keeps the LLM's output inside the vocabulary. A CLI that can drive every API. → [Architecture](docs/architecture/README.md)
+- **Poets and readers of poetry** — give a poem as it is, and see what its words become in the picture and what does not survive. Words of feeling and judgment cannot be written in DDL, so what remains is what can be checked by looking: shape, color, and position. The key visual and the "One line at a time" example on this page start from classical Japanese waka and tanka
 
 ---
 
@@ -154,11 +155,12 @@ The compiler, the Score, the renderer, and the state machine of the drawing pipe
 ## DDL
 
 ```
-Fill the background with blue.
-Washi.
-Line up forty white gouache loosely swaying horizontal lines.
-Draw one red pencil line at the right edge.
+"a lone red umbrella lay open"
+draw one white thick line from horizontal 0.638034, vertical 0.638034 to horizontal 0.758034, vertical 0.718034.
+place one red gouache flat ellipse width 0.32, height 0.24 at horizontal 0.618034, vertical 0.618034.
 ```
+
+(The start of one group in the DDL the model wrote for the red umbrella above, as written.)
 
 Design principles:
 

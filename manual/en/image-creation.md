@@ -577,7 +577,7 @@ The same card comes out of the CLI with `inku-cli export-card`.
 
 ### 15.3 Animation
 
-One saved work and several selected works export differently. For the displayed work or one checked work in the Library, choose `Layer animation` from `Export`. For several checked works, choose `Transition animation` to move between works from oldest to newest. In Lineage, choose either the path from the origin to the displayed work or only the checked works.
+One saved work and several selected works export differently. For the displayed work or one checked work in the Library, choose `Line animation` from `Export`. For several checked works, choose `Transition animation` to move between works from oldest to newest. In Lineage, choose either the path from the origin to the displayed work or only the checked works.
 
 | Setting | Choices |
 |---|---|
@@ -586,7 +586,7 @@ One saved work and several selected works export differently. For the displayed 
 | Hold | Seconds each work is shown |
 | Resolution (Y axis) | 150 px, 300 px, 500 px, 1K (1080 px), 4K (2160 px), 8K (4320 px), custom |
 
-For one work, `Layer frames` sets the number of forward frames from ground to finish. Layers accumulate from frame to frame until the work is complete. `Layer interval` sets the seconds each frame remains on screen. This is a simulated making process based on the saved SVG's stacking order.
+For one work, the finished picture appears first, then the animation returns to the ground and adds DDL instructions one by one. DDL appears on the left and the picture on the right, with the current line highlighted. Turn off `Show DDL` to show only the picture. `Line interval` sets the seconds per frame. A notice appears when the current engine's drawing differs from the saved picture or some instructions could not be drawn.
 
 | Replay | Motion |
 |---|---|

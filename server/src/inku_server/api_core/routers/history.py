@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from copy import deepcopy
+import json
 from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field, ValidationError
@@ -39,7 +41,7 @@ class AnimationExportBody(BaseModel):
         ...,
         min_length=1,
         max_length=100,
-        description="Ids of the works to animate, in playing order. One id makes a layer animation of that work; several make a sequence. Duplicates are removed, keeping the first.",
+        description="Ids of the works to animate, in playing order. One id makes a DDL line animation; several make a sequence. Duplicates are removed, keeping the first.",
     )
     format: Literal["apng", "gif"] = Field(default="apng", description="File format of the animation: apng or gif.")
     pattern: Literal["cut", "crossfade", "fade_white", "slide"] = Field(
@@ -58,15 +60,10 @@ class AnimationExportBody(BaseModel):
         le=12000,
         description="Height of each frame in pixels, from 64 to 12000. Omit to use the height of the chosen resolution.",
     )
-    layer_frame_count: int = Field(
-        default=12,
-        ge=2,
-        le=120,
-        description="Number of frames in a layer animation of a single work, from 2 to 120. Not used for a sequence.",
-    )
+    show_ddl: bool = Field(default=True, description="Show DDL beside a single work's line animation. Not used for a sequence.")
     replay: Literal["restart", "reverse", "once"] = Field(
         default="restart",
-        description="How a layer animation plays: restart (loop from the start), reverse (loop back and forth) or once (play one time). Not used for a sequence.",
+        description="How a line animation plays: restart (loop from the start), reverse (loop back and forth) or once (play one time). Not used for a sequence.",
     )
 
 
@@ -254,6 +251,62 @@ def api_history_state(actor: dict = Depends(_current_user)) -> HistoryStateRespo
     return HistoryStateResponse(total=total, newest_at=newest_at, newest_id=newest_id)
 
 
+def _line_animation_request(owner: str, item: dict, show_ddl: bool) -> dict:
+    from ...pipeline_runtime import get_service
+    from ...pipeline_api import saved_work_parent
+    from ...pipeline_candidate import _bytes
+    from ...macro_catalog import resolve_new_work_macro_catalog
+    from ...color_catalogs import render_color_map_for_catalog
+
+    service = get_service()
+    _, work = saved_work_parent(service.store, owner, item["id"])
+    config = service.config_for(owner, work)
+    if "saved_config" in work:
+        catalog = work.get("macro_catalog") or {}
+    else:
+        catalog = resolve_new_work_macro_catalog(service.binding, config)
+        config["definitions"] = catalog["definitions"]
+    compiler = deepcopy(config["compiler"])
+    score = item.get("score") or {}
+    policy = score.get("resource_policy") or {}
+    if "saved_config" in work and policy:
+        compiler["hard_resource_policy"] = policy["hard_policy"]
+        compiler["operational_resource_budget"] = policy["operational_budget"]
+    canvas_id = item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect") or "square"
+    entry = next((entry for entry in service.binding.canvas_registry["registry"]["formats"] if entry["id"] == canvas_id), None)
+    if entry is None:
+        raise ValueError("unknown_canvas_format")
+    seed = item.get("render_seed")
+    if seed is None:
+        raise ValueError("saved_render_seed_missing")
+    color_id = item.get("render_color_catalog_id") or item.get("catalog_id") or "default"
+    colors = item.get("render_color_map") or render_color_map_for_catalog(color_id)
+    background = score.get("background", "white")
+    palette = json.loads(service.binding.resolve_palette(_bytes({"color_map": colors, "catalog_id": color_id, "render_seed": str(seed), "background": background})))
+    if palette.get("error"):
+        raise ValueError("saved_palette_unavailable")
+    host = compiler["host"]
+    host.update(canvas_format_id=canvas_id, resolved_catalog_id=color_id, catalog_mode="saved", background=background, palette=palette)
+    if item.get("composition_seed") is not None:
+        compiler["composition_seed"] = str(item["composition_seed"])
+    compiler.pop("stage15_variation", None)
+    manifest = service.config_for.__self__.manifest
+    render = deepcopy(manifest["render"])
+    height = render["options"]["canvas"]["height"]
+    render["options"].update(canvas={"width": round(height * entry["width_units"] / entry["height_units"]), "height": height},
+                             canvas_aspect_id=canvas_id, catalog_id=color_id, resolved_color_map=colors,
+                             render_seed=str(seed), composition_seed=compiler["composition_seed"],
+                             wild=item.get("render_wild") is True, error_policy=compiler["error_policy"])
+    locks = deepcopy(catalog.get("definition_locks", []))
+    for lock in locks:
+        if not lock["digest"].startswith("sha256:"):
+            lock["digest"] = "sha256:" + lock["digest"]
+    return {"document": {"source": item.get("ddl") or "", "language": item.get("instruction_lang_resolved") or config.get("language") or "ja",
+                         "macro_locks": locks, "saijiki": "inku.saijiki.v3"},
+            "definitions": config.get("definitions", []), "compiler": compiler, "options": render["options"],
+            "clip": render["clip"], "saved_svg": item["svg"], "show_ddl": show_ddl}
+
+
 @router.post("/api/history/export-animation", summary="Export works as an animation")
 def api_history_export_animation(
     body: AnimationExportBody,
@@ -261,8 +314,10 @@ def api_history_export_animation(
 ) -> Response:
     """Build an APNG or GIF animation from the saved SVGs of the works sent.
 
-    One work makes a layer animation; several make a sequence joined by the
-    chosen transition. The file is returned as an attachment. Returns 404 when
+    One work makes a DDL line animation; several make a sequence joined by the
+    chosen transition. The file is returned as an attachment. Single-work
+    responses include X-Inku-Matches-Saved-Svg and X-Inku-Compile-Outcome.
+    Returns 404 when
     any id is not found for the caller, 409 when a work has no saved SVG, and
     400 when the animation cannot be built from the settings sent.
     """
@@ -275,10 +330,9 @@ def api_history_export_animation(
         raise HTTPException(status_code=409, detail="one or more works have no saved SVG")
     try:
         if len(ids) == 1:
-            payload = build_layer_animation(
-                svgs[0],
+            payload, matches, outcome = build_layer_animation(
+                _line_animation_request(actor["id"], items[0], body.show_ddl),
                 output_format=body.format,
-                frame_count=body.layer_frame_count,
                 replay=body.replay,
                 hold_seconds=body.hold_seconds,
                 resolution=body.resolution,
@@ -305,6 +359,7 @@ def api_history_export_animation(
         headers={
             "Content-Disposition": "attachment; filename=\"" + filename + "\"",
             "Cache-Control": "no-store",
+            **({"X-Inku-Matches-Saved-Svg": str(matches).lower(), "X-Inku-Compile-Outcome": outcome} if len(ids) == 1 else {}),
         },
     )
 

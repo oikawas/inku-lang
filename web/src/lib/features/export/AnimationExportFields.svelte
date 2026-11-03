@@ -38,9 +38,8 @@
 	{/if}
 	{#if mode !== 'transition'}
 		<label>
-			<span>{t().settingsAnimationLayerFrames}</span>
-			<input type="number" min="2" max="120" step="1" value={settings.layerFrameCount} {disabled} onchange={(event) => (settings = { ...settings, layerFrameCount: Math.max(2, Math.min(120, Math.round(Number(event.currentTarget.value) || 12))) })} />
-			<small>{t().settingsAnimationLayerFramesHint}</small>
+			<span>{t().settingsAnimationShowDdl}</span>
+			<input type="checkbox" checked={settings.showDdl} {disabled} onchange={(event) => (settings = { ...settings, showDdl: event.currentTarget.checked })} />
 		</label>
 		<label>
 			<span>{t().settingsAnimationLayerInterval}</span>

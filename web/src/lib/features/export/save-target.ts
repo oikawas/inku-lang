@@ -37,11 +37,14 @@ const DB_VERSION = 1;
 const STORE = 'handles';
 const HANDLE_KEY = 'download-directory';
 
-export type SaveOutcome =
+export type SaveOutcome = (
 	/** Written into the folder the user picked. */
 	| { kind: 'folder'; folderName: string }
 	/** Went to the browser's own download folder, and why. */
-	| { kind: 'browser'; reason: 'unsupported' | 'disabled' | 'no-folder' | 'denied' | 'failed' };
+	| { kind: 'browser'; reason: 'unsupported' | 'disabled' | 'no-folder' | 'denied' | 'failed' }) & {
+		animationMatchesSaved?: string | null;
+		animationCompileOutcome?: string | null;
+	};
 
 export function supportsDirectoryPicker(): boolean {
 	return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';

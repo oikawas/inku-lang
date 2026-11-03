@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: export a single work as a DDL line animation, starting with the finished picture. DDL display is optional; differences from the saved picture and instructions that could not be drawn are reported.
+
 - Shared core: generate SVG frames and source line ranges from saved instructions, revealing one instruction at a time after the ground and reporting equality with the saved SVG. The composition fills the frame height with the image, wraps DDL without splitting words or numbers, and follows the current line in a window. Also supports image-only frames through Python and UniFFI. UniFFI can rasterize SVG text with host-supplied fonts reused across frames; existing host exports are unchanged.
 
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.

@@ -2207,7 +2207,7 @@ def test_history_animation_export_preserves_requested_order(auth_context, monkey
         db.delete_items(user["id"], item_ids)
 
 
-def test_history_animation_export_uses_saved_svg_for_one_work(auth_context, monkeypatch):
+def test_history_animation_export_uses_saved_work_for_one_work(auth_context, monkeypatch):
     headers, user, _group = auth_context
     response = client.post(
         "/api/history",
@@ -2226,18 +2226,19 @@ def test_history_animation_export_uses_saved_svg_for_one_work(auth_context, monk
         expected_svg = db.get_items(user["id"], [item_id])[0]["svg"]
         captured: dict = {}
 
-        def fake_build(svg, **options):
-            captured["svg"] = svg
+        def fake_build(request, **options):
+            captured["request"] = request
             captured["options"] = options
-            return b"GIF89a"
+            return b"GIF89a", False, "complete"
 
         monkeypatch.setattr(history_routes, "build_layer_animation", fake_build)
+        monkeypatch.setattr(history_routes, "_line_animation_request", lambda owner, item, show: {"saved_svg": item["svg"], "show_ddl": show})
         response = client.post(
             "/api/history/export-animation",
             json={
                 "ids": [item_id],
                 "format": "gif",
-                "layer_frame_count": 8,
+                "show_ddl": False,
                 "replay": "reverse",
                 "hold_seconds": 0.4,
                 "resolution": "1k",
@@ -2250,11 +2251,12 @@ def test_history_animation_export_uses_saved_svg_for_one_work(auth_context, monk
         assert response.headers["content-type"] == "image/gif"
         assert response.headers["content-disposition"].endswith('.gif"')
         assert response.content == b"GIF89a"
+        assert response.headers["x-inku-matches-saved-svg"] == "false"
+        assert response.headers["x-inku-compile-outcome"] == "complete"
         assert captured == {
-            "svg": expected_svg,
+            "request": {"saved_svg": expected_svg, "show_ddl": False},
             "options": {
                 "output_format": "gif",
-                "frame_count": 8,
                 "replay": "reverse",
                 "hold_seconds": 0.4,
                 "resolution": "1k",

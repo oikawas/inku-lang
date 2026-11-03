@@ -253,93 +253,73 @@ def test_requires_two_works():
         raise AssertionError("single-work export should fail")
 
 
-def test_progressive_svg_states_keep_compositing_structure_and_exact_final_svg():
-    states = list(animation_export._progressive_svg_states(LAYERED_SVG, 4))
+def test_line_animation_starts_complete_and_then_builds_up(monkeypatch):
+    import json
+    import inku_render
 
-    assert [repeats for _svg, repeats in states] == [1, 1, 1, 1]
-    assert "clipPath" in states[0][0]
-    assert 'clip-path="url(#clip)"' in states[0][0]
-    assert 'filter="url(#ink)"' in states[0][0]
-    assert 'transform="translate(1 2)"' in states[0][0]
-    assert "stroke-1" not in states[0][0]
-    assert "stroke-1" in states[1][0]
-    assert "stroke-2" not in states[1][0]
-    assert "stroke-2" in states[2][0]
-    assert "stroke-3" not in states[2][0]
-    assert states[-1][0] == LAYERED_SVG
-
-    root_rects = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="background" fill="white"/><rect id="art-1" fill="red"/><rect id="art-2" fill="blue"/></svg>'
-    rect_states = list(animation_export._progressive_svg_states(root_rects, 3))
-    assert 'fill="white"' in rect_states[0][0]
-    assert 'id="art-1"' not in rect_states[0][0]
-    assert 'id="art-2"' not in rect_states[0][0]
-    assert rect_states[-1][0] == root_rects
-
-
-def test_layer_animation_encodes_reverse_and_once_replay_boundaries():
-    reverse = Image.open(BytesIO(animation_export.build_layer_animation(
-        LAYERED_SVG,
-        output_format="gif",
-        frame_count=8,
-        hold_seconds=0.3,
-        replay="reverse",
-        resolution="1k",
-        height_px=64,
-    )))
-    assert reverse.info["loop"] == 0
-    assert reverse.n_frames == 6
-    reverse_frames = []
-    reverse_durations = []
-    for index in range(reverse.n_frames):
-        reverse.seek(index)
-        reverse_frames.append(reverse.convert("RGB").tobytes())
-        reverse_durations.append(reverse.info["duration"])
-    assert len(set(reverse_frames[:4])) == 4
-    assert reverse_frames == [
-        reverse_frames[0], reverse_frames[1], reverse_frames[2],
-        reverse_frames[3], reverse_frames[2], reverse_frames[1],
-    ]
-    assert reverse_durations == [900, 600, 600, 900, 600, 600]
-    assert sum(reverse_durations) == (2 * 8 - 2) * 300
-
-    once = Image.open(BytesIO(animation_export.build_layer_animation(
-        LAYERED_SVG,
-        output_format="apng",
-        frame_count=8,
-        hold_seconds=0.3,
-        replay="once",
-        resolution="1k",
-        height_px=64,
-    )))
-    assert once.info["loop"] == 1
-    assert once.n_frames == 4
-    once_durations = []
-    for index in range(once.n_frames):
-        once.seek(index)
-        once_durations.append(once.info["duration"])
-    assert once_durations == [600.0, 600.0, 600.0, 600.0]
-    assert sum(once_durations) == 8 * 300
-    once.seek(once.n_frames - 1)
-    saved = Image.open(BytesIO(animation_export.svg_to_png(LAYERED_SVG, height=64)))
-    assert once.convert("RGBA").tobytes() == saved.convert("RGBA").tobytes()
-
-
-def test_layer_animation_rejects_a_gif_frame_duration_above_the_format_limit(monkeypatch):
-    monkeypatch.setattr(
-        animation_export,
-        "svg_to_png",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must reject before rasterizing")),
+    monkeypatch.setattr(inku_render, "pipeline_line_animation", lambda _payload: json.dumps({
+        "frames": [{"svg": "red"}, {"svg": "green"}, {"svg": "blue"}],
+        "matches_saved_svg": False, "outcome": "complete",
+    }).encode())
+    monkeypatch.setattr(animation_export, "svg_to_png", lambda svg, height, font_files: _png(svg, height=height))
+    payload, matches, outcome = animation_export.build_layer_animation(
+        {}, output_format="gif", hold_seconds=0.3, replay="once", resolution="1k", height_px=64,
     )
-    try:
-        animation_export.build_layer_animation(
-            LAYERED_SVG,
-            output_format="gif",
-            frame_count=120,
-            hold_seconds=30,
-            replay="once",
-            resolution="1k",
-        )
-    except ValueError as error:
-        assert str(error) == "GIF cannot preserve this frame count and animation interval"
-    else:
-        raise AssertionError("a GIF frame duration above 655.35 seconds should fail")
+    image = Image.open(BytesIO(payload))
+    pixels = []
+    for index in range(image.n_frames):
+        image.seek(index)
+        pixels.append(image.convert("RGB").getpixel((1, 1)))
+    assert pixels == [(0, 0, 255), (255, 0, 0), (0, 128, 0), (0, 0, 255)]
+    assert matches is False
+    assert outcome == "complete"
+
+
+def test_line_animation_reverse_plays_back_from_completed_sequence(monkeypatch):
+    import json
+    import inku_render
+
+    monkeypatch.setattr(inku_render, "pipeline_line_animation", lambda _payload: json.dumps({
+        "frames": [{"svg": "red"}, {"svg": "green"}, {"svg": "blue"}],
+        "matches_saved_svg": True, "outcome": "complete",
+    }).encode())
+    monkeypatch.setattr(animation_export, "svg_to_png", lambda svg, height, font_files: _png(svg, height=height))
+    payload, matches, _ = animation_export.build_layer_animation(
+        {}, output_format="apng", replay="reverse", resolution="1k", height_px=64,
+    )
+    image = Image.open(BytesIO(payload))
+    pixels = []
+    for index in range(image.n_frames):
+        image.seek(index)
+        pixels.append(image.convert("RGB").getpixel((1, 1)))
+    assert pixels == [(0, 0, 255), (255, 0, 0), (0, 128, 0), (0, 0, 255), (0, 128, 0), (255, 0, 0)]
+    assert image.info["loop"] == 0
+    assert matches is True
+
+
+def test_saved_lock_digest_is_sent_in_document_format(monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from inku_server import pipeline_api, pipeline_runtime
+    from inku_server.api_core.routers.history import _line_animation_request
+
+    compiler = {"host": {}, "composition_seed": None, "error_policy": "omit_and_continue"}
+    config = {"compiler": compiler, "definitions": [{"id": "saved"}], "language": "ja"}
+    lock = {"qualified_name": "Test.word", "version": "1", "digest": "a" * 64}
+    work = {"saved_config": config, "macro_catalog": {"definition_locks": [lock]}}
+
+    class Settings:
+        manifest = {"render": {"options": {"canvas": {"height": 1000}}, "clip": {}}}
+
+        def config_for(self, _owner, source):
+            return source["saved_config"]
+
+    binding = SimpleNamespace(canvas_registry={"registry": {"formats": [{"id": "square", "width_units": 1, "height_units": 1}]}},
+                              resolve_palette=lambda _request: json.dumps({"background": "white"}).encode())
+    monkeypatch.setattr(pipeline_runtime, "get_service", lambda: SimpleNamespace(store=None, binding=binding, config_for=Settings().config_for))
+    monkeypatch.setattr(pipeline_api, "saved_work_parent", lambda *_args: (None, work))
+    request = _line_animation_request("owner", {"id": "id", "ddl": "円", "svg": "svg", "score": {},
+                                                       "render_seed": 1, "render_color_map": {"white": "#fff"}}, True)
+    assert request["document"]["macro_locks"][0]["digest"] == "sha256:" + "a" * 64
+    assert lock["digest"] == "a" * 64
+    assert request["definitions"] == [{"id": "saved"}]

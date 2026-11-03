@@ -15,7 +15,7 @@
 		count: number;
 		mode?: 'layer' | 'transition';
 		scopeDescription?: string | null;
-		onSave: (settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => Promise<void>;
+		onSave: (settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => Promise<string | null>;
 		onClose: () => void;
 	};
 
@@ -27,6 +27,7 @@
 	let picking = $state(false);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
+	let notice = $state<string | null>(null);
 	const busy = $derived(picking || saving);
 	const mode = $derived(requestedMode ?? (count === 1 ? 'layer' : 'transition'));
 	const title = $derived(mode === 'layer' ? t().animationExportLayerTitle : t().animationExportTransitionTitle);
@@ -65,9 +66,10 @@
 		if (busy) return;
 		saving = true;
 		error = null;
+		notice = null;
 		try {
-			await onSave(normalizeAnimationExportSettings(settings), directory ?? undefined);
-			onClose();
+			notice = await onSave(normalizeAnimationExportSettings(settings), directory ?? undefined);
+			if (!notice) onClose();
 		} catch (cause) {
 			const reason = cause instanceof Error ? cause.message : String(cause);
 			error = t().animationExportFailed(reason);
@@ -114,6 +116,7 @@
 			{/if}
 		</section>
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
+		{#if notice}<p role="status">{notice}</p>{/if}
 		<footer>
 			<button class="save" type="submit" disabled={busy}>
 				{saving ? t().animationExportBusy : t().animationExportSave}

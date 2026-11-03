@@ -3,7 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import AnimationExportModal from '$lib/components/AnimationExportModal.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
-	import type { AnimationExportSettings } from '$lib/animationExport';
+	import { animationWarnings, type AnimationExportSettings } from '$lib/animationExport';
 	import type { SheetVariant } from '$lib/contactSheet';
 	import { svgImage } from '$lib/svgImage';
 	import type { SvgProfile } from '$lib/features/export/download';
@@ -179,7 +179,7 @@
 		}
 	}
 
-	async function saveAnimation(settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle): Promise<void> {
+	async function saveAnimation(settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle): Promise<string | null> {
 		const target = snapshot;
 		if (!target || busy) throw new Error(t().savedWorkExportUnavailable);
 		busy = true;
@@ -187,7 +187,14 @@
 		fallbackReason = null;
 		try {
 			if (!(await onValidateSnapshot(target))) throw new Error(t().savedWorkExportUnavailable);
-			saved(await onDownloadAnimation(target, settings, directory));
+			const result = await onDownloadAnimation(target, settings, directory);
+			saved(result);
+			const outcome = result && !Array.isArray(result) ? result as import('$lib/features/export/save-target').SaveOutcome : null;
+			const warnings = animationWarnings(outcome);
+			const notices = [];
+			if (warnings.mismatch) notices.push(t().animationSavedMismatch);
+			if (warnings.incomplete) notices.push(t().animationCompileIncomplete);
+			return notices.length ? notices.join(' ') : null;
 		} catch (cause) {
 			failed(cause);
 			throw cause;

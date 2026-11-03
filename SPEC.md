@@ -1251,9 +1251,9 @@ Lineage browsing state is separate from the selected work. Within one rooted tre
 
 The web UI follows recorded derivations through Lineage. The Score-similarity-ranked Nearby works display and automatic loading are retired, together with the dedicated `GET /api/history/{item_id}/neighbors` endpoint. Switching works or completing generation does not trigger a similar-work search or fetch. Saved works and Lineage data are retained.
 
-Saved-work export uses a shared menu with a fixed scope. The displayed work or one selected work offers SVG, PNG, a share card, and layer animation. Multiple checked works offer chronological work animation and review or AI contact sheets. A Lineage path uses root-to-displayed order. The checked set and the path never mix. The menu snapshots its target when opened and validates each work immediately before export; trashed, unavailable, or failed-validation works are not exported.
+Saved-work export uses a shared menu with a fixed scope. The displayed work or one selected work offers SVG, PNG, a share card, and line animation. Multiple checked works offer chronological work animation and review or AI contact sheets. A Lineage path uses root-to-displayed order. The checked set and the path never mix. The menu snapshots its target when opened and validates each work immediately before export; trashed, unavailable, or failed-validation works are not exported.
 
-The shared core separately exposes SVG frames for line animation from a saved work's DDL, definitions and locks, compiler settings, and rendering conditions. It compiles the complete Score with the current compiler and resolves it with the current renderer, then reveals one instruction at a time after frame 0, which shows only the ground. Each frame carries its source line ranges; when one sentence produces several instructions, its line is highlighted on the last of them. Source ranges of continuation sentences that affect the same instruction are included. The final image equals ordinary rendering of the same Score and conditions; byte equality with the saved SVG is reported separately. A host may request the DDL beside an image that fills the frame's height, or the image alone. DDL wraps without splitting numbers or words, with fixed line spacing; when it does not fit, the window follows the current line, and frame 0 starts at the beginning. The host supplies the font family and files, and uses those files when rasterizing the SVG. The entry is available to Python and UniFFI. It does not yet change the existing Server, Web, or macOS export actions.
+The shared core exposes SVG frames for line animation from a saved work's DDL, definitions and locks, compiler settings, and rendering conditions. It compiles the complete Score with the current compiler and resolves it with the current renderer, then reveals one instruction at a time after frame 0, which shows only the ground. Each frame carries its source line ranges; when one sentence produces several instructions, its line is highlighted on the last of them. Source ranges of continuation sentences that affect the same instruction are included. The final image equals ordinary rendering of the same Score and conditions; byte equality with the saved SVG is reported separately. A host may request the DDL beside an image that fills the frame's height, or the image alone. DDL wraps without splitting numbers or words, with fixed line spacing; when it does not fit, the window follows the current line, and frame 0 starts at the beginning. The host supplies the font family and files, and uses those files when rasterizing the SVG. The entry is available to Python and UniFFI.
 
 `line_animation` (Python: `pipeline_line_animation`) accepts UTF-8 JSON bytes with `document`, `definitions`, `compiler`, render `options`, `clip`, `saved_svg`, `show_ddl`, `font_family`, and `font_files`. The first five use the existing compile and render boundary types. Each item of `frames` contains `instruction_count`, the currently highlighted `lines` as one-based inclusive ranges, the selected `svg`, and image-only `art_svg`. `matches_saved_svg` compares the final `art_svg` with the saved SVG, not the composite. The answer also includes the compiler `outcome`, diagnostics, and omissions. `font_files` is returned for the host to pass to rasterization; the core does not choose a system font.
 
@@ -1363,21 +1363,11 @@ no `PNG 4320px` (author's decision, 2026-10-06). The PNG choices in the shared E
 are generated from these templates, and export width is computed from
 the target work's canvas aspect ratio.
 
-The shared Export menu on a work, Library, or Lineage opens the same export
-modal as Layer animation for one work and Transition animation for multiple
-works. For one work, it creates a simulated making process by revealing
-layers of the saved SVG in drawing order, from the background to the finished
-work. Choose the number of frames including background and completion (2–120,
-default 12), the interval (0.1–30 seconds, default 0.3), and replay behavior.
-Restart repeats from the beginning; Reverse plays back toward the beginning
-after completion and repeats; Play once stops on the completed work. Drawing
-groups, stacking order, background, clipping, and filters are preserved, and
-the completed frame uses the original saved SVG. When there are fewer layers
-than requested frames, repeated states combine their display durations.
+The shared Export menu on a work, Library, or Lineage opens Line animation for one work and Transition animation for multiple works. For one work, the current compiler and renderer show the finished picture first, then the ground and each DDL instruction in turn. Choose DDL beside the picture or the picture alone, the interval (0.1–30 seconds, default 0.3), and replay behavior. The Server reports whether the final picture matches the saved SVG and the compiler outcome; Web shows a notice for a mismatch or incomplete compilation.
 
 For two or more works, checked works switch from oldest to newest, while a
 Lineage path switches from its root to the displayed work. The settings export tab holds defaults for the shared
-format (APNG/GIF), resolution, and custom height, the single-work frame count,
+format (APNG/GIF), resolution, and custom height, single-work DDL display,
 interval, and replay behavior, and the multiple-work transition and hold time.
 The export modal shows the controls for the selected number of works. Size and
 save location are shared by both modes. Supported browsers offer a save-location

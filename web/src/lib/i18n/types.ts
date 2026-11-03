@@ -1248,8 +1248,9 @@ export interface LangPack {
 	animationPatternSlide: string;
 	settingsAnimationHold: string;
 	settingsAnimationHoldHint: string;
-	settingsAnimationLayerFrames: string;
-	settingsAnimationLayerFramesHint: string;
+	settingsAnimationShowDdl: string;
+	animationSavedMismatch: string;
+	animationCompileIncomplete: string;
 	settingsAnimationLayerInterval: string;
 	settingsAnimationLayerIntervalHint: string;
 	settingsAnimationLayerReplay: string;

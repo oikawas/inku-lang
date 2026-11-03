@@ -8,6 +8,7 @@ stateShim.raw = identity;
 
 const {
 	DEFAULT_ANIMATION_EXPORT_SETTINGS,
+	animationWarnings,
 	animationExportRequest,
 	parseAnimationExportSettings
 } = await import('./animationExport.ts');
@@ -20,7 +21,7 @@ test('legacy settings gain layer defaults and requests keep the single-work boun
 		resolution: 'custom',
 		customHeight: 960
 	}));
-	assert.equal(settings.layerFrameCount, DEFAULT_ANIMATION_EXPORT_SETTINGS.layerFrameCount);
+	assert.equal(settings.showDdl, DEFAULT_ANIMATION_EXPORT_SETTINGS.showDdl);
 	assert.equal(settings.layerIntervalSeconds, DEFAULT_ANIMATION_EXPORT_SETTINGS.layerIntervalSeconds);
 	assert.equal(settings.layerReplay, DEFAULT_ANIMATION_EXPORT_SETTINGS.layerReplay);
 
@@ -29,7 +30,7 @@ test('legacy settings gain layer defaults and requests keep the single-work boun
 		format: 'gif',
 		resolution: '1k',
 		height_px: 960,
-		layer_frame_count: 12,
+		show_ddl: true,
 		replay: 'restart',
 		hold_seconds: 0.3
 	});
@@ -41,4 +42,11 @@ test('legacy settings gain layer defaults and requests keep the single-work boun
 		pattern: 'slide',
 		hold_seconds: 2
 	});
+	assert.equal(animationExportRequest(['one'], { ...settings, showDdl: false }).show_ddl, false);
+});
+
+test('saved-picture mismatch and incomplete compilation are reported independently', () => {
+	assert.deepEqual(animationWarnings({ kind: 'folder', folderName: 'test', animationMatchesSaved: 'false', animationCompileOutcome: 'complete' }), { mismatch: true, incomplete: false });
+	assert.deepEqual(animationWarnings({ kind: 'folder', folderName: 'test', animationMatchesSaved: 'true', animationCompileOutcome: 'complete_with_omissions' }), { mismatch: false, incomplete: true });
+	assert.deepEqual(animationWarnings(null), { mismatch: false, incomplete: false });
 });

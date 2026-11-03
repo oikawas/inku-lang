@@ -155,17 +155,22 @@ fn composed_frame(
         ranges
             .get(frame - 1)
             .and_then(|spans| {
-                rows.iter()
-                    .position(|(line, _)| spans.iter().any(|&(a, b)| a <= *line && *line <= b))
+                let mut matching = rows.iter().enumerate().filter_map(|(index, (line, _))| {
+                    spans
+                        .iter()
+                        .any(|&(a, b)| a <= *line && *line <= b)
+                        .then_some(index)
+                });
+                let first = matching.next()?;
+                let last = matching.next_back().unwrap_or(first);
+                Some(first + (last - first) / 2)
             })
             .unwrap_or(0)
     };
     let first = if frame == 0 {
         0
     } else {
-        focus
-            .saturating_sub(visible_rows / 2)
-            .min(rows.len().saturating_sub(visible_rows))
+        focus.saturating_sub(visible_rows / 2)
     };
     let mut text = String::new();
     for (row, (line, value)) in rows.iter().skip(first).take(visible_rows).enumerate() {
@@ -361,6 +366,21 @@ mod line_animation_tests {
         assert!(middle.contains("<rect width=\"10\" height=\"20\"/>"));
         assert!(middle.contains("width=\"28\" height=\"20\""));
         assert!(middle.contains("translate(18 0)"));
+        let last = composed_frame(
+            &source,
+            svg,
+            "Font & Family",
+            &[vec![(45, 45)]],
+            1,
+            10.0,
+            20.0,
+        )
+        .unwrap();
+        let last_line = last
+            .split("<text ")
+            .find(|element| element.contains("行45"))
+            .unwrap();
+        assert!(last_line.contains("y=\"10\""), "{last_line}");
         let rows = wrapped_ddl(
             "縦0.118、縦0.296666。直径0.25。 Place a horizontal line.",
             8.0,

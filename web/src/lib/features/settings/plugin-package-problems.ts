@@ -117,6 +117,11 @@ export function pluginProblemMessage(code: string, isJapanese: boolean): string 
 	return isJapanese ? message.ja : message.en;
 }
 
+export function describePluginProblem(problem: { code: string; detail: string }, isJapanese: boolean): string {
+	const message = pluginProblemMessage(problem.code, isJapanese);
+	return problem.detail ? `${message}（${problem.detail}）` : message;
+}
+
 /** Installed-package rejection reasons carry a file path before the code. */
 export function pluginRejectionMessage(reason: string, isJapanese: boolean): { message: string; path?: string } {
 	const match = /^(.*):\s*([a-z0-9_]+)$/.exec(reason);

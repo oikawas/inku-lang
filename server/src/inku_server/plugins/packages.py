@@ -101,7 +101,7 @@ class PackageWord:
                 for language in LANGUAGES for name in self.names(language)]
 
     def example_for(self, language: str) -> str:
-        """The written example, or the bare call when the package names none.
+        """The written example, or a default appropriate to the word's kind.
 
         The default names the primary visible word in braces.
         """
@@ -109,6 +109,8 @@ class PackageWord:
         if written:
             return written
         name = (self.names(language) or (self.heading,))[0]
+        if self.definition.get("kind") == "object":
+            return f"｛{name}｝を置く。" if language == "ja" else f"Place {{{name}}}."
         return f"｛{name}｝。" if language == "ja" else f"{{{name}}}."
 
     def summary_for(self, language: str) -> str:
@@ -147,7 +149,7 @@ class PluginPackage:
 class ExampleDrawing:
     svg: str = ""
     marks: int = 0
-    reasons: tuple[str, ...] = ()
+    reasons: tuple[str | dict[str, Any], ...] = ()
 
 
 def package_core(payload: dict[str, Any]) -> dict[str, Any]:

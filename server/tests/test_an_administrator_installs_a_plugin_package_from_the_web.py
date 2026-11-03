@@ -109,6 +109,41 @@ def test_the_guide_object_example_compiles_without_diagnostics(admin, guide, lan
     assert not _codes(report), _codes(report)
 
 
+def test_object_without_examples_gets_placement_examples(admin):
+    package = _guide()
+    word = package["words"][0]
+    word["definition"] = _guide_object_definition("PLUGIN.ja.md")
+    word.pop("example_ja")
+    word.pop("example_en")
+    report = _check(admin, package)
+    assert report["ok"] is True, report
+    assert report["words"][0]["example_ja"] == "｛星｝を置く。"
+    assert report["words"][0]["example_en"] == "Place {stars}."
+
+
+def test_explicit_object_example_reports_structured_missing_action(admin):
+    package = _guide()
+    word = package["words"][0]
+    word["definition"] = _guide_object_definition("PLUGIN.ja.md")
+    word["example_ja"] = "｛星｝。"
+    report = _check(admin, package)
+    assert report["ok"] is False
+    assert {"path": "words[0].example_ja", "code": "missing_place_action", "detail": ""} in report["words"][0]["problems"]
+
+
+def test_object_over_budget_reports_the_structured_reason(admin):
+    package = _guide()
+    word = package["words"][0]
+    definition = _guide_object_definition("PLUGIN.ja.md")
+    definition["body"] = [{"op": "repeat", "count": {"expr": "integer", "value": 64},
+                           "maximum": 64, "index": "i", "body": definition["body"]}]
+    word["definition"] = definition
+    report = _check(admin, package)
+    assert report["ok"] is False
+    problem = next(p for p in report["words"][0]["problems"] if p["code"] == "budget_exceeded")
+    assert json.loads(problem["detail"])["value"]["dimension"] == "object_templates"
+
+
 def test_bundled_v2_leaves_pass_shape_definition_and_real_example_drawings(admin):
     bundle = package_core({"action": "bundled_nature"})
     archive = io.BytesIO()
@@ -202,8 +237,8 @@ def test_exported_zip_passes_v2_check(admin):
     assert checked.status_code == 200 and checked.json()["ok"], checked.text
 
 
-def test_both_example_packages_pass_the_full_check(admin):
-    for name in ("sky-nihonga", "water-nihonga"):
+def test_example_packages_pass_the_full_check(admin):
+    for name in ("sky-nihonga", "water-nihonga", "akikusa-nihonga"):
         data = (ROOT / "docs/plugins" / f"{name}.zip").read_bytes()
         checked = client.post("/api/plugins/packages/validate", headers=admin,
                               json={"archive": base64.b64encode(data).decode()})

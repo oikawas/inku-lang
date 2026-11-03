@@ -310,9 +310,14 @@ def draw_plugin_example(owner: str, ddl: str, language: str, imported: list[dict
                                           canvas_aspect=None, options=options, prepared=None), None)
         delivery = view.get("delivery") or {}
         reasons = tuple(
-            str(item.get("reason", ""))
+            item["reason"]
             for key in ("upstream_diagnostics", "downstream_diagnostics")
             for item in delivery.get(key) or ()
+            if item.get("reason") is not None
+        ) + tuple(
+            item["cause"]["reason"]
+            for item in delivery.get("resource_omissions") or ()
+            if isinstance(item.get("cause"), dict) and item["cause"].get("reason") is not None
         )
         if view.get("result") is None and delivery and delivery.get("outcome") != "stopped" and not reasons:
             view = _wait(owner, service.command(owner, view["execution_id"], {"tag": "perform"}), None)

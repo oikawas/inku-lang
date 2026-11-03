@@ -40,6 +40,7 @@ EXPECTED_KINDS = {
     # The AI refinement's chunk move (まとまりの手, 2026-10-27).
     "chunk_move",
     "color_arrangement_change",
+    "composition_form_change",
     "ddl_edit",
     "description_edit",
     "external_seed_change",

@@ -104,7 +104,9 @@ PUBLIC = {  # every entry needs a reason
 #   pictures (2026-10-26).
 # The old document-only validate and reload routes retired with the v2 package cutover.
 # Editor inspection and package-word preview add two authenticated routes.
-EXPECTED_ROUTE_COUNT = 146
+# Five authenticated routes were added: activity, batch list/start/heartbeat,
+# and saving a composition-form execution.
+EXPECTED_ROUTE_COUNT = 151
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

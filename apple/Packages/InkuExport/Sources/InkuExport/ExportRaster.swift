@@ -9,10 +9,10 @@ enum ExportRaster {
         try dimensions(scene: InkuCore.prepareSVG(svg: svg), height: height)
     }
 
-    private static func dimensions(scene: PreparedSVG, height: Int) throws -> (Int, Int) {
+    static func dimensions(scene: PreparedSVG, height: Int, maximumPixels: Int = ExportService.maximumImagePixels) throws -> (Int, Int) {
         let widthValue = max(1, (scene.intrinsicWidth / scene.intrinsicHeight * Double(height)).rounded(.toNearestOrAwayFromZero))
         guard widthValue.isFinite, widthValue <= Double(Int32.max), height >= 1,
-              widthValue * Double(height) <= Double(ExportService.maximumImagePixels) else {
+              widthValue * Double(height) <= Double(maximumPixels) else {
             throw ExportFailure("用紙比率を保つと1画像の上限（1億4400万画素）を超えます。Y軸を小さくしてください。")
         }
         return (Int(widthValue), height)
@@ -24,15 +24,15 @@ enum ExportRaster {
         return try image(scene: scene, height: height, forcedTileSide: forcedTileSide)
     }
 
-    private static func image(scene: PreparedSVG, height: Int, forcedTileSide: Int? = nil) throws -> CGImage {
-        let (width, height) = try dimensions(scene: scene, height: height)
+    static func image(scene: PreparedSVG, height: Int, forcedTileSide: Int? = nil, maximumPixels: Int = ExportService.maximumImagePixels) throws -> CGImage {
+        let (width, height) = try dimensions(scene: scene, height: height, maximumPixels: maximumPixels)
         if forcedTileSide == nil, max(width, height) <= 8192, width * height <= 16_777_216 {
             let raster = try scene.rasterize(targetHeight: UInt32(height))
             try Task.checkCancellation()
             guard let image = raster.makeCGImage() else { throw ExportFailure("描画画像を作れませんでした。") }
             return image
         }
-        let context = try bitmap(width: width, height: height)
+        let context = try bitmap(width: width, height: height, maximumPixels: maximumPixels)
         let side = forcedTileSide ?? tileSide
         for y in stride(from: 0, to: height, by: side) {
             for x in stride(from: 0, to: width, by: side) {
@@ -48,8 +48,8 @@ enum ExportRaster {
         return result
     }
 
-    static func bitmap(width: Int, height: Int) throws -> CGContext {
-        guard width > 0, height > 0, width <= ExportService.maximumImagePixels / height,
+    static func bitmap(width: Int, height: Int, maximumPixels: Int = ExportService.maximumImagePixels) throws -> CGContext {
+        guard width > 0, height > 0, width <= maximumPixels / height,
               let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else {

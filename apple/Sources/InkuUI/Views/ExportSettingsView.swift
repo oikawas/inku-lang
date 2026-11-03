@@ -131,8 +131,7 @@ struct ExportSettingsView: View {
                 TextField(model.display.webCopy("settingsAnimationHold", "表示ウェイト"), value: $animationConfiguration.options.holdSeconds, format: .number)
                 Text(model.display.webCopy("settingsAnimationHoldHint", "各作品を表示する秒数")).inkuFont(12).foregroundStyle(.secondary)
                 } else {
-                Stepper(model.display.webCopy("settingsAnimationLayerFrames", "レイヤーの分割枚数") + ": \(animationConfiguration.options.layerFrameCount)", value: $animationConfiguration.options.layerFrameCount, in: 2...120)
-                Text(model.display.webCopy("settingsAnimationLayerFramesHint", "背景から完成までの順方向フレーム数")).inkuFont(12).foregroundStyle(.secondary)
+                Toggle(model.display.webCopy("settingsAnimationShowDdl", "DDL を並べる"), isOn: $animationConfiguration.options.showDDL)
                 TextField(model.display.webCopy("settingsAnimationLayerInterval", "レイヤーの間隔"), value: $animationConfiguration.options.layerIntervalSeconds, format: .number)
                 Text(model.display.webCopy("settingsAnimationLayerIntervalHint", "各フレームを表示する秒数")).inkuFont(12).foregroundStyle(.secondary)
                 Picker(model.display.webCopy("settingsAnimationLayerReplay", "繰り返し方"), selection: $animationConfiguration.options.layerReplay) {

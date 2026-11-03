@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
+
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.
 
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.

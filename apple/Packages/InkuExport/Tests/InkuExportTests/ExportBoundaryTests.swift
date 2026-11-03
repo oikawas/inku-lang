@@ -3,6 +3,7 @@ import Foundation
 import ImageIO
 import InkuHost
 import InkuPersistence
+import InkuCore
 import XCTest
 @testable import InkuExport
 
@@ -39,31 +40,19 @@ final class ExportBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(direct.dataProvider?.data as Data?, tiled.dataProvider?.data as Data?)
     }
 
-    // Failure: an exported APNG contains only its first image or loses held/reverse frames.
-    func testAPNGHasActualFramesAndServerLayerTiming() throws {
-        var options = ExportOptions(); options.format = .apng; options.pixelHeight = 64
-        options.layerFrameCount = 12; options.layerIntervalSeconds = 0.3; options.layerReplay = "reverse"
-        let artifacts = try ExportService.render(sources: [source()], options: options)
-        let data = try XCTUnwrap(artifacts.first?.data)
-        let decoder = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
-        XCTAssertEqual(CGImageSourceGetCount(decoder), 4)
-        let expected = [1.5, 1.8, 1.5, 1.8]
-        for index in 0..<4 {
-            let properties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(decoder, index, nil) as? [String: Any])
-            let png = try XCTUnwrap(properties[kCGImagePropertyPNGDictionary as String] as? [String: Any])
-            let duration = try XCTUnwrap(png[kCGImagePropertyAPNGUnclampedDelayTime as String] as? Double)
-            XCTAssertEqual(duration, expected[index], accuracy: 0.011)
-        }
-        let first = try XCTUnwrap(CGImageSourceCreateImageAtIndex(decoder, 0, nil))
-        let completed = try XCTUnwrap(CGImageSourceCreateImageAtIndex(decoder, 2, nil))
-        XCTAssertNotEqual(first.dataProvider?.data as Data?, completed.dataProvider?.data as Data?)
-        XCTAssertEqual(source().work.svg, layered)
-        options.layerReplay = "once"
-        let once = try ExportService.render(sources: [source()], options: options)[0].data
-        let onceDecoder = try XCTUnwrap(CGImageSourceCreateWithData(once as CFData, nil))
-        let globals = try XCTUnwrap(CGImageSourceCopyProperties(onceDecoder, nil) as? [String: Any])
-        let png = try XCTUnwrap(globals[kCGImagePropertyPNGDictionary as String] as? [String: Any])
-        XCTAssertEqual(png[kCGImagePropertyAPNGLoopCount as String] as? Int, 1)
+    func testLineAnimationOrderMatchesServer() {
+        XCTAssertEqual(AnimationEncoder.order(frameCount: 4, replay: "restart"), [3, 0, 1, 2, 3])
+        XCTAssertEqual(AnimationEncoder.order(frameCount: 4, replay: "once"), [3, 0, 1, 2, 3])
+        XCTAssertEqual(AnimationEncoder.order(frameCount: 4, replay: "reverse"), [3, 0, 1, 2, 3, 2, 1, 0])
+    }
+
+    func testBundledFontPaintsTextInRaster() throws {
+        let font = try XCTUnwrap(AnimationEncoder.fontURL)
+        let fonts = try InkuCore.prepareRasterFonts([font.path])
+        let svg = #"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="10" y="70" font-family="Noto Serif JP" font-size="60">花</text></svg>"#
+        let image = try ExportRaster.image(scene: fonts.prepareSVG(svg), height: 100)
+        let pixels = try XCTUnwrap(image.dataProvider?.data) as Data
+        XCTAssertTrue(pixels.contains { $0 != 0 })
     }
 
     // Failure: multi-work GIF omits transitions or applies the next work's canvas to all frames.

@@ -2181,7 +2181,7 @@ public final class AppModel {
 
     public func markOutputRead(_ output: String) { unreadOutputs.remove(output) }
 
-    public func prepareExportSources(works: [SavedWork], profile: String = "display", requiresPluginDefinitions: Bool = false) async throws -> [ExportSource] {
+    public func prepareExportSources(works: [SavedWork], profile: String = "display", requiresPluginDefinitions: Bool = false, lineAnimation: Bool = false) async throws -> [ExportSource] {
         guard !isBusy, let host, let database else { throw HostError("export_busy_or_unavailable") }
         let exportRevision = restorationRevision
         var sources: [ExportSource] = []
@@ -2199,20 +2199,22 @@ public final class AppModel {
             } else { work = candidate }
             var value: ExactJSON = .object([:])
             var locks: [ExactJSON] = []
+            var lineRequest: ExactJSON?
             do {
                 let context = try await host.savedAuthoringContext(workID: work.id)
                 value = try ExactJSON(data: context.configuration)
                 if let document = context.document { locks = try ExactJSON(data: document)["macro_locks"].array ?? [] }
+                if lineAnimation { lineRequest = try PipelineHost.lineAnimationRequest(work: work, context: context, locks: locks) }
             }
             catch {
-                if profile != "display" || requiresPluginDefinitions { throw HostError("saved_export_plugin_context_unavailable") }
+                if profile != "display" || requiresPluginDefinitions || lineAnimation { throw HostError("saved_export_plugin_context_unavailable") }
             }
             var profiles: [String: String] = [:]
             if profile != "display" { profiles[profile] = try await host.exportSVG(workID: work.id, profile: profile) }
             guard !isBusy, restorationRevision == exportRevision else { throw HostError("saved_export_work_changed") }
             sources.append(ExportSource(work: work, profiles: profiles,
                 pluginDefinitions: value["definitions"].array ?? [], pluginSummaries: value["macro_summaries"].array?.compactMap(\.string) ?? [], pluginLocks: locks,
-                language: value["language"].string))
+                language: value["language"].string, lineAnimationRequest: lineRequest))
         }
         return sources
     }

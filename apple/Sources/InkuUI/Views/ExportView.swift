@@ -20,21 +20,23 @@ struct ExportView: View {
     @State private var error: String?
     @State private var operation: Task<Void, Never>?
     @State private var exportedURLs: [URL] = []
+    @State private var animationDestination: URL?
     @State private var svgHelpOpen = false
     @State private var directExportStarted = false
     private let preserveOrder: Bool
     private let directCard: Bool
     private let directFormat: Bool
+    private let lineAnimation: Bool
     @State private var restorationRevision: UInt64
 
     init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false, directCard: Bool = false, initialFormat: SavedExportFormat? = nil,
-         initialSVGProfile: String? = nil, initialPixelHeight: Int? = nil) {
+         initialSVGProfile: String? = nil, initialPixelHeight: Int? = nil, lineAnimation: Bool = false) {
         self.model = model
         _restorationRevision = State(initialValue: model.restorationRevision)
         let candidates = works ?? model.works.filter { !$0.trashed }
         _candidates = State(initialValue: candidates)
         _selectedIDs = State(initialValue: works == nil ? Set(model.selectedWorkID.map { [$0] } ?? []) : Set(candidates.map(\.id)))
-        let requestedFormat = directCard ? SavedExportFormat.shareCard : initialFormat ?? model.display.preferences.exportDefaults.options.format
+        let requestedFormat = lineAnimation ? model.display.preferences.animationDefaults.options.format : directCard ? SavedExportFormat.shareCard : initialFormat ?? model.display.preferences.exportDefaults.options.format
         let defaults = requestedFormat == .apng || requestedFormat == .gif
             ? model.display.preferences.animationDefaults : model.display.preferences.exportDefaults
         var initialOptions = defaults.options
@@ -48,6 +50,7 @@ struct ExportView: View {
         _customHeight = State(initialValue: defaults.customHeight)
         self.preserveOrder = preserveOrder
         self.directCard = directCard
+        self.lineAnimation = lineAnimation
         self.directFormat = !directCard && initialFormat != nil && works != nil
     }
 
@@ -60,13 +63,13 @@ struct ExportView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(model.display.localized(directCard ? "共有カードを書き出す" : "保存作品を書き出す")).inkuFont(16, weight: .semibold)
+                Text(lineAnimation ? copy("animationExportLayerTitle", "行ごとのアニメーションを書き出す") : model.display.localized(directCard ? "共有カードを書き出す" : "保存作品を書き出す")).inkuFont(16, weight: .semibold)
                 Spacer()
                 Text(model.display.localizedFormat("%ld作品", selectedIDs.count)).foregroundStyle(.secondary)
             }
             if !directCard && !directFormat {
               HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
+                if !lineAnimation { VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Button(model.display.localized("すべて選択")) { selectedIDs = Set(candidates.map(\.id)) }
                         Button(model.display.localized("選択解除")) { selectedIDs = [] }
@@ -88,10 +91,12 @@ struct ExportView: View {
                     }.frame(minWidth: 240, maxWidth: 310, minHeight: 260)
                     Text(model.display.localized(preserveOrder ? "系譜の順序で書き出します。" : "選択作品を作成日時の順で書き出します。"))
                         .inkuFont(12).foregroundStyle(.secondary)
-                }
+                } }
                 Form {
-                    Picker(model.display.localized("形式"), selection: $options.format) {
-                        ForEach(SavedExportFormat.allCases, id: \.self) { format in Text(model.display.localized(format.title)).tag(format) }
+                    Picker(lineAnimation ? copy("settingsAnimationFormat", "フォーマット") : model.display.localized("形式"), selection: $options.format) {
+                        ForEach(lineAnimation ? [.apng, .gif] : SavedExportFormat.allCases, id: \.self) { format in
+                            Text(lineAnimation ? copy(format == .apng ? "animationFormatApng" : "animationFormatGif", format.title) : model.display.localized(format.title)).tag(format)
+                        }
                     }
                     if options.format == .svg {
                         HStack {
@@ -109,7 +114,7 @@ struct ExportView: View {
                         Text(model.display.localized("表示用は保存時の記述をSVGへ添えます。ほかのプロファイルは作品の保存条件で描画します。"))
                             .inkuFont(12).foregroundStyle(.secondary)
                     }
-                    if options.format == .png || options.format == .shareCard || animation {
+                    if !animation && (options.format == .png || options.format == .shareCard) {
                         Picker(model.display.localized("Y軸"), selection: $resolution) {
                             if animation {
                                 Text("150px").tag(150); Text("300px").tag(300); Text("500px").tag(500)
@@ -151,10 +156,11 @@ struct ExportView: View {
                     }
                     if animation {
                         if selection.count == 1 {
-                            Stepper(model.display.localizedFormat("フレーム数: %ld", options.layerFrameCount), value: $options.layerFrameCount, in: 2...120)
-                            TextField(model.display.localized("描画間隔（0.1〜30秒）"), value: $options.layerIntervalSeconds, format: .number)
-                            Picker(model.display.localized("再生"), selection: $options.layerReplay) {
-                                Text(model.display.localized("最初から繰り返し")).tag("restart"); Text(model.display.localized("往復")).tag("reverse"); Text(model.display.localized("1回のみ")).tag("once")
+                            Toggle(copy("settingsAnimationShowDdl", "DDL を並べる"), isOn: $options.showDDL)
+                            TextField(copy("settingsAnimationLayerInterval", "行の間隔"), value: $options.layerIntervalSeconds, format: .number)
+                            Text(copy("settingsAnimationLayerIntervalHint", "各フレームを表示する秒数")).inkuFont(12).foregroundStyle(.secondary)
+                            Picker(copy("settingsAnimationLayerReplay", "繰り返し方"), selection: $options.layerReplay) {
+                                Text(copy("animationLayerReplayRestart", "最初に戻る")).tag("restart"); Text(copy("animationLayerReplayReverse", "逆に再生する")).tag("reverse"); Text(copy("animationLayerReplayOnce", "最初だけ再生する")).tag("once")
                             }
                         } else {
                             Picker(model.display.localized("切り替え"), selection: $options.transition) {
@@ -163,11 +169,30 @@ struct ExportView: View {
                             }
                             TextField(model.display.localized("作品の表示時間（0.1〜30秒）"), value: $options.holdSeconds, format: .number)
                         }
-                        Text(model.display.localized("1作品では描画要素を順に表示します。合計6億画素を超える設定は書き出す前に確認します。"))
+                        Text(copy("settingsAnimationExportDescription", "1作品は行ごとに描画します。"))
                             .inkuFont(12).foregroundStyle(.secondary)
+                        Picker(copy("settingsAnimationResolution", "解像度（Y軸）"), selection: $resolution) {
+                            Text("150px").tag(150); Text("300px").tag(300); Text("500px").tag(500)
+                            Text("1K（1080px）").tag(1080); Text("4K（2160px）").tag(2160); Text("8K（4320px）").tag(4320)
+                            Text(copy("animationResolutionCustom", "任意指定")).tag(0)
+                            if resolution != 0, ![150, 300, 500, 1080, 2160, 4320].contains(resolution) { Text("\(resolution)px").tag(resolution) }
+                        }
+                        if resolution == 0 { TextField(copy("animationCustomHeight", "Y軸ピクセル数"), value: $customHeight, format: .number) }
                     }
                 }.formStyle(.grouped).frame(minWidth: 370).disabled(isBusy)
               }
+            }
+            if lineAnimation {
+                HStack {
+                    Text(copy("settingsDownloadFolderLabel", "保存先"))
+                    Text(animationDestination?.lastPathComponent ?? model.display.preferences.exportDefaults.destinationName ?? copy("settingsDownloadFolderNone", "書き出すときに選択"))
+                        .foregroundStyle(.secondary)
+                    Button(copy("animationExportChoosePath", "保存先を選択")) {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true
+                        if panel.runModal() == .OK { animationDestination = panel.url }
+                    }.disabled(isBusy)
+                }
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
             if !status.isEmpty { Text(model.display.message(status)).inkuFont(13).foregroundStyle(.secondary) }
@@ -247,7 +272,8 @@ struct ExportView: View {
             defer { isBusy = false; operation = nil }
             do {
                 let profile = capturedOptions.format == .svg ? capturedOptions.svgProfile : "display"
-                let sources = try await model.prepareExportSources(works: capturedWorks, profile: profile, requiresPluginDefinitions: capturedOptions.format == .ddl)
+                let sources = try await model.prepareExportSources(works: capturedWorks, profile: profile, requiresPluginDefinitions: capturedOptions.format == .ddl,
+                                                                   lineAnimation: capturedWorks.count == 1 && (capturedOptions.format == .apng || capturedOptions.format == .gif))
                 try Task.checkCancellation()
                 status = "\(capturedWorks.count)作品を描画・エンコードしています…"
                 let artifacts = try await ExportService.prepare(sources: sources, options: capturedOptions)
@@ -260,6 +286,12 @@ struct ExportView: View {
                 }
                 let urls = try await save(artifacts: artifacts, destination: destination)
                 exportedURLs = urls; status = "\(urls.count)ファイルを書き出しました。"
+                if capturedWorks.count == 1, let artifact = artifacts.first, let matches = artifact.matchesSavedSVG {
+                    var warnings: [String] = []
+                    if !matches { warnings.append(copy("animationSavedMismatch", "現在の描画結果は保存された絵と異なります。")) }
+                    if artifact.compileOutcome != "complete" { warnings.append(copy("animationCompileIncomplete", "指示書の一部を描けませんでした。")) }
+                    if warnings.isEmpty { dismiss() } else { status = warnings.joined(separator: " ") }
+                }
                 if directFormat { model.reportExportStatus(status); dismiss() }
             } catch is CancellationError {
                 status = "書き出しを中止しました。"
@@ -270,6 +302,7 @@ struct ExportView: View {
     }
 
     private func destination(artifacts: [ExportArtifact], format: SavedExportFormat, configuration: ExportConfiguration) throws -> URL? {
+        if lineAnimation, let animationDestination { return animationDestination }
         if !directFormat, let bookmark = configuration.destinationBookmark {
             var stale = false
             let folder = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)

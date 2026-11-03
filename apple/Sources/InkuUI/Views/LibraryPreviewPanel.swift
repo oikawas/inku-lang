@@ -110,7 +110,7 @@ struct LibraryPreviewPanel: View {
             }
             Button(display.localized("共有カード")) { onWorkAction(work, "export-format:shareCard") }
             Button(display.webCopy("savedWorkExportDdl", "DDL（プラグイン定義付き）")) { onWorkAction(work, "export-format:ddl") }
-            Button(display.webCopy("savedWorkExportLayerAnimation", "レイヤーアニメーション")) { onWorkAction(work, "export-format:apng") }
+            Button(display.webCopy("savedWorkExportLayerAnimation", "行ごとのアニメーション")) { onWorkAction(work, "export-line-animation") }
         } label: { menuLabel(display.localized("書き出す")) }
         .menuStyle(.borderlessButton).fixedSize().disabled(disabled || writingLocked)
     }

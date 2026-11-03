@@ -35,10 +35,13 @@ struct SavedWorkExportMenu: View {
                 Button(copy("historyCardExport", "共有カード")) { onAction("export-format:shareCard") }
                 Button(copy("savedWorkExportDdl", "DDL（プラグイン定義付き）")) { onAction("export-format:ddl") }
             }
-            Menu(copy(count == 1 ? "savedWorkExportLayerAnimation" : "savedWorkExportTransitionAnimation",
-                      count == 1 ? "レイヤーアニメーション" : "作品の切り替えアニメーション")) {
+            if count == 1 {
+                Button(copy("savedWorkExportLayerAnimation", "行ごとのアニメーション")) { onAction("export-line-animation") }
+            } else {
+            Menu(copy("savedWorkExportTransitionAnimation", "作品の切り替えアニメーション")) {
                 Button("APNG") { onAction("export-format:apng") }
                 Button("GIF") { onAction("export-format:gif") }
+            }
             }
             if count > 1 {
                 Button(copy("savedWorkExportContactSheet", "コンタクトシート（閲覧用）")) { onAction("export-format:reviewSheet") }

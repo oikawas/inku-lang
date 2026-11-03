@@ -382,12 +382,6 @@ fn account_composition_plan(
                 })
             })
             .transpose()?;
-        let templates = 1_u64
-            .checked_add(body.map_or(0, |body| body.object_templates))
-            .ok_or_else(|| PlanResourceError {
-                owner: Box::new(owner.clone()),
-                reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::ObjectTemplates),
-            })?;
         let nodes = body.map_or(Some(0), |body| Some(body.template_nodes));
         let nodes = nodes
             .and_then(|n| 1_u64.checked_add(n))
@@ -397,7 +391,7 @@ fn account_composition_plan(
             })?;
         accounting.add(
             ResourceDemand {
-                object_templates: templates,
+                object_templates: 1,
                 template_nodes: nodes,
                 ..ResourceDemand::default()
             },

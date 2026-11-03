@@ -282,9 +282,9 @@ The checks look at shape and correctness, not at how a word looks. These rules w
 - **Thickness.** Write thickness with `thinness` (the table in §3.8). When a `cycle` table chooses the tool, write the thickness as its own `cycle` table too.
 - **How fluctuation looks, roughly.** It depends on the shape and size, but `broadly` sways widely and `narrowly` slightly; `loosely` makes slow broad undulations and `tightly` fine crinkles, with no frequency word in between; `undulating` is a regular wave and `swaying` an irregular sway. `ink_spread` `bleeding` adds a soft haze around the line.
 - **Place words.** `place` words are those in the list of §3.8; there is no word such as "lower right".
-- **Object boxes.** Inside a box that is not square (an `aspect` such as `1:2`), a figure under a `transform` was not drawn, with no diagnostic. An object that uses tilted arcs takes a `1:1` box and keeps its shape in the middle of it. An object's normal size draws small, so try "large" and the like in its example.
+- **Object boxes.** A `transform` that fits is drawn inside a non-square box too (an `aspect` such as `1:2`). A diagnostic for a figure omitted inside the object belongs to its object instruction. An object's normal size draws small, so try "large" and the like in its example.
 - **Give an object's example a placing verb.** An object is placed like a square, so its bare name `{stone}.` draws nothing (`missing_place_action`). An omitted object example is drawn as `Place {stone}.` Write an explicit example like `Place a large {stone} at the center.`
-- **Objects and the figure count.** An object's content counts toward a work's figure instructions (64, §8). A work with an object that went over 64 lost the object or was not made. Keep the counts in the examples of large objects down.
+- **Objects and the figure count.** An object counts as one figure instruction (64 per work, §8); its content counts toward the work-wide template-node and primitive-mark limits. Keep the counts in the examples of large objects down.
 
 ## 4. Calling a plugin from DDL
 

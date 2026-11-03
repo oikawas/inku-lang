@@ -56,6 +56,132 @@ fn lock(definition: &MacroDefinition) -> MacroLock {
 }
 
 #[test]
+fn object_body_is_bounded_by_nodes_and_marks_not_instruction_count() {
+    let body: Vec<_> = (0..64)
+        .map(|i| {
+            let mut line = arc(&format!("part{i}"), "0.5", "0");
+            let fields = line["fields"].as_object_mut().unwrap();
+            fields.insert(
+                "shape".into(),
+                json!({"expr":"semantic_ref","category":"shape","id":"line"}),
+            );
+            fields.remove("chord");
+            fields.remove("sagitta");
+            fields.insert(
+                "length".into(),
+                json!({"expr":"exact_decimal","value":"0.4"}),
+            );
+            line
+        })
+        .collect();
+    let definition = word("Many", "多い", "many", "1:1", json!(body));
+    let mut budget = ResourceBudget {
+        maximum: ResourceDemand {
+            logical_objects: 400,
+            primitive_marks: 400,
+            object_templates: 64,
+            maximum_per_template_primitive_marks: 240,
+            maximum_resolved_count: 2000,
+            template_nodes: 128,
+            anchor_instances: 400,
+            transform_instances: 400,
+            placement_instances: 400,
+            fill_instances: 400,
+        },
+    };
+    let run = |budget| {
+        compile_ddl_to_score_with_resources(
+            NormalizedDdlDocument::new(
+                "｛多い｝を置く。",
+                ResolvedInstructionLanguage::Ja,
+                vec![lock(&definition)],
+            )
+            .unwrap(),
+            std::slice::from_ref(&definition),
+            Some(37),
+            MacroExpansionLimits {
+                max_invocations: 64,
+                max_depth: 16,
+                max_evaluation_steps: 8192,
+                max_nodes_per_invocation: 512,
+                max_total_nodes: 512,
+            },
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::OmitAndContinue,
+            HardResourcePolicy {
+                identity: "many-object-test.v1".into(),
+                budget,
+            },
+            OperationalResourceBudget(budget),
+        )
+    };
+    let result = run(budget);
+    assert!(
+        result.downstream_diagnostics().is_empty(),
+        "{:?}",
+        result.downstream_diagnostics()
+    );
+    let score = result.score().unwrap();
+    assert_eq!(score.object_templates.len(), 1);
+    assert_eq!(result.demand().unwrap().object_templates, 1);
+    assert_eq!(result.demand().unwrap().primitive_marks, 64);
+    let replay = inku_score::finalize_saved_score(
+        score,
+        &HardResourcePolicy {
+            identity: "many-object-test.v1".into(),
+            budget,
+        },
+        OperationalResourceBudget(budget),
+    )
+    .unwrap();
+    assert!(
+        replay.resource_diagnostics.is_empty(),
+        "{:?}",
+        replay.resource_diagnostics
+    );
+    assert_eq!(replay.demand.object_templates, 1);
+    let picture = inku_render::render::render_with_resources(
+        inku_render::types::RenderRequest {
+            score: score.clone(),
+            options: inku_render::types::RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas: inku_render::types::CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: inku_render::types::SvgProfile::Display,
+                render_seed: Some(17),
+                composition_seed: Some(37),
+                wild: false,
+                error_policy: ScoreErrorPolicy::OmitAndContinue,
+            },
+        },
+        &HardResourcePolicy {
+            identity: "many-object-test.v1".into(),
+            budget,
+        },
+        OperationalResourceBudget(budget),
+        inku_render::render::CompatFillClipPolicy {
+            tolerance_pixels: 0.1,
+            limits: inku_render::compat_clip::ClipLimits {
+                max_nodes: 50_000,
+                max_path_elements: 200_000,
+                max_flattened_points: 200_000,
+                max_work: 10_000_000,
+                max_output_vertices: 200_000,
+            },
+        },
+    )
+    .unwrap();
+    assert!(picture.svg.matches("<path").count() >= 64);
+    budget.maximum.template_nodes = 64;
+    let rejected = run(budget);
+    assert_eq!(rejected.resource_omissions().len(), 1);
+    assert!(
+        format!("{:?}", rejected.resource_omissions()[0].cause.reason).contains("TemplateNodes")
+    );
+}
+
+#[test]
 fn an_undeclared_object_color_changes_only_the_primary_literal_color() {
     let mut hull = arc("hull", "0.3", "0");
     let mut mast = arc("mast", "0.5", "0");
@@ -1082,7 +1208,7 @@ fn object_word_draws_instead_of_being_rejected() {
         );
         if source.contains("8枚") || source.contains("8 {leaf}") {
             assert_eq!(result.demand().unwrap().primitive_marks, 16);
-            assert_eq!(result.demand().unwrap().object_templates, 3);
+            assert_eq!(result.demand().unwrap().object_templates, 1);
         }
         assert_eq!(score.version, "0.23.0");
         assert_eq!(score.object_templates.len(), 1);

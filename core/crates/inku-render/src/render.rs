@@ -433,6 +433,7 @@ fn paint_object_body(
     material_definitions: &mut Vec<Element>,
     surface_definitions: &mut Vec<Element>,
     allowance: &mut OutputAllowance,
+    body_diagnostics: &mut Vec<inku_score::ScoreExecutionDiagnostic>,
 ) -> Result<Element, RenderError> {
     let (canvas, box_transform) =
         crate::object_template::object_box_transform(parent, request.options.canvas, containing)
@@ -466,11 +467,31 @@ fn paint_object_body(
             CheckedPerformanceWithResourcesError::Performance(error) => {
                 RenderError::CheckedPerformance(error)
             }
-        })?
+        })
     } else {
         resolve_checked_performance(body_request, request.options.error_policy)
-            .map_err(RenderError::CheckedPerformance)?
+            .map_err(RenderError::CheckedPerformance)
     };
+    let performed = match performed {
+        Ok(performed) => performed,
+        Err(RenderError::CheckedPerformance(error))
+            if request.options.error_policy == inku_score::ScoreErrorPolicy::OmitAndContinue
+                && error.diagnostics.iter().any(|d| {
+                    d.reason == inku_score::ScoreExecutionReason::NoDrawableInstructions
+                }) =>
+        {
+            body_diagnostics.extend(
+                error.diagnostics.into_iter().filter(|d| {
+                    d.reason != inku_score::ScoreExecutionReason::NoDrawableInstructions
+                }),
+            );
+            return Ok(Element::new("g"));
+        }
+        Err(error) => return Err(error),
+    };
+    if let Some(execution) = &performed.execution {
+        body_diagnostics.extend(execution.diagnostics.iter().cloned());
+    }
     let profile = request.options.svg_profile;
     let use_filters = matches!(profile, SvgProfile::Display | SvgProfile::Live);
     let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&performed.score.instructions);
@@ -1040,6 +1061,7 @@ fn render_impl(
     // line keeps them, so every other work draws as before.
     let keeps_obstacles = performance.score.uses_free_line();
     let mut obstacles = Vec::new();
+    let mut object_diagnostics = Vec::new();
     for (performed_index, (instruction, performed)) in ordered {
         let visible =
             instruction_limit.is_none_or(|limit| performed.original_instruction_index < limit);
@@ -1134,6 +1156,7 @@ fn render_impl(
         for (mark_index, copy) in expanded.iter().enumerate() {
             let single = &copy.instruction;
             if let Some(template) = object_templates.get(&performed.original_instruction_index) {
+                let mut body_diagnostics = Vec::new();
                 let body = paint_object_body(
                     template,
                     single,
@@ -1148,7 +1171,18 @@ fn render_impl(
                     &mut material_definitions,
                     &mut surface_definitions,
                     &mut allowance,
+                    &mut body_diagnostics,
                 )?;
+                if visible {
+                    for mut diagnostic in body_diagnostics {
+                        diagnostic.instruction_index = performed.original_instruction_index;
+                        diagnostic.anchor_index = None;
+                        diagnostic.dependency_instruction_index = None;
+                        if !object_diagnostics.contains(&diagnostic) {
+                            object_diagnostics.push(diagnostic);
+                        }
+                    }
+                }
                 if structured || has_fill_scopes {
                     instruction_group.push(body);
                 } else if visible {
@@ -1401,6 +1435,7 @@ fn render_impl(
         .into_iter()
         .map(|name| crate::types::RenderWarning::InvalidColor { name })
         .collect();
+    let rendered_instruction_indices = performance.original_instruction_indices();
     if let Some(demand) = performance.resource_demand {
         use crate::types::{
             RenderResourceExecution, RenderResourceFailure, RenderResourceOmission,
@@ -1440,6 +1475,18 @@ fn render_impl(
             omissions,
             relation_omissions: performance.relation_diagnostics,
         });
+    }
+    if !object_diagnostics.is_empty() {
+        let execution =
+            performance
+                .execution
+                .get_or_insert_with(|| inku_score::ScoreExecutionSummary {
+                    input_score_digest: inku_score::canonical_score_digest(&source_score)
+                        .expect("validated Score canonicalization"),
+                    diagnostics: Vec::new(),
+                    rendered_instruction_indices,
+                });
+        execution.diagnostics.extend(object_diagnostics);
     }
     metadata.execution = performance.execution;
     Ok(RenderOutput { svg, metadata })
@@ -1576,6 +1623,7 @@ mod tests {
             &mut definitions,
             &mut surfaces,
             &mut allowance,
+            &mut Vec::new(),
         )
         .unwrap();
         assert_eq!(body.children().len(), 2);
@@ -1595,6 +1643,57 @@ mod tests {
             "{}",
             rendered.svg
         );
+    }
+
+    #[test]
+    fn rectangular_object_transforms_draw_and_report_body_omissions_at_parent() {
+        for aspect in [[1, 2], [2, 1]] {
+            for (rotation, translation, fails) in
+                [(30.0, 0.0, false), (0.0, 0.05, false), (0.0, 2.0, true)]
+            {
+                let body: Score = serde_json::from_value(serde_json::json!({"version":"0.22.0","instructions":[
+                    {"primitive":"line","from":[0.3,0.5],"to":[0.7,0.5],"color":"red"}
+                ],"transform_groups":[{"start":0,"end":1,"rotation_degrees":rotation,"translate_x":translation,"fixed_position_indices":[0]}]})).unwrap();
+                let mut score: Score =
+                    serde_json::from_value(serde_json::json!({"version":"0.23.0","instructions":[
+                        {"primitive":"line","from":[0.1,0.1],"to":[0.2,0.1]},
+                        {"primitive":"square","position":[0.3,0.3],"size":[0.2,0.2]}
+                    ]}))
+                    .unwrap();
+                score.object_templates.push(inku_score::ObjectTemplate {
+                    instruction_index: 1,
+                    aspect,
+                    body: Box::new(body),
+                });
+                let output = render(RenderRequest {
+                    score,
+                    options: RenderOptions {
+                        resolved_color_map: Default::default(),
+                        catalog_id: None,
+                        canvas: CanvasSize::new(1000.0, 1000.0),
+                        canvas_aspect_id: "square".into(),
+                        svg_profile: SvgProfile::Display,
+                        render_seed: Some(17),
+                        composition_seed: Some(37),
+                        wild: false,
+                        error_policy: inku_score::ScoreErrorPolicy::OmitAndContinue,
+                    },
+                })
+                .unwrap();
+                let diagnostics = output
+                    .metadata
+                    .execution
+                    .as_ref()
+                    .map(|s| s.diagnostics.as_slice())
+                    .unwrap_or(&[]);
+                if fails {
+                    assert!(diagnostics.iter().any(|d| d.instruction_index == 1 && d.anchor_index.is_none() && d.reason == inku_score::ScoreExecutionReason::NumericTransformGroupPositionConflict), "{diagnostics:?}");
+                } else {
+                    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+                    assert!(output.svg.matches("<path").count() >= 2, "{}", output.svg);
+                }
+            }
+        }
     }
 
     #[test]
@@ -1663,6 +1762,7 @@ mod tests {
                 &mut Vec::new(),
                 &mut Vec::new(),
                 &mut OutputAllowance::default(),
+                &mut Vec::new(),
             )
             .unwrap();
             let mut doc = Document::new(request.options.canvas);

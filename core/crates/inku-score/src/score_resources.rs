@@ -998,16 +998,6 @@ impl Analysis {
                 });
                 continue;
             };
-            let Some(object_templates) =
-                1_u64.checked_add(body.map_or(0, |body| body.object_templates))
-            else {
-                self.pending_failures.push(PendingFailure {
-                    source,
-                    owner,
-                    dimension: ResourceDimension::ObjectTemplates,
-                });
-                continue;
-            };
             let Some(template_nodes) =
                 body.map_or(Some(1), |body| body.template_nodes.checked_add(1))
             else {
@@ -1076,7 +1066,7 @@ impl Analysis {
                 demand: ResourceDemand {
                     logical_objects: unclaimed_logical,
                     primitive_marks,
-                    object_templates,
+                    object_templates: 1,
                     maximum_per_template_primitive_marks: per_template,
                     maximum_resolved_count: intrinsic
                         .max(body.map_or(0, |body| body.maximum_resolved_count)),
@@ -1353,7 +1343,6 @@ pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceD
                     .ok_or(ResourceDimension::PrimitiveMarks)?;
                 let multiply = |value: u64, dimension| value.checked_mul(marks).ok_or(dimension);
                 template_demand = template_demand.checked_add(ResourceDemand {
-                    object_templates: body.object_templates,
                     anchor_instances: multiply(
                         body.anchor_instances,
                         ResourceDimension::AnchorInstances,
@@ -2192,7 +2181,7 @@ mod tests {
         });
         let demand = legacy_resource_demand(&score).unwrap();
         assert_eq!(demand.primitive_marks, 16);
-        assert_eq!(demand.object_templates, 3);
+        assert_eq!(demand.object_templates, 1);
         assert!(
             check_legacy_resource_demand(&score, &hard(15), OperationalResourceBudget(budget(15)))
                 .is_err()
@@ -2240,7 +2229,7 @@ mod tests {
         assert_eq!(result.score.object_templates.len(), 1);
         assert_eq!(result.score.object_templates[0].instruction_index, 0);
         assert_eq!(result.demand.primitive_marks, 1);
-        assert_eq!(result.demand.object_templates, 2);
+        assert_eq!(result.demand.object_templates, 1);
     }
 
     #[test]

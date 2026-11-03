@@ -72,7 +72,7 @@ DDL is written as short sentences in English or Japanese. It can be read without
 
 The same text, read by a different model, gives a different reading and a different picture. The choice of model is one more variable of expression.
 
-<!-- TODO(author): draw the same input text with different models and export 5 works (the first frame is the work above, GPT-6.1 Sol) as "Transition animation". GIF, height 480 px, cut, hold 1.0 s (a 5 s loop, I-030). No labels on the frames; list the model names in order in the note below -->
+<!-- TODO(author): on the work above (86a9a876), use "Change the model" in the work edit menu to draw candidates with 4 models and save them as children (manual §10), then export 86a9a876 and the 4 children, 5 works, as "Transition animation" (manual §15.3). GIF, height 480 px, cut, hold 1.0 s (a 5 s loop, I-030). No labels on the frames; list the model names in order in the note below -->
 <p align="center">
   <img src="docs/assets/readme/umbrella-models.en.gif" width="420" alt="Pictures of the same red umbrella text, drawn by five models, follow one another, one second each"><!-- TODO(me): once the works are in, add how each frame differs to the alt text -->
 </p>

@@ -1293,7 +1293,10 @@ fn render_impl(
                     crate::types::Weight::Burin | crate::types::Weight::Drypoint
                 )
             });
-    if instruction_limit != Some(0)
+    if (instruction_limit != Some(0)
+        || ground
+            .as_ref()
+            .is_some_and(|ground| ground.material == crate::types::GroundMaterial::Mezzotint))
         && is_print
         && let Some(seed) = request.options.render_seed
     {
@@ -1503,6 +1506,25 @@ mod tests {
             .next()
             .unwrap();
         assert!(full.contains(first_mark));
+    }
+
+    #[test]
+    fn ground_only_mezzotint_frame_keeps_its_plate_tone() {
+        let request = RenderRequest {
+            score: serde_json::from_value(serde_json::json!({"canvas":{"aspect":"square","ground":{"material":"mezzotint","tone":"warm","grain":"medium"}},"instructions":[]})).unwrap(),
+            options: RenderOptions { resolved_color_map: Default::default(), catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0), canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display, render_seed: Some(17), composition_seed: None,
+                wild: false, error_policy: inku_score::ScoreErrorPolicy::OmitAndContinue },
+        };
+        let ordinary = render_impl(request.clone(), None, &[], OutputAllowance::default(), None)
+            .unwrap()
+            .svg;
+        let frame = render_impl(request, None, &[], OutputAllowance::default(), Some(0))
+            .unwrap()
+            .svg;
+        assert!(frame.contains("layer_15_plate_tone"));
+        assert_eq!(ordinary, frame);
     }
 
     #[test]

@@ -130,13 +130,22 @@ pub fn line_animation(input_bytes: Vec<u8>) -> Vec<u8> {
         .map_err(|error| refusal("compile_refused", &error.to_string()))?;
         let mut frames = Vec::with_capacity(ranges.len() + 1);
         for index in 0..=ranges.len() {
-            let output = inku_pipeline::core_boundary::render_delivery_instruction_prefix(
-                &delivery,
-                input.options.clone().into(),
-                &input.compiler,
-                input.clip,
-                index,
-            )
+            let output = if index == ranges.len() {
+                inku_pipeline::core_boundary::render_delivery(
+                    &delivery,
+                    input.options.clone().into(),
+                    &input.compiler,
+                    input.clip,
+                )
+            } else {
+                inku_pipeline::core_boundary::render_delivery_instruction_prefix(
+                    &delivery,
+                    input.options.clone().into(),
+                    &input.compiler,
+                    input.clip,
+                    index,
+                )
+            }
             .map_err(|error| refusal("render_refused", &error.to_string()))?;
             let selected = if index == 0 {
                 (1..=input.document.source.split('\n').count())

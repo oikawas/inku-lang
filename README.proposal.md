@@ -72,11 +72,11 @@ DDL is written as short sentences in English or Japanese. It can be read without
 
 The same text, read by a different model, gives a different reading and a different picture. The choice of model is one more variable of expression.
 
-<!-- TODO(author): on the work above (86a9a876), use "Change the model" in the work edit menu to draw candidates with 4 models and save them as children (manual §10), then export 86a9a876 and the 4 children, 5 works, as "Transition animation" (manual §15.3). GIF, height 480 px, cut, hold 1.0 s (a 5 s loop, I-030). No labels on the frames; list the model names in order in the note below -->
+<!-- Work 86a9a876 (GPT-6.1 Sol) and its children 009ea32d, 66dc1105, 3de5c74d, dfeddfa2, drawn with "Change the model" in the work edit menu, exported with the web's "Transition animation" (GIF, 480×480, cut, 1.0 s each, endless loop, 0.17 MiB. I-030) -->
 <p align="center">
-  <img src="docs/assets/readme/umbrella-models.en.gif" width="420" alt="Pictures of the same red umbrella text, drawn by five models, follow one another, one second each"><!-- TODO(me): once the works are in, add how each frame differs to the alt text -->
+  <img src="docs/assets/readme/umbrella-models.en.gif" width="420" alt="Pictures of the same red umbrella text, drawn by five models, change every second. Gray watercolor discs tiled like cobblestones on a dark slate ground, under a red ellipse. Rows of gray ovals and thin blue vertical lines on a pale gray ground, with a large red circle left of center. A red circle with dark specks on a blue-gray ground ruled by a thin blue grid. A red circle at lower left on blue-gray, with pale ellipses at upper right and a chain of thin circles along the bottom. A red circle over a chain of black rings along the bottom, with a pale cloudy shape at upper right">
 </p>
-<p align="center"><sub>Frames in order: GPT-6.1 Sol → (TODO: model names)</sub></p>
+<p align="center"><sub>Frames in order: GPT-6.1 Sol → GPT-6.1 Terra → Gemini 3.8 Flash → Claude Sonnet 5.5 → Claude Opus 5.5</sub></p>
 
 ---
 
@@ -227,11 +227,11 @@ Change one tool word in the DDL, and the same shapes are drawn another way. In t
 On the night of the blackout, candles flickered to life in the apartment windows, one by one, until an uneven grid of light emerged from the darkness.
 ```
 
-<!-- TODO(author): open work 763e2b5a-889d-418a-b896-b6feb6cc3039 (parent 76070056, Build 1385, render engine 96), use "Change the touches" → "Same tool for every sentence" to save it in 5 tools, and export 6 works with the original as the first frame as "Transition animation". GIF, height 480 px, cut, hold 0.8 s (a 4.8 s loop, I-030). The DDL names a tool in only 13 of its 33 drawing sentences (pen 4, watercolor 9); "Same tool for every sentence" writes the tool word into the other 20 too. No labels on the frames; list the tools in order in the note below -->
+<!-- Work 763e2b5a and its children 506cc532, e5abfbb4, ff141585, 2bf6d565, a8715026, drawn with "Change the touches" (Same tool for every sentence) in the work edit menu, exported with the web's "Transition animation" (GIF, 480×480, cut, 0.8 s each, endless loop, 0.26 MiB. I-030). The DDL names a tool in only 13 of its 33 drawing sentences; "Same tool for every sentence" writes the tool word into the other 20 too -->
 <p align="center">
-  <img src="docs/assets/readme/candle-touches.en.gif" width="420" alt="The same picture of an apartment block with candles lit in some windows, drawn with a different tool every 0.8 seconds"><!-- TODO(me): once the works are in, add how each frame's drawing differs to the alt text -->
+  <img src="docs/assets/readme/candle-touches.en.gif" width="420" alt="The same picture of an apartment block, with candles lit in nine windows, changes its tool every 0.8 seconds. The original. A picture in grainy, fine horizontal streaks. A picture scored in fine slanting parallel lines. A picture with a gray wash spreading wide over the ground. Coarse-pixel windows on a bright pale blue and pink ground. A picture crossed by broad gray, white, and orange strokes of a knife">
 </p>
-<p align="center"><sub>Frames in order: the original (pen, watercolor) → (TODO: tools)</sub></p>
+<p align="center"><sub>Frames in order: the original (pen, watercolor) → silverpoint → etching → watercolor → computer → painting knife</sub></p>
 <p align="center"><sub>Model GPT-6.1 Sol · color catalog Lantern &amp; Dew · seed 8069091770428325</sub></p>
 
 In the original picture, a large gray square stands for the apartment block on a black ground, and gray window rectangles are lined up on it, five across and four down. Nine of the windows glow with an orange or yellow oval of light, each with a small candle and a flame inside.

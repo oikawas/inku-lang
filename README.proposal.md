@@ -175,7 +175,7 @@ Design principles:
 
 ### One line at a time
 
-DDL is drawn from the top line down. The animation below shows the picture after each added line of DDL: the DDL on the left, the picture on the right, with the current line marked.
+DDL is drawn from the top line down. The animation below starts from the finished picture, goes back to the bare ground, and shows the picture after each added line of DDL: the DDL on the left, the picture on the right, with the line just drawn in bold.
 
 ```
 清水へ　祇園をよぎる　桜月夜　こよひ逢ふ人　みなうつくしき[みだれ髪・与謝野晶子・明治34年 1901年]
@@ -183,9 +183,9 @@ DDL is drawn from the top line down. The animation below shows the picture after
 
 (A tanka by Yosano Akiko, from *Midaregami*, 1901: "To Kiyomizu, crossing Gion on a night of cherry blossoms under the moon — everyone I meet tonight is beautiful." Translation for this README.)
 
-<!-- TODO(author): export work ddb757dd-e40c-4245-9931-4b294172a416 (parent 55f5278a, Build 1385, render engine 96) with the web's "Line animation" (manual §15.3). "Show DDL" on, GIF, height 480 px (frames are 912×480), "Line interval" 1.0 s (18 frames, an 18 s loop: an exception to I-030's 3 to 5 s, chosen by the author on 2026-11-03), repeat "Restart". Under I-030 the first frame is the finished picture -->
+<!-- Work ddb757dd-e40c-4245-9931-4b294172a416 (parent 55f5278a, Build 1385, render engine 96), exported with the web's "Line animation" on 5173 (v2.15.310 / Build 1386; manual §15.3. "Show DDL" on, GIF, 912×480, 18 frames, "Line interval" 1.0 s for an 18 s loop, an exception to I-030's 3 to 5 s chosen by the author, repeat "Restart", 0.53 MiB). Under I-030 the first frame is the finished picture -->
 <p align="center">
-  <img src="docs/assets/readme/tanka-lines.gif" width="720" alt="On the left, lines of DDL appear one by one from the top; on the right, thin white lines, white circles, and clusters of small circles are added in turn on a navy ground">
+  <img src="docs/assets/readme/tanka-lines.gif" width="720" alt="DDL on the left and a picture on a navy ground on the right. After the finished picture, it goes back to the bare ground, and every second one line of the DDL turns bold as its shapes are added to the picture: thin white lines drawn across and on a slant, clusters of small circles scattered, and four white circles placed, until the finished picture returns. The DDL column scrolls to keep the bold line near the middle">
 </p>
 <p align="center"><sub>Model GPT-6.1 Sol · color catalog Lantern &amp; Dew · seed 754190306630586</sub></p>
 

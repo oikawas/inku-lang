@@ -736,6 +736,8 @@ PNG 書き出しの選択肢は、設定モーダルのエクスポートタブ�
 
 口 `line_animation`（Python は `pipeline_line_animation`）は UTF-8 JSON bytes で `document`、`definitions`、`compiler`、描画 `options`、`clip`、`saved_svg`、`show_ddl`、`font_family`、`font_files` を受ける。前5項は既存の compile／render 境界と同じ型である。答えの `frames` は `instruction_count`、今回強調する1始まり・両端を含む `lines`、選択された `svg`、絵だけの `art_svg` を持つ。`matches_saved_svg` は最後の `art_svg` と保存 SVG の比較であり、合成した SVG との比較ではない。compile の `outcome` と診断・省略も返す。`font_files` は host が rasterize に渡せるよう返し、core は system font を選ばない。
 
+UniFFI の `prepare_raster_scene_with_fonts(svg, font_files)` は指定された字体ファイルだけを使って SVG を画像化用に準備し、読めないファイルは `font_file_unreadable` で断る。複数コマでは `prepare_raster_fonts(font_files)` の返す字体を使い回して各 scene を準備できる。既定の `prepare_raster_scene` は字体を読み込まない。
+
 2作品以上では、チェックした作品は古い順、系譜経路は起点から表示中までの順で切り替える。設定のエクスポートタブの値を初期値として、形式（APNG／GIF）、解像度と任意の高さ、1作品用の分割・間隔・リプレイ、複数作品用の切り替えパターン・表示秒数を管理する。出力モーダルには対象数に対応する項目を表示する。サイズと保存先は両方式で共通で、対応ブラウザでは保存先パス指定ボタンからフォルダを選択できる。モーダル内の設定・保存先の変更は今回の出力にだけ適用し、既定設定に保存しない。保存先の指定がない場合は既存の保存先設定に従い、フォルダ選択に非対応のブラウザではブラウザのダウンロード設定を使う。今回指定したフォルダへの保存失敗はモーダル内に表示し、別の保存先へ自動で切り替えない。
 
 系譜では表示中作品・起点から表示中までの経路・チェックした作品に別々の「書き出す」を置く。メニューを開いた時点の対象を保持し、チェックした作品の書き出しに、チェックされていない祖先や表示中作品を自動で追加しない。

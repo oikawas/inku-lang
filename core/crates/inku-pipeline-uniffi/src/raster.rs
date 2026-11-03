@@ -29,6 +29,44 @@ pub struct RasterScene {
     scene: inku_svg_raster::PreparedScene,
 }
 
+/// Host-supplied fonts, loaded once and reused across prepared SVG scenes.
+#[derive(uniffi::Object)]
+pub struct RasterFonts {
+    fonts: inku_svg_raster::PreparedFonts,
+}
+
+#[uniffi::export]
+impl RasterFonts {
+    pub fn prepare_scene(&self, svg: String) -> Result<Arc<RasterScene>, RasterFailure> {
+        catch_unwind(AssertUnwindSafe(|| {
+            Ok(Arc::new(RasterScene {
+                scene: inku_svg_raster::prepare_scene_with_fonts(&svg, &self.fonts)?,
+            }))
+        }))
+        .unwrap_or(Err(RasterFailure::InternalInvariant))
+    }
+}
+
+/// Load explicit font files once for repeated scene preparation.
+#[uniffi::export]
+pub fn prepare_raster_fonts(font_files: Vec<String>) -> Result<Arc<RasterFonts>, RasterFailure> {
+    catch_unwind(AssertUnwindSafe(|| {
+        Ok(Arc::new(RasterFonts {
+            fonts: inku_svg_raster::prepare_fonts(&font_files)?,
+        }))
+    }))
+    .unwrap_or(Err(RasterFailure::InternalInvariant))
+}
+
+/// Prepare one scene with explicitly supplied font files.
+#[uniffi::export]
+pub fn prepare_raster_scene_with_fonts(
+    svg: String,
+    font_files: Vec<String>,
+) -> Result<Arc<RasterScene>, RasterFailure> {
+    prepare_raster_fonts(font_files)?.prepare_scene(svg)
+}
+
 #[uniffi::export]
 impl RasterScene {
     pub fn source_byte_count(&self) -> u64 {
@@ -131,6 +169,7 @@ impl From<RasterError> for RasterFailure {
             RasterError::PixelCountTooLarge { .. } => "pixel_count_too_large",
             RasterError::ByteLengthOverflow => "byte_length_overflow",
             RasterError::Parse(_) => "invalid_svg",
+            RasterError::FontFile { .. } => "font_file_unreadable",
             RasterError::AllocationFailed => "allocation_failed",
         };
         Self::Refused {
@@ -263,4 +302,94 @@ pub(crate) fn measure_visible_difference(input: &[u8]) -> Option<Vec<u8>> {
             (Err(detail), _) | (_, Err(detail)) => measure_refusal("not_drawable", detail),
         },
     )
+}
+
+#[cfg(test)]
+mod font_tests {
+    use super::*;
+
+    fn noto_serif() -> String {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../server/src/inku_server/fonts/NotoSerifJP-Variable.ttf")
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    #[test]
+    fn explicit_font_draws_text_and_can_be_reused_without_system_fonts() {
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80"><text x="4" y="55" font-size="36" font-family="Noto Serif JP">文字 Hello</text></svg>"#;
+        let old = prepare_raster_scene(svg.to_owned())
+            .unwrap()
+            .rasterize(None, Some(80))
+            .unwrap();
+        let empty = prepare_raster_scene_with_fonts(svg.to_owned(), vec![])
+            .unwrap()
+            .rasterize(None, Some(80))
+            .unwrap();
+        assert_eq!(old.pixels, empty.pixels);
+        assert!(
+            old.pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|pixel| pixel[3] == 0)
+        );
+        let font_files = vec![noto_serif()];
+        let fonts = prepare_raster_fonts(font_files.clone()).unwrap();
+        let first = fonts
+            .prepare_scene(svg.to_owned())
+            .unwrap()
+            .rasterize(None, Some(80))
+            .unwrap();
+        let second = fonts
+            .prepare_scene(svg.to_owned())
+            .unwrap()
+            .rasterize(None, Some(80))
+            .unwrap();
+        let direct = prepare_raster_scene_with_fonts(svg.to_owned(), font_files)
+            .unwrap()
+            .rasterize(None, Some(80))
+            .unwrap();
+        assert!(
+            first
+                .pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|pixel| pixel[3] != 0)
+        );
+        assert_eq!(first.pixels, second.pixels);
+        assert_eq!(first.pixels, direct.pixels);
+    }
+
+    #[test]
+    fn unreadable_fonts_are_refused_and_plain_art_is_unchanged() {
+        let missing = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("missing-font-file-for-raster-test.ttf")
+            .to_string_lossy()
+            .into_owned();
+        assert!(matches!(
+            prepare_raster_scene_with_fonts("<svg/>".to_owned(), vec![missing.clone()]),
+            Err(RasterFailure::Refused { code, .. }) if code == "font_file_unreadable"
+        ));
+        assert!(
+            matches!(prepare_raster_fonts(vec![missing]), Err(RasterFailure::Refused { code, .. }) if code == "font_file_unreadable")
+        );
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="#123456"/></svg>"##;
+        let old = prepare_raster_scene(svg.to_owned())
+            .unwrap()
+            .rasterize(None, Some(20))
+            .unwrap();
+        let with_font = prepare_raster_scene_with_fonts(svg.to_owned(), vec![noto_serif()])
+            .unwrap()
+            .rasterize(None, Some(20))
+            .unwrap();
+        assert_eq!(old.pixels, with_font.pixels);
+        assert_eq!(
+            old.pixels,
+            rasterize_svg(svg.to_owned(), None, Some(20))
+                .unwrap()
+                .pixels
+        );
+    }
 }

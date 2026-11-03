@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 use std::fmt;
+use std::sync::Arc;
 
 use resvg::tiny_skia::{Pixmap, Transform};
 use resvg::usvg;
@@ -67,6 +68,7 @@ pub enum RasterError {
     PixelCountTooLarge { actual: u64, maximum: u64 },
     ByteLengthOverflow,
     Parse(String),
+    FontFile { path: String, message: String },
     AllocationFailed,
 }
 
@@ -104,6 +106,7 @@ impl fmt::Display for RasterError {
             }
             Self::ByteLengthOverflow => formatter.write_str("raster byte length overflow"),
             Self::Parse(message) => write!(formatter, "SVG parse failed: {message}"),
+            Self::FontFile { path, message } => write!(formatter, "font file {path}: {message}"),
             Self::AllocationFailed => formatter.write_str("raster allocation failed"),
         }
     }
@@ -146,14 +149,57 @@ impl PreparedScene {
 /// Reuse exactly the same parser options as the one-shot display/export calls.
 pub fn prepare_scene(svg: &str) -> Result<PreparedScene, RasterError> {
     let tree = parse_tree(svg)?;
+    Ok(prepared_scene(svg, tree))
+}
+
+/// An immutable database of host-supplied fonts, reusable for many scenes.
+pub struct PreparedFonts {
+    fontdb: Arc<usvg::fontdb::Database>,
+}
+
+/// Load only the named files. Unreadable paths are refused; like the Python
+/// renderer, fontdb ignores readable data it cannot parse as a font.
+pub fn prepare_fonts(font_files: &[String]) -> Result<PreparedFonts, RasterError> {
+    let mut fontdb = usvg::fontdb::Database::new();
+    for path in font_files {
+        let data = std::fs::read(path).map_err(|error| RasterError::FontFile {
+            path: path.clone(),
+            message: error.to_string(),
+        })?;
+        fontdb.load_font_data(data);
+    }
+    Ok(PreparedFonts {
+        fontdb: Arc::new(fontdb),
+    })
+}
+
+/// Prepare an SVG using only fonts supplied by the host.
+pub fn prepare_scene_with_fonts(
+    svg: &str,
+    fonts: &PreparedFonts,
+) -> Result<PreparedScene, RasterError> {
+    validate_svg(svg)?;
+    let tree = usvg::Tree::from_str(
+        svg,
+        &usvg::Options {
+            resources_dir: None,
+            fontdb: Arc::clone(&fonts.fontdb),
+            ..usvg::Options::default()
+        },
+    )
+    .map_err(|error| RasterError::Parse(error.to_string()))?;
+    Ok(prepared_scene(svg, tree))
+}
+
+fn prepared_scene(svg: &str, tree: usvg::Tree) -> PreparedScene {
     let source_bytes = svg.len() as u64;
     // Count expanded geometry too: repeated <use> nodes can outgrow source text.
     let cache_cost_bytes = scene_cost(&tree).saturating_add(source_bytes.saturating_mul(16));
-    Ok(PreparedScene {
+    PreparedScene {
         tree,
         source_bytes,
         cache_cost_bytes,
-    })
+    }
 }
 
 fn validate_svg(svg: &str) -> Result<(), RasterError> {
@@ -211,7 +257,7 @@ fn scene_cost(tree: &usvg::Tree) -> u64 {
                     };
                     data.saturating_add(std::mem::size_of::<usvg::Image>() as u64)
                 }
-                // Text is disabled in this crate. Source weight also covers metadata.
+                // Source weight also covers text and metadata.
                 usvg::Node::Text(_) => 2048,
             };
             bytes = bytes.saturating_add(cost);

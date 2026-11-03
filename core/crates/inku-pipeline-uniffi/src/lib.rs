@@ -35,8 +35,9 @@ pub use plugin_diagnostics::explain_plugin_diagnostics;
 pub use plugin_name_migration::migrate_plugin_names;
 pub use plugin_package::plugin_package;
 pub use raster::{
-    RasterFailure, RasterFrame, RasterScene, prepare_raster_scene, raster_api_version,
-    rasterize_svg, rasterize_svg_region,
+    RasterFailure, RasterFonts, RasterFrame, RasterScene, prepare_raster_fonts,
+    prepare_raster_scene, prepare_raster_scene_with_fonts, raster_api_version, rasterize_svg,
+    rasterize_svg_region,
 };
 pub use saijiki_migration::{migrate_saijiki_v1, migrate_saijiki_v2};
 pub use standalone::{

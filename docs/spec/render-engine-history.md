@@ -13,6 +13,10 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 
 [SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated. Record a new version's values, reasons, and results only in [CHANGELOG.md](../../CHANGELOG.md); do not add a new version section here.
 
+## engine 96 — computer lattice fill
+
+The author selected A+B on 2026-11-03: five dithered colors in lattice cells with bright scanlines replace the black scanlines and RGB stripes that made fills dark and grey. Works with computer fills change; other works and computer lines and contours do not.
+
 Render engine 94's object-word performance and render engine 95's Saijiki v3 media are recorded under Unreleased in the changelog.
 
 What follows explains the historical "Versions and identity IDs." **There were two reasons.**

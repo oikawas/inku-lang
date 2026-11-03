@@ -33,8 +33,8 @@ fn representative_mask_crt_shapes_and_compat_preserve_geometry_and_local_definit
     assert_eq!(values(&normal, "d"), values(&dense, "d"));
     assert!(normal.contains("mask-type:alpha"));
     assert!(normal.contains("computer-crt-fill-v1"));
-    assert!(normal.contains("fill-opacity=\"0.82\""));
-    assert!(normal.contains("fill-opacity=\"0.62\""));
+    assert!(normal.contains("fill-opacity=\"0.42\""));
+    assert!(normal.contains("fill-opacity=\"0.26\""));
     assert!(normal.contains("fill=\"#2468ac\""));
     assert!(!normal.contains("solid-mottle"));
     assert!(!normal.contains("fill-stroke-v1"));
@@ -64,7 +64,7 @@ fn representative_mask_crt_shapes_and_compat_preserve_geometry_and_local_definit
     assert!(compat_dense.contains("tool-fill-compat-v1"));
     assert!(compat_dense.contains("computer-crt-fill-v1"));
     assert!(compat_dense.contains("<pattern"));
-    assert!(compat_dense.contains("tool-fill-2-0-grille"));
+    assert!(!compat_dense.contains("tool-fill-2-0-grille"));
     assert!(compat_dense.contains("tool-fill-2-0-scanlines"));
     assert!(compat_faint.contains("opacity=\"0.35\""));
     assert_eq!(values(&compat_dense, "d"), values(&compat_faint, "d"));
@@ -139,6 +139,74 @@ fn element_at(svg: &str, start: usize) -> &str {
             return &svg[start..index];
         }
     }
+}
+
+#[test]
+fn computer_fill_cells_share_the_contours_lattice_and_rotation_and_ignore_seed() {
+    let mut request = RenderRequest {
+        score: serde_json::from_str(r#"{"instructions":[{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"computer","color":"blue","filled":true,"rotation":30}]}"#).unwrap(),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::from([("blue".to_owned(), "#2468ac".to_owned())]),
+            catalog_id: None, canvas: CanvasSize::new(1000.0, 1000.0), canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Display, render_seed: Some(1), composition_seed: None,
+            wild: false, error_policy: Default::default(),
+        },
+    };
+    let svg = render(request.clone()).unwrap().svg;
+    let start = svg.find("<g class=\"computer-crt-fill-v1\"").unwrap();
+    let fill = element_at(&svg, start);
+    assert!(svg[..start].contains("rotate(30"));
+    assert!(svg[start + fill.len()..].contains("raster-bleed"));
+    for tag in fill
+        .split("<path ")
+        .skip(1)
+        .filter(|s| s.contains("computer-lattice-"))
+    {
+        let d = tag.split("d=\"").nth(1).unwrap().split('"').next().unwrap();
+        for run in d.split('M').skip(1) {
+            let (x, tail) = run.split_once(' ').unwrap();
+            let y = tail.split('h').next().unwrap();
+            for coord in [x, y] {
+                let index = (coord.parse::<f64>().unwrap() + 9.0) / 18.0;
+                assert!((index - index.round()).abs() < 1e-8, "off grid: {coord}");
+            }
+        }
+    }
+    request.options.render_seed = Some(999);
+    let other = render(request).unwrap().svg;
+    let other_start = other.find("<g class=\"computer-crt-fill-v1\"").unwrap();
+    assert_eq!(fill, element_at(&other, other_start));
+}
+
+#[test]
+fn a_tiny_computer_point_keeps_one_fill_cell() {
+    let request = RenderRequest {
+        score: serde_json::from_str(r#"{"instructions":[{"primitive":"point","center":[0.8,0.8],"radius":0.006,"weight":"computer","color":"blue","filled":true}]}"#).unwrap(),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::from([("blue".to_owned(), "#2468ac".to_owned())]),
+            catalog_id: None, canvas: CanvasSize::new(1000.0, 1000.0), canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Display, render_seed: Some(1), composition_seed: None,
+            wild: false, error_policy: Default::default(),
+        },
+    };
+    let svg = render(request).unwrap().svg;
+    let start = svg.find("<g class=\"computer-crt-fill-v1\"").unwrap();
+    let fill = element_at(&svg, start);
+    let field = fill
+        .split("class=\"computer-lattice-field-v1\"")
+        .nth(1)
+        .unwrap()
+        .split("/>")
+        .next()
+        .unwrap();
+    let path = field
+        .split("d=\"")
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap();
+    assert_eq!(path, "M783 783h18v18h-18z");
 }
 
 #[test]

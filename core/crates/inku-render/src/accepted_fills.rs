@@ -4,9 +4,9 @@ use sha2::{Digest, Sha256};
 
 use crate::geometry::{point_to_pixels, size_to_pixels};
 use crate::mark_geometry::MarkGeometry;
-use crate::mark_paths::polygon_path;
+use crate::mark_paths::{grid_step, polygon_path};
 use crate::marks::{MarkContext, MarkStyle, mark_style, weight_opacity};
-use crate::surface_geometry::shape_bbox;
+use crate::surface_geometry::{point_in_polygon, shape_bbox};
 use crate::svg::{Element, format_number};
 use crate::types::{
     ArcForm, Instruction, Point, Primitive, SurfaceIntensity, SurfaceTexture, SvgProfile, Weight,
@@ -177,52 +177,58 @@ fn interior_for_closed_contour(
     let path = polygon_path(contour);
     if instruction.weight == Weight::Computer {
         let id = identifier(context);
+        let cells = computer_cells(contour, grid_step(Weight::Computer, context.canvas));
+        let step = grid_step(Weight::Computer, context.canvas);
+        let silhouette = computer_runs(&cells, step, None);
+        let colors =
+            crate::materials::computer_palette(&style.color, instruction.surface_intensity);
         let mut fill = Element::new("g")
             .attr("class", "computer-crt-fill-v1")
             .attr(
                 "opacity",
                 format_number(style.fill_opacity.unwrap_or(style.stroke_opacity)),
             );
-        if context.profile == SvgProfile::Compat {
-            fill.push(
-                Element::new("path")
-                    .attr("d", &path)
-                    .attr("fill", format!("url(#{id}-field)"))
-                    .attr("stroke", "none"),
-            );
-            for (pattern, alpha) in [("grille", 0.28), ("scanlines", 1.0)] {
-                fill.push(
-                    Element::new("path")
-                        .attr("d", &path)
-                        .attr("fill", format!("url(#{id}-{pattern})"))
-                        .attr("opacity", format_number(alpha))
-                        .attr("stroke", "none"),
-                );
-            }
-            return Some(fill);
+        if context.profile != SvgProfile::Compat {
+            let mut clip = Element::new("clipPath")
+                .attr("id", format!("{id}-clip"))
+                .attr("clipPathUnits", "userSpaceOnUse");
+            clip.push(Element::new("path").attr("d", &silhouette));
+            let mut defs = Element::new("defs");
+            defs.push(clip);
+            fill.push(defs);
         }
-        let mut clip = Element::new("clipPath")
-            .attr("id", format!("{id}-clip"))
-            .attr("clipPathUnits", "userSpaceOnUse");
-        clip.push(Element::new("path").attr("d", &path));
-        let mut defs = Element::new("defs");
-        defs.push(clip);
-        fill.push(defs);
         fill.push(
             Element::new("path")
-                .attr("d", &path)
+                .attr("class", "computer-lattice-field-v1")
+                .attr("d", &silhouette)
                 .attr("fill", format!("url(#{id}-field)"))
                 .attr("stroke", "none"),
         );
-        let mut surface = Element::new("g").attr("clip-path", format!("url(#{id}-clip)"));
-        for (pattern, alpha, blurred) in [
-            ("grille", 0.24, true),
-            ("grille", 0.28, false),
-            ("scanlines", 1.0, false),
-        ] {
-            if blurred && context.profile == SvgProfile::Compat {
-                continue;
+        for (level, color) in colors.iter().enumerate() {
+            let runs = computer_runs(&cells, step, Some(level));
+            if !runs.is_empty() {
+                fill.push(
+                    Element::new("path")
+                        .attr("class", "computer-lattice-cells-v1")
+                        .attr("d", runs)
+                        .attr("fill", color)
+                        .attr("stroke", "none"),
+                );
             }
+        }
+        let mut surface = Element::new("g").attr("class", "computer-scanlines-v1");
+        if context.profile == SvgProfile::Compat {
+            surface.push(
+                Element::new("path")
+                    .attr("d", &silhouette)
+                    .attr("fill", format!("url(#{id}-scanlines)"))
+                    .attr("stroke", "none"),
+            );
+            fill.push(surface);
+            return Some(fill);
+        }
+        surface.set_attr("clip-path", format!("url(#{id}-clip)"));
+        for (alpha, blurred) in [(0.7, true), (1.0, false)] {
             // A fitted frame's rect covers its paper (render engine 93).
             let [x0, y0, x1, y1] = context.canvas.paper();
             let mut rect = Element::new("rect");
@@ -234,7 +240,7 @@ fn interior_for_closed_contour(
             let mut rect = rect
                 .attr("width", format_number(x1 - x0))
                 .attr("height", format_number(y1 - y0))
-                .attr("fill", format!("url(#{id}-{pattern})"))
+                .attr("fill", format!("url(#{id}-scanlines)"))
                 .attr("opacity", format_number(alpha));
             if blurred {
                 rect.set_attr("filter", format!("url(#{id}-glow)"));
@@ -872,24 +878,98 @@ fn engraving(
     definitions
 }
 
-fn tint(color: &str, accent: [f64; 3], mix: f64, intensity: SurfaceIntensity) -> String {
-    let channels = (0..3)
-        .map(|index| {
-            let channel = color
-                .get(1 + index * 2..3 + index * 2)
-                .and_then(|value| u8::from_str_radix(value, 16).ok())
-                .unwrap_or(17);
-            let normal = 12.0 + 0.9 * ((1.0 - mix) * f64::from(channel) + mix * accent[index]);
-            match intensity {
-                SurfaceIntensity::Normal => normal,
-                SurfaceIntensity::Dense => normal * 0.58,
-                SurfaceIntensity::Faint => normal * 0.5 + 127.5,
+fn computer_cells(contour: &[Point], step: f64) -> Vec<(i64, i64, usize)> {
+    const BAYER: [[u8; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+    let (x0, x1) = contour
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), p| {
+            (a.min(p.x), b.max(p.x))
+        });
+    let (y0, y1) = contour
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), p| {
+            (a.min(p.y), b.max(p.y))
+        });
+    let (width, height) = ((x1 - x0).max(1e-9), (y1 - y0).max(1e-9));
+    let mut cells = Vec::new();
+    for l in (y0 / step).floor() as i64..=(y1 / step).ceil() as i64 {
+        for k in (x0 / step).floor() as i64..=(x1 / step).ceil() as i64 {
+            let (x, y) = (k as f64 * step, l as f64 * step);
+            if point_in_polygon(Point::new(x, y), contour) {
+                let t = (0.2 * (x - x0) / width + (y - y0) / height) / 1.04;
+                let threshold =
+                    (f64::from(BAYER[l.rem_euclid(4) as usize][k.rem_euclid(4) as usize]) + 0.5)
+                        / 16.0;
+                let level = (t.clamp(0.0, 1.0) * 4.0 + 0.5 + (threshold - 0.5) * 0.6)
+                    .floor()
+                    .clamp(0.0, 4.0) as usize;
+                cells.push((k, l, level));
             }
-            .round()
-            .clamp(0.0, 255.0) as u8
-        })
-        .collect::<Vec<_>>();
-    format!("#{:02x}{:02x}{:02x}", channels[0], channels[1], channels[2])
+        }
+    }
+    if cells.is_empty() {
+        let k = ((x0 + x1) / (2.0 * step)).round() as i64;
+        let l = ((y0 + y1) / (2.0 * step)).round() as i64;
+        let t = (0.2 * (k as f64 * step - x0) / width + (l as f64 * step - y0) / height) / 1.04;
+        let threshold =
+            (f64::from(BAYER[l.rem_euclid(4) as usize][k.rem_euclid(4) as usize]) + 0.5) / 16.0;
+        let level = (t.clamp(0.0, 1.0) * 4.0 + 0.5 + (threshold - 0.5) * 0.6)
+            .floor()
+            .clamp(0.0, 4.0) as usize;
+        cells.push((k, l, level));
+    }
+    cells
+}
+
+fn computer_runs(cells: &[(i64, i64, usize)], step: f64, level: Option<usize>) -> String {
+    let mut out = String::new();
+    let mut run: Option<(i64, i64, i64)> = None;
+    let emit = |out: &mut String, (start, end, row): (i64, i64, i64)| {
+        let width = (end - start + 1) as f64 * step;
+        out.push_str(&format!(
+            "M{} {}h{}v{}h{}z",
+            format_number(start as f64 * step - step / 2.0),
+            format_number(row as f64 * step - step / 2.0),
+            format_number(width),
+            format_number(step),
+            format_number(-width)
+        ));
+    };
+    for &(k, l, cell_level) in cells {
+        if level.is_some_and(|wanted| wanted != cell_level) {
+            continue;
+        }
+        match run {
+            Some((start, end, row)) if l == row && k == end + 1 => run = Some((start, k, row)),
+            Some(previous) => {
+                emit(&mut out, previous);
+                run = Some((k, k, l));
+            }
+            None => run = Some((k, k, l)),
+        }
+    }
+    if let Some(last) = run {
+        emit(&mut out, last);
+    }
+    out
+}
+
+#[cfg(test)]
+mod computer_lattice_tests {
+    use super::*;
+
+    #[test]
+    fn tiny_contour_keeps_one_cell() {
+        let p = [
+            Point::new(794.0, 794.0),
+            Point::new(806.0, 794.0),
+            Point::new(806.0, 806.0),
+            Point::new(794.0, 806.0),
+        ];
+        let cells = computer_cells(&p, 18.0);
+        assert_eq!(cells.len(), 1);
+        assert_eq!((cells[0].0, cells[0].1), (44, 44));
+    }
 }
 
 fn computer(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element> {
@@ -903,39 +983,15 @@ fn computer(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element>
         .attr("x2", "0.2")
         .attr("y2", "1")
         .attr("color-interpolation", "sRGB");
-    for (offset, accent, mix) in [
-        ("0", [50.0, 230.0, 245.0], 0.24),
-        ("0.48", [255.0; 3], 0.12),
-        ("1", [245.0, 65.0, 220.0], 0.24),
-    ] {
-        gradient.push(Element::new("stop").attr("offset", offset).attr(
-            "stop-color",
-            tint(&style.color, accent, mix, instruction.surface_intensity),
-        ));
-    }
-    let mut grille = Element::new("pattern")
-        .attr("id", format!("{id}-grille"))
-        .attr("patternUnits", "userSpaceOnUse")
-        .attr("width", format_number(3.0 * unit))
-        .attr("height", format_number(8.0 * unit));
-    for (x, accent) in [
-        [255.0, 40.0, 60.0],
-        [40.0, 255.0, 120.0],
-        [70.0, 100.0, 255.0],
-    ]
-    .into_iter()
-    .enumerate()
+    for (i, color) in
+        crate::materials::computer_palette(&style.color, instruction.surface_intensity)
+            .iter()
+            .enumerate()
     {
-        grille.push(
-            Element::new("rect")
-                .attr("x", format_number(x as f64 * unit))
-                .attr("y", "0")
-                .attr("width", format_number(0.78 * unit))
-                .attr("height", format_number(8.0 * unit))
-                .attr(
-                    "fill",
-                    tint(&style.color, accent, 0.32, instruction.surface_intensity),
-                ),
+        gradient.push(
+            Element::new("stop")
+                .attr("offset", format_number(i as f64 / 4.0))
+                .attr("stop-color", color),
         );
     }
     let mut scanlines = Element::new("pattern")
@@ -943,18 +999,18 @@ fn computer(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element>
         .attr("patternUnits", "userSpaceOnUse")
         .attr("width", format_number(3.0 * unit))
         .attr("height", format_number(8.0 * unit));
-    for (y, alpha) in [(2.8, "0.82"), (6.8, "0.62")] {
+    for (y, alpha) in [(2.8, "0.42"), (6.8, "0.26")] {
         scanlines.push(
             Element::new("rect")
                 .attr("x", "0")
                 .attr("y", format_number(y * unit))
                 .attr("width", format_number(3.0 * unit))
                 .attr("height", format_number(1.2 * unit))
-                .attr("fill", "#000000")
+                .attr("fill", "#ffffff")
                 .attr("fill-opacity", alpha),
         );
     }
-    let mut definitions = vec![gradient, grille, scanlines];
+    let mut definitions = vec![gradient, scanlines];
     if context.profile != SvgProfile::Compat {
         let mut glow = Element::new("filter")
             .attr("id", format!("{id}-glow"))
@@ -1297,13 +1353,9 @@ mod tests {
                 SurfaceIntensity::Normal,
                 SurfaceIntensity::Faint,
             ]
-            .map(|intensity| tint(color, [50.0, 230.0, 245.0], 0.24, intensity));
-            for channel in [1, 3, 5] {
-                let values = tones
-                    .each_ref()
-                    .map(|tone| u8::from_str_radix(&tone[channel..channel + 2], 16).unwrap());
-                assert!(values[0] < values[1] && values[1] < values[2]);
-            }
+            .map(|intensity| crate::materials::computer_palette(color, intensity));
+            assert_ne!(tones[0], tones[1]);
+            assert_ne!(tones[1], tones[2]);
         }
         instruction.surface.as_mut().unwrap().texture = SurfaceTexture::Wash;
         instruction.surface_intensity = SurfaceIntensity::Normal;

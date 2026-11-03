@@ -1,0 +1,1 @@
+`computer-lattice.svg` is a small synthetic display-profile computer fill: five-stop field, lattice paths, white scanline pattern, clip and glow. The support-table test checks that `display_svg` accepts this combination; it is not a pixel-parity reference.

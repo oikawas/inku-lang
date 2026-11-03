@@ -99,6 +99,11 @@ fn the_core_s_linear_gradients_are_inside_the_table() {
 }
 
 #[test]
+fn computer_lattice_fill_is_inside_the_display_table() {
+    display_svg(&compat("computer-lattice")).expect("computer lattice is supported");
+}
+
+#[test]
 fn the_core_s_user_space_gradients_and_round_joins_are_inside_the_table() {
     for name in ["user-space-gradient", "round-join"] {
         assert!(display_svg(&compat(name)).is_ok(), "{name}");

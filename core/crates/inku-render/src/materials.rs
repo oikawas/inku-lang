@@ -217,6 +217,64 @@ fn turn_towards(hue: f64, target: f64, limit: f64) -> f64 {
     (hue + difference.clamp(-limit, limit)).rem_euclid(360.0)
 }
 
+/// Five dither levels for the computer's lattice, from cyan to pink.
+pub(crate) fn computer_palette(color: &str, intensity: SurfaceIntensity) -> [String; 5] {
+    std::array::from_fn(|i| {
+        adjust_pigment(color, |l, c, h| {
+            let neutral = c < 0.025;
+            let (l, c) = match intensity {
+                SurfaceIntensity::Normal => (l, if neutral { 0.07 } else { c.max(0.12) }),
+                SurfaceIntensity::Faint => (
+                    l + (0.97 - l) * 0.6,
+                    if neutral { 0.06 } else { (c * 0.9).max(0.09) },
+                ),
+                SurfaceIntensity::Dense => {
+                    (l * 0.85, if neutral { 0.08 } else { (c * 1.1).max(0.12) })
+                }
+            };
+            let turn = |target: f64| {
+                let delta = (target - h + 540.0_f64).rem_euclid(360.0) - 180.0;
+                (h + (delta * 0.6).clamp(-70.0, 70.0)).rem_euclid(360.0)
+            };
+            let top = if neutral { 215.0 } else { turn(215.0) };
+            let bottom = if neutral { 350.0 } else { turn(350.0) };
+            let middle = if neutral { 282.5 } else { h };
+            let interpolate = |from: f64, to: f64, u: f64| {
+                (from + ((to - from + 540.0).rem_euclid(360.0) - 180.0) * u).rem_euclid(360.0)
+            };
+            if i <= 2 {
+                let u = i as f64 / 2.0;
+                (l + 0.05 * (1.0 - u), c, interpolate(top, middle, u))
+            } else {
+                let u = (i - 2) as f64 / 2.0;
+                (l - 0.04 * u, c, interpolate(middle, bottom, u))
+            }
+        })
+    })
+}
+
+#[cfg(test)]
+mod computer_palette_tests {
+    use super::*;
+
+    #[test]
+    fn normal_blue_keeps_lightness_chroma_and_turns_toward_cyan_and_pink() {
+        let colors = computer_palette("#2468ac", SurfaceIntensity::Normal);
+        let values = colors.map(|color| {
+            let [l, a, b] = oklab(parse_pigment(&color).unwrap());
+            (l, a.hypot(b), b.atan2(a).to_degrees().rem_euclid(360.0))
+        });
+        assert_eq!(
+            computer_palette("#2468ac", SurfaceIntensity::Normal)[2],
+            "#2468ac"
+        );
+        for (l, c, _) in values {
+            assert!(l >= 0.510 - 0.04 - 0.003 && c >= 0.09);
+        }
+        assert!(values[0].2 < values[2].2 && values[4].2 > values[2].2);
+    }
+}
+
 /// A ridge keeps the pigment's colour: it steps in lightness, keeps its chroma
 /// and leans cool in shadow and warm in light, instead of greying towards black
 /// or white. A neutral pigment gets a faint cool shadow and warm light.

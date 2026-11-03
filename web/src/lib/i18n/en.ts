@@ -1019,7 +1019,7 @@ export const en: LangPack = {
 	settingsExportNavDestination: 'Save location',
 	settingsExportNavPng: 'PNG',
 	settingsExportNavAnimation: 'Animation',
-	settingsExportAnimationLayer: 'One work (layers)',
+	settingsExportAnimationLayer: 'One work (lines)',
 	settingsExportAnimationTransition: 'Multiple works (transitions)',
 	settingsExportNavCard: 'Share card',
 	settingsExportBrowserScope: 'Saved in this browser only.',

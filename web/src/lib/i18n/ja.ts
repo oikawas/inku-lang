@@ -1017,7 +1017,7 @@ export const ja: LangPack = {
 	settingsExportNavDestination: '保存先',
 	settingsExportNavPng: 'PNG',
 	settingsExportNavAnimation: 'アニメーション',
-	settingsExportAnimationLayer: '1作品（レイヤー）',
+	settingsExportAnimationLayer: '1作品（行ごと）',
 	settingsExportAnimationTransition: '複数作品（切り替え）',
 	settingsExportNavCard: '共有カード',
 	settingsExportBrowserScope: 'このブラウザにのみ保存されます。',

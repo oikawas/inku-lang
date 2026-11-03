@@ -154,12 +154,10 @@ fn composed_frame(
     } else {
         ranges
             .get(frame - 1)
-            .and_then(|spans| {
+            .and_then(|spans| spans.first())
+            .and_then(|&(first_line, last_line)| {
                 let mut matching = rows.iter().enumerate().filter_map(|(index, (line, _))| {
-                    spans
-                        .iter()
-                        .any(|&(a, b)| a <= *line && *line <= b)
-                        .then_some(index)
+                    (first_line <= *line && *line <= last_line).then_some(index)
                 });
                 let first = matching.next()?;
                 let last = matching.next_back().unwrap_or(first);
@@ -381,6 +379,17 @@ mod line_animation_tests {
             .find(|element| element.contains("行45"))
             .unwrap();
         assert!(last_line.contains("y=\"10\""), "{last_line}");
+        let distant = composed_frame(
+            &source,
+            svg,
+            "Font & Family",
+            &[vec![(1, 1), (45, 45)]],
+            1,
+            10.0,
+            20.0,
+        )
+        .unwrap();
+        assert!(distant.contains("行01") && !distant.contains("行45"));
         let rows = wrapped_ddl(
             "縦0.118、縦0.296666。直径0.25。 Place a horizontal line.",
             8.0,

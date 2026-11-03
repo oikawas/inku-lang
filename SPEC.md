@@ -2872,16 +2872,17 @@ In the shared compiler, ordinary DDL and declared flat Macros use one resolver. 
 
 ### 13.7 Sway from Phenomena: the Nature Plugin
 
-`Nature.leaves` connects seven bundled MacroDefinition v1 motifs — `Nature.若葉`,
-`Nature.下草`, `Nature.青葉`, `Nature.紅葉`, `Nature.落葉`, `Nature.枯草`, and
-`Nature.枯葉` — from the shared catalog through the ordinary lock / expansion
+`Nature.leaves` connects seven bundled MacroDefinition v1 motifs — young leaves,
+undergrowth, summer leaves, autumn leaves, fallen leaves, withered grass, and
+withered leaves — from the shared catalog through the ordinary lock / expansion
 boundary. Definitions emit core meaning from closed typed parameters, bounded
 repeat, typed transforms, and deterministic bounded vary; they write neither raw
 Score fields nor renderer instructions or noise algorithms. Server and Android
 use the same catalog for resolution and display.
 
-This connection does not provide an external runtime loader, an arbitrarily
-installed package, or an official registry for the whole `Nature` namespace.
+This connection does not provide an external code runtime loader or an official
+registry for the whole `Nature` namespace. Data-only plugin packages can be
+registered as described in §4.
 `Nature.雨` and `Nature.風` remain conceptual examples, not bundled catalog
 entries. The v1.70 hard-coded Nature expansion is legacy compatibility, not new
 semantic canon or a permanent fallback. Saved Score / expanded artifacts take

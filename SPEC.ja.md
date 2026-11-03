@@ -1795,7 +1795,7 @@ Shared compilerでは、通常DDLと宣言済みflat Macroが一つのresolver�
 
 `Nature.leaves`は、若葉、下草、青葉、紅葉、落葉、枯草、枯葉の七つの同梱MacroDefinition v1をshared catalogから通常のlock / expansion境界へ接続する。definition は閉じたtyped parameter、bounded repeat、typed transform、deterministic bounded varyからcore meaningをemitし、raw Score field、renderer命令、noise algorithmを直接書かない。ServerとAndroidは同じcatalogを表示と解決に使う。
 
-この接続は外部runtime loader、任意にinstallするpackage、または`Nature`名前空間全体の公式registryを意味しない。`Nature.雨`と`Nature.風`は引き続き概念例であり、同梱catalogのentryではない。v1.70 のhard-coded Nature展開はlegacy compatibilityであり、新規semantic canonや恒久fallbackではない。保存済みScore / expanded artifactを優先し、欠落を別図形へ黙って変えない。
+この接続は外部コードのruntime loaderや、`Nature`名前空間全体の公式registryを意味しない。プラグインのdata-only packageは§4のとおり登録できる。`Nature.雨`と`Nature.風`は概念例であり、同梱catalogのentryではない。v1.70 のhard-coded Nature展開はlegacy compatibilityであり、新規semantic canonや恒久fallbackではない。保存済みScore / expanded artifactを優先し、欠落を別図形へ黙って変えない。
 
 ### 13.8 Renderer での揺らぎ生成
 

@@ -909,6 +909,8 @@ Touches describe the tool's trace, rather than line width itself. All ten primit
 
 Saijiki v3 (2026-10-31) reduced the touches from twelve to eleven. `rotring` merged into `pen`, `crayon` into `chalk`, `fine-brush` and `thick-brush` into `gouache`, and `burin` and `drypoint` into `etching`; `oil pastel`, `watercolor`, and `painting knife` were added. Current instructions do not read the six retired words. Saved instructions and plugin definitions are rewritten once into the new words by the edition migration, which also moves each width word to the step nearest the original width (for example, `rotring line` becomes `thin pen line`, and `thick-brush line` becomes `thick gouache line`). A saved Score's retired tools are performed as before. English also reads `oil-pastel`, `painting-knife`, and `watercolour` as the same words.
 
+Computer fills layer five-color dithering and white scanlines on the same lattice as the outline (render engine 96). `Dense` darkens the fill and `faint` lightens it. Lines and contours continue to be drawn with lattice cells.
+
 ### 4.4. Continuity — つらなり
 
 Continuity describes a line or contour's breaks. Every primitive accepts these words, but a point remains one point; adding continuity does not turn it into a dotted row or supply a count. Stipple is a separate surface attribute.
@@ -1168,13 +1170,13 @@ The following constructions are available grammar, rather than new rows in the 1
 | Groups, repetition, fading, color shift | 組, 繰り返して, 左から右へ薄れさせて, 順に段々に移して | Instructions about structure and distribution; no additional category or word chip. |
 | Canvas formats | Host options such as `square`, `a4`, and `wide` | The paper, selected outside the DDL text; a format name is not written in DDL. What a DDL writes is the declaration of the ratio it was laid out in, `Aspect ratio W:H.` (3.27). Distinct from form and proportion words with the same spelling. |
 | Title lines | `"lighthouse"`, `""` / `「灯台」`, `「」` | A line of only a quoted name; it names the chunk of sentences up to the next title (3.1). It draws nothing and takes no sentence number, and its words are not read as drawing words. |
-| Vocabulary Macros | Qualified names such as `Nature.YoungLeaves` | A separate registered vocabulary catalog, outside the core Saijiki's 101 rows. |
+| Vocabulary Macros | Bracketed names such as `｛若葉｝` / `{young leaves}` | Require a registered definition or one saved with the work; outside the core Saijiki's 101 rows. `Nature.YoungLeaves` identifies a definition; old qualified names are not read for drawing (3.22). |
 
 ### Sources and verification scope
 
 Spellings, flags, and order come from `core/crates/inku-ddl/assets/saijiki-v3.json`. `src/saijiki.rs` defines recognition eligibility and projections; `src/parser.rs` and `src/shape_constraint.rs` define parser spellings and grammar. Acceptance was compared with `src/score_lowering.rs`, `src/geometry.rs`, `src/score_angle.rs`, `src/fluctuation.rs`, `assets/work-plan-capabilities-v2.json`, and the relevant existing fixture and test source. The distinction between accepted surfaces and visible performance was checked in `inku-render/src/surfaces.rs`, `marks.rs`, and `support.rs`. Short interface explanations also informed the text: `web/src/routes/+page.svelte` and `web/src/lib/saijiki-surface.ts`.
 
-The reference commit is `97b50a52367554a94e9f364b90dc538d0f6b68bc`. Spellings and acceptance boundaries follow that source version, except that the touch words (4.3), the row counts, and the examples' tool words were brought to Saijiki v3 (2026-10-31), and every example was compiled with the v3 core. Actual performance also requires the prior objects a relation names, the work's drawing conditions, and sufficient resources.
+The initial investigation used commit `97b50a52367554a94e9f364b90dc538d0f6b68bc`. Since then, this reference has been updated for bracketed plugin names (3.22), Saijiki v3 touch words and row counts (4.3), and color and tool phrases (3.2). The examples' tool words were also brought to v3, and every example was compiled with the v3 core. Actual performance also requires the prior objects a relation names, the work's drawing conditions, and sufficient resources.
 
 ## 5. Fifty complex DDL examples
 

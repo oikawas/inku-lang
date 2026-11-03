@@ -183,7 +183,7 @@ DDL is drawn from the top line down. The animation below shows the picture after
 
 (A tanka by Yosano Akiko, from *Midaregami*, 1901: "To Kiyomizu, crossing Gion on a night of cherry blossoms under the moon — everyone I meet tonight is beautiful." Translation for this README.)
 
-<!-- TODO(author): export work ddb757dd-e40c-4245-9931-4b294172a416 (parent 55f5278a, Build 1385, render engine 96) with the line-by-line animation (after the rework). DDL on the left (current line highlighted), the picture on the right. GIF. Under I-030 the first frame is the finished picture. Size and hold are decided after the rework -->
+<!-- TODO(author): export work ddb757dd-e40c-4245-9931-4b294172a416 (parent 55f5278a, Build 1385, render engine 96) with the web's "Line animation" (manual §15.3). "Show DDL" on, GIF, height 480 px (frames are 912×480), "Line interval" 1.0 s (18 frames, an 18 s loop: an exception to I-030's 3 to 5 s, chosen by the author on 2026-11-03), repeat "Restart". Under I-030 the first frame is the finished picture -->
 <p align="center">
   <img src="docs/assets/readme/tanka-lines.gif" width="720" alt="On the left, lines of DDL appear one by one from the top; on the right, thin white lines, white circles, and clusters of small circles are added in turn on a navy ground">
 </p>

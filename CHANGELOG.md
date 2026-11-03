@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: preserve structured drawing and resource omission reasons when checking plugin examples.
+
 - Core: use a placing sentence for an omitted object plugin example and extract the code and detail from structured example-drawing reasons.
 
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.

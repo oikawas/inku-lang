@@ -69,6 +69,20 @@ struct PluginPackageRepository: Sendable {
     static func safeID(_ id: String) -> Bool {
         !id.isEmpty && id != "." && id != ".." && !id.contains("/") && !id.contains("\\") && !id.contains("\0")
     }
+    static func exampleReasons(_ delivery: ExactJSON) -> [ExactJSON] {
+        func accepted(_ value: ExactJSON) -> ExactJSON? {
+            switch value {
+            case .string(let text) where !text.isEmpty: return value
+            case .object: return value
+            default: return nil
+            }
+        }
+        let diagnostics = ["upstream_diagnostics", "downstream_diagnostics"].flatMap { key in
+            (delivery[key].array ?? []).compactMap { accepted($0["reason"]) }
+        }
+        let omissions = (delivery["resource_omissions"].array ?? []).compactMap { accepted($0["cause"]["reason"]) }
+        return diagnostics + omissions
+    }
     func load() throws -> [InstalledPluginPackage] {
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
         let urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
@@ -141,14 +155,12 @@ struct PluginPackageRepository: Sendable {
                 request.saveHistory = false; request.declareCanvas = false
                 let view = try await host.generate(request)
                 let delivery = try view.deliveryJSON.map { try ExactJSON(data: $0) } ?? .null
-                let reasons = ["upstream_diagnostics", "downstream_diagnostics"].flatMap {
-                    (delivery[$0].array ?? []).compactMap { $0["reason"].string }.filter { !$0.isEmpty }
-                }
+                let reasons = Self.exampleReasons(delivery)
                 let score = try view.scoreJSON.map { try ExactJSON(data: $0) } ?? .null
                 let marks = score["instructions"].array?.count ?? 0
-                let stopped = reasons.isEmpty && view.svg == nil ? ["example_not_drawn"] : reasons
+                let stopped: [ExactJSON] = reasons.isEmpty && view.svg == nil ? [.string("example_not_drawn")] : reasons
                 drawings.append(.object(["id": .string(id), "svg": .string(view.svg ?? ""), "marks": .integer(marks),
-                                         "reasons": .array(stopped.map(ExactJSON.string))]))
+                                         "reasons": .array(stopped)]))
             } catch {
                 let reason = (error as? HostError)?.code ?? "example_not_drawn"
                 drawings.append(.object(["id": .string(id), "svg": .string(""), "marks": .integer(0), "reasons": .array([.string(reason)])]))

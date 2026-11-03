@@ -837,6 +837,8 @@ Server-derived resources include the saijiki, 13 color catalogs, 11 canvas forma
 
 On macOS, Settings checks a selected plugin-package JSON or ZIP with the shared core and draws its examples without a provider, then shows each word's result before installation or replacement. Installed packages live in `plugin-packages` beside the database; enabled words appear in the catalog for new works, Saijiki, DDL completion and highlighting. Unreadable packages show their problems and can be removed. Bundled packages can be enabled or disabled, but not removed. Saved works retain their definitions after removal.
 
+Example drawing diagnostics and resource omission reasons pass to the shared core as strings or structured objects.
+
 The native color chooser displays catalog IDs, localized descriptions, ordered swatches, HEX values, and Japanese/English color names. Fixed and description-based choices remain drafts: Confirm/close applies upcoming conditions, while Cancel/Escape discards them. New random selection is unavailable. Direct DDL does not use description-based selection; switching input to DDL normalizes an existing auto choice to fixed.
 
 macOS accepts one DDL file dropped onto the window through the same URL reader and validation as the standard panel. Reading disables generation and batch starts; cancellation, scene disappearance, and changed draft context exclude late results. Success reveals Creation. Imported-definition notices belong to the current draft, and New or opening a saved work clears stale completion messages.

@@ -3,6 +3,17 @@ import InkuHost
 @testable import InkuUI
 
 @MainActor final class PluginPackageSettingsTests: XCTestCase {
+    func testExampleReasonsKeepStringsAndObjectsInDeliveryOrder() {
+        let object: ExactJSON = .object(["type": .string("missing_place_action"), "line": .integer(2)])
+        let resource: ExactJSON = .object(["type": .string("resource_limit"), "limit": .integer(10)])
+        let delivery: ExactJSON = .object([
+            "upstream_diagnostics": .array([.object(["reason": .string("first")]), .object(["reason": .string("")]), .object([:])]),
+            "downstream_diagnostics": .array([.object(["reason": object]), .object(["reason": .integer(42)])]),
+            "resource_omissions": .array([.object(["cause": .object(["reason": resource])])])
+        ])
+        XCTAssertEqual(PluginPackageRepository.exampleReasons(delivery), [.string("first"), object, resource])
+    }
+
     func testPackageSettingsChooseInstallDisableAndDelete() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-plugin-settings-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

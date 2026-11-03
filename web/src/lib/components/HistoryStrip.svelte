@@ -4,7 +4,8 @@
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 	import LibraryPageInput from '$lib/components/LibraryPageInput.svelte';
 	import CanvasWorkSearch from '$lib/features/canvas/CanvasWorkSearch.svelte';
-	import { formatHistoryStripEngineVersion, type HistoryStripField } from '$lib/historyStripFields';
+	import { formatHistoryStripEngineVersion, historyStripHeightKey, type HistoryStripField } from '$lib/historyStripFields';
+	import { textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { groupDigits } from '$lib/formatNumber';
 
 	type HistoryItem = {
@@ -146,17 +147,30 @@
 		if (historyTotal > 0) heldWorks = true;
 	});
 	const searching = $derived((filtered || heldWorks) && historyItems.length === 0 && searchBusy);
-	// The row never gets lower than it has been for the chosen fields, so a
-	// search or a page with shorter tiles does not move the canvas above it.
+	// Within one text size and field set, a shorter page does not move the canvas.
 	let stripHeight = $state(0);
 	let keptHeights = $state<Record<string, number>>({});
-	const fieldsKey = $derived(historyStripFields.join(','));
-	const keptHeight = $derived(keptHeights[fieldsKey] ?? 0);
+	const heightKey = $derived(historyStripHeightKey(historyStripFields, textSizeSettings.step));
+	const keptHeight = $derived(keptHeights[heightKey] ?? 0);
 	$effect(() => {
 		const height = stripHeight;
 		untrack(() => {
-			if (height > (keptHeights[fieldsKey] ?? 0)) keptHeights[fieldsKey] = height;
+			if (height > (keptHeights[heightKey] ?? 0)) keptHeights[heightKey] = height;
 		});
+	});
+	// A new key can have the same measured height as the previous one, so the
+	// clientHeight binding may not change. Measure after the new style applies.
+	$effect(() => {
+		const key = heightKey;
+		let active = true;
+		void tick().then(() => {
+			if (!active) return;
+			const height = thumbStrip?.clientHeight ?? 0;
+			untrack(() => {
+				if (height > (keptHeights[key] ?? 0)) keptHeights[key] = height;
+			});
+		});
+		return () => { active = false; };
 	});
 
 	function lineageGenerationLabel(item: HistoryItem): string {
@@ -216,6 +230,7 @@
 		if (interactionLocked) return;
 		onLoadItem(item);
 	}
+
 
 	let thumbStrip = $state<HTMLDivElement | null>(null);
 

@@ -699,7 +699,7 @@ Administrators' `Models` settings manage shared connections and publication. Whe
 
 The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
 
-`Text size` in `Display and operation` has five values: 90%, 100%, 110%, 120%, and 130%. Moving it changes the screen immediately; confirming the control saves it on the account. `Return to standard` restores 100%. If saving fails, the current size remains visible and `Retry` saves it again. It does not change the work SVG, PNG output, or export dimensions.
+`Text size` in `Display and operation` has five values: 90%, 100%, 110%, 120%, and 130%. Moving it changes the screen immediately; confirming the control saves it on the account. `Return to standard` restores 100%. If saving fails, the current size remains visible and `Retry` saves it again. The left panel width and history-strip height also follow the text size. It does not change the work SVG, PNG output, or export dimensions.
 
 `User management` provides search, permission and no-group filters, then selection and editing of users. `Add user` opens the add form explicitly. Edit only the selected member, set permissions and groups, then use `Save changes`. While edits are unsaved, it does not refresh the list or select another user; a failed save keeps both input and error. Administrators and leaders use it within their respective permission scopes in the Web UI.
 

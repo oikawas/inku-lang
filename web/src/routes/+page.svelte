@@ -3974,7 +3974,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	/* ── Left panel ─────────────────────────────────────────── */
 	.left-panel {
-		width: 440px;
+		width: calc(440px * var(--ui-text-scale, 1));
 		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
@@ -4003,7 +4003,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.left-rail-toggle:hover { background: var(--panel); color: var(--fg); }
 
 	@media (max-width: 1180px) {
-		.left-panel { width: min(400px, 42vw); }
+		.left-panel { width: min(calc(400px * var(--ui-text-scale, 1)), 42vw); }
 		.panel-scroll { padding-inline: 12px; }
 	}
 

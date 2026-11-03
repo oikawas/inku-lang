@@ -18,6 +18,7 @@ import {
 	canAddHistoryStripField,
 	DEFAULT_HISTORY_STRIP_FIELDS,
 	formatHistoryStripEngineVersion,
+	historyStripHeightKey,
 	HISTORY_STRIP_FIELD_LIMIT,
 	HISTORY_STRIP_FIELDS,
 	normalizeHistoryStripFields,
@@ -29,6 +30,23 @@ const STRIP = readFileSync(new URL('./components/HistoryStrip.svelte', import.me
 const PANEL = readFileSync(new URL('./features/settings/AppearanceSettings.svelte', import.meta.url), 'utf-8');
 const JA = readFileSync(new URL('./i18n/ja.ts', import.meta.url), 'utf-8');
 const EN = readFileSync(new URL('./i18n/en.ts', import.meta.url), 'utf-8');
+
+test('the strip remembers its maximum separately for each text size and field set', () => {
+	const fields: HistoryStripField[] = ['generation', 'model'];
+	const kept: Record<string, number> = {};
+	const large = historyStripHeightKey(fields, 4);
+	const small = historyStripHeightKey(fields, 0);
+	kept[large] = 190;
+	assert.equal(kept[small] ?? 0, 0);
+	kept[small] = Math.max(kept[small] ?? 0, 130);
+	kept[small] = Math.max(kept[small], 110);
+	assert.equal(kept[small], 130);
+	assert.equal(kept[large], 190);
+	assert.notEqual(historyStripHeightKey(['bytes'], 0), small);
+	assert.match(STRIP, /historyStripHeightKey\(historyStripFields, textSizeSettings\.step\)/);
+	assert.match(STRIP, /keptHeights\[heightKey\] \?\? 0/);
+	assert.match(STRIP, /const key = heightKey;[\s\S]*?tick\(\)\.then\([\s\S]*?thumbStrip\?\.clientHeight/);
+});
 
 test('T-147  an absent value takes the default and an empty list does not', () => {
 	// The four shapes an absent value arrives in.

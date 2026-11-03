@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: adjust the left panel width and retained history-strip height to the text size.
+
 - Web: show batch line, elapsed time and average time per work as compact numeric tiles.
 
 - Core: draw computer fills as five dithered lattice colors with bright scanlines (render engine 96).

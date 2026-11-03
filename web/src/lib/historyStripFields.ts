@@ -21,6 +21,11 @@ export const HISTORY_STRIP_FIELDS = ['generation', 'model', 'engine_version', 'b
 
 export type HistoryStripField = (typeof HISTORY_STRIP_FIELDS)[number];
 
+/** Keep each text size's measured maximum separate for the same field set. */
+export function historyStripHeightKey(fields: readonly HistoryStripField[], textSizeStep: number): string {
+	return `${fields.join(',')}|${textSizeStep}`;
+}
+
 export function formatHistoryStripEngineVersion(value: string | null | undefined, notRecorded: string): string {
 	const version = String(value ?? '').trim();
 	if (!version) return notRecorded;

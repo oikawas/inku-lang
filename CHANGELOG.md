@@ -8,13 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server: supply placement examples for plugin object words without examples, and pass structured drawing diagnostics and resource-limit reasons to package validation.
-
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.
-
-- Render engine 97: check transformed bounds, and the bounds of touching, along and cutting relations, correctly on non-square canvases and object boxes, and report body diagnostics on the object instruction. Count each object once against the instruction limit; its contents count against template-node and mark limits. Redrawing saved works can reveal transformed groups, relations, or objects previously omitted.
-
-- Core: use a placing sentence for an omitted object plugin example and extract the code and detail from structured example-drawing reasons.
 
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.
 
@@ -586,6 +580,14 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.311 (2026-11-04 / Build 1387)
+
+- Server: supply placement examples for plugin object words without examples, and pass structured drawing diagnostics and resource-limit reasons to package validation.
+
+- Render engine 97: check transformed bounds, and the bounds of touching, along and cutting relations, correctly on non-square canvases and object boxes, and report body diagnostics on the object instruction. Count each object once against the instruction limit; its contents count against template-node and mark limits. Redrawing saved works can reveal transformed groups, relations, or objects previously omitted.
+
+- Core: use a placing sentence for an omitted object plugin example and extract the code and detail from structured example-drawing reasons.
 
 ## v2.15.310 (2026-11-03 / Build 1386)
 

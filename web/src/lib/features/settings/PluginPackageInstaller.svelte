@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import type { PluginPackageProblem, PluginPackageReport, PluginPackageUpload } from './server-administration.svelte';
-	import { pluginProblemMessage } from './plugin-package-problems';
+	import { describePluginProblem } from './plugin-package-problems';
 	import { readPluginPackageFile } from './plugin-files';
 
 	// Adding a plugin is one file -- the JSON, or a zip holding it beside its
@@ -58,8 +58,7 @@
 	}
 
 	function describe(problem: PluginPackageProblem): string {
-		const message = pluginProblemMessage(problem.code, isJapanese);
-		return problem.detail ? `${message}（${problem.detail}）` : message;
+		return describePluginProblem(problem, isJapanese);
 	}
 </script>
 
@@ -85,7 +84,7 @@
 			{#if (isJapanese ? report.description_ja : report.description_en)}<div class="system-plugin-desc">{isJapanese ? report.description_ja : report.description_en}</div>{/if}
 			{#if report.problems.length}
 				<ul class="plugin-problems">
-					{#each report.problems as problem (problem.path + problem.code)}
+					{#each report.problems as problem, index (index)}
 						<li><code>{problem.path || fileName}</code> {describe(problem)}</li>
 					{/each}
 				</ul>
@@ -104,7 +103,7 @@
 								{#if word.preview_png}<small>{word.preview_source === 'file' ? t().settingsPluginPictureFromFile : t().settingsPluginPictureDrawn}</small>{/if}
 								{#if word.problems.length}
 									<ul class="plugin-problems">
-										{#each word.problems as problem (problem.path + problem.code)}
+										{#each word.problems as problem, index (index)}
 											<li><code>{problem.path}</code> {describe(problem)}</li>
 										{/each}
 									</ul>

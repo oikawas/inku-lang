@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { pluginProblemMessage, pluginRejectionMessage } from './plugin-package-problems';
+import { describePluginProblem, pluginProblemMessage, pluginRejectionMessage } from './plugin-package-problems';
 
 const here = new URL('.', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, here), 'utf8');
@@ -31,6 +31,15 @@ test('every problem the Server writes for a package file is explained in both la
 
 test('a code the table does not know is shown as itself, not hidden', () => {
 	assert.equal(pluginProblemMessage('a_code_from_a_newer_core', true), 'a_code_from_a_newer_core');
+});
+
+test('structured details remain readable and repeated codes can be rendered', () => {
+	const detail = '{"value":{"dimension":"object_templates","maximum":64,"required":65}}';
+	assert.equal(describePluginProblem({ code: 'budget_exceeded', detail }, true), `budget_exceeded（${detail}）`);
+	assert.equal(describePluginProblem({ code: 'missing_place_action', detail: '' }, false), pluginProblemMessage('missing_place_action', false));
+	const installer = read('./PluginPackageInstaller.svelte');
+	assert.match(installer, /#each report\.problems as problem, index \(index\)/);
+	assert.match(installer, /#each word\.problems as problem, index \(index\)/);
 });
 
 test('rejected installed files show translated check reasons and no drawing hint', () => {

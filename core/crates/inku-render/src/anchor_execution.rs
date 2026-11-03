@@ -2101,7 +2101,10 @@ impl Execution<'_> {
             .iter()
             .any(|outer| group_contains(outer, &group));
         if !has_outer {
-            let extent = crate::geometry::short_side_scales(self.request.canvas);
+            let extent = crate::geometry::point_to_short_side_units(
+                Point::new(1.0, 1.0),
+                self.request.canvas,
+            );
             let inside = |point: Point| {
                 point.x >= -GEOMETRY_EPSILON
                     && point.y >= -GEOMETRY_EPSILON

@@ -12,6 +12,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.
 
+- Render engine 97: check transformed bounds, and the bounds of touching, along and cutting relations, correctly on non-square canvases and object boxes, and report body diagnostics on the object instruction. Count each object once against the instruction limit; its contents count against template-node and mark limits. Redrawing saved works can reveal transformed groups, relations, or objects previously omitted.
+
 - Core: use a placing sentence for an omitted object plugin example and extract the code and detail from structured example-drawing reasons.
 
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.

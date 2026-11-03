@@ -1544,6 +1544,8 @@ Line-upだけが方向を配置へ届ける。省略は、名前の範囲が画�
 
 Planは一instruction / 一Emitにつき一件で、exact count、解決済み寸法・外観・angle・位置・layout式とsource / generated originを持つ。count比例の配列・個体geometry・Score命令複製は作らない。旧Stop / Continue入力にかかわらず、recoverableなblockingは既存のtyped owner / span / 理由 / 実処置を保つ最小fieldまたは実行単位の省略として扱い、残るplanを返す。全省略をReadyにせず、未対応field・relation・coordinationを黙って捨てない。resource-aware materializerはこのPlanをScore 0.10を基準とする再演可能なrecipeへ写し、必要な追加fieldに応じて最小の後続Score版を選ぶ。個体配列を作る前にhard policyとcallerが明示許可したoperational budgetの双方で需要を検査する。現行出荷値はprimitive mark合計400、展開後Score templateごとのprimitive mark 240、resolved count 2000、drawable template 64に加え、`logical_objects` 4096、`template_nodes` 128、`anchor_instances` 4096、`transform_instances` 4096、`placement_instances` 64、`fill_instances` 64である。既存4上限の管理者設定と作品に保存された旧予算は維持する。単独primitiveの明示countが予算を超える場合は、元Planとsourceの要求値を変えず、source順の先頭から安全に実行できる最大数をScoreへ届け、要求数・実行数・超過理由をresource診断として表示・保存・ログへ渡す。安全に一つも実行できない場合と、部分実行が構造を壊すcoordinated placement／Macro等だけは既定のtyped単位を省略し、独立した後続を続ける。保存Scoreはauthorityのsnapshotを持つが需要の自己申告は持たず、再演時にrecipeから再計算する。既存Score wire / lowering outcome / compiler executionの成功意味とScore 0.9のdefault / legacy互換は変わらない。同じ`inku.geometry-resolution-policy.v1`がこの解決をattestする。通常Server／Web／Androidと保存compact Scoreの再演は、この共有materializerと局所回復の契約を使う。
 
+描画エンジン 97 は、正方形でない画面と物の箱の変換の範囲を短辺単位で判定し、物の中で外れた図形の診断を物の命令に付ける。物は `object_templates` に一つと数え、中身は `template_nodes` と `primitive_marks` などで数える。保存作品の再描画では、以前落ちた変換や物が現れることがある。
+
 ## 13. 揺らぎの設計
 
 ### 13.1 揺らぎとランダム性の区別

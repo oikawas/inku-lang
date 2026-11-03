@@ -12,6 +12,36 @@ fn score(json: &str) -> Score {
 }
 
 #[test]
+fn fixed_transform_group_checks_short_side_canvas_extent() {
+    let input = score(
+        r#"{"version":"0.5.0","instructions":[{"primitive":"line","from":[0.3,0.5],"to":[0.7,0.5]}],"transform_groups":[{"start":0,"end":1,"rotation_degrees":30,"fixed_position_indices":[0]}]}"#,
+    );
+    for canvas in [
+        CanvasSize::new(200.0, 1000.0),
+        CanvasSize::new(1000.0, 200.0),
+    ] {
+        let run = |score| {
+            resolve_checked_performance(
+                PerformanceRequest {
+                    score,
+                    performance_seed: Some(1),
+                    composition_seed: Some(1),
+                    canvas: Some(canvas),
+                },
+                ScoreErrorPolicy::Stop,
+            )
+        };
+        assert_eq!(run(&input).unwrap().score.instructions.len(), 1);
+        let mut outside = input.clone();
+        outside.transform_groups[0].translate_x = 2.0;
+        assert_eq!(
+            run(&outside).unwrap_err().diagnostics[0].reason,
+            ScoreExecutionReason::NumericTransformGroupPositionConflict
+        );
+    }
+}
+
+#[test]
 fn affine_groups_scale_geometry_spacing_and_compose_in_physical_order() {
     let input = score(
         r#"{"version":"0.5.0","instructions":[

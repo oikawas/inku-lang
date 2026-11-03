@@ -2,6 +2,15 @@ use inku_score::Score;
 use serde_json::{Value, json};
 
 #[test]
+fn legacy_object_replay_counts_only_outer_instruction_but_all_marks() {
+    let body = json!({"version":"0.9.0", "instructions":vec![json!({"primitive":"line"});64]});
+    let score: Score = serde_json::from_value(json!({"version":"0.23.0", "instructions":[{"primitive":"square"}], "object_templates":[{"instruction_index":0,"aspect":[1,1],"body":body}]})).unwrap();
+    let demand = inku_score::legacy_resource_demand(&score).unwrap();
+    assert_eq!(demand.object_templates, 1);
+    assert_eq!(demand.primitive_marks, 64);
+}
+
+#[test]
 fn templates_require_the_new_edition_and_a_unique_square_owner() {
     let body = json!({"version":"0.9.0", "instructions":[]});
     let wire = json!({"version":"0.23.0", "instructions":[{"primitive":"square"}],

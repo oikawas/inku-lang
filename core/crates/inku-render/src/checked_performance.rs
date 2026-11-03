@@ -83,7 +83,8 @@ fn checked_touching_candidate(
         }
         let bounds = performed_instruction_bounds_on_canvas(&candidate, None, 0, canvas)
             .ok_or(ScoreExecutionReason::UnsupportedTouchingPrimitive)?;
-        let extent = crate::geometry::short_side_scales(canvas);
+        let extent =
+            crate::geometry::point_to_short_side_units(crate::types::Point::new(1.0, 1.0), canvas);
         if bounds.min.x < -GEOMETRY_EPSILON
             || bounds.min.y < -GEOMETRY_EPSILON
             || bounds.max.x > extent.x + GEOMETRY_EPSILON
@@ -286,7 +287,8 @@ fn clamp_short_side_point(
     point: crate::types::Point,
     canvas: Option<crate::types::CanvasSize>,
 ) -> crate::types::Point {
-    let extent = crate::geometry::short_side_scales(canvas);
+    let extent =
+        crate::geometry::point_to_short_side_units(crate::types::Point::new(1.0, 1.0), canvas);
     crate::types::Point::new(point.x.clamp(0.0, extent.x), point.y.clamp(0.0, extent.y))
 }
 
@@ -294,7 +296,8 @@ fn fits_canvas_bounds(instruction: &Instruction, canvas: Option<crate::types::Ca
     let Some(bounds) = performed_instruction_bounds_on_canvas(instruction, None, 0, canvas) else {
         return false;
     };
-    let extent = crate::geometry::short_side_scales(canvas);
+    let extent =
+        crate::geometry::point_to_short_side_units(crate::types::Point::new(1.0, 1.0), canvas);
     bounds.min.x >= -GEOMETRY_EPSILON
         && bounds.min.y >= -GEOMETRY_EPSILON
         && bounds.max.x <= extent.x + GEOMETRY_EPSILON

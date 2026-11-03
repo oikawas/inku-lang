@@ -17,6 +17,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | コマンド | 用途 |
 |---|---|
 | login / logout / me | セッションの開始、破棄、本人確認 |
+| activity | 実行中の描画、登録されたバッチ、自動推敲を確認。管理者は `--all` で全利用者と描画枠も表示 |
 | models | CLI既定の描画モデル（Stage 1/2共通）・Visionモデルと色カタログの設定 |
 | paint / batch | 記述または指示書から単体・一括描画 |
 | refine | 既存作品から要素（構図・色）を推敲し派生を生成・保存 |
@@ -43,6 +44,8 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | version | CLIと接続先serverのversion/build表示 |
 
 サーバーへ接続するコマンドは共通に `--base-url`（既定 http://127.0.0.1:8100）と `--timeout-seconds`（HTTP のタイムアウト秒。既定 600）を受け付けます。
+
+`inku-cli activity` は実行状態をJSONで返します。バッチには予定数・完了数・状態・最後の生存通知を示します。実行権の期限切れはクライアントが停止した証明ではありません。描画の一覧は応答したServer process内に限り、未登録の古いバッチや他processの描画は分かりません。自動推敲は手の合間も含む実行DBの状態で、子の描画との対応は応答processが把握するものに限ります。古いServerで自動推敲の欄が無い場合は状態不明です。
 
 ### login と models の旗
 

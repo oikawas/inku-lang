@@ -69,7 +69,7 @@ The new password must be at least eight characters. **It does not change unless 
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
 
-While you wait, the indicator names the stage that is working. When `Paint` draws a single work, it reads `Interpreting your words…` until the drawing is done, and beside it `Awaiting reply (try 1/4)` and the like count the attempts at the model's reply. For the candidates refinement makes, the demo, and batches, the layer names (`sketching from life…`, `interpreting your words…`, `writing the score…`, `performing…`) **are switched by a signal the server sends when each layer finishes** (v2.13.39). With `Sketch from life` set to `Off`, the wait does not open on `sketching from life…`. Either way, while the composition is being read (after Stage 1, before the instructions are settled), it reads `Reading the composition…`, while the laws are chosen (after the composition, before the instructions are settled), `Choosing the laws…`, and while the colors are chosen (after the laws, before the instructions are settled), `Choosing the colors…`.
+While you wait, progress lists the finished stages and current work in order as a log. It shows input and output tokens for each stage and a total on the last line; retries count toward their stage. Requests that did not report token counts are distinguished too. While receiving a ChatGPT plan response, it also shows the amount received. The current work may be reading the composition, choosing laws or colors, or final rendering. The stages used depend on the drawing method and conditions.
 
 The first work is the source work.
 
@@ -323,6 +323,8 @@ A refinement changes exactly one element at a time, chosen from the work-editing
 
 In `Another composition` you may choose `Make one option` or `Make four options`.
 
+In `Change the composition form`, choose one of seven forms and draw one or four options. The options share the parent's reading if it has one; otherwise a new reading is made. Drawing switches to `In words` with composition enabled, and the chosen option is saved as a child. This is unavailable when the description is held. Save or discard unsaved options before making new ones.
+
 Check the options you want to keep, then press `Make one option` or `Make four options` to save the unsaved options checked at that moment before drawing the requested number of new options. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain. Options already saved are not saved again.
 
 `Another performance` (changing the touch with words) and `Another reading` were removed on 2026-10-14: the touch's words were never read for their meaning and only made the drawing's seed. `Edit drawing parameters` in the work-editing menu, which drew them, and the `Touch` and `Reading` elements of autonomous refinement were removed with them. Works made by a touch or a reading before then keep their `Touch` or `Reading` edge in the lineage, and redraw from their saved instructions and seed.
@@ -429,9 +431,9 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 | Section | Main contents |
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
-| Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback and Score fallback records |
+| Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation fallback and Score fallback records |
 | Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Lift the stroke limit, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
-| Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, transform layer, Build |
+| Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, the work's Score version, transform layer, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
 
@@ -440,6 +442,8 @@ The `Offered plugins` row records the words offered to AI in this work's run, th
 For a color catalog chosen from the description, Performance shows the selection method, the light and color reading, and the counts of axes and colors dropped as absent from the description. The history and drawing APIs return this optional record as `catalog_reading`.
 
 Every row carries an explanation. The render seed is "the seed that fixes the sway of the performance; the same seed and the same score give the same picture"; the description hash is "the fingerprint of the description; it binds works that came from the same words".
+
+The Score version in the information dialog is the newest version this app can read and write. The Score version in provenance is the one recorded in the displayed work, and may differ. An older work without a recorded version says so.
 
 **The weight of a drawing is printed as three quantities.** `SVG size` is the amount of data, `SVG objects` is how many shapes the SVG holds (containers and notes — svg, defs, title, desc, metadata — are not shapes), and `SVG points` is how many points those shapes are drawn from. **None of the three stands in for the others**: at the same size, few objects with many points is a drawing of fine lines, and many objects with few points is a drawing of many forms.
 
@@ -641,13 +645,13 @@ The performance of the corrected instructions appears in the work tab and is sav
 2. Enter one description per line.
 3. Press `Paint`.
 
-While it runs, the current line, progress, elapsed time, token counts, and the instructions in flight are shown. Failed lines can be inspected in the report, and successful works are saved to history. Each work records the batch run ID and the line number.
+While it runs, the current line, progress, elapsed time, token counts, and the instructions in flight are shown. Tiles above progress show the line count, time since the batch started, and average time for successful works. The average appears after the first success and excludes failed and interrupted works. Each work's elapsed time is also shown; the batch clock starts again on resumption. Failed lines can be inspected in the report, and successful works are saved to history. Each work records the batch run ID and the line number.
 
 Descriptions used before can be restored from `Batch description history`. The last fifty are kept (v2.13.21; twenty before that). The list reaches half the window height at most and scrolls when it does not fit. Clicking outside it or pressing `Esc` closes it.
 
-A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It checks the unfinished lines of the original batch, skips completed works, and restores the original text and drawing conditions. After a browser reload, the same signed-in account can also resume when its newest saved batch text and saved batch works establish that the batch stopped part-way. If the unfinished lines cannot be established from the saved history and text, no resume card appears.
+A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It restores the original text and drawing conditions, checks saved works, and draws only unfinished lines with their original line numbers. After a reload, a registered interrupted or expired run can be offered for resumption even if no work was saved yet. Resume is not offered while a drawing is active or its state is uncertain. Older unregistered runs are offered only when history and text establish the unfinished lines.
 
-When a stopped batch still has lines that failed to draw, `Retry failed works` appears. It redraws only the failed lines, with their original text, line numbers and drawing conditions, leaving out lines that succeeded, were interrupted or never ran. Lines that succeed leave the error list, and the remaining errors can be tried again. When the previous batch's full text cannot be confirmed, the button is unavailable and says so.
+When a stopped batch or one that reached the end still has failed lines, `Retry failed works` appears. It redraws only the failed lines, with their original text, line numbers and drawing conditions, leaving out lines that succeeded, were interrupted or never ran. Lines that succeed leave the error list, and the remaining errors can be tried again. When the previous batch's full text cannot be confirmed, the button is unavailable and says so.
 
 Set `Batch retry` in the settings to one or more and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 
@@ -663,7 +667,7 @@ Each picture goes the same way as the Image tab in §16 and is saved. The condit
 
 A browser cannot read a folder from a typed path, and cannot open a picked folder again later, so there is no path field.
 
-**Stopping and continuing**: the run stops with `Stop`, or by itself when the Server cannot be reached. While the same folder is chosen, `Continue (N left)` paints the pictures not yet painted. After a reload, choose the same folder again and the same button appears. A painted picture is recognised by its path inside the folder, its size and its modification time, so a file replaced under the same name is painted again. `Paint from the start` forgets that folder's progress and paints every picture.
+**Stopping and continuing**: the run stops with `Stop`, or by itself when the Server cannot be reached. While the same folder is chosen, `Continue (N left)` paints the pictures not yet painted. After a reload, choose the same folder again. The browser records the submitted file order and reconciles it with saved works before continuing; losing browser localStorage loses that reconciliation. A painted picture is recognised by its path inside the folder, its size and its modification time. A replacement with a changed size or modification time is painted again. `Paint from the start` forgets that folder's progress and paints every picture.
 
 **Pictures that failed**: one failure does not stop the run. Open `N pictures could not be painted` to see each path and its reason. `Continue` paints them again.
 

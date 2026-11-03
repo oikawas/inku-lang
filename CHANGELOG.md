@@ -8,18 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server and Web: distinguish batches that finish with failed lines from interruptions and offer to draw the missing lines.
-
-- Web: make the model and color catalog condition rows and the model picker more compact.
-
-- Server and Web: show the latest supported Score version in Info and each work's Score version in its details.
-
-- Core: expose the newest Score version this core can read and write through the Python binding.
-
-- Web: show per-work elapsed time and the average completed-work time in batches, label token counts and wrap long status details.
-
-- Server and CLI: show running autonomous refinements in activity and identify their child executions in the responding process.
-
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.
 
 - Align macOS automatic catalog selection with color reading and the run seed, showing the selection and prompts in saved works.
@@ -568,6 +556,20 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.307 (2026-11-03 / Build 1383)
+
+- Server and Web: distinguish batches that finish with failed lines from interruptions and offer to draw the missing lines.
+
+- Web: make the model and color catalog condition rows and the model picker more compact.
+
+- Server and Web: show the latest supported Score version in Info and each work's Score version in its details.
+
+- Core: expose the newest Score version this core can read and write through the Python binding.
+
+- Web: show per-work elapsed time and the average completed-work time in batches, label token counts and wrap long status details.
+
+- Server and CLI: show running autonomous refinements in activity and identify their child executions in the responding process.
 
 ## v2.15.306 (2026-11-02 / Build 1382)
 

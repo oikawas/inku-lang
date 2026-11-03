@@ -13,8 +13,8 @@ use inku_render::{
     ground::shown_background,
     palette::work_palette_context,
     render::{
-        CompatFillClipPolicy, RenderError, render_with_resources,
-        render_with_resources_and_svg_limit,
+        CompatFillClipPolicy, RenderError, render_instruction_prefix_with_resources,
+        render_with_resources, render_with_resources_and_svg_limit,
     },
     types::{RenderOptions, RenderOutput, RenderRequest},
 };
@@ -458,6 +458,97 @@ pub(crate) fn compile_with_resources(
     ))
 }
 
+/// One set of inclusive, one-based line ranges per Score instruction.
+pub type InstructionLineRanges = Vec<Vec<(usize, usize)>>;
+
+/// Line ranges for the owners of the compiled Score's instructions.
+/// Line numbers are one-based and inclusive. Continuation predicates belong
+/// to the same instruction as the head they modify.
+pub fn instruction_line_ranges(
+    document: NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    options: &CompilerOptions,
+) -> Result<InstructionLineRanges, BoundaryError> {
+    let source = document.source().to_owned();
+    let result = compile_with_resources(document, definitions, options)?;
+    instruction_line_ranges_from_result(&result, &source)
+}
+
+fn instruction_line_ranges_from_result(
+    result: &CompilerResourceExecutionResult,
+    source: &str,
+) -> Result<InstructionLineRanges, BoundaryError> {
+    let semantic = result
+        .compilation()
+        .semantic_document
+        .as_ref()
+        .ok_or(BoundaryError::CompilationHasNoScore)?;
+    let score = result.score().ok_or(BoundaryError::CompilationHasNoScore)?;
+    if result.instruction_origins().len() != score.instructions.len() {
+        return Err(BoundaryError::InvalidCompiledDelivery);
+    }
+    let clauses = &semantic
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses;
+    let lines = |span: SourceSpan| {
+        let start = span.start_byte.min(source.len());
+        let mut end = span.end_byte.min(source.len()).max(start);
+        while end > start && matches!(source.as_bytes()[end - 1], b'\n' | b'\r') {
+            end -= 1;
+        }
+        let first = 1 + source.as_bytes()[..start]
+            .iter()
+            .filter(|&&b| b == b'\n')
+            .count();
+        let last = first
+            + source.as_bytes()[start..end]
+                .iter()
+                .filter(|&&b| b == b'\n')
+                .count();
+        (first, last)
+    };
+    result
+        .instruction_origins()
+        .iter()
+        .map(|origin| {
+            let index = match origin {
+                ScoreInstructionOrigin::SourceInstruction { instruction_index } => {
+                    *instruction_index
+                }
+                ScoreInstructionOrigin::MacroEmit {
+                    source_instruction_index,
+                    ..
+                } => *source_instruction_index,
+            };
+            let instruction = semantic
+                .ast
+                .instructions
+                .get(index)
+                .ok_or(BoundaryError::InvalidCompiledDelivery)?;
+            let head = instruction.entity.head.source().span;
+            let span = clauses
+                .iter()
+                .find(|clause| {
+                    clause.span.start_byte <= head.start_byte
+                        && head.end_byte <= clause.span.end_byte
+                })
+                .map_or(head, |clause| clause.span);
+            let mut ranges = vec![lines(span)];
+            for edge in &semantic.ast.continuations {
+                if edge.target_instruction_index == index {
+                    let range = lines(edge.predicate_span);
+                    if !ranges.contains(&range) {
+                        ranges.push(range);
+                    }
+                }
+            }
+            Ok(ranges)
+        })
+        .collect()
+}
+
 /// Compile the exact committed document once and retain all observable evidence.
 pub fn compile_committed(
     document: NormalizedDdlDocument,
@@ -466,6 +557,27 @@ pub fn compile_committed(
 ) -> Result<CompiledDelivery, BoundaryError> {
     let source_digest = sha256_hex(document.source().as_bytes());
     let result = compile_with_resources(document, definitions, options)?;
+    delivery_from_result(&result, options, source_digest)
+}
+
+/// Compile once, retaining both the checked delivery and line provenance.
+pub fn compile_committed_with_line_ranges(
+    document: NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    options: &CompilerOptions,
+) -> Result<(CompiledDelivery, InstructionLineRanges), BoundaryError> {
+    let source = document.source().to_owned();
+    let result = compile_with_resources(document, definitions, options)?;
+    let ranges = instruction_line_ranges_from_result(&result, &source)?;
+    let delivery = delivery_from_result(&result, options, sha256_hex(source.as_bytes()))?;
+    Ok((delivery, ranges))
+}
+
+fn delivery_from_result(
+    result: &CompilerResourceExecutionResult,
+    options: &CompilerOptions,
+    source_digest: String,
+) -> Result<CompiledDelivery, BoundaryError> {
     let compilation = result.compilation();
     let semantic_digest = compilation
         .compiler_lock
@@ -704,7 +816,7 @@ pub fn render_saved_score(
     operational_budget: OperationalResourceBudget,
     clip: ClipPolicy,
 ) -> Result<RenderOutput, BoundaryError> {
-    render_saved_score_impl(request, hard_policy, operational_budget, clip, None)
+    render_saved_score_impl(request, hard_policy, operational_budget, clip, None, None)
 }
 
 /// Replay with a host-only runtime allowance, outside the saved Score policy.
@@ -721,6 +833,7 @@ pub fn render_saved_score_with_svg_limit(
         operational_budget,
         clip,
         Some(max_svg_bytes),
+        None,
     )
 }
 
@@ -730,8 +843,19 @@ fn render_saved_score_impl(
     operational_budget: OperationalResourceBudget,
     clip: ClipPolicy,
     max_svg_bytes: Option<usize>,
+    instruction_limit: Option<usize>,
 ) -> Result<RenderOutput, BoundaryError> {
     let clip = clip.resolved()?;
+    if let Some(limit) = instruction_limit {
+        return render_instruction_prefix_with_resources(
+            request,
+            hard_policy,
+            operational_budget,
+            clip,
+            limit,
+        )
+        .map_err(BoundaryError::Render);
+    }
     match max_svg_bytes {
         Some(maximum) => render_with_resources_and_svg_limit(
             request,
@@ -752,7 +876,7 @@ pub fn render_delivery(
     compiler: &CompilerOptions,
     clip: ClipPolicy,
 ) -> Result<RenderOutput, BoundaryError> {
-    render_delivery_impl(delivery, options, compiler, clip, None)
+    render_delivery_impl(delivery, options, compiler, clip, None, None)
 }
 
 /// Preserve delivery identity while applying a host-only output allowance.
@@ -763,7 +887,17 @@ pub fn render_delivery_with_svg_limit(
     clip: ClipPolicy,
     max_svg_bytes: usize,
 ) -> Result<RenderOutput, BoundaryError> {
-    render_delivery_impl(delivery, options, compiler, clip, Some(max_svg_bytes))
+    render_delivery_impl(delivery, options, compiler, clip, Some(max_svg_bytes), None)
+}
+
+pub fn render_delivery_instruction_prefix(
+    delivery: &CompiledDelivery,
+    options: RenderOptions,
+    compiler: &CompilerOptions,
+    clip: ClipPolicy,
+    limit: usize,
+) -> Result<RenderOutput, BoundaryError> {
+    render_delivery_impl(delivery, options, compiler, clip, None, Some(limit))
 }
 
 fn render_delivery_impl(
@@ -772,6 +906,7 @@ fn render_delivery_impl(
     compiler: &CompilerOptions,
     clip: ClipPolicy,
     max_svg_bytes: Option<usize>,
+    instruction_limit: Option<usize>,
 ) -> Result<RenderOutput, BoundaryError> {
     compiler.validate()?;
     delivery.validate()?;
@@ -832,6 +967,7 @@ fn render_delivery_impl(
         compiler.operational_resource_budget,
         clip,
         max_svg_bytes,
+        instruction_limit,
     )
 }
 

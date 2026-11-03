@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Shared core: generate SVG frames and source line ranges from saved instructions, revealing one instruction at a time after the ground and reporting equality with the saved SVG. Supports DDL-and-image composition or image-only frames through Python and UniFFI; existing host exports are unchanged.
+
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.
 
 - Align macOS automatic catalog selection with color reading and the run seed, showing the selection and prompts in saved works.

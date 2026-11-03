@@ -140,6 +140,23 @@ use inku_score::{
     CANVAS_FORMAT_REGISTRY_ID, Color, HardResourcePolicy, OperationalResourceBudget,
     ResourceBudget, ResourceDemand, ScoreErrorPolicy, canvas_format_registry_digest,
 };
+
+#[test]
+fn animation_line_ranges_include_a_separate_continuation() {
+    let document = inku_ddl::NormalizedDdlDocument::new(
+        "Place one thin pencil line at the center.\nThe line sways narrowly.\nPlace a circle.",
+        inku_ddl::ResolvedInstructionLanguage::En,
+        vec![],
+    )
+    .unwrap();
+    let ranges =
+        inku_pipeline::core_boundary::instruction_line_ranges(document, &[], &config().compiler)
+            .unwrap();
+    assert_eq!(ranges.len(), 2);
+    assert!(ranges[0].contains(&(1, 1)));
+    assert!(ranges[0].contains(&(2, 2)));
+    assert!(ranges[1].contains(&(3, 3)));
+}
 fn config() -> PipelineConfig {
     let white = ResolvedPaletteColorDto {
         abstract_color: Color::White,

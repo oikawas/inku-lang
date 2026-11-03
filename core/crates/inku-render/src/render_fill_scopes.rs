@@ -89,6 +89,7 @@ impl FillPaintForest {
         definitions: &mut Vec<Element>,
         clip_policy: CompatFillClipPolicy,
         performed: &[PerformedInstruction],
+        instruction_limit: Option<usize>,
     ) -> (Vec<Element>, Vec<ScoreExecutionDiagnostic>, Vec<usize>) {
         let roots = std::mem::take(&mut self.roots);
         let mut failures = BTreeMap::new();
@@ -125,6 +126,14 @@ impl FillPaintForest {
         // Whole-scope clipping must not regroup paint and carve instructions.
         // Recover their original paint order after the bounded tree operation.
         paints.sort_by_key(|(order, _)| *order);
+        if let Some(limit) = instruction_limit {
+            let owners = self
+                .paint_order
+                .values()
+                .map(|&(order, index)| (order, performed[index].original_instruction_index))
+                .collect::<BTreeMap<_, _>>();
+            paints.retain(|(order, _)| owners.get(order).is_some_and(|owner| *owner < limit));
+        }
         let elements = paints.into_iter().map(|(_, element)| element).collect();
         let mut originals = BTreeMap::new();
         for (index, reason) in failures {

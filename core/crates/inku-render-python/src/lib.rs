@@ -160,6 +160,17 @@ fn pipeline_version_report() -> String {
     inku_pipeline_uniffi::version_report()
 }
 
+/// Produce line animation frames through the same byte boundary as UniFFI.
+#[pyfunction]
+fn pipeline_line_animation<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::line_animation(input));
+    PyBytes::new(py, &output)
+}
+
 /// Share the canonical canvas registry with the Python host.
 #[pyfunction]
 fn pipeline_canvas_registry() -> String {
@@ -680,6 +691,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_with_svg_limit, module)?)?;
     module.add_function(wrap_pyfunction!(render_with_resources, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_version_report, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_line_animation, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_canvas_registry, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_stage1_system_projection, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_step, module)?)?;

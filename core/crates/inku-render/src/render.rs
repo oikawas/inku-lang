@@ -668,6 +668,7 @@ fn paint_object_body(
             &mut definitions,
             clip_policy,
             &performed.performed,
+            None,
         );
         if !diagnostics.is_empty() {
             return Err(RenderError::InvalidScore(
@@ -746,7 +747,7 @@ fn render_with_allowance(
         inku_score::OperationalResourceBudget(absolute.budget),
     )
     .map_err(RenderError::ResourceAuthority)?;
-    render_impl(request, None, &[], allowance)
+    render_impl(request, None, &[], allowance, None)
 }
 
 /// Render a typed Score with independently authorized resource policies.
@@ -763,6 +764,7 @@ pub fn render_with_resources(
         operational_budget,
         clip_policy,
         OutputAllowance::default(),
+        None,
     )
 }
 
@@ -781,6 +783,25 @@ pub fn render_with_resources_and_svg_limit(
         operational_budget,
         clip_policy,
         OutputAllowance::default().with_minimum_base(max_svg_bytes),
+        None,
+    )
+}
+
+/// Render the full resolved Score while revealing only the first source instructions.
+pub fn render_instruction_prefix_with_resources(
+    request: RenderRequest,
+    hard_policy: &inku_score::HardResourcePolicy,
+    operational_budget: inku_score::OperationalResourceBudget,
+    clip_policy: CompatFillClipPolicy,
+    instruction_limit: usize,
+) -> Result<RenderOutput, RenderError> {
+    render_with_resources_and_allowance(
+        request,
+        hard_policy,
+        operational_budget,
+        clip_policy,
+        OutputAllowance::default(),
+        Some(instruction_limit),
     )
 }
 
@@ -790,6 +811,7 @@ fn render_with_resources_and_allowance(
     operational_budget: inku_score::OperationalResourceBudget,
     clip_policy: CompatFillClipPolicy,
     allowance: OutputAllowance,
+    instruction_limit: Option<usize>,
 ) -> Result<RenderOutput, RenderError> {
     validate_request(&request)?;
     let mut omitted = std::collections::BTreeMap::new();
@@ -800,6 +822,7 @@ fn render_with_resources_and_allowance(
             Some((hard_policy, operational_budget, clip_policy)),
             &excluded,
             allowance,
+            instruction_limit,
         )?;
         let mut changed = false;
         if let Some(execution) = &mut output.metadata.execution {
@@ -845,6 +868,7 @@ fn render_impl(
     )>,
     omitted_instructions: &[usize],
     mut allowance: OutputAllowance,
+    instruction_limit: Option<usize>,
 ) -> Result<RenderOutput, RenderError> {
     let invalid_colors =
         crate::palette::sanitize_color_map(&mut request.options.resolved_color_map);
@@ -1017,6 +1041,8 @@ fn render_impl(
     let keeps_obstacles = performance.score.uses_free_line();
     let mut obstacles = Vec::new();
     for (performed_index, (instruction, performed)) in ordered {
+        let visible =
+            instruction_limit.is_none_or(|limit| performed.original_instruction_index < limit);
         let instruction_index = performed.instruction_index;
         let non_finite_before = crate::svg::non_finite_writes();
         let instruction_seed_override = performed.seed_override;
@@ -1100,7 +1126,7 @@ fn render_impl(
                 )?;
                 if structured || has_fill_scopes {
                     instruction_group.push(fill);
-                } else {
+                } else if visible {
                     content.push(fill);
                 }
             }
@@ -1125,7 +1151,7 @@ fn render_impl(
                 )?;
                 if structured || has_fill_scopes {
                     instruction_group.push(body);
-                } else {
+                } else if visible {
                     content.push(body);
                 }
                 continue;
@@ -1199,7 +1225,7 @@ fn render_impl(
                     mark.set_attr("id", mark_id(single, instruction_index, mark_index));
                 }
                 instruction_group.push(mark);
-            } else {
+            } else if visible {
                 content.push(mark);
             }
         }
@@ -1215,7 +1241,7 @@ fn render_impl(
                 fill_scope,
                 &performance.fill_scopes,
             );
-        } else if structured {
+        } else if structured && visible {
             content.push(instruction_group);
         }
         if first_non_finite.is_none() && crate::svg::non_finite_writes() != non_finite_before {
@@ -1234,6 +1260,7 @@ fn render_impl(
             &mut definitions,
             clip_policy,
             &performance.performed,
+            instruction_limit,
         );
         material_definitions.extend(definitions.into_iter().skip(before));
         for element in paint {
@@ -1266,7 +1293,10 @@ fn render_impl(
                     crate::types::Weight::Burin | crate::types::Weight::Drypoint
                 )
             });
-    if is_print && let Some(seed) = request.options.render_seed {
+    if instruction_limit != Some(0)
+        && is_print
+        && let Some(seed) = request.options.render_seed
+    {
         // The plate covers a fitted frame's paper (render engine 93).
         let [x0, y0, x1, y1] = request.options.canvas.paper();
         let mut plate_tone = Element::new("rect")
@@ -1290,7 +1320,11 @@ fn render_impl(
         }
         content.push(plate_tone);
     }
-    let presence = render_presence_layer(&performance.score, request.options.canvas, &assignment);
+    let presence = if instruction_limit == Some(0) {
+        None
+    } else {
+        render_presence_layer(&performance.score, request.options.canvas, &assignment)
+    };
     let ground = ground
         .as_ref()
         .and_then(|ground| render_ground(ground, paper, &background, request.options.render_seed));
@@ -1414,6 +1448,64 @@ mod tests {
     use crate::types::{CanvasSize, RenderOptions};
 
     #[test]
+    fn instruction_prefix_keeps_the_resolved_marks_and_final_bytes() {
+        let request = RenderRequest {
+            score: serde_json::from_value(serde_json::json!({"instructions": [
+                {"primitive":"circle", "center":[0.25,0.5], "radius":0.1, "color":"red"},
+                {"primitive":"circle", "center":[0.75,0.5], "radius":0.1, "color":"blue"}
+            ]}))
+            .unwrap(),
+            options: RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(17),
+                composition_seed: Some(37),
+                wild: false,
+                error_policy: inku_score::ScoreErrorPolicy::OmitAndContinue,
+            },
+        };
+        let full = render_impl(request.clone(), None, &[], OutputAllowance::default(), None)
+            .unwrap()
+            .svg;
+        let final_frame = render_impl(
+            request.clone(),
+            None,
+            &[],
+            OutputAllowance::default(),
+            Some(2),
+        )
+        .unwrap()
+        .svg;
+        let first = render_impl(
+            request.clone(),
+            None,
+            &[],
+            OutputAllowance::default(),
+            Some(1),
+        )
+        .unwrap()
+        .svg;
+        let ground = render_impl(request, None, &[], OutputAllowance::default(), Some(0))
+            .unwrap()
+            .svg;
+        assert_eq!(full, final_frame);
+        assert_ne!(ground, first);
+        assert_ne!(first, full);
+        let first_content = first.split("id=\"layer_10_content\"").nth(1).unwrap();
+        let first_mark = first_content
+            .split('>')
+            .nth(1)
+            .unwrap()
+            .split("</g>")
+            .next()
+            .unwrap();
+        assert!(full.contains(first_mark));
+    }
+
+    #[test]
     fn object_body_is_painted_as_marks_inside_the_performed_box() {
         let parent: Instruction = serde_json::from_value(
             serde_json::json!({"primitive":"square","position":[0.2,0.65],"size":[0.2,0.1]}),
@@ -1474,7 +1566,7 @@ mod tests {
         request.score.version = "0.23.0".into();
         request.score.instructions.push(parent);
         request.score.object_templates.push(template);
-        let rendered = render_impl(request, None, &[], OutputAllowance::default()).unwrap();
+        let rendered = render_impl(request, None, &[], OutputAllowance::default(), None).unwrap();
         assert_eq!(rendered.svg.matches("<rect").count(), 1, "{}", rendered.svg);
         assert!(
             rendered.svg.contains("<line") || rendered.svg.contains("<path"),
@@ -1724,7 +1816,8 @@ mod tests {
                 error_policy: Default::default(),
             },
         };
-        let error = render_impl(request, None, &[], OutputAllowance::new(1_000, 10)).unwrap_err();
+        let error =
+            render_impl(request, None, &[], OutputAllowance::new(1_000, 10), None).unwrap_err();
         assert_eq!(
             error,
             RenderError::OutputTooLarge {

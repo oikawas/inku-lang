@@ -39,7 +39,9 @@ pub use raster::{
     rasterize_svg, rasterize_svg_region,
 };
 pub use saijiki_migration::{migrate_saijiki_v1, migrate_saijiki_v2};
-pub use standalone::{compile_document, render_compiled, render_compiled_svg_limited};
+pub use standalone::{
+    compile_document, line_animation, render_compiled, render_compiled_svg_limited,
+};
 
 const BINDING_VERSION: &str = "1.1.0";
 const PROTOCOL_VERSION: &str = "1.0.0";

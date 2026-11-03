@@ -2,7 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ja } from '../../i18n/ja.ts';
 import { en } from '../../i18n/en.ts';
-import { batchElapsedTime } from './elapsed.ts';
+import { batchClockTime, batchElapsedTime } from './elapsed.ts';
+
+test('batch clock uses compact minutes and hours, flooring and clamping', () => {
+	assert.deepEqual([45, 60, 723, 3723].map((s) => batchClockTime(s * 1000)), ['0:45', '1:00', '12:03', '1:02:03']);
+	assert.equal(batchClockTime(-10), '0:00');
+	assert.equal(batchClockTime(59_999), '0:59');
+});
+
+test('batch tiles have Japanese and English headings', () => {
+	assert.deepEqual([ja.batchTileLine, ja.batchTileElapsed, ja.batchTileAverage], ['行', '開始から', '1 枚の平均']);
+	assert.deepEqual([en.batchTileLine, en.batchTileElapsed, en.batchTileAverage], ['Line', 'Since start', 'Avg / work']);
+});
 
 test('batch time and row labels follow the Japanese and English boundaries', () => {
 	assert.deepEqual([45, 60, 723, 3723].map((s) => batchElapsedTime(s * 1000, ja)),

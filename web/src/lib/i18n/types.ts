@@ -384,6 +384,9 @@ export interface LangPack {
 	batchRowOfTotal: (current: number, total: number) => string;
 	batchElapsed: (time: string) => string;
 	batchAverageWork: (time: string) => string;
+	batchTileLine: string;
+	batchTileElapsed: string;
+	batchTileAverage: string;
 	elapsedSeconds: (s: string) => string;
 	elapsedMinutes: (m: string, s: string) => string;
 	elapsedHours: (h: string, m: string, s: string) => string;

@@ -57,7 +57,7 @@
 		canResumeBatch: boolean;
 		canRetryBatchFailures?: boolean;
 		/** The stopped batch's remaining work, found without changing the editor. */
-		batchResumeInfo?: { nextLine: number | null; pending: number | null; total: number } | null;
+		batchResumeInfo?: { nextLine: number | null; pending: number | null; total: number; reason?: 'failed'; failureCount?: number } | null;
 		/** A resume scan is in progress; its result has not yet replaced the editor. */
 		batchResuming?: boolean;
 		/** The last batch was explicitly stopped before it reached its end. */
@@ -282,11 +282,13 @@
 {/if}
 
 {#if !batchRunning && canResumeBatch}
-	<section class="batch-resume-card" aria-label={t().batchResumeTitle}>
+	<section class="batch-resume-card" aria-label={batchResumeInfo?.reason === 'failed' ? t().batchFailedResumeTitle : t().batchResumeTitle}>
 		<div class="batch-resume-copy">
-			<strong>{t().batchResumeTitle}</strong>
+			<strong>{batchResumeInfo?.reason === 'failed' ? t().batchFailedResumeTitle : t().batchResumeTitle}</strong>
 			<p>
-				{#if batchResumeInfo?.nextLine !== null && batchResumeInfo?.nextLine !== undefined && batchResumeInfo?.pending !== null && batchResumeInfo?.pending !== undefined}
+				{#if batchResumeInfo?.reason === 'failed'}
+					{t().batchFailedResumeDescription(batchResumeInfo.total, batchResumeInfo.failureCount ?? 0)}
+				{:else if batchResumeInfo?.nextLine !== null && batchResumeInfo?.nextLine !== undefined && batchResumeInfo?.pending !== null && batchResumeInfo?.pending !== undefined}
 					{t().batchResumeKnown(batchResumeInfo.nextLine, batchResumeInfo.pending, batchResumeInfo.total)}
 				{:else}
 					{t().batchResumeUnknown(batchResumeInfo?.total ?? 0)}
@@ -295,10 +297,10 @@
 			{#if batchResumeInfo?.pending !== null && batchResumeInfo?.pending !== undefined}
 				<span>{t().batchResumeCompleted(batchResumeInfo.total - batchResumeInfo.pending)}</span>
 			{/if}
-			<span>{t().batchResumeRestores}</span>
+			<span>{batchResumeInfo?.reason === 'failed' ? t().batchFailedResumeRestores : t().batchResumeRestores}</span>
 		</div>
 		<button type="button" class="ghost-btn batch-resume-btn" onclick={onResumeBatch} disabled={actionDisabled || batchResuming}>
-			{batchResuming ? t().batchResumeScanning : t().batchResumeBtn}
+			{batchResuming ? t().batchResumeScanning : batchResumeInfo?.reason === 'failed' ? t().batchFailedResumeBtn : t().batchResumeBtn}
 		</button>
 	</section>
 {/if}

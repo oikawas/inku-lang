@@ -259,6 +259,10 @@ export interface LangPack {
 	batchResumeUnknown: (total: number) => string;
 	batchResumeCompleted: (success: number) => string;
 	batchResumeRestores: string;
+	batchFailedResumeTitle: string;
+	batchFailedResumeDescription: (total: number, failed: number) => string;
+	batchFailedResumeBtn: string;
+	batchFailedResumeRestores: string;
 	batchNewRunLabel: string;
 	batchNewRunBtn: string;
 	demoOpenSettings: string;

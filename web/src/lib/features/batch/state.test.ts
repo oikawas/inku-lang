@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { ja } from '../../i18n/ja.ts';
+import { en } from '../../i18n/en.ts';
+import type { BatchFailureReport } from './failure-report.svelte.ts';
 
 const identity = <T>(value: T): T => value;
 const stateShim = identity as (<T>(value: T) => T) & { raw: <T>(value: T) => T };
@@ -629,6 +632,81 @@ function outageState(upAfter: number, options: { limitMs?: number; onSleep?: () 
 
 const quietRun = { canvasAspectId: 'square' as const, maxRetries: 0,
 	onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {} };
+
+test('finished failures close differently from completion, a stop, or a lost connection', async () => {
+	for (const scenario of ['success', 'failed', 'stopped', 'lost', 'unexpected'] as const) {
+		const statuses: string[] = [];
+		let reportWrites = 0;
+		let state: InstanceType<typeof BatchState>;
+		state = new BatchState({
+			apiFetch: async (path, init) => {
+				if (path === '/api/pipeline/batches' && init?.method === 'POST') return jsonResponse({ lease: 'lease' });
+				if (path.endsWith('/heartbeat')) { statuses.push(JSON.parse(String(init?.body)).state); return jsonResponse({}); }
+				if (path === '/api/pipeline/batches') return jsonResponse({ batches: [] });
+				if (path === '/api/info') return new Response('', { status: 503 });
+				return jsonResponse({ items: [] });
+			},
+			signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {
+				if (scenario === 'unexpected' && ++reportWrites === 2) throw new Error('report failed');
+			},
+			createRunId: () => 'run-1', serverWait: { limitMs: 0, firstPhaseMs: 0, firstIntervalMs: 1, laterIntervalMs: 1 },
+		});
+		state.input = 'first\nsecond';
+		const run = state.run({ ...quietRun, paintLine: async (_text, options) => {
+			if (options.batchLineNumber === 2 && scenario === 'failed') throw new Error('failed');
+			if (options.batchLineNumber === 2 && scenario === 'lost') throw new ConnectionFailure('cut', 'lost');
+			if (options.batchLineNumber === 2 && scenario === 'stopped') state.stop();
+			return result(options.batchLineNumber!);
+		} });
+		if (scenario === 'unexpected') await assert.rejects(run, /report failed/);
+		else await run;
+		assert.equal(statuses.at(-1), scenario === 'success' ? 'completed' : scenario === 'failed' ? 'finished_with_failures' : 'interrupted', scenario);
+	}
+});
+
+test('finished failures offer failed lines while interruptions keep their existing notice', async () => {
+	const conditions = { stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+		sketchGrain: null, wild: null, canvasAspectId: null };
+	const record = { run_id: 'run-1', kind: 'web', total: 3, completed: 2,
+		state: 'finished_with_failures', prompt: 'one\ntwo\nthree', conditions, updated_at: 1 };
+	const state = new BatchState({ apiFetch: async (path) => path === '/api/pipeline/batches'
+		? jsonResponse({ batches: [record] }) : jsonResponse({ items: [
+			{ batch_run_id: 'run-1', batch_line_number: 1 }, { batch_run_id: 'run-1', batch_line_number: 3 },
+		] }), signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {} });
+	await state.refreshResume();
+	assert.equal(state.canResume, true);
+	assert.deepEqual(state.resumeInfo, { nextLine: null, pending: null, total: 3, reason: 'failed', failureCount: 1 });
+	assert.equal(ja.batchFailedResumeTitle, '描けなかった行を描き直す');
+	assert.equal(ja.batchFailedResumeDescription(3, 1), '元のバッチ（3 件）で描けなかった 1 件を描きます。');
+	assert.equal(en.batchFailedResumeTitle, 'Draw the lines that failed');
+	assert.equal(en.batchFailedResumeDescription(3, 1), 'Draws the 1 line of the original batch (3) that was not drawn.');
+	assert.equal(en.batchFailedResumeDescription(50, 2), 'Draws the 2 lines of the original batch (50) that were not drawn.');
+	let sent: number[] = [];
+	await state.resumeInterrupted({ blocked: () => false, applyConditions: () => {}, run: async (lines) => { sent = lines.map((line) => line.line); } });
+	assert.deepEqual(sent, [2]);
+	const reopened = new BatchState({ apiFetch: async () => jsonResponse({ batches: [{ ...record, state: 'interrupted' }] }),
+		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {} });
+	await reopened.refreshResume();
+	assert.equal(reopened.canResume, true);
+	assert.equal(reopened.resume?.reason, undefined);
+});
+
+test('the same run failure report suppresses only its duplicate failure notice', async () => {
+	const conditions = { stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+		sketchGrain: null, wild: null, canvasAspectId: null };
+	const record = { run_id: 'run-1', kind: 'web', total: 2, completed: 1, state: 'finished_with_failures',
+		prompt: 'one\ntwo', conditions, updated_at: 1 };
+	let report: BatchFailureReport | null = { success: 1, total: 2, failures: [{ line: 2, input: 'two', message: 'failed' }],
+		retry: { prompt: record.prompt, runId: 'run-1', conditions, failedLines: [2], pendingLines: [2] } };
+	const state = new BatchState({ apiFetch: async () => jsonResponse({ batches: [record] }),
+		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {}, getFailureReport: () => report });
+	await state.refreshResume();
+	assert.equal(state.canResume, false);
+	report = { ...report!, retry: { ...report!.retry!, runId: 'another' } };
+	assert.equal(state.canResume, true);
+	report = null;
+	assert.equal(state.canResume, true);
+});
 
 test('a batch waits for the Server through a restart and sends the cut lines again, failing none (Q1, Q2)', async () => {
 	const { state, server } = outageState(3);

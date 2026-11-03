@@ -89,7 +89,7 @@
 		batchPromptHistory: string[];
 		canResumeBatch: boolean;
 		canRetryBatchFailures: boolean;
-		batchResumeInfo: { nextLine: number | null; pending: number | null; total: number } | null;
+		batchResumeInfo: { nextLine: number | null; pending: number | null; total: number; reason?: 'failed'; failureCount?: number } | null;
 		batchResuming: boolean;
 		batchInterrupted: boolean;
 		batchWaitingLine?: number | null;

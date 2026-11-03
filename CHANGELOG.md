@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: distinguish batches that finish with failed lines from interruptions and offer to draw the missing lines.
+
 - Web: make the model and color catalog condition rows and the model picker more compact.
 
 - Server and Web: show the latest supported Score version in Info and each work's Score version in its details.

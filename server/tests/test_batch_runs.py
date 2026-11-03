@@ -42,3 +42,31 @@ def test_expired_batch_can_resume_only_after_active_draw_finishes_and_fences_old
     with pytest.raises(HTTPException):
         registry.start("alice", body, set())
     engine.dispose()
+
+
+def test_finished_with_failures_is_durable_validated_and_resumable(tmp_path, monkeypatch):
+    from inku_server.pipeline_api import BatchUpdateBody
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'finished.db'}")
+    AppSettingRow.__table__.create(engine)
+    clock = [1000.0]
+    monkeypatch.setattr(batch_runs.time, "time", lambda: clock[0])
+    registry = BatchRuns(engine)
+    body = {"run_id": "run-1", "kind": "web", "total": 3, "prompt": "one\ntwo\nthree", "conditions": {}}
+    lease = registry.start("alice", body, set())["lease"]
+    assert BatchUpdateBody(lease=lease, completed=2, state="finished_with_failures").state == "finished_with_failures"
+    with pytest.raises(HTTPException) as full:
+        registry.update("alice", "run-1", lease, 3, "finished_with_failures")
+    assert (full.value.status_code, full.value.detail) == (422, "batch_has_no_failures")
+    registry.update("alice", "run-1", lease, 2, "finished_with_failures")
+    clock[0] += 1000
+    assert registry.list("alice", set())[0]["state"] == "finished_with_failures"
+    assert registry.list("alice", {"run-1"})[0]["state"] == "uncertain"
+    resumed = registry.start("alice", body, set())["lease"]
+    assert registry.list("alice", set())[0]["completed"] == 2
+    registry.update("alice", "run-1", resumed, 3, "running")
+    with pytest.raises(HTTPException) as previous_full:
+        registry.update("alice", "run-1", resumed, 2, "finished_with_failures")
+    assert previous_full.value.detail == "batch_has_no_failures"
+    registry.update("alice", "run-1", resumed, 3, "completed")
+    engine.dispose()

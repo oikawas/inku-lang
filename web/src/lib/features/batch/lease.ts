@@ -3,7 +3,7 @@ import type { BatchRunConditions } from './resume.ts';
 
 export type BatchLeaseRecord = {
 	run_id: string; kind: 'web' | 'cli' | 'image'; total: number; completed: number;
-	state: 'running' | 'uncertain' | 'lease_expired' | 'interrupted' | 'stopped' | 'completed';
+	state: 'running' | 'uncertain' | 'lease_expired' | 'interrupted' | 'stopped' | 'completed' | 'finished_with_failures';
 	prompt: string; conditions: BatchRunConditions; updated_at: number;
 };
 
@@ -13,7 +13,7 @@ export async function startBatchLease(apiFetch: ApiFetch, runId: string, prompt:
 	kind: 'web' | 'image' = 'web'): Promise<{
 	lease: string;
 	refresh: () => Promise<void>;
-	finish: (state: 'completed' | 'stopped' | 'interrupted') => Promise<void>;
+	finish: (state: 'completed' | 'stopped' | 'interrupted' | 'finished_with_failures') => Promise<void>;
 } | null> {
 	const response = await apiFetch('/api/pipeline/batches', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ run_id: runId, kind, prompt, conditions, total }) });
@@ -24,7 +24,7 @@ export async function startBatchLease(apiFetch: ApiFetch, runId: string, prompt:
 	const lease = data.lease;
 	let ended = false;
 	let pending = false;
-	const update = async (state: 'running' | 'completed' | 'stopped' | 'interrupted') => {
+	const update = async (state: 'running' | 'completed' | 'stopped' | 'interrupted' | 'finished_with_failures') => {
 		const result = await apiFetch(`/api/pipeline/batches/${encodeURIComponent(runId)}/heartbeat`, {
 			method: 'POST', headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ lease, state, completed: completed() })

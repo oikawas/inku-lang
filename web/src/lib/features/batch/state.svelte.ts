@@ -72,6 +72,8 @@ export type BatchResumeCandidate<TWork extends BatchWork = BatchWork> = {
 	conditions: BatchRunConditions;
 	pending: NumberedLine[] | null;
 	source: 'history' | 'session';
+	reason?: 'failed';
+	failureCount?: number;
 };
 
 type InterruptedBatchSnapshot<TWork extends BatchWork> = {
@@ -207,7 +209,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	get canResume(): boolean {
-		return this.resume !== null;
+		const candidate = this.resume;
+		const report = this.deps.getFailureReport?.();
+		return candidate !== null && !(candidate.reason === 'failed' && candidate.runId !== null
+			&& report?.retry?.runId === candidate.runId && report.failures.length > 0);
 	}
 
 	get canRetryFailures(): boolean {
@@ -216,13 +221,14 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	/** Enough progress for the button to explain an in-session continuation. */
-	get resumeInfo(): { nextLine: number | null; pending: number | null; total: number } {
+	get resumeInfo(): { nextLine: number | null; pending: number | null; total: number; reason?: 'failed'; failureCount?: number } {
 		const candidate = this.resume;
 		if (!candidate) return { nextLine: null, pending: null, total: 0 };
 		return {
 			nextLine: candidate.pending?.[0]?.line ?? null,
 			pending: candidate.pending?.length ?? null,
 			total: candidate.lines.length,
+			...(candidate.reason === 'failed' ? { reason: 'failed' as const, failureCount: candidate.failureCount } : {}),
 		};
 	}
 
@@ -321,9 +327,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 						const record = data.batches.find((item) => item.kind === 'web');
 						if (record) {
 							const lines = numberedBatchLines(record.prompt, this.deps.paintable);
-							this.resume = (record.state === 'interrupted' || record.state === 'lease_expired') && lines.length === record.total
+							this.resume = (record.state === 'interrupted' || record.state === 'lease_expired' || record.state === 'finished_with_failures') && lines.length === record.total
 								? { prompt: record.prompt, lines, runId: record.run_id, work: null,
-									conditions: record.conditions, pending: null, source: 'history' }
+									conditions: record.conditions, pending: null, source: 'history',
+									...(record.state === 'finished_with_failures' ? { reason: 'failed' as const, failureCount: record.total - record.completed } : {}) }
 								: null;
 							return;
 						}
@@ -502,6 +509,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		const batchRunId = snapshot.runId;
 		this.total = lineTotal;
 		let interrupted = false;
+		let finishedAllLines = false;
 		let lease: Awaited<ReturnType<typeof startBatchLease>> = null;
 
 		const isCurrent = (): boolean => (
@@ -681,6 +689,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				completedRetryRounds += 1;
 			}
 
+			finishedAllLines = !interrupted && isCurrent();
 			this.retryRound = 0;
 			this.total = lineTotal;
 			options.onPaintComplete?.();
@@ -697,8 +706,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			await this.refreshResume();
 		} finally {
 			if (lease) {
-				const state = this.serverLost || interrupted ? 'interrupted'
-					: this.stopRequested ? 'stopped' : snapshot.pending.length ? 'interrupted' : 'completed';
+				const unfinishedBeforeRetry = retrying && snapshot.pending.some((line) =>
+					!paintLines.some((item) => item.line === line.line));
+				const state = this.serverLost || interrupted || unfinishedBeforeRetry || (!finishedAllLines && !this.stopRequested) ? 'interrupted'
+					: this.stopRequested ? 'stopped' : snapshot.pending.length ? 'finished_with_failures' : 'completed';
 				await lease.finish(state).catch((cause) => this.warn('failed to close the batch lease', cause));
 			}
 			if (this.abortController === abortController) {

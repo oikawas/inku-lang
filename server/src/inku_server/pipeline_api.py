@@ -1047,7 +1047,7 @@ class BatchUpdateBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     lease: str = Field(min_length=1, max_length=200)
     completed: int = Field(ge=0, le=100000)
-    state: Literal["running", "completed", "stopped", "interrupted"] = "running"
+    state: Literal["running", "completed", "stopped", "interrupted", "finished_with_failures"] = "running"
 
 
 def pipeline_router(service: PipelineService | Callable[[], PipelineService], actor_dependency: Callable,

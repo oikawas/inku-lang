@@ -73,6 +73,8 @@ class BatchRuns:
                 raise HTTPException(422, "batch_completed_exceeds_total")
             if state == "completed" and max(record["completed"], completed) != record["total"]:
                 raise HTTPException(422, "batch_not_complete")
+            if state == "finished_with_failures" and max(record["completed"], completed) == record["total"]:
+                raise HTTPException(422, "batch_has_no_failures")
             record.update(completed=max(record["completed"], completed), state=state, updated_at=now)
             connection.execute(AppSettingRow.__table__.update().where(AppSettingRow.key == key).values(value=json.dumps(record, ensure_ascii=False), at=now))
             connection.commit()

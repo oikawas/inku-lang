@@ -11,13 +11,13 @@ final class ExportDefaultsChecks: XCTestCase, @unchecked Sendable {
         var options = ExportOptions()
         options.format = .gif; options.svgProfile = "compat"; options.pngAlphaWhite = true
         options.cardLayout = "portrait"; options.cardSeal = false; options.transition = "slide"
-        options.holdSeconds = 4.2; options.layerFrameCount = 29; options.layerIntervalSeconds = 0.7; options.layerReplay = "reverse"
+        options.holdSeconds = 4.2; options.showDDL = false; options.layerIntervalSeconds = 0.7; options.layerReplay = "reverse"
         options.title = "詞書e\u{301}"; options.subtitle = "試作"
         var configuration = ExportConfiguration(options: options, resolution: 0, customHeight: 12000).normalized()
         configuration.destinationBookmark = Data([1, 2, 3]); configuration.destinationName = "作品"
         XCTAssertEqual(try JSONDecoder().decode(ExportConfiguration.self, from: JSONEncoder().encode(configuration)), configuration)
         let partial = try JSONDecoder().decode(ExportConfiguration.self, from: Data("{\"options\":{\"layerFrameCount\":999,\"svgProfile\":\"unknown\"}}".utf8))
-        XCTAssertEqual(partial.options.layerFrameCount, 120); XCTAssertEqual(partial.options.svgProfile, "display")
+        XCTAssertTrue(partial.options.showDDL); XCTAssertEqual(partial.options.svgProfile, "display")
         XCTAssertNil(partial.destinationBookmark)
         XCTAssertEqual(ExportTemplate.normalized([.init(id: "png-1024", pixelHeight: 1024), .init(id: "png-2048", pixelHeight: 2048)]), ExportTemplate.defaults)
         let template = ExportTemplate(name: "小さい絵", description: "透明", pixelHeight: 67)

@@ -14,11 +14,13 @@ public struct ExportSource: Sendable {
     public let pluginSummaries: [String]
     public let pluginLocks: [ExactJSON]
     public let language: String
+    public let lineAnimationRequest: ExactJSON?
 
-    public init(work: SavedWork, profiles: [String: String] = [:], pluginDefinitions: [ExactJSON] = [], pluginSummaries: [String] = [], pluginLocks: [ExactJSON] = [], language: String? = nil) {
+    public init(work: SavedWork, profiles: [String: String] = [:], pluginDefinitions: [ExactJSON] = [], pluginSummaries: [String] = [], pluginLocks: [ExactJSON] = [], language: String? = nil, lineAnimationRequest: ExactJSON? = nil) {
         self.work = work; self.profiles = profiles
         self.pluginDefinitions = pluginDefinitions; self.pluginSummaries = pluginSummaries; self.pluginLocks = pluginLocks
         self.language = work.instructionLangResolved ?? language ?? "ja"
+        self.lineAnimationRequest = lineAnimationRequest
     }
 
     public func svg(profile: String) throws -> String {
@@ -68,7 +70,7 @@ public struct ExportOptions: Codable, Sendable, Equatable {
     public var cardSeal = true
     public var transition = "crossfade"
     public var holdSeconds = 1.5
-    public var layerFrameCount = 12
+    public var showDDL = true
     public var layerIntervalSeconds = 0.3
     public var layerReplay = "restart"
     public var title = "inku"
@@ -77,7 +79,7 @@ public struct ExportOptions: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case format, svgProfile, pixelHeight, pngAlphaWhite, cardLayout, cardSeal, transition, holdSeconds
-        case layerFrameCount, layerIntervalSeconds, layerReplay, title, subtitle
+        case showDDL, layerIntervalSeconds, layerReplay, title, subtitle
     }
     public init(from decoder: Decoder) throws {
         self.init()
@@ -90,7 +92,7 @@ public struct ExportOptions: Codable, Sendable, Equatable {
         cardSeal = try values.decodeIfPresent(Bool.self, forKey: .cardSeal) ?? cardSeal
         transition = try values.decodeIfPresent(String.self, forKey: .transition) ?? transition
         holdSeconds = try values.decodeIfPresent(Double.self, forKey: .holdSeconds) ?? holdSeconds
-        layerFrameCount = try values.decodeIfPresent(Int.self, forKey: .layerFrameCount) ?? layerFrameCount
+        showDDL = try values.decodeIfPresent(Bool.self, forKey: .showDDL) ?? showDDL
         layerIntervalSeconds = try values.decodeIfPresent(Double.self, forKey: .layerIntervalSeconds) ?? layerIntervalSeconds
         layerReplay = try values.decodeIfPresent(String.self, forKey: .layerReplay) ?? layerReplay
         title = try values.decodeIfPresent(String.self, forKey: .title) ?? title
@@ -107,7 +109,6 @@ public struct ExportOptions: Codable, Sendable, Equatable {
         if !["restart", "reverse", "once"].contains(value.layerReplay) { value.layerReplay = "restart" }
         value.holdSeconds = value.holdSeconds.isFinite ? min(30, max(0.1, value.holdSeconds)) : 1.5
         value.layerIntervalSeconds = value.layerIntervalSeconds.isFinite ? min(30, max(0.1, value.layerIntervalSeconds)) : 0.3
-        value.layerFrameCount = min(120, max(2, value.layerFrameCount))
         return value
     }
 }
@@ -115,7 +116,11 @@ public struct ExportOptions: Codable, Sendable, Equatable {
 public struct ExportArtifact: Sendable {
     public let name: String
     public let data: Data
-    public init(name: String, data: Data) { self.name = name; self.data = data }
+    public let matchesSavedSVG: Bool?
+    public let compileOutcome: String?
+    public init(name: String, data: Data, matchesSavedSVG: Bool? = nil, compileOutcome: String? = nil) {
+        self.name = name; self.data = data; self.matchesSavedSVG = matchesSavedSVG; self.compileOutcome = compileOutcome
+    }
 }
 
 public struct ExportFailure: LocalizedError, Sendable {
@@ -140,7 +145,9 @@ public enum ExportService {
         try validate(sources: sources, options: options)
         switch options.format {
         case .apng, .gif:
-            return [ExportArtifact(name: "inku-animation.\(options.format.fileExtension)", data: try AnimationEncoder.encode(sources: sources, options: options))]
+            let result = try AnimationEncoder.encode(sources: sources, options: options)
+            return [ExportArtifact(name: "inku-animation.\(options.format.fileExtension)", data: result.data,
+                                   matchesSavedSVG: result.matches, compileOutcome: result.outcome)]
         case .reviewSheet, .aiSheet:
             return try ExportSheets.build(sources: sources, options: options)
         default:
@@ -181,7 +188,6 @@ public enum ExportService {
         if options.format == .apng || options.format == .gif {
             guard ["cut", "crossfade", "fade_white", "slide"].contains(options.transition),
                   ["restart", "reverse", "once"].contains(options.layerReplay),
-                  (2...120).contains(options.layerFrameCount),
                   options.holdSeconds.isFinite, (0.1...30).contains(options.holdSeconds),
                   options.layerIntervalSeconds.isFinite, (0.1...30).contains(options.layerIntervalSeconds) else {
                 throw ExportFailure("アニメーションのフレーム数・間隔・再生方式を確認してください。")

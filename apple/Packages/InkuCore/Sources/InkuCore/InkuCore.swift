@@ -50,6 +50,17 @@ public struct PreparedSVG: Sendable {
     }
 }
 
+/// Reuses the explicitly supplied font database across animation frames.
+public struct PreparedRasterFonts: Sendable {
+    private let fonts: InkuCoreBindings.RasterFonts
+    fileprivate init(_ fonts: InkuCoreBindings.RasterFonts) { self.fonts = fonts }
+    public func prepareSVG(_ svg: String) throws -> PreparedSVG {
+        do { return PreparedSVG(try fonts.prepareScene(svg: svg)) }
+        catch InkuCoreBindings.RasterFailure.Refused(let code, let message) { throw CoreFailure.rasterRefused(code: code, message: message) }
+        catch InkuCoreBindings.RasterFailure.InternalInvariant { throw CoreFailure.internalInvariant }
+    }
+}
+
 /// A window on a canvas `fullWidth` × `fullHeight` pixels.
 public struct DisplayRegion: Sendable, Equatable {
     public let fullWidth: UInt32
@@ -209,6 +220,16 @@ public enum InkuCore {
         do { return PreparedSVG(try InkuCoreBindings.prepareRasterScene(svg: svg)) }
         catch InkuCoreBindings.RasterFailure.Refused(let code, let message) { throw CoreFailure.rasterRefused(code: code, message: message) }
         catch InkuCoreBindings.RasterFailure.InternalInvariant { throw CoreFailure.internalInvariant }
+    }
+
+    public static func prepareRasterFonts(_ paths: [String]) throws -> PreparedRasterFonts {
+        do { return PreparedRasterFonts(try InkuCoreBindings.prepareRasterFonts(fontFiles: paths)) }
+        catch InkuCoreBindings.RasterFailure.Refused(let code, let message) { throw CoreFailure.rasterRefused(code: code, message: message) }
+        catch InkuCoreBindings.RasterFailure.InternalInvariant { throw CoreFailure.internalInvariant }
+    }
+
+    public static func lineAnimation(_ input: Data) -> Data {
+        InkuCoreBindings.lineAnimation(inputBytes: input)
     }
 
     public static var displayAPIVersion: String { InkuCoreBindings.displayApiVersion() }

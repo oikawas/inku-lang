@@ -21,6 +21,7 @@ private struct ExportSession {
     let works: [SavedWork]
     let preserveOrder: Bool
     var directCard = false
+    var lineAnimation = false
     var initialFormat: SavedExportFormat? = nil
     var initialSVGProfile: String? = nil
     var initialPixelHeight: Int? = nil
@@ -477,7 +478,7 @@ public struct ContentView: View {
         case .export(let session):
             #if os(macOS)
             ExportView(model: model, works: session.works, preserveOrder: session.preserveOrder, directCard: session.directCard, initialFormat: session.initialFormat,
-                       initialSVGProfile: session.initialSVGProfile, initialPixelHeight: session.initialPixelHeight)
+                       initialSVGProfile: session.initialSVGProfile, initialPixelHeight: session.initialPixelHeight, lineAnimation: session.lineAnimation)
                 .id(session.id)
                 .environment(model.display)
             #else
@@ -600,6 +601,7 @@ public struct ContentView: View {
         case "ai": dialog = .advice(RefinementSession(work: work))
         case "colophon": dialog = .colophon(RefinementSession(work: work))
         case "export": dialog = .export(ExportSession(works: [work], preserveOrder: false))
+        case "export-line-animation": dialog = .export(ExportSession(works: [work], preserveOrder: false, lineAnimation: true))
         case let requested where requested.hasPrefix("export-svg:"):
             let profile = String(requested.dropFirst("export-svg:".count))
             guard ["display", "editable", "compat", "live"].contains(profile) else { return }
@@ -673,7 +675,7 @@ public struct ContentView: View {
 
     private func openSelectionExport(_ ids: [String], action: String) {
         guard !ids.isEmpty, !model.isBrowsingLocked else { return }
-        let format: SavedExportFormat
+        let format: SavedExportFormat?
         var profile: String?
         var height: Int?
         if ids.count == 1, action.hasPrefix("export-svg:") {
@@ -683,6 +685,8 @@ public struct ContentView: View {
         } else if ids.count == 1, action.hasPrefix("export-png:") {
             guard let requested = Int(action.dropFirst("export-png:".count)), (64...12000).contains(requested) else { return }
             format = .png; height = requested
+        } else if ids.count == 1, action == "export-line-animation" {
+            format = nil
         } else {
             guard action.hasPrefix("export-format:"),
                   let requested = SavedExportFormat(rawValue: String(action.dropFirst("export-format:".count))),
@@ -698,7 +702,7 @@ public struct ContentView: View {
                     works.append(work)
                 }
                 guard !Task.isCancelled, !model.isBrowsingLocked else { return }
-                dialog = .export(ExportSession(works: works, preserveOrder: false, initialFormat: format,
+                dialog = .export(ExportSession(works: works, preserveOrder: false, lineAnimation: action == "export-line-animation", initialFormat: format,
                                                initialSVGProfile: profile, initialPixelHeight: height))
             } catch { model.errorText = error.localizedDescription }
         }

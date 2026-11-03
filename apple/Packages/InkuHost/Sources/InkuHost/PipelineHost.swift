@@ -192,6 +192,24 @@ public actor PipelineHost {
             catalogReading: context["catalog_reading"].object == nil ? nil : context["catalog_reading"].data)
     }
 
+    /// Reconstruct the line-animation request from the same persisted values used by retained rendering.
+    public static func lineAnimationRequest(work: SavedWork, context: SavedAuthoringContext, locks: [ExactJSON]) throws -> ExactJSON {
+        let configuration = try ExactJSON(data: context.configuration)
+        var compiler = try configuration.requiredObject("compiler")
+        if case .object(var fields) = compiler {
+            fields.removeValue(forKey: "stage15_variation")
+            compiler = .object(fields)
+        }
+        let document = try context.document.map { try ExactJSON(data: $0) } ?? .object([
+            "source": .string(work.ddl ?? ""),
+            "language": .string(work.instructionLangResolved ?? configuration["language"].string ?? "ja"),
+            "macro_locks": .array(locks), "saijiki": .string("inku.saijiki.v3")
+        ])
+        return .object(["document": document, "definitions": configuration["definitions"], "compiler": compiler,
+                        "options": try ExactJSON(data: context.renderOptions), "clip": try ExactJSON(data: context.clipPolicy),
+                        "saved_svg": .string(work.svg)])
+    }
+
     public func savedAuthoringSummaries(workIDs: [String]) async throws -> [String: SavedAuthoringSummary] {
         let locations = Set(workIDs).compactMap { id -> (workID: String, executionID: String, effectID: String)? in
             guard let location = try? WorkIdentity.location(id) else { return nil }

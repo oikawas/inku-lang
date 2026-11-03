@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
+
 - Server: supply placement examples for plugin object words without examples, and pass structured drawing diagnostics and resource-limit reasons to package validation.
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.

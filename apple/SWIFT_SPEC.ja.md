@@ -927,6 +927,8 @@ ChatGPT プランの操作判定が共有 core に揃い、言葉で描く4操�
 
 [InkuExport](Packages/InkuExport/Package.swift)はDisplay／Editable／Compat／Live SVG、PNG、定義付きDDL、共有card、review／AI contact sheet、APNG／GIFを扱う。Displayは保存canonical SVGを再描画せず、保存時の記述（`sourceText`、nil時は`input`）をXML escapeして最初のSVG開始tag直後へ`<desc>`として追加する。空の記述は保持し、既存の`<desc>`と保存canonical SVGは変更しない。ほかのSVGは保存Scoreと固定contextを共通coreへ渡す。PNGはY軸1080／2160／4320、custom 64〜12000pxと用紙比率を保持する。大きい画像は元のsceneを用いるregion rasterで分割し、filter／clipを落とさない。静止画は144,000,000pixel、animationは合計600,000,000pixelを上限とし、取消し後の結果を公開しない。
 
+1作品のAPNG／GIFは保存条件からDDLの行ごとに再描画し、完成画から始める。DDLの併記、間隔、繰り返し方と高さを選べる。保存画との差や描けなかった指示は書き出し画面に知らせる。複数作品は従来どおり作品間を切り替える。
+
 単作品animationのlayer進行／restart・reverse・once、複数作品のcut・crossfade・fade_white・slide、保存日時順と明示系譜path順を区別する。日本語文字はServerと同じNoto Serif JPをlicenseと共に同梱する。保存先folderのbookmarkとPNG templateを保持し、複数出力は新規folderへ保存する。Finder表示とOS共有へ接続する。
 
 書出し対象は開いている画面で決める。制作は表示中の保存作品、libraryはcheckboxの選択作品（未選択なら表示作品）、系譜はfocusへ至るpathをsnapshotとして渡す。別画面のcheckboxを制作や系譜の対象へ混ぜない。未保存previewは保存作品の書出しへ含めない。書出しdialogもDDL作品の表示名をlibraryと揃える。

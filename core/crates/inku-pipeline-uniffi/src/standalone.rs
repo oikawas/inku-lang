@@ -48,6 +48,81 @@ fn xml_escape(text: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+// Keep Latin words and numeric expressions intact, and keep contiguous
+// Japanese text together. Punctuation stays with what precedes it.
+fn ddl_tokens(line: &str) -> Vec<String> {
+    fn class(ch: char) -> u8 {
+        if ch.is_whitespace() {
+            0
+        } else if ch.is_ascii_alphanumeric()
+            || matches!(
+                ch,
+                '.' | '-' | '+' | '~' | '〜' | '～' | '−' | '/' | '_' | '\''
+            )
+            || ('０'..='９').contains(&ch)
+        {
+            1
+        } else if ('\u{3040}'..='\u{30ff}').contains(&ch)
+            || ('\u{3400}'..='\u{9fff}').contains(&ch)
+            || matches!(ch, '々' | 'ー')
+        {
+            2
+        } else {
+            3
+        }
+    }
+    let mut tokens: Vec<String> = Vec::new();
+    let mut previous = None;
+    for ch in line.chars() {
+        let kind = class(ch);
+        let count_unit = kind == 2
+            && previous == Some(1)
+            && matches!(ch, '本' | '個' | '枚' | 'つ' | '度' | '倍' | '段')
+            && tokens
+                .last()
+                .and_then(|token| token.chars().last())
+                .is_some_and(|last| last.is_ascii_digit() || ('０'..='９').contains(&last));
+        if count_unit {
+            tokens.last_mut().expect("numeric token").push(ch);
+            previous = Some(kind);
+        } else if kind == 3 && !tokens.is_empty() {
+            tokens.last_mut().expect("nonempty tokens").push(ch);
+            previous = None;
+        } else if previous == Some(kind) {
+            tokens.last_mut().expect("previous token").push(ch);
+        } else {
+            tokens.push(ch.to_string());
+            previous = Some(kind);
+        }
+    }
+    tokens
+}
+
+fn text_units(text: &str) -> f64 {
+    text.chars()
+        .map(|ch| if ch.is_ascii() { 0.6 } else { 1.0 })
+        .sum()
+}
+
+fn wrapped_ddl(source: &str, capacity: f64) -> Vec<(usize, String)> {
+    let mut rows = Vec::new();
+    for (index, line) in source.split('\n').enumerate() {
+        let mut row = String::new();
+        for token in ddl_tokens(line) {
+            if !row.is_empty() && text_units(&row) + text_units(&token) > capacity {
+                rows.push((index + 1, std::mem::take(&mut row)));
+            }
+            if !row.is_empty() || !token.trim().is_empty() {
+                row.push_str(&token);
+            }
+        }
+        if !row.is_empty() || line.is_empty() {
+            rows.push((index + 1, row));
+        }
+    }
+    rows
+}
+
 fn composed_frame(
     source: &str,
     svg: &str,
@@ -63,22 +138,37 @@ fn composed_frame(
     let end = svg
         .rfind("</svg>")
         .ok_or_else(|| refusal("invalid_svg", "missing SVG end"))?;
-    let mut rows = Vec::new();
-    for (index, line) in source.split('\n').enumerate() {
-        let mut part = String::new();
-        for ch in line.chars() {
-            part.push(ch);
-            if part.chars().count() >= 28 {
-                rows.push((index + 1, std::mem::take(&mut part)));
-            }
-        }
-        if !part.is_empty() || line.is_empty() {
-            rows.push((index + 1, part));
-        }
-    }
-    let font_size = (960.0 / rows.len().max(1) as f64).min(17.0);
+    let line_height = height / 22.0;
+    let font_size = line_height * 0.77;
+    let margin = height * 0.03;
+    let widest_token = source
+        .lines()
+        .flat_map(ddl_tokens)
+        .map(|token| text_units(&token))
+        .fold(0.0_f64, f64::max);
+    let panel_width = (height * 0.90).max(widest_token * font_size + 2.0 * margin);
+    let rows = wrapped_ddl(source, (panel_width - 2.0 * margin) / font_size);
+    let visible_rows = 21_usize;
+    let focus = if frame == 0 {
+        0
+    } else {
+        ranges
+            .get(frame - 1)
+            .and_then(|spans| {
+                rows.iter()
+                    .position(|(line, _)| spans.iter().any(|&(a, b)| a <= *line && *line <= b))
+            })
+            .unwrap_or(0)
+    };
+    let first = if frame == 0 {
+        0
+    } else {
+        focus
+            .saturating_sub(visible_rows / 2)
+            .min(rows.len().saturating_sub(visible_rows))
+    };
     let mut text = String::new();
-    for (row, (line, value)) in rows.iter().enumerate() {
+    for (row, (line, value)) in rows.iter().skip(first).take(visible_rows).enumerate() {
         let last = ranges
             .iter()
             .enumerate()
@@ -95,20 +185,26 @@ fn composed_frame(
         };
         let weight = if last == frame { "bold" } else { "normal" };
         text.push_str(&format!(
-            "<text x=\"20\" y=\"{}\" font-size=\"{}\" fill=\"{}\" font-weight=\"{}\">{}</text>",
-            20.0 + (row + 1) as f64 * font_size,
-            font_size * 0.85,
+            "<text x=\"{}\" y=\"{}\" font-size=\"{}\" fill=\"{}\" font-weight=\"{}\">{}</text>",
+            margin,
+            (row as f64 + 1.0) * line_height,
+            font_size,
             color,
             weight,
             xml_escape(value)
         ));
     }
-    let scale = (490.0 / width).min(960.0 / height);
     Ok(format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1000\" height=\"1000\" viewBox=\"0 0 1000 1000\"><rect width=\"1000\" height=\"1000\" fill=\"#ffffff\"/><g font-family=\"{}\">{}</g><g transform=\"translate(500 20) scale({})\">{}</g></svg>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\"><rect width=\"{}\" height=\"{}\" fill=\"#ffffff\"/><g font-family=\"{}\">{}</g><g transform=\"translate({} 0)\">{}</g></svg>",
+        panel_width + width,
+        height,
+        panel_width + width,
+        height,
+        panel_width + width,
+        height,
         xml_escape(family),
         text,
-        scale,
+        panel_width,
         &svg[start + 1..end]
     ))
 }
@@ -231,28 +327,54 @@ mod line_animation_tests {
             serde_json::from_slice(&line_animation(serde_json::to_vec(&input).unwrap())).unwrap();
         assert_eq!(same["matches_saved_svg"], true);
         assert_eq!(same["frames"][2]["svg"], same["frames"][2]["art_svg"]);
+        input["show_ddl"] = true.into();
+        let composed: serde_json::Value =
+            serde_json::from_slice(&line_animation(serde_json::to_vec(&input).unwrap())).unwrap();
+        assert_eq!(composed["matches_saved_svg"], same["matches_saved_svg"]);
+        for index in 0..3 {
+            assert_eq!(
+                composed["frames"][index]["art_svg"],
+                same["frames"][index]["art_svg"]
+            );
+            assert_eq!(
+                composed["frames"][index]["lines"],
+                same["frames"][index]["lines"]
+            );
+        }
     }
 
     #[test]
-    fn composed_frame_keeps_all_long_lines_and_escapes_text() {
-        let source = std::iter::repeat_n("長い文章と<記号>", 45)
+    fn composed_frame_scrolls_without_shrinking_or_splitting_words() {
+        let source = (1..=45)
+            .map(|i| format!("行{i:02} 長い文章と<記号>"))
             .collect::<Vec<_>>()
             .join("\n");
         let svg =
             "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"10\" height=\"20\"/></svg>";
-        let output = composed_frame(
-            &source,
-            svg,
-            "Font & Family",
-            &[vec![(1, 1)]],
-            1,
-            10.0,
-            20.0,
-        )
-        .unwrap();
-        assert_eq!(output.matches("長い文章と&lt;記号&gt;").count(), 45);
-        assert!(output.contains("Font &amp; Family"));
-        assert!(output.contains("<rect width=\"10\" height=\"20\"/>"));
+        let ranges = vec![vec![(30, 30)]];
+        let first = composed_frame(&source, svg, "Font & Family", &ranges, 0, 10.0, 20.0).unwrap();
+        let middle = composed_frame(&source, svg, "Font & Family", &ranges, 1, 10.0, 20.0).unwrap();
+        assert!(first.contains("行01") && !first.contains("行45"));
+        assert!(middle.contains("行30") && !middle.contains("行01"));
+        assert_eq!(first.matches("font-size=").count(), 21);
+        assert!(middle.contains("Font &amp; Family"));
+        assert!(middle.contains("<rect width=\"10\" height=\"20\"/>"));
+        assert!(middle.contains("width=\"28\" height=\"20\""));
+        assert!(middle.contains("translate(18 0)"));
+        let rows = wrapped_ddl(
+            "縦0.118、縦0.296666。直径0.25。 Place a horizontal line.",
+            8.0,
+        );
+        assert!(rows.iter().any(|(_, row)| row.contains("0.296666")));
+        assert!(rows.iter().any(|(_, row)| row.contains("直径")));
+        assert!(rows.iter().any(|(_, row)| row.contains("horizontal")));
+        assert!(rows.iter().any(|(_, row)| row.contains("0.118")));
+        let range_rows = wrapped_ddl("横0.05〜0.23、縦0.2～0.3。", 6.0);
+        assert!(range_rows.iter().any(|(_, row)| row.contains("0.05〜0.23")));
+        assert!(range_rows.iter().any(|(_, row)| row.contains("0.2～0.3")));
+        let count_rows = wrapped_ddl("円を1個置く。線を100本引く。", 5.0);
+        assert!(count_rows.iter().any(|(_, row)| row.contains("1個")));
+        assert!(count_rows.iter().any(|(_, row)| row.contains("100本")));
     }
 }
 

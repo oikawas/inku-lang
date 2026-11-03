@@ -258,7 +258,21 @@ test('a batch drops the old single-work failure and retains its own line failure
 	let work: ReturnType<typeof createWorkState>;
 	const paints: string[] = [];
 	const reports: Array<BatchFailureReport | null> = [];
+	const heartbeats: Array<{ lease: string; completed: number; state: string }> = [];
 	const apiFetch: WorkStateDeps['apiFetch'] = async (path, init) => {
+		if (path === '/api/pipeline/batches' && init?.method === 'POST') {
+			const body = JSON.parse(String(init.body)) as { run_id: string; total: number; prompt: string };
+			assert.deepEqual({ run_id: body.run_id, total: body.total, prompt: body.prompt },
+				{ run_id: 'batch-test', total: 2, prompt: 'drawn line\nfailed line' });
+			return new Response(JSON.stringify({ lease: 'test-lease' }), { headers: { 'Content-Type': 'application/json' } });
+		}
+		if (path === '/api/pipeline/batches/batch-test/heartbeat') {
+			heartbeats.push(JSON.parse(String(init?.body)));
+			return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+		}
+		if (path === '/api/pipeline/batches' && !init?.method) {
+			return new Response(JSON.stringify({ batches: [] }), { headers: { 'Content-Type': 'application/json' } });
+		}
 		assert.equal(path, '/api/paint/stream');
 		const body = JSON.parse(String(init?.body)) as { description: string };
 		paints.push(body.description);
@@ -316,6 +330,7 @@ test('a batch drops the old single-work failure and retains its own line failure
 	assert.deepEqual(report.retry?.failedLines, [2]);
 	assert.deepEqual(report.retry?.pendingLines, [2]);
 	assert.deepEqual(paints, ['drawn line', 'failed line']);
+	assert.deepEqual(heartbeats.at(-1), { lease: 'test-lease', completed: 1, state: 'finished_with_failures' });
 
 	work.inputMode = 'single';
 	await assert.rejects(work.paintOne('single failure'), /schema_violation: 4 attempts/);

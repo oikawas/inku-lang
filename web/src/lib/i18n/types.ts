@@ -221,7 +221,7 @@ export interface LangPack {
 	providerLabel: string;
 	modelLabel: string;
 	showThinkingLabel: string;
-	modelSelectionSharedHint: string;
+	modelSelectionSelected: (model: string) => string;
 	modelSelectionVisionHint: string;
 
 	// Saijiki

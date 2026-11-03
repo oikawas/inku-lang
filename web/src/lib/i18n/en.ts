@@ -341,7 +341,7 @@ export const en: LangPack = {
 	providerLabel: 'Provider:',
 	modelLabel: 'Model:',
 	showThinkingLabel: 'Show thinking',
-	modelSelectionSharedHint: 'The selected model is used for both Stage 1 and Stage 2 (the two stages cannot use different models). Models measured per stage are ordered by their lower stage.',
+	modelSelectionSelected: (model) => `Selected ${model}`,
 	modelSelectionVisionHint: 'Choose the model used for Vision processing of images.',
 
 	saijikiLabel: 'saijiki:',

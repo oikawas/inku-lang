@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: make the model and color catalog condition rows and the model picker more compact.
+
 - Server and Web: show the latest supported Score version in Info and each work's Score version in its details.
 
 - Core: expose the newest Score version this core can read and write through the Python binding.

@@ -339,7 +339,7 @@ export const ja: LangPack = {
 	providerLabel: '接続先：',
 	modelLabel: 'モデル：',
 	showThinkingLabel: '思考を表示',
-	modelSelectionSharedHint: '選んだモデルを Stage 1 と Stage 2 の両方に使います（段ごとに別のモデルは選べません）。段ごとに測ってあるモデルは、低いほうの段の順に並べます。',
+	modelSelectionSelected: (model) => `選択中 ${model}`,
 	modelSelectionVisionHint: '画像を読むVision処理に使うモデルを選択します。',
 
 	saijikiLabel: '歳時記:',

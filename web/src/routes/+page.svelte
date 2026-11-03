@@ -3371,7 +3371,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{#snippet inputSettings()}
 			<div class="demo-drawing-conditions" inert={demoRunning}>
 				<h3>{t().nextWorkConditions}</h3>
-				<ModelCardPicker label="Stage 1/2" selectedModel={qualifiedModelRef(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
+				<ModelCardPicker label={t().modelButton} selectedModel={qualifiedModelRef(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
 					onSelect={setDrawingModel} />
 				<label class="demo-catalog-field"><span>{t().colorCatalogButton}</span>
 					<select bind:value={colorCatalogSettings.selected}>

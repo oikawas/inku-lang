@@ -37,10 +37,13 @@
 	// One model draws both stages (2026-09-30, the author): the drawing tab
 	// chooses it for Stage 1 and Stage 2 together, and there is no per-stage tab.
 	type ModelSelectionTab = 'shared' | 'vision';
-	let modelSelectionTab = $state<ModelSelectionTab>('shared');
-	$effect(() => { if (visionOnlySelection) modelSelectionTab = 'vision'; });
+	let selectedTab = $state<ModelSelectionTab>('shared');
+	const modelSelectionTab = $derived<ModelSelectionTab>(visionOnlySelection ? 'vision' : allowVisionSelection ? selectedTab : 'shared');
 	const recommendationPurpose = $derived<ModelPurpose>(modelSelectionTab === 'vision' ? 'vision' : 'llm');
 	const recommendationStage = $derived<ModelStage | undefined>(modelSelectionTab === 'vision' ? undefined : 'both');
+	const selectedName = $derived(modelSelectionTab === 'vision'
+		? visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel
+		: providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model);
 	function modelSelected(provider: Provider, model: string): boolean {
 		if (modelSelectionTab === 'vision') return visionProvider === provider && visionModel === model;
 		return stage1Provider === provider && stage1Model === model;
@@ -61,16 +64,14 @@
 
 </script>
 
+		{#if allowVisionSelection && !visionOnlySelection}
 		<div class="settings-tabs model-selection-tabs" role="tablist" aria-label={t().modelSelectButton}>
-			{#if !visionOnlySelection}<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (modelSelectionTab = 'shared')}>Stage 1/2</button>{/if}
-			{#if allowVisionSelection}<button role="tab" aria-selected={modelSelectionTab === 'vision'} class:active={modelSelectionTab === 'vision'} onclick={() => (modelSelectionTab = 'vision')}>Vision</button>{/if}
+			<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (selectedTab = 'shared')}>LLM</button>
+			<button role="tab" aria-selected={modelSelectionTab === 'vision'} class:active={modelSelectionTab === 'vision'} onclick={() => (selectedTab = 'vision')}>Vision</button>
 		</div>
+		{/if}
 	<div class="settings-body">
-			<div class="model-selection-summary">
-				{#if !visionOnlySelection}<span><strong>Stage 1/2</strong>{providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}</span>{/if}
-				{#if allowVisionSelection}<span><strong>Vision</strong>{visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel}</span>{/if}
-			</div>
-			<p class="model-selection-hint">{modelSelectionTab === 'vision' ? t().modelSelectionVisionHint : t().modelSelectionSharedHint}</p>
+			{#if modelSelectionTab === 'vision'}<p class="model-selection-hint">{t().modelSelectionVisionHint}</p>{/if}
 			{#if !visionOnlySelection && stage1Provider === 'chatgpt'}
 				<p>{providerGroups.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.id === stage1Model)) ? t().chatgptUsingPlan : t().chatgptModelUnavailable}</p>
 			{/if}
@@ -116,6 +117,7 @@
 			{/if}
 	</div>
 		<div class="catalog-modal-foot">
+			<span class="model-selection-current" title={t().modelSelectionSelected(selectedName)}>{t().modelSelectionSelected(selectedName)}</span>
 			<button class="ghost-btn" onclick={onCancel}>{t().confirmCancel}</button>
 			<button class="ghost-btn primary-inline" onclick={onConfirm}>{t().colorCatalogConfirm}</button>
 		</div>

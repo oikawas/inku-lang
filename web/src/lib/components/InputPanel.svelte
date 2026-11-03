@@ -233,6 +233,9 @@
 
 	// The batch tab paints pictures with the picture tab's settings.
 	const pictureConditions = $derived(inputMode === 'image' || (inputMode === 'batch' && imageFolder.source === 'image'));
+	const conditionModelName = $derived(pictureConditions ? visionModelName
+		: nextStage1Model === nextStage2Model ? nextStage1Model
+		: `${isJapanese ? '解釈' : 'Interpretation'} ${nextStage1Model} ／ ${isJapanese ? '描画' : 'Performance'} ${nextStage2Model}`);
 
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning && !imageRunning, progress: '' },
@@ -267,41 +270,22 @@
 	<!-- The description is written before its conditions, immediately before painting. -->
 	{#snippet inputConditionRows()}
 		<div class="condition-rows" aria-label={t().nextWorkConditions}>
-			<div class="condition-row">
-				<div class="condition-row-head">
-					<span class="condition-label">{t().modelButton}</span>
-					<!-- The button sits at the panel's right edge. A centred bubble reached
-					     past it even while hidden, so the panel scrolled sideways and a
-					     swipe or a focus cut off the left of every row. -->
-					<Tooltip text={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} placement="top-left">
-						<button class="ghost-btn condition-change" aria-label={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} onclick={pictureConditions ? onOpenImageModelSelection : onOpenModelSelection}>{t().editButton}</button>
-					</Tooltip>
-				</div>
-				<div class="condition-value condition-model-value">
-					<div class="condition-model-names">
-						{#if pictureConditions}
-							<span title={visionModelName}>{visionModelName}</span>
-						{:else if nextStage1Model === nextStage2Model}
-							<span title={nextStage1Model}>{nextStage1Model}</span>
-						{:else}
-							<span><small>{isJapanese ? '解釈' : 'Interpretation'}</small><span title={nextStage1Model}>{nextStage1Model}</span></span>
-							<span><small>{isJapanese ? '描画' : 'Performance'}</small><span title={nextStage2Model}>{nextStage2Model}</span></span>
-						{/if}
-					</div>
-					{#if chatgptPlanSelected && inputMode === 'single'}
-						<a class="chatgpt-plan-label" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer" title={t().chatgptManageUsage}>{t().chatgptPlanLabel}</a>
-					{/if}
-				</div>
+			<div class="condition-selection">
+				<span class="condition-inline-label">{t().modelButton}</span>
+				<span class="condition-value" title={conditionModelName}>{conditionModelName}</span>
+				{#if chatgptPlanSelected && inputMode === 'single'}
+					<a class="chatgpt-plan-label" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer" title={t().chatgptManageUsage}>{t().chatgptPlanLabel}</a>
+				{/if}
+				<Tooltip text={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} placement="top-left">
+					<button class="ghost-btn condition-change" aria-label={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} onclick={pictureConditions ? onOpenImageModelSelection : onOpenModelSelection}>{t().editButton}</button>
+				</Tooltip>
 			</div>
-			<div class="condition-row">
-				<div class="condition-row-head">
-					<span class="condition-label">{t().colorCatalogButton}</span>
-					<Tooltip text={t().tooltipInputCatalog} placement="top-left">
-						<button class="ghost-btn condition-change" aria-label={t().tooltipInputCatalog} onclick={onOpenCatalogModal}>{t().editButton}</button>
-					</Tooltip>
-				</div>
-				<!-- This still names the description-selected catalog when applicable. -->
+			<div class="condition-selection">
+				<span class="condition-inline-label">{t().colorCatalogButton}</span>
 				<span class="condition-value" title={nextCatalogName}>{nextCatalogName}</span>
+				<Tooltip text={t().tooltipInputCatalog} placement="top-left">
+					<button class="ghost-btn condition-change" aria-label={t().tooltipInputCatalog} onclick={onOpenCatalogModal}>{t().editButton}</button>
+				</Tooltip>
 			</div>
 			<div class="condition-compact-rows">
 				{#if !pictureConditions}
@@ -604,48 +588,18 @@
 		gap: 6px;
 		min-width: 0;
 	}
-	.condition-row {
-		display: grid;
-		gap: 5px;
-		min-width: 0;
-		padding: 7px 0;
-	}
-	.condition-row + .condition-row { border-top: 1px solid var(--border); }
-	.condition-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-	.condition-label {
-		color: var(--fg2);
-		font-size: var(--ui-font-size-12);
-		line-height: 1.35;
-		font-weight: 500;
-	}
+	.condition-selection { display: flex; align-items: center; gap: 8px; min-width: 0; }
+	.condition-selection > .condition-inline-label { flex: 0 0 auto; }
+	.condition-selection :global(.tooltip-wrap) { flex: 0 0 auto; margin-left: auto; }
 	.condition-value {
+		flex: 1 1 auto;
 		min-width: 0;
 		color: var(--fg);
 		font-size: var(--ui-font-size-14);
 		line-height: 1.35;
-		overflow-wrap: anywhere;
-	}
-	.condition-model-value {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-	}
-	.condition-model-names {
-		display: grid;
-		gap: 3px;
-		min-width: 0;
-	}
-	.condition-model-names > span {
-		display: flex;
-		gap: 6px;
-		min-width: 0;
-	}
-	.condition-model-names > span > span { min-width: 0; overflow-wrap: anywhere; }
-	.condition-model-value small {
-		flex: none;
-		color: var(--fg3);
-		font-size: var(--ui-font-size-12);
-		font-weight: 400;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.chatgpt-plan-label {
 		flex: none;
@@ -662,8 +616,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
-		padding-top: 6px;
-		border-top: 1px solid var(--border);
 	}
 	.condition-compact-row {
 		display: flex;

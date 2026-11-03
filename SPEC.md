@@ -4264,10 +4264,9 @@ for display and replay.
 
 The normal UI displays visible DDL, proposed patches, and saved results from
 the shared pipeline execution state. The compatibility `POST /api/paint/stream`
-returns the final shared-pipeline result as one `done` NDJSON record. A pending
-patch approval returns HTTP 409 before streaming starts. The former four-stage
-`sketch` / `stage1` / `score` stream is not the progress contract for new works.
-`POST /api/paint` remains a compatibility entry to the same shared route.
+returns shared-pipeline progress and the final result as NDJSON (§12.10). A pending
+patch approval returns HTTP 409 before streaming starts. `POST /api/paint` remains
+a compatibility entry to the same shared route.
 
 DDL replay shows elapsed time, token information, a stop button, and the
 progress mascot.  Stopping replay aborts the active request.

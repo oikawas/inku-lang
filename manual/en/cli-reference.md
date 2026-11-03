@@ -17,6 +17,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | Command | Purpose |
 |---|---|
 | login / logout / me | Start, discard, and inspect a session |
+| activity | Inspect live drawings, registered batches and autonomous refinement; administrators may use `--all` for all users and render slots |
 | models | Configure the default drawing model (shared Stage 1/2), Vision model and color catalog |
 | paint / batch | Paint one or many works from descriptions or instructions |
 | refine | Refine an existing work's composition or color |
@@ -43,6 +44,8 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | version | Show CLI and server version and build information |
 
 Commands that call the server accept `--base-url` (default http://127.0.0.1:8100) and `--timeout-seconds` (HTTP timeout in seconds, default 600).
+
+`inku-cli activity` returns JSON. Batches include planned and completed counts, state and the last heartbeat. An expired lease does not prove the client stopped. Drawings are limited to the responding Server process; unregistered older batches and drawings in other processes are outside that observation. Autonomous refinement comes from the run database and includes intervals between moves; child drawings are linked only when tracked by the responding process. If an older Server omits the autonomous refinement field, its state is unknown.
 
 ### login and models flags
 

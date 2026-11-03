@@ -8,12 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: adjust the left panel width and retained history-strip height to the text size.
-
-- Web: show batch line, elapsed time and average time per work as compact numeric tiles.
-
-- Core: draw computer fills as five dithered lattice colors with bright scanlines (render engine 96).
-
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.
 
 - Align macOS automatic catalog selection with color reading and the run seed, showing the selection and prompts in saved works.
@@ -562,6 +556,14 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.308 (2026-11-03 / Build 1384)
+
+- Web: adjust the left panel width and retained history-strip height to the text size.
+
+- Web: show batch line, elapsed time and average time per work as compact numeric tiles.
+
+- Core: draw computer fills as five dithered lattice colors with bright scanlines (render engine 96).
 
 ## v2.15.307 (2026-11-03 / Build 1383)
 

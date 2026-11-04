@@ -78,7 +78,7 @@ ChatGPTプラン設定では接続状態を再確認でき、接続解除とは�
 
 ## 2026-10-23 画面比の宣言とはめ込み
 
-親のない新しいdirect DDLは、coreのauthoringへ`declare_canvas: true`を渡し、選んだ紙の画面比を先頭に記録する。作者が書いた宣言はcoreが保つ。保存作品から描く・編集する道にはこの印を渡さない。記述からのStage 1の宣言はcoreが書く。
+親のない新しいdirect DDLは、coreのauthoringへ`declare_canvas: true`を渡し、選んだ紙の画面比を先頭に記録する。作者が書いた宣言はcoreが保つ。保存作品から描く・編集する道にはこの印を渡さない。モデルが記述や画像から指示書を書く時の宣言はcoreが書く。
 
 主画面の「指示書から描画」は選んだ紙、保存作品の指示書エディタはその作品の紙、新規の指示書dialogは選んだ紙を対象にする。画面はWebと同じ小さい比の読み取りを使い、宣言の比と紙が違うときだけ「はめ込んで描く」「この紙に合わせて描く」「キャンセル」を出す。手を入れていない保存作品は、宣言が無ければ描いた紙の記録を使う。比が同じ・記録も宣言も無いときは問わない。問いをキャンセルすると描画・保存を始めず、dialogの文と持ち込み定義を残す。
 
@@ -99,14 +99,14 @@ ChatGPTプラン設定では接続状態を再確認でき、接続解除とは�
 ## 2026-10-21 AI自動推敲を共有coreの法則の手・取り合わせの手にする
 
 - AI自動推敲プロセスは、UniFFIの`autonomous_refine`（`inku.autonomous-refine.v1`）を呼ぶ。`next`が手番と終端、`measure`が親子のSVGの見える差、`record`が子の辺の`ai_move`を決める。端末は送信・描画・保存・画面だけを担当し、Server APIは呼ばない。
-- 手数は1〜10（既定5）、使う手は法則・取り合わせの1つ以上、方向性は前後を除いて1,000 UTF-16単位以内。モデルは既存の取り合わせと同じVision用途のpickerで1つ選び、一文の選択・Stage 1・Stage 2・法則の段をそのモデルに固定する。言語は画面の言語。「筆致制限を外す」は指定しなければ親のまま。手数・使う手・方向性を`interface.json`の`autonomousRefine`に覚える。
+- 手数は1〜10（既定5）、使う手は法則・取り合わせの1つ以上、方向性は前後を除いて1,000 UTF-16単位以内。モデルは既存の取り合わせと同じVision用途のpickerで1つ選び、一文の選択・指示書を書く送信・補完・法則の段をそのモデルに固定する。言語は画面の言語。「筆致制限を外す」は指定しなければ親のまま。手数・使う手・方向性を`interface.json`の`autonomousRefine`に覚える。
 - 法則の手は親の指示書・記述・completion_ranges・laws_layers・laws_basisを共有pipelineの`saved_laws`へ渡す。親の保存条件・種・palette・キャンバス・限りを使い、子は記述固定で`laws_change`（札は「法則」／Laws）になる。取り合わせの手は既存の`juxtaposition`を使い、coreの`rank`・`reuse`・除外文と系譜ですでに足した文を尊重して`joined`から描く。子は`description_edit`で、辺に`edited_from_history_id`・`juxtaposition`とcoreの`ai_move`を残す。
-- 法則の手はStage 1と構図の読みを再送しない。親の保存設定に`colors`があれば`choose_laws`の後に`choose_colors`も送り、無ければ`choose_laws`だけを送る。段を選ぶのは共有coreで、端末は保存設定を保つ。
+- 法則の手は指示書を書く送信と構図の読みを再送しない。親の保存設定に`colors`があれば`choose_laws`の後に`choose_colors`も送り、無ければ`choose_laws`だけを送る。段を選ぶのは共有coreで、端末は保存設定を保つ。
 - 子はすべて`lineage_only`で保存する。`kept`だけを次の親にし、差が小さい子も系譜に残す。終端は`moves_done`・`nothing_available`・`stalled`・`stopped`・`interrupted`・`failed`。停止時は進行中の送信・描画を取り消す。終端では最後の`kept`だけを通常履歴に出す。可視差は品質・順位・採否の判定ではなく、スター等は作者が決める。
 - runはAppModelが1つずつ回し、画面を閉じても続く。進み具合は作品DBと別の、DB名に対応する`.autonomous-runs.json`へatomic writeで残す。作品の正本は作品と辺の記録。次の起動で走行中のrunを`interrupted`にし、最後の`kept`を履歴へ出す。自動でLLM送信を再開しない。
 - 画面はWebと同じ順に、題・説明・固定注記・モデル・使う手・手数と「筆致制限を外す」・方向性・開始を出す。実行中は試みごとの小さな画・手番・手・結果・見える差・一文か主の法則・理由、終端後は終わり方と最後の子を開くボタンを出す。Webの`aiRefine*`を同梱し直し、常駐先の文だけ「サーバー」から「アプリ」へ適応する。
 - 旧Vision方式の自動実行と`aiRefine`の設定は廃止する。前の作品の`autonomous_refine_mode`（vision／random）や`vision_*`はそのまま読める。10-18節の自動推敲の方式・確認は、その時点の履歴である。
-- `--shared-autonomous-refine-only <cases>`は`server/tests/data/autonomous-refine-cases.json`の全行をUniFFI経由で照合する。`--auxiliary-provenance-only`は偽providerと一時SQLiteで両方の手・辺・可視差・履歴昇格・停止・再起動を確かめる。`--saved-laws-stages-only`は保存設定の配色あり・なしで、法則の手の送信順とStage 1・構図の読みを再送しないことを確かめる。実providerと作者の画面受入は別に確認する。
+- `--shared-autonomous-refine-only <cases>`は`server/tests/data/autonomous-refine-cases.json`の全行をUniFFI経由で照合する。`--auxiliary-provenance-only`は偽providerと一時SQLiteで両方の手・辺・可視差・履歴昇格・停止・再起動を確かめる。`--saved-laws-stages-only`は保存設定の配色あり・なしで、法則の手の送信順と、指示書を書く送信・構図の読みを再送しないことを確かめる。実providerと作者の画面受入は別に確認する。
 
 ## 2026-10-20 作品編集メニューの「取り合わせ」
 
@@ -114,7 +114,7 @@ Webの「取り合わせ」（Build 1282。決まりはBuild 1294で共有core�
 
 - 「記述から描き直す」の群の最後（「モデルを変える」の後）に置き、「LLM」のバッジを付ける。押せない条件と理由は「記述を変える」と同じ。開くだけでは送らず、描かない。
 - 決まりはUniFFIの`juxtaposition`（`inku.juxtaposition.v1`）に任せ、Swiftに写さない。候補を集める`gather`、頼む文の`prompt`、答えを確かめて足した後の記述を返す`check`を、Serverの`juxtaposition.py`と同じ順に呼ぶ。Swiftは候補の元を集め、画を作り、Visionへ送り、子を描く。
-- 候補の元は、ゴミ箱でない、系譜だけでない（`history_visibility`が`normal`）、札が`DDL`・`[demo]`でない、コメントに`test data`が無い（大文字小文字を問わない）、記述がある、今の作品でない作品。記述が固定されているかは、メニューと同じ保存条件（Stage 1の生成で`description_authoritative`）で決める。記述のラベルはcoreで除く。系譜は根から今の作品までの記述（ラベルを除き、続けて同じものは1つ）と、辺の記録の`juxtaposition.sentence`を渡す。seedは要求ごとのUInt64を十進の文字列で渡す。候補の上限はServerの設定の初期値の400に決める（macOSに設定は置かない）。
+- 候補の元は、ゴミ箱でない、系譜だけでない（`history_visibility`が`normal`）、札が`DDL`・`[demo]`でない、コメントに`test data`が無い（大文字小文字を問わない）、記述がある、今の作品でない作品。記述が固定されているかは、メニューと同じ保存条件（記述から指示書を書いた生成で`description_authoritative`）で決める。記述のラベルはcoreで除く。系譜は根から今の作品までの記述（ラベルを除き、続けて同じものは1つ）と、辺の記録の`juxtaposition.sentence`を渡す。seedは要求ごとのUInt64を十進の文字列で渡す。候補の上限はServerの設定の初期値の400に決める（macOSに設定は置かない）。
 - Visionへは、作品の画（768×768のPNG、画像助言と同じ作り方）を添え、温度0.35、上限1200で送る。頼む言葉は画面の言葉。モデルは設定のVisionモデルが既定で、ダイアログで選ぶと設定にも保存する。coreが答えを断ったら、その理由を添えて1回だけ送り直し、2回目も断られたら理由を出して止まる。
 - 一文を選んで「この記述で描く」を押すと、coreの`joined`（保存した記述にラベルごと一文を足したもの）から、「記述を変える」と同じ道で子を描いて保存する。辺の記録は`edited_from_history_id`と、Webの`juxtapositionMetadata`と同じ`juxtaposition`の7欄（`sentence`・`history_ids`・`rank`・`reason`・`position`・`candidates`・`model`）。「筆致制限を外す」・色カタログ・キャンバスは親のまま。「選び直す」は、このダイアログで出した一文をすべて除いて頼み直す。
 - 同梱の`ui-reference.json`はBuild 1294から作り直した。取り合わせの鍵のほか、Webの履歴の絞り込みの札（「スターのみ」→「スター」、「推敲マークのみ」→「推敲」、「グループ共有のみ」→「共有」と、その吹き出し）の変化も入った。
@@ -337,7 +337,7 @@ AI自動推敲プロセスは、記述ロック・DDL直接入力の作品もVis
 作者の決定（製品SPEC §8.4）に合わせ、推敲の「読み取りを変える」と「言葉でタッチを変える」を削除した。
 
 - 中身がなくなった「描画パラメータの編集」メニューと要素選択・言葉入力・その保存設定を削除する。「配置を変える」は独立した入口に残る。記述そのものの編集と通常の新規描画、モデル比較は保つ。
-- 自律推敲とVision助言の要素は色カタログ・配置の2つ。古い設定の`reinterpretation`と`touch_change`は選択と要求から除き、新しい手動／自律要求も受け付けない。方向性の入力欄はVision方式だけに表示し、助言の材料にだけ使う。方向性や助言を描画の記述に加えない。色の世代は記述の作品でも親の保存DDLから別の色カタログで描き、Stage 1を呼ばない。
+- 自律推敲とVision助言の要素は色カタログ・配置の2つ。古い設定の`reinterpretation`と`touch_change`は選択と要求から除き、新しい手動／自律要求も受け付けない。方向性の入力欄はVision方式だけに表示し、助言の材料にだけ使う。方向性や助言を描画の記述に加えない。色の世代は記述の作品でも親の保存DDLから別の色カタログで描き、指示書を書き直さない。
 - 保存済みの`touch_change`と`reinterpretation`の辺と「タッチ／Touch」「解釈／Reading」のラベル、作品に残る`seed_text`と`interpretation_seed`の生成情報表示は保持する。描き直しは保存した`render_seed`を使い、言葉を種へ変換しない。描画seedが未記録の旧作品は従来の暫定0と注意を保つ。
 - 同梱Web文言とツールチップ照合表から削除済みキーを外す。以下の過去の確認記録は、その時点での記録として保持する。
 
@@ -576,7 +576,7 @@ macOS版を初めて配布するにあたり、画面・操作・保存した選
 
 - 制作条件（色カタログとその自動選択、用紙、「筆致制限を外す」）、設定画面の最後のタブ、作品／系譜、記述／バッチ、ライブラリの表示方式と表示形式、推敲の種類、自律推敲の前回設定、モデル比較の選択を、表示設定（`interface.json`）へ保存する。保存した値がもう無いカタログ・用紙のときは既定に戻す。
 - 表示設定とデモ設定は項目ごとに読み、欠けた項目や型の合わない項目だけを既定に戻す。読めないファイルは上書きせず、日時付きの名前で残す。版を上げても他の選択は失われない。
-- デモで選んだモデルが一時的に使えないときは、表示だけをStage 1のモデルにし、保存した選択は書き換えない。
+- デモで選んだモデルが一時的に使えないときは、表示だけを設定の描画モデル（`stage1Model`）にし、保存した選択は書き換えない。
 - 新しく作る表示設定の既定は、Webと同じくテーマdark、写生欄を開く。既存の保存値は変えない。
 
 ### 入力補助とツールチップ
@@ -652,7 +652,7 @@ Serverの追加変更に合わせ、描画capability matrixの再導出をshape�
 
 ### 新しい操作のモデル・origin・seed
 
-新規記述と再解釈は、今回選ぶStage 1モデルを両段へ使う。新規の独立DDLはStage 2モデルを優先する。保存DDLの編集と配置変更は親のStage 1来歴を保ち、今回選ぶStage 2だけを使う。DDL／配置のモデルchooserで確定した値はStage 2の既定へ保存し、Stage 1既定を変更しない。通常制作の次モデル、保存既定、開始済みbatch／demoの凍結requestは別に保持する。
+新規記述と再解釈は、今回選ぶ描画モデルを`stage1Model`・`stage2Model`の両方へ使う。新規の独立DDLは`stage2Model`を優先する。保存DDLの編集と配置変更は親の`stage1_model`の来歴を保ち、今回選ぶ`stage2Model`だけを使う。DDL／配置のモデルchooserで確定した値は設定の`stage2Model`へ保存し、`stage1Model`を変更しない。通常制作の次モデル、保存既定、開始済みbatch／demoの凍結requestは別に保持する。
 
 共通coreのauthoring originは正式な `stage1_generated`／`user_authored_ddl` を使い、portable欄 `ddl_source_origin` の移行情報とは混同しない。render seedはcanonicalなUInt64十進文字列、composition seedは独立したnullable文字列として境界を渡す。保存時の未設定をrender seedで埋めず、新操作のcompilerとrenderのcomposition seedが違う場合は拒否する。旧保存requestや作品本文はこの入口正規化で書き直さない。
 
@@ -664,11 +664,11 @@ Serverの追加変更に合わせ、描画capability matrixの再導出をshape�
 
 ### 保存作品を開くときの固定情報
 
-新作品の送信prompt、compile delivery、render metadata、diagnostics、eventsを保存effectのACKへimmutableなpresentationとして入れる。作品の再選択はその作品のACKを読み、同じexecutionに後から保存したchildの情報や現在の設定で置き換えない。空配列は当該段を送っていない新記録、欠落は旧記録の未記録として区別する。構図・写生・自動配色のprivate requestをStage 1／穴補完のauthor向けpromptへ混ぜない。保存前の取消しを確認し、commit後の取消し通知で保存済み作品とACKを消さない。
+新作品の送信prompt、compile delivery、render metadata、diagnostics、eventsを保存effectのACKへimmutableなpresentationとして入れる。作品の再選択はその作品のACKを読み、同じexecutionに後から保存したchildの情報や現在の設定で置き換えない。空配列は当該段を送っていない新記録、欠落は旧記録の未記録として区別する。構図・写生・自動配色のprivate requestを、指示書を書く送信／穴補完のauthor向けpromptへ混ぜない。保存前の取消しを確認し、commit後の取消し通知で保存済み作品とACKを消さない。
 
-生成情報は開いた保存作品を固定し、「詳細」「プロンプト」「Score (JSON)」のtabで読む。詳細は写生、両段のmodel／言語、seed、色の対応、canvas、SVGのbyte／object／point数、hash、版、由来、batch ID／元行、保存comment、日時／時間と実usageを表示する。送信記録の欠落と空配列、読込中と取得失敗を区別し、promptの開閉・コピーとScoreの行番号・コピーを提供する。プロンプトのtabは、写生（Stage 0.5）、Stage 1、構図の読み、Stage 2を処理の順に出し、写生と構図の読みは送った入力も出す（2026-10-13 作者の指示、SPEC §12.7.1）。保存作品は各段の最後の送信と記録した段の一覧を持ち、一覧にある段でmodelを呼ばなかったものは「呼んでいません」、一覧に無い段（それより前に保存した作品の写生と構図の読み）は記録なしと示す。色カタログの選択は出さない。読込みやtab変更で制作の選択、現在設定、provider送信を変えない。
+生成情報は開いた保存作品を固定し、「詳細」「プロンプト」「Score (JSON)」のtabで読む。詳細は写生、両段のmodel／言語、seed、色の対応、canvas、SVGのbyte／object／point数、hash、版、由来、batch ID／元行、保存comment、日時／時間と実usageを表示する。送信記録の欠落と空配列、読込中と取得失敗を区別し、promptの開閉・コピーとScoreの行番号・コピーを提供する。プロンプトのtabは、写生、指示書を書く送信、構図の読み、補完を処理の順に出し、写生と構図の読みは送った入力も出す（2026-10-13 作者の指示、SPEC §12.7.1）。保存作品は各段の最後の送信と記録した段の一覧を持ち、一覧にある段でmodelを呼ばなかったものは「呼んでいません」、一覧に無い段（それより前に保存した作品の写生と構図の読み）は記録なしと示す。色カタログの選択は出さない。読込みやtab変更で制作の選択、現在設定、provider送信を変えない。
 
-新規requestのoptional `GenerationProvenance` はDDL／DDL engine、native Bundle build、参照資料build、UI言語とbatch ID／行番号をsave ACKへ保持する。旧作品の欠落を現在値で補わず、再演は元のprovenanceを保つ。Stage 1 promptの基底digestはnativeでは未記録として示す。意味が異なる `base_source_digest` を代用しない。usageの部分記録から完全な総tokenを作らない。この生成情報UIの最終追加はsource実装であり、以下の途中の型検査や過去画面確認を最終build／実画面受入と読み替えない。
+新規requestのoptional `GenerationProvenance` はDDL／DDL engine、native Bundle build、参照資料build、UI言語とbatch ID／行番号をsave ACKへ保持する。旧作品の欠落を現在値で補わず、再演は元のprovenanceを保つ。指示書を書く送信のpromptの基底digest（`stage1_prompt_base_digest`）はnativeでは未記録として示す。意味が異なる `base_source_digest` を代用しない。usageの部分記録から完全な総tokenを作らない。この生成情報UIの最終追加はsource実装であり、以下の途中の型検査や過去画面確認を最終build／実画面受入と読み替えない。
 
 保存記述の空文字列を保持し、DDL作品の表示名だけに保存DDLの先頭行を使う。専用DDL editorは保存親とdraftを固定し、取消しで本文・表示作品・revision・履歴を変えない。確定DDLの記述ロックと直接DDLを区別し、保存条件の読込中／未記録も操作不可の理由として表示する。制作・library・系譜・previewの共通作品menuは同じ固定した保存対象へ接続し、直接DDLでは描画パラメータ・記述・写生・model再解釈を隠す。確定DDL編集では理由を添えて再解釈を抑止し、配置・配色・DDL編集を残す。
 
@@ -716,7 +716,7 @@ toolbarの「描画ログ」で直近100件のpipeline実行を新しい順に�
 
 新規バッチは1行に1作品分の記述を入力する。DDLからの新規バッチ描画を選択できず、制作の入力mode・DDL・指定写生を引き継がない。写生はバッチ独立の「なし／あり」で既定は「なし」、各選択にWebと同じ説明を表示する。「筆致制限を外す」は「切／入」を切り替え、開始時の値を全行に固定する。言語とseedは詳細から変更する。
 
-モデル変更はWebのモデル選択dialogへ揃え、Stage 1/2の共通tab、仮選択の要約、説明、サービス別card、取消・決定を表示する。card選択はdraftだけを変え、決定で次のモデルへ適用し、×・取消・Escapeは破棄する。候補は設定の登録catalogまたは同じ標準接続の同梱catalogにある使用中LLMに限る。登録外の参照を候補や次のバッチの値へ補わず、登録外の既定値では使用中モデルを選ぶまで開始できない。提供終了・契約専用cardは選択不可とし、段別評価は低い段の順に並べる。ChatGPTの順序はcatalogを保つ。hover／keyboard focusで用途・段別評価・速度・表示言語のcommentを示す。dialogを開くだけでHTTP・Keychain・設定保存を行わない。保存済み設定と作品の参照は保持する。
+モデル変更はWebのモデル選択dialogへ揃え、全ての送信に共通の描画モデルのtab、仮選択の要約、説明、サービス別card、取消・決定を表示する。card選択はdraftだけを変え、決定で次のモデルへ適用し、×・取消・Escapeは破棄する。候補は設定の登録catalogまたは同じ標準接続の同梱catalogにある使用中LLMに限る。登録外の参照を候補や次のバッチの値へ補わず、登録外の既定値では使用中モデルを選ぶまで開始できない。提供終了・契約専用cardは選択不可とし、段別評価は低い段の順に並べる。ChatGPTの順序はcatalogを保つ。hover／keyboard focusで用途・段別評価・速度・表示言語のcommentを示す。dialogを開くだけでHTTP・Keychain・設定保存を行わない。保存済み設定と作品の参照は保持する。
 
 色dialogは「記述から自動選択」の独立cardを先頭に置き、カタログ名・ID・説明と10色の見本・HEX・色名の行を続ける。日本語色名は日本語表示でだけ追加し、幅が狭いときは5列へ折り返す。ランダムの新選択肢は設けない。選択はdraftとし、決定と×で適用、キャンセル・Escapeで破棄する。制作と共有する色dialogでも新規のrandom選択を撤去する。新バッチはautoかfixedを捕捉し、旧random状態は固定されたcatalogとして扱う。
 
@@ -816,13 +816,13 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 状態欄は共通coreの試行回数とhostの開始時刻を用い、providerの段階、固定要求の呼出しmodel、試行／再試行、段階全体と今回の経過時間を表示する。同じ段階の再試行は段階の時計を保持し、今回の時計を開始し直す。完了・失敗・確認待ち・停止で時計を確定し、停止は遅い応答の終了を待つ。入力／出力token数はproviderが返した実usageを使い、未取得は「記録なし」、明示0は0と表示する。文字数や予算用の推定tokenを実usageへ置き換えない。通常生成と比較候補は同じ表示を使い、古いtokenの応答を除外する。新規・新しい処理開始は古い表示を消す。保存作品の選択とprovider不要の再現比較は、当該作品の保存時recordを読む。
 
-新規生成の設定はServerから生成した`composition: {read: true}`を使用する。構造化した下絵の後、共通Rustが要求する`read_composition`を通常API／Personal ChatGPTへ渡し、同じaction identityの`composition_read`を返す。構図の読みは下絵と同じStage 1 modelと上限を使い、再試行・既定値へのfallback・可視DDLへの構図反映は共通Rustが所有する。構図の意味と`［構図］`／`[composition]`の規則は[製品仕様](../SPEC.ja.md)に従う。
+新規生成の設定はServerから生成した`composition: {read: true}`を使用する。構造化した下絵の後、共通Rustが要求する`read_composition`を通常API／Personal ChatGPTへ渡し、同じaction identityの`composition_read`を返す。構図の読みは下絵（型を埋める）と同じ描画modelと上限を使い、再試行・既定値へのfallback・可視DDLへの構図反映は共通Rustが所有する。構図の意味と`［構図］`／`[composition]`の規則は[製品仕様](../SPEC.ja.md)に従う。
 
-保存設定のcomposition欠落と`read:false`はそのまま保持する。欠落は従来の下絵、`read:false`はLLMの読みを行わない既定の構図として扱う。直接DDL、構造化済み応答からの継続、保存Scoreの再演奏へ構図要求を追加せず、既存の保存SVG・Score・DDLを変更しない。構図promptは耐久execution snapshotに保持し、作品のStage 1／2送信prompt履歴へ混ぜない。
+保存設定のcomposition欠落と`read:false`はそのまま保持する。欠落は従来の下絵、`read:false`はLLMの読みを行わない既定の構図として扱う。直接DDL、構造化済み応答からの継続、保存Scoreの再演奏へ構図要求を追加せず、既存の保存SVG・Score・DDLを変更しない。構図promptは耐久execution snapshotに保持し、作品の、指示書を書く送信と補完の送信prompt履歴へ混ぜない。
 
-構図は独立した進行段階として表示し、下絵から切り替えた時に段階時計を開始し直す。通常生成と比較候補の両方で固定Stage 1 model、試行、経過時間を表示する。保存`elapsedMS`は構図待ちを含む実行全体の経過時間であり、個々のprovider呼出し時間とは区別する。
+構図は独立した進行段階として表示し、下絵から切り替えた時に段階時計を開始し直す。通常生成と比較候補の両方で固定した描画model、試行、経過時間を表示する。保存`elapsedMS`は構図待ちを含む実行全体の経過時間であり、個々のprovider呼出し時間とは区別する。
 
-新規生成の設定は、構図の読みの後に法則の段（`laws: {}`）と配色の段（`colors: {}`）も持つ（Serverの既定、2026-10-20）。`colors`がある実行では、hostが`colors.render_seed`にその実行のrender seedを10進の文字列で入れ、各カタログの解決済み`palette`に`paints`（観測した絵具のカタログでの名前を観測の順に並べたもの。jaは`name_ja`、ほかは`name`、カタログに無い絵具はnull）を足す。共通Rustが構図を読んだ計画にだけ要求する`choose_laws`・`choose_colors`を、構図の読みと同じく通常API／Personal ChatGPTへ渡し、同じaction identityの`laws_chosen`・`colors_chosen`を返す。2つの段はStage 1 modelと上限で送り、頼む文・答えの確かめ・送り直し・退きは共通Rustが所有する。保存設定に段の無い作品には段を足さない。進行の段階は「法則の選択」「配色の選択」、状態欄はWebと同じ「法則の選択中…」「配色の選択中…」と表示する。プロンプトtabは、構図の読みの後・Stage 2の前に、法則の段と配色の段の送った入力とシステムプロンプトを出す。
+新規生成の設定は、構図の読みの後に法則の段（`laws: {}`）と配色の段（`colors: {}`）も持つ（Serverの既定、2026-10-20）。`colors`がある実行では、hostが`colors.render_seed`にその実行のrender seedを10進の文字列で入れ、各カタログの解決済み`palette`に`paints`（観測した絵具のカタログでの名前を観測の順に並べたもの。jaは`name_ja`、ほかは`name`、カタログに無い絵具はnull）を足す。共通Rustが構図を読んだ計画にだけ要求する`choose_laws`・`choose_colors`を、構図の読みと同じく通常API／Personal ChatGPTへ渡し、同じaction identityの`laws_chosen`・`colors_chosen`を返す。2つの段は型を埋める送信と同じ描画modelと上限で送り、頼む文・答えの確かめ・送り直し・退きは共通Rustが所有する。保存設定に段の無い作品には段を足さない。進行の段階は「法則の選択」「配色の選択」、状態欄はWebと同じ「法則の選択中…」「配色の選択中…」と表示する。プロンプトtabは、構図の読みの後・補完の前に、法則の段と配色の段の送った入力とシステムプロンプトを出す。
 
 法則を当てた実行のsnapshotの`laws_layers`・`laws_basis`は、`completion_ranges`と同じく作品のperformance contextへ保存する。保存作品からの直接DDL（DDLの編集・描き直し・配置の変更）は2つを共通Rustの`direct_ddl`へ渡し、実行の無い子（配色の並べ替え・地の変更・再演奏）は親の記録を持つ。タッチの変更は親の`laws_layers`を`tool_render`へ渡して返った記録に置き換え、配置の変更は`recompose`へ渡して法則が置いた層を動かさない。2つの記録は今は画面で使わない（自動推敲の法則の手の土台）。`InkuAppCheck --laws-colors-host-only`が、偽の送り口と一時SQLiteで、送りの並び・配色の段の一度の断り・答えた配色・頼む文の記録・観測の段・記録の保存と受け継ぎを確かめる。
 
@@ -868,7 +868,7 @@ Swift物理schemaはv4で、10table構成を保ち、local annotationの廃止�
 
 「配置を変える」は明示した保存親を固定し、配置の1案／4案を用意する。生成前に全条件を固定し、候補を通常履歴・系譜へ入れず比較する。拡大はdialog内だけで行い、制作の表示作品を替えない。選択した候補だけを子として原子的・idempotentに保存し、残りは破棄する。途中で保存を停止した場合は保存済みの印を保持し、再試行で二重保存しない。停止／closeは所有Taskと遅い応答の終了を待つ。採用後と再表示後のDDL変更も、新しい保存childを作る。
 
-配置は親の保存DDL、定義・lock・配色・タッチを保持し、新しい配置seedで共通coreから描く。dialogの描画model指定は構造化側にだけ適用し、親の読み取りmodelを保持する。DDL／配置のdialogでmodelを確定するとStage 2の設定defaultへ保存し、Stage 1 defaultは保持する。
+配置は親の保存DDL、定義・lock・配色・タッチを保持し、新しい配置seedで共通coreから描く。dialogの描画model指定は構造化側にだけ適用し、親の読み取りmodelを保持する。DDL／配置のdialogでmodelを確定すると設定の`stage2Model`へ保存し、`stage1Model`は保持する。
 
 読み取りと言葉によるタッチの推敲は2026-10-14に削除した。保存済みの辺・語句・interpretation_seed・数値seedは旧記録として保持し、再演では保存したrender_seedを使う。
 
@@ -912,7 +912,7 @@ ChatGPT プランの公開と認証の判断は共有 core を使い、モデル
 
 
 
-Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とする。利用者が明示して有効化・接続し、公開したmodelを描画modelとして選ぶ。Stage1／Stage2は同じ描画modelを使用する。本人の接続を複数保存しても、作品DBは一つのローカルlibraryであり、multi-user機能を追加しない。
+Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とする。利用者が明示して有効化・接続し、公開したmodelを描画modelとして選ぶ。指示書を書く送信と補完は同じ描画modelを使用する。本人の接続を複数保存しても、作品DBは一つのローカルlibraryであり、multi-user機能を追加しない。
 
 設定の導線はServer／Webに合わせる（2026-10-12）。ChatGPTプランの設定は接続だけを扱い（有効化、接続・再認証・同意の更新・選択・接続解除・利用枠の後の再試行、利用状況）、選択中の登録が接続済みでプラン利用の許可があれば、案内と「モデル設定を開く」を出す。modelは「モデル」設定の「ChatGPTプラン」で選ぶ。開くだけでは外部取得せず保存済みの一覧を読み、「モデル一覧を更新」で取得し、チェックしたmodelを登録ごとの公開として保存する。一覧にないmodelと選択中でない登録への保存は拒否し、同じ本人の再認証は公開を保つ。公開したmodelだけが、描画のモデル選択・比較・描画の既定値の候補に「ChatGPTプラン」として出る（予約provider `chatgpt`のmodelsへ写す。名前・rate・URL・API keyの設定は無い）。描画の要求は、一覧にあって公開したmodelだけを送り、ほかは要求を送らず`chatgpt_model_not_offered`で止める。既存の接続でも公開を一度保存する。
 

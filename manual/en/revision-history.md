@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-04 — Stages named by what they do, not by number
+
+The numbers `Stage 0.5`, `Stage 1`, `Stage 1.5` and `Stage 2` no longer describe today's flow, which has grown into the sketch from life, reading, composition reading, laws, writing, review, colors and completion, so the documents now name each stage by what it does (the author's decision).
+
+- The flow diagram at the start of "Creating Images" became a table of stages for each route (`In words`, `With a plan`, painting from an image), with what the earlier numbers stood for.
+- In "Creating Images", the heading of section 4, the instructions section in section 6, the model and canvas in section 7, and the Provenance table in section 11 now use the stage names and today's screen names (`Writing the instructions`, `Instructions model`, `Completion model` and so on). Section 7's "the stage that builds the composition (Stage 2)" was wrong, since that stage now only completes holes; the canvas reaches the stages that write the instructions.
+- The numbers in the "CLI Reference", the "CLI Reference for AI", "Server Configuration" and the "DDL Reference" also became stage names. Names such as `--stage1-model` and `INKU_LLM_STAGE1_*` keep their names, and the text says what they apply to.
+- Dated records of the past keep their original wording.
+
 ## 2026-11-04 — Tool words, words not kept as written, and the language of image instructions (v2.15.314 / Build 1390)
 
 - Sections 4 (`In words`) and 16 (Paint from an Image) of "Creating Images", in Japanese and English, now say that the model writes one tool word in each sentence that draws a shape (I-728).

@@ -38,7 +38,7 @@ Paint the first work from a description (Shikishi text) and save it to the serve
 ```sh
 uv run inku-cli paint "Draw one wave line with a thick black brush on white space." --stage1-model chatgpt:gpt-6-luna -o ./test_output --png --save-history
 ```
-`--stage1-model` selects the shared Stage 1/2 model. Explicitly use `gemini:gemma-4-31b-it` when testing Secondary. Do not omit the selector and inherit a server or saved CLI default.
+`--stage1-model` selects the drawing model, shared by writing the instructions and completion (the option keeps its earlier `Stage 1` name). Explicitly use `gemini:gemma-4-31b-it` when testing Secondary. Do not omit the selector and inherit a server or saved CLI default.
 
 * **Expected Output (JSON)**:
   A JSON object representing the generated work's metadata.
@@ -55,7 +55,7 @@ Refine one element of the work and attach the resulting work as a child node in 
 uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **Choosing the `--kind` parameter**:
-  * `layout`: Reconstruct coordinates and size balance. It sets a new `composition_seed` and Stage 2 recomposes.
+  * `layout`: Reconstruct coordinates and size balance. It sets a new `composition_seed` and chooses again the ranges and angles written as numbers in the instructions (no model; completion runs only when holes remain).
   * `color`: Apply a different color catalog (very fast; no LLM call).
 * **Expected Output**: Without `-o`, a JSON object with the refined child work's metadata. With `-o DIR`, the command writes `refine-<kind>-<render_hash_short>.json` and `.svg` (and `.png` with `--png`) to DIR and prints a `Saved:` line instead of JSON.
 
@@ -134,7 +134,7 @@ Variation is retired. Do not use the old amplitude or seed flags. Refinement has
 
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
-  * Runs the LLM backends one after another (not in parallel) to inspect and compare DDL interpretations and drawings for the same input text. Each model serves both Stage 1 and Stage 2.
+  * Runs the LLM backends one after another (not in parallel) to inspect and compare DDL interpretations and drawings for the same input text. Each model serves every stage that writes the instructions and completion.
   * Use it to compare which LLM model produces the most expressive output.
   * Future comparisons use `--models chatgpt:gpt-6-luna,gemini:gemma-4-31b-it`. Do not include NIM.
 

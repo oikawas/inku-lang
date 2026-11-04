@@ -8,7 +8,7 @@
 
 1. OS／service設定: `/etc/inku/inku-api.env`、systemd、reverse proxy、filesystem権限
 2. 管理者設定: provider接続、公開モデル、制限値、DB backup、artifact、ログ方針、ユーザー管理
-3. ユーザー設定: Stage 1/2共通の描画モデル、Visionモデル、UI言語、UIモード、テーマ、文字サイズ、キャンバス、色カタログ、写生、筆致制限を外す、保存先フォルダ、履歴選択動作
+3. ユーザー設定: 指示書を書く工程と補完に共通の描画モデル、Visionモデル、UI言語、UIモード、テーマ、文字サイズ、キャンバス、色カタログ、写生、筆致制限を外す、保存先フォルダ、履歴選択動作
 
 API keyの環境変数は初期値です。管理UIでDBへ保存したprovider keyがある場合は暗号化して利用します。ホスト固有情報と秘密をGit追跡文書へ書かないでください。
 
@@ -103,14 +103,14 @@ pipelineのeffect実行poolはこれとは別です。manifestの`host_limits`�
 | 変数 | 目的 | 実装既定値 |
 |---|---|---|
 | `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | catalog選択・穴補完policyのattempt／total秒 | `120` |
-| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | Stage 1の1試行の上限秒 | `300` |
-| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | Stage 1の総予算秒（attempt以上へ正規化） | `540` |
+| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | 写生・型を埋める・構図の読み・法則・配色・書く・見比べ・画像から書く・画像との見比べの1試行の上限秒（色カタログと補完には効かない。変数の名は以前の`Stage 1`の名のまま） | `300` |
+| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | 同じ送信の総予算秒（attempt以上へ正規化） | `540` |
 | `INKU_LLM_RETRY_ATTEMPTS` | policyの最大試行回数 | `4` |
 | `INKU_LLM_RETRY_BASE_DELAY` | policyの試行間待機秒 | `2.0` |
 
 配布templateは運用例としてretry値を明示しています。実装既定値とtemplate値を意識して変更してください。
 
-通常pipelineのretryは有限のpolicyで管理します。旧`INKU_STAGE1_HARD_TIMEOUT_SECONDS`／`INKU_STAGE2_HARD_TIMEOUT_SECONDS`／`INKU_SKETCH_HARD_TIMEOUT_SECONDS`はこの制御に使いません。policyが継続を認めない一般のStage 1失敗は`Failed`、穴補完の失敗は`NeedsUserEdit`として止まります。再試行できない失敗なら予算を使い切る前にも止まります。写生失敗時に補足なしで記述を使うことや、検証して保持できた候補だけを採用する限定fallbackを、一般失敗から定型作品を作る動作と混同しないでください。
+通常pipelineのretryは有限のpolicyで管理します。旧`INKU_STAGE1_HARD_TIMEOUT_SECONDS`／`INKU_STAGE2_HARD_TIMEOUT_SECONDS`／`INKU_SKETCH_HARD_TIMEOUT_SECONDS`はこの制御に使いません。policyが継続を認めない指示書を書く工程（型を埋める・書く）の一般の失敗は`Failed`、補完の失敗は`NeedsUserEdit`として止まります。再試行できない失敗なら予算を使い切る前にも止まります。写生失敗時に補足なしで記述を使うことや、検証して保持できた候補だけを採用する限定fallbackを、一般失敗から定型作品を作る動作と混同しないでください。
 
 #### pipeline manifestを変更する
 
@@ -142,7 +142,7 @@ sudo editor /etc/inku/pipeline.json
 設定の`プラグイン`は、語彙プラグインを追加・削除し、有効・無効と語の一覧（名前・別名・表記・注釈・例・見本の絵）を見る画面です。
 
 - `プラグインを追加`で v2 のファイル（`inku.plugin-package.v2` JSON または PNG を含む zip。[作成ガイド](../../PLUGIN.ja.md#51-web-からプラグインのファイルを追加する)）を選ぶと、Server が形・定義・日英の例文を描く三つの検査をします。通ったファイルだけ追加できます。同じ id なら置き換えられます。
-- 追加した語は新しい作品と歳時記に入り、note が下絵（Stage 1）の提示にも使われます。保存済みの作品は保存した定義で再演できます。
+- 追加した語は新しい作品と歳時記に入り、note が型を埋める工程（下絵）の提示にも使われます。保存済みの作品は保存した定義で再演できます。
 - 語ごとに`絵を差し替える`でPNGを上げると、歳時記の絵をその画像にできます。`元の絵に戻す`で、zipの絵か例文から描いた絵に戻ります。置き換えても、差し替えた絵は残ります。
 - `書き出す`で、定義・note・例文と今の絵をまとめた v2 zip を保存できます。
 - 追加したプラグインは無効にも、削除にもできます。
@@ -276,15 +276,15 @@ passwordを設定し直すと、そのアカウントのほかのsessionは終�
 
 別のホストの自己ホストでは、`inku ChatGPTで接続`と`再認証`がこのMacの専用アプリ「inku ChatGPT」を開きます。押すとChromeやBraveがウィンドウの上に「inku ChatGPT を開きますか？」の確認を出すので、`inku ChatGPT を開く`を押してください（設定の画面が暗く覆われるので見落としやすい位置です）。開かない場合は、画面に出る`inku ChatGPTをもう一度開く`で開き直せます。専用アプリで接続を終えてWebのページへ戻ると、ページが接続状態を読み直します。ボタンを押しても専用アプリの確認画面が出ない場合は、アクティビティモニタで「inku ChatGPT」を終了してから（Dockには出ません）、もう一度押してください。
 
-| 段階 | 役割 |
+| 工程 | 役割 |
 |---|---|
-| Stage 0.5 | 任意の写生。記述を残し、場所と光を自然文で補う |
-| Stage 1 | 記述と任意の写生補足を指示書（正規化DDL）へ解釈 |
-| Stage 2 | 未読部分・穴を補完し、可視DDLの変更が必要なら作者承認を待つ |
-| compile | 確定したDDLと名前空間付き語の定義を決定的に解決し、Scoreとresource検査へ進める。書かれていない関係は追加しない |
+| 写生 | 任意。記述を残し、場所と光を自然文で補う（`言葉で描く`では記述の読み） |
+| 指示書を書く工程 | `型で描く`は型を埋め、構図の読み・法則・配色を通る。`言葉で描く`は書いて見比べる（構図・法則・配色は札で）。`画像から描く`は画像から書いて見比べる |
+| 補完 | 未読部分・穴を補い、可視DDLの変更が必要なら作者承認を待つ |
+| compile | 確定したDDLと名前空間付き語の定義を決定的に解決し（中間フィルタを含む）、Scoreとresource検査へ進める。書かれていない関係は追加しない |
 | Renderer | ScoreをSVGへ演奏 |
 
-旧Stage 1.5／coerceの名称や値が保存済み記録に残ることと、現行生成で隠れた意味補修を行うことは別です。
+描き方ごとの工程の順は「画像の作成方法」の冒頭の表を参照してください。以前の文書や保存済み記録の`Stage 0.5`は写生、`Stage 1`は指示書を書く工程、`Stage 2`は補完、`Stage 1.5`は中間フィルタです。旧Stage 1.5／coerceの名称や値が保存済み記録に残ることと、現行生成で隠れた意味補修を行うことは別です。
 
 写生の現行選択は`なし`／`あり`で、既定は`なし`です。`あり`でも元の記述を置き換えず、その横に場所と光を補います。写生が失敗した場合は補足なしで進み、`sketch_state`へ`fallback`を記録します。使わなかった作品は`off`、この列より前の作品は値を持ちません。**値がないことは`off`ではありません。**旧作品の`fine`／`coarse`と粒度の記録は互換用に保持し、現行写生には使いません。各段の詳しい意味はSPECを参照してください。
 
@@ -437,7 +437,7 @@ curl -sS -i --max-time 5 \
 | 描画が503で拒否される | サーバー同時描画数の設定。環境変数ではなくDBの設定が正本。同じアカウントの描画が30秒を超えて続いていないか |
 | 管理者が誰もログインできない | passwordを忘れた → 2.2の`inku-admin reset-password`。ローカルログインが止まっている → 13.1 |
 | 数の指定が上限に達する | resource診断、§5.1の四つの上限とmanifestのstructural budget。旧Scoreの場合だけ互換設定も確認 |
-| 写生が効いていない | 作品の`sketch_state`。`fallback`ならStage 0.5のtimeoutとprovider |
+| 写生が効いていない | 作品の`sketch_state`。`fallback`なら写生のtimeoutとprovider |
 | プラグイン語が展開されない | `plugin list` の拒否理由、`INKU_PLUGIN_PACKAGE_DIR`、有効・無効の状態 |
 
 ### 13.1 ローカルログインを戻す

@@ -195,7 +195,7 @@ These mean the same as `draw 100 green chalk lines.`, `draw a red chalk line.`, 
 | `In chalk.` | No shape |
 | `fill the background with blue.` | The background sentence (§3.21) |
 
-The recommended form remains the modifier before the noun, which Stage 1 writes.
+The recommended form remains the modifier before the noun, which the stages that write the instructions (fill the plan, writing) also use.
 
 ### 3.3 Subject continuation
 

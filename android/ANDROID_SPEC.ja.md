@@ -58,9 +58,9 @@ DDL と作品 JSON の書き出しに `saijiki: inku.saijiki.v3` を付ける。
 
 ## 2026-10-24 カメラを共通coreの「画像から描く」で描く
 
-外部のVisionモデルで撮った写真は、共通coreの画像の実行（SPEC §12.6.6）で描く。観察記述・詩的な記述・記述からのStage 1は通らず、選んだ1つのモデルが写真からDDLを書き、描いた画と写真を見比べて直し、DDL編集として確定する。色カタログが自動なら、先に写真からカタログを選ぶ。作品はDDLが正本で記述を持たず（記述固定）、写生と暴れるは使わない。端末内モデル（LiteRT）は写真を添えてDDLを書かせる道を持たないため、従来の観察記述・詩的な記述・Stage 1で描く（2026-10-24 作者の選択）。
+外部のVisionモデルで撮った写真は、共通coreの画像の実行（SPEC §12.6.6）で描く。観察記述・詩的な記述・記述から指示書を書く工程は通らず、選んだ1つのモデルが写真からDDLを書き、描いた画と写真を見比べて直し、DDL編集として確定する。色カタログが自動なら、先に写真からカタログを選ぶ。作品はDDLが正本で記述を持たず（記述固定）、写生と暴れるは使わない。端末内モデル（LiteRT）は写真を添えてDDLを書かせる道を持たないため、従来の観察記述・詩的な記述と、その記述から指示書を書く道で描く（2026-10-24 作者の選択）。
 
-写真はcoreの決まり（`image_input_policy`・`image_canvas`。長辺1568、JPEG品質90、4 MiBまで）で向きを補正し、透明部を白に置き、送る大きさにしてJPEGにする。紙は写真の比に近い11形式の紙（`nearest_format_id`）で、DDLの1文目に写真の比を宣言し、はめ込み（contain）で描く。書く回と見比べの回の答えの上限は8192 token（Serverの`image_max_tokens`）、カタログ選びはStage 1の上限のまま。見比べの画は、作品と同じ色・種・紙でcoreが返すSVG（`image_review_svg`）を、指定の大きさのPNGにして写真の後に送る。画を作れなければcoreへ`image_review_undrawn`を返し、書いたDDLを確定する。
+写真はcoreの決まり（`image_input_policy`・`image_canvas`。長辺1568、JPEG品質90、4 MiBまで）で向きを補正し、透明部を白に置き、送る大きさにしてJPEGにする。紙は写真の比に近い11形式の紙（`nearest_format_id`）で、DDLの1文目に写真の比を宣言し、はめ込み（contain）で描く。書く回と見比べの回の答えの上限は8192 token（Serverの`image_max_tokens`）、カタログ選びは型を埋めると同じ2048 tokenの上限（`stage1_max_tokens`）のまま。見比べの画は、作品と同じ色・種・紙でcoreが返すSVG（`image_review_svg`）を、指定の大きさのPNGにして写真の後に送る。画を作れなければcoreへ`image_review_undrawn`を返し、書いたDDLを確定する。
 
 写真と見比べのPNGは実行の間だけメモリに持ち、snapshot・Room・ログには参照（形式・大きさ・SHA-256・バイト数）だけが入る。アプリが止まるなどで画像が無い実行は、送らずに取り消して`image_missing`とする。確定の後の記録`image_ddl`（送った画像の参照、宣言した比、近い紙、回ごとの記録、見比べる前のDDL、見比べの画の参照、除いた行）を作品のrender metadataに保存し、`input_provenance`の経路を`image_ddl_to_pipeline`（出力の形は`ddl`）とする。Room schemaは変えない。JNIには`imageInputPolicy`・`imageCanvas`・`imageReviewSvg`を足した（uniffiの関数の包みで、coreの動作は変えない）。
 
@@ -68,7 +68,7 @@ DDL と作品 JSON の書き出しに `saijiki: inku.saijiki.v3` を付ける。
 
 ## 2026-10-23 画面比の宣言とはめ込み
 
-DDL 26・DDL engine 70・描画エンジン93に合わせ、親の無い新しいdirect DDLの開始にだけ `declare_canvas: true` を渡す。保存作品の編集・描き直しでは渡さず、Stage 1の宣言はcoreに任せる。
+DDL 26・DDL engine 70・描画エンジン93に合わせ、親の無い新しいdirect DDLの開始にだけ `declare_canvas: true` を渡す。保存作品の編集・描き直しでは渡さず、モデルが記述や画像から指示書を書くときの宣言はcoreが自分で足す。
 
 DDLの「描く」、保存作品のDDL編集、新しいDDLでは、宣言した比と今の紙が違うときにWebと同じ「はめ込んで描く」「この紙に合わせて描く」「キャンセル」を出す。宣言が無く、手を入れていない保存作品では、記録した描画の紙の比を使う。比が分からないときと同じ比では問いを出さない。キャンセルは入力と編集欄を保ち、描画・保存を始めない。通常のDDL変換では、はめ込みを選んだときだけ `compiler.host.canvas_fit: "contain"` を渡す。既存実行と設定が違えば、保存設定からの新しい実行にする。
 
@@ -88,8 +88,8 @@ DDLの「描く」、保存作品のDDL編集、新しいDDLでは、宣言し�
 
 作品編集メニューの自律推敲は、Server・Webと同じ`inku.autonomous-refine.v1`（JNIの`autonomousRefine`）を使う。AndroidはServer APIを呼ばず、端末の中で送り・描き・保存する。次の手と止め時、見える差のゲート、子の辺の記録は共通coreだけが決める。以下は、10月18日と17日に記したVisionの方式を置き換える。
 
-- 手数は1〜10、既定5。法則・取り合わせの手を1つ以上選ぶ。方向性は前後の空白を除いて1,000字まで。モデルは取り合わせと同じVision用途のモデル選びで1つ選び、一文の選択、Stage 1・Stage 2・法則の段にそのモデルを使う。言語は画面の言語、暴れるは指定しなければ各親のまま。画の無い親からは始めない。
-- 法則の手は、保存した親の指示書と記述、設定・種・色・比・限り、`completion_ranges`・`laws_layers`・`laws_basis`を共有pipelineの`saved_laws`へ渡す。Stage 1と構図の読みはやり直さず、親の保存した設定に`colors`があれば法則の段の後に配色の段も行い、無ければ行わない（作者裁定、2026-10-21）。`direction`はcoreの答えのまま。子は記述固定で、派生は`laws_change`（札は「法則」）。送った後の`laws_refused`・`laws_compile`・`laws_unavailable`はfailed、ほかの断りはunavailableとしてcoreへ返す。
+- 手数は1〜10、既定5。法則・取り合わせの手を1つ以上選ぶ。方向性は前後の空白を除いて1,000字まで。モデルは取り合わせと同じVision用途のモデル選びで1つ選び、一文の選択、指示書を書く送信、補完、法則の段にそのモデルを使う。言語は画面の言語、暴れるは指定しなければ各親のまま。画の無い親からは始めない。
+- 法則の手は、保存した親の指示書と記述、設定・種・色・比・限り、`completion_ranges`・`laws_layers`・`laws_basis`を共有pipelineの`saved_laws`へ渡す。指示書を書く送信と構図の読みはやり直さず、親の保存した設定に`colors`があれば法則の段の後に配色の段も行い、無ければ行わない（作者裁定、2026-10-21）。`direction`はcoreの答えのまま。子は記述固定で、派生は`laws_change`（札は「法則」）。送った後の`laws_refused`・`laws_compile`・`laws_unavailable`はfailed、ほかの断りはunavailableとしてcoreへ返す。
 - 取り合わせの手は、既存の取り合わせで一文を4つ選ぶ。coreのexcludeと同じ系譜で足した一文を除き、reuseなら同じ手番の答えを使い、rankの一文のjoinedから子を描く。派生は`description_edit`。辺には`edited_from_history_id`と`juxtaposition`を残す。
 - 子のSVGを親と比べるmeasureと、辺の`ai_move`（取り合わせなら`juxtaposition`も）はcoreの答えを保存する。keptの子だけを次の親にする。すべての子は系譜だけに保存し、runが終わる・止まる・失敗する・途切れると、最後のkeptだけを通常履歴へ出す。停止と保存が重なっても、保存した子の記録を終えてから止める。
 - runは同時に1つ。補助の進捗はアプリ専用`autonomous-refinement-runs.json`に原子的に保存する。作品の正本は作品DBと系譜の辺で、DBのschemaは変えない。ダイアログを閉じてもrunは続く。起動時に残ったrunningはinterruptedへ変え、最後のkeptを履歴へ出す。
@@ -102,7 +102,7 @@ DDLの「描く」、保存作品のDDL編集、新しいDDLでは、宣言し�
 
 - 設定：新しい作品の設定に`laws`（空）と`colors`（その実行のrender seedを10進の文字列で）を足す（Serverの`default_manifest`）。構図を読む設定のときだけ足すので、端末の中で動くモデルには2つの段を頼まない。保存した作品から走る実行は保存した設定のまま走り、`colors`があればseedだけをその実行のものにする。2つの段の無い古い作品の子には足さない。
 - 絵具の名前：設定に`colors`があるときは、各カタログの解決済みのpaletteに`paints`を足す。観測した絵具のカタログでの名前を観測の順に並べ、指示の言語がjaなら日本語名、そうでなければ英語名、カタログに無い絵具はnull（Serverの`_paint_names`）。
-- 送り：2つの段はStage 1と同じモデルへ送る。答えのtagは`laws_chosen`・`colors_chosen`。ChatGPTプランでも送る。時間と失敗は`laws`・`colors`の段に、Stage 1と分けて記録する。
+- 送り：2つの段は描画モデルへ送る。答えのtagは`laws_chosen`・`colors_chosen`。ChatGPTプランでも送る。時間と失敗は`laws`・`colors`の段に、指示書を書く送信（`stage1`）と分けて記録する。
 - 送信プロンプト：実行は`sketch, stage1, composition, laws, colors, stage2`の段を記録し、法則の段・配色の段も送ったメッセージを残す。作品の情報の送信プロンプトの欄は、「構図」の後、「効果」の前に「法則の段」「配色の段」を同じ形（システムプロンプトと送信メッセージ）で出す。
 - 描いている間の札：法則の段は「法則の選択中…」、配色の段は「配色の選択中…」（Webの`stageChoosingLaws`・`stageChoosingColors`）。
 - 法則の記録：法則を当てた実行の`laws_layers`・`laws_basis`は、`completion_ranges`と同じく作品の情報に保存する。実行の無い子（配色・支持体・てざわり・描き直し）は親の記録を受け継ぐ。DDLから描く子（DDLの編集、配置を変える）は、Serverと同じく親の記録を実行の始まりに渡し、配置を変えるときは`laws_layers`をcoreの`recompose`に渡す。記録は今の画面では使わない。
@@ -209,7 +209,7 @@ ChatGPTプランの要求とSSEは次の段（上の節）で移した。専用V
 
 **端末内のVisionモデルでは構図を読まない（作者の決定 2026-10-17）。** `composition.read`は`!isLocalVisionModel(modelId)`とし、外部providerのモデルではtrueを保つ。E2Bで構図読取りの4回の試行に約114秒を費やして既定読みに切り替わった受入結果により、端末内モデルだけ元の動作へ戻した。Serverが常にtrueとする点との意図的な差である。新規実行と保存作品からのforkの設定に同じ規則を使う。外部providerの再試行・応答の判定・fallbackは既存の共有pipelineを使う。
 
-providerは、明示した`provider:model`、そのモデルを一覧に持つ有効なproviderが1つ、利用者の段の既定provider、の順で共通coreが選ぶ。Stage 2は`complete_visible_ddl_holes`、それ以外はStage 1の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
+providerは、明示した`provider:model`、そのモデルを一覧に持つ有効なproviderが1つ、利用者の段の既定provider、の順で共通coreが選ぶ。`complete_visible_ddl_holes`（補完）は`stage2`の既定、それ以外の要求は`stage1`の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
 
 自律推敲のVision助言は保存SVGを縦横比を保って768×768に収まるよう画像化し、透明な正方形の中央へ置いてPNGで送る。本文のMIMEは`image/png`、IHDRは768×768である。カメラ画像のJPEG前処理と端末内モデルへの写真経路は変えない。
 
@@ -227,7 +227,7 @@ JVM試験はhost用のJNIライブラリを作り、`server/tests/data/identity-
 
 配置の次の4案を作る際は、チェック済みで未保存の候補を先に保存する。保存に失敗したら候補と選択を残し、次の描画へ進まない。色カタログ変更は開いた時点で現在以外のカタログ候補を作る。モデル検分は描画済みモデルを再実行せず、新しい成功候補を既存候補へ追加し、あるモデルが失敗しても別の選択モデルを続け、失敗をモデルごとに表示する。公開・接続条件を満たすChatGPTプランのモデルも検分候補に含める。カメラ撮影用のVisionモデル候補には引き続き含めない（2026-10-24に廃止。「ChatGPTプランでカメラを使う」を参照）。推敲のWildは「継承」「オン」「オフ」を選べ、継承は親作品の値を使い、指定した値はその推敲に適用する。
 
-作品一覧はUUIDとそのprefixでも探せる。キャンバスの検索は記述文、render hash、description hash、完全UUIDで保存作品を探し、入力を250ms待ってから絞り込む。検索結果から作品を開け、消去・0件・失敗を区別して表示する。生成情報には保存作品のUUIDを表示してコピーでき、未保存作品と区別する。保存作品の「prompt」表示は、その作品に結び付く実行の送信済みsystem promptを写生・Stage 1・構図読み取り・Stage 2別に読み、写生と構図読み取りのmessageも示す。未記録、未呼出し、読取り不能を混同せず、保存sourceやDDLから送信文を推測しない。
+作品一覧はUUIDとそのprefixでも探せる。キャンバスの検索は記述文、render hash、description hash、完全UUIDで保存作品を探し、入力を250ms待ってから絞り込む。検索結果から作品を開け、消去・0件・失敗を区別して表示する。生成情報には保存作品のUUIDを表示してコピーでき、未保存作品と区別する。保存作品の「prompt」表示は、その作品に結び付く実行の送信済みsystem promptを工程別に読む。欄は「色の読み」「色カタログの選択」「写生」「型を埋める」「構図」「法則の段」「配色の段」「補完」「読み」「構図と法則」「書く」「見比べ」（`SavedWorkParityStrings.kt`の`sentPromptStages`）で、写生と構図のmessageも示す。未記録、未呼出し、読取り不能を混同せず、保存sourceやDDLから送信文を推測しない。
 
 進行表示は `read_composition` の間「構図の読み中…」と示す。連作は元の行番号・本文・描画条件を保持し、失敗行のみを手動で再実行できる。自動再試行は既定0回、設定範囲0〜5回で、停止した実行を自動で再開しない。歳時記は語の説明図、描画への効果、指示書の例を表示し、効果はUI言語、例は指示書言語に従う。モデル選択の見出しには用途に応じた推薦星を表示し、元のカタログ評価をそのまま使う。
 
@@ -251,7 +251,7 @@ Anthropicの対象Claudeモデルは、通常描画とVisionを含むrequestで�
 
 ## 2026-10-14 読み取り推敲の削除
 
-推敲の「読み取りを変える」と作品編集メニューの「描画パラメータの編集」を削除した。「配置を変える」「色カタログを変える」は対象作品の既存の推敲workspaceを開き、開くだけでは描画・保存しない。残る要素は色カタログ・配置で、配置を既定とする。色候補は親の保存Scoreを別の色カタログで描き、Stage 1で記述を読み直さない。
+推敲の「読み取りを変える」と作品編集メニューの「描画パラメータの編集」を削除した。「配置を変える」「色カタログを変える」は対象作品の既存の推敲workspaceを開き、開くだけでは描画・保存しない。残る要素は色カタログ・配置で、配置を既定とする。色候補は親の保存Scoreを別の色カタログで描き、記述から指示書を書き直さない。
 
 新しい描画要求と実行optionsに`interpretation_seed`を載せず、その採番も行わない。保存した`reinterpretation`の系譜の辺と解釈/Readingラベル、作品の`interpretation_seed`の生成情報は読取り用の記録として保持する。記述の編集とモデル比較による描画は従来の入口を保つ。
 
@@ -318,7 +318,7 @@ propertyOrderingの順でpropertiesを書き出す。items・配列・入れ子�
 OpenAI互換・Anthropic・Geminiの順の計算・投影・圧縮は共有coreが行う。ChatGPTプランも2026-10-17のChatGPTの節から同じ処理を使う。
 JSONObjectへ入れ直すだけで済ませず、送信文字列の順を指定して書く。
 順序の変更が無いJSONは従来のtoStringをそのまま使うため、propertyOrderingの無い
-Stage 1・Stage 2等の本文は同じバイトになる。
+指示書を書く送信・補完などの本文は同じバイトになる。
 
 ## 2026-10-13 OpenAI APIの描画と推論指定
 
@@ -494,7 +494,7 @@ Server／Webとの差の監査で見つけた差を、次の規則に揃えた�
 - **補完の承認と辞退**: 画面に出ている変更案のrevisionとdigestを送り、変更案が変わっていればcoreが断る。承認待ちのあいだのDDL編集はhostで辞退を作らずcoreに任せ、断られたら「補完候補に答えてから、DDLを編集してください。」と出す（作者の決定、2026-10-06）。
 - **止まった理由**: `needs_user_edit`／`failed`の理由と、その段のmodelの失敗をWebと同じ文で出す（`attention.ts`）。APIキーが無いときは「モデルのAPIキーがありません」と出す。
 - **provider**:
-  - OpenAI互換では、構図の読み（`read_composition`）もStage 1と同じ温度0.3で送る。
+  - OpenAI互換では、構図の読み（`read_composition`）も型を埋める（`generate_normalized_ddl`）と同じ温度0.3で送る。
   - 応答の形が欠けたら`malformed_payload`とする。設定の誤り（鍵・Base URL・provider・httpのURL・未取得の端末モデル）は`provider_rejected`とし、coreに再試行させない。
   - 鍵が要るproviderはServerの定義（openai・anthropic・gemini・nvidia・ollama-cloud）に従う。OpenAI互換は鍵が空なら`Bearer none`を送る。
   - 成功の応答は1 MiB（bytes）まで読み、エラーの本文は先頭16 KiBで分類する。ChatGPTの引数の上限は1 MiBとし、失敗の分類とSSEの区切りはServerと同じにする。
@@ -555,7 +555,7 @@ Androidは端末で本人が使うsingle-user hostとして、Serverを介さず
 
 Android は裏の通信を止めることがあるため、認可の戻りに先に返事をし、token の交換は認証の期限内に inku が前に出てから行う。
 
-設定「モデル」のChatGPTプランで「モデル選択」から本人の一覧を取得し、使うモデルを選んで保存する。取得だけでは公開しない。公開済みかつ本人の一覧にあるモデルだけが描画候補に現れ、Stage 1/2に同じ`chatgpt:<slug>`を使う。提供終了の公開指定や保存済み作品のモデルIDは保持する。設定画面を開くだけではモデル一覧を取得しない。共有のAPIキー設定、bare名の所有、カメラ写真の観察、デモ指示文の生成にはこの接続を提供しない（Androidは奥書を持たない）。2026-10-24から、カメラは共通coreの画像の実行でこの接続を使える（「ChatGPTプランでカメラを使う」）。モデル検分と自律推敲の専用Vision助言には、公開済みの本人モデルを使える。
+設定「モデル」のChatGPTプランで「モデル選択」から本人の一覧を取得し、使うモデルを選んで保存する。取得だけでは公開しない。公開済みかつ本人の一覧にあるモデルだけが描画候補に現れ、指示書を書く工程と補完に同じ`chatgpt:<slug>`を使う。提供終了の公開指定や保存済み作品のモデルIDは保持する。設定画面を開くだけではモデル一覧を取得しない。共有のAPIキー設定、bare名の所有、カメラ写真の観察、デモ指示文の生成にはこの接続を提供しない（Androidは奥書を持たない）。2026-10-24から、カメラは共通coreの画像の実行でこの接続を使える（「ChatGPTプランでカメラを使う」）。モデル検分と自律推敲の専用Vision助言には、公開済みの本人モデルを使える。
 
 登録を複数保持でき、本人確認済みのアカウントと発行client IDをラベルで見分けて選ぶ。再認証と明示した再同意、認証中止、切断、利用枠を管理するリンクを提供する。描画画面にも利用中のプランと登録を示す。本人確認だけではプラン利用を許可せず、`chatgpt.tokens.use.direct`のscopeを確認する。上限に達した後は追加描画を止め、一覧の明示した再取得で利用可能性を確認できる。切断は端末のtokenを先に除去し、遠隔の失効が確認できない場合はその旨を示す。公開モデルと登録の識別情報は保持する。
 
@@ -573,7 +573,7 @@ OAuthは端末の`127.0.0.1`の一時listenerを先に開き、dynamic registrat
 
 LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJson` を `ResponseFormat.json(schema)` へ渡す。応答の型を持つ要求だけ、会話の `enableResponseFormat` と送信時の `responseFormat` を同時に設定して、SDKのJSON Schema制約を使う。型の無い文章の要求と写真の観察文ではこの制約を有効にしない。
 
-2026-10-21の作者裁定によるcoreの下絵の層数制限の廃止に合わせ、端末の `generate_normalized_ddl` の型に足していた `properties.layers.maxItems` と値8の写しを外した。Stage 1も構図の読みも、共有coreから受けた型を加工せずSDKへ渡し、端末独自の層数上限は置かない。これは2026-10-04の、coreの8層の上限を端末だけに写す裁定を置き換える。
+2026-10-21の作者裁定によるcoreの下絵の層数制限の廃止に合わせ、端末の `generate_normalized_ddl` の型に足していた `properties.layers.maxItems` と値8の写しを外した。型を埋めるも構図の読みも、共有coreから受けた型を加工せずSDKへ渡し、端末独自の層数上限は置かない。これは2026-10-04の、coreの8層の上限を端末だけに写す裁定を置き換える。
 
 共有coreのprompt/schemaと再試行の判断を使い、GPU、4096 tokenの窓、temperature0.0を含む既存sampling設定を維持する。端末Gemma 4 E2Bの構図は `read: false` のままで、既定の読みを使う。
 
@@ -581,7 +581,7 @@ LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJso
 
 ## 2026-10-03 下絵の後の構図と読み
 
-共有SPEC §12.6.2の構図を新規設定へ取り込む。雲のモデルは `composition: {"read": true}` とし、下絵の後・可視DDLのcommit前に `read_composition` を同じStage 1モデル・最大token・sampling（OpenAI互換は温度0.3、2026-10-06に揃えた）で送り、`composition_read` を返す。読みの再試行は共有coreが `composition_retry`、無ければ `catalog_retry` の予算で行う。端末のLiteRT Gemma 4 E2Bは作者の判断どおり `read: false` とし、読みの要求を送らず既定の読みで構図を入れる。
+共有SPEC §12.6.2の構図を新規設定へ取り込む。雲のモデルは `composition: {"read": true}` とし、下絵の後・可視DDLのcommit前に `read_composition` を描画モデルで、型を埋めると同じ最大token・sampling（OpenAI互換は温度0.3、2026-10-06に揃えた）で送り、`composition_read` を返す。読みの再試行は共有coreが `composition_retry`、無ければ `catalog_retry` の予算で行う。端末のLiteRT Gemma 4 E2Bは作者の判断どおり `read: false` とし、読みの要求を送らず既定の読みで構図を入れる。
 
 Geminiへ渡す応答の型は、各objectの `propertyOrdering` に沿って `properties` を書き、要旨 `thesis` を先頭にする。指名されない項目も残す。読みが使えない場合と構図を入れられない場合はcoreの既定の読み／下絵のままのcommitへ進み、Android hostは止めない。新しいsnapshot欄と出来事は共有coreの記録として保持し、読みの段を進み具合やプロンプトのタブへ加えない。
 
@@ -605,9 +605,9 @@ Room schema 13では、`history_items.normalized_ddl`と一覧用の`HistoryList
 
 ## 2026-09-30 撮影から詩的な記述へ・モデルの統一
 
-撮影後は、写真から観察記述を得る呼出しに続き、同じモデルへテキストだけを渡して絵画のための短い記述へ書き換える。`camera-poetic-description-v1`は「視覚的な短歌」「主張しない、提示する」に従い、焦点を一つ、観察した具体的な手掛かりを二つか三つ残す。光・色・形・物質・繰り返し・余白の関係を省略と対置で提示し、口述の単なる短縮、感情の説明、評価、擬人化、観察にない物や出来事を求めない。日本語は一〜三文・六十〜百二十字程度、英語は二十〜五十語程度を目安とする。完成した記述を通常のStage 1へ渡し、作品の記述として保存する。
+撮影後は、写真から観察記述を得る呼出しに続き、同じモデルへテキストだけを渡して絵画のための短い記述へ書き換える。`camera-poetic-description-v1`は「視覚的な短歌」「主張しない、提示する」に従い、焦点を一つ、観察した具体的な手掛かりを二つか三つ残す。光・色・形・物質・繰り返し・余白の関係を省略と対置で提示し、口述の単なる短縮、感情の説明、評価、擬人化、観察にない物や出来事を求めない。日本語は一〜三文・六十〜百二十字程度、英語は二十〜五十語程度を目安とする。完成した記述は通常の記述として描き、作品の記述として保存する。
 
-写真の読取り・記述の書き換え・描画のStage 1／2は単一の選択モデルを使う。制作と撮影プレビューの「モデル選択」は同じ値を変更し、プレビューとダイアログにモデルを一つだけ表示する。正本は既存の`model_selection`であり、旧`camera_vision_model`は読まず、設定「その他」の独立した記述生成モデル選択を廃止する。撮影プレビューで確定した値を撮影runへ反映し、シャッター後と描画の再試行では変更しない。
+写真の読取り・記述の書き換え・描画の全ての送信は単一の選択モデルを使う。制作と撮影プレビューの「モデル選択」は同じ値を変更し、プレビューとダイアログにモデルを一つだけ表示する。正本は既存の`model_selection`であり、旧`camera_vision_model`は読まず、設定「その他」の独立した記述生成モデル選択を廃止する。撮影プレビューで確定した値を撮影runへ反映し、シャッター後と描画の再試行では変更しない。
 
 書き換え中は「絵になる言葉を紡いでいます」と表示し、取消を受け付ける。追加段の出力枠は2048 tokenとする。空応答、提供元が出力上限による途中終了を返した応答、書き換えの失敗は「記述をまとめられませんでした」として止め、観察記述へ戻して描画しない。描画だけが失敗した再試行は完成した記述から始め、写真の読取りと書き換えを繰り返さない。`input_provenance`には実使用の`description_model_id`と`description_prompt_version`を任意の対として追加する。旧作品では両項目を要求せず、観察文・写真・パスを由来metadataに保存しない。Room schemaと共有描画coreは変更しない。
 
@@ -679,7 +679,7 @@ Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへ
 
 ## 2026-09-25 現行のプラグイン（draw-system04）
 
-下絵の任意`plugins`とその個数（`count`）、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.1.0）の照合と、語に書いた個数の受け取り（SPEC §4.6）は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
+下絵の任意`plugins`とその個数（`count`）、指示書を書く頼む文の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.1.0）の照合と、語に書いた個数の受け取り（SPEC §4.6）は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
 
 同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。v2 の語は `｛若葉｝`／`{young leaves}` と書く。設定には共有coreの資産から絵、日英の主の名、ほかの名、種類、説明、例文を出す。
 
@@ -701,9 +701,9 @@ DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Android
 
 写真から記述を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値と、サポート対象から外した端末内モデル（Gemma 4 E4B）は既定へ戻す。設定画面からは撮影中に変更できない（撮影画面の「モデル選択」からは変えられ、その撮影に使う）。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。Gemini種別の画像要求は、Serverと同じく上の「Geminiのモデル別思考レベル」の最も低い段を使う（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
 
-記述からの描画は、NVIDIA NIM・`vivid_material`・写生なしの固定経路を廃止し、撮影開始時の描画設定（Stage 1／2モデル、色カタログ（自動を含む）、写生）を使う。設定はrun単位で固定し、再試行も同じ値を使う。撮影前に、記述生成モデルと描画モデルについて、端末内モデルは取得済みか、外部providerは有効でBase URLと必要なAPI keyがあるかを確かめ、不足時は撮影を始めない。端末内の記述生成モデルは、撮影画面を開いている間に読み込みを始める。新しい作品の`input_provenance.route`は`description_to_pipeline`、`vision_provider_id`は実際に使ったproviderである。旧値`local_description_to_nim`／`local_ddl_to_nim_stage2`／`ddl_to_pipeline_stage2`の作品は従来どおり表示する。
+記述からの描画は、NVIDIA NIM・`vivid_material`・写生なしの固定経路を廃止し、撮影開始時の描画設定（描画モデル、色カタログ（自動を含む）、写生）を使う。設定はrun単位で固定し、再試行も同じ値を使う。撮影前に、記述生成モデルと描画モデルについて、端末内モデルは取得済みか、外部providerは有効でBase URLと必要なAPI keyがあるかを確かめ、不足時は撮影を始めない。端末内の記述生成モデルは、撮影画面を開いている間に読み込みを始める。新しい作品の`input_provenance.route`は`description_to_pipeline`、`vision_provider_id`は実際に使ったproviderである。旧値`local_description_to_nim`／`local_ddl_to_nim_stage2`／`ddl_to_pipeline_stage2`の作品は従来どおり表示する。
 
-写真は常に記述を経て通常のStage 1へ渡る。記述生成モデルにDDLを直接書かせる「DDL直接」モード（`camera-ddl-v2`）は廃止した。この指示文はStage 1の文法と語彙だけを渡し、構図の計画も文数の上限も持たなかったため、実機では外部の`gemini:gemma-4-31b-it`が「中心に緑のコンピュータの塗りの四角を1個置く。」を112回繰り返して出力上限で切れ（全121文中119文が「中心」、描画まで270秒）、端末内のE2Bも角括弧付きの崩れたDDLや語彙の羅列を出した。設定のモード選択は削除し、保存済みの`camera_vision_output_mode`は読まない（`ddl`を選んでいた端末も記述で描く）。headlessの`vision_mode`指定も削除した。
+写真は常に記述を経て、通常どおり指示書を書く工程へ渡る。記述生成モデルにDDLを直接書かせる「DDL直接」モード（`camera-ddl-v2`）は廃止した。この指示文はStage 1の文法と語彙だけを渡し、構図の計画も文数の上限も持たなかったため、実機では外部の`gemini:gemma-4-31b-it`が「中心に緑のコンピュータの塗りの四角を1個置く。」を112回繰り返して出力上限で切れ（全121文中119文が「中心」、描画まで270秒）、端末内のE2Bも角括弧付きの崩れたDDLや語彙の羅列を出した。設定のモード選択は削除し、保存済みの`camera_vision_output_mode`は読まない（`ddl`を選んでいた端末も記述で描く）。headlessの`vision_mode`指定も削除した。
 
 ## 2026-09-25 現行の色カタログと保存作品
 
@@ -715,7 +715,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 共有仕様§12.6.1に従い、写生は描画ごとに作者が選ぶ。既定は「なし」で、記述ごとに要否を決める自動modeは置かない。開始入力と記述からの再生成には`sketch`を渡し、`{"mode":"off"}`、作者が選ぶ`{"mode":"on"}`、作者が直した文または保存済み文を使う`{"mode":"supplied","text":"..."}`を区別する。suppliedでは写生providerを呼ばない。
 
-`on`ではStage 1と同じmodelでStage 1の前に`generate_sketch`を任意effectとして実行し、prompt `inku.sketch-supplement-prompt.v1`への応答JSON `{"sketch":"..."}`から`sketch_generated`を作り、その文を下絵へ渡す。失敗時の再試行予算は`sketch_retry`（未設定なら`catalog_retry`）を使う。写生を作者確認で止めず、provider失敗は`fallback`として記述だけで続行し、空の応答は`not_needed`として記述だけで続行する。snapshotの状態は`pending`、`supplemented`、`not_needed`、`fallback`、`supplied`を表す。保存時は`supplemented`または`supplied`の文を`sketch_text`へ保存し、`sketch_grain`はnullとする。`not_needed`と`fallback`はそれぞれ状態だけを保存し、写生記録がない場合は`off`である。`sketch_state`には`supplemented`と`not_needed`を含める。
+`on`では描画モデルで、指示書を書く前に`generate_sketch`を任意effectとして実行し、prompt `inku.sketch-supplement-prompt.v1`への応答JSON `{"sketch":"..."}`から`sketch_generated`を作り、その文を下絵へ渡す。失敗時の再試行予算は`sketch_retry`（未設定なら`catalog_retry`）を使う。写生を作者確認で止めず、provider失敗は`fallback`として記述だけで続行し、空の応答は`not_needed`として記述だけで続行する。snapshotの状態は`pending`、`supplemented`、`not_needed`、`fallback`、`supplied`を表す。保存時は`supplemented`または`supplied`の文を`sketch_text`へ保存し、`sketch_grain`はnullとする。`not_needed`と`fallback`はそれぞれ状態だけを保存し、写生記録がない場合は`off`である。`sketch_state`には`supplemented`と`not_needed`を含める。
 
 通常のなし／あり選択はAndroidの描画設定に置き、既定をなしとする。作品からの「写生なし／ありで描き直す」は選択作品の子を系譜へ保存し、派生種別には既存の`sketch_grain_change`を使う。metadataは`from_sketch_state`と`to_sketch_mode`を記録する。旧`fine`／`coarse`は保存済み作品の表示と再描画時の選択判定にのみ使い、新しい写生の入力や保存には使わない。
 
@@ -723,7 +723,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。Serverと同じく`{model}`は設定した名前全体をpercent encodeしたもので、先頭の`models/`も残す（`models/models%2F...`）。外すのはモデル一覧の取得だけである。API key は `x-goog-api-key` で渡し（モデル一覧の取得も同じヘッダーで渡し、最後のページまで読む）、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
-共有pipelineのprovider要求は共有coreの`provider_wire.rs`が生成し、Androidは返された本文バイト列をそのまま送る。以下のtemperature・思考量・schema変換・出力予算もcoreが決める。Geminiではtemperatureを送らず、思考は上の「Geminiのモデル別思考レベル」に従い、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の本文予算は2048、hole補完は2048とする。Geminiの思考を送る要求は上の規則で8192を足す。
+共有pipelineのprovider要求は共有coreの`provider_wire.rs`が生成し、Androidは返された本文バイト列をそのまま送る。以下のtemperature・思考量・schema変換・出力予算もcoreが決める。Geminiではtemperatureを送らず、思考は上の「Geminiのモデル別思考レベル」に従い、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerでは型を埋める（`generate_normalized_ddl`）、構図の読み（`read_composition`）、法則、配色、言葉で描くの読み・構図・書く・見比べをtemperature 0.3、他の要求を0.0とする。本文予算は、型を埋める・写生・カタログ選択・構図の読み・法則・配色が2048（`stage1_max_tokens`）、言葉で描くの読み・構図・書く・見比べと画像から書く・画像との見比べが8192、hole補完が2048とする。Geminiの思考を送る要求は上の規則で8192を足す。
 
 Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snapshot32＋metadata/protocol64＋他field余裕32 MiB）。この枠を超える旧行を無制限に読む保証ではない。実行状態のBLOBはcursorへ全量を載せず、固定digestを指定した1 MiBのchunkで読み、全量のSHA-256を検証する。最新実行・実行metadata queryもBLOBを含めない。新しいhost stateはrenderedをJSON objectで保持して二重escapeを避け、旧文字列形式も読み戻せる。
 
@@ -739,7 +739,7 @@ Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snaps
 
 この節は、新しく撮影またはPhoto Pickerで選択する写真についての現行契約である。末尾に残す2026-08-26および2026-08-27の各実装記録のうち、「写真を保存しない」「photo persistenceを追加しない」という制限を、以下のアプリ内保持に置き換える。過去の実装・受入記録は履歴として維持する。
 
-進行表示は実際の処理状態に追随する。写真の準備、端末内モデルの準備、写真内容の確認、構図の検討、色と形の組立て、描画の仕上げ、作品保存を区別し、その段階で行っていることを短い文で伝える。写真を用いる演出は表示専用のプレビューへ適用し、入力写真や保存写真を書き換えない。写真内容の確認中はプレビュー写真を揺らし、横帯ごとにずれた写真片、走査線、移動する光帯、断続的な信号ノイズを重ねる。仕上げ中は大きな幾何学図形を多彩な色で重ね、順に積み上がる様子を見せる。構図・色・輪郭などの演出は処理段階を表すものであり、未完成の描画結果とは扱わない。文字と元写真を読める明度を保ち、画面全体を急に点滅させない。架空の中間SVG、進捗率、残り時間、演出のための待ち時間を加えず、Direct DDLで省略されるStage 1を表示しない。システムのアニメーション無効時は同じ段階を静止表示し、実際の保存完了後に作品を見せる。
+進行表示は実際の処理状態に追随する。写真の準備、端末内モデルの準備、写真内容の確認、構図の検討、色と形の組立て、描画の仕上げ、作品保存を区別し、その段階で行っていることを短い文で伝える。写真を用いる演出は表示専用のプレビューへ適用し、入力写真や保存写真を書き換えない。写真内容の確認中はプレビュー写真を揺らし、横帯ごとにずれた写真片、走査線、移動する光帯、断続的な信号ノイズを重ねる。仕上げ中は大きな幾何学図形を多彩な色で重ね、順に積み上がる様子を見せる。構図・色・輪郭などの演出は処理段階を表すものであり、未完成の描画結果とは扱わない。文字と元写真を読める明度を保ち、画面全体を急に点滅させない。架空の中間SVG、進捗率、残り時間、演出のための待ち時間を加えず、Direct DDLで行わない指示書を書く工程を表示しない。システムのアニメーション無効時は同じ段階を静止表示し、実際の保存完了後に作品を見せる。
 
 撮影結果またはPhoto Pickerから受け取った写真のbytesを、そのままアプリ専用の`filesDir/original-photos/`へ保持する。元写真の保存には縮小・再圧縮・メタデータ除去を行わないため、元のEXIF等が含まれていればそのまま残る。端末内Visionには従来どおり向き補正、長辺1280px、JPEG品質85の正規化写真を渡し、保存する元写真と区別する。NIMへ渡すのは従来どおりテキストだけで、写真、URI、ローカルパス、EXIFをremote modelへ送らない。
 
@@ -756,8 +756,9 @@ Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snaps
 - デフォルト provider はローカルモデル provider とする。
 - Web 参照実装との互換性のため、外部 provider も維持する:
   OpenAI、Claude、Gemini、NVIDIA NIM、Ollama Cloud。
-- Android の通常パイプラインは共有Rustのauthoring state machineを使い、
-  description -> Stage 1 -> visible DDL -> typed meaning / Stage 1.5 -> Score -> SVGを辿る。
+- Android の通常パイプラインは共有Rustのauthoring state machineを使う。
+  モデルの送信が指示書を visible DDL として書き、compile がそれを typed meaning と Score、
+  さらに SVG にする。描き方ごとの工程はこの一覧の後の表に置く。
   Stage遷移、有限語彙、parse／meaning、known-hole補完判断、Score compile／coerce／repairは共有Rustが決める。
 - JSON Score、render metadata、履歴 import/export、色カタログ、canvas aspect、SVG profile、
   render hash は Web 実装と互換にする。
@@ -773,6 +774,16 @@ Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snaps
 - Gemma 4 E2B を端末内モデルとする（Gemma 4 E4B は 2026-09-26 にサポート対象から外した）。
 - 初回起動時は、ライセンス同意後に選択されたローカルモデルをダウンロードする。
 - 対象端末クラスは Pixel 9 以降とする。
+
+| 描き方 | 通る工程（順） |
+|---|---|
+| 言葉で描く（既定） | ［写生（読み）。既定で通る］→［構図の読み・法則］→ 書く →［見比べ］→［配色］→ compile → 描画 |
+| 型で描く | ［写生］→ 型を埋める → 構図の読み → 法則 → 配色 →（穴が残れば）補完 → compile → 描画 |
+| 画像から描く（カメラ） | ［画像の色カタログ］→ 画像から書く → 画像との見比べ → compile → 描画 |
+
+［］は札や設定で通るかが決まる工程。言葉で描くの見比べは、描画モデルが画像を読める時だけ通る。画像から描くの見比べは、書いた指示書を描けない時は飛ばす。記述から色カタログを自動で選ぶ時は、どの描き方も最初に色カタログを通る。プラグインの書き下し、中間フィルタ（旧 Stage 1.5）、lowerer はモデルを使わず compile の中で行う。端末内の LiteRT のモデルは型で描くだけを通り、構図の読み・法則・配色は通らない（`read: false`）。
+
+識別子との対応：設定と保存した作品の `stage1_model`・`stage2_model` などの `stage1_*` の欄、headless の extras `stage1_model`・`stage2_model` は名を変えない。`stage1_*` は補完以外の送信の設定、`stage2_*` は補完の設定を言う。答えの上限は送信によって別に持つ（書く・見比べ・読みは画像の上限。上の出力枠の項を参照）。
 
 ## 現在の実装状態
 
@@ -832,7 +843,7 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   - adb から起動可能な run ID と prompt/model/catalog/canvas extras
   - app sandbox artifacts under `files/headless/<run_id>/`
   - `result.json`、`normalized.ddl`、`score.json`、`output.svg` の抽出
-  - `INPUT_MODE=ddl` で Stage 1 を通さず、入力済み正規化DDLを Stage 2 以降へ直接流せる。
+  - `INPUT_MODE=ddl` で指示書を書く工程を通さず、入力済み正規化DDLを共有coreへ直接流せる（穴が残れば補完、compile、描画）。
     LLM 出力の揺れを切り離し、DDL -> Score -> SVG の server 差分確認に使う。
   - server CLI も `inku-cli paint --input-mode ddl` を持ち、`/api/compose` 経由で
     DDL -> Score -> SVG を実行する。`--save-history` 指定時は `/api/history` へ保存する。
@@ -849,8 +860,8 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   model state が `ready` であることを確認し、cached LiteRT-LM `Engine` を初期化し、
   coreが作ったbounded promptを `Conversation` に一度送って返却 `Message` をtext化する。
   Timeout、再試行、別actionの要否は共有Rustが決定し、Kotlin providerは独自fallbackへ分岐しない。
-- Stage 1の有限語彙と出典、catalog選択、visible normalized DDL schemaは共有Rustが構成する。
-- DDL parse、typed meaning／Stage 1.5、known-hole検出とpatch制約、Stage 2 Score compile、
+- 指示書を書くための有限語彙と出典、catalog選択、visible normalized DDL schemaは共有Rustが構成する。
+- DDL parse、typed meaning／中間フィルタ、known-hole検出とpatch制約（補完）、Score compile、
   coerce／repair、診断と資源policyは共有Rustを正本とする。
 - 旧Kotlin Stage 1／1.5／2、Score coerce／repair、deterministic fallbackの実装は2026-09-14（`03bbd686`）に撤去し、
   比較用にも残していない。
@@ -868,7 +879,7 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
 - 作品画面の選択 item に対する Star／解除、soft trash、Android `FileProvider` 経由のJSON共有。
 - 保存済み作品の生成情報sheetは、写生、モデルと言語、seedと記録済みの変奏（旧）、色カタログと色map、
   canvas、render hash / engine、作成日時、処理時間を読み取り専用で表示する。
-- DDLはWebと同じく「指示書」と呼ぶ（「解釈」は記述を指示書へ読み解くStage 1の行為だけを指す、2026-09-28）。制作の指示書の見出し、作品を見ているときに「指示書を見る」で開いた指示書、推敲の候補のDDLの見出しを、Webの`ddlLabelIn`と同じ「指示書（日本語DDL）」「指示書（英語DDL）」とし、長押しでWebと同じ説明を出す（押せそうに見える小札にはしない）。保存した作品のDDLのままならその作品の`instruction_lang_resolved`、編集したDDLはServerの`auto`と同じ規則（仮名・漢字が1字でもあれば日本語）で決める。
+- DDLはWebと同じく「指示書」と呼ぶ（「解釈」は記述を指示書へ読み解く行為だけを指し、工程の名でもDDLの名でもない、2026-09-28）。制作の指示書の見出し、作品を見ているときに「指示書を見る」で開いた指示書、推敲の候補のDDLの見出しを、Webの`ddlLabelIn`と同じ「指示書（日本語DDL）」「指示書（英語DDL）」とし、長押しでWebと同じ説明を出す（押せそうに見える小札にはしない）。保存した作品のDDLのままならその作品の`instruction_lang_resolved`、編集したDDLはServerの`auto`と同じ規則（仮名・漢字が1字でもあれば日本語）で決める。
 - 系譜cardは保存済みDDLの編集とStar／解除を持ち、focus外cardの操作でも現在focusを変えない。
 - 起動時、最新選択履歴 item を prompt、DDL、catalog、canvas settings へ復元する。
 - Pixel 9 status bar / navigation bar safe-area handling。
@@ -988,7 +999,7 @@ Server-only web features は、clear local single-user equivalent がない限�
 
 Android 版のUI、host orchestration、保存の参照実装は `web/` と `server/` である。
 pipelineの意味は共有Rust（`core/crates/inku-pipeline/`・`inku-ddl`・`inku-score`・`inku-render`）が正本で、
-Stage 1の語彙とprompt、Stage 1.5、known-holeの補完、Scoreのcompile、coerce／repair、診断と資源policy、
+指示書を書くための語彙とprompt、中間フィルタ、known-holeの補完、Scoreのcompile、coerce／repair、診断と資源policy、
 SVGと演奏metadataをServerとAndroidが同じcoreから使う。Kotlinはhostの責務だけを持ち、coreの規則を写さない。
 coreにある規則（記述の札など）は、Kotlinに写さずJNIで呼ぶ。
 
@@ -1015,7 +1026,7 @@ web/server との parity を優先する。
 
 Saijiki parity は生成で担保する。Android UI の word groups は手で写さず、
 `server/scripts/gen_saijiki_kt.py` が `saijiki.py` から焼く `SaijikiGenerated.kt`（日英各 10 分類 73 語）
-を画面が読む。鮮度は `server/tests/test_saijiki_kt_is_current.py` が見る。Stage 1の語彙とScoreのcoerce／repairは
+を画面が読む。鮮度は `server/tests/test_saijiki_kt_is_current.py` が見る。指示書を書くための語彙とScoreのcoerce／repairは
 共有Rustが行い、Androidは歳時記の補完を独自に持たない。
 
 ## Web Component Porting Matrix
@@ -1036,7 +1047,7 @@ local single-user equivalent と明記されたものを除き、Web component �
 | `DemoPanel.svelte` | one-shot local demo generation として移植。Interval loop parity 用 persisted local settings は予定。 |
 | `CanvasAspectPlugin.svelte` | Canvas settings panel と plugin enable flag の Room settings 永続化として移植。 |
 | `ColorCatalogModal.svelte` | cancel/confirm semantics を持つ color catalog selection panel として移植。 |
-| `DdlEditor.svelte` / `DdlEditPanel.svelte` | inline DDL editor、editor dialog、auto-repair toggle、Stage 2 replay、stop action として移植。 |
+| `DdlEditor.svelte` / `DdlEditPanel.svelte` | inline DDL editor、editor dialog、auto-repair toggle、DDLからの描き直し、stop action として移植。 |
 | `SaijikiInline.svelte` | 同じ word groups を使う inline Saijiki panel として移植。 |
 | `SaijikiDrawer.svelte` | Android では inline Saijiki panel が mobile equivalent。drawer layout は使わない。 |
 | `CanvasPanel.svelte` | artwork/prompt/score tabs、star、hash copy、render metadata、zoom/pan controls、SVG share、PNG share として移植。 |

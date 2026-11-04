@@ -27,8 +27,13 @@
 | 一角／全面／帯 | **One corner / All over / Bands** | 構図の形 | — |
 | 分ける線／格子 | **Dividing line / Grid** | 構図の形 | — |
 | 群れと逸れ／不等辺の三角 | **Flock and stray / Unequal triangle** | 構図の形 | — |
-| 解釈（Stage 1） | **interpretation** / **interpret** | 名詞／動詞 | ~~reading~~（読み取りと混線する） |
-| 下絵（Stage 1 の出力） | **underdrawing** | 名詞。LLM が返す閉じた型の設計で、指示書はここから決定的に印字される。浮世絵の絵師の下絵（彫師が版木を彫る元）に倣った名。2026-09-25 に「作品計画」から改名。実装の識別子 `work_plan` と schema ID は変えない | ~~work plan~~（旧称）、~~sketch~~（写生と紛れる）、~~plan~~ 単独（lowerer の symbolic Plan と紛れる） |
+| 解釈（記述を指示書へ読み解くこと） | **interpretation** / **interpret** | 名詞／動詞。工程の名ではない（型で描くは型を埋める、言葉で描くは書く・見比べが行う） | ~~reading~~（読み取りと混線する） |
+| 型を埋める（型で描くの工程。旧 Stage 1） | **Fill the plan** | 工程の名（2026-11-04 作者の決定） | ~~Interpretation~~（工程の名として）、~~Stage 1~~ |
+| 書く（言葉で描くの工程） | **Writing** | 工程の名（2026-11-04 作者の決定） | ~~Write in words~~（描き方の名 In words と紛れる） |
+| 見比べ（描いた画と指示書を比べて直す工程） | **Review** | 工程の名（2026-11-04 作者の決定）。画像は「画像との見比べ」**Picture review** | ~~Look and correct~~、「見直し」「見て直す」 |
+| 補完（指示書に残った穴を補う工程。旧 Stage 2） | **completion** | 工程の名 | ~~Stage 2~~、~~hole filling~~ |
+| 中間フィルタ（旧 Stage 1.5） | **intermediate filter** | モデルを使わない compile の中の確かめと変換（SPEC §12.11） | ~~Stage 1.5~~、~~expansion~~ 単独 |
+| 下絵（型を埋める工程の出力） | **underdrawing** | 名詞。LLM が返す閉じた型の設計で、指示書はここから決定的に印字される。浮世絵の絵師の下絵（彫師が版木を彫る元）に倣った名。2026-09-25 に「作品計画」から改名。実装の識別子 `work_plan` と schema ID は変えない | ~~work plan~~（旧称）、~~sketch~~（写生と紛れる）、~~plan~~ 単独（lowerer の symbolic Plan と紛れる） |
 | 指示書（正規化DDL） | **instructions** | **常に複数形**。初出は "Instructions (normalized DDL)" | ~~instruction~~（単数）、~~spec~~ |
 | 楽譜 | **score**（固有表記は **JSON Score**） | 名詞 | — |
 | 演奏 | **performance** / **perform** | 名詞／動詞 | ~~rendering~~（技術文脈のみ） |
@@ -37,7 +42,7 @@
 | 版木・版 | **block** / **state** | 版画の文脈のみ。engine の版数は **engine version** | — |
 | 起点（新規作成） | **origin**（動作は **New**） | 名詞。系譜の根の札も origin | ~~Root~~（graph の語。web の旧表示は 2026-08-17 実測で解消済み） |
 | 読み取り（言葉の読み直し） | **reading** | 名詞 | ~~interpretation~~ |
-| 写生（Stage 0.5） | **Sketch from life** | 名詞句。**短縮形 `Sketch` を単独で使わない**（2026-08-03 作者裁定 D-1）。英語版 Stage 1 プロンプトが `sketch` を weight の語（淡い鉛筆の筆致）に使っており、単独だと一語二義になる | ~~Sketch~~（単独）、~~sketching~~、~~drawing from life~~ |
+| 写生（旧 Stage 0.5） | **Sketch from life** | 名詞句。**短縮形 `Sketch` を単独で使わない**（2026-08-03 作者裁定 D-1）。英語版の型を埋める頼む文（当時の Stage 1 プロンプト）が `sketch` を weight の語（淡い鉛筆の筆致）に使っており、単独だと一語二義になる | ~~Sketch~~（単独）、~~sketching~~、~~drawing from life~~ |
 | 区切りの大きさ | **grain** | 名詞。写生の操作子の見出し語 | ~~granularity~~（工学的）、~~segmentation~~ |
 | 細かく区切る／大きく区切る | **Fine** / **Coarse** | 形容詞。**grain の値としてのみ**。揺らぎの振幅の `fine` / `broad` とは別の軸 | ~~Small / Large~~（量に読める） |
 
@@ -47,10 +52,10 @@
 |---|---|---|---|
 | 演奏する（主動作ボタン） | **Paint** | 動詞・**lint 固定**。API `/api/paint` と一致 | ~~Generate~~、~~Create~~、~~Draw~~（ボタン語として） |
 | 組（図形のまとまり） | **group** / **a group of …** | 複数図形を一つの配置単位として表す名詞句。歳時記チップは追加しない | ~~command block~~（描画命令の入れ子を表す語ではない） |
-| 純粋呼出し（プラグイン語だけの入力） | **pure invocation** | 名詞句。Stage 1 を飛ばして転写する判定の名 | — |
-| 転写・書き下し（プラグイン展開） | **writing-down** / **transcription** | 名詞。宣言的プラグイン文書の決定的展開。転写された instruction は transcribed instruction | ~~expansion~~ 単独（Stage 1.5 の展開と紛れる文脈では避ける） |
-| 解釈フォールバック（Stage 1 が落ちた） | **Interpretation fallback** | 名詞句。**層を名指す**ため作曲側と対で使う | ~~Stage 1 fallback~~（UI で段番号を主語にしない） |
-| 作曲フォールバック（Stage 2 が落ちた） | **Score fallback** | 名詞句。印の文言と生成情報の見出し | ~~Composition fallback~~（`composition` は配置・構図の語で `composition_seed` と紛れる）、~~Stage 2 fallback~~ |
+| 純粋呼出し（プラグイン語だけの入力） | **pure invocation** | 名詞句。指示書を書く工程を飛ばして転写する判定の名 | — |
+| 転写・書き下し（プラグイン展開） | **writing-down** / **transcription** | 名詞。宣言的プラグイン文書の決定的展開。転写された instruction は transcribed instruction | ~~expansion~~ 単独（旧 Stage 1.5 の展開層・中間フィルタと紛れる文脈では避ける） |
+| 解釈フォールバック（指示書を書く工程が落ちた。古い作品の記録） | **Interpretation fallback** | 名詞句。**層を名指す**ため作曲側と対で使う | ~~Stage 1 fallback~~（UI で段番号を主語にしない） |
+| 作曲フォールバック（旧 Stage 2 の作曲が落ちた。古い作品の記録） | **Score fallback** | 名詞句。印の文言と生成情報の見出し | ~~Composition fallback~~（`composition` は配置・構図の語で `composition_seed` と紛れる）、~~Stage 2 fallback~~ |
 | ★ 要求配達（coerce の配達契約） | **request delivery** / **deliver requests** | 固有の保守用語。記述で明示された色・形・個数・主題を Score へ届ける coerce の責務 | ~~preserving explicit requests~~（形が揃わない）。毎回の言い換えはしない |
 | 天井（強制上限） | **ceiling**（強調は **hard ceiling**） | 名詞。coerce の最後に 1 回だけ当たる上限 | ~~cap~~・~~quota~~ |
 | drop-only 優先 | **drop-only preference** | 名詞句。不正値を補正せず落とす設計傾向 | — |
@@ -127,11 +132,11 @@ composition / color catalog と食い違って見える（→ §8）。
 | 素材（歳時記語を開く操作子） | **Materials** | 名詞 | — |
 | プロンプト最適化 | **Instruction optimization** | 名詞句。`prompt` が禁止なので指示書側の語で言い直す | ~~Prompt optimization~~ |
 | 調整（比較 3 面の 1 つ） | **Adjust** | 見出し語。他は Model / Language | — |
-| Stage 1/2 共通（比較モード） | **Stage 1/2 shared** | 名詞句。他は `Stage 1 fixed + Stage 2 compared` / `Stage 1 compared + Stage 2 fixed` | — |
+| （旧）Stage 1/2 共通（比較モード。今の Web の画面には無い） | **Stage 1/2 shared** | 名詞句。他は `Stage 1 fixed + Stage 2 compared` / `Stage 1 compared + Stage 2 fixed` | — |
 | 説明（テンプレートの注記） | **Details** | 名詞。**`Description` は記述に予約** | ~~Description~~ |
 | 履歴の値／現在値を維持 | **The history's value** / **Keep the current value** | 履歴選択の 2 択 | — |
 | （推奨しない） | **(not recommended)** | 括弧付きの付記。**メニューの選択肢の隣にだけ** | ~~deprecated~~（廃止に読める）、~~legacy~~ |
-| オススメ度（モデル評価） | **recommendation** | LLM・Stage 1・Stage 2・Visionそれぞれの5段階の評価。既存モデル詳細の語に合わせる | ~~rating~~（別の尺度に読める） |
+| オススメ度（モデル評価） | **recommendation** | LLM・指示書を書く工程・補完・Visionそれぞれの5段階の評価。既存モデル詳細の語に合わせる | ~~rating~~（別の尺度に読める） |
 | SVG オブジェクト数／SVG 点数 | **SVG objects** / **SVG points** | 生成情報の重さの行。数え方の正本は `$lib/svgWeight` | ~~elements~~・~~nodes~~（DOM の量に読める）、~~vertices~~ |
 | 揺らぎ | **sway** | 名詞 | ~~fluctuation~~（計測器）、~~jitter~~（信号） |
 | 添景 | **staffage** | 名詞。v2.11.0 で軸ごと畳んだ（記録の表示にのみ残る） | ~~decoration~~、~~props~~ |

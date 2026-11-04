@@ -504,6 +504,7 @@ Combine `Thumbnails` with `By lineage` to show lineages with at least two works 
 - Switching between ordinary history and trash
 - Thumbnail view and list view. The list compares ID (a UUID copy button), timestamp, model, elapsed time, and color catalog
 - Move to trash, restore, and permanent delete, singly or by multiple selection
+- `Select all` toggles selection of works on the current page; the adjacent `Clear selection` clears selections across all pages
 - Expanding and selecting a whole lineage at once
 - Syncing to the displayed work and jumping to the oldest or latest page
 - **The words for moving agree everywhere.** On the canvas, the strip and Library alike, left is newer and right is older, and `prev`, `next` and `first` are not used (`← newer` / `older →` / `Latest` / `Oldest`)

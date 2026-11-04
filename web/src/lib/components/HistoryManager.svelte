@@ -120,6 +120,7 @@
 		onSetForShareOnly: (value: boolean) => void;
 		onToggleForRevision: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		onSelectAll: () => void;
+		onClearSelection: () => void;
 		onAskTrash: (ids: string[]) => void;
 		onAskRestore: (ids: string[]) => void;
 		onAskPermanentDelete: (ids: string[]) => void;
@@ -189,6 +190,7 @@
 		onSetForShareOnly,
 		onToggleForRevision,
 		onSelectAll,
+		onClearSelection,
 		onAskTrash,
 		onAskRestore,
 		onAskPermanentDelete,
@@ -932,6 +934,9 @@
 		<div class="history-tool-group">
 			<Tooltip placement="bottom-right" text={t().tooltipHistorySelectAll}>
 				<button class="ghost-btn" onclick={selectAllVisible}>{t().historySelectAll}</button>
+			</Tooltip>
+			<Tooltip placement="bottom-right" text={t().tooltipHistoryClearSelection}>
+				<button class="ghost-btn" onclick={onClearSelection} disabled={selectedHistoryIds.length === 0}>{t().historyClearSelection}</button>
 			</Tooltip>
 			<div class="history-filter-group" role="group" aria-label={t().historyFilterLabel}>
 				<span class="history-filter-label">{t().historyFilterLabel}</span>

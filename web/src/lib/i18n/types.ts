@@ -1407,6 +1407,7 @@ export interface LangPack {
 	historySelectLineage: string;
 	historySelectItem: (selected: boolean) => string;
 	historySelectAll: string;
+	historyClearSelection: string;
 	historyContactSheet: string;
 	historyContactSheetHint: string;
 	historyContactSheetAi: string;
@@ -1446,6 +1447,7 @@ export interface LangPack {
 	tooltipHistoryOldestPage: string;
 	tooltipHistoryClose: string;
 	tooltipHistorySelectAll: string;
+	tooltipHistoryClearSelection: string;
 	tooltipHistoryStarredOnly: string;
 	tooltipHistoryTrashView: string;
 	tooltipHistoryMoveToTrash: string;

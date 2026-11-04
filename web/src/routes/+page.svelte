@@ -3607,6 +3607,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetForShareOnly={historyManager.setForShareOnly}
 			onToggleForRevision={toggleHistoryForRevision}
 			onSelectAll={selectAllManagedHistory}
+			onClearSelection={historyManager.clearSelection}
 			onAskTrash={askTrash}
 			onAskRestore={askRestore}
 			onAskPermanentDelete={askPermanentDelete}

@@ -8,7 +8,7 @@ Settings belong to three boundaries.
 
 1. OS and service: `/etc/inku/inku-api.env`, systemd, reverse proxy, and filesystem permissions
 2. Administrator: provider connections, published models, limits, DB backups, artifacts, log policy, and users
-3. User: one drawing model shared by Stage 1/2, Vision model, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Lift the stroke limit, download folder, and history-selection behavior
+3. User: one drawing model shared by writing the instructions and completion, Vision model, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Lift the stroke limit, download folder, and history-selection behavior
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
@@ -103,14 +103,14 @@ The distributed Compose files put a memory ceiling on the `api` container (`INKU
 | Variable | Purpose | Implementation default |
 |---|---|---|
 | `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Catalog selection / hole completion policy attempt and total seconds | `120` |
-| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | Stage 1 per-attempt ceiling in seconds | `300` |
-| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | Stage 1 total seconds (normalized to at least the attempt ceiling) | `540` |
+| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | Per-attempt ceiling in seconds for the sketch from life, fill the plan, composition reading, laws, colors, writing, review, writing from a picture and picture review (not the color catalog or completion; the variable keeps its earlier `Stage 1` name) | `300` |
+| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | Total seconds for the same sends (normalized to at least the attempt ceiling) | `540` |
 | `INKU_LLM_RETRY_ATTEMPTS` | Maximum policy attempts | `4` |
 | `INKU_LLM_RETRY_BASE_DELAY` | Policy delay between attempts in seconds | `2.0` |
 
 The distributed environment template explicitly sets operational example values. Be aware of the difference between template values and implementation defaults.
 
-Normal pipeline retries follow finite policies. The old `INKU_STAGE1_HARD_TIMEOUT_SECONDS`, `INKU_STAGE2_HARD_TIMEOUT_SECONDS`, and `INKU_SKETCH_HARD_TIMEOUT_SECONDS` do not control them. When policy permits no further attempt, an ordinary Stage 1 failure ends as `Failed` and hole completion failure stops as `NeedsUserEdit`. A non-retryable failure may stop before the budget is spent. A sketch failure proceeding without its supplement, or retaining only an already verified candidate, is a limited fallback, not a promise to replace general failures with a stock successful work.
+Normal pipeline retries follow finite policies. The old `INKU_STAGE1_HARD_TIMEOUT_SECONDS`, `INKU_STAGE2_HARD_TIMEOUT_SECONDS`, and `INKU_SKETCH_HARD_TIMEOUT_SECONDS` do not control them. When policy permits no further attempt, an ordinary failure of writing the instructions (fill the plan, writing) ends as `Failed` and a completion failure stops as `NeedsUserEdit`. A non-retryable failure may stop before the budget is spent. A sketch failure proceeding without its supplement, or retaining only an already verified candidate, is a limited fallback, not a promise to replace general failures with a stock successful work.
 
 #### Changing the pipeline manifest
 
@@ -142,7 +142,7 @@ Explicitly set the additional structural limits in both `pipeline.compiler.hard_
 The `Plugins` settings add and delete vocabulary plugins and show whether each is on and its words (name, aliases, surfaces, notes, example, preview).
 
 - `Add a plugin` accepts an `inku.plugin-package.v2` JSON file or a zip with PNGs (see the [guide](../../PLUGIN.md#51-adding-a-plugin-file-from-the-web)). The Server checks the file's shape, each shared-core definition, and drawings of the Japanese and English examples. Only a fully checked file can be installed. An installed file with the same id can be replaced.
-- Installed words enter new works and the Saijiki, and their notes feed the Stage 1 offer. Saved works replay with their saved definitions after replacement or deletion.
+- Installed words enter new works and the Saijiki, and their notes feed the offer to fill the plan (the underdrawing). Saved works replay with their saved definitions after replacement or deletion.
 - `Replace picture` on a word uploads a PNG the Saijiki shows instead; `Back to the original picture` returns to the zip's picture or the one drawn from the example. Replacing the plugin keeps replaced pictures.
 - `Export` saves a v2 zip with definitions, notes, examples, and current pictures; another Server can add it as it is.
 - An added plugin can be switched off or deleted.
@@ -290,13 +290,13 @@ On a self-hosted server on another host, `Connect with inku ChatGPT` and `Sign i
 
 | Stage | Role |
 |---|---|
-| Stage 0.5 | Optional sketch supplement: retain the description and add place and light in prose |
-| Stage 1 | Interpret the description and optional sketch supplement as instructions (normalized DDL) |
-| Stage 2 | Complete unread portions and holes; wait for author approval when visible DDL must change |
-| compile | Deterministically resolve committed DDL and definitions of namespaced terms, producing Score and resource checks; do not add unstated relations |
+| Sketch from life | Optional: retain the description and add place and light in prose (in `In words`, the reading of the description) |
+| Writing the instructions | `With a plan` fills the plan and passes the composition reading, laws and colors. `In words` writes and reviews (composition, laws and colors by chip). Painting from an image writes from the picture and reviews it |
+| Completion | Complete unread portions and holes; wait for author approval when visible DDL must change |
+| compile | Deterministically resolve committed DDL and definitions of namespaced terms (including the intermediate filter), producing Score and resource checks; do not add unstated relations |
 | Renderer | Perform the Score as SVG |
 
-Old Stage 1.5 / coerce names and values may remain in saved records; that does not mean current generation performs hidden semantic repairs.
+For the order of the stages in each route, see the table at the start of "Creating Images". In earlier documents and saved records, `Stage 0.5` is the sketch from life, `Stage 1` is writing the instructions, `Stage 2` is completion and `Stage 1.5` is the intermediate filter. Old Stage 1.5 / coerce names and values may remain in saved records; that does not mean current generation performs hidden semantic repairs.
 
 The current sketch choices are `Off` / `On`, defaulting to `Off`. On adds place and light alongside the original description rather than replacing it. If sketching fails, the run proceeds without the supplement and records `sketch_state: fallback`. A work painted without it records `off`, and works predating the column hold no value at all. **No value is not `off`.** Old works' `fine` / `coarse` and grain records remain for compatibility and do not control the current sketch. See SPEC for the detailed meaning of each stage.
 
@@ -449,7 +449,7 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 | Painting is refused with 503 | The server concurrency setting. The DB setting is canonical, not the environment variable. Whether one account's render has run past 30 seconds |
 | No administrator can sign in | A forgotten password: `inku-admin reset-password` in 2.2. Local sign-in turned off: 13.1 |
 | A stated count reaches a ceiling | Resource diagnostics, the four limits in §5.1, and the manifest's structural budget; check compatibility settings only for an old Score |
-| The sketch layer seems not to run | The work's `sketch_state`. `fallback` points at the Stage 0.5 timeout and the provider |
+| The sketch layer seems not to run | The work's `sketch_state`. `fallback` points at the sketch-from-life timeout and the provider |
 | Plugin words are not expanded | Rejection reasons from `plugin list`, `INKU_PLUGIN_PACKAGE_DIR`, and enabled state |
 
 ### 13.1 Turning Local Sign-in Back On

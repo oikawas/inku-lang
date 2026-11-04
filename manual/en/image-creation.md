@@ -2,18 +2,23 @@
 
 The Web instructions in this guide use inku v2.15.147 (Build 1223) as their baseline. A description becomes visible instructions, passes through any needed completion and Rust compilation, and is performed from Score.
 
-```text
-description + sketch supplement (Stage 0.5, optional) -> interpretation (Stage 1) -> visible instructions (DDL)
-            -> composition reading -> laws stage and settling -> completion of needed holes (Stage 2) -> Rust compile -> JSON Score -> SVG
-```
+Each route has the model pass these stages in order to make the instructions ([ ] marks a stage that a chip or setting decides):
+
+| Route | Stages, in order |
+|---|---|
+| `In words` (default) | [sketch from life (reading), on by default] → [composition reading, laws] → writing → [review] → [colors] → compile → drawing |
+| `With a plan` | [sketch from life] → fill the plan → composition reading → laws → colors → (when holes remain) completion → compile → drawing |
+| Paint from an Image (§16) | [picture color catalog] → writing from a picture → picture review → compile → drawing |
+
+The review in `In words` runs only when the drawing model can read images. The picture review is skipped when the written instructions cannot be drawn. When the color catalog is set to `From the description`, every route first chooses the color catalog. Plugin writing-down and the Rust compile (including the intermediate filter) use no model; the compile makes JSON Score from the instructions, and that is drawn as SVG. In earlier documents and the records of older works, `Stage 0.5` is the sketch from life, `Stage 1` is the stage that writes the instructions (fill the plan, writing), `Stage 2` is completion and `Stage 1.5` is the intermediate filter.
 
 The description is the work's score; the SVG is one performance. The same description may produce a different work when its models, sketch, composition seed, or render seed change.
 
-You can also paint from an image file instead of a description (v2.15.241). On the `Image` tab a Vision model reads the image, writes the instructions directly, and those instructions are painted. The sketch, interpretation, composition reading, laws stage and color stage are not used. See §16 for the steps.
+You can also paint from an image file instead of a description (v2.15.241). On the `Image` tab a Vision model reads the image, writes the instructions directly, and those instructions are painted. The sketch, fill the plan, composition reading, laws stage and color stage are not used. See §16 for the steps.
 
 In the laws stage after the composition, the model chooses the laws for the work (their number is not fixed) from 19 laws of painting, design and music (the golden section, equal repetition, principal and subordinate, patterns, jo-ha-kyū and others). Only the layers a law changes are rewritten in the instructions, in numbers (`at horizontal 0.381966, vertical 0.381966`, `from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5` and the like). The laws' names do not appear in the instructions. When no law can be laid, the work is settled as the composition left it. After the laws stage comes a color stage, which chooses the work's colors by laws of color (contrast of hue, harmony of analogous colors, masses of light and dark and others, 18 in all), a default since 2026-10-20. It keeps the colors of the layers the description names and a ground color the description names; where the description names none, the color stage may choose the ground's color too. Estimating how the drawing looks, it chooses again a color that would not show from the ground or with which the law would not hold. When no colors can be laid, the work is settled as the laws stage left it. A refinement drawn from a saved work (Change the description, Juxtapose and the like) follows the settings the work was drawn with, so a work saved before the color stage became a default does not take it.
 
-Stage 2 completes holes remaining in the visible instructions; the shared Rust compiler produces JSON Score. Relations come only from the author's instructions or explicit definitions. The old Stage 1.5 and coerce are not layers that invent relations, and the old `Auto-repair` switch is retired. Layer and fallback names retained in older works' provenance describe their historical execution.
+Completion fills holes remaining in the visible instructions; the shared Rust compiler produces JSON Score. Relations come only from the author's instructions or explicit definitions. The old Stage 1.5 (intermediate filter) and coerce are not layers that invent relations, and the old `Auto-repair` switch is retired. Layer and fallback names retained in older works' provenance describe their historical execution.
 
 The vocabulary used in the UI is as follows.
 
@@ -21,8 +26,8 @@ The vocabulary used in the UI is as follows.
 |---|---|
 | description | The poetic input the author writes. The topmost layer of a work |
 | Source note | The image's source or a note, written on the Image tab. Saved with the work and not used for painting |
-| Sketch from life | The Stage 0.5 act of keeping the description and adding prose about place and light |
-| interpretation | The Stage 1 act of reading the description and, when enabled, its sketch supplement into instructions |
+| Sketch from life | The stage that keeps the description and adds prose about place and light. In `In words` it makes the reading of the description |
+| interpretation | Reading the description and, when enabled, its sketch supplement into instructions. Fill the plan does it in `With a plan`; writing and review do it in `In words` |
 | instructions (normalized DDL) | The executable specification interpretation produces |
 | score (JSON Score) | The intermediate form the shared Rust compiler produces from instructions, saved for performance |
 | performance (SVG) | The one-time result of performing the score |
@@ -124,7 +129,7 @@ No layer adds what the description does not ask for. What is written is performe
 
 **Naming a sheet with `Ground:` changes how the mark runs** (v2.13.31). Each of the seven supports carries its own absorbency and tooth, so the same description with the same settings leaves a different mark on washi than on canvas. How much it shows depends on the tool: a pen picks up almost nothing from the sheet. **`Surface: grain` and the sway `bleeding` now stay where they are when they land on a line or an arc** (also v2.13.31; Saijiki v2 moved bleeding from the surfaces to the sways). These two say how the mark runs rather than how an inside is, so they make that one instruction work the sheet harder (up to three times). **`Surface: sweep` stays there too** (v2.13.35; Saijiki v2's word for the retired pale ink wash, which becomes `faint sweep`). A sweep is not about the sheet but about the stroke (a broad sweep of the brush), so instead of working the sheet it **draws that one mark as a broader band** (three times the width, at 0.8 of the tool's opacity); for a paler band, add the handling word `faint`. **Before v2.13.35, a wash named on a line or an arc was drawn nowhere at all.** The other surface words move to the closed shape before them as before, and are dropped where there is none.
 
-**A `free line` is a line whose path between its start and its end the drawing decides** (v2.15.147). Write it as you write a line, as in `Draw one black pen rising free line at center`; angle, place, draw, scatter, and line up work as they do for a line. The path is built from three to seven parts (straight runs, arcs, and free bends), and the tool decides how: tools that draw with a fine point (silverpoint, pencil, pen, etching, computer) use only straight runs and arcs, while tools that draw with a tip or a face (chalk, oil pastel, gouache, watercolor, oil paint, painting knife) use free bends too. The bends turn away from the edges of the paper and from the shapes drawn before it (lines and free lines aside). With no size written, it is 0.55 of the short edge long (about twice a line). One sentence that draws several gives each its own path. **When drawing from a description** (v2.15.149), interpretation (Stage 1) is told to choose a free line only when the description names one, or when what it describes is a line without a set shape, such as a track left behind or a path something took. If no angle is written, the composition reading writes one from how the layer moves (rising → up to the right, falling → down to the right, flowing → level).
+**A `free line` is a line whose path between its start and its end the drawing decides** (v2.15.147). Write it as you write a line, as in `Draw one black pen rising free line at center`; angle, place, draw, scatter, and line up work as they do for a line. The path is built from three to seven parts (straight runs, arcs, and free bends), and the tool decides how: tools that draw with a fine point (silverpoint, pencil, pen, etching, computer) use only straight runs and arcs, while tools that draw with a tip or a face (chalk, oil pastel, gouache, watercolor, oil paint, painting knife) use free bends too. The bends turn away from the edges of the paper and from the shapes drawn before it (lines and free lines aside). With no size written, it is 0.55 of the short edge long (about twice a line). One sentence that draws several gives each its own path. **When drawing from a description** (v2.15.149), the fill-the-plan stage of `With a plan` is told to choose a free line only when the description names one, or when what it describes is a line without a set shape, such as a track left behind or a path something took. If no angle is written, the composition reading writes one from how the layer moves (rising → up to the right, falling → down to the right, flowing → level).
 
 An explicit count is retained in the meaning of the instructions. The current drawing budget does not silently substitute a representative count. If a single primitive exceeds the budget, the permitted prefix is drawn and diagnostics report the requested and performed counts. Older count rewriting and representation belong to saved-format compatibility. See [Server configuration](server-configuration.md) for details.
 
@@ -132,7 +137,7 @@ A written size is treated the same way. A sentence that states a size, such as "
 
 Leading serial numbers and bracketed annotations belong to the writer, not to the drawing. If nothing but numbers and annotations remains, painting reports that there is nothing left to draw.
 
-## 4. Sketch from Life (Stage 0.5)
+## 4. Sketch from Life
 
 `Sketch from life` keeps the original description and adds prose about place and light for interpretation. Choose it from `Sketch from life` in the button row of the describe tab.
 
@@ -143,11 +148,11 @@ Leading serial numbers and bracketed annotations belong to the writer, not to th
 
 `Fine` and `Coarse` on older works record the sketch method used at the time. They are no longer current choices.
 
-After painting, the result appears under `Sketch from life (Stage 0.5)` on the left and can be edited there. Drawing again with the same description and the sketch on sends the edited sketch to interpretation as a supplement. Changing the description generates a new sketch; switching the sketch off omits the supplement.
+After painting, the result appears under `Sketch from life` on the left and can be edited there. Drawing again with the same description and the sketch on sends the edited sketch to interpretation as a supplement. Changing the description generates a new sketch; switching the sketch off omits the supplement.
 
 If the layer does not answer, the description goes to interpretation unchanged and the work records that. A work painted with the layer off carries the same kind of record.
 
-`Sketch from life (Stage 0.5)` folds from the triangle in its heading. This state is saved on the account and starts open. The instructions box stays visible. Folding numeric ranges within its editor is separate from collapsing the whole box.
+`Sketch from life` folds from the triangle in its heading. This state is saved on the account and starts open. The instructions box stays visible. Folding numeric ranges within its editor is separate from collapsing the whole box.
 
 ### The Drawing and the Steps It Passes (With a Plan, In Words)
 
@@ -157,7 +162,7 @@ If the layer does not answer, the description goes to interpretation unchanged a
 |---|---|
 | Drawing | `In words` (the default, which starts with the sketch lit) or `With a plan`. In words, the model writes the instructions itself and corrects them once beside the drawing. With a plan, the model fills the fields of a fixed plan and the program writes the instructions from it |
 | Steps | The chips `Sketch from life` and `Composition, laws, colors`. A press lights one (passed); another press turns it off. Their names and hints are the same on both drawings. The colors come with the composition and laws and cannot be left out alone. With a plan always passes all three, so that chip stays lit with a lock |
-| Flow | The steps the current choices pass, in their order, on one line, such as `Description › Sketch › Composition and laws › Write in words › Look and correct › Colors › Picture`. A step a chip added is colored |
+| Flow | The steps the current choices pass, in their order, on one line, such as `Description › Sketch › Composition and laws › Writing › Review › Colors › Picture`. A step a chip added is colored |
 
 With a plan passes the sketch (when lit), the plan, then the composition reading, the laws stage and the color stage. The rest of this section is about In words. With `In words`, the model reads the description from the speaker's eye, writes what that eye sees as instructions, and corrects them once beside their drawing before the work is made. When writing and correcting, the model is given what mark each texture word in the Saijiki makes, and writes one tool word (pen, watercolor, gouache, chalk and so on) in each sentence that draws a shape (from 2026-11-04; a sentence drawn with a pen also says `pen`). The composition reading, the laws stage and the color stage of With a plan are not passed through. The work stays a description's work and can be drawn again from its description or an edited reading. Editing it in the DDL tab holds its description, as it does for any work.
 
@@ -200,13 +205,13 @@ Plugin words appear in the same row and wear the same face as built-in ones. The
 
 To write instructions yourself, see the [DDL Syntax and Vocabulary Reference](./ddl-reference.md). It covers grammar principles, available words, numeric and relation syntax, and 50 complex examples.
 
-After painting, the instructions section on the left shows how Stage 1 read the input.
+After painting, the instructions section on the left shows how the model read the input and wrote it as instructions.
 
 - description: the words a human wrote
-- Sketch from life (Stage 0.5): prose supplementing the description with place and light (older works retain their original sketch)
+- Sketch from life: prose supplementing the description with place and light; in `In words`, the reading of the description (older works retain their original sketch)
 - instructions (normalized DDL): drawing instructions arranged into the core vocabulary
-- Expanded (Stage 2 input): the DDL Stage 2 actually received, after plugin expansion and the expansion layer filled in
-- JSON Score: the machine-readable score Stage 2 writes
+- writing-down: writing plugin words out into the core vocabulary. It uses no model and runs inside the compile
+- JSON Score: the machine-readable score the Rust compile makes from the instructions
 - Work: the SVG the renderer performs
 
 The headings of the instructions section on the left and of the instructions editor name the language the instructions are read in: `Instructions (Japanese DDL)` or `Instructions (English DDL)`. The editor judges it again from the text being written. Numeric ranges and the like are written differently in Japanese and English, and the instructions are read with that language's grammar. A single hiragana, katakana, or kanji character makes them Japanese DDL, so one Japanese name in English instructions has them read as Japanese.
@@ -224,7 +229,7 @@ There are two entrances to the instruction dialog. Both use the same dialog and 
 | New instructions | Open it from the Describe side. Write instructions directly, without a description, and paint them as an independent work |
 | Instruction editor | Open it beside the displayed work's instructions heading or from the work editing menu. Edit the text and repaint it as that work's child |
 
-`Draw from instructions` sends the displayed instructions to Stage 2 unchanged. Stage 1 does not run, so the interpretation does not change.
+`Draw from instructions` compiles the displayed instructions unchanged and draws them again (passing completion when holes remain). The stage that writes the instructions (fill the plan, writing) does not run, so the interpretation does not change.
 
 On Web and Android, when instruction completion stops, `Gaps that could not be completed` shows the author's original text and a plain reason for each gap. The approval screen also shows these when a proposal leaves some gaps uncompleted. Gaps that passed are not listed. A context that is too long gets an explanation; an unknown reason reads `Refused by the check (code).` While the model is asked again with the reasons its proposal was refused, the running line reads, for example, `Asking again with the reasons the proposal was refused (2/4)`. A communication retry continues to read `Retrying`.
 
@@ -275,13 +280,13 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 
 | Control | Contents |
 |---|---|
-| Model | The drawing model used for both Stage 1 and Stage 2 |
+| Model | The drawing model used for every stage that writes the instructions and for completion |
 | Color catalog | The catalog that maps abstract color names such as `red`, `blue`, and `gray` onto actual colors |
-| Sketch from life | The grain for Stage 0.5, described in §4 |
+| Sketch from life | Whether the sketch from life runs, described in §4 |
 | Lift the stroke limit | Removes the stroke limit |
 | Canvas | The aspect ratio |
 
-Drawing uses the same model for Stage 1 and Stage 2. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately. The Image tab (§16) paints with this Vision model.
+The drawing model is used for every stage that writes the instructions and for completion. Models measured separately for writing the instructions and for completion are ordered by the lower of the two ratings. The model for Vision, which reads images, is chosen separately. The Image tab (§16) paints with this Vision model.
 
 The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. The choice is saved per user. On the Image tab the same choice reads `Choose from image automatically`, and the model reads the image to choose the catalog.
 
@@ -307,7 +312,7 @@ There are eleven canvases.
 
 Coordinates stay normalized to 0.0–1.0 whatever the canvas. **A mark's size is measured against the canvas's short edge, so the same description draws the same shape on any ratio** (an ellipse written wide stays wide on the pillar canvas). **The shape an arrangement makes follows the same measure** -- a ring laid out radially is drawn as round on every ratio, and a region stated as a square is treated as a square. **So does the shape of one clump when marks are scattered in clusters, and the swing of a path (wave, diagonal, top to bottom).** Placement, a region's centre, and a cluster's centre still spread with the ratio, and **so does how far along the paper a path travels**. The canvas ratio is a system plugin, so if an administrator disables it only the square remains.
 
-**From v2.13.14 the canvas you choose also reaches the stage that builds the composition (Stage 2).** The composition is told which paper it is for, so the same description is laid out differently on a pillar than on a folding screen. **Only size and placement move with the paper** -- a number the description states is drawn as stated, and a size the description states is not changed to suit the paper.
+**The canvas you choose also reaches the stage that writes the instructions (fill the plan, writing)** (from v2.13.14). The composition is told which paper it is for, so the same description is laid out differently on a pillar than on a folding screen. **Only size and placement move with the paper** -- a number the description states is drawn as stated, and a size the description states is not changed to suit the paper.
 
 **From DDL 26 an instruction set begins with the declaration of the paper's ratio it was drawn for** (`Aspect ratio 16:9.` and the like; Japanese `画面比16:9。`). Only a new instruction set gets one: one drawn from a description and one newly written in DDL. Editing an instruction set or redrawing a saved work adds none. The declaration records the ratio the composition was laid out in and does not bind the paper. See [DDL reference 3.27](ddl-reference.md#327-aspect-ratio-declare-the-ratio-the-ddl-was-laid-out-in) for how it is written.
 
@@ -383,7 +388,7 @@ Choosing, saving, and discarding options work as in 8.2.
 Choosing `Juxtapose` (marked `LLM`) under `Redraw from the description` in the work-editing menu opens a dialog that adds a sentence from another work's description after this one. Opening it draws nothing.
 
 1. Choose the Vision model that picks the sentences (by default the account's Vision model) and press `Pick sentences`. From the first sentences of the descriptions of your other works, the AI picks four. Each is shown as its `Sentence` and its `Reason`, one sentence on how adding it moves the idea of the work.
-2. Once the four are shown, `Pick again` and `Draw with this description` take the place of `Pick sentences`. Choosing one shows `The description with the sentence`. `Draw with this description` draws a child of the selected work from Stage 1 and saves it to the lineage, as `Change the description` does. The color catalog, canvas and seeds come from the original work; choose `Lift the stroke limit` in this dialog.
+2. Once the four are shown, `Pick again` and `Draw with this description` take the place of `Pick sentences`. Choosing one shows `The description with the sentence`. `Draw with this description` draws a child of the selected work from the stage that writes the instructions and saves it to the lineage, as `Change the description` does. The color catalog, canvas and seeds come from the original work; choose `Lift the stroke limit` in this dialog.
 3. If none fits, press `Pick again`. The sentences shown earlier in this dialog are left out and four are picked again.
 
 Only the descriptions of works you own are candidates; shared works and other people's works are never read. Works in the trash, DDL-authored works, works whose comment says `test data`, and works whose description is held are not used either. Sentences that differ only in spacing or spelling count once. A sentence matching the description of this work or of its lineage, and one this lineage already added by a juxtaposition, is not offered. At most the administrator's `Most sentences to choose from` (in `Other (server)` of Settings, 400 by default) go to the AI; when there are more candidates, each request draws that many at random from all of them.
@@ -416,7 +421,7 @@ Every drawn child enters the history, including those that did not pass the gate
 
 ## 10. Change the Model
 
-Choose `Change the model` from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab) and a dialog of its own opens. Pick the models from those laid out across the top and press `Draw with the chosen models`: each chosen model redraws the work from its description, and the options are laid out side by side. Each chosen model runs both Stage 1 and Stage 2; neither stage is held fixed. The color catalog and the canvas are the target work's.
+Choose `Change the model` from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab) and a dialog of its own opens. Pick the models from those laid out across the top and press `Draw with the chosen models`: each chosen model redraws the work from its description, and the options are laid out side by side. Each chosen model runs every stage that writes the instructions and completion; no stage is held to a fixed model. The color catalog and the canvas are the target work's.
 
 At most four models can be chosen. A model used by the target work cannot be chosen; when an old work used different models for its two stages, neither can be chosen. Old works' records remain unchanged.
 
@@ -433,8 +438,8 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 | Section | Main contents |
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
-| Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation fallback and Score fallback records |
-| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Lift the stroke limit, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
+| Writing the instructions | instructions model, instructions language, requested language, interpretation fallback and Score fallback records |
+| Performance | completion model, completion language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Lift the stroke limit, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
 | Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, the work's Score version, transform layer, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
@@ -455,7 +460,7 @@ Under each stage's system prompt appears its `Prompt digest`, a fingerprint of w
 
 New automatic choices from a description show the color reading before the catalog choice, with the text sent to each. Earlier works show only the stages they recorded.
 
-Ordinary Stage 1 generation stops as a failure if its finite retries cannot succeed. Uncompleted holes in the instructions wait for the author's edits; neither case saves a stock replacement as a successful work. Limited fallbacks, such as using the original description after a sketch failure, are separate.
+The stage that writes the instructions stops as a failure if its finite retries cannot succeed. Uncompleted holes in the instructions wait for the author's edits; neither case saves a stock replacement as a successful work. Limited fallbacks, such as using the original description after a sketch failure, are separate.
 
 `Interpretation fallback` and `Score fallback` retained on old works describe their historical execution. `No record` does not mean no fallback occurred.
 
@@ -500,7 +505,7 @@ Combine `Thumbnails` with `By lineage` to show lineages with at least two works 
 
 **What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to three** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A fourth choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 
-- Search descriptions, DDL, Stage 1/2 models, color catalogs, whole hashes, hash beginnings or last four characters, and whole work IDs (UUIDs) or their beginnings. Find the UUID under `Identity` in Provenance. Searches are case-insensitive
+- Search descriptions, DDL, instructions and completion models, color catalogs, whole hashes, hash beginnings or last four characters, and whole work IDs (UUIDs) or their beginnings. Find the UUID under `Identity` in Provenance. Searches are case-insensitive
 - The `#` buttons copy the work's UUID (so does the `#` at the bottom right of the canvas). The `ID` row of the preview shows the UUID's first eight characters. To name a work to an AI or to inku-cli, pass this UUID rather than a hash: a hash can coincide with another work of the same drawing, and it is rewritten when the hash scheme changes
 - The `Starred`, `Revision`, and `Shared` filters. Used together, only works matching every one of them remain
 - Switching between ordinary history and trash
@@ -603,7 +608,7 @@ From Library the order is oldest to newest; from the lineage it runs from the or
 
 ## 16. Paint from an Image
 
-On the `Image` tab you paint from an image file instead of a description (v2.15.241). A Vision model reads the image and writes instructions directly, and those instructions are painted. As with `In words`, it writes one tool word in each sentence that draws a shape (from 2026-11-04). The sketch, interpretation, composition reading, laws stage and color stage are not used.
+On the `Image` tab you paint from an image file instead of a description (v2.15.241). A Vision model reads the image and writes instructions directly, and those instructions are painted. As with `In words`, it writes one tool word in each sentence that draws a shape (from 2026-11-04). The sketch, fill the plan, composition reading, laws stage and color stage are not used.
 
 1. Open the `Image` tab (to the right of `Describe` among the input tabs).
 2. If you like, write the image's source or a note in `Source note`. It is saved with the work and is not used for painting. Choosing an image fills the source note with the file name and the shooting facts from the photo's Exif (time taken, camera, lens, exposure). The location (GPS) is never included. You can edit the note before painting, and a note you have typed yourself is kept. What goes in is chosen in `Settings` under `Image`, with the `Put the file name in the source note` and `Put the Exif in the source note` checkboxes (both on by default, kept in this browser).
@@ -680,7 +685,7 @@ A browser cannot read a folder from a typed path, and cannot open a picked folde
 
 Open `Settings` → `Making` → `Demo`. It writes short descriptions from a seed phrase, then paints them repeatedly. Choose saving to DB, saving files, the description model, display interval in seconds, and timeout in minutes.
 
-Choose one drawing model for both Stage 1 and Stage 2, separately from the description model. ChatGPT plans cannot generate demo descriptions. The interval runs from the start of one description generation to the next. Generation and drawing time are subtracted: a 30-second setting with 20 seconds of work leaves about 10 seconds to wait. Work taking longer than the interval leaves no wait; no new work starts after the stop deadline.
+Choose one drawing model for writing the instructions and for completion, separately from the description model. ChatGPT plans cannot generate demo descriptions. The interval runs from the start of one description generation to the next. Generation and drawing time are subtracted: a 30-second setting with 20 seconds of work leaves about 10 seconds to wait. Work taking longer than the interval leaves no wait; no new work starts after the stop deadline.
 
 Starting Demo closes Settings so you can watch the canvas. While it runs, the making screen shows a stop control and `Demo settings and progress`, which reopens its settings. Description and Batch text are retained.
 
@@ -702,7 +707,7 @@ Open it from `Settings` in the app rail. Settings are grouped as `Display and op
 
 To choose one drawing model for both stages, open `Model selection` from the making screen's conditions and select it. Choose the image-reading model separately from the Image tab when needed. When opened from Settings, use the `LLM` and `Vision` tabs. Ordinary model selection omits providers with no candidates. If a normal provider's selected model disappears, selection moves to the first available candidate, or keeps the original ID if none exists. Personal ChatGPT does not switch to another model automatically and explains why it is unavailable. The generic pickers in Demo and the Instruction editor instead show empty-list guidance and mark an absent selected ID `Not in the list`.
 
-The stars at the edge of each drawing-model button summarize its rating. Ordinary Stage 1/2 selection uses the lower available stage rating, or the LLM rating for an end-to-end measurement. Its detailed hover can show the strengths of each measured stage. Generic pickers show a single rating for the purpose in both button and hover; they do not select models per stage. Hover also shows `LLM` and `Vision` badges (greyed where unavailable), three recommendation tiers (★★★, ★★☆, ★☆☆), approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model), and speed (measured mean seconds when present, otherwise the speed label).
+The stars at the edge of each drawing-model button summarize its rating. Ordinary drawing-model selection uses the lower of the available ratings for writing the instructions and for completion, or the LLM rating for an end-to-end measurement. Its detailed hover can show the strengths of each separately measured stage. Generic pickers show a single rating for the purpose in both button and hover; they do not select a model per stage. Hover also shows `LLM` and `Vision` badges (greyed where unavailable), three recommendation tiers (★★★, ★★☆, ★☆☆), approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model), and speed (measured mean seconds when present, otherwise the speed label).
 
 Administrators' `Models` settings manage shared connections and publication. Where personal ChatGPT is enabled, connect through the separate `ChatGPT plan` page and publish models in your personal `Models` settings, independently of API key connections. Published ChatGPT plan models become drawing candidates for LLM use, and Vision refinement, colophon and Image tab candidates for Vision use. See the [ChatGPT plan connection guide](../../docs/guide/chatgpt-plan.md).
 

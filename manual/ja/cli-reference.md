@@ -18,14 +18,14 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 |---|---|
 | login / logout / me | セッションの開始、破棄、本人確認 |
 | activity | 実行中の描画、登録されたバッチ、自動推敲を確認。管理者は `--all` で全利用者と描画枠も表示 |
-| models | CLI既定の描画モデル（Stage 1/2共通）・Visionモデルと色カタログの設定 |
+| models | CLI既定の描画モデル（指示書を書く工程と補完に共通）・Visionモデルと色カタログの設定 |
 | paint / batch | 記述または指示書から単体・一括描画 |
 | refine | 既存作品から要素（構図・色）を推敲し派生を生成・保存 |
 | lineage | 作品の系譜（親・子・兄弟）ツリーの探索表示、中間ノードの昇格 |
 | colophon | 起点から対象作品までの一本の枝を、追記専用の読みとして朗読 |
 | inspect | 同一記述に対する複数モデルの解釈・描画を順に実行して比較 |
 | review | Vision による視覚的評価、および未読語フィードバック |
-| render-score | Stage 1 / 2を通さずScore JSONを描画 |
+| render-score | モデルを通さずScore JSONを描画 |
 | replay | 保存済み作品を現行engineで描き直して保存済みSVGと比較し、必要なら子として保存（Webの`再演`） |
 | render-local | 指定checkoutのcoreでScoreをoffline描画・比較。サーバー接続・DB保存なし |
 | demo-instruction | デモ用記述の生成 |
@@ -71,7 +71,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--prefix P` | 出力ファイル名の接頭辞 |
 | `--png` | `--out-dir` を指定したとき、PNGも書き出す |
 | `--svg-profile {display,editable,compat,live}` | 保存するSVGのプロファイル |
-| `--input-mode {paint,ddl}` | `paint` は記述をStage 1へ、`ddl` は可視DDLからcompile・必要な穴補完と演奏へ進む。各段の意味はSPECを参照 |
+| `--input-mode {paint,ddl}` | `paint` は記述から指示書を書く工程へ、`ddl` は可視DDLからcompile・必要な補完と演奏へ進む。各工程の意味はSPEC §12を参照 |
 | `--ddl-text DDL` | **`render-score` 専用。**指示書をprovenance・hash metadataとして送る。DDLに基づく本数・関係の自動補修は行わない |
 | `--ddl-file PATH` | **`render-score` 専用。**指示書をファイルから読む。`-` は標準入力。`--ddl-text` とは併用できない |
 | `--save-history` | 描いた絵を作品としてサーバーの履歴のDBへ追加する。付けなければ作品は保存されず、ただし描画は生成回数に数えられます（`--image` も同じ）。 |
@@ -95,13 +95,13 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 uv run inku-cli paint --image photo.jpg --provenance "2026年10月 京都・鴨川で撮影" --vision-model chatgpt:gpt-6-luna --save-history -o ./out --png
 ```
 
-### 写生（Stage 0.5）
+### 写生
 
 | 旗 | 内容 |
 |---|---|
 | `--sketch` | 写生を有効にし、元の記述を残して場所と光を補って解釈へ渡す。サーバー・Web UIとも既定はなし（off）。現行選択はなし／あり（off/on） |
 | `--sketch-grain {fine,coarse}` | 旧作品との互換用の旗。現行写生には使わない |
-| `--sketch-text TEXT` | Stage 0.5を呼ばず、この写生文を使う（保存済みまたは手で直した写生の再演） |
+| `--sketch-text TEXT` | 写生を頼まず、この写生文を使う（保存済みまたは手で直した写生の再演） |
 | `--route {stages,read_and_draw}` | 描き方。`stages`（Web の「型で描く」。既定）か `read_and_draw`（Web の「言葉で描く」。記述を語り手の目から読み、DDL に書き、描いた画を見て一度直す）。`read_and_draw` では `--sketch` が読みを通し、`--sketch-text` は直した読みになる |
 | `--composition {off,on}` | `--route read_and_draw` のときだけ。`on` は記述（と読み）から先に構図と法則を決め、それに向けて指示書を書き、測って合わせ、直し、確定の前に配色を選ぶ。`off`（既定）は構図と法則を通さずに書く |
 

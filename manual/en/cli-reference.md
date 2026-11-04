@@ -18,14 +18,14 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 |---|---|
 | login / logout / me | Start, discard, and inspect a session |
 | activity | Inspect live drawings, registered batches and autonomous refinement; administrators may use `--all` for all users and render slots |
-| models | Configure the default drawing model (shared Stage 1/2), Vision model and color catalog |
+| models | Configure the default drawing model (shared by writing the instructions and completion), Vision model and color catalog |
 | paint / batch | Paint one or many works from descriptions or instructions |
 | refine | Refine an existing work's composition or color |
 | lineage | Inspect lineage node trees |
 | colophon | Recite one origin-to-target lineage branch as an append-only reading |
 | inspect | Inspect and compare multiple inference models, one after another |
 | review | Evaluate works with Vision and submit unread words |
-| render-score | Render Score JSON without Stage 1 or Stage 2 |
+| render-score | Render Score JSON without any model |
 | replay | Draw a saved work again with the current engine, compare it with the saved SVG, and optionally save it as a child (the web's `Replay`) |
 | render-local | Render and compare Score offline with a chosen checkout's core; no server connection or DB save |
 | demo-instruction | Write a demo description |
@@ -71,7 +71,7 @@ For limits they record the values used in `render_limits` and their origin in `r
 | `--prefix P` | Output filename prefix |
 | `--png` | Also write PNG when `--out-dir` is set |
 | `--svg-profile {display,editable,compat,live}` | SVG profile for saved files |
-| `--input-mode {paint,ddl}` | `paint` sends the description through Stage 1; `ddl` starts from visible DDL and proceeds to compilation, any required hole completion, and performance. See SPEC for each stage's meaning |
+| `--input-mode {paint,ddl}` | `paint` sends the description to the stages that write the instructions; `ddl` starts from visible DDL and proceeds to compilation, any required completion, and performance. See SPEC §12 for each stage's meaning |
 | `--ddl-text DDL` | **`render-score` only.** Sends the instructions as provenance / hash metadata; it does not automatically repair counts or relations from DDL |
 | `--ddl-file PATH` | **`render-score` only.** Reads the instructions from a file; `-` means stdin. Cannot be combined with `--ddl-text` |
 | `--save-history` | Add the drawing to the server's history database as a work. Without it no work is saved, though the drawing still counts toward the generation count. This holds for `--image` too |
@@ -95,13 +95,13 @@ With `--image`, the description, `--input-mode`, the sketch flags, `--wild`, `--
 uv run inku-cli paint --image photo.jpg --provenance "Taken by the Kamo River, Kyoto, October 2026" --vision-model chatgpt:gpt-6-luna --save-history -o ./out --png
 ```
 
-### Sketch from life (Stage 0.5)
+### Sketch from life
 
 | Flag | Contents |
 |---|---|
 | `--sketch` | Enable a sketch that adds place and light alongside the original description for interpretation. Both server and Web UI default to off. Current choices are off/on |
 | `--sketch-grain {fine,coarse}` | Compatibility flag for old works; unused by the current sketch |
-| `--sketch-text TEXT` | Use this sketch text instead of calling Stage 0.5, replaying a saved or hand-edited sketch |
+| `--sketch-text TEXT` | Use this sketch text instead of asking for a sketch from life, replaying a saved or hand-edited sketch |
 | `--route {stages,read_and_draw}` | How the description is drawn: `stages` (the current stages, the default) or `read_and_draw` (read from the speaker's eye, written as DDL and corrected once beside its drawing). With read and draw, `--sketch` passes through the reading and `--sketch-text` is an edited reading |
 | `--composition {off,on}` | With `--route read_and_draw` only: `on` first decides a composition and laws from the description (and its reading), then writes, measures, and corrects the DDL toward them, and chooses its colors before the commit; `off` (the default) draws read and draw as before |
 

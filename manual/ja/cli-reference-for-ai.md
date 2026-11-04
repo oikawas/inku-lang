@@ -38,7 +38,7 @@ uv run inku-cli me
 ```sh
 uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。" --stage1-model chatgpt:gpt-6-luna -o ./test_output --png --save-history
 ```
-`--stage1-model`はStage 1/2共通のモデルを指定します。Secondaryを試すときは`gemini:gemma-4-31b-it`を明示します。省略してサーバーや保存済みCLI設定の既定へ委ねません。
+`--stage1-model`は描画モデル（指示書を書く工程と補完に共通。引数の名は以前の`Stage 1`の名のまま）を指定します。Secondaryを試すときは`gemini:gemma-4-31b-it`を明示します。省略してサーバーや保存済みCLI設定の既定へ委ねません。
 
 * **期待される出力 (JSON)**:
   生成された作品のメタデータを含む JSON オブジェクト。
@@ -55,7 +55,7 @@ uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。
 uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **パラメータ `--kind` の選択基準**:
-  * `layout`: 線の位置や大きさを再構築したいとき。新しい `composition_seed` を置き、Stage 2が再配置する
+  * `layout`: 線の位置や大きさを再構築したいとき。新しい `composition_seed` を置き、指示書の数で書いた範囲と角度を選び直す（モデルを使わない。指示書に穴が残るときだけ補完を通る）
   * `color`: 他の色カタログを適用したいとき（LLM呼び出しなし）
 * **期待される出力**: `-o`を省くと派生作品のメタデータを JSON で表示します。`-o DIR` を付けると DIR に `refine-<kind>-<render_hash_short>.json` と `.svg`（`--png` を付けると `.png` も）を書き、JSON の代わりに `Saved:` の行を表示します。
 
@@ -134,7 +134,7 @@ uv run inku-cli paint "TEXT" --stage1-model chatgpt:gpt-6-luna --sketch --catalo
 
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
-  * 同一の入力テキストに対して、指定した複数の LLM モデルを順に（並行ではなく）実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。各モデルをStage 1とStage 2の両方に使います。
+  * 同一の入力テキストに対して、指定した複数の LLM モデルを順に（並行ではなく）実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。各モデルを、指示書を書く工程と補完の全てに使います。
   * どの LLM モデルが最も表現力に富む出力を生み出せるかを AI が検証・比較する際に使用します。
   * 今後の比較対象は`--models chatgpt:gpt-6-luna,gemini:gemma-4-31b-it`です。NIMは含めません。
 
@@ -142,4 +142,4 @@ uv run inku-cli paint "TEXT" --stage1-model chatgpt:gpt-6-luna --sketch --catalo
 * **`review evaluate <PNG_FILE> [--model M] [--prompt P]`**
   * NIM専用の製品機能を説明する項目です。今後のテスト・比較・Vision評価には使いません。
 * **`review unread <WORD> --context <CONTEXT>`**
-  * Stage 1 (解釈) で AI が自信を持って読み取れなかった語彙（未読語）を、サーバーの未読語フィードバック台帳へ直接登録します。
+  * 指示書を書く工程（解釈）で AI が自信を持って読み取れなかった語彙（未読語）を、サーバーの未読語フィードバック台帳へ直接登録します。

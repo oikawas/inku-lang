@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Docs: rewrite the README in English and Japanese, with a key visual, examples of changing the model, changing the tools and line-by-line animation, the drawing modes, getting started and the current status. The Japanese input hint on Web, Android and macOS now reads "短い文で、表現したいものを入力。" ("in a short sentence").
+
 - macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.

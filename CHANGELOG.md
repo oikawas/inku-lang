@@ -8,12 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Render engine 100 reduces the width-field direction's wobble in oil-fill bristle and mixed-color streaks before stretching.
-
-- Web: keep drawing choices per input tab and show the work's recorded choices above the canvas. Per-user defaults, new work and batch resume use the same choices.
-
-- Server: record drawing choices with each work and return them in history; save per-tab drawing defaults in user settings. Unrecorded choices on older works remain unknown.
-
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.
@@ -598,6 +592,14 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.316 (2026-11-04 / Build 1392)
+
+- Render engine 100 reduces the width-field direction's wobble in oil-fill bristle and mixed-color streaks before stretching.
+
+- Web: keep drawing choices per input tab and show the work's recorded choices above the canvas. Per-user defaults, new work and batch resume use the same choices.
+
+- Server: record drawing choices with each work and return them in history; save per-tab drawing defaults in user settings. Unrecorded choices on older works remain unknown.
 
 ## v2.15.315 (2026-11-04 / Build 1391)
 

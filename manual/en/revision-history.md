@@ -2,6 +2,13 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-04 — Tool words, words not kept as written, and the language of image instructions (v2.15.314 / Build 1390)
+
+- Sections 4 (`In words`) and 16 (Paint from an Image) of "Creating Images", in Japanese and English, now say that the model writes one tool word in each sentence that draws a shape (I-728).
+- After the completion paragraph in section 6 of the same document, a paragraph describes `Words not kept as written`, shown at the approval of a completion proposal (I-695; Web, macOS and Android).
+- Instructions written from an image now follow the requested language or the UI language instead of always Japanese, so section 16 and `--image` in the "CLI Reference" were rewritten (Server, Web, CLI and macOS).
+- Render engine 99 (how a shallow arc's extent is measured) changes no manual text.
+
 ## 2026-10-27 — The chunk move's check before drawing
 
 The chunk move now checks the instructions a move made before drawing them and asks again naming the lines that would not be drawn, so the paragraph on checks in section 9 of "Creating Images" gains a sentence, in Japanese and English.

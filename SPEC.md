@@ -4538,6 +4538,8 @@ The web app includes authentication, permission groups, the visibility scope of 
 and its sharing, sessions, per-user settings, user profile editing, and user management.
 Passwords are stored as salted PBKDF2-SHA256 hashes.
 
+Password changes through the Web and API require the target account's current password, except when an administrator resets another user's password. The server's `inku-admin reset-password` remains available for recovery when sign-in is impossible.
+
 **Permission groups (v2.12.0).**  What a member may do is decided by the permission
 groups they hold.  The groups are **fixed at three — `admins`, `leaders`, and `users`** —
 and members cannot create more: the demand for more is really per-work sharing, which
@@ -4639,8 +4641,8 @@ dialog can update the user's email address and password through
 `PATCH /api/auth/me/profile`.  Password changes require the current password,
 and the endpoint is separate from admin user-management APIs.
 **Setting a password again ends the account's other sessions (2026-09-26).**  A
-reset by an administrator or by `inku-admin reset-password` ends every session;
-the account's own change ends every session but the one that made it — a reset
+change through the user-management API or `inku-admin reset-password` ends every session;
+a change through the profile ends every session but the one that made it — a reset
 is how someone who learned the old password is locked out, and a session they
 made with it would outlive it.
 

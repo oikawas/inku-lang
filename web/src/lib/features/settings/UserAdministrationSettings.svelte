@@ -56,6 +56,7 @@
 	let editUserName = $state('');
 	let editUserEmail = $state('');
 	let editUserPassword = $state('');
+	let editUserCurrentPassword = $state('');
 	let editUserPermissionGroups = $state<PermissionGroup[]>(['users']);
 	let editUserGroupId = $state('');
 	let newGroupName = $state('');
@@ -96,6 +97,7 @@
 		editUserName = user.username;
 		editUserEmail = user.email;
 		editUserPassword = '';
+		editUserCurrentPassword = '';
 		editUserPermissionGroups = [...user.permission_groups];
 		editUserGroupId = user.group_id ?? '';
 		editUserInitialDraft = editUserSignature();
@@ -106,6 +108,7 @@
 		editUserName = '';
 		editUserEmail = '';
 		editUserPassword = '';
+		editUserCurrentPassword = '';
 		editUserPermissionGroups = ['users'];
 		editUserGroupId = '';
 		editUserInitialDraft = '';
@@ -123,6 +126,7 @@
 	const administrationDirty = $derived(editUserDirty || (showAddUser && newUserDirty));
 	const userBusy = $derived(userSettingsLoading || userMutationPending);
 	const selectedUser = $derived(users.find((user) => user.id === selectedUserId) ?? null);
+	const requiresCurrentPassword = $derived(!isAdmin || selectedUserId === currentUser?.id);
 	const filteredUsers = $derived.by(() => {
 		const query = userSearch.trim().toLowerCase();
 		return users.filter((user) => {
@@ -185,7 +189,10 @@
 			permission_groups: editUserPermissionGroups,
 			group_id: editUserGroupId || null
 		};
-		if (editUserPassword) input.password = editUserPassword;
+		if (editUserPassword) {
+			input.password = editUserPassword;
+			if (requiresCurrentPassword) input.current_password = editUserCurrentPassword;
+		}
 		userMutationPending = true;
 		try {
 			if (await administration.updateUser(selectedUserId, input)) {
@@ -363,6 +370,10 @@
 						<span>{t().userNewPasswordPlaceholder}</span>
 						<input bind:value={editUserPassword} type="password" autocomplete="new-password" />
 						</label>
+						{#if requiresCurrentPassword && editUserPassword}<label class="user-form-field">
+						<span>{selectedUserId === currentUser?.id ? t().profileCurrentPasswordLabel : t().userCurrentPasswordLabel}</span>
+						<input bind:value={editUserCurrentPassword} type="password" autocomplete="current-password" />
+						</label>{/if}
 						{#if isAdmin}<div class="user-form-field">
 						<span>{t().permissionGroupSelectLabel}</span>
 						<small>{t().userPermissionGroupsHint}</small>
@@ -382,7 +393,7 @@
 						</fieldset>
 						<div class="user-form-actions">
 						<button class="ghost-btn" onclick={onClearEditUser} disabled={userBusy}>{t().userClearSelection}</button>
-						<button class="ghost-btn primary-inline" onclick={onSaveUserEdit} disabled={userBusy || !editUserDirty || !editUserName.trim() || !editUserEmail.trim() || (!!editUserPassword && editUserPassword.length < 8)}>{t().userSaveChanges}</button>
+						<button class="ghost-btn primary-inline" onclick={onSaveUserEdit} disabled={userBusy || !editUserDirty || !editUserName.trim() || !editUserEmail.trim() || (!!editUserPassword && (editUserPassword.length < 8 || (requiresCurrentPassword && !editUserCurrentPassword)))}>{t().userSaveChanges}</button>
 						</div>{:else}<div class="inline-message">{t().userSelectPrompt}</div>{/if}</section>
 				</div>
 			</div>

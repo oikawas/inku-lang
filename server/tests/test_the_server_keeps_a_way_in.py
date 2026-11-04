@@ -82,3 +82,30 @@ def test_a_new_password_signs_the_account_out_elsewhere(fresh_db) -> None:
     assert changed.status_code == 200
     assert db.get_session_user(here) is not None
     assert db.get_session_user(elsewhere) is None
+
+
+def test_managed_password_changes_require_current_password_except_admin_other(fresh_db) -> None:
+    group = db.add_user_group("group")
+    admin = db.add_user("admin", "admin@example.test", "admin-old", ["admins"], group["id"])
+    leader = db.add_user("leader", "leader@example.test", "leader-old", ["leaders"], group["id"])
+    member = db.add_user("member", "member@example.test", "member-old", ["users"], group["id"])
+    admin_headers, leader_headers = _bearer(admin), _bearer(leader)
+
+    for headers, target, current in (
+        (admin_headers, admin, "admin-old"),
+        (leader_headers, member, "member-old"),
+    ):
+        path = f"/api/users/{target['id']}"
+        for supplied in ({}, {"current_password": "wrong"}):
+            response = client.patch(path, headers=headers, json={"password": "new-password", **supplied})
+            assert response.status_code == 400
+            assert db.authenticate_user(target["username"], current) is not None
+        response = client.patch(path, headers=headers, json={"password": "new-password", "current_password": current})
+        assert response.status_code == 200
+        assert db.authenticate_user(target["username"], "new-password") is not None
+
+    reset = client.patch(
+        f"/api/users/{member['id']}", headers=_bearer(admin), json={"password": "admin-reset"}
+    )
+    assert reset.status_code == 200
+    assert db.authenticate_user(member["username"], "admin-reset") is not None

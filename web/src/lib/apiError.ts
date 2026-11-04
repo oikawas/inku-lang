@@ -74,6 +74,7 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 	if (detail === 'user has history') return strings.errorUserHasWorks;
 	if (detail === "other accounts' works derive from this user's works") return strings.errorUserIsLineageOrigin;
 	if (detail === 'the last administrator cannot be removed') return strings.errorLastAdministrator;
+	if (detail === 'current password is invalid') return strings.errorCurrentPasswordInvalid;
 	// A model the administrator has not offered: a string from the routes that
 	// call one directly, a code from the authoring pipeline.
 	if (detail === 'model is not offered on this server') return strings.errorModelNotOffered;

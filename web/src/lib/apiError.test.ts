@@ -90,6 +90,7 @@ test('the account deletions the server refuses read in the page language', () =>
 
 test('the last administrator and a withheld model read in the page language', () => {
 	assert.equal(describeApiErrorDetail('the last administrator cannot be removed', 409, ja), ja.errorLastAdministrator);
+	assert.equal(describeApiErrorDetail('current password is invalid', 400, ja), ja.errorCurrentPasswordInvalid);
 	// The same refusal arrives as a string from the routes that call a model and
 	// as a code from the authoring pipeline.
 	assert.equal(describeApiErrorDetail('model is not offered on this server', 403, ja), ja.errorModelNotOffered);

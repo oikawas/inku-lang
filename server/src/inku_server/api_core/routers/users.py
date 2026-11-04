@@ -48,6 +48,7 @@ class UserAccountUpdateBody(BaseModel):
     username: str | None = Field(default=None, min_length=1, description="New username. Null or omitted leaves it unchanged.")
     email: str | None = Field(default=None, min_length=1, description="New email address. Null or omitted leaves it unchanged.")
     password: str | None = Field(default=None, min_length=8, description="New password, at least 8 characters. Null or omitted leaves it unchanged.")
+    current_password: str | None = Field(default=None, min_length=1, description="The account's current password, required for password changes except when an administrator changes another account.")
     permission_groups: list[str] | None = Field(
         default=None,
         description="Replacement list of permission groups. Null or omitted leaves them unchanged.",
@@ -183,7 +184,8 @@ def api_users_update(
 
     A leader who is not an administrator cannot give an account any permission group other than
     `users`, nor move it to another user group or out of its group with `group_id: null`; those
-    requests return 403. Returns 409 when the
+    requests return 403. Password changes require the account's current password, except when an
+    administrator changes another account. Returns 409 when the
     change would leave the server without an administrator, 400 when a value is invalid, and 404
     when the account does not exist or a leader may not change it.
     """

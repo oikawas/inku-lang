@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web and Server: require the current password for password changes, except when an administrator resets another account.
+
 - DDL engine 77: read an arc's sagitta as half its chord when decimal rounding makes it exceed that half by at most 0.000001.
 
 - Web: add a button next to Library's `Select all` to clear selections across all pages.

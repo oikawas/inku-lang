@@ -314,6 +314,7 @@ export interface LangPack {
 	errorUserHasWorks: string;
 	errorUserIsLineageOrigin: string;
 	errorLastAdministrator: string;
+	errorCurrentPasswordInvalid: string;
 	errorModelNotOffered: string;
 	errorDbWriteLocked: string;
 	errorSaijikiMigrationRequired: string;
@@ -1335,6 +1336,7 @@ export interface LangPack {
 	userEmailPlaceholder: string;
 	userPasswordPlaceholder: string;
 	userNewPasswordPlaceholder: string;
+	userCurrentPasswordLabel: string;
 	groupNamePlaceholder: string;
 	userAddTitle: string;
 	userEditTitle: string;

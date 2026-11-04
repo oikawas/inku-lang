@@ -623,6 +623,7 @@ class UserAccountUpdater:
     admin_remains_fn: Callable[[Any], bool] | None = None
     # Signs the account out everywhere when its password is set.
     end_sessions_fn: Callable[..., int] | None = None
+    verify_password_fn: Callable[[str, str], bool] = verify_password
 
     def update_user(
         self,
@@ -631,6 +632,7 @@ class UserAccountUpdater:
         username: str | None = None,
         email: str | None = None,
         password: str | None = None,
+        current_password: str | None = None,
         permission_groups: list[str] | None = None,
         group_id: str | None | object = None,
         actor: dict | None = None,
@@ -647,6 +649,12 @@ class UserAccountUpdater:
             row = query.first()
             if not row:
                 return None
+            if password and actor is not None:
+                admin_override = self.has_permission_group_fn(actor, "admins") and actor.get("id") != row.id
+                if not admin_override and (
+                    not current_password or not self.verify_password_fn(current_password, row.password_hash)
+                ):
+                    raise ValueError("current password is invalid")
             if username is not None:
                 username = username.strip()
                 if not username:

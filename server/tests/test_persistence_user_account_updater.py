@@ -63,6 +63,7 @@ def test_accounts_owns_updater_and_db_delegates(monkeypatch: pytest.MonkeyPatch)
                 "username": None,
                 "email": " mail ",
                 "password": None,
+                "current_password": None,
                 "permission_groups": None,
                 "group_id": dependencies[6],
                 "actor": None,

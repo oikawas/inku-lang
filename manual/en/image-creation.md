@@ -710,6 +710,8 @@ The settings dialog has `Standard` and `Detailed` modes, switched through `Displ
 
 `User management` provides search, permission and no-group filters, then selection and editing of users. `Add user` opens the add form explicitly. Edit only the selected member, set permissions and groups, then use `Save changes`. While edits are unsaved, it does not refresh the list or select another user; a failed save keeps both input and error. Administrators and leaders use it within their respective permission scopes in the Web UI.
 
+When a leader changes a user's password, enter that user's current password. An administrator resetting another user's password does not need it.
+
 `Limits` applies to the current pipeline's resource policy and drawing budget. All nine values are not injected into both stages' prompts: the normal pipeline uses four ceilings, for marks per work, marks per instruction, resolved count, and instruction count. The `SVG limit` in the `SVG output` group is a safety ceiling for saving newly generated SVG: a work above it is not saved (it is not recorded on works and does not affect viewing saved works). See `Server Configuration` for saved conditions and the current mapping.
 
 **When a work is redrawn, the limits it was drawn under are the ones that apply** (v2.13.31). Today's settings are used only for an older work whose row recorded no limits. **When a limit actually takes effect and drops marks, it says so under the picture, named** (the same place as the plugin warnings). The same rule holds here as in the settings: a limit can be lowered for one drawing, never raised.

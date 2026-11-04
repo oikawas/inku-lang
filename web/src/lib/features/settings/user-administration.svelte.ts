@@ -32,6 +32,7 @@ export type CreateSettingsUserInput = {
 
 export type UpdateSettingsUserInput = Omit<CreateSettingsUserInput, 'password'> & {
 	password?: string;
+	current_password?: string;
 };
 
 type UserAdministrationDeps<TActor extends SettingsActor> = {

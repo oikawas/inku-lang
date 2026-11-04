@@ -67,6 +67,18 @@ test('saved server lines reconcile a disconnected picture batch before retry', (
 	assert.deepEqual(folder.pending.map((item) => item.webkitRelativePath), ['trip/3.jpg']);
 });
 
+test('new work hides the selected folder and interruption without deleting history', () => {
+	const { store } = memoryStore([{ name: 'trip', total: 1, done: [], failures: [], updatedAt: 1 }]);
+	const folder = new ImageFolderBatch<FolderFile>(store);
+	folder.pick([file('trip/1.jpg')]);
+	folder.interrupted = true;
+	folder.clearInput();
+	assert.equal(folder.folderName, '');
+	assert.deepEqual(folder.pictures, []);
+	assert.equal(folder.interrupted, false);
+	assert.equal(folder.history.length, 1);
+});
+
 test('a picked folder keeps only its pictures, in the order Finder shows them', () => {
 	const files = [
 		file('trip/10.jpg'), file('trip/2.JPG'), file('trip/notes.txt'), file('trip/.DS_Store'),

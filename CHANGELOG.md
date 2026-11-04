@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: keep drawing choices per input tab and show the work's recorded choices above the canvas. Per-user defaults, new work and batch resume use the same choices.
+
 - Server: record drawing choices with each work and return them in history; save per-tab drawing defaults in user settings. Unrecorded choices on older works remain unknown.
 
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.

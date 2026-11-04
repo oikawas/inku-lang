@@ -52,6 +52,7 @@ function pictureServer(onFirstPoll: () => void) {
 	let firstPoll = true;
 	const polls = new Map<string, number>();
 	const performed: string[] = [];
+	const starts: Array<Record<string, unknown>> = [];
 	const fetch = async (path: string, init?: RequestInit): Promise<Response> => {
 		const method = init?.method ?? 'GET';
 		if (path.startsWith('/api/pipeline/batches')) return json({}, 404);
@@ -59,6 +60,7 @@ function pictureServer(onFirstPoll: () => void) {
 			return json({ image_id: `i${started + 1}`, thumbnail: '', original_width: 10, original_height: 10, width: 10, height: 10, nearest_format_id: 'square' });
 		}
 		if (path === '/api/pipeline/variations' && method === 'POST') {
+			starts.push(JSON.parse(String(init?.body)));
 			started += 1;
 			return json(view(started, 'awaiting_llm', { busy: true }));
 		}
@@ -78,7 +80,7 @@ function pictureServer(onFirstPoll: () => void) {
 		}
 		throw new Error(`unexpected request ${method} ${path}`);
 	};
-	return { fetch, performed, started: () => started };
+	return { fetch, performed, starts, started: () => started };
 }
 
 function pictureWork(fetch: (path: string, init?: RequestInit) => Promise<Response>) {
@@ -116,6 +118,23 @@ test('opening a saved work while a picture runs does not cut that picture short'
 	assert.equal(work.imageFolder.success, 2);
 	assert.equal(work.imageFolder.failures.length, 0);
 	assert.equal(made.refreshed(), 2, 'the history list learns of each saved work');
+});
+
+test('picture folder captures its chosen canvas and model at run start', async () => {
+	let work!: Work;
+	const server = pictureServer(() => { work.drawOptions.canvas_aspect = 'square'; work.drawOptions.models.vision = 'openai:other'; });
+	work = pictureWork(server.fetch).work;
+	work.inputMode = 'batch';
+	work.imageFolder.setSource('image');
+	work.drawOptions.canvas_aspect = 'a4';
+	work.drawOptions.models.vision = 'openai:vision';
+	work.drawOptions.catalog = { id: 'auto', mode: 'auto' };
+	work.imageFolder.pick([new File(['1'], '1.jpg'), new File(['2'], '2.jpg')]);
+	work.runImageFolder(true);
+	await finished(work);
+	assert.deepEqual(server.starts.map((body) => body.canvas_format_id), ['a4', 'a4']);
+	assert.deepEqual(server.starts.map((body) => (body.options as { stage1_model: string }).stage1_model), ['openai:vision', 'openai:vision']);
+	assert.deepEqual(server.starts.map((body) => (body.options as { catalog_id: string }).catalog_id), ['default', 'default']);
 });
 
 test('a picture whose run ends without a saved work is a failure, not a success', async () => {

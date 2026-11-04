@@ -84,6 +84,16 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 		this.store.saveSource(source);
 	}
 
+	clearInput(): void {
+		if (this.running) return;
+		this.pictures = [];
+		this.folderName = '';
+		this.interrupted = false;
+		this.stopReason = null;
+		this.resumeBlocked = false;
+		this.success = 0;
+	}
+
 	/** The files of the folder the author picked, as the browser handed them over. */
 	pick(files: readonly TFile[]): void {
 		if (this.running) return;

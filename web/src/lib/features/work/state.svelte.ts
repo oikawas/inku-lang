@@ -2,9 +2,9 @@ import { pipelineDescription } from '$lib/description-labels';
 import { hasDdlBody } from '$lib/ddl-source';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
-import { DEFAULT_SKETCH_MODE, normalizeSketchState, type SketchMode, type SketchState } from '$lib/sketch';
+import { normalizeSketchState, type SketchState } from '$lib/sketch';
 import {
-	DEFAULT_COMPOSITION_MODE, DEFAULT_DRAW_ROUTE, compositionModeOf, compositionOption, drawRouteOf, sketchModeForRoute,
+	compositionOption, sketchModeForRoute,
 	type CompositionMode, type DrawRoute
 } from '$lib/draw-route';
 import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
@@ -17,7 +17,6 @@ import { renderSettingsPayload, type RenderOverrides } from '$lib/features/rende
 import { runCurrentWork, type InstructionLang, type PaintOptions, type PaintResult, type Seed } from '$lib/features/run/current-work';
 import { batchSettings } from '$lib/features/batch/settings.svelte';
 import { wildOverride } from '$lib/features/wild/render';
-import { wildSettings } from '$lib/features/wild/settings.svelte';
 import type { NumberedLine } from '$lib/features/batch/resume';
 import { getCanvasAspectOption, type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import { canvasRatioLabel, canvasRatioOfAspect, declaredCanvasRatio, sameCanvasRatio, type CanvasRatio } from '$lib/canvas-ratio';
@@ -41,6 +40,7 @@ import { readExifFacts } from '$lib/features/image-provenance/exif';
 import { imageProvenanceText } from '$lib/features/image-provenance/provenance';
 import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
 import { runningStageLabel, type ProviderAttemptCount } from '$lib/paintStream';
+import { copyDrawDefaults, copyDrawOptions, optionsForWork, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
 
 type Iteration = HistoryItem;
 type BatchPaintResult = PaintResult & { ddl: string; thinking: string | null; };
@@ -92,7 +92,32 @@ export function createWorkState(deps: WorkStateDeps) {
 	let uploadedImage = $state<UploadedPipelineImage | null>(null);
 	let imageFileName = $state('');
 	let imageUploading = $state(false);
-	let imageCanvasAspectId = $state<CanvasAspectId>('image');
+	const initialOptions = (image: boolean): DrawOptions => ({ route: 'read_and_draw', sketch: 'on', composition: 'off', wild: 'off',
+		catalog: { id: 'default', mode: 'fixed' }, canvas_aspect: image ? 'image' : 'square', models: {} });
+	let drawDefaults = $state<DrawDefaults>({ describe: initialOptions(false), image: initialOptions(true), batch_text: initialOptions(false), batch_image: initialOptions(true) });
+	let drawChoices = $state<DrawDefaults>({ describe: initialOptions(false), image: initialOptions(true), batch_text: initialOptions(false), batch_image: initialOptions(true) });
+	let defaultsOwner: string | null = null;
+	function activeDrawTab(): DrawTab {
+		return inputMode === 'single' ? 'describe' : inputMode === 'image' ? 'image'
+			: imageFolder.source === 'image' ? 'batch_image' : 'batch_text';
+	}
+	function currentOptions(): DrawOptions { return drawChoices[activeDrawTab()]; }
+	function setDrawDefaults(owner: string, defaults: DrawDefaults): void {
+		drawDefaults = copyDrawDefaults(defaults);
+		if (defaultsOwner !== owner) {
+			drawChoices = copyDrawDefaults(defaults);
+			defaultsOwner = owner;
+		}
+	}
+	function selectWorkOptions(record: RecordedDrawOptions | null | undefined, image: boolean): void {
+		const tab = image ? 'image' : 'describe';
+		drawChoices[tab] = optionsForWork(record, drawDefaults[tab], tab);
+	}
+	function applyMigratedWild(previous: DrawDefaults, migrated: DrawDefaults): void {
+		for (const tab of ['describe', 'image', 'batch_text', 'batch_image'] as const) {
+			if (drawChoices[tab].wild === previous[tab].wild) drawChoices[tab].wild = migrated[tab].wild;
+		}
+	}
 	let imageUploadOrdinal = 0;
 	let imageFile: File | null = null;
 	let imageUploadConsumed = false;
@@ -185,43 +210,23 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	let result = $state<PaintResult | null>(null);
 
-	// Sketching (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
-	// way a user setting like the color catalog is (contract section 0.3.1).
-	// It starts the way choosing the default route starts it: on, for read and draw.
-	let sketchMode = $state<SketchMode>(sketchModeForRoute(DEFAULT_DRAW_ROUTE, DEFAULT_SKETCH_MODE));
-
-	// How a description is drawn (SPEC 12.6.7). Chosen per draw like the sketch,
-	// never saved as a setting; a work opened from the history sets it.
-	let drawRoute = $state<DrawRoute>(DEFAULT_DRAW_ROUTE);
-
 	/** The author's choice of route. Read and draw starts with the sketch on
 	 *  (the author's answer, 2026-10-25); the current stages leave it alone. */
 	function selectDrawRoute(route: DrawRoute): void {
-		if (route !== drawRoute) sketchMode = sketchModeForRoute(route, sketchMode);
-		drawRoute = route;
+		if (route !== currentOptions().route) currentOptions().sketch = sketchModeForRoute(route, currentOptions().sketch);
+		currentOptions().route = route;
 	}
-
-	// The composition and laws inside read and draw (2026-10-26). Chosen per
-	// draw like the route and never saved as a setting; it stays as chosen when
-	// the route moves, and only read and draw sends it.
-	let compositionMode = $state<CompositionMode>(DEFAULT_COMPOSITION_MODE);
 
 	function selectCompositionMode(mode: CompositionMode): void {
-		compositionMode = mode;
+		currentOptions().composition = mode;
 	}
 
-	// The prose the layer wrote for the run on screen, and the author's edit of
-	// it. Editing and painting again sends the edited prose instead of calling
-	// the layer, so what the author reads is what Stage 1 reads.
+	// The reading belonging to the work on screen, shown without an editor.
 	let sketchText = $state<string | null>(null);
 
 	// Which description the prose was written for. Prose written for one text is
 	// not prose for another, and the description can be edited after a run.
 	let sketchSource = $state<string | null>(null);
-
-	let sketchDraft = $state('');
-
-	let sketchEditing = $state(false);
 
 	// What the record says the layer did for the work on screen. `null` is a work
 	// whose record is absent -- drawn before the column existed -- and the note
@@ -234,7 +239,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	 *  makes those a comparison of models rather than of two different texts. */
 	function sketchTextFor(text: string): string | null {
 		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()
-			? sketchDraft
+			? sketchText
 			: null;
 	}
 
@@ -245,41 +250,17 @@ export function createWorkState(deps: WorkStateDeps) {
 		return prose ? { sketch_text: prose } : {};
 	}
 
-	/** Show the sketch a run or a saved work was painted with, and turn the
-	 *  control on for a work that has one so a redraw starts from the same
-	 *  place; any other work leaves the control off.
-	 *
-	 *  What the author is going to draw next is a separate question from what
-	 *  the work on screen was drawn through. The state is what keeps the two
-	 *  apart: it is carried whole, so the note can say "drawn without the layer",
-	 *  "the description needed no sketch" and "drawn before the layer was
-	 *  recorded" as the different things they are. */
+	/** Show the saved reading without changing the next drawing's choices. */
 	function adoptSketch(
 		text: string | null,
 		grain: unknown,
 		source: string | null = null,
-		state: unknown = null,
-		route?: DrawRoute,
-		composition: CompositionMode = DEFAULT_COMPOSITION_MODE
+		state: unknown = null
 	): void {
 		sketchText = text;
 		sketchSource = source;
-		sketchDraft = text ?? '';
-		sketchEditing = false;
 		void grain;
 		sketchState = normalizeSketchState(state);
-		// A picture's run names no route: the next description keeps the
-		// author's choices (2026-10-27, when the default became read and draw).
-		if (route === undefined) {
-			if (text) sketchMode = 'on';
-			return;
-		}
-		sketchMode = text ? 'on' : DEFAULT_SKETCH_MODE;
-		// The route the work was drawn by. A read-and-draw work's reading is its
-		// sketch text; one drawn without a reading keeps the sketch off.
-		drawRoute = route;
-		// Drawn with the composition and laws, the work redraws with them.
-		compositionMode = composition;
 	}
 
 	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId; } | null>(null);
@@ -318,20 +299,22 @@ export function createWorkState(deps: WorkStateDeps) {
 	let pipelineBusy = $state(false);
 
 	function pipelineOptions(options: PaintOptions = {}): PipelineOptions {
-		const render = renderSettingsPayload('paint', options.renderOverrides);
-		const route = options.route ?? drawRoute;
+		const selected = currentOptions();
+		const render = renderSettingsPayload('paint', { ...colorCatalogOverride(selected.catalog.mode === 'auto' ? AUTO_CATALOG_ID : selected.catalog.id),
+			...wildOverride(selected.wild === 'on'), ...options.renderOverrides });
+		const route = options.route ?? currentOptions().route;
 		return {
 			route,
-			...compositionOption(route, options.compositionMode ?? compositionMode),
-			sketch: options.sketchMode ?? sketchMode,
+			...compositionOption(route, options.compositionMode ?? currentOptions().composition),
+			sketch: options.sketchMode ?? currentOptions().sketch,
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
-			stage1_model: options.stage1Model ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
-			stage2_model: options.stage2Model ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
+			stage1_model: options.stage1Model ?? selected.models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
+			stage2_model: options.stage2Model ?? selected.models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
 			instruction_lang: instructionLang,
 			ui_lang: getLang(),
 			catalog_id: typeof render.catalog_id === 'string' ? render.catalog_id : colorCatalogSettings.effectiveId,
 			catalog_mode: typeof render.catalog_mode === 'string' ? render.catalog_mode : undefined,
-			canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
+			canvas_aspect: options.canvasAspectId ?? selected.canvas_aspect,
 			...(options.canvasFit ? { canvas_fit: options.canvasFit } : {}),
 			render_seed: options.renderSeed,
 			composition_seed: options.compositionSeed,
@@ -376,9 +359,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!view.result) return;
 		const painted = view.result;
 		result = painted;
-		const record = { route: view.route, description_ddl: view.description_ddl ?? painted.description_ddl };
-		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state,
-			drawRouteOf(record), compositionModeOf(record));
+		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state);
 		thinking = painted.thinking ?? null;
 		elapsedStage1Ms = painted.elapsed_stage1_ms;
 		elapsedStage2Ms = painted.elapsed_stage2_ms;
@@ -423,7 +404,10 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!uploadedImage || imageUploading || loading || reloading || pipelineBusy || refinementSession.gridBusy || demo.running || batch.resuming) return;
 		let image = uploadedImage;
 		const provenance = imageProvenance;
-		const model = qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
+		const choices = copyDrawOptions(drawChoices.image);
+		const model = choices.models.vision ?? qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
+		const selectedCatalog = choices.catalog.mode === 'auto' ? AUTO_CATALOG_ID : choices.catalog.id;
+		const catalog = renderSettingsPayload('paint', colorCatalogOverride(selectedCatalog));
 		const abortController = new AbortController();
 		submitAbortController = abortController;
 		submitStopRequested = false;
@@ -447,9 +431,12 @@ export function createWorkState(deps: WorkStateDeps) {
 				uploadedImage = image;
 			}
 			imageUploadConsumed = true;
+			const imageCanvasAspectId = choices.canvas_aspect;
 			const view = await finishPipeline(() => pipelineController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 				...pipelineOptions(), stage1_model: model, stage2_model: model,
-				sketch: 'off', sketch_text: undefined, wild: false,
+				catalog_id: typeof catalog.catalog_id === 'string' ? catalog.catalog_id : 'default', catalog_mode: choices.catalog.mode,
+				route: choices.route, ...compositionOption(choices.route, choices.composition),
+				sketch: choices.sketch, sketch_text: undefined, wild: choices.wild === 'on',
 				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 				canvas_fit: 'contain',
 			}, abortController.signal));
@@ -520,18 +507,23 @@ export function createWorkState(deps: WorkStateDeps) {
 		(view) => { if (followsImageBatch()) followRunProgress(view); },
 	);
 
-	async function paintPictureFile(file: File, signal: AbortSignal, runId?: string, lease?: string): Promise<void> {
+	async function paintPictureFile(file: File, signal: AbortSignal, choices: DrawOptions, runId?: string, lease?: string): Promise<void> {
+		const imageCanvasAspectId = choices.canvas_aspect;
+		const selectedCatalog = choices.catalog.mode === 'auto' ? AUTO_CATALOG_ID : choices.catalog.id;
+		const catalog = renderSettingsPayload('paint', colorCatalogOverride(selectedCatalog));
 		const api = new PipelineApi(apiFetch);
 		const provenance = await provenanceOfFile(file);
 		const image = await api.uploadImage(file, signal);
 		signal.throwIfAborted();
-		const model = qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
+		const model = choices.models.vision ?? qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
 		stageLabel = t().imageWritingDdl;
 		let view: PipelineView;
 		try {
 			view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 				...pipelineOptions(), stage1_model: model, stage2_model: model,
-				sketch: 'off', sketch_text: undefined, wild: false,
+				catalog_id: typeof catalog.catalog_id === 'string' ? catalog.catalog_id : 'default', catalog_mode: choices.catalog.mode,
+				route: choices.route, ...compositionOption(choices.route, choices.composition),
+				sketch: choices.sketch, sketch_text: undefined, wild: choices.wild === 'on',
 				batch_run_id: runId, batch_line_number: runId ? imageFolder.current : undefined, batch_lease: lease,
 				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 				canvas_fit: 'contain',
@@ -577,6 +569,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			if (!found || found.state === 'running' || found.state === 'uncertain') return false;
 			if (!record.batchKeys || record.batchKeys.length !== found.total) return false;
 			if (reconcile) {
+				const saved = (found.conditions as unknown as { draw_options?: DrawOptions } | undefined)?.draw_options;
+				if (saved) drawChoices.batch_image = copyDrawOptions(saved);
 				const lines: number[] = [];
 				for (let offset = 0; ; offset += 100) {
 					const page = await apiFetch(`/api/history?offset=${offset}&limit=100&include_svg=false`, { cache: 'no-store' });
@@ -612,9 +606,10 @@ export function createWorkState(deps: WorkStateDeps) {
 			? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 		try {
 			if (!(await refreshImageBatchResume(!fromStart))) throw new Error('The previous image batch may still be running.');
+			const choices = copyDrawOptions(drawChoices.batch_image);
 			const total = fromStart ? imageFolder.pictures.length : imageFolder.pending.length;
 			if (total === 0) return;
-			lease = await startBatchLease(apiFetch, runId, '', {}, total, () => imageFolder.success,
+			lease = await startBatchLease(apiFetch, runId, '', { draw_options: choices }, total, () => imageFolder.success,
 				() => imageFolder.stop(), 'image');
 			await imageFolder.run({
 				fromStart,
@@ -624,7 +619,7 @@ export function createWorkState(deps: WorkStateDeps) {
 						try { await lease.refresh(); }
 						catch (cause) { throw new ConnectionFailure('unreachable', String(cause), { cause }); }
 					}
-					await paintPictureFile(file, signal, lease ? runId : undefined, lease?.lease);
+					await paintPictureFile(file, signal, choices, lease ? runId : undefined, lease?.lease);
 				},
 				stopsTheRun: pictureRunLost,
 				describe: (cause) => cause instanceof PipelineApiError ? describeApiError(cause.detail, cause.status)
@@ -688,7 +683,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	async function authorDescription(text: string, options: PaintOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
 		// An edited sketch for this very description is drawn as it stands.
-		const mode = options.sketchMode ?? sketchMode;
+		const mode = options.sketchMode ?? currentOptions().sketch;
 		const edited = options.sketchText ?? (mode === 'off' ? null : sketchTextFor(text));
 		return finishPipeline(() => pipelineController.fromDescription(text, pipelineOptions({ ...options, ...(edited ? { sketchText: edited } : {}) }), signal));
 	}
@@ -873,15 +868,16 @@ export function createWorkState(deps: WorkStateDeps) {
 				strings: t(),
 				// Resolve injected route settings before entering the stateless run
 				// operation. A caller's one-run override still wins there.
-				stage1Model: qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
-				stage2Model: qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
+				stage1Model: currentOptions().models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
+				stage2Model: currentOptions().models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
 				includeThinking: deps.models.includeThinking(),
 				instructionLang,
-				canvasAspectId: effectiveCanvasAspectId(),
-				sketchMode,
-				route: drawRoute,
-				compositionMode,
-				renderPayload: renderSettingsPayload('paint', options.renderOverrides)
+				canvasAspectId: currentOptions().canvas_aspect,
+				sketchMode: currentOptions().sketch,
+				route: currentOptions().route,
+				compositionMode: currentOptions().composition,
+				renderPayload: renderSettingsPayload('paint', { ...colorCatalogOverride(currentOptions().catalog.mode === 'auto' ? AUTO_CATALOG_ID : currentOptions().catalog.id),
+					...wildOverride(currentOptions().wild === 'on'), ...options.renderOverrides })
 			},
 			{
 				apiFetch,
@@ -1152,8 +1148,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		startTimer();
 
 		try {
-			stageLabel = drawRoute === 'read_and_draw'
-				? (sketchMode === 'off' ? t().readDrawWriting : t().readDrawReading)
+			stageLabel = currentOptions().route === 'read_and_draw'
+				? (currentOptions().sketch === 'off' ? t().readDrawWriting : t().readDrawReading)
 				: t().stageDdlGenerating;
 			const view = await authorDescription(input, {
 				sourceText: input,
@@ -1182,14 +1178,14 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	async function submitBatch(options: { resumeLines?: NumberedLine[]; retryFailedLines?: NumberedLine[]; }): Promise<void> {
-		const batchCanvasAspectId = effectiveCanvasAspectId();
-		const batchCatalogId = colorCatalogSettings.selected;
-		const batchStage1Model = qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
-		const batchStage2Model = qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
-		const batchSketchMode = sketchMode;
-		const batchRoute = drawRoute;
-		const batchComposition = compositionMode;
-		const batchWild = wildSettings.selected;
+		const batchCanvasAspectId = drawChoices.batch_text.canvas_aspect;
+		const batchCatalogId = drawChoices.batch_text.catalog.mode === 'auto' ? AUTO_CATALOG_ID : drawChoices.batch_text.catalog.id;
+		const batchStage1Model = drawChoices.batch_text.models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
+		const batchStage2Model = drawChoices.batch_text.models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
+		const batchSketchMode = drawChoices.batch_text.sketch;
+		const batchRoute = drawChoices.batch_text.route;
+		const batchComposition = drawChoices.batch_text.composition;
+		const batchWild = drawChoices.batch_text.wild === 'on';
 		// The batch owns its line failures; the previous single-work run is no longer current.
 		pipelineController.clear();
 		loading = true; error = null;
@@ -1388,7 +1384,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				lineageParentNodeId: replayParentNodeId,
 				derivationKind: replayKind,
 				derivationMetadata: replayDerivationMetadata,
-				renderOverrides: wildOverride(unedited ? recordedWild : wildSettings.enabled),
+				renderOverrides: wildOverride(unedited ? recordedWild : currentOptions().wild === 'on'),
 			}, abortController.signal);
 			if (view.result) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
@@ -1462,8 +1458,16 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	function clearInput() {
+		drawChoices[activeDrawTab()] = copyDrawOptions(drawDefaults[activeDrawTab()]);
 		if (inputMode === 'single') input = '';
-		if (inputMode === 'batch') batch.clearInput();
+		if (inputMode === 'batch') {
+			batch.clearInput();
+			if (imageFolder.source === 'image') imageFolder.clearInput();
+		}
+		if (inputMode === 'image') clearImage();
+		sketchText = null;
+		sketchSource = null;
+		sketchState = null;
 		resetWorkOutput();
 	}
 
@@ -1471,8 +1475,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		resetTargetScopedState();
 		pipelineController.clear();
 		pendingCanvasAspectDerivation = null;
-		ddl = inputMode === 'single' ? '' : null;
-		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
+		ddl = null;
+		ddlGeneratedBaseline = null;
 		thinking = null;
 		result = null;
 		stage1UserPrompt = '';
@@ -1520,10 +1524,10 @@ export function createWorkState(deps: WorkStateDeps) {
 		get composeFallbackRecord() { return composeFallbackState(composeFallbackRaw); },
 		get statusDdlOrigin() { return (displayedHistoryItem?.display_label ?? null) === 'DDL'; },
 		get stage1ModelLabel() {
-			return modelDisplayName(qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()), deps.models.available(), deps.models.stage1Provider());
+			return modelDisplayName(currentOptions().models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()), deps.models.available(), deps.models.stage1Provider());
 		},
 		get stage2ModelLabel() {
-			return modelDisplayName(qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()), deps.models.available(), deps.models.stage2Provider());
+			return modelDisplayName(currentOptions().models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()), deps.models.available(), deps.models.stage2Provider());
 		},
 		get inputMode() { return inputMode; },
 		set inputMode(value) { inputMode = value; },
@@ -1533,8 +1537,15 @@ export function createWorkState(deps: WorkStateDeps) {
 		get imageFileName() { return imageFileName; },
 		get imageUploading() { return imageUploading; },
 		get imageRunning() { return imageRunActive || (reloading && !!(displayedHistoryItem?.image_ddl ?? result?.image_ddl)); },
-		get imageCanvasAspectId() { return imageCanvasAspectId; },
-		set imageCanvasAspectId(value) { imageCanvasAspectId = value; },
+		get imageCanvasAspectId() { return currentOptions().canvas_aspect; },
+		set imageCanvasAspectId(value) { currentOptions().canvas_aspect = value; },
+		get drawOptions() { return currentOptions(); },
+		get batchTextOptions() { return drawChoices.batch_text; },
+		get drawDefaults() { return drawDefaults; },
+		setDrawDefaults,
+		resetDrawDefaultsOwner: () => { defaultsOwner = null; },
+		selectWorkOptions,
+		applyMigratedWild,
 		get imageBeforeReviewDdl() { return imageBeforeReviewDdl(); },
 		replayImageBeforeReview,
 		selectImage,
@@ -1571,20 +1582,16 @@ export function createWorkState(deps: WorkStateDeps) {
 		set thinking(value) { thinking = value; },
 		get result() { return result; },
 		set result(value) { result = value; },
-		get sketchMode() { return sketchMode; },
-		set sketchMode(value) { sketchMode = value; },
-		get drawRoute() { return drawRoute; },
+		get sketchMode() { return currentOptions().sketch; },
+		set sketchMode(value) { currentOptions().sketch = value; },
+		get drawRoute() { return currentOptions().route; },
 		selectDrawRoute,
-		get compositionMode() { return compositionMode; },
+		get compositionMode() { return currentOptions().composition; },
 		selectCompositionMode,
 		get sketchText() { return sketchText; },
 		set sketchText(value) { sketchText = value; },
 		get sketchSource() { return sketchSource; },
 		set sketchSource(value) { sketchSource = value; },
-		get sketchDraft() { return sketchDraft; },
-		set sketchDraft(value) { sketchDraft = value; },
-		get sketchEditing() { return sketchEditing; },
-		set sketchEditing(value) { sketchEditing = value; },
 		get sketchState() { return sketchState; },
 		set sketchState(value) { sketchState = value; },
 		get lineageDetached() { return lineageDetached; },

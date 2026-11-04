@@ -17,8 +17,8 @@
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { HistoryMutations } from '$lib/features/history/mutations';
-	import { normalizeSketchState, sketchStateNote, sketchStateShort, type SketchMode } from '$lib/sketch';
-	import { workRouteLabel } from '$lib/draw-route';
+	import type { SketchMode } from '$lib/sketch';
+	import { drawOptionRows } from '$lib/features/draw-options';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatCanvasCapacity, groupDigits } from '$lib/formatNumber';
@@ -451,11 +451,9 @@
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
 			: (isJapanese ? '独立作品' : 'Standalone')
 	);
+	const statusWork = $derived(statusHistoryItem ?? result);
 	// How the work on screen was drawn and what its sketch did, from the saved
 	// work when there is one, as the generation information reads them.
-	const statusWork = $derived(statusHistoryItem ?? result);
-	const statusDrawRoute = $derived(workRouteLabel(statusWork, isJapanese));
-	const statusSketchState = $derived(normalizeSketchState(statusWork?.sketch_state));
 	async function openLineageRefinement(node: LineageNode, view: RefinementView): Promise<void> {
 		await onOpenLineageNode(node);
 		onSetRefineWild(null);
@@ -736,41 +734,11 @@
 					</span>
 				</div>
 				<div class="render-meta-fields">
-					<span class="render-meta-item render-meta-model">
-						<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
-						<strong title={statusStage1Model + ' / ' + statusStage2Model}>
-							{#if statusStage1Model === statusStage2Model}
-								<span class="render-meta-model-line">
-									<span class="render-meta-model-name">{statusStage1ModelOnly}</span>
-								</span>
-							{:else}
-								<span class="render-meta-model-line">
-									<span class="render-meta-model-stage">{isJapanese ? '\u89e3\u91c8' : 'Interpretation'}</span>
-									<span class="render-meta-model-name">{statusStage1ModelOnly}</span>
-								</span>
-								<span class="render-meta-model-line">
-									<span class="render-meta-model-stage">{isJapanese ? '\u63cf\u753b' : 'Performance'}</span>
-									<span class="render-meta-model-name">{statusStage2ModelOnly}</span>
-								</span>
-							{/if}
-						</strong>
-					</span>
-					<span class="render-meta-item render-meta-catalog">
-						<span class="render-meta-label">{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</span>
-						<strong title={statusCatalogName}>{statusCatalogName}</strong>
-					</span>
-					<span class="render-meta-item render-meta-canvas">
-						<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
-						<strong title={statusCanvasName}>{statusCanvasName}</strong>
-					</span>
-					<span class="render-meta-item render-meta-route">
-						<span class="render-meta-label">{isJapanese ? '描き方' : 'Drawing'}</span>
-						<strong title={statusDrawRoute}>{statusDrawRoute}</strong>
-					</span>
-					<span class="render-meta-item render-meta-sketch">
-						<span class="render-meta-label">{isJapanese ? '写生' : 'Sketch from life'}</span>
-						<strong title={sketchStateNote(statusSketchState, isJapanese) || sketchStateShort(statusSketchState, isJapanese)}>{sketchStateShort(statusSketchState, isJapanese)}</strong>
-					</span>
+					{#each drawOptionRows(statusHistoryItem?.draw_options, t()) as option (option.key)}
+						<span class="render-meta-item" data-draw-option={option.key}>
+							<span class="render-meta-label">{option.label}</span><strong title={option.text}>{option.text}</strong>
+						</span>
+					{/each}
 					<!-- The same byte measurement the drawer shows, rounded to a compact
 					     whole-kilobyte capacity in this narrow strip. -->
 					<span class="render-meta-item render-meta-svg-size">
@@ -1158,7 +1126,7 @@
 	.render-meta-generation strong { color: var(--fg2); font-size: var(--ui-font-size-13); font-weight: 450; line-height: 1.2; }
 	.render-meta-fields {
 		display: grid;
-		grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content max-content max-content;
+		grid-template-columns: repeat(auto-fit, minmax(calc(90px * var(--ui-text-scale)), 1fr));
 		min-width: 0;
 		padding-block: 7px;
 	}
@@ -1197,25 +1165,6 @@
 		line-height: 1.2;
 		white-space: nowrap;
 	}
-	.render-meta-model strong {
-		display: grid;
-		gap: 1px;
-		max-width: 280px;
-	}
-	.render-meta-model-line {
-		display: flex;
-		gap: 4px;
-		min-width: 0;
-		white-space: nowrap;
-	}
-	.render-meta-model-stage { flex: 0 0 auto; color: var(--fg3); }
-	.render-meta-model-name {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.render-meta-catalog strong { max-width: 130px; }
-	.render-meta-canvas strong { max-width: 100px; }
 	/* The two numeric items: never ellipsised, and set on the digit grid so a
 	   size and a timestamp do not jitter as the work on screen changes. */
 	.render-meta-created strong,
@@ -1280,7 +1229,6 @@
 		}
 		.render-meta-fields,
 		.render-meta-strip.english .render-meta-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-		.render-meta-strip.english .render-meta-model { grid-column: span 2; }
 	}
 	.canvas-area {
 		flex: 1;

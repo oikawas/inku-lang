@@ -250,6 +250,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	clearInput(): void {
+		this.resumeDiscovery += 1;
+		this.resume = null;
+		this.interrupted = false;
+		this.interruptedSnapshot = null;
 		this.input = '';
 		this.failures = [];
 		this.lastSnapshot = null;
@@ -605,9 +609,9 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				this.latestDdl = painted.ddl;
 				this.latestThinking = painted.thinking;
 				this.latestPrompt = `#${item.line} ${item.input}`;
-				options.onLatestResult(painted, this.latestPrompt);
 				await options.refreshAfterServerSave();
 				if (!isCurrent()) return null;
+				options.onLatestResult(painted, this.latestPrompt);
 				return true;
 			} catch (cause) {
 				// Saving the work and refreshing its history are separate operations.
@@ -785,6 +789,8 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			sketchGrain: null,
 			wild: null,
 			canvasAspectId: null,
+			route: null,
+			composition: null,
 		};
 	}
 

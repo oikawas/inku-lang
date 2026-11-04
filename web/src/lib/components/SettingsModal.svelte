@@ -16,6 +16,8 @@
 	import ClipboardExportSettings from '$lib/features/settings/ClipboardExportSettings.svelte';
 	import ImageSettings from '$lib/features/settings/ImageSettings.svelte';
 	import AppearanceSettings from '$lib/features/settings/AppearanceSettings.svelte';
+	import DrawDefaultsSettings from '$lib/features/settings/DrawDefaultsSettings.svelte';
+	import type { DrawDefaults } from '$lib/features/draw-options';
 	import '$lib/features/settings/settings-modal.css';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -28,6 +30,10 @@
 	import type { SettingsController, SettingsTab, SettingsUserItem } from '$lib/features/settings/state.svelte';
 
 	type Props = {
+		drawDefaults: DrawDefaults;
+		drawCatalogs: { id: string; name: string }[];
+		drawCanvases: { id: string; label: string }[];
+		onSaveDrawDefaults: (value: DrawDefaults) => Promise<void>;
 		settings: SettingsController;
 		demoContent?: Snippet;
 		singleUserMode: boolean;
@@ -78,6 +84,7 @@
 	};
 
 	let {
+		drawDefaults, drawCatalogs, drawCanvases, onSaveDrawDefaults,
 		settings,
 		demoContent,
 		singleUserMode,
@@ -495,6 +502,9 @@
 			{:else if settingsTab === 'demo'}
 				{@render demoContent?.()}
 			{:else}
+				{#if appearanceSection === 'making'}
+					<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} onSave={onSaveDrawDefaults} />
+				{/if}
 				<AppearanceSettings
 					section={appearanceSection}
 					{uiMode} {uiCustom} {uiModeSaving} {uiModeSaveError}

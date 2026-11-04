@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { onDestroy, onMount, tick } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import { qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -31,7 +30,7 @@
 
 	let { node, visionModel, visionProviderGroups, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, progress = null, onClose, onSaveVisionModel, onJuxtapose, onDrawDescription }: Props = $props();
 	let selectedModel = $state('');
-	let wild = $state(wildSettings.enabled);
+	let wild = $state(untrack(() => node.history?.draw_options?.wild === 'on'));
 	$effect(() => { if (!selectedModel) selectedModel = visionModel; });
 	let result = $state<JuxtapositionResult | null>(null);
 	let shown = $state<string[]>([]);

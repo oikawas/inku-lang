@@ -2,7 +2,6 @@
 // for uninhibited strokes.
 // The saved default and the next drawing's switch are separate.
 import { bindWildRenderState } from '$lib/features/wild/render';
-import { registerPersistedSetting } from '$lib/features/persisted-settings';
 
 const WILD_DEFAULT_KEY = 'inku-wild-default';
 
@@ -34,6 +33,3 @@ export const wildSettings = new WildSettings();
 
 // The render slice lives in ./render.ts; it reads the live switch through this.
 bindWildRenderState(() => wildSettings.selected);
-
-// Restored at start-up with every other persisted setting.
-registerPersistedSetting({ id: 'wild', load: wildSettings.load });

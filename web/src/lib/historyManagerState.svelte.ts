@@ -10,6 +10,7 @@ export type HistoryManagerTab = 'thumbs' | 'list';
 export type Score = { instructions: unknown[]; canvas?: string | null; version?: string | null };
 
 export type HistoryItem = {
+	draw_options?: import('./features/draw-options').RecordedDrawOptions | null;
 	image_ddl?: Record<string, unknown> | null;
 	/** Read and draw's record (SPEC 12.6.7); a work drawn that way keeps it. */
 	description_ddl?: DescriptionDdlRecord | null;

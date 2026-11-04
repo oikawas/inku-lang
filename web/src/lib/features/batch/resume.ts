@@ -5,7 +5,8 @@
 // works were drawn under -- is arithmetic over a list and a listing, and is
 // testable on its own. Same reason retry.ts is a module and not a closure.
 
-import { compositionModeOf, drawRouteOf, type CompositionMode, type DrawRoute } from '../../draw-route.ts';
+import type { CompositionMode, DrawRoute } from '../../draw-route.ts';
+import type { RecordedDrawOptions } from '../draw-options.ts';
 
 /** One line of a batch prompt, numbered the way the run numbers it. */
 export type NumberedLine = {
@@ -20,6 +21,7 @@ export type NumberedLine = {
  * `$state`, and pulling it in would drag the Svelte compiler into node:test.
  */
 export type BatchWork = {
+	draw_options?: RecordedDrawOptions | null;
 	at?: number | null;
 	batch_line_number?: number | null;
 	batch_run_id?: string | null;
@@ -157,15 +159,16 @@ export type BatchRunConditions = {
  * not that the switch was off.
  */
 export function conditionsOfWork(work: BatchWork): BatchRunConditions {
+	const options = work.draw_options;
 	return {
-		stage1Model: work.stage1_model ?? null,
-		stage2Model: work.stage2_model ?? null,
-		catalogId: work.render_color_catalog_id ?? work.catalog_id ?? null,
-		catalogMode: work.catalog_mode ?? null,
-		sketchGrain: work.sketch_grain ?? null,
-		wild: typeof work.render_wild === 'boolean' ? work.render_wild : null,
-		canvasAspectId: work.render_canvas_aspect_id ?? work.render_canvas_aspect ?? null,
-		route: drawRouteOf(work),
-		composition: drawRouteOf(work) === 'read_and_draw' ? compositionModeOf(work) : null,
+		stage1Model: options?.models?.stage1 ?? null,
+		stage2Model: options?.models?.stage2 ?? null,
+		catalogId: options?.catalog?.id ?? null,
+		catalogMode: options?.catalog?.mode ?? null,
+		sketchGrain: options?.sketch ?? null,
+		wild: options?.wild == null ? null : options.wild === 'on',
+		canvasAspectId: options?.canvas_aspect ?? null,
+		route: options?.route ?? null,
+		composition: options?.composition ?? null,
 	};
 }

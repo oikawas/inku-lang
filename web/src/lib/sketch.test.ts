@@ -66,7 +66,7 @@ test('T-9: both draw paths send the chosen mode', () => {
 	const work = read('./features/work/state.svelte.ts');
 	const currentWork = read('./features/run/current-work.ts');
 	assert.match(currentWork, /sketch:\s*sketchOn/);
-	assert.match(work, /sketch: options\.sketchMode \?\? sketchMode/);
+	assert.match(work, /sketch: options\.sketchMode \?\? currentOptions\(\)\.sketch/);
 });
 
 // ----------------------------------------------------------------- T-10 (edge)
@@ -163,10 +163,10 @@ test('T-6: both places that put a work on screen carry its state, and the panel 
 	// half the works reading as though they predate the column. Saved-work field
 	// mapping now belongs to the canonical current-work projection.
 	// Both carry the route the work was drawn by after the state (2026-10-25).
-	assert.match(work, /adoptSketch\(painted\.sketch_text \?\? null, painted\.sketch_grain, view\.description, painted\.sketch_state,\s*drawRouteOf\(/);
+	assert.match(work, /adoptSketch\(painted\.sketch_text \?\? null, painted\.sketch_grain, view\.description, painted\.sketch_state\)/);
 	assert.match(currentWork, /sketchState: item\.sketch_state/);
 	// And after the route, whether it was drawn with the composition and laws (2026-10-26).
-	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState, drawRouteOf\(it\),\s*compositionModeOf\(it\)\)/);
+	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState\)/);
 	assert.match(page, /sketchStateNote\(work\.sketchState, getLang\(\) === 'ja'\)/);
 	assert.match(generationInfo, /normalizeSketchState\(statusHistoryItem\?\.sketch_state \?\? result\?\.sketch_state\)/);
 });

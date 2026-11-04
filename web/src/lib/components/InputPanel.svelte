@@ -10,7 +10,6 @@
 	import SwitchChip from './SwitchChip.svelte';
 	import { type SketchMode } from '$lib/sketch';
 	import { type CompositionMode, type DrawRoute } from '$lib/draw-route';
-	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import DescriptionMeter from './DescriptionMeter.svelte';
@@ -105,6 +104,8 @@
 		stage2ModelLabel: string;
 		/** Sketch from life (Stage 0.5). Chosen per draw, not stored as a user setting. */
 		sketchMode: SketchMode;
+		wild: boolean;
+		onSelectWild: (value: boolean) => void;
 		onSelectSketchMode: (mode: SketchMode) => void;
 		/** How a description is drawn. Chosen per draw, like the sketch. */
 		drawRoute: DrawRoute;
@@ -188,6 +189,8 @@
 		stage1ModelLabel,
 		stage2ModelLabel,
 		sketchMode,
+		wild,
+		onSelectWild,
 		onSelectSketchMode,
 		drawRoute,
 		onSelectDrawRoute,
@@ -298,7 +301,7 @@
 					     after it too, so it names no one switch. -->
 					<span class="condition-inline-label">{isJapanese ? 'オプション' : 'Options'}</span>
 					<Tooltip text={t().tooltipInputWild} placement="top-right">
-						<SwitchChip label={t().wildButton} on={wildSettings.selected} onToggle={() => wildSettings.setSelected(!wildSettings.selected)} />
+						<SwitchChip label={t().wildButton} on={wild} onToggle={() => onSelectWild(!wild)} />
 					</Tooltip>
 				</div>
 				{/if}
@@ -403,6 +406,7 @@
 
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'image'}
+		<button class="ghost-btn" onclick={onClearInput} disabled={singleRunning || generationDisabled}>{t().clearInputBtn}</button>
 		<label class="input-heading" for="image-provenance">{t().imageProvenanceLabel}</label>
 		<textarea id="image-provenance" class="input-ta" rows="4" bind:value={imageProvenance} oninput={() => onImageProvenanceInput?.()} placeholder={t().imageProvenanceHint}></textarea>
 		<p class="input-description">{t().imageProvenanceHint}</p>
@@ -441,6 +445,7 @@
 			</span>
 		{/snippet}
 		{#if imageFolder.source === 'image'}
+			<button class="ghost-btn" onclick={onClearInput} disabled={folderRunning || generationDisabled}>{t().clearInputBtn}</button>
 			<ImageFolderBatchPanel
 				sourceSwitch={batchSourceSwitch}
 				folder={imageFolder}

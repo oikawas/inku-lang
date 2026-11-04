@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Render engine 98: exclude known machine notes when resolving legacy color hints, correcting colors on redraw. Saved Scores and SVGs remain unchanged.
+
 - Web and Server: require the current password for password changes, except when an administrator resets another account.
 
 - Server: when an unqualified model name has multiple or no listed providers, resolve it using the user's Stage 1 provider at drawing intake and record the provider for both stages.

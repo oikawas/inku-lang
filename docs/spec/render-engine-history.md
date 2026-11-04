@@ -13,6 +13,10 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 
 [SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated. Record a new version's values, reasons, and results in [CHANGELOG.md](../../CHANGELOG.md).
 
+## engine 98 — legacy color hints
+
+Exclude clauses matching known machine-note templates when reading color. Saved SVGs do not change; redrawing an old work can correct its colors. See Unreleased in the changelog.
+
 ## engine 97 — transforms on non-square canvases and object boxes
 
 Check transformed bounds, and the bounds of touching, along and cutting relations, against the canvas edge in short-side units (the edge had been taken as its reciprocal, so non-square canvases and object boxes lost them). Count an object as one instruction. Redrawing saved works can reveal transformed groups, relations and objects previously omitted. See Unreleased in the changelog.

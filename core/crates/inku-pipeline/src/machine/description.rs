@@ -2741,9 +2741,9 @@ mod tests {
         assert_eq!(composition_record(&state).things, [0, 1, 2]);
     }
 
-    /// A sentence the compile leaves out (a semicircle's chord and sagitta in
-    /// a tiling): the live work e5b0d996's of 2026-10-26, which fell back.
-    const LEFT_OUT: &str = "画面の横0.0〜1.0、縦0.618〜1.0の範囲に、弦長0.083333、矢高0.041667の灰の細かくゆるやかに揺れる細い半円の弧を60個敷き詰める。";
+    /// A genuinely invalid sagitta, beyond the decimal-rounding tolerance of
+    /// DDL engine 77, keeps this omitted-sentence test exercising its purpose.
+    const LEFT_OUT: &str = "画面の横0.0〜1.0、縦0.618〜1.0の範囲に、弦長0.083333、矢高0.042の灰の細かくゆるやかに揺れる細い半円の弧を60個敷き詰める。";
 
     #[test]
     fn a_sentence_the_compile_leaves_out_keeps_its_words_and_takes_no_colors() {

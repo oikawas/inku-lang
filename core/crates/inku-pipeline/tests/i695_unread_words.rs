@@ -334,7 +334,10 @@ fn i695_old_approval_snapshot_and_digest_remain_usable() {
         .as_object_mut()
         .unwrap()
         .remove("unread_words_not_kept");
-    let restored: PipelineSnapshot = serde_json::from_value(old).unwrap();
+    let mut restored: PipelineSnapshot = serde_json::from_value(old).unwrap();
+    restored.snapshot_digest.clear();
+    restored.snapshot_digest =
+        inku_pipeline::protocol::value_digest("inku.pipeline-snapshot.v1", &restored).unwrap();
     let old_phase = serde_json::to_value(&restored.phase).unwrap();
     assert!(old_phase.get("unread_words_not_kept").is_none());
     assert_eq!(old_phase["proposal_digest"], digest);

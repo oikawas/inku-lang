@@ -94,6 +94,7 @@
 	import { DemoState } from '$lib/features/demo/state.svelte';
 	import { demoInstructionModelGroups } from '$lib/demo';
 	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
+	import { loadBatchSavedWork } from '$lib/features/batch/saved-work';
 	import { copyDrawOptions, migrateLegacyWild, type DrawDefaults } from '$lib/features/draw-options';
 	import { bindWildRenderState, wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -575,6 +576,7 @@
 		showCanvas: () => { outputTab = 'canvas'; },
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
 		displayLatestBatchRender,
+		loadBatchSavedWork: (id) => loadBatchSavedWork(apiFetch, id),
 		pushHistory,
 		imageUploadNotice: {
 			due: () => !!session.currentUser && uploadNoticeDue(String(session.currentUser.id)),
@@ -2033,12 +2035,12 @@ $effect(() => {
 		resetTargetScopedState({ preserveLineageBrowsing: sameTree });
 		work.pendingCanvasAspectDerivation = null;
 		work.displayedHistoryItem = it;
+		const imageWork = !!it.image_ddl || it.image_provenance != null;
+		work.selectWorkOptions(it.draw_options, imageWork);
 		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id);
 		void history.syncToItem(it);
 		work.lineageDetached = false;
 		if (!options.preserveAuthoring) {
-			const imageWork = !!it.image_ddl || it.image_provenance != null;
-			work.selectWorkOptions(it.draw_options, imageWork);
 			if (work.inputMode !== 'batch') work.inputMode = imageWork ? 'image' : 'single';
 			if (imageWork && work.inputMode === 'image') {
 				work.clearImage();

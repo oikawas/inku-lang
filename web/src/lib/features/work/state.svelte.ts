@@ -70,6 +70,7 @@ export type WorkStateDeps = {
 	showCanvas: () => void;
 	requestConfirmation: (confirmation: { message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void; }) => void;
 	displayLatestBatchRender: () => void;
+	loadBatchSavedWork: (id: string) => Promise<Iteration>;
 	pushHistory: (item: Iteration, options?: SaveHistoryOptions) => Promise<Iteration | null>;
 	/** The warning that a picture goes to the provider, due before the first picture after a sign-in. */
 	imageUploadNotice?: { due: () => boolean; acknowledge: () => void };
@@ -1178,6 +1179,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	async function submitBatch(options: { resumeLines?: NumberedLine[]; retryFailedLines?: NumberedLine[]; }): Promise<void> {
+		let savedWork: Iteration | null = null;
 		const batchCanvasAspectId = drawChoices.batch_text.canvas_aspect;
 		const batchCatalogId = drawChoices.batch_text.catalog.mode === 'auto' ? AUTO_CATALOG_ID : drawChoices.batch_text.catalog.id;
 		const batchStage1Model = drawChoices.batch_text.models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
@@ -1222,10 +1224,18 @@ export function createWorkState(deps: WorkStateDeps) {
 				}),
 				onLatestResult: (painted) => {
 					thinking = painted.thinking;
-					if (inputMode === 'batch' && batch.autoFollowLatest) displayLatestBatchRender();
+					if (inputMode === 'batch' && batch.autoFollowLatest) {
+						displayedHistoryItem = savedWork;
+						displayLatestBatchRender();
+					}
 				},
 				onPaintComplete: () => { elapsedTotalMs = Date.now() - _timerStart; },
-				refreshAfterServerSave: () => deps.history().refreshAfterServerSave(),
+				refreshAfterServerSave: async () => {
+					await deps.history().refreshAfterServerSave();
+					const id = batch.latestResult?.history_id;
+					savedWork = id && inputMode === 'batch' && batch.autoFollowLatest
+						? await deps.loadBatchSavedWork(id) : null;
+				},
 				refreshAfterRun: () => deps.history().refreshAfterRun(),
 			});
 		} catch (cause) {

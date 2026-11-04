@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Docs: rewrite the README in English and Japanese, with a key visual, examples of changing the model, changing the tools and line-by-line animation, the drawing modes, getting started and the current status. The Japanese input hint on Web, Android and macOS now reads "短い文で、表現したいものを入力。" ("in a short sentence").
-
 - macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.
@@ -584,6 +582,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.312 (2026-11-04 / Build 1388)
+
+- Docs: rewrite the README in English and Japanese, with a key visual, examples of changing the model, changing the tools and line-by-line animation, the drawing modes, getting started and the current status. The Japanese input hint on Web, Android and macOS now reads "短い文で、表現したいものを入力。" ("in a short sentence").
 
 ## v2.15.311 (2026-11-04 / Build 1387)
 

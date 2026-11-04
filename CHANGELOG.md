@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Read and draw, and draw from an image: give the drawer and tracer the tools' physical marks and ask for a tool word in each sentence using a forms word.
+
 - Android: show unread words not kept as written before approving a DDL completion proposal.
 
 - Web: before approving a DDL completion proposal, show unread words that the proposal does not keep as written.

@@ -1245,6 +1245,8 @@ Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が
 
 ### 12.6.6 画像から書く作品（画像タブ、2026-10-24）
 
+書く回と見比べの回の頼む文には、型で描くと同じ歳時記のてざわりの物の説明 `tool_marks` を入れ、かたちの語を使う文ごとに道具の語を一つ書くよう頼む（2026-11-04、I-728）。
+
 実行は、記述の代わりに画像から始められる（`AuthoringInput::Image`。2026-10-24 作者の依頼「画像ファイルから、直接DDLを生成する機能」、記述タブの右隣の画像タブ）。Visionのモデルが画像を見て、compilerが読む文法で可視DDLを直接書く。写生・作品計画・構図・法則・配色の段は通らず、記述も無い。hostの設定が`image`（`ImageConfig`。欄`review`）を持つときだけ行える。書く回と見比べの回の予算は`image_retry`（無ければStage 1の予算）、画像からのカタログ選びはカタログの予算を使う。
 
 - 画像はcoreに入らない: hostが画像を縮め（coreの決まり`inku.image-input-policy.v1`: 長辺1568画素まで、JPEGの質90、4 MiBまで、JPEGかPNG）、その参照（形式・送る画素数・SHA-256・バイト数）と元の画素数を渡す（`ImageInput`）。依頼は送る画像を順に`images`で名指す。画像の無い依頼はこの欄を書かず、bytesとdigestは変わらない。promptのdigestは画像の参照を含む。
@@ -1262,6 +1264,8 @@ Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が
 - バージョン: protocol（1.0.0）、binding、core APIのバージョンは変えない。ServerのPythonの出口に`pipeline_image_input_policy`・`pipeline_image_canvas`・`pipeline_image_review_svg`を足す（UniFFI・JNIの呼び出しは変えない）。
 
 ### 12.6.7 読んで描く作品（記述を読み、DDLを直接書く、2026-10-25）
+
+書く回と見比べの回の頼む文には、型で描くと同じ歳時記のてざわりの物の説明 `tool_marks` を入れ、かたちの語を使う文ごとに道具の語を一つ書くよう頼む（2026-11-04、I-728）。
 
 Server の `composition_form` は言葉で描く＋構図ありでのみ指定でき、親から自動では継がない。選択した未保存の描画済み実行は所有者が保存でき、構図と読みの記録を保持する。同じ実行の再保存は同じ作品を返し、生成数を二重に数えない。
 

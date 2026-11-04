@@ -2089,6 +2089,8 @@ In a run with colors, a **color stage** runs once after the laws stage (§12.6.4
 
 ### 12.6.6 A Work Written From an Image (the Image Tab, 2026-10-24)
 
+The writing and review prompts include the Saijiki's physical tool descriptions as `tool_marks`, as in typed drawing, and ask for one tool word in each sentence using a forms word (2026-11-04, I-728).
+
 A run may start from an image instead of a description (`AuthoringInput::Image`; the author's request of 2026-10-24 for "a function that generates DDL directly from an image file", an image tab to the right of the description tab). A Vision model sees the image and writes visible DDL directly in the grammar the compiler reads. The run passes no sketch, work plan, composition, laws or colors, and has no description. It is offered only when the host's configuration carries `image` (`ImageConfig`, field `review`). Writing and reviewing take the budget `image_retry` (Stage 1's when absent); choosing the catalog from the image takes the catalog budget.
 
 - The image never enters the core. The host shrinks it (the core's policy `inku.image-input-policy.v1`: the long side at most 1568 pixels, JPEG quality 90, at most 4 MiB, JPEG or PNG) and gives its reference (media type, sent size, SHA-256 and length) with the original's pixel size (`ImageInput`). A request names the images it sends, in order, in `images`; a request without images does not write the field, so its bytes and digest are unchanged. The prompt digest covers the images' references.
@@ -2106,6 +2108,8 @@ A run may start from an image instead of a description (`AuthoringInput::Image`;
 - Versions: the protocol (1.0.0), the binding version and the core API version are unchanged. The Server's Python binding adds `pipeline_image_input_policy`, `pipeline_image_canvas` and `pipeline_image_review_svg` (the UniFFI and JNI calls are unchanged).
 
 ### 12.6.7 A Work Read and Drawn From Its Description (Writing DDL Directly, 2026-10-25)
+
+The writing and review prompts include the Saijiki's physical tool descriptions as `tool_marks`, as in typed drawing, and ask for one tool word in each sentence using a forms word (2026-11-04, I-728).
 
 The Server accepts `composition_form` only for In words with composition enabled, and does not inherit it into a child. An owner can save a selected completed execution with its reading and composition record. Repeated saves return the same work without counting the generation twice.
 

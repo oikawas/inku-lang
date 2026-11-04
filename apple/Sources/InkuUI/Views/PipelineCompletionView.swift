@@ -1,4 +1,5 @@
 import Foundation
+import InkuHost
 import SwiftUI
 
 public struct PipelinePatchReview: Equatable {
@@ -6,6 +7,11 @@ public struct PipelinePatchReview: Equatable {
     public let proposal: String
     public let committedDDL: String
     public let proposedDDL: String
+
+    var unreadWordsNotKept: [String] {
+        guard let data = proposal.data(using: .utf8), let phase = try? ExactJSON(data: data) else { return [] }
+        return (phase["unread_words_not_kept"].array ?? []).flatMap { ($0["words"].array ?? []).compactMap(\.string) }
+    }
 }
 
 /// Web PipelineStatus: independent of a saved work, because a new execution can await approval.
@@ -27,6 +33,16 @@ struct PipelineCompletionView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         pane(model.display.webCopy("pipelineCommittedDdl", "保存済みのDDL"), review.committedDDL)
                         pane(model.display.webCopy("pipelineProposedDdl", "候補のDDL"), review.proposedDDL)
+                    }
+                }
+                if !review.unreadWordsNotKept.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(model.display.webCopy("pipelineUnreadNotKeptTitle", model.display.label("案にそのまま残らない語", "Words not kept as written")))
+                            .inkuFont(12, weight: .semibold)
+                        Text(model.display.webCopy("pipelineUnreadNotKeptHint", model.display.label("元の DDL で読めなかった語のうち、案に同じ字では残らない語です。消えたか、別の語に書き換わっています。採用の前に案と見比べてください。", "Words the original DDL could not read that the proposal does not keep as written. They were dropped or rewritten. Compare them with the proposal before approving.")))
+                            .inkuFont(12).foregroundStyle(.secondary)
+                        Text(review.unreadWordsNotKept.joined(separator: model.display.preferences.language == "en" ? ", " : "、"))
+                            .inkuFont(12, design: .monospaced).textSelection(.enabled)
                     }
                 }
                 HStack {

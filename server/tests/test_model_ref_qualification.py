@@ -175,3 +175,67 @@ def test_the_demo_prompt_pair_reads_the_single_string_it_replaced():
 def test_the_demo_prompt_model_keeps_its_own_colons():
     clean = _normalize_demo_settings({"prompt_provider": "ollama", "prompt_model": "gpt-oss:20b"})
     assert (clean["prompt_provider"], clean["prompt_model"]) == ("ollama", "gpt-oss:20b")
+
+
+@pytest.fixture
+def prepare_drawing_with_ambiguous_catalog(monkeypatch):
+    from inku_server import db
+    from inku_server.pipeline_candidate import PipelineBinding
+    from inku_server.pipeline_defaults import default_manifest
+    from inku_server.pipeline_product import ProductPipelineEffects
+
+    ambiguity = EXPECTATIONS["ambiguity"]
+    catalog = default_model_settings()
+    catalog["providers"][ambiguity["added_owner"]]["models"].append(
+        {"id": ambiguity["ref"], "label": ambiguity["ref"]}
+    )
+    actor = {"id": "author", "permission_groups": ["admins"], "model_settings":
+             normalize_user_model_settings({"stage1_provider": "ollama-cloud", "stage1_model": "another-model",
+                                            "stage2_provider": "nvidia"})}
+    monkeypatch.setattr(db, "get_user", lambda _owner: actor)
+    monkeypatch.setattr(db, "get_model_settings", lambda: catalog)
+    binding = PipelineBinding()
+    manifest = default_manifest(binding)
+    effects = ProductPipelineEffects(binding, manifest)
+    def prepare(ref):
+        _, context = effects.prepare("author", "description", "A circle", {"stage1_model": ref},
+                                     {"saved_config": manifest["pipeline"], "macro_catalog": {}})
+        return context["host_options"]
+
+    return prepare, actor, catalog
+
+
+def test_prepare_uses_user_stage_provider_for_ambiguous_name(prepare_drawing_with_ambiguous_catalog):
+    prepare, _actor, catalog = prepare_drawing_with_ambiguous_catalog
+    ambiguity = EXPECTATIONS["ambiguity"]
+    selected = prepare(ambiguity["ref"])
+    old_resolution = provider_for_model(selected["stage1_model"], stage="stage1", settings=catalog)
+    assert (selected["stage1_model"], selected["stage2_model"]) == (
+        f"ollama-cloud:{ambiguity['ref']}", f"ollama-cloud:{ambiguity['ref']}"
+    ), f"recorded {selected['stage1_model']!r}; execution would resolve {old_resolution!r}"
+
+
+def test_prepare_uses_user_stage_provider_when_ambiguous_name_matches_default(prepare_drawing_with_ambiguous_catalog):
+    prepare, actor, _catalog = prepare_drawing_with_ambiguous_catalog
+    ref = EXPECTATIONS["ambiguity"]["ref"]
+    actor["model_settings"]["stage1_model"] = ref
+    selected = prepare(ref)
+    assert (selected["stage1_model"], selected["stage2_model"]) == (f"ollama-cloud:{ref}", f"ollama-cloud:{ref}")
+
+
+@pytest.mark.parametrize(("ref", "expected"), [
+    ("ollama:gemma4:31b", "ollama:gemma4:31b"),
+    ("qwen3.5:4b-q4_K_M", "ollama:qwen3.5:4b-q4_K_M"),
+])
+def test_prepare_keeps_explicit_and_sole_owner_rules(prepare_drawing_with_ambiguous_catalog, ref, expected):
+    prepare, _actor, _catalog = prepare_drawing_with_ambiguous_catalog
+    selected = prepare(ref)
+    assert (selected["stage1_model"], selected["stage2_model"]) == (expected, expected)
+
+
+def test_prepare_does_not_mutate_catalog_or_user_settings(prepare_drawing_with_ambiguous_catalog):
+    prepare, actor, catalog = prepare_drawing_with_ambiguous_catalog
+    original_catalog, original_actor = deepcopy(catalog), deepcopy(actor)
+    prepare(EXPECTATIONS["ambiguity"]["ref"])
+    assert catalog == original_catalog
+    assert actor == original_actor

@@ -166,6 +166,8 @@ object InkuStringsEn : InkuStrings {
     override val pipelineProposal = "Review the proposed DDL changes."
     override val pipelineOriginalDdl = "Current DDL"
     override val pipelineProposedDdl = "Proposed DDL"
+    override val pipelineUnreadNotKeptTitle = "Words not kept as written"
+    override val pipelineUnreadNotKeptHint = "Words the original DDL could not read that the proposal does not keep as written. They were dropped or rewritten. Compare them with the proposal before approving."
     override val pipelineApprove = "Approve changes and draw"
     override val pipelineDecline = "Keep current DDL"
     override val pipelineResume = "Continue drawing"

@@ -177,6 +177,8 @@ interface InkuStrings {
     val pipelineProposal: String
     val pipelineOriginalDdl: String
     val pipelineProposedDdl: String
+    val pipelineUnreadNotKeptTitle: String
+    val pipelineUnreadNotKeptHint: String
     val pipelineApprove: String
     val pipelineDecline: String
     val pipelineResume: String

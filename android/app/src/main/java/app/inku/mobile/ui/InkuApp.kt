@@ -20,6 +20,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.text.font.FontFamily
 import android.content.Context
 import android.content.Intent
 import android.content.ClipData
@@ -7477,6 +7478,15 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 RangeDdlText(proposal.candidateDdl, preview = { bounds ->
                     state.selectedHistory?.let { RangeArtworkPreview(it, bounds) }
                 })
+                if (proposal.unreadWordsNotKept.isNotEmpty()) {
+                    Text(S.pipelineUnreadNotKeptTitle, style = MaterialTheme.typography.labelMedium)
+                    Text(S.pipelineUnreadNotKeptHint, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        proposal.unreadWordsNotKept.joinToString(if (state.uiLanguage.isEnglish) ", " else "、"),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
                 HoleCompletionReasons(completionDetails)
                 WrapRow {
                     TextButton(onClick = viewModel::approvePipelinePatch, enabled = !state.isDrawing) { Text(S.pipelineApprove) }

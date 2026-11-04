@@ -155,6 +155,7 @@ data class PipelinePatchProposal(
     val baseRevision: String,
     val patchJson: String,
     val candidateDdl: String,
+    val unreadWordsNotKept: List<String> = emptyList(),
 )
 
 /** A hole's check, with the author's source text; never a model replacement. */

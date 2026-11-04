@@ -160,6 +160,8 @@ object InkuStringsJa : InkuStrings {
     override val pipelineProposal = "DDLの変更案を確認してください。"
     override val pipelineOriginalDdl = "現在のDDL"
     override val pipelineProposedDdl = "変更後のDDL"
+    override val pipelineUnreadNotKeptTitle = "案にそのまま残らない語"
+    override val pipelineUnreadNotKeptHint = "元の DDL で読めなかった語のうち、案に同じ字では残らない語です。消えたか、別の語に書き換わっています。採用の前に案と見比べてください。"
     override val pipelineApprove = "変更を承認して描画"
     override val pipelineDecline = "変更しない"
     override val pipelineResume = "描画を続ける"

@@ -37,6 +37,20 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun approvalProposalProjectsUnreadWordsInOrderAndDefaultsToEmpty() = runBlocking {
+        suspend fun proposal(unread: JSONArray?): PipelinePatchProposal {
+            val binding = ScriptedBinding().apply { unreadWordsNotKept = unread }
+            return requireNotNull(host(binding, RecordingEffectProvider(), RecordingCommitStore(), MemoryExecutionStore())
+                .start(startRequest(PipelineAuthoring.Description("mist", false))).patchProposal)
+        }
+        val unread = JSONArray()
+            .put(JSONObject().put("hole_id", "first").put("words", JSONArray().put(" 霞 ").put("雨")))
+            .put(JSONObject().put("hole_id", "second").put("words", JSONArray().put("fog")))
+        assertEquals(listOf(" 霞 ", "雨", "fog"), proposal(unread).unreadWordsNotKept)
+        assertTrue(proposal(null).unreadWordsNotKept.isEmpty())
+    }
+
+    @Test
     fun descriptionRouteFieldsAreOnlySentForReadAndDraw() = runBlocking {
         val binding = ScriptedBinding(uniqueExecutions = true)
         val host = host(binding, RecordingEffectProvider(), RecordingCommitStore(), MemoryExecutionStore())
@@ -1359,6 +1373,7 @@ class SharedPipelineHostTest {
         var holeDelivers = false
         var retryStage1Once = false
         var holeCompletionCheck: JSONObject? = null
+        var unreadWordsNotKept: JSONArray? = null
         var completionRecord: JSONObject? = null
         val completionStatesRequests = mutableListOf<JSONObject>()
         var completionStatesResponse: String? = null
@@ -1521,6 +1536,7 @@ class SharedPipelineHostTest {
                     .put("candidate", visibleDocument("patched DDL"))
                     .put("proposal_digest", "proposal")
                     .put("base_revision", "1")
+                    .also { phase -> unreadWordsNotKept?.let { phase.put("unread_words_not_kept", it) } }
                 State.Ready -> JSONObject().put("tag", "score_ready")
                 State.Completed -> JSONObject().put("tag", "completed")
                 State.Cancelled -> JSONObject().put("tag", "cancelled")

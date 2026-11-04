@@ -724,6 +724,12 @@ class SharedPipelineHost(
                 baseRevision = phase.requiredString("base_revision"),
                 patchJson = phase.requiredObject("patch").toString(),
                 candidateDdl = phase.requiredObject("candidate").requiredString("source"),
+                unreadWordsNotKept = phase.optJSONArray("unread_words_not_kept")?.let { edits ->
+                    (0 until edits.length()).flatMap { index ->
+                        val words = edits.optJSONObject(index)?.optJSONArray("words")
+                        (0 until (words?.length() ?: 0)).mapNotNull { words?.opt(it) as? String }
+                    }
+                }.orEmpty(),
             )
         } else {
             null

@@ -354,7 +354,7 @@ export const ja: LangPack = {
 
 	clearInputBtn: '新規作成',
 	inputSectionLabel: '記述',
-	inputSectionHint: '短い文章で、表現したいものを入力。',
+	inputSectionHint: '短い文で、表現したいものを入力。',
 	inputMeterVerse: (count, target, form) => form ? `文字数 ${count}/${target}（${form}）` : `文字数 ${count}`,
 	inputMeterMora: (count, target, form, approximate) => `音数 ${approximate ? '約' : ''}${count}${form ? `/${target}（${form}）` : ''}`,
 	inputMeterLines: (count, target, form) => form ? `行数 ${count}/${target}（${form}）` : `行数 ${count}`,

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: attach unread fragments not retained verbatim to each affected hole in a DDL completion proposal awaiting approval.
+
 - macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.

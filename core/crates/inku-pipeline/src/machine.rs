@@ -829,6 +829,12 @@ pub enum PipelineInput {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UnreadWordsNotKept {
+    pub hole_id: String,
+    pub words: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "tag", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PipelinePhase {
     AuthoringStarted,
@@ -852,6 +858,8 @@ pub enum PipelinePhase {
         candidate: VisibleDocument,
         proposal_digest: String,
         base_revision: DecimalU64,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        unread_words_not_kept: Vec<UnreadWordsNotKept>,
     },
     /// The host is drawing the written DDL to show beside the image
     /// (`draw_image_review`).
@@ -4035,13 +4043,37 @@ impl PipelineSnapshot {
             "inku.pipeline-visible-patch-proposal.v1",
             &json!({"patch":patch,"candidate":candidate,"revision":DecimalU64::new(self.authority.revision())}),
         )?;
-        self.event(events, "visible_patch_proposed", json!({"base":self.document,"candidate":candidate,"patch":patch,"proposal_digest":proposal_digest}))?;
+        let unread_words_not_kept: Vec<_> = patch
+            .edits
+            .iter()
+            .filter_map(|edit| {
+                let replacement = edit.replacement.to_lowercase();
+                let words: Vec<_> =
+                    crate::hole_completion::unread_words(&base, edit.allowed_span.into())
+                        .into_iter()
+                        .map(|word| word.trim().to_owned())
+                        .filter(|word| {
+                            !word.is_empty() && !replacement.contains(&word.to_lowercase())
+                        })
+                        .collect();
+                (!words.is_empty()).then(|| UnreadWordsNotKept {
+                    hole_id: edit.hole_id.clone(),
+                    words,
+                })
+            })
+            .collect();
+        let mut event = json!({"base":self.document,"candidate":candidate,"patch":patch,"proposal_digest":proposal_digest});
+        if !unread_words_not_kept.is_empty() {
+            event["unread_words_not_kept"] = json!(unread_words_not_kept);
+        }
+        self.event(events, "visible_patch_proposed", event)?;
         self.action = None;
         self.phase = PipelinePhase::AwaitingPatchApproval {
             patch,
             candidate,
             proposal_digest,
             base_revision: DecimalU64::new(self.authority.revision()),
+            unread_words_not_kept,
         };
         Ok(())
     }
@@ -4474,6 +4506,7 @@ fn advance_impl(
                     candidate,
                     proposal_digest: expected,
                     base_revision,
+                    ..
                 } = state.phase.clone()
                 else {
                     return Err(ProtocolError::InvalidState);

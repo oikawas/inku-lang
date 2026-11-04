@@ -10,8 +10,8 @@
 
 **One sentence, one picture.**
 
-inku is an application that turns text or images into editable vector graphics (SVG).
-What the LLM outputs is not an image but **code in DDL, a drawing language people can read**. A typed compiler checks the DDL, and a Rust renderer outputs the SVG. The same input and seed reproduce the same SVG.
+inku is an application that turns a sentence or an image into vector graphics (SVG), using an LLM and a typed compiler.
+What the LLM outputs is not an image but **code in DDL, a drawing language people can read**. DDL is an original graphics description language: in the spirit of MML (Music Macro Language), it lets you describe a painting. The LLM interprets the sentence nondeterministically, differently for each model, and outputs DDL. What the DDL describes is drawn deterministically by the typed compiler. inku uses an LLM, yet gives you a creative environment that people can control.
 
 <!-- Key visual: the saved SVG of work c0e3251b-5f94-4cec-b752-bef70e99408d (parent 74dbedfe, Build 1385, render engine 96), rasterized by the core's svg_to_png to a 1000×1000 PNG (I-030: large pictures in the body are still PNGs) -->
 <p align="center">
@@ -26,9 +26,9 @@ Model GPT-6.1 Sol · color catalog Ink &amp; Season · seed 8569402127366273
 
 ---
 
-## Example: text → DDL → SVG
+## Example: sentence → DDL → SVG
 
-The input is ordinary text.
+The input is an ordinary sentence.
 
 ```
 After the summer rain, a lone red umbrella lay open upon the glistening cobblestones.
@@ -66,15 +66,15 @@ The compiler turns the DDL into a JSON intermediate representation (the Score), 
 </p>
 <p align="center"><sub>Model GPT-6.1 Sol · color catalog Weathered Heritage · seed 3886759235775369</sub></p>
 
-DDL is written as short sentences in English or Japanese. It can be read without prior knowledge, and edited directly and drawn again. A quoted line such as `"glistening cobblestones"` is a label on a group of shapes; it does not change the drawing.
+DDL is written as short sentences in English or Japanese. It can be read without prior knowledge, and edited directly to draw the work again. A quoted line such as `"glistening cobblestones"` is a label on a group of shapes; it does not change the drawing.
 
 ### Change the model
 
-The same text, read by a different model, gives a different reading and a different picture. The choice of model is one more variable of expression.
+The same sentence, read by a different model, gives a different reading and a different picture. The choice of model is one more variable of expression. Even the same model reads differently each time, so here, too, there is sway.
 
 <!-- Work 86a9a876 (GPT-6.1 Sol) and its children 009ea32d, 66dc1105, 3de5c74d, dfeddfa2, drawn with "Change the model" in the work edit menu, exported with the web's "Transition animation" (GIF, 480×480, cut, 1.0 s each, endless loop, 0.17 MiB. I-030) -->
 <p align="center">
-  <img src="docs/assets/readme/umbrella-models.en.gif" width="420" alt="Pictures of the same red umbrella text, drawn by five models, change every second. Gray watercolor discs tiled like cobblestones on a dark slate ground, under a red ellipse. Rows of gray ovals and thin blue vertical lines on a pale gray ground, with a large red circle left of center. A red circle with dark specks on a blue-gray ground ruled by a thin blue grid. A red circle at lower left on blue-gray, with pale ellipses at upper right and a chain of thin circles along the bottom. A red circle over a chain of black rings along the bottom, with a pale cloudy shape at upper right">
+  <img src="docs/assets/readme/umbrella-models.en.gif" width="420" alt="Pictures of the same red umbrella sentence, drawn by five models, change every second. Gray watercolor discs tiled like cobblestones on a dark slate ground, under a red ellipse. Rows of gray ovals and thin blue vertical lines on a pale gray ground, with a large red circle left of center. A red circle with dark specks on a blue-gray ground ruled by a thin blue grid. A red circle at lower left on blue-gray, with pale ellipses at upper right and a chain of thin circles along the bottom. A red circle over a chain of black rings along the bottom, with a pale cloudy shape at upper right">
 </p>
 <p align="center"><sub>Frames in order: GPT-6.1 Sol → GPT-6.1 Terra → Gemini 3.8 Flash → Claude Sonnet 5.5 → Claude Opus 5.5</sub></p>
 
@@ -95,28 +95,28 @@ The same text, read by a different model, gives a different reading and a differ
 
 ## From abstract to figurative
 
-inku began as a generator of abstract pictures. It can now draw concrete motifs as well.
+inku began as a generator of abstract pictures (getting it to interpret a sentence and draw a picture whose meaning comes through turned out to be harder than expected). It can now draw concrete motifs as well.
 
 - **Position and size in coordinates** — as in "at horizontal 0.6, vertical 0.4, width 0.1, height 0.3", position and size are given as fractions of the canvas. The red umbrella above is written this way
-- **Motif words you can add** — plugins add words to the vocabulary. Scene words, for a stream, the sea, rain, or young leaves, draw their defined picture as it is. Object words, such as one for stars, can be placed like shapes, with position, count, size, and tilt. A plugin word is called by its name in braces, as in `{stars}.` Both kinds are made of the core shapes and tools
-- **Composition** — the LLM can also choose a composition from principles of painting, design, and music, decide the position and size of the motifs, and then write the DDL
-- **Starting from an image** — a model with Vision looks at a photo or a picture and writes DDL. The result remains as editable DDL
+- **Motif words you can add** — plugins add words to the vocabulary. Scene words, for a stream, the sea, rain, or young leaves, draw their defined picture as it is. Object words, such as one for stars, can be placed like shapes, with position, count, size, and tilt. A plugin word is called by its name in braces, as in `{stars}.` A plugin holds word definitions (macros) that expand into the form of ordinary DDL
+- **Composition** — the LLM can also choose a composition from general principles of painting, design, and music, decide the position and size of the motifs, and then write the DDL
+- **Starting from an image** — a model with Vision looks at a photo or a picture and writes DDL. It is an easy way to see what DDL can express. The result remains as editable DDL
 
 <table><tr><td><img src="docs/plugins/water.svg" width="420" alt="A plugin sample drawing water lines, ripples, and water rings in ultramarine and pale ink on a washi ground"></td></tr></table>
 
 This is the output of the plugin sample "water" (after the flowing-water motif of the Rinpa school and the ripples of Japanese painting). → [Plugin examples](docs/plugins/README.md)
 
-Words of judgment or feeling, such as "beautifully" or "sadly", are not in the vocabulary. DDL can say only what can be checked by looking: shape, tool, position, motion, and relation. What to express is up to the writer.
+Words of judgment or feeling, such as "beautifully" or "sadly", are not in the vocabulary. DDL can say only what can be checked by looking: shape, tool, position, motion, and relation. This is a design decision, to keep the LLM's nondeterminism out of DDL. What to express is up to the writer.
 
 ---
 
 ## Who it is for
 
-- **Illustration and design** — draft vector illustrations from text and refine them by editing the DDL. Colors can be swapped just by changing the color catalog
-- **Generative art and creative coding** — generative works written in sentences instead of code. Seed-driven sway, a brush engine that draws 11 tools (pencil, watercolor, oil paint, etching, and more), 7 paper and canvas grounds, and 13 color catalogs
-- **Language implementation and compilers** — a natural-language DSL that can be written in English or Japanese. A typed semantic representation that keeps source positions, and error recovery that does not guess at a clause it cannot read but drops only that clause, with a diagnostic. → [SPEC.md](SPEC.md)
+- **Illustration and design** — draft vector illustrations from a sentence and refine them into a finished work by editing the DDL. Export the SVG and edit it in other applications
+- **Generative art and creative coding** — for generative works written in sentences instead of code. Seed-driven sway, a brush engine that draws 11 tools (pencil, watercolor, oil paint, etching, and more), 7 paper and canvas grounds, and 13 color catalogs to work with, and batches for many trial drawings at once
+- **Language implementation and compilers** — built as a natural-language DSL that can be written in English or Japanese. It implements a typed semantic representation that keeps source positions, and error recovery that does not guess at a clause it cannot read but drops only that clause, with a diagnostic. → [SPEC.md](SPEC.md)
 - **LLM applications and agent development** — a design that alternates nondeterministic LLM steps with deterministic programs. Structured output under a JSON Schema keeps the LLM's output inside the vocabulary. A CLI that can drive every API. → [Architecture](docs/architecture/README.md)
-- **Poets and readers of poetry** — give a poem as it is, and see what its words become in the picture and what does not survive. Words of feeling and judgment cannot be written in DDL, so what remains is what can be checked by looking: shape, color, and position. The key visual and the "One line at a time" example on this page start from classical Japanese waka and tanka
+- **Poets and readers of poetry** — give a poem as it is, and see its world as a picture. Combined with an LLM, one sentence can draw out many different images. The key visual and the "One line at a time" example on this page start from classical Japanese waka and tanka
 
 ---
 
@@ -125,10 +125,10 @@ Words of judgment or feeling, such as "beautifully" or "sadly", are not in the v
 ```
   Input                      LLM (nondeterministic)
   ───────────────────────────────────────────────────────────────
-  Text ─┬─ Direct          reads the text, writes DDL, looks at the rendered result, and fixes it once
-        └─ Structured      DDL is built mechanically from structured output bound by a JSON Schema
-  Image ── a model with Vision looks at the image and writes DDL
-  By hand  the user writes DDL directly
+  Sentence ─┬─ Direct          reads the sentence, writes DDL, looks at the rendered result, and fixes it once
+            └─ Structured      DDL is built mechanically from structured output bound by a JSON Schema
+  Image ────── a model with Vision looks at the image and writes DDL
+  By hand      the user writes DDL directly
                     │
                     ▼
   DDL               readable, editable source. From here on, everything is deterministic
@@ -136,16 +136,16 @@ Words of judgment or feeling, such as "beautifully" or "sadly", are not in the v
                     │  (for a clause it cannot interpret, the LLM proposes a completion and the user approves it)
                     ▼
   Score (JSON)      the intermediate representation stored in the DB
-                    │  renderer (seed-driven sway)
+                    │  renderer
                     ▼
   SVG
 ```
 
 **The LLM takes part only up to writing the DDL.** From DDL on, everything is deterministic: the same Score, the same seed, and the same drawing conditions give the same SVG. A different seed gives an SVG whose line tremor and placement differ a little.
 
-**There are two modes.** The web default is direct (shown in the UI as "Draw with words"). The LLM writes the DDL, including the numbers for position and size. When the compiler returns lines that cannot be drawn as written, with reasons, the LLM rewrites once, and any lines still left are dropped before drawing. In structured mode ("Draw with types"), the LLM returns JSON built only from vocabulary enums, and the DDL is generated from it mechanically. Earlier, the LLM wrote DDL directly; in 150 saved records, 193 of 458 sentences (42%) fell outside the vocabulary or grammar and could not be compiled. Structured mode brings this to zero.
+**There are two modes.** The web default is direct (shown in the UI as "Draw with words"). The LLM infers the background of the sentence, composes the picture, and writes the DDL, including the numbers for position and size. The result is a more figurative picture. In structured mode ("Draw with types"), the sentence is taken more mechanically: the LLM returns JSON built only from vocabulary enums, and the DDL is generated from it mechanically. The result leans toward the abstract.
 
-The interpreting model can be chosen (OpenAI, Anthropic, Gemini, NVIDIA, local Ollama, or your own ChatGPT plan). A different model changes the output a great deal.
+The interpreting model can be chosen (OpenAI, Anthropic, Gemini, or a local LLM). No model is built into the app; each is called through an API. Your ChatGPT plan (its subscription allowance) can also be used. A different model changes the output a great deal.
 
 The compiler, the Score, the renderer, and the state machine of the drawing pipeline live in a **shared Rust core**. The server (Python), Android (Kotlin), and macOS (Swift) all call the same core, so the same DDL gives the same result everywhere.
 
@@ -289,7 +289,7 @@ draw one orange thick swaying line from horizontal 0.78, vertical 0.743 to horiz
 
 ### Vocabulary
 
-The vocabulary dictionary (called **Saijiki** in the apps) is finite. In the apps, choosing a word shows a sample drawing and what the word does, so you can write without memorizing the vocabulary.
+The vocabulary dictionary (called **Saijiki** in the apps) holds a carefully chosen set of words. In the apps, choosing a word shows a sample drawing and what the word does, so you can write without memorizing the vocabulary.
 
 <details>
 <summary>The vocabulary (v3, 16 categories)</summary>
@@ -313,7 +313,7 @@ The vocabulary dictionary (called **Saijiki** in the apps) is finite. In the app
 | proportions | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | relations | along, not touching, touching, cutting, between, connected, resting on, inside, overlaps, crossing, mirrored |
 
-Color names are drawn with the colors of the chosen color catalog. The canonical vocabulary is `core/crates/inku-ddl/assets/saijiki-v3.json`, and `inku-cli reference --md` prints the full list. Plugin words (such as `{stars}`) only expand into combinations of core words; they do not change the core vocabulary. → [PLUGIN.md](PLUGIN.md)
+Color names are drawn with the colors of the chosen color catalog. Plugin words (such as `{stars}`) are macros: they only expand into combinations of core words; they do not change the core vocabulary. → [PLUGIN.md](PLUGIN.md)
 
 </details>
 
@@ -321,7 +321,7 @@ Color names are drawn with the colors of the chosen color catalog. The canonical
 
 ## Editing and derivation history
 
-<table><tr><td><img src="docs/assets/ui/describe-and-paint-dark.en.png" width="900" alt="On the left, a text box with the DDL below it, each word colored by its kind. On the right, a large canvas shows a work of white lines crossing a blue ground, and a row of history thumbnails runs along the bottom"></td></tr></table>
+<table><tr><td><img src="docs/assets/ui/describe-and-paint-dark.en.png" width="900" alt="On the left, the Description box with the DDL below it, each word colored by its kind. On the right, a large canvas shows a work of white lines crossing a blue ground, and a row of history thumbnails runs along the bottom"></td></tr></table>
 
 The first output is a starting point. Edit the DDL, change the color catalog, redraw the placement. Choose one candidate, and it becomes the parent of the next edit. Parent and child are saved as a **derivation tree**.
 
@@ -348,12 +348,16 @@ Instead, the SVG that was output is saved as it is, so the original output can a
 | How to use it | Steps |
 |---|---|
 | **On a Mac, with your own ChatGPT plan** (single user) | [Start with Docker Desktop](docs/guide/docker-desktop.md) |
-| **Run the release image on a server** (API keys, multiple users) | [`deploy/README.md`](deploy/README.md) |
+| **Run the Docker image on a server** (API keys, multiple users) | [`deploy/README.md`](deploy/README.md) |
 | **macOS app** (no server, Universal, macOS 14 or later) | [apple/README.md](apple/README.md) |
 | **Android app** (no server, Android 15 or later, arm64) | [Installing the APK](docs/guide/android-apk.md) |
 | **From source** | [SETUP.md](SETUP.md) |
 
-The easiest way is Docker Desktop with your own ChatGPT plan.
+The easiest way is the macOS app with your own ChatGPT plan.
+
+There is no native Windows app for now. On Windows, run the Docker container (WSL 2) and use the web UI (signing in with a ChatGPT plan on Windows is untested).
+
+To run it with Docker Desktop, start like this:
 
 ```sh
 git clone https://github.com/oikawas/inku-lang.git && cd inku-lang
@@ -369,11 +373,11 @@ After it starts, bring your ChatGPT sign-in into the container and choose a mode
 
 | | Status |
 |---|---|
-| **Web** (SvelteKit + FastAPI) | Running. Text, images, batch drawing, derivation tree. Direct and structured modes |
-| **CLI** (`inku-cli`) | Can do everything the GUI can, through the public API only. Meant for use by AI agents |
-| **Android** | Running ([`android/VERSION`](android/VERSION)). Calls the shared core on the device. Camera input |
-| **macOS** | Distributed ([`apple/VERSION`](apple/VERSION)). Calls the shared core on the Mac. A signed and notarized `.dmg` |
-| **Shared core** (Rust) | Compiler, Score, renderer, and the state machine of the drawing pipeline. Everything above uses the same core |
+| **Web** (SvelteKit + FastAPI) | The main line of development is this server version. Almost every feature is available, including multi-user use. No camera |
+| **CLI** (`inku-cli`) | A CLI that can do everything the GUI can, through the public API only. Meant for use by AI agents |
+| **Android** | Distributed ([`android/VERSION`](android/VERSION)). Calls the shared core on the device. Camera input |
+| **macOS** | Distributed ([`apple/VERSION`](apple/VERSION)). Calls the shared core on the Mac. Shipped as a signed and notarized `.dmg` |
+| **Shared core** (Rust) | Implements the compiler, the Score, the renderer, and the state machine of the drawing pipeline |
 
 DDL supports English and Japanese, and the author maintains both. The Score JSON does not depend on language, but DDL needs tuning for each language, and there is no mechanism yet for adding other languages. Contributions in other languages are welcome.
 
@@ -381,13 +385,13 @@ DDL supports English and Japanese, and the author maintains both. The Score JSON
 
 ## Background
 
-The idea came on April 2, 2026, at the exhibition "Sol LeWitt: Open Structure" at the Museum of Contemporary Art Tokyo. LeWitt's wall drawings are painted on the wall by craftspeople, following instructions the artist wrote. The starting point was the question: could an LLM take the craftsperson's part?
+The first idea of DDL came on April 2, 2026, at the exhibition "Sol LeWitt: Open Structure" at the Museum of Contemporary Art Tokyo. LeWitt's wall drawings are painted on the wall by craftspeople, following instructions the artist wrote. The starting point was the question: could a computer take the craftsperson's part?
 
 | Source of the idea | What inku took from it |
 |---|---|
 | **Sol LeWitt's instructions** | The written description itself is the work. The one who describes and the hand that draws are separate |
 | **Bonsai** | A narrower vocabulary leads to better expression |
-| **Tanka** | Short text that holds many meanings is the expected input |
+| **Tanka** | A short sentence that holds many meanings is the expected input |
 
 ---
 

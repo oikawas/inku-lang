@@ -48,6 +48,16 @@ func runImageChecks(realOpus: Bool = false) async throws {
     let provenance = ImageProvenance.text(url: imageURL, includeFileName: true, includeExif: true, language: "ja")
     app.setImageInput(prepared, fileName: imageURL.lastPathComponent, automaticProvenance: provenance)
     guard app.canvasID == "square" else { throw CheckFailure.message("image changed description paper") }
+    var languageFailures: [String] = []
+    for uiLanguage in ["en", "ja"] {
+        app.display.preferences.language = uiLanguage
+        let request = try app.requestForImage(prepared, provenance: "日本語の来歴")
+        let actual = try ExactJSON(data: request.configuration)["language"].string ?? "missing"
+        FileHandle.standardError.write(Data("Image request UI=\(uiLanguage): language=\(actual), expected=\(uiLanguage)\n".utf8))
+        if actual != uiLanguage { languageFailures.append("UI=\(uiLanguage): expected \(uiLanguage), got \(actual)") }
+    }
+    app.display.preferences.language = "ja"
+    guard languageFailures.isEmpty else { throw CheckFailure.message("image request language: " + languageFailures.joined(separator: "; ")) }
     let automatic = try app.requestForImage(prepared, provenance: "")
     guard try ExactJSON(data: automatic.renderOptions)["canvas_aspect_id"].string == "sd_monitor" else {
         throw CheckFailure.message("automatic image paper")

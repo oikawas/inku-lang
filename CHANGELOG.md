@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: use the selected language or UI language for instructions written from an image.
+
 - Server, Web and CLI: image instructions follow the explicitly requested language or UI language, without using the source note as a language hint.
 
 - Render engine 99: check an open arc's extent by its swept stroke so shallow arcs with large circle radii can draw.

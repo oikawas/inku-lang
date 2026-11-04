@@ -1131,7 +1131,7 @@ public final class AppModel {
         guard SettingsModel.isRegisteredModelAvailable(vision, purpose: "vision", settings: settings) else { throw HostError("vision_model_not_available") }
         let selectedCanvasID = canvasID ?? imageCanvasID
         let resolvedCanvasID = selectedCanvasID == "image" ? image.nearestFormatID : selectedCanvasID
-        var request = try bootstrap.request(inputMode: "description", source: "", description: "", language: "ja",
+        var request = try bootstrap.request(inputMode: "description", source: "", description: "", language: instructionLanguage(for: ""),
             catalogID: catalogID, canvasID: resolvedCanvasID, seed: seedText, wild: false,
             settings: nextGenerationHostSettings, parentWorkID: nil, derivationKind: "new",
             catalogMode: catalogMode, sketch: .off)

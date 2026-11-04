@@ -19,6 +19,8 @@ test('the saved-work strip retains sketch results and readable condition names',
 	assert.match(PANEL, /drawOptionRows\(statusHistoryItem\?\.draw_options/);
 	assert.match(PANEL, /statusStage1ModelOnly/);
 	assert.match(PANEL, /statusStage2ModelOnly/);
+	assert.match(PANEL, /isJapanese \? '解釈' : 'Interpretation'/);
+	assert.match(PANEL, /isJapanese \? '描画' : 'Performance'/);
 	assert.match(PANEL, /statusCatalogName/);
 	assert.match(PANEL, /statusCanvasName/);
 	assert.match(PANEL, /sketchStateShort\(statusSketchState, isJapanese\)/);

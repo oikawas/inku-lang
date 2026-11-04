@@ -745,8 +745,8 @@
 									{:else if statusHistoryItem.draw_options.models.stage1 === statusHistoryItem.draw_options.models.stage2}
 										<span class="render-meta-model-line"><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
 									{:else}
-										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '指示書' : 'Instructions'}</span><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
-										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '補完' : 'Completion'}</span><span class="render-meta-model-name">{statusStage2ModelOnly}</span></span>
+										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '解釈' : 'Interpretation'}</span><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
+										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '描画' : 'Performance'}</span><span class="render-meta-model-name">{statusStage2ModelOnly}</span></span>
 									{/if}
 								</strong>
 							{:else if option.key === 'catalog' && statusHistoryItem?.draw_options?.catalog}

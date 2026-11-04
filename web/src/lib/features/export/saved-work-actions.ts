@@ -20,6 +20,7 @@ export type SavedWorkExportActionsDeps = {
 	catalogName: (id: string | null | undefined) => string;
 	formatDate: (at: number) => string;
 	previewText: (text: string) => string;
+	rememberAnimation?: (settings: AnimationExportSettings) => void;
 };
 
 function savedWorkFilename(item: HistoryItem, extension: string, size?: number): string {
@@ -160,6 +161,7 @@ export function makeSavedWorkExportActions(deps: SavedWorkExportActionsDeps) {
 			return saveBlob(blob, savedWorkFilename(item, 'inku-ddl.json'), { enabled: downloadFolderSettings.enabled });
 		},
 		onDownloadAnimation: async (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => {
+			deps.rememberAnimation?.(settings);
 			const items = await resolveSnapshot(snapshot);
 			return downloadAnimation(deps.apiFetch, items.map((item) => item.id as string), settings, directory);
 		},

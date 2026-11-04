@@ -81,6 +81,25 @@ export function parseAnimationExportSettings(value: string | null): AnimationExp
 	}
 }
 
+const ANIMATION_LAST_USED_KEY = 'inku-animation-export-last-used:';
+
+export function loadLastAnimationExport(owner: string): AnimationExportSettings | null {
+	try {
+		const raw = localStorage.getItem(ANIMATION_LAST_USED_KEY + owner);
+		return raw === null ? null : parseAnimationExportSettings(raw);
+	} catch {
+		return null;
+	}
+}
+
+export function saveLastAnimationExport(owner: string, settings: AnimationExportSettings): void {
+	try {
+		localStorage.setItem(ANIMATION_LAST_USED_KEY + owner, JSON.stringify(normalizeAnimationExportSettings(settings)));
+	} catch {
+		// The current session still keeps the choice when browser storage is unavailable.
+	}
+}
+
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
 export function animationExportRequest(ids: string[], settings: AnimationExportSettings): Record<string, unknown> {

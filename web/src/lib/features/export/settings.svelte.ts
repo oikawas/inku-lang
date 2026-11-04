@@ -1,6 +1,9 @@
 import {
 	DEFAULT_ANIMATION_EXPORT_SETTINGS,
+	loadLastAnimationExport,
+	normalizeAnimationExportSettings,
 	parseAnimationExportSettings,
+	saveLastAnimationExport,
 	type AnimationExportSettings
 } from '$lib/animationExport';
 import {
@@ -26,9 +29,33 @@ const CLIPBOARD_EXPORT_SETTINGS_KEY = 'inku-clipboard-export-settings';
 class ExportSettings {
 	pngAlphaWhite = $state(false);
 	animation = $state<AnimationExportSettings>({ ...DEFAULT_ANIMATION_EXPORT_SETTINGS });
+	lastAnimation = $state<AnimationExportSettings | null>(null);
+	private animationOwner: string | null = null;
 	card = $state<CardExportSettings>({ ...DEFAULT_CARD_EXPORT_SETTINGS });
 	clipboard = $state<ClipboardExportSettings>({ ...DEFAULT_CLIPBOARD_EXPORT_SETTINGS });
 	private loaded = $state(false);
+
+	get selectedAnimation(): AnimationExportSettings {
+		return this.lastAnimation ?? this.animation;
+	}
+
+	set selectedAnimation(value: AnimationExportSettings) {
+		if (this.animationOwner) this.rememberAnimation(this.animationOwner, value);
+		else this.animation = normalizeAnimationExportSettings(value);
+	}
+
+	setAnimationOwner = (owner: string | null) => {
+		if (this.animationOwner === owner) return;
+		this.animationOwner = owner;
+		this.lastAnimation = owner ? loadLastAnimationExport(owner) : null;
+	};
+
+	rememberAnimation = (owner: string | null, settings: AnimationExportSettings) => {
+		if (!owner) return;
+		this.setAnimationOwner(owner);
+		this.lastAnimation = normalizeAnimationExportSettings(settings);
+		saveLastAnimationExport(owner, this.lastAnimation);
+	};
 
 	// The caller owns the try/catch (see color-catalog).
 	load = () => {

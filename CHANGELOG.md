@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: remember animation export choices per user in this browser for the next export.
+
 - Android: show unread words not kept as written before approving a DDL completion proposal.
 
 - Web: before approving a DDL completion proposal, show unread words that the proposal does not keep as written.

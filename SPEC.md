@@ -1373,8 +1373,9 @@ format (APNG/GIF), resolution, and custom height, single-work DDL display,
 interval, and replay behavior, and the multiple-work transition and hold time.
 The export modal shows the controls for the selected number of works. Size and
 save location are shared by both modes. Supported browsers offer a save-location
-button to choose a folder. Changes in the modal apply only to this export and
-do not update the default settings or folder. Without a destination override,
+button to choose a folder. Starting an export saves its settings per user in
+this browser for next time; the settings tab can also change them. A folder
+chosen in the modal applies only to this export. Without a destination override,
 the existing save settings apply; browsers without folder selection use their
 own download settings. Failure to write to a folder chosen for this export stays
 visible in the modal and does not redirect the file to another destination.

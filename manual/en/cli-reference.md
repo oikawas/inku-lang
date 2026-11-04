@@ -84,7 +84,7 @@ For limits they record the values used in `render_limits` and their origin in `r
 
 | Flag | Contents |
 |---|---|
-| `--image PATH` | Draw from this image instead of a description, as the web image tab does. The Vision model writes the DDL in Japanese, and the paper follows the image unless `--canvas-aspect` names one. The server keeps the image in memory for the run and never saves it |
+| `--image PATH` | Draw from this image instead of a description, as the web image tab does. The Vision model writes DDL in `--instruction-lang` (default `auto` uses the UI language, or Japanese if absent), and the paper follows the image unless `--canvas-aspect` names one. The server keeps the image in memory for the run and never saves it |
 | `--provenance TEXT` | The image's source note. It is kept with the work apart from the description and never sent to the models |
 | `--provenance-file PATH` | Read the source note from a UTF-8 file; `-` means stdin |
 | `--vision-model MODEL` | The Vision model that writes the DDL. Defaults to the one saved with `models --vision-model` |

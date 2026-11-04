@@ -22,7 +22,7 @@ from inku_server.pipeline_api import PipelineService, pipeline_router, register_
 from inku_server.pipeline_candidate import CandidateHostError, PipelineBinding
 from inku_server.pipeline_defaults import default_manifest
 from inku_server.pipeline_images import PendingImages, prepare_image
-from inku_server.pipeline_product import ProductPipelineEffects
+from inku_server.pipeline_product import ProductPipelineEffects, record_system_prompt
 
 
 def _file(format="PNG", size=(80, 40), *, exif=None):
@@ -117,6 +117,7 @@ def image_host(tmp_path, monkeypatch):
     def provider(owner, context, images):
         def perform(action):
             assert owner == "owner"
+            record_system_prompt(context, action)
             refs = action["payload"]["prompt"]["images"]
             assert len(images) == len(refs)
             for data_url, ref in zip(images, refs, strict=True):
@@ -163,6 +164,21 @@ def _wait(service, execution_id):
             return run, view
         time.sleep(0.01)
     pytest.fail("image run did not finish")
+
+
+def test_image_uses_english_ui_not_japanese_provenance(image_host):
+    client, service, _effects, _sent, _admission = image_host
+    uploaded = client.post("/api/pipeline/images", content=_file(),
+                           headers={"x-owner": "owner", "content-type": "application/octet-stream"})
+    assert uploaded.status_code == 200
+    started = client.post("/api/pipeline/variations", headers={"x-owner": "owner"}, json={
+        "kind": "image", "text": "test data: 海辺で撮った写真。", "image_id": uploaded.json()["image_id"],
+        "options": {"stage1_model": "openai:fixture-vision", "ui_lang": "en"},
+    })
+    assert started.status_code == 200, started.text
+    run, _view = _wait(service, started.json()["execution_id"])
+    assert run.config["language"] == "en"
+    assert run.context["system_prompts"]["image_ddl"]["instruction_language"] == "en"
 
 
 def test_image_http_to_review_commit_and_saved_history_keeps_no_input_bytes(image_host):

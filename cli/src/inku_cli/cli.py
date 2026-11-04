@@ -2470,7 +2470,8 @@ def _image_pipeline_options(
     color_catalog: str,
 ) -> dict[str, Any]:
     # The options the web image tab sends (state.svelte.ts submitImage): the
-    # Vision model writes the DDL in Japanese, the paper is fitted to the image
+    # DDL uses --instruction-lang; auto follows --ui-lang or falls back to Japanese.
+    # The paper is fitted to the image
     # and there is no sketch or wild performance. The server saves a pipeline
     # work unless told not to, so `save_history` is always named.
     options: dict[str, Any] = {
@@ -2478,7 +2479,7 @@ def _image_pipeline_options(
         "stage2_model": vision_model,
         "sketch": "off",
         "wild": False,
-        "instruction_lang": "ja",
+        "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
         "catalog_mode": args.catalog_mode,
@@ -4780,7 +4781,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         parser.add_argument(
             "--image",
             metavar="PATH",
-            help="draw from this image instead of a description, as the web image tab does: the Vision model writes the DDL in Japanese and the paper follows the image unless --canvas-aspect names one; the server holds the image in memory only and never saves it",
+            help="draw from this image instead of a description, as the web image tab does: the DDL language follows --instruction-lang (auto uses --ui-lang or Japanese), and the paper follows the image unless --canvas-aspect names one; the server holds the image in memory only and never saves it",
         )
         parser.add_argument(
             "--provenance",

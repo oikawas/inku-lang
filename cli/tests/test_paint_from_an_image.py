@@ -111,7 +111,7 @@ def test_an_image_run_sends_the_image_tab_requests_and_writes_the_drawing(monkey
     options = start["options"]
     assert options["canvas_aspect"] == "golden"
     assert options["stage1_model"] == options["stage2_model"] == "chatgpt:gpt-6-luna"
-    assert (options["sketch"], options["wild"], options["instruction_lang"], options["canvas_fit"]) == ("off", False, "ja", "contain")
+    assert (options["sketch"], options["wild"], options["instruction_lang"], options["canvas_fit"]) == ("off", False, "auto", "contain")
     assert options["save_history"] is True
     assert "description" not in options
     assert _sent(server, "POST", "/api/pipeline/executions/e1/commands") == [{"tag": "perform"}]

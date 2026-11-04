@@ -363,8 +363,8 @@ class ProductPipelineEffects:
         except ValidationError as error:
             raise CandidateHostError("invalid_authoring_options") from error
         if kind == "image":
-            # Provenance never supplies a language hint or drawable text.
-            options.update(wild=False, sketch="off", instruction_lang="ja", canvas_fit="contain")
+            # Provenance is not drawable text and does not choose the language.
+            options.update(wild=False, sketch="off", canvas_fit="contain")
             options.pop("sketch_text", None)
             for key in ("history_input", "history_source_text"):
                 options[key] = ""
@@ -400,7 +400,8 @@ class ProductPipelineEffects:
         if kind == "image":
             config.setdefault("image", {"review": True})
         _apply_developer_options(config, options, developer_mode=_env_flag("INKU_DEVELOPER_MODE"))
-        language = _resolve_instruction_lang(text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
+        # Images use the requested or UI language; their source note is not a language hint.
+        language = _resolve_instruction_lang("" if kind == "image" else text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
         config["language"] = language
         if work and "saved_config" in work:
             catalog_context = deepcopy(work.get("macro_catalog", {}))

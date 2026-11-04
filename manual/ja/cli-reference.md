@@ -84,7 +84,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 
 | 旗 | 内容 |
 |---|---|
-| `--image PATH` | 記述の代わりにこの画像から描く。Web の画像タブと同じく、VisionモデルがDDLを日本語で書き、紙は `--canvas-aspect` を指定しなければ画像の比に近い紙になる。サーバーは画像を実行中のメモリにだけ置き、保存しない |
+| `--image PATH` | 記述の代わりにこの画像から描く。Web の画像タブと同じく、Visionモデルが `--instruction-lang`（既定 `auto` はUI言語、未指定なら日本語）でDDLを書き、紙は `--canvas-aspect` を指定しなければ画像の比に近い紙になる。サーバーは画像を実行中のメモリにだけ置き、保存しない |
 | `--provenance TEXT` | 画像の来歴。記述とは別の欄に作品と一緒に保存され、モデルには送らない |
 | `--provenance-file PATH` | 来歴をUTF-8ファイルから読む。`-` は標準入力 |
 | `--vision-model MODEL` | DDLを書くVisionモデル。省略すると `models --vision-model` で保存したモデル |

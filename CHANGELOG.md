@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server, Web and CLI: image instructions follow the explicitly requested language or UI language, without using the source note as a language hint.
+
 - Render engine 99: check an open arc's extent by its swept stroke so shallow arcs with large circle radii can draw.
 
 - Read and draw, and draw from an image: give the drawer and tracer the tools' physical marks and ask for a tool word in each sentence using a forms word.

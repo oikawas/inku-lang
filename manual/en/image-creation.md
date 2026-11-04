@@ -601,7 +601,7 @@ From Library the order is oldest to newest; from the lineage it runs from the or
 
 ## 16. Paint from an Image
 
-On the `Image` tab you paint from an image file instead of a description (v2.15.241). A Vision model reads the image and writes Japanese instructions directly, and those instructions are painted. The sketch, interpretation, composition reading, laws stage and color stage are not used.
+On the `Image` tab you paint from an image file instead of a description (v2.15.241). A Vision model reads the image and writes instructions directly, and those instructions are painted. The sketch, interpretation, composition reading, laws stage and color stage are not used.
 
 1. Open the `Image` tab (to the right of `Describe` among the input tabs).
 2. If you like, write the image's source or a note in `Source note`. It is saved with the work and is not used for painting. Choosing an image fills the source note with the file name and the shooting facts from the photo's Exif (time taken, camera, lens, exposure). The location (GPS) is never included. You can edit the note before painting, and a note you have typed yourself is kept. What goes in is chosen in `Settings` under `Image`, with the `Put the file name in the source note` and `Put the Exif in the source note` checkboxes (both on by default, kept in this browser).
@@ -617,7 +617,7 @@ The first time you paint from a picture after signing in, a warning says that pa
 | Color catalog | `Choose from image automatically` lets the model read the image and choose the work's color catalog. Choose another catalog to paint with it |
 | Canvas | `Use image aspect ratio` (the default) chooses, from the eleven papers (§7), the one closest to the image's ratio. Another paper can be chosen as well |
 
-Sketch from life and Lift the stroke limit do not appear on the Image tab; both are off. The instructions are written in Japanese whatever the UI language.
+Sketch from life and Lift the stroke limit do not appear on the Image tab; both are off. Since 2026-11-04, image instructions follow the UI language. An explicit Japanese or English API or CLI request takes precedence; a missing or unsupported UI language falls back to Japanese. The source note does not determine the language. Earlier image works used Japanese.
 
 While you wait, the indicator names the step at work.
 

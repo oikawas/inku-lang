@@ -449,7 +449,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			imageUploadConsumed = true;
 			const view = await finishPipeline(() => pipelineController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 				...pipelineOptions(), stage1_model: model, stage2_model: model,
-				sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
+				sketch: 'off', sketch_text: undefined, wild: false,
 				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 				canvas_fit: 'contain',
 			}, abortController.signal));
@@ -531,7 +531,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		try {
 			view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 				...pipelineOptions(), stage1_model: model, stage2_model: model,
-				sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
+				sketch: 'off', sketch_text: undefined, wild: false,
 				batch_run_id: runId, batch_line_number: runId ? imageFolder.current : undefined, batch_lease: lease,
 				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 				canvas_fit: 'contain',

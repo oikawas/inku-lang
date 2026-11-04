@@ -479,8 +479,63 @@ fn hue_tokens(name: &str) -> &'static [&'static str] {
     }
 }
 
+#[derive(Clone, Copy)]
+enum MachineColorNote {
+    CycleRestored,
+    ForegroundVisible,
+    CoverageClause,
+    PaperShardRestored,
+    PrimaryStrokePromoted,
+    SensoryLayerVisible,
+}
+
+const MACHINE_COLOR_NOTES: [MachineColorNote; 6] = [
+    MachineColorNote::CycleRestored,
+    MachineColorNote::ForegroundVisible,
+    MachineColorNote::CoverageClause,
+    MachineColorNote::PaperShardRestored,
+    MachineColorNote::PrimaryStrokePromoted,
+    MachineColorNote::SensoryLayerVisible,
+];
+
+fn abstract_colors(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .split('/')
+            .all(|color| HINT_HUE_PRIORITY.contains(&color))
+}
+
+fn machine_color_note(clause: &str) -> bool {
+    let clause = clause.trim();
+    MACHINE_COLOR_NOTES.iter().any(|pattern| match pattern {
+        MachineColorNote::CycleRestored => clause
+            .strip_suffix(" restored in color_cycle from DDL color intent")
+            .is_some_and(abstract_colors),
+        MachineColorNote::ForegroundVisible => clause
+            .strip_suffix(" foreground made visible")
+            .is_some_and(abstract_colors),
+        MachineColorNote::CoverageClause => clause
+            .strip_prefix("coverage from DDL clause: ")
+            .is_some_and(|ddl| !ddl.trim().is_empty()),
+        MachineColorNote::PaperShardRestored => {
+            clause == "paper_shard motif restored from DDL intent"
+        }
+        MachineColorNote::PrimaryStrokePromoted => clause
+            .strip_suffix(" promoted to primary stroke from DDL color intent")
+            .is_some_and(abstract_colors),
+        MachineColorNote::SensoryLayerVisible => clause
+            .split_once(" sensory layer made visible as pale ")
+            .is_some_and(|(first, second)| abstract_colors(first) && abstract_colors(second)),
+    })
+}
+
 fn hint_hues(hint: &str) -> BTreeSet<&'static str> {
-    let normalized = normalized_label(hint);
+    let hint = hint
+        .split([';', '；'])
+        .filter(|clause| !machine_color_note(clause))
+        .collect::<Vec<_>>()
+        .join(";");
+    let normalized = normalized_label(&hint);
     let words = ascii_words(&normalized);
     let mut hues = BTreeSet::new();
     for name in [
@@ -533,4 +588,93 @@ pub fn resolve_color(
         }
     }
     fallback
+}
+
+#[cfg(test)]
+mod i183_tests {
+    use super::*;
+
+    fn resolve(color: Color, hint: &str) -> String {
+        let colors = default_color_map();
+        resolve_color(color, Some(hint), &colors, &colors)
+    }
+
+    #[test]
+    fn i183_foreground_machine_note_keeps_black() {
+        assert_eq!(
+            resolve(Color::Black, "white foreground made visible"),
+            default_color(Color::Black)
+        );
+    }
+
+    #[test]
+    fn i183_promotion_note_keeps_authored_blue() {
+        assert_eq!(
+            resolve(
+                Color::Gray,
+                "red promoted to primary stroke from DDL color intent; 青い線"
+            ),
+            default_color(Color::Blue)
+        );
+    }
+
+    #[test]
+    fn i183_coverage_note_keeps_gray() {
+        assert_eq!(
+            resolve(
+                Color::Gray,
+                "coverage from DDL clause: 画面全体に黄色の細筆の小さな楕円を散らす"
+            ),
+            default_color(Color::Gray)
+        );
+    }
+
+    #[test]
+    fn i183_all_machine_note_patterns_require_complete_clauses() {
+        for note in [
+            "red/blue restored in color_cycle from DDL color intent",
+            "white foreground made visible",
+            "coverage from DDL clause: 黄色の弧",
+            "paper_shard motif restored from DDL intent",
+            "red promoted to primary stroke from DDL color intent",
+            "blue sensory layer made visible as pale white",
+        ] {
+            assert!(machine_color_note(note), "{note}");
+            assert_eq!(
+                resolve(Color::Gray, note),
+                default_color(Color::Gray),
+                "{note}"
+            );
+        }
+        assert_eq!(
+            resolve(Color::Gray, "white foreground made visible；青い線"),
+            default_color(Color::Blue)
+        );
+        for note in [
+            "white foreground made visible today",
+            "almost paper_shard motif restored from DDL intent",
+            "brown foreground made visible",
+            "white//red restored in color_cycle from DDL color intent",
+            "withered grass kept as muted blue-gray",
+        ] {
+            assert!(!machine_color_note(note), "{note}");
+        }
+    }
+
+    #[test]
+    fn i183_authored_color_hints_remain_effective() {
+        assert_eq!(resolve(Color::Green, "黄色"), default_color(Color::Yellow));
+        assert_eq!(
+            resolve(Color::Gray, "red restored flowers are visible"),
+            default_color(Color::Red)
+        );
+        assert_eq!(
+            resolve(Color::Gray, "white foreground made visible today"),
+            default_color(Color::White)
+        );
+        assert_eq!(
+            resolve(Color::Gray, "withered grass kept as muted blue-gray"),
+            default_color(Color::Blue)
+        );
+    }
 }

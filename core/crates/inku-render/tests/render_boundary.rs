@@ -9,6 +9,38 @@ fn score(json: &str) -> Score {
 }
 
 #[test]
+fn i183_color_cycle_svg_is_unchanged_by_machine_color_note() {
+    let score = score(
+        r#"{"version":"0.1.0","instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,"color":"black","color_hint":"white foreground made visible","arrangement":{"count":3,"layout":"horizontal","color_cycle":["blue","red"]}}]}"#,
+    );
+    let options = RenderOptions {
+        resolved_color_map: BTreeMap::new(),
+        catalog_id: None,
+        canvas: CanvasSize::new(1000.0, 1000.0),
+        canvas_aspect_id: "square".to_owned(),
+        svg_profile: SvgProfile::Display,
+        render_seed: Some(31),
+        composition_seed: Some(17),
+        wild: false,
+        error_policy: Default::default(),
+    };
+    let with_note = render(RenderRequest {
+        score: score.clone(),
+        options: options.clone(),
+    })
+    .unwrap();
+    let mut without_note = score;
+    without_note.instructions[0].color_hint = None;
+    let without_note = render(RenderRequest {
+        score: without_note,
+        options,
+    })
+    .unwrap();
+    assert_eq!(with_note.svg, without_note.svg);
+    assert!(with_note.svg.contains("#2c3e91") && with_note.svg.contains("#a2342a"));
+}
+
+#[test]
 fn canonical_python_score_accepts_explicit_null_fields() {
     let input = score(
         r#"{"version":"0.1.0","canvas":{"aspect":"square","ground":null},

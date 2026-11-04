@@ -2589,6 +2589,8 @@ One plan per instruction / Emit retains exact count, resolved dimensions, appear
 
 Render engine 97 checks transforms on non-square canvases and object boxes in short-side units and assigns omitted body diagnostics to the object instruction. An object counts once in `object_templates`; its contents count toward `template_nodes`, `primitive_marks`, and other resources. Redrawing saved works can reveal previously omitted transforms or objects.
 
+Render engine 98 excludes clauses matching known machine-note templates when reading color from a legacy Score's color hint, using the remaining nuance and instruction color. Saved SVGs do not change; a redraw can correct a color previously taken from a machine note.
+
 ## 13. The Design of Sway
 
 Sway is intentional.  DDL does not attempt to eliminate all model or

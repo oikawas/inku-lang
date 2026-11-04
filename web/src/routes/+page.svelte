@@ -3410,6 +3410,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{visionProvider}
 			{visionModel}
 			providerGroups={settings.mode === 'model' ? availableModelCatalog : settings.modelCatalog}
+			drawingProviderGroups={availableModelCatalog}
 			visionProviderGroups={availableVisionModelCatalog}
 			allowVisionSelection={modelSelectionAllowVision}
 			visionOnlySelection={modelSelectionVisionOnly}

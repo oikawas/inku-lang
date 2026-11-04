@@ -43,6 +43,7 @@
 		visionProvider: Provider;
 		visionModel: string;
 		providerGroups: ProviderGroup[];
+		drawingProviderGroups: ProviderGroup[];
 		visionProviderGroups: ProviderGroup[];
 		allowVisionSelection: boolean;
 		visionOnlySelection?: boolean;
@@ -94,6 +95,7 @@
 		visionProvider,
 		visionModel,
 		providerGroups,
+		drawingProviderGroups,
 		visionProviderGroups,
 		allowVisionSelection,
 		visionOnlySelection = false,
@@ -502,7 +504,7 @@
 			{:else if settingsTab === 'image'}
 				<ImageSettings />
 			{:else if settingsTab === 'draw_defaults'}
-				<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} {providerGroups} {visionProviderGroups} onSave={onSaveDrawDefaults} />
+				<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} providerGroups={drawingProviderGroups} {visionProviderGroups} onSave={onSaveDrawDefaults} />
 			{:else if settingsTab === 'demo'}
 				{@render demoContent?.()}
 			{:else}

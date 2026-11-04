@@ -43,6 +43,9 @@ test('settings expose a separate page and use the existing model picker', () => 
 	assert.match(modal, /settingsTab === 'draw_defaults'[^]*<DrawDefaultsSettings/);
 	assert.match(nav, /BROWSER_ONLY_SETTINGS_TABS[^]*'draw_defaults'/);
 	assert.match(settings, /<ModelSelectionSettings/);
+	assert.match(modal, /<DrawDefaultsSettings[^>]*providerGroups=\{drawingProviderGroups\}/);
+	const page = readFileSync(new URL('../../routes/+page.svelte', import.meta.url), 'utf8');
+	assert.match(page, /drawingProviderGroups=\{availableModelCatalog\}/);
 	assert.doesNotMatch(settings, /<input/);
 	assert.match(settings, /\{#if !image\}[^]*data-draw-option="route"[^]*data-draw-option="wild"[^]*\{\/if\}/);
 	assert.match(settings, /<option value="auto">\{t\(\)\.colorCatalogAuto\}<\/option>/);

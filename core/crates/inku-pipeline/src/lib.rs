@@ -19,6 +19,7 @@ pub mod description_colors;
 pub mod description_composition;
 pub mod description_ddl;
 pub mod description_laws;
+pub mod draw_options;
 mod hole_completion;
 pub mod identity;
 pub mod image_ddl;

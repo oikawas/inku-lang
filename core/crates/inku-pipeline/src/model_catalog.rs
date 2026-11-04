@@ -448,14 +448,16 @@ fn split_ref<'a>(reference: &'a str, providers: &Value) -> (Option<&'a str>, &'a
 }
 
 fn user_defaults() -> Value {
-    json!({"stage1_provider":"nvidia", "stage1_model":"google/gemma-4-31b-it",
+    let mut settings = json!({"stage1_provider":"nvidia", "stage1_model":"google/gemma-4-31b-it",
         "stage2_provider":"nvidia", "stage2_model":"google/gemma-4-31b-it",
         "vision_provider":"nvidia", "vision_model":"meta/llama-3.2-90b-vision-instruct",
         "okugaki_provider":"nvidia", "okugaki_model":"meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models":[], "instruction_caption_visible":true,
         "instruction_caption_writing_mode":"horizontal", "instruction_caption_position":"left",
         "color_catalog_id":"default", "ui_text_size":1, "sketch_open":true,
-        "generation_info_follows_selection":true, "generation_info_token_detail":false})
+        "generation_info_follows_selection":true, "generation_info_token_detail":false});
+    settings["draw_defaults"] = crate::draw_options::default_draw_defaults(&settings);
+    settings
 }
 
 fn normalize_user(input: &Value, color_ids: &Value, default_color: &str) -> Value {
@@ -546,6 +548,8 @@ fn normalize_user(input: &Value, color_ids: &Value, default_color: &str) -> Valu
             .filter(|v| (0..5).contains(v))
             .unwrap_or(1)
     );
+    clean["draw_defaults"] =
+        crate::draw_options::normalize_draw_defaults(&input["draw_defaults"], &clean, color_ids);
     clean
 }
 
@@ -589,6 +593,14 @@ fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &s
         if let Some(value) = patch.get(key) {
             clean[key] = value.clone();
         }
+    }
+    if let Some(draw_defaults) = patch.get("draw_defaults") {
+        clean["draw_defaults"] = draw_defaults.clone();
+    } else if current.get("draw_defaults").is_none() {
+        clean
+            .as_object_mut()
+            .expect("user settings")
+            .remove("draw_defaults");
     }
     normalize_user(&clean, colors, default_color)
 }
@@ -1123,6 +1135,23 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             json!({"query":next})
         }
         Some("user_defaults") => json!({"settings":user_defaults()}),
+        Some("options_of_work") => {
+            json!({"options":crate::draw_options::options_of_work(&request["record"])})
+        }
+        Some("options_for_tab") => match crate::draw_options::options_for_tab(
+            &request["record"],
+            request["tab"].as_str().unwrap_or(""),
+            &request["defaults"],
+        ) {
+            Some(options) => json!({"options":options}),
+            None => json!({"outcome":"refused", "reason":"invalid_tab"}),
+        },
+        Some("default_draw_defaults") => {
+            json!({"draw_defaults":crate::draw_options::default_draw_defaults(&user_defaults())})
+        }
+        Some("normalize_draw_defaults") => {
+            json!({"draw_defaults":crate::draw_options::normalize_draw_defaults(&request["draw_defaults"], &user_defaults(), &request["color_ids"])})
+        }
         Some("normalize_user") => {
             json!({"settings":normalize_user(&request["settings"], &request["color_ids"], request["default_color"].as_str().unwrap_or("default"))})
         }
@@ -1423,16 +1452,15 @@ mod tests {
             );
         }
         for row in array(cases.get("user_normalization")) {
-            assert_eq!(
-                normalize_user(&row["input"], &json!(["default"]), "default"),
-                row["result"]
-            );
+            let mut actual = normalize_user(&row["input"], &json!(["default"]), "default");
+            actual.as_object_mut().unwrap().remove("draw_defaults");
+            assert_eq!(actual, row["result"]);
         }
         for row in array(cases.get("user_updates")) {
-            assert_eq!(
-                update_user(&row["input"], &row["patch"], &json!(["default"]), "default"),
-                row["result"]
-            );
+            let mut actual =
+                update_user(&row["input"], &row["patch"], &json!(["default"]), "default");
+            actual.as_object_mut().unwrap().remove("draw_defaults");
+            assert_eq!(actual, row["result"]);
         }
         for row in array(cases.get("models_normalization")) {
             assert_eq!(json!(normalize_models(&row["input"])), row["result"]);

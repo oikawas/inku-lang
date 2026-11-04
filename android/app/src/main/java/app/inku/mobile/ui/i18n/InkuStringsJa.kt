@@ -29,8 +29,8 @@ object InkuStringsJa : InkuStrings {
     override val flowFillPlan = "型を埋める"
     override val flowComposition = "構図と法則"
     override val flowColors = "配色"
-    override val flowWrite = "言葉で書く"
-    override val flowReview = "見て直す"
+    override val flowWrite = "書く"
+    override val flowReview = "見比べ"
     override val flowPicture = "画"
     override val readingRead = "記述を読み、その読みで書いた"
     override val readingSupplied = "作者が直した読みで書いた"
@@ -56,6 +56,8 @@ object InkuStringsJa : InkuStrings {
     override val modelFailed = "描画失敗"
     override val refinementNoneToGenerate = "推敲の要素・指示書・Visionモデルを確認してください。"
     override val modelRecommendation = "推奨度"
+    override val modelInstructionsStage = "指示書を書く工程"
+    override val modelCompletionStage = "補完"
     override val modelAverageSeconds = "平均秒数"
     override val modelEstimatedCost = "概算コスト"
     override val modelAccessCheck = "この鍵で確かめる"
@@ -140,8 +142,8 @@ object InkuStringsJa : InkuStrings {
     override val interpretationToggle = "指示書を見る"
     override val interpretationHide = "指示書を閉じる"
 
-    override val statusStage1 = "Stage 1: DDL生成中..."
-    override val statusStage2 = "Stage 2: 画像生成中..."
+    override val statusStage1 = "描画を始めています…"
+    override val statusStage2 = "描画中…"
     override val statusComposingFromDdl = "DDLからScoreを構成しています..."
     override val statusStopped = "停止しました。"
     // Both were English before the pack existed and were left so by the
@@ -444,7 +446,7 @@ object InkuStringsJa : InkuStrings {
     override val exportPngHeightOutOfRange: (Int, Int) -> String = { min, max -> "PNGの高さは${min}〜${max}pxにしてください。テンプレートの高さを直してください。" }
     // Web's wording (`settingsPngAlpha`); the earlier label read the opposite way.
     override val pngAlphaWhite = "白背景時アルファチャンネルを有効にする"
-    override val stagesShared = "Stage 1 / Stage 2 共通"
+    override val stagesShared = "描画の全工程で共通"
     override val uiModeSubtitle = "UIの表示密度・構成"
     override val displaySafeMarginsSubtitle = "全画面表示でカメラ穴や画面端を避けます。用紙の比率は変わりません。"
     override val displaySafeMarginsToggle = "横方向の安全領域を使う"
@@ -589,18 +591,18 @@ object InkuStringsJa : InkuStrings {
     override val stageChoosingColors = "配色の選択中…"
     override val stageChoosingLaws = "法則の選択中…"
     override val runStageCatalog = "色カタログ"; override val runStageReading = "読む"; override val runStageComposition = "構図"; override val runStageWriting = "書く"
-    override val runStageReview = "見直し"; override val runStageColors = "配色"; override val runStageLaws = "法則"; override val runStageInterpret = "解釈"
+    override val runStageReview = "見比べ"; override val runStageColors = "配色"; override val runStageLaws = "法則"; override val runStageInterpret = "型を埋める"
     override val runStageSketch = "写生"; override val runStageCompositionReading = "構図の読み"; override val runStageCompletion = "補完"
-    override val runStageImageCatalog = "画像の色カタログ"; override val runStageImageWriting = "画像から書く"; override val runStageImageReview = "画像の見直し"
+    override val runStageImageCatalog = "画像の色カタログ"; override val runStageImageWriting = "画像から書く"; override val runStageImageReview = "画像との見比べ"
     override val runFinishedReading = "読みました"; override val runFinishedReadingDropped: (String) -> String = { "読みました（$it 語を外した）" }
     override val runFinishedComposition: (String, String) -> String = { things, law -> "構図：物 $things つ・主の法則 $law" }
-    override val runFinishedWriting = "書きました"; override val runFinishedReview = "見て直しました"
+    override val runFinishedWriting = "書きました"; override val runFinishedReview = "見比べて直しました"
     override val runFinishedCatalog: (String, String) -> String = { stage, catalog -> "$stage：$catalog" }
     override val runFinishedLaw: (String, String) -> String = { stage, law -> "$stage：主の法則 $law" }
     override val runFinishedReady: (String) -> String = { "$it：完了" }
     override val runFinishedFallback: (String) -> String = { "$it：既定の形で続けました" }
     override val runFinishedRetried: (String) -> String = { "$it：問い直しました" }
-    override val runLocalReview = "見直し用に描いています…"; override val runLocalRender = "描いています…"; override val runLocalSave = "保存しています…"
+    override val runLocalReview = "見比べ用に描いています…"; override val runLocalRender = "描いています…"; override val runLocalSave = "保存しています…"
     override val runStatusStageTokens: (String, String) -> String = { input, output -> "入力 $input・出力 $output" }
     override val runStatusTotalTokens: (String, String) -> String = { input, output -> "合計 入力 $input・出力 $output" }
     override val runStatusPartialTokens: (String, String) -> String = { input, output -> "合計（一部不明）入力 $input・出力 $output" }
@@ -729,7 +731,7 @@ object InkuStringsJa : InkuStrings {
     override val saijikiTapNote = "語を押すと DDL 編集欄へ挿入します。"
     override val descriptionField = "説明"
     override val add = "追加"
-    override val ddlOverwriteBody = "通常の描画を実行すると、現在の指示書（正規化DDL）は Stage 1 の結果で上書きされます。"
+    override val ddlOverwriteBody = "通常の描画を実行すると、現在の指示書（正規化DDL）は記述から書いた指示書で上書きされます。"
     override val selected = "選択中"
     override val close = "閉じる"
     override val renderTabArtwork = "描画"
@@ -750,16 +752,16 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoInputOriginCamera = "カメラ"
     override val generationInfoInputOriginPhotoPicker = "既存の写真"
     override val generationInfoInputRouteLocalDescriptionToNim = "端末内記述 → NIM"
-    override val generationInfoInputRouteLocalDdlToNimStage2 = "端末内DDL → NIM Stage 2"
+    override val generationInfoInputRouteLocalDdlToNimStage2 = "端末内DDL → NIM 旧 Stage 2"
     override val generationInfoInputRouteDescriptionToPipeline = "写真の記述 → 描画設定"
-    override val generationInfoInputRouteDdlToPipelineStage2 = "写真のDDL → 描画設定のStage 2"
+    override val generationInfoInputRouteDdlToPipelineStage2 = "写真のDDL → 旧描画設定の補完"
     override val generationInfoInputRouteImageDdlToPipeline = "写真から書いたDDL → 見比べて直す"
     override val generationInfoVisionOutputModeDescription = "記述"
     override val generationInfoVisionOutputModeDdl = "DDL"
     override val generationInfoSketchGrain = "区切り"
     override val generationInfoSketchState = "写生の記録"
-    override val generationInfoStage1Model = "Stage 1 モデル"
-    override val generationInfoStage2Model = "Stage 2 モデル"
+    override val generationInfoStage1Model = "指示書のモデル"
+    override val generationInfoStage2Model = "補完のモデル"
     override val generationInfoLanguageRequested = "要求した言語"
     override val generationInfoLanguageResolved = "解決した言語"
     override val generationInfoInterpretationSeed = "解釈 seed"
@@ -799,8 +801,8 @@ object InkuStringsJa : InkuStrings {
     override val apiKeyDeleteBody: (String) -> String = { name -> "$name の保存済みAPIキーを削除します。" }
     override val serviceDeleteBody: (String) -> String = { name -> "$name をモデル接続先から削除します。" }
     override val seconds: (Int) -> String = { seconds -> "${seconds}秒" }
-    override val llmSummary: (String) -> String = { model -> "LLM $model · 指示文生成/Stage1/2共通" }
-    override val llmSummaryDot: (String) -> String = { model -> "LLM · $model · 指示文生成/Stage1/2共通" }
+    override val llmSummary: (String) -> String = { model -> "LLM $model · デモ・描画の全工程で共通" }
+    override val llmSummaryDot: (String) -> String = { model -> "LLM · $model · デモ・描画の全工程で共通" }
     override val qualityTier: (String) -> String = { tier -> "品質: $tier" }
     override val batchTally: (Int, Int, Int) -> String = { success, failures, total -> "成功 $success / 失敗 $failures / 全 $total" }
     override val exportOf: (String) -> String = { hash -> "書き出し  F$hash" }

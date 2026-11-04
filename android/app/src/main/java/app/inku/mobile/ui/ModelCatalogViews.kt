@@ -153,7 +153,7 @@ private fun ModelLabelText(label: app.inku.mobile.data.ModelCatalogLabel, string
 private fun ModelCatalogFigures(model: CatalogModel, strings: InkuStrings) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         val record = model.record
-        listOf("llm" to "LLM", "stage1" to "Stage 1", "stage2" to "Stage 2", "vision" to "Vision").forEach { (key, name) ->
+        listOf("llm" to "LLM", "stage1" to strings.modelInstructionsStage, "stage2" to strings.modelCompletionStage, "vision" to "Vision").forEach { (key, name) ->
             if (record.has("recommendation_$key")) Text("${strings.modelRecommendation} $name: ${"★".repeat(record.optInt("recommendation_$key").coerceIn(0, 5))}", style = MaterialTheme.typography.labelSmall)
         }
         if (record.has("recommendation_level")) Text("${strings.modelRecommendation}: ${record.get("recommendation_level")}", style = MaterialTheme.typography.labelSmall)

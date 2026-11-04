@@ -80,6 +80,8 @@ interface InkuStrings {
     val code: String
     val label: String
     val modelRecommendation: String
+    val modelInstructionsStage: String
+    val modelCompletionStage: String
     val modelAverageSeconds: String
     val modelEstimatedCost: String
     val modelAccessCheck: String

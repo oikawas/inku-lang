@@ -237,7 +237,7 @@ class GenerationInfoSheetTest {
         assertEquals("local-litert-lm:gemma-4-e2b", rows[GenerationInfoField.Stage1Model])
         assertEquals("stage-2-model", rows[GenerationInfoField.Stage2Model])
         assertEquals(
-            "写真のDDL → 描画設定のStage 2",
+            "写真のDDL → 旧描画設定の補完",
             generationInfoDisplayValue(
                 sections.first().rows.first { it.field == GenerationInfoField.InputRoute },
                 InkuStringsJa,

@@ -539,7 +539,7 @@ class ProductPipelineEffects:
                         "system_prompts": {}, "system_prompt_stages": list(_SYSTEM_PROMPT_STAGE_NAMES),
                         "render_limits_source": self.settings.limits_source(work, requested_limits),
                         "auto_catalog": kind in {"description", "image"} and mode == "auto",
-                        "sketch_request": sketch_request_for(kind, options), "metrics": {}}
+                        "sketch_request": sketch_request_for(kind, options), "input_kind": kind, "metrics": {}}
 
     def provider_for(self, owner: str, context: dict, images: list[str] | None = None):
         from . import db
@@ -694,6 +694,16 @@ class ProductPipelineEffects:
         if image_ddl is not None:
             result.update(image_ddl=deepcopy(image_ddl), image_provenance=context.get("image_provenance", ""),
                           elapsed_image_ms=metrics.get("image", 0))
+        if context.get("input_kind") == "description":
+            result.update(
+                draw_route=settings.get("route") or "stages",
+                sketch_requested="0" if context["sketch_request"].get("mode") == "off" else "1",
+                composition_requested="1" if settings.get("composition") == "on" else "0",
+            )
+        from .verified_model_catalog import core_catalog
+        options_record = {**result, "catalog_mode": settings.get("catalog_mode"),
+                          "render_wild": "1" if result["render_wild"] else "0"}
+        result["draw_options"] = core_catalog("options_of_work", record=options_record)["options"]
         result["render_hash"] = db.render_hash_for_item({**result, "input": result["description"]})
         result["render_hash_short"] = db.render_hash_short(result["render_hash"])
         result["render_diagnostics"] = render_metadata.get("execution")
@@ -801,7 +811,7 @@ class ProductPipelineEffects:
                            snapshot["authority"]["revision"], snapshot["delivery"]["source_digest"],
                            snapshot=snapshot, context=context,
                            pipeline_diagnostics=pipeline_diagnostics)
-        result.update({"history_id": item["id"], "history_at": item["at"],
+        result.update({"history_id": item["id"], "history_at": item["at"], "draw_options": item["draw_options"],
                        **{key: item.get(key) for key in ("lineage_node_id", "lineage_parent_node_id", "derivation_kind", "description_hash")}})
         if not item.get("_idempotent_replay"):
             if settings.get("save_artifacts") is not False:

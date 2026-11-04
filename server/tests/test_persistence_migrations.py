@@ -63,11 +63,14 @@ def _engine(path: Path):
     return create_engine(f"sqlite:///{path}", future=True)
 
 
-def _create_history_schema(connection) -> None:
+def _create_history_schema(connection, *, current=False) -> None:
     connection.exec_driver_sql(_HISTORY_DDL)
     connection.exec_driver_sql("ALTER TABLE history ADD COLUMN ddl_source_origin TEXT")
     connection.exec_driver_sql("ALTER TABLE history ADD COLUMN image_provenance TEXT")
     connection.exec_driver_sql("ALTER TABLE history ADD COLUMN image_ddl TEXT")
+    if current:
+        for name in migrations.DRAW_OPTIONS_HISTORY_COLUMNS:
+            connection.exec_driver_sql(f"ALTER TABLE history ADD COLUMN {name} VARCHAR")
 
 
 def _no_op(_connection) -> None:
@@ -151,7 +154,7 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
 
     def create_schema(connection) -> None:
         calls["create"] += 1
-        _create_history_schema(connection)
+        _create_history_schema(connection, current=True)
 
     def seed(connection) -> None:
         calls["seed"] += 1
@@ -300,7 +303,7 @@ def test_registry_checksum_mismatch_fails_closed(tmp_path: Path) -> None:
     ensure_current_schema(
         engine=engine,
         database_path=path,
-        create_schema=_create_history_schema,
+        create_schema=lambda connection: _create_history_schema(connection, current=True),
         seed_fresh=_no_op,
         apply_legacy=_no_op,
     )

@@ -404,6 +404,7 @@ class HistoryItem(HistoryPostBody):
     """A saved work as the history listing and the work endpoints return it."""
 
     id: str = Field(description="The identifier of the work, a UUID.")
+    draw_options: dict = Field(default_factory=dict, description="Recorded drawing choices; unknown choices are null.")
     # Read-only: the Python Stage 1/2 recorded these until the shared core took
     # over (2026-09-14). The core's prompt digest lives in the execution record.
     stage1_prompt_digest: str | None = Field(

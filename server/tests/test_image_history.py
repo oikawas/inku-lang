@@ -69,10 +69,10 @@ def test_v4_adds_nullable_image_fields_once_and_preserves_saved_values(tmp_path)
             for name in migrations.IMAGE_HISTORY_COLUMNS:
                 assert columns[name][2:5] == ("TEXT", 0, None)
             after = list(connection.exec_driver_sql("SELECT rowid,* FROM history ORDER BY id"))
-            assert [tuple(row[:-2]) for row in after] == [tuple(row) for row in before]
-            assert all(tuple(row[-2:]) == (None, None) for row in after)
+            assert [tuple(row[:-5]) for row in after] == [tuple(row) for row in before]
+            assert all(tuple(row[-5:]) == (None, None, None, None, None) for row in after)
             assert connection.exec_driver_sql("SELECT version FROM schema_migrations ORDER BY version").all() == [
-                (3,), (4,), (6,),
+                (3,), (4,), (7,),
             ]
         with sqlite3.connect(first.snapshot.path) as snapshot:
             assert "image_ddl" not in {row[1] for row in snapshot.execute("PRAGMA table_info(history)")}

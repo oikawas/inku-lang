@@ -4396,6 +4396,8 @@ this record carry no value, and the absence of a value means "not recorded", not
 value would only ever be another user's selection.  Only a catalog that still
 exists, or `auto`, can be stored; a retired id falls back to the default.
 
+For works drawn from a description, Server saves the requested drawing route, sketch, and composition in history and includes core's `draw_options` in work APIs. Wild strokes, color, canvas, and models also come from the saved record; unrecorded choices remain null rather than being inferred. For image works, route, sketch, and composition are null and the model is returned as Vision. `model_settings.draw_defaults` holds defaults for the four input tabs and can be updated by ordinary users. When older settings lack it, the server derives defaults from the existing models and color, and copies the legacy `canvas-aspect` choice to the description and text batch canvases.
+
 Clicking outside the dialog confirms the current selection exactly like the
 save/confirm action. The cancel button still restores the selection snapshot from
 when the dialog was opened.

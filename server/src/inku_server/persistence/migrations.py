@@ -83,13 +83,20 @@ _IMAGE_MANIFEST = (*_SINGLE_DDL_MANIFEST, "nullable-image-provenance-and-ddl-rec
 IMAGE_CHECKSUM = hashlib.sha256(
     json.dumps(_IMAGE_MANIFEST, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
-MIGRATION_VERSION = 6
-MIGRATION_NAME = "all_works_in_history"
-_MIGRATION_MANIFEST = (*_IMAGE_MANIFEST, "lineage-only-to-normal-v1")
+_V6_VERSION = 6
+_V6_NAME = "all_works_in_history"
+_V6_MANIFEST = (*_IMAGE_MANIFEST, "lineage-only-to-normal-v1")
+_V6_CHECKSUM = hashlib.sha256(
+    json.dumps(_V6_MANIFEST, separators=(",", ":")).encode("utf-8")
+).hexdigest()
+MIGRATION_VERSION = 7
+MIGRATION_NAME = "draw_options_history"
+_MIGRATION_MANIFEST = (*_V6_MANIFEST, "draw-options-request-columns-v1")
 MIGRATION_CHECKSUM = hashlib.sha256(
     json.dumps(_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
 IMAGE_HISTORY_COLUMNS = ("image_provenance", "image_ddl")
+DRAW_OPTIONS_HISTORY_COLUMNS = ("draw_route", "sketch_requested", "composition_requested")
 
 _REGISTRY_DDL = """
 CREATE TABLE schema_migrations (
@@ -373,11 +380,21 @@ def _require_image_history_schema(connection: Connection) -> None:
             raise MigrationStateError("image history fields must be nullable TEXT without a default")
 
 
+def _require_draw_options_history_schema(connection: Connection) -> None:
+    columns = {row[1]: row for row in connection.exec_driver_sql("PRAGMA table_info(history)")}
+    if not set(DRAW_OPTIONS_HISTORY_COLUMNS) <= columns.keys():
+        raise MigrationStateError("registry and draw options history schema disagree")
+    for name in DRAW_OPTIONS_HISTORY_COLUMNS:
+        if columns[name][3] or columns[name][2].upper() != "VARCHAR" or columns[name][4] is not None:
+            raise MigrationStateError("draw options fields must be nullable VARCHAR without a default")
+
+
 def _verify_registry(connection: Connection) -> str:
     rows = connection.exec_driver_sql(
         "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
     ).fetchall()
     current = [(MIGRATION_VERSION, MIGRATION_NAME, MIGRATION_CHECKSUM)]
+    v6 = [(_V6_VERSION, _V6_NAME, _V6_CHECKSUM)]
     image = [(IMAGE_VERSION, IMAGE_NAME, IMAGE_CHECKSUM)]
     single_ddl = [(SINGLE_DDL_VERSION, SINGLE_DDL_NAME, SINGLE_DDL_CHECKSUM)]
     v3 = [(LEGACY_V3_VERSION, LEGACY_V3_NAME, LEGACY_V3_CHECKSUM)]
@@ -390,8 +407,10 @@ def _verify_registry(connection: Connection) -> str:
     ]
     v1 = [(_V1_MIGRATION_VERSION, _V1_MIGRATION_NAME, _V1_MIGRATION_CHECKSUM)]
     prefixes = ([], single_ddl, v3, v3 + single_ddl)
-    if any(rows == prefix + suffix + current for prefix in prefixes for suffix in ([], image)):
+    if any(rows == prefix + suffix + prior + current for prefix in prefixes for suffix in ([], image) for prior in ([], v6)):
         return "current"
+    if any(rows == prefix + suffix + v6 for prefix in prefixes for suffix in ([], image)):
+        return "v6"
     if any(rows == prefix + image for prefix in prefixes):
         return "image"
     if rows in (single_ddl, v3 + single_ddl):
@@ -488,8 +507,15 @@ def _upgrade_history(*, engine: Engine, database_path: Path | None,
                 for name in IMAGE_HISTORY_COLUMNS:
                     connection.exec_driver_sql(f"ALTER TABLE history ADD COLUMN {name} TEXT")
             _require_image_history_schema(connection)
-            works = connection.exec_driver_sql("UPDATE history SET history_visibility = 'normal' WHERE history_visibility = 'lineage_only'").rowcount
-            nodes = connection.exec_driver_sql("UPDATE lineage_nodes SET state = 'active' WHERE state = 'lineage_only'").rowcount
+            works = nodes = 0
+            if previous_state != "v6":
+                works = connection.exec_driver_sql("UPDATE history SET history_visibility = 'normal' WHERE history_visibility = 'lineage_only'").rowcount
+                nodes = connection.exec_driver_sql("UPDATE lineage_nodes SET state = 'active' WHERE state = 'lineage_only'").rowcount
+            columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(history)")}
+            if set(DRAW_OPTIONS_HISTORY_COLUMNS) & columns:
+                raise MigrationStateError("older registry contains draw options history columns")
+            for name in DRAW_OPTIONS_HISTORY_COLUMNS:
+                connection.exec_driver_sql(f"ALTER TABLE history ADD COLUMN {name} VARCHAR")
             require_integrity(connection)
             _record_baseline(connection)
             connection.commit()
@@ -525,6 +551,7 @@ def ensure_current_schema(
                 fts_enabled = install_history_fts(connection, rebuild=False)
                 _require_single_ddl_schema(connection)
                 _require_image_history_schema(connection)
+                _require_draw_options_history_schema(connection)
                 require_integrity(connection)
                 _record_baseline(connection)
                 connection.commit()
@@ -541,10 +568,11 @@ def ensure_current_schema(
             if registry_state == "current":
                 _require_single_ddl_schema(connection)
                 _require_image_history_schema(connection)
+                _require_draw_options_history_schema(connection)
                 return MigrationOutcome(
                     mode="current", fts_enabled=state == "complete"
                 )
-            if registry_state in ("single_ddl", "image"):
+            if registry_state in ("single_ddl", "image", "v6"):
                 _require_single_ddl_schema(connection)
                 return _upgrade_history(engine=engine, database_path=database_path,
                                         fts_enabled=state == "complete", previous_state=registry_state)

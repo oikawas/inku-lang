@@ -58,8 +58,17 @@ pub struct GpuWindows {
 impl GpuWindows {
     pub fn new() -> Result<Self, GpuError> {
         let backend = metal_backend()?;
-        let mut context =
-            graphite::mtl::context_factory::make_metal(&backend, None).ok_or_else(|| {
+        let mut options = graphite::ContextOptions::new();
+        // SAFETY: ContextOptions is skia-safe's repr(transparent) Handle over this exact
+        // skia-bindings type; it is initialized and exclusively borrowed for this write.
+        let native = unsafe {
+            &mut *(&mut options as *mut graphite::ContextOptions
+                as *mut skia_bindings::skgpu_graphite_ContextOptions)
+        };
+        // I-726: MSAA 4 diverges from CPU coverage on steep edges; Skia caps 8 to the GPU's limit.
+        native.fInternalMultisampleCount = skia_bindings::skgpu_graphite_SampleCount::k8;
+        let mut context = graphite::mtl::context_factory::make_metal(&backend, Some(&options))
+            .ok_or_else(|| {
                 GpuError::new("gpu_context", "Graphite could not make a Metal context")
             })?;
         let recorder = context

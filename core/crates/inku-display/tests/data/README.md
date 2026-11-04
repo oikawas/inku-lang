@@ -48,13 +48,8 @@ thick strokes and acute corners. Both are large, dark, noise-free synthetic pict
 yardstick. The Skia/Chrome C2 comparison keeps both pictures unchanged.
 
 The CPU/Graphite comparison at 1x and in a 4x window uses `user-space-gradient` and
-`round-join-gentle`. The latter keeps the same stroke width and round caps and joins,
-with 90-degree corners. Along steep lines (about 74 degrees), CPU and Graphite edge
-coverage differs at 1x regardless of join shape: miter differs in 0.725% of pixels,
-and thin round lines in 0.60-0.64%, above the 0.5% yardstick (I-726). This is why
-Graphite uses the gentler picture. It is compared only with the CPU and has no
-Chrome reference image. The original acute picture and its Chrome reference remain
-in C2.
+the acute `round-join`. Graphite uses MSAA 8 to reduce steep-line edge coverage
+differences from the CPU (I-726). Both pictures and their Chrome references remain in C2.
 
 ## `public-requests.json` (C6)
 

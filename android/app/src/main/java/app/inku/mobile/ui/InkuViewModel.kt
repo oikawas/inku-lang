@@ -4573,8 +4573,8 @@ class InkuViewModel @JvmOverloads constructor(
 
     private fun validateModelsForRun(state: InkuUiState): String? {
         val models = listOf(
-            "Stage1" to state.selectedModelId,
-            "Stage2" to state.selectedStage2ModelId,
+            strings().modelInstructionsStage to state.selectedModelId,
+            strings().modelCompletionStage to state.selectedStage2ModelId,
         ).distinctBy { it.second }
 
         return models

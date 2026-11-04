@@ -32,7 +32,7 @@ object InkuStringsEn : InkuStrings {
     override val descriptionHint = "Enter a short description of what you want to express."
     override val descriptionCommentHint = "[Text in brackets is treated as a comment]"
     override val flowDescription = "Description"
-    override val flowSketch = "Sketch"
+    override val flowSketch = "Sketch from life"
     override val flowFillPlan = "Fill the plan"
     override val flowComposition = "Composition and laws"
     override val flowColors = "Colors"
@@ -63,6 +63,8 @@ object InkuStringsEn : InkuStrings {
     override val modelFailed = "Drawing failed"
     override val refinementNoneToGenerate = "Check the refinement elements, instructions, and Vision model."
     override val modelRecommendation = "Recommendation"
+    override val modelInstructionsStage = "Writing the instructions"
+    override val modelCompletionStage = "Completion"
     override val modelAverageSeconds = "Average seconds"
     override val modelEstimatedCost = "Estimated cost"
     override val modelAccessCheck = "Check with this key"
@@ -147,10 +149,9 @@ object InkuStringsEn : InkuStrings {
     override val interpretationToggle = "View instructions"
     override val interpretationHide = "Hide instructions"
 
-    // 生成 is not "generating": Stage 1 interprets and Stage 2 performs, which is
-    // what those stages are called throughout (GLOSSARY §2).
-    override val statusStage1 = "Stage 1: interpreting…"
-    override val statusStage2 = "Stage 2: performing…"
+    // Drawing starts before the selected route's individual steps are known.
+    override val statusStage1 = "Starting the drawing…"
+    override val statusStage2 = "Drawing…"
     override val statusComposingFromDdl = "Composing the score from the instructions…"
     override val statusStopped = "Stopped."
     override val statusDrawFailed = "Drawing failed."
@@ -470,7 +471,7 @@ object InkuStringsEn : InkuStrings {
     override val exportPngHeightOutOfRange: (Int, Int) -> String = { min, max -> "A PNG height must be ${min} to ${max}px. Change the template's height." }
     // Web's wording (`settingsPngAlpha`); the earlier label read the opposite way.
     override val pngAlphaWhite = "Enable alpha channel on white background"
-    override val stagesShared = "Stage 1 / Stage 2 shared"
+    override val stagesShared = "Shared across drawing steps"
     override val uiModeSubtitle = "Interface density and layout"
     override val displaySafeMarginsSubtitle = "Avoids camera cutouts and screen edges in full screen without changing the paper ratio."
     override val displaySafeMarginsToggle = "Use horizontal safe areas"
@@ -616,9 +617,9 @@ object InkuStringsEn : InkuStrings {
     override val stageChoosingColors = "Choosing the colors…"
     override val stageChoosingLaws = "Choosing the laws…"
     override val runStageCatalog = "Color catalog"; override val runStageReading = "Reading"; override val runStageComposition = "Composition"; override val runStageWriting = "Writing"
-    override val runStageReview = "Review"; override val runStageColors = "Colors"; override val runStageLaws = "Laws"; override val runStageInterpret = "Interpretation"
-    override val runStageSketch = "Sketch"; override val runStageCompositionReading = "Reading composition"; override val runStageCompletion = "Completion"
-    override val runStageImageCatalog = "Image color catalog"; override val runStageImageWriting = "Writing from image"; override val runStageImageReview = "Image review"
+    override val runStageReview = "Review"; override val runStageColors = "Colors"; override val runStageLaws = "Laws"; override val runStageInterpret = "Fill the plan"
+    override val runStageSketch = "Sketch from life"; override val runStageCompositionReading = "Reading composition"; override val runStageCompletion = "Completion"
+    override val runStageImageCatalog = "Image color catalog"; override val runStageImageWriting = "Writing from image"; override val runStageImageReview = "Picture review"
     override val runFinishedReading = "Read"; override val runFinishedReadingDropped: (String) -> String = { "Read ($it words omitted)" }
     override val runFinishedComposition: (String, String) -> String = { things, law -> "Composition: $things objects · main law $law" }
     override val runFinishedWriting = "Written"; override val runFinishedReview = "Reviewed and revised"
@@ -759,7 +760,7 @@ object InkuStringsEn : InkuStrings {
     // "Description" with it would put two concepts under one word.
     override val descriptionField = "Details"
     override val add = "Add"
-    override val ddlOverwriteBody = "Painting normally replaces the current instructions (the normalized DDL) with what Stage 1 produces."
+    override val ddlOverwriteBody = "Painting normally replaces the current instructions (the normalized DDL) with instructions written from the description."
     override val selected = "Selected"
     override val close = "Close"
     override val renderTabArtwork = "Work"
@@ -780,16 +781,16 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoInputOriginCamera = "Camera"
     override val generationInfoInputOriginPhotoPicker = "Existing photo"
     override val generationInfoInputRouteLocalDescriptionToNim = "Local description → NIM"
-    override val generationInfoInputRouteLocalDdlToNimStage2 = "Local DDL → NIM Stage 2"
+    override val generationInfoInputRouteLocalDdlToNimStage2 = "Local DDL → old NIM Stage 2"
     override val generationInfoInputRouteDescriptionToPipeline = "Photo description → drawing settings"
-    override val generationInfoInputRouteDdlToPipelineStage2 = "Photo DDL → drawing settings Stage 2"
+    override val generationInfoInputRouteDdlToPipelineStage2 = "Photo DDL → completion with old drawing settings"
     override val generationInfoInputRouteImageDdlToPipeline = "DDL written from the photo → reviewed beside it"
     override val generationInfoVisionOutputModeDescription = "Description"
     override val generationInfoVisionOutputModeDdl = "DDL"
     override val generationInfoSketchGrain = "Grain"
     override val generationInfoSketchState = "What the record says"
-    override val generationInfoStage1Model = "Stage 1 model"
-    override val generationInfoStage2Model = "Stage 2 model"
+    override val generationInfoStage1Model = "Instructions model"
+    override val generationInfoStage2Model = "Completion model"
     override val generationInfoLanguageRequested = "Language requested"
     override val generationInfoLanguageResolved = "Language used"
     override val generationInfoInterpretationSeed = "Interpretation seed"
@@ -829,8 +830,8 @@ object InkuStringsEn : InkuStrings {
     override val apiKeyDeleteBody: (String) -> String = { name -> "Deletes the stored API key for $name." }
     override val serviceDeleteBody: (String) -> String = { name -> "Removes $name from the model services." }
     override val seconds: (Int) -> String = { seconds -> "${seconds}s" }
-    override val llmSummary: (String) -> String = { model -> "LLM $model · demo, Stage 1 and Stage 2" }
-    override val llmSummaryDot: (String) -> String = { model -> "LLM · $model · demo, Stage 1 and Stage 2" }
+    override val llmSummary: (String) -> String = { model -> "LLM $model · shared by demo and drawing steps" }
+    override val llmSummaryDot: (String) -> String = { model -> "LLM · $model · shared by demo and drawing steps" }
     override val qualityTier: (String) -> String = { tier -> "Quality: $tier" }
     override val batchTally: (Int, Int, Int) -> String = { success, failures, total -> "$success drawn / $failures failed / $total in all" }
     override val exportOf: (String) -> String = { hash -> "Export  F$hash" }

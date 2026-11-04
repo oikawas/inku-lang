@@ -10,7 +10,9 @@ const {
 	DEFAULT_ANIMATION_EXPORT_SETTINGS,
 	animationWarnings,
 	animationExportRequest,
-	parseAnimationExportSettings
+	parseAnimationExportSettings,
+	loadLastAnimationExport,
+	saveLastAnimationExport
 } = await import('./animationExport.ts');
 
 test('legacy settings gain layer defaults and requests keep the single-work boundary', () => {
@@ -43,6 +45,31 @@ test('legacy settings gain layer defaults and requests keep the single-work boun
 		hold_seconds: 2
 	});
 	assert.equal(animationExportRequest(['one'], { ...settings, showDdl: false }).show_ddl, false);
+});
+
+test('last animation choices survive reload separately for each user', () => {
+	const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+	const entries = new Map<string, string>();
+	Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+		getItem: (key: string) => entries.get(key) ?? null,
+		setItem: (key: string, value: string) => entries.set(key, value),
+	} });
+	try {
+		const a = { ...DEFAULT_ANIMATION_EXPORT_SETTINGS, format: 'gif' as const, showDdl: false, layerReplay: 'once' as const };
+		const b = { ...DEFAULT_ANIMATION_EXPORT_SETTINGS, pattern: 'slide' as const, resolution: 'custom' as const, customHeight: 900 };
+		assert.equal(loadLastAnimationExport('a'), null);
+		saveLastAnimationExport('a', a);
+		saveLastAnimationExport('b', b);
+		assert.deepEqual(loadLastAnimationExport('a'), a);
+		assert.deepEqual(loadLastAnimationExport('b'), b);
+		assert.equal(loadLastAnimationExport('c'), null);
+		Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: () => { throw new Error('denied'); } });
+		assert.equal(loadLastAnimationExport('a'), null);
+		assert.doesNotThrow(() => saveLastAnimationExport('a', b));
+	} finally {
+		if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
+		else Reflect.deleteProperty(globalThis, 'localStorage');
+	}
 });
 
 test('saved-picture mismatch and incomplete compilation are reported independently', () => {

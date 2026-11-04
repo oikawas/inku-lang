@@ -2290,7 +2290,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	// ── Download ────────────────────────────────────────────
 	const savedWorkExportActions = makeSavedWorkExportActions({
-		apiFetch, catalogName, formatDate: formatHistoryDate, previewText: historyPreviewText
+		apiFetch, catalogName, formatDate: formatHistoryDate, previewText: historyPreviewText,
+		rememberAnimation: (value) => exportSettings.rememberAnimation(session.currentUser?.id ?? null, value)
 	});
 
 	// The canvas toolbar builds the card from the work it is showing, which is
@@ -2726,6 +2727,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// persist() reads every field it writes, so this effect tracks them all
 	// without the page having to name them one by one.
 	$effect(() => exportSettings.persist());
+	$effect(() => exportSettings.setAnimationOwner(session.currentUser?.id ?? null));
 	$effect(() => imageProvenanceSettings.persist());
 	$effect(() => {
 		if (typeof document === 'undefined') return;
@@ -3234,7 +3236,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onOpenAutonomousChild={showNewLineageChild}
 				onJuxtapose={work.requestJuxtaposition}
 				pngTemplates={exportTemplates}
-				animationExportSettings={exportSettings.animation}
+				animationExportSettings={exportSettings.selectedAnimation}
 				{apiFetch}
 			/>
 		</div><!-- /body -->
@@ -3430,7 +3432,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			bind:loginUserName={session.loginUserName}
 			bind:loginPassword={session.loginPassword}
 			bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
-			bind:animationExportSettings={exportSettings.animation}
+			bind:animationExportSettings={exportSettings.selectedAnimation}
 			bind:cardExportSettings={exportSettings.card}
 			{exportTemplates}
 			{exportTemplateStatus}
@@ -3601,7 +3603,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			managedHistoryTotal={historyManager.total}
 			{trashTotal}
 			selectedHistoryIds={historyManager.selectedIds}
-			animationExportSettings={exportSettings.animation}
+			animationExportSettings={exportSettings.selectedAnimation}
 			historyManagerStarredOnly={historyManager.starredOnly}
 			historyManagerForRevisionOnly={historyManager.forRevisionOnly}
 			historyManagerForShareOnly={historyManager.forShareOnly}

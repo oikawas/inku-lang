@@ -602,7 +602,7 @@ For one work, the finished picture appears first, then the animation returns to 
 | Play back and forth | Reverse from the finished work to the ground, then repeat forwards |
 | Play once and hold | Build up once and stop at the finished work |
 
-For several works, choose the transition pattern and display hold for each work. Format, resolution, and destination are common to both types. Settings and destination changed in the export dialog apply only to that export. In supported browsers, `Choose save path` chooses a folder; other browsers use their download settings.
+For several works, choose the transition pattern and display hold for each work. Format, resolution, and destination are common to both types. When you start an export, its chosen format, motion, and other settings are saved per user in this browser for the next export. You can also change them under animation in `Settings`. A destination chosen in the dialog applies only to that export. In supported browsers, `Choose save path` chooses a folder; other browsers use their download settings.
 
 From Library the order is oldest to newest; from the lineage it runs from the origin to the selected work.
 

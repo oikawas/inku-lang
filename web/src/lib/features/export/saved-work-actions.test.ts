@@ -62,11 +62,13 @@ test('all saved-work export formats carry folder fallback outcomes to their menu
 	const item = { id: 'saved', at: 1, input: 'Work', svg: '<svg />', score: {} };
 	const snapshot = snapshotSavedWorkExport({ kind: 'current', works: [item] });
 	assert.ok(snapshot);
+	const remembered: unknown[] = [];
 	const actions = makeSavedWorkExportActions({
 		apiFetch: async (path) => path.includes('/lineage?')
 			? Response.json({ nodes: [{ history: item }] })
 			: path.endsWith('/ddl-export') ? Response.json({ ddl: 'work' }) : new Response('file'),
 		catalogName: () => '', formatDate: () => '', previewText: (text) => text,
+		rememberAnimation: (settings) => remembered.push(settings),
 	});
 	const formats = [
 		() => actions.onDownloadSVG('display', snapshot),
@@ -86,6 +88,7 @@ test('all saved-work export formats carry folder fallback outcomes to their menu
 		assert.equal(exportFallbackReason(result), reason);
 	}
 	assert.equal(outcomes.length, 0);
+	assert.deepEqual(remembered, [DEFAULT_ANIMATION_EXPORT_SETTINGS, DEFAULT_ANIMATION_EXPORT_SETTINGS]);
 	assert.equal(saves.length, 14);
 	assert.ok(saves.every((save) => (save.options as { enabled: boolean }).enabled));
 });

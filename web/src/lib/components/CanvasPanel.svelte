@@ -4,7 +4,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
-	import type { Provider, ProviderGroup } from '$lib/models';
+	import { modelShortName, type Provider, type ProviderGroup } from '$lib/models';
 	import CanvasArtworkWorkspace from '$lib/features/canvas/CanvasArtworkWorkspace.svelte';
 	import Ddl3DHost from '$lib/features/experimental-3d/Ddl3DHost.svelte';
 	import Ddl3DModeSwitch from '$lib/features/experimental-3d/Ddl3DModeSwitch.svelte';
@@ -17,7 +17,7 @@
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { HistoryMutations } from '$lib/features/history/mutations';
-	import type { SketchMode } from '$lib/sketch';
+	import { normalizeSketchState, sketchStateNote, sketchStateShort, type SketchMode } from '$lib/sketch';
 	import { drawOptionRows } from '$lib/features/draw-options';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
@@ -452,6 +452,7 @@
 			: (isJapanese ? '独立作品' : 'Standalone')
 	);
 	const statusWork = $derived(statusHistoryItem ?? result);
+	const statusSketchState = $derived(normalizeSketchState(statusHistoryItem?.sketch_state));
 	// How the work on screen was drawn and what its sketch did, from the saved
 	// work when there is one, as the generation information reads them.
 	async function openLineageRefinement(node: LineageNode, view: RefinementView): Promise<void> {
@@ -736,7 +737,28 @@
 				<div class="render-meta-fields">
 					{#each drawOptionRows(statusHistoryItem?.draw_options, t()) as option (option.key)}
 						<span class="render-meta-item" data-draw-option={option.key}>
-							<span class="render-meta-label">{option.label}</span><strong title={option.text}>{option.text}</strong>
+							<span class="render-meta-label">{option.label}</span>
+							{#if option.key === 'models' && statusHistoryItem?.draw_options?.models && (statusHistoryItem.draw_options.models.vision || statusHistoryItem.draw_options.models.stage1 || statusHistoryItem.draw_options.models.stage2)}
+								<strong title={statusStage1Model + ' / ' + statusStage2Model}>
+									{#if statusHistoryItem.draw_options.models.vision}
+										<span class="render-meta-model-line"><span class="render-meta-model-name">{modelShortName(statusHistoryItem.draw_options.models.vision)}</span></span>
+									{:else if statusHistoryItem.draw_options.models.stage1 === statusHistoryItem.draw_options.models.stage2}
+										<span class="render-meta-model-line"><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
+									{:else}
+										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '指示書' : 'Instructions'}</span><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
+										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '補完' : 'Completion'}</span><span class="render-meta-model-name">{statusStage2ModelOnly}</span></span>
+									{/if}
+								</strong>
+							{:else if option.key === 'catalog' && statusHistoryItem?.draw_options?.catalog}
+								{@const catalog = statusHistoryItem.draw_options.catalog}
+								<strong title={statusCatalogName}>{catalog.id ? statusCatalogName : t().drawOptionsUnavailable} ({catalog.mode === 'auto' ? t().colorCatalogAuto : catalog.mode === 'fixed' ? t().drawDefaultsFixed : t().drawOptionsUnavailable})</strong>
+							{:else if option.key === 'canvas_aspect' && statusHistoryItem?.draw_options?.canvas_aspect}
+								<strong title={statusCanvasName}>{statusCanvasName}</strong>
+							{:else if option.key === 'sketch' && statusHistoryItem?.draw_options?.sketch}
+								<strong title={`${sketchStateNote(statusSketchState, isJapanese) || sketchStateShort(statusSketchState, isJapanese)} — ${option.text}`}>{sketchStateShort(statusSketchState, isJapanese)} ({option.text})</strong>
+							{:else}
+								<strong title={option.text}>{option.text}</strong>
+							{/if}
 						</span>
 					{/each}
 					<!-- The same byte measurement the drawer shows, rounded to a compact

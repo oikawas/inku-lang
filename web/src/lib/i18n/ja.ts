@@ -1105,6 +1105,7 @@ export const ja: LangPack = {
 	drawDefaultsStages: "型で描く",
 	drawDefaultsComposition: "構図・法則・配色",
 	drawDefaultsOff: "オフ",
+	drawOptionsUnavailable: "N/A",
 	drawDefaultsOn: "オン",
 	drawDefaultsFixed: "固定",
 	drawDefaultsCatalogId: "色カタログの種類",

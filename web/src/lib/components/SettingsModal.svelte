@@ -192,6 +192,7 @@
 				? { title: strings.settingsTabClipboard, hint: strings.settingsClipboardHint }
 				: { title: strings.settingsTabFileSaving, hint: strings.settingsExportHint };
 			case 'image': return { title: strings.imageTab, hint: strings.settingsImageHint };
+			case 'draw_defaults': return { title: strings.drawDefaultsTitle, hint: '' };
 			case 'demo': return { title: strings.modeDemo, hint: strings.tooltipInputTabDemo };
 			default: return appearanceSection === 'making'
 				? { title: strings.settingsCategoryMaking, hint: strings.settingsMakingHint }
@@ -294,6 +295,7 @@
 				</section>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
+					<button aria-current={settingsTab === 'draw_defaults' ? 'page' : undefined} class:active={settingsTab === 'draw_defaults'} onclick={() => onSelectSettingsTab('draw_defaults')}>{t().drawDefaultsTitle}</button>
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
 					<button aria-current={settingsTab === 'demo' ? 'page' : undefined} class:active={settingsTab === 'demo'} onclick={() => onSelectSettingsTab('demo')}>{t().modeDemo}</button>
 				</section>
@@ -499,12 +501,11 @@
 				/>
 			{:else if settingsTab === 'image'}
 				<ImageSettings />
+			{:else if settingsTab === 'draw_defaults'}
+				<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} {providerGroups} {visionProviderGroups} onSave={onSaveDrawDefaults} />
 			{:else if settingsTab === 'demo'}
 				{@render demoContent?.()}
 			{:else}
-				{#if appearanceSection === 'making'}
-					<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} onSave={onSaveDrawDefaults} />
-				{/if}
 				<AppearanceSettings
 					section={appearanceSection}
 					{uiMode} {uiCustom} {uiModeSaving} {uiModeSaveError}

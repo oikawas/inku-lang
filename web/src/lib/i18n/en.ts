@@ -1107,6 +1107,7 @@ export const en: LangPack = {
 	drawDefaultsStages: "Draw in stages",
 	drawDefaultsComposition: "Composition, laws and colors",
 	drawDefaultsOff: "Off",
+	drawOptionsUnavailable: "N/A",
 	drawDefaultsOn: "On",
 	drawDefaultsFixed: "Fixed",
 	drawDefaultsCatalogId: "Color catalog",

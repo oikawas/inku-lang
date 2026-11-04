@@ -60,16 +60,16 @@ export function drawOptionRows(options: RecordedDrawOptions | null | undefined, 
 		wild: labels.wildButton, catalog: labels.colorCatalogButton, canvas_aspect: labels.drawDefaultsCanvas, models: labels.drawDefaultsModel };
 	return DRAW_OPTIONS.map((key) => {
 		const value = options?.[key];
-		let text = 'N/A';
+		let text = labels.drawOptionsUnavailable;
 		if (typeof value === 'string') {
 			text = value === 'on' ? labels.drawDefaultsOn : value === 'off' ? labels.drawDefaultsOff
 				: value === 'read_and_draw' ? labels.drawDefaultsRead : value === 'stages' ? labels.drawDefaultsStages : value;
 		} else if (key === 'catalog' && options?.catalog) {
 			const catalog = options.catalog;
-			text = `${catalog.id ?? 'N/A'} (${catalog.mode === 'auto' ? labels.colorCatalogAuto : catalog.mode === 'fixed' ? labels.drawDefaultsFixed : catalog.mode ?? 'N/A'})`;
+			text = `${catalog.id ?? labels.drawOptionsUnavailable} (${catalog.mode === 'auto' ? labels.colorCatalogAuto : catalog.mode === 'fixed' ? labels.drawDefaultsFixed : catalog.mode ?? labels.drawOptionsUnavailable})`;
 		} else if (key === 'models' && options?.models) {
 			const models = options.models;
-			text = models.vision ?? (models.stage1 === models.stage2 ? models.stage1 : [models.stage1, models.stage2].map((v) => v ?? 'N/A').join(' / ')) ?? 'N/A';
+			text = models.vision ?? (models.stage1 === models.stage2 ? models.stage1 : [models.stage1, models.stage2].map((v) => v ?? labels.drawOptionsUnavailable).join(' / ')) ?? labels.drawOptionsUnavailable;
 		}
 		return { key, label: names[key], text };
 	});

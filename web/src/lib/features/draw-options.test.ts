@@ -34,3 +34,16 @@ test('legacy wild default is copied to all tabs without changing the originals',
 	assert.equal(defaults.wild, 'on');
 	assert.equal(migrateLegacyWild(all, null), null);
 });
+
+
+test('settings expose a separate page and use the existing model picker', () => {
+	const modal = readFileSync(new URL('../components/SettingsModal.svelte', import.meta.url), 'utf8');
+	const nav = readFileSync(new URL('./settings/navigation-state.svelte.ts', import.meta.url), 'utf8');
+	assert.match(modal, /onSelectSettingsTab\('draw_defaults'\)/);
+	assert.match(modal, /settingsTab === 'draw_defaults'[^]*<DrawDefaultsSettings/);
+	assert.match(nav, /BROWSER_ONLY_SETTINGS_TABS[^]*'draw_defaults'/);
+	assert.match(settings, /<ModelSelectionSettings/);
+	assert.doesNotMatch(settings, /<input/);
+	assert.match(settings, /\{#if !image\}[^]*data-draw-option="route"[^]*data-draw-option="wild"[^]*\{\/if\}/);
+	assert.match(settings, /<option value="auto">\{t\(\)\.colorCatalogAuto\}<\/option>/);
+});

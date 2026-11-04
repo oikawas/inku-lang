@@ -963,6 +963,7 @@ export interface LangPack {
 	drawDefaultsStages: string;
 	drawDefaultsComposition: string;
 	drawDefaultsOff: string;
+	drawOptionsUnavailable: string;
 	drawDefaultsOn: string;
 	drawDefaultsFixed: string;
 	drawDefaultsCatalogId: string;

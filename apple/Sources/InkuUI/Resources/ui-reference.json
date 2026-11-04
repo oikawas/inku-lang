@@ -265,7 +265,7 @@
         "saveCurrentBtn": "現在を保存",
         "clearInputBtn": "新規作成",
         "inputSectionLabel": "記述",
-        "inputSectionHint": "短い文章で、表現したいものを入力。",
+        "inputSectionHint": "短い文で、表現したいものを入力。",
         "inputCommentHint": "[括弧内文字列はコメント扱い]",
         "interpretationFeedbackLabel": "解釈フィードバック",
         "canvasAspectButton": "キャンバス",

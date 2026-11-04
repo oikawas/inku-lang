@@ -73,6 +73,9 @@ class HistoryRow(Base):
     ui_lang = Column(String, nullable=True)
     render_seed = Column(String, nullable=True)
     render_wild = Column(String, nullable=True)  # engine 12: "1"/"0"; NULL = recorded before the flag (not OFF)
+    draw_route = Column(String, nullable=True)
+    sketch_requested = Column(String, nullable=True)
+    composition_requested = Column(String, nullable=True)
     composition_seed = Column(String, nullable=True)
     tenkei = Column(String, nullable=True)  # v1.97 scenery level; NULL = recorded before the field
     focus = Column(String, nullable=True)  # v1.98 focus; NULL = selected deterministically from DDL text

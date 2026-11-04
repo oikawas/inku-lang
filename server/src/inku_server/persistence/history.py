@@ -1137,6 +1137,8 @@ class HistoryWriter:
             instruction_lang_resolved=item.get("instruction_lang_resolved"), ui_lang=item.get("ui_lang"),
             render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
             render_wild=("1" if item.get("render_wild") else "0") if item.get("render_wild") is not None else None,
+            draw_route=item.get("draw_route"), sketch_requested=item.get("sketch_requested"),
+            composition_requested=item.get("composition_requested"),
             composition_seed=str(item.get("composition_seed")) if item.get("composition_seed") is not None else None,
             # Legacy focus/variation columns stay readable; new works leave them NULL.
             tenkei=item.get("tenkei"),
@@ -1325,6 +1327,14 @@ def row_to_dict(
     "lineage_node_id": row.lineage_node_id,
 }
     image_ddl = getattr(row, "image_ddl", None)
+    from ..verified_model_catalog import core_catalog
+    record = {key: getattr(row, key, None) for key in (
+        "draw_route", "sketch_requested", "composition_requested", "render_wild",
+        "catalog_id", "catalog_mode", "render_color_catalog_id", "render_canvas_aspect_id",
+        "render_canvas_aspect", "stage1_model", "stage2_model",
+    )}
+    record["image_ddl"] = {} if image_ddl is not None else None
+    item["draw_options"] = core_catalog("options_of_work", record=record)["options"]
     if image_ddl is not None:
         try:
             record = json.loads(image_ddl)

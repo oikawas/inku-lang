@@ -19,6 +19,7 @@ import { downloadFolderSettings } from '$lib/features/export/download-folder.sve
 import { startupAnswer } from './startup';
 
 export type UserModelSettings = {
+	draw_defaults?: import('../draw-options').DrawDefaults;
 	stage1_provider: Provider;
 	stage1_model: string;
 	stage2_provider: Provider;

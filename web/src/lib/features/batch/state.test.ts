@@ -104,6 +104,27 @@ test('batch average uses saved works only and begins empty on each run', async (
 	assert.equal(state.averageWorkMs, null);
 });
 
+test('new batch clears the interruption and pending resume together', () => {
+	const { state } = makeState();
+	state.interrupted = true;
+	state.resume = { prompt: 'first', lines: [{ line: 1, input: 'first' }], runId: 'old', work: null,
+		conditions: { stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+			sketchGrain: null, wild: null, canvasAspectId: null }, pending: null, source: 'history' };
+	state.clearInput();
+	assert.equal(state.interrupted, false);
+	assert.equal(state.resume, null);
+});
+
+test('a saved batch work is shown only after its history refresh', async () => {
+	const { state } = makeState();
+	state.input = 'first';
+	const events: string[] = [];
+	await state.run({ canvasAspectId: 'square', maxRetries: 0, paintLine: async () => result(1),
+		refreshAfterServerSave: async () => { events.push('history'); },
+		onLatestResult: () => { events.push('shown'); }, refreshAfterRun: async () => {} });
+	assert.deepEqual(events, ['history', 'shown']);
+});
+
 test('an expired registered batch can resume even before its first saved work, but an active batch cannot', async () => {
 	const record = { run_id: 'recorded-run', kind: 'web', total: 2, completed: 0,
 		state: 'running', prompt: 'first\nsecond', conditions: {
@@ -390,6 +411,8 @@ test('T-806: prompt history and resume are owned together without renumbering re
 		batch_run_id: 'run-old',
 		source_text: 'second',
 		stage1_model: 'provider/model-1',
+		draw_options: { route: 'stages', sketch: 'off', composition: 'off', wild: 'off',
+			catalog: null, canvas_aspect: null, models: { stage1: 'provider/model-1' } },
 	};
 	const requests: Array<{ path: string; init?: RequestInit }> = [];
 	const { state } = makeState(async (path, init) => {
@@ -814,4 +837,45 @@ test('a line cut three times in a row while the Server answers is counted as a f
 	assert.deepEqual(calls, [1, 1, 1]);
 	assert.deepEqual(state.failures.map((failure) => [failure.line, failure.message]), [[1, 'paint stream ended before completion']]);
 	assert.equal(server.probes, 2);
+});
+
+test('a dismissed lease stays hidden after refresh and a new batch remains eligible', async () => {
+	const values = new Map<string, string>();
+	const oldStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+	Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+		getItem: (key: string) => values.get(key) ?? null,
+		setItem: (key: string, value: string) => values.set(key, value),
+	} });
+	try {
+		const conditions = { stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+			sketchGrain: null, wild: null, canvasAspectId: null };
+		let runId = 'dismiss-test-old';
+		const make = () => new BatchState({
+			apiFetch: async () => jsonResponse({ batches: [{ run_id: runId, kind: 'web', total: 2, completed: 1,
+				state: 'interrupted', prompt: 'first\nsecond', conditions }] }),
+			signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {},
+		});
+		const state = make();
+		await state.refreshResume();
+		assert.equal(state.resume?.runId, runId);
+		state.clearInput();
+		assert.match(values.get('inku.batch.dismissedRuns.v1') ?? '', /dismiss-test-old/);
+		await state.refreshResume();
+		assert.equal(state.resume, null);
+		const reopened = make();
+		await reopened.refreshResume();
+		assert.equal(reopened.resume, null);
+		// Simulate a fresh page: this id exists only in persisted storage, not in
+		// this module's in-memory set.
+		values.set('inku.batch.dismissedRuns.v1', JSON.stringify(['dismiss-test-from-storage']));
+		runId = 'dismiss-test-from-storage';
+		await reopened.refreshResume();
+		assert.equal(reopened.resume, null);
+		runId = 'dismiss-test-new';
+		await reopened.refreshResume();
+		assert.equal(reopened.resume?.runId, runId);
+	} finally {
+		if (oldStorage) Object.defineProperty(globalThis, 'localStorage', oldStorage);
+		else Reflect.deleteProperty(globalThis, 'localStorage');
+	}
 });

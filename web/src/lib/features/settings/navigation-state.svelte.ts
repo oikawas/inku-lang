@@ -24,6 +24,7 @@ export type SettingsTab =
 	| 'unread'
 	| 'export'
 	| 'image'
+	| 'draw_defaults'
 	| 'demo'
 	| 'misc'
 	| 'server_misc'
@@ -33,7 +34,7 @@ export type SettingsTab =
 // Tabs the Server keeps no name for: they are browser-only pages, so opening
 // one is not written back as the account's remembered tab (the Server would
 // refuse the name with 400).
-const BROWSER_ONLY_SETTINGS_TABS: readonly SettingsTab[] = ['image'];
+const BROWSER_ONLY_SETTINGS_TABS: readonly SettingsTab[] = ['image', 'draw_defaults'];
 
 export type SettingsActor = {
 	id?: string;
@@ -68,7 +69,7 @@ export type SettingsNavigation = {
 };
 
 function isSettingsContentTab(tab: string | null | undefined): tab is Exclude<SettingsTab, 'connection'> {
-	return tab === 'chatgpt' || tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'image' || tab === 'demo' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
+	return tab === 'chatgpt' || tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'image' || tab === 'draw_defaults' || tab === 'demo' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
 }
 
 export function createSettingsNavigation<TActor extends SettingsActor>(

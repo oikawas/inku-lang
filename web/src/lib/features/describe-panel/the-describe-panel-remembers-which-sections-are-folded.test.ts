@@ -76,21 +76,21 @@ test('T-18: the sketch body is inside the fold and the head is not', () => {
 	const head = section.slice(0, headEnd);
 	assert.match(head, /onclick=\{describePanelSettings\.toggleSketch\}/);
 	assert.match(head, /sketch-grain/);
-	assert.match(head, /sketch-edit-btn/);
+	assert.doesNotMatch(head, /sketch-edit-btn/);
 
 	// Everything that shows the prose is behind the fold.
 	const body = section.slice(headEnd);
 	assert.match(body, /\{#if describePanelSettings\.sketchOpen\}/);
 	const guarded = body.slice(body.indexOf('{#if describePanelSettings.sketchOpen}'));
-	for (const marker of ['sketch-body', 'sketch-editor', 'sketch-note']) {
+	for (const marker of ['sketch-body', 'sketch-note']) {
 		assert.match(guarded, new RegExp(marker), `${marker} is outside the fold`);
 	}
 	assert.doesNotMatch(body.slice(0, body.indexOf('{#if describePanelSettings.sketchOpen}')), /sketch-body/);
 });
 
-test('T-18: opening the editor unfolds the prose it edits', () => {
+test('T-18: the displayed sketch is read only', () => {
 	const page = read('../../../routes/+page.svelte');
-	assert.match(page, /work\.sketchEditing = !work\.sketchEditing; if \(work\.sketchEditing\) describePanelSettings\.revealSketch\(\)/);
+	assert.doesNotMatch(page, /work\.sketchEditing|work\.sketchDraft/);
 });
 
 // ------------------------------------------------ T-19 (the folds are saved)

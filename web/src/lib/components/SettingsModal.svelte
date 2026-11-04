@@ -16,6 +16,8 @@
 	import ClipboardExportSettings from '$lib/features/settings/ClipboardExportSettings.svelte';
 	import ImageSettings from '$lib/features/settings/ImageSettings.svelte';
 	import AppearanceSettings from '$lib/features/settings/AppearanceSettings.svelte';
+	import DrawDefaultsSettings from '$lib/features/settings/DrawDefaultsSettings.svelte';
+	import type { DrawDefaults } from '$lib/features/draw-options';
 	import '$lib/features/settings/settings-modal.css';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -28,6 +30,10 @@
 	import type { SettingsController, SettingsTab, SettingsUserItem } from '$lib/features/settings/state.svelte';
 
 	type Props = {
+		drawDefaults: DrawDefaults;
+		drawCatalogs: { id: string; name: string }[];
+		drawCanvases: { id: string; label: string }[];
+		onSaveDrawDefaults: (value: DrawDefaults) => Promise<void>;
 		settings: SettingsController;
 		demoContent?: Snippet;
 		singleUserMode: boolean;
@@ -37,6 +43,7 @@
 		visionProvider: Provider;
 		visionModel: string;
 		providerGroups: ProviderGroup[];
+		drawingProviderGroups: ProviderGroup[];
 		visionProviderGroups: ProviderGroup[];
 		allowVisionSelection: boolean;
 		visionOnlySelection?: boolean;
@@ -78,6 +85,7 @@
 	};
 
 	let {
+		drawDefaults, drawCatalogs, drawCanvases, onSaveDrawDefaults,
 		settings,
 		demoContent,
 		singleUserMode,
@@ -87,6 +95,7 @@
 		visionProvider,
 		visionModel,
 		providerGroups,
+		drawingProviderGroups,
 		visionProviderGroups,
 		allowVisionSelection,
 		visionOnlySelection = false,
@@ -185,6 +194,7 @@
 				? { title: strings.settingsTabClipboard, hint: strings.settingsClipboardHint }
 				: { title: strings.settingsTabFileSaving, hint: strings.settingsExportHint };
 			case 'image': return { title: strings.imageTab, hint: strings.settingsImageHint };
+			case 'draw_defaults': return { title: strings.drawDefaultsTitle, hint: '' };
 			case 'demo': return { title: strings.modeDemo, hint: strings.tooltipInputTabDemo };
 			default: return appearanceSection === 'making'
 				? { title: strings.settingsCategoryMaking, hint: strings.settingsMakingHint }
@@ -287,6 +297,7 @@
 				</section>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
+					<button aria-current={settingsTab === 'draw_defaults' ? 'page' : undefined} class:active={settingsTab === 'draw_defaults'} onclick={() => onSelectSettingsTab('draw_defaults')}>{t().drawDefaultsTitle}</button>
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
 					<button aria-current={settingsTab === 'demo' ? 'page' : undefined} class:active={settingsTab === 'demo'} onclick={() => onSelectSettingsTab('demo')}>{t().modeDemo}</button>
 				</section>
@@ -492,6 +503,8 @@
 				/>
 			{:else if settingsTab === 'image'}
 				<ImageSettings />
+			{:else if settingsTab === 'draw_defaults'}
+				<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} providerGroups={drawingProviderGroups} {visionProviderGroups} onSave={onSaveDrawDefaults} />
 			{:else if settingsTab === 'demo'}
 				{@render demoContent?.()}
 			{:else}

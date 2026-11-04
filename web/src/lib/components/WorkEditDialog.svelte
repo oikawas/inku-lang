@@ -4,7 +4,6 @@
 	import SketchSelect from './SketchSelect.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
-	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import DescriptionMeter from './DescriptionMeter.svelte';
 	import { normalizeSketchState, sketchStateNote, type SketchMode } from '$lib/sketch';
 	import type { LineageNode } from '$lib/features/history/types';
@@ -29,7 +28,7 @@
 
 	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, progress = null, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
 	let draft = $state('');
-	let wildOverride = $state(wildSettings.enabled);
+	let wildOverride = $state(false);
 	let sketchMode = $state<SketchMode>('on');
 	let drawing = $state(false);
 	let error = $state<string | null>(null);
@@ -51,7 +50,7 @@
 		if (nextKey === initializedKey) return;
 		initializedKey = nextKey;
 		draft = mode === 'description' ? (node.history?.source_text ?? node.history?.input ?? '') : '';
-		wildOverride = wildSettings.enabled;
+		wildOverride = node.history?.draw_options?.wild === 'on';
 		// Offer the other side of what the work was drawn with.
 		sketchMode = node.history?.sketch_text ? 'off' : 'on';
 		error = null;

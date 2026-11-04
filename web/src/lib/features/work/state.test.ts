@@ -31,6 +31,7 @@ const { batchSettings } = await import('../batch/settings.svelte.ts');
 const { createWorkState } = await import('./state.svelte.ts');
 const { wildSettings } = await import('../wild/settings.svelte.ts');
 const { pipelineAttentionReason } = await import('../pipeline/attention.ts');
+const { DRAW_OPTIONS } = await import('../draw-options.ts');
 
 function imageWork(apiFetch: WorkStateDeps['apiFetch'], overrides: Partial<WorkStateDeps> = {}) {
 	return createWorkState({
@@ -82,13 +83,13 @@ for (const unchanged of [false, true]) {
 	test(`before-review redraw forks the original through DDL editing (${unchanged ? 'same' : 'different'} final DDL)`, async () => {
 		const requests: Array<Record<string, unknown>> = [];
 		const original = { ...recordedImage(unchanged ? beforeReview : afterReview), render_wild: !unchanged };
-		wildSettings.enabled = unchanged;
 		const work = imageWork(async (path, init) => {
 			assert.equal(path, '/api/pipeline/history/image-work/fork');
 			requests.push(JSON.parse(String(init?.body)));
 			return Response.json({ detail: 'captured before provider' }, { status: 400 });
 		}, { ensureVisibleLineageParentId: async () => 'image-node' });
 		work.inputMode = 'image'; work.input = '';
+		work.drawOptions.wild = unchanged ? 'on' : 'off';
 		work.lineageDetached = true;
 		work.result = imageResult(original.ddl);
 		work.displayedHistoryItem = original;
@@ -106,7 +107,6 @@ for (const unchanged of [false, true]) {
 		assert.equal(original.ddl, unchanged ? beforeReview : afterReview);
 		assert.equal(work.ddlGeneratedBaseline, original.ddl);
 		assert.equal(work.input, '');
-		wildSettings.enabled = false;
 	});
 }
 
@@ -174,11 +174,12 @@ test('image authoring keeps provenance out of description and reuploads consumed
 		const options = body.options as Record<string, unknown>;
 		assert.equal(options.stage1_model, 'chatgpt:vision');
 		assert.equal(options.stage2_model, 'chatgpt:vision');
-		assert.equal(options.sketch, 'off');
+		assert.equal(options.sketch, 'on');
 		assert.equal(options.sketch_text, undefined);
 		assert.equal(options.wild, false);
 		assert.equal(options.canvas_fit, 'contain');
-		assert.equal(options.instruction_lang, 'ja');
+		assert.equal(options.instruction_lang, 'auto');
+		assert.equal(options.ui_lang, 'ja');
 	}
 	assert.equal(work.input, '');
 	assert.equal(work.currentInstructionText, '');
@@ -371,7 +372,7 @@ test('a new drawing uses the changed model and clears the preceding failure with
 	assert.deepEqual(models, ['chatgpt:luna', 'openai:other']);
 });
 
-test('an edited sketch reaches authoring only for its description with sketching on', async () => {
+test('a saved sketch reaches authoring only for its description with sketching on', async () => {
 	const requests: Array<{ text: string; options: { sketch: string; sketch_text?: string } }> = [];
 	const work = createWorkState({
 		apiFetch: async (path: string, init?: RequestInit) => {
@@ -386,9 +387,8 @@ test('an edited sketch reaches authoring only for its description with sketching
 			stage2Provider: () => 'openai', stage2Model: () => 'drawing', includeThinking: () => false },
 	} as unknown as WorkStateDeps);
 	work.adoptSketch('original sketch', null, 'same description', 'generated');
-	work.sketchDraft = 'author edited sketch';
 	await assert.rejects(work.authorDescription('same description'));
-	assert.equal(requests.at(-1)?.options.sketch_text, 'author edited sketch');
+	assert.equal(requests.at(-1)?.options.sketch_text, 'original sketch');
 	assert.equal(work.sketchText, 'original sketch');
 
 	work.sketchMode = 'off';
@@ -400,10 +400,34 @@ test('an edited sketch reaches authoring only for its description with sketching
 	assert.equal(requests.at(-1)?.options.sketch_text, undefined);
 
 	work.adoptSketch('new work sketch', null, 'new description', 'generated');
-	assert.equal(work.sketchDraft, 'new work sketch');
-	assert.equal(work.sketchEditing, false);
+	assert.equal(work.sketchText, 'new work sketch');
 	await assert.rejects(work.authorDescription('new description'));
 	assert.equal(requests.at(-1)?.options.sketch_text, 'new work sketch');
+});
+
+test('the four tabs retain independent choices and new work restores its default', () => {
+	const work = imageWork(async () => { throw new Error('no request expected'); });
+	const options = (canvas_aspect: string) => ({ route: 'read_and_draw' as const, sketch: 'on' as const,
+		composition: 'off' as const, wild: 'off' as const, catalog: { id: 'default', mode: 'fixed' as const },
+		canvas_aspect, models: { stage1: 'openai:a', stage2: 'openai:a', vision: 'openai:v' } });
+	work.setDrawDefaults('owner', { describe: options('square'), image: options('image'),
+		batch_text: options('a4'), batch_image: options('hd_monitor') });
+	work.drawOptions.composition = 'on';
+	work.inputMode = 'batch';
+	assert.equal(work.drawOptions.canvas_aspect, 'a4');
+	work.drawOptions.composition = 'on';
+	work.selectWorkOptions(null, false);
+	assert.equal(work.drawOptions.composition, 'on', 'opening a work does not alter batch selection');
+	work.inputMode = 'single';
+	assert.equal(work.drawOptions.composition, 'off', 'an unrecorded switch restores as off');
+	work.drawOptions.wild = 'on';
+	work.clearInput();
+	for (const key of DRAW_OPTIONS) assert.deepEqual(work.drawOptions[key], work.drawDefaults.describe[key], `${key} resets to its default`);
+	work.inputMode = 'image';
+	assert.equal(work.drawOptions.canvas_aspect, 'image');
+	work.inputMode = 'batch';
+	work.imageFolder.setSource('image');
+	assert.equal(work.drawOptions.canvas_aspect, 'hd_monitor');
 });
 
 test('demo drawing sends its shared model to both stages even with a legacy stage 2 value', async () => {

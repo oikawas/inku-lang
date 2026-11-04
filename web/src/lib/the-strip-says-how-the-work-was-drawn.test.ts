@@ -15,11 +15,17 @@ import { sketchStateShort } from './sketch.ts';
 const here = path.dirname(new URL(import.meta.url).pathname);
 const PANEL = fs.readFileSync(path.join(here, './components/CanvasPanel.svelte'), 'utf8');
 
-test('the route and the sketch stand between the canvas and the size', () => {
-	const at = (item: string) => PANEL.indexOf(`class="render-meta-item ${item}"`);
-	const [canvas, route, sketch, size] = ['render-meta-canvas', 'render-meta-route', 'render-meta-sketch', 'render-meta-svg-size'].map(at);
-	assert.ok(canvas > 0 && route > 0 && sketch > 0 && size > 0, 'an item is missing from the strip');
-	assert.ok(canvas < route && route < sketch && sketch < size, 'the order is canvas, route, sketch, size');
+test('the saved-work strip retains sketch results and readable condition names', () => {
+	assert.match(PANEL, /drawOptionRows\(statusHistoryItem\?\.draw_options/);
+	assert.match(PANEL, /statusStage1ModelOnly/);
+	assert.match(PANEL, /statusStage2ModelOnly/);
+	assert.match(PANEL, /isJapanese \? '解釈' : 'Interpretation'/);
+	assert.match(PANEL, /isJapanese \? '描画' : 'Performance'/);
+	assert.match(PANEL, /statusCatalogName/);
+	assert.match(PANEL, /statusCanvasName/);
+	assert.match(PANEL, /sketchStateShort\(statusSketchState, isJapanese\)/);
+	assert.match(PANEL, /sketchStateNote\(statusSketchState, isJapanese\)/);
+	assert.match(PANEL, /sketchStateShort\(statusSketchState, isJapanese\)\} \({option.text}\)/);
 });
 
 test('the route names the work on screen, a picture going through neither', () => {

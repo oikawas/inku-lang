@@ -100,32 +100,22 @@ test('T-62  works from another run do not count as drawn', () => {
 test('T-63  the conditions are read off the work that was drawn last', () => {
 	assert.deepEqual(
 		conditionsOfWork({
-			stage1_model: 'nvidia:gemma-4',
-			stage2_model: 'nvidia:gemma-4',
-			render_color_catalog_id: 'sumi',
-			catalog_mode: 'fixed',
-			sketch_grain: 'coarse',
-			render_wild: true,
-			render_canvas_aspect_id: 'tate',
+			draw_options: {route: 'read_and_draw', sketch: 'on', composition: 'on', wild: 'on',
+				catalog: {id: 'sumi', mode: 'fixed'}, canvas_aspect: 'tate',
+				models: {stage1: 'nvidia:gemma-4', stage2: 'nvidia:gemma-4'}},
 		}),
 		{
 			stage1Model: 'nvidia:gemma-4',
 			stage2Model: 'nvidia:gemma-4',
 			catalogId: 'sumi',
 			catalogMode: 'fixed',
-			sketchGrain: 'coarse',
+			sketchGrain: 'on',
 			wild: true,
 			canvasAspectId: 'tate',
-			route: 'stages',
-			// The stages have no composition and laws of their own to resume.
-			composition: null,
+			route: 'read_and_draw',
+			composition: 'on',
 		},
 	);
-	// A read-and-draw work keeps its record, and the batch resumes on that route,
-	// with the composition and laws as the work had them (2026-10-26).
-	assert.equal(conditionsOfWork({ description_ddl: { reading_state: 'read' } }).route, 'read_and_draw');
-	assert.equal(conditionsOfWork({ description_ddl: { reading_state: 'read' } }).composition, 'off');
-	assert.equal(conditionsOfWork({ description_ddl: { composition: { state: 'used' } } }).composition, 'on');
 });
 
 test('T-63  a condition the work never recorded is not invented', () => {
@@ -140,19 +130,18 @@ test('T-63  a condition the work never recorded is not invented', () => {
 		sketchGrain: null,
 		wild: null,
 		canvasAspectId: null,
-		// Not invented: every work without the read-and-draw record was drawn
-		// by the stages, the only route there was before it.
-		route: 'stages',
+		route: null,
 		composition: null,
 	});
-	assert.equal(conditionsOfWork({ render_wild: false }).wild, false);
+	assert.equal(conditionsOfWork({ render_wild: false }).wild, null);
 });
 
 test('T-66  a run made under auto says so, beside the catalog it resolved to', () => {
 	// [I-257]. `auto` reads each description anew, so the resolved id is what the
 	// last line happened to get. Both are kept: the mode says what was asked for,
 	// the id is still what that line was drawn in.
-	const auto = conditionsOfWork({ catalog_mode: 'auto', render_color_catalog_id: 'sumi' });
+	const auto = conditionsOfWork({ draw_options: {route: null, sketch: null, composition: null, wild: null,
+		catalog: {mode: 'auto', id: 'sumi'}, canvas_aspect: null, models: null} });
 	assert.equal(auto.catalogMode, 'auto');
 	assert.equal(auto.catalogId, 'sumi');
 });

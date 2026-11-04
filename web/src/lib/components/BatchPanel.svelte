@@ -337,7 +337,6 @@
 	</div>
 {:else}
 	<div class="batch-actions" class:batch-actions-busy={batchResuming}>
-		<span class="batch-action-label">{t().batchNewRunLabel}</span>
 		<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled || batchResuming}>{t().batchNewRunBtn}</PaintButton>
 	</div>
 {/if}
@@ -599,13 +598,6 @@
 		gap: 6px;
 		margin-top: 12px;
 	}
-	.batch-action-label {
-		display: flex;
-		align-items: center;
-		color: var(--fg2);
-		font-size: var(--ui-font-size-12);
-		white-space: nowrap;
-	}
 	.batch-actions-busy {
 		cursor: wait;
 		opacity: 0.62;
@@ -733,7 +725,6 @@
 		.batch-resume-card { align-items: stretch; flex-direction: column; gap: 8px; }
 		.batch-resume-btn { width: 100%; }
 		.batch-actions { align-items: stretch; flex-direction: column; }
-		.batch-action-label { min-height: 0; }
 		.batch-actions :global(.paint-btn.block) { width: 100%; }
 		.batch-observe-head { grid-template-columns: 1fr; gap: 3px; }
 		.batch-observe-meta { justify-self: start; }

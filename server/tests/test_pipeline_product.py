@@ -420,8 +420,8 @@ def test_an_issued_render_seed_survives_a_javascript_number(tmp_path, monkeypatc
 @pytest.mark.parametrize(
     ("requested", "expected"),
     [
-        ({"stage1_model": "fixture:one", "stage2_model": "fixture:two"}, "fixture:one"),
-        ({"stage2_model": "fixture:two"}, "fixture:two"),
+        ({"stage1_model": "fixture:one", "stage2_model": "fixture:two"}, "nvidia:fixture:one"),
+        ({"stage2_model": "fixture:two"}, "nvidia:fixture:two"),
     ],
     ids=["two-named-keeps-stage1", "stage2-alone-is-the-one-model"],
 )
@@ -460,6 +460,26 @@ def test_fork_does_not_inherit_the_parent_stroke_limit(tmp_path, monkeypatch, su
     _config, context = effects.prepare("author", "direct_ddl", "Nature.青葉。",
         {"instruction_lang": "ja", "catalog_id": "default", "stage1_model": "fixture:one", **supplied}, parent)
     assert context["host_options"]["wild"] is expected
+    engine.dispose()
+
+
+def test_description_fork_uses_inherited_route_and_composition(tmp_path, monkeypatch):
+    from inku_server import db
+    from inku_server.api_core import common
+
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'inherited.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    parent = {"host_options": {"route": "read_and_draw", "composition": "on"}}
+    _, context = effects.prepare("author", "description", "A line",
+        {"instruction_lang": "en", "stage1_model": "fixture:one", "sketch": "on"}, parent)
+    assert context["host_options"]["route"] == "read_and_draw"
+    assert context["host_options"]["composition"] == "on"
+    assert context["sketch_request"]["mode"] == "on"
     engine.dispose()
 
 
@@ -507,6 +527,10 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
                                         "stage1_model": "nvidia:poolside/laguna-xs-2.1"}, None)
     context.update(description="Old description", committed_description="Old description",
                    derivation_kind="legacy_ddl_fork", parent_legacy_history_id=legacy_parent["id"])
+    # Exercise the saved description execution's requested choices through the
+    # real history writer without sending a request to a model.
+    context.update(input_kind="description", sketch_request={"mode": "on"})
+    context["host_options"].update(route="read_and_draw", composition="on")
     assert options["definitions"][0]["heading"] == "Circle"
     lock = context["macro_catalog"]["definition_locks"][0]
     assert lock["qualified_name"] == "Example.Circle"
@@ -573,6 +597,9 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     assert result["render_warnings"] == render_warnings
     assert "invalid_color" in caplog.text
     item = db.get_items("author", [result["history_id"]])[0]
+    assert item["draw_options"]["route"] == "read_and_draw"
+    assert item["draw_options"]["sketch"] == item["draw_options"]["composition"] == "on"
+    assert item["draw_options"] == result["draw_options"]
     response = HistoryItem.model_validate(item).model_dump()
     assert response["score"] == snapshot["delivery"]["score"]
     assert response["ddl"] == snapshot["document"]["source"]

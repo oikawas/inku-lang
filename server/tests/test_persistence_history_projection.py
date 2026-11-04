@@ -258,6 +258,9 @@ def test_history_projection_full_valid_row_is_exact_and_ordered() -> None:
         "batch_run_id": "batch-1",
         "description_hash": "dh1:abc",
         "lineage_node_id": "node-1",
+        "draw_options": {"route": None, "sketch": None, "composition": None, "wild": "on",
+                         "catalog": {"id": "current-id", "mode": "fixed"}, "canvas_aspect": "portrait",
+                         "models": {"stage1": "stage-1", "stage2": "stage-2"}},
         "stage1_prompt_digest": "stage1",
         "stage1_prompt_base_digest": "stage1-base",
         "stage2_prompt_digest": "stage2",
@@ -336,6 +339,7 @@ def test_history_projection_absence_row_has_exact_base_key_set() -> None:
         "batch_run_id",
         "description_hash",
         "lineage_node_id",
+        "draw_options",
     ]
     assert item["source_text"] == "input"
     assert "history_visibility" not in item

@@ -31,7 +31,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { holeCompletionIssues } from '$lib/features/pipeline/hole-completion';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
-	import { compositionModeOf, drawRouteOf, readingStateNote } from '$lib/draw-route';
+	import { readingStateNote } from '$lib/draw-route';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 	import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -94,8 +94,9 @@
 	import { DemoState } from '$lib/features/demo/state.svelte';
 	import { demoInstructionModelGroups } from '$lib/demo';
 	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
-	import { wildSettings } from '$lib/features/wild/settings.svelte';
-	import { wildOverride } from '$lib/features/wild/render';
+	import { loadBatchSavedWork } from '$lib/features/batch/saved-work';
+	import { copyDrawOptions, migrateLegacyWild, type DrawDefaults } from '$lib/features/draw-options';
+	import { bindWildRenderState, wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
 	import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
 	import { downloadCard, fetchCardPng } from '$lib/cardExport';
@@ -244,6 +245,8 @@
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
 	let modelSelectionAllowVision = $state(true);
 	let modelSelectionVisionOnly = $state(false);
+	let modelSelectionForDrawing = false;
+	let legacyWildMigration = false;
 	// The Server config supplies the candidate-grid cap so it tracks render slots;
 	// apiFetch handles 503 retries when other work temporarily occupies a slot.
 	let renderFanoutLimit = $state(4);
@@ -573,12 +576,14 @@
 		showCanvas: () => { outputTab = 'canvas'; },
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
 		displayLatestBatchRender,
+		loadBatchSavedWork: (id) => loadBatchSavedWork(apiFetch, id),
 		pushHistory,
 		imageUploadNotice: {
 			due: () => !!session.currentUser && uploadNoticeDue(String(session.currentUser.id)),
 			acknowledge: () => { if (session.currentUser) acknowledgeUploadNotice(String(session.currentUser.id)); },
 		}
 	});
+	bindWildRenderState(() => work.drawOptions.wild === 'on');
 	const settings = createSettingsController({
 		chatgptAvailable: () => chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id,
 		invalidateChatGPTModels: () => {
@@ -666,6 +671,19 @@
 		const settings = user?.model_settings;
 		applyUserSettings(settings, { excludeIds: options.excludeUserSettingIds });
 		if (!settings) return;
+		if (user && settings.draw_defaults) work.setDrawDefaults(user.id, settings.draw_defaults);
+		if (user && settings.draw_defaults && !legacyWildMigration && typeof localStorage !== 'undefined') {
+			const raw = localStorage.getItem('inku-wild-default');
+			const defaults = migrateLegacyWild(settings.draw_defaults, raw);
+			if (defaults) {
+				legacyWildMigration = true;
+				void saveDrawDefaults(defaults).then(() => {
+					work.applyMigratedWild(settings.draw_defaults!, defaults);
+					localStorage.removeItem('inku-wild-default');
+				})
+					.catch(() => { legacyWildMigration = false; });
+			}
+		}
 		stage1Provider = settings.stage1_provider;
 		stage1Model = settings.stage1_model;
 		stage2Provider = settings.stage2_provider;
@@ -676,6 +694,18 @@
 			? qualifiedModelRef(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
 			: qualifiedModelRef(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
+	}
+
+	async function saveDrawDefaults(defaults: DrawDefaults): Promise<void> {
+		const user = session.currentUser;
+		if (!user) throw new Error('not signed in');
+		const response = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ model_settings: { draw_defaults: defaults } }) });
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		const updated = await response.json() as UserItem;
+		if (session.currentUser?.id !== user.id) throw new Error('account changed');
+		session.setCurrentUser(updated);
+		if (updated.model_settings?.draw_defaults) work.setDrawDefaults(user.id, updated.model_settings.draw_defaults);
 	}
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
@@ -735,32 +765,26 @@
 
 	/** Put back the conditions the last work of the stopped run was drawn under. */
 	async function applyBatchRunConditions(conditions: BatchRunConditions) {
+		const choices = work.batchTextOptions;
+		Object.assign(choices, copyDrawOptions(work.drawDefaults.batch_text));
 		await loadModelReferences([conditions.stage1Model, conditions.stage2Model].filter((ref): ref is string => !!ref).map((ref) => ({action: 'split_ref', ref})));
-		if (conditions.stage1Model) {
-			const ref = splitModelReference(conditions.stage1Model, availableModelCatalog);
-			if (ref.provider) stage1Provider = ref.provider;
-			stage1Model = ref.model;
-		}
-		if (conditions.stage2Model) {
-			const ref = splitModelReference(conditions.stage2Model, availableModelCatalog);
-			if (ref.provider) stage2Provider = ref.provider;
-			stage2Model = ref.model;
-		}
 		// `auto` reads each description anew, so a run made under it must resume
 		// under it -- the resolved id is what the last line happened to get, not
 		// what was asked for. A work older than the column records no mode, and
 		// then the resolved id is the best that was ever stored.
-		if (conditions.catalogMode === 'auto') colorCatalogSettings.selected = AUTO_CATALOG_ID;
-		else if (conditions.catalogId) colorCatalogSettings.selected = conditions.catalogId;
+		if (conditions.catalogId) choices.catalog.id = conditions.catalogId;
+		if (conditions.catalogMode) choices.catalog.mode = conditions.catalogMode === 'auto' ? 'auto' : 'fixed';
+		if (conditions.stage1Model) choices.models.stage1 = conditions.stage1Model;
+		if (conditions.stage2Model) choices.models.stage2 = conditions.stage2Model;
 		// The route first: choosing read and draw turns the sketch on, and the
 		// line after puts back the sketch the run was drawn with.
-		if (conditions.route) work.selectDrawRoute(conditions.route);
-		if (conditions.composition) work.selectCompositionMode(conditions.composition);
+		if (conditions.route) choices.route = conditions.route;
+		choices.composition = conditions.composition ?? 'off';
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
-		work.sketchMode = sketchModeOf(conditions.sketchGrain);
-		if (conditions.wild !== null) wildSettings.setSelected(conditions.wild);
-		if (conditions.canvasAspectId) canvasAspectId = normalizeCanvasAspectId(conditions.canvasAspectId);
+		choices.sketch = sketchModeOf(conditions.sketchGrain);
+		choices.wild = conditions.wild === true ? 'on' : 'off';
+		if (conditions.canvasAspectId) choices.canvas_aspect = normalizeCanvasAspectId(conditions.canvasAspectId);
 	}
 
 	async function resumeInterruptedBatch() {
@@ -820,30 +844,14 @@
 	}
 
 	function effectiveCanvasAspectId(): CanvasAspectId {
-		return canvasAspectId;
-	}
-
-	async function saveCanvasAspectPluginValue() {
-		if (!session.currentUser) return;
-		try {
-			const r = await apiFetch(`/api/auth/me/plugin-storage/${CANVAS_ASPECT_PLUGIN_ID}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ value: { enabled: true, selected: canvasAspectId } })
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-		} catch (e) {
-			console.warn('failed to save canvas aspect plugin storage', e);
-		}
+		return work.drawOptions.canvas_aspect;
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
-		if (!session.isAdmin) return;
 		const nextAspectId = normalizeCanvasAspectId(id);
 		const currentAspectId = effectiveCanvasAspectId();
 		canvasAspectMenuOpen = false;
 		if (nextAspectId === currentAspectId) {
-			await saveCanvasAspectPluginValue();
 			return;
 		}
 		const existingPending = work.pendingCanvasAspectDerivation;
@@ -852,12 +860,9 @@
 			? { parentNodeId, fromAspectId: existingPending?.fromAspectId ?? currentAspectId, toAspectId: nextAspectId }
 			: null;
 		canvasAspectId = nextAspectId;
-		work.result = null;
-		work.displayedHistoryItem = null;
-		history.clearSelection();
+		work.drawOptions.canvas_aspect = nextAspectId;
 		outputTab = 'canvas';
 		canvasViewport.fit();
-		await saveCanvasAspectPluginValue();
 	}
 
 	async function loadExportTemplates() {
@@ -929,10 +934,19 @@
 		return saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
 	}
 
-	function openModelSelection(allowVision = true, visionOnly = false) {
+	function openModelSelection(allowVision = true, visionOnly = false, forDrawing = false) {
 		modelSelectionAllowVision = allowVision;
 		modelSelectionVisionOnly = visionOnly;
+		modelSelectionForDrawing = forDrawing;
 		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
+		if (forDrawing) {
+			const ref = visionOnly ? work.drawOptions.models.vision : work.drawOptions.models.stage1;
+			if (ref) {
+				const selected = splitModelReference(ref, visionOnly ? availableVisionModelCatalog : availableModelCatalog);
+				if (visionOnly) { if (selected.provider) visionProvider = selected.provider; visionModel = selected.model; }
+				else { if (selected.provider) stage1Provider = stage2Provider = selected.provider; stage1Model = stage2Model = selected.model; }
+			}
+		}
 		settings.openModelSelection();
 	}
 
@@ -988,6 +1002,13 @@
 	}
 
 	async function confirmModelSelection() {
+		if (modelSelectionForDrawing) {
+			if (modelSelectionVisionOnly) work.drawOptions.models.vision = qualifiedModelRef(visionProvider, visionModel);
+			else work.drawOptions.models.stage1 = work.drawOptions.models.stage2 = qualifiedModelRef(stage1Provider, stage1Model);
+			restoreModelSelection();
+			settings.finishModelSelection();
+			return;
+		}
 		modelSelectionSnapshot = null;
 		await persistModelSelection();
 		settings.finishModelSelection();
@@ -1006,12 +1027,14 @@
 	}
 
 	function openCatalogModal() {
+		colorCatalogSettings.selected = work.drawOptions.catalog.mode === 'auto' ? AUTO_CATALOG_ID : work.drawOptions.catalog.id;
 		catalogSelectionSnapshot = colorCatalogSettings.selected;
 		catalogOpen = true;
 	}
 
 	function persistSelectedCatalog() {
-		colorCatalogSettings.save();
+		work.drawOptions.catalog.mode = colorCatalogSettings.selected === AUTO_CATALOG_ID ? 'auto' : 'fixed';
+		if (colorCatalogSettings.selected !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = colorCatalogSettings.selected;
 	}
 
 	// The selection rides in the user's model_settings: a drawing needs a session,
@@ -1323,6 +1346,8 @@
 	}
 
 	function resetAfterSignedOut(): void {
+		work.resetDrawDefaultsOwner();
+		legacyWildMigration = false;
 		work.clearImage();
 		compositionRanges = [];
 		ddlRangePreview = null;
@@ -1725,7 +1750,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 			// The dialog supplies its own choice; otherwise use the saved default.
 			renderOverrides: {
 				...colorCatalogOverride(lineageCatalogId(node)),
-				...wildOverride(wild ?? wildSettings.enabled)
+				...wildOverride(wild ?? (work.drawOptions.wild === 'on'))
 			},
 		}, signal);
 		// A cancelled run hands back its last view instead of throwing; a stop
@@ -1740,7 +1765,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 /** Redraw a saved work with the sketch off or on, as its child. The
  *  sketch is asked again (or dropped) -- replaying the stored one would leave
  *  the choice dead. */
-async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = wildSettings.enabled): Promise<void> {
+async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = work.drawOptions.wild === 'on'): Promise<void> {
 	if (!node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
@@ -1789,7 +1814,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(ddlDialogWildOverride ?? wildSettings.enabled)
+			...wildOverride(ddlDialogWildOverride ?? (work.drawOptions.wild === 'on'))
 		},
 	}, signal);
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
@@ -2010,12 +2035,14 @@ $effect(() => {
 		resetTargetScopedState({ preserveLineageBrowsing: sameTree });
 		work.pendingCanvasAspectDerivation = null;
 		work.displayedHistoryItem = it;
+		const imageWork = !!it.image_ddl || it.image_provenance != null;
+		work.selectWorkOptions(it.draw_options, imageWork);
 		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id);
 		void history.syncToItem(it);
 		work.lineageDetached = false;
 		if (!options.preserveAuthoring) {
-			work.inputMode = it.image_ddl || it.image_provenance != null ? 'image' : 'single';
-			if (work.inputMode === 'image') {
+			if (work.inputMode !== 'batch') work.inputMode = imageWork ? 'image' : 'single';
+			if (imageWork && work.inputMode === 'image') {
 				work.clearImage();
 				work.imageProvenance = it.image_provenance ?? '';
 			}
@@ -2024,8 +2051,7 @@ $effect(() => {
 			work.ddlGeneratedBaseline = projection.ddl;
 			work.thinking = projection.thinking;
 			work.stage1UserPrompt = projection.sourceText;
-			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState, drawRouteOf(it),
-				compositionModeOf(it));
+			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState);
 		}
 		work.result = projection.result;
 		work.error = null;
@@ -2153,23 +2179,15 @@ $effect(() => {
 
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
-		work.displayedHistoryItem = null;
-		history.clearSelection();
 		stage1Provider = v; stage1Model = modelsFor(v)[0]?.id ?? stage1Model;
 	}
 	function setStage1Model(v: string) {
-		work.displayedHistoryItem = null;
-		history.clearSelection();
 		stage1Model = v;
 	}
 	function setStage2Provider(v: Provider) {
-		work.displayedHistoryItem = null;
-		history.clearSelection();
 		stage2Provider = v; stage2Model = modelsFor(v)[0]?.id ?? stage2Model;
 	}
 	function setStage2Model(v: string) {
-		work.displayedHistoryItem = null;
-		history.clearSelection();
 		stage2Model = v;
 	}
 	function setDrawingModel(provider: Provider, model: string) {
@@ -2266,9 +2284,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 }
 
 	function setSelectedCatalog(id: string) {
-		work.displayedHistoryItem = null;
-		history.clearSelection();
 		colorCatalogSettings.selected = id;
+		persistSelectedCatalog();
 	}
 
 	// ── Download ────────────────────────────────────────────
@@ -2421,9 +2438,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const statusStage2ModelOnly = $derived(work.displayedHistoryItem
 		? (work.displayedHistoryItem.stage2_model ? modelShortName(work.displayedHistoryItem.stage2_model) : '-')
 		: (work.result?.stage2_model ? modelShortName(work.result.stage2_model) : '-'));
-	const nextStage1Model = $derived(statusModelName(qualifiedModelRef(stage1Provider, stage1Model)));
-	const nextStage2Model = $derived(statusModelName(qualifiedModelRef(stage2Provider, stage2Model)));
-	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? (work.inputMode === 'image' ? t().imageCatalogAuto : t().colorCatalogAuto) : currentCatalog.name);
+	const nextStage1Model = $derived(statusModelName(work.drawOptions.models.stage1 ?? qualifiedModelRef(stage1Provider, stage1Model)));
+	const nextStage2Model = $derived(statusModelName(work.drawOptions.models.stage2 ?? qualifiedModelRef(stage2Provider, stage2Model)));
+	const nextCatalogName = $derived(work.drawOptions.catalog.mode === 'auto' ? (work.inputMode === 'image' ? t().imageCatalogAuto : t().colorCatalogAuto) : (catalogById(colorCatalogs, work.drawOptions.catalog.id)?.name ?? work.drawOptions.catalog.id));
 	// The catalog a work was drawn with, named as it stands today. Two things
 	// the bare name cannot say are said here instead of being papered over: an
 	// id nothing current answers to is marked retired rather than shown as the
@@ -2469,12 +2486,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (work.displayedHistoryItem) return work.displayedHistoryItem;
 		if (work.result?.history_id) {
 			const historyId = work.result.history_id;
-			const projected = currentResultStarState?.id === historyId ? currentResultStarState : null;
-			return historyItems.find((item) => item.id === historyId) ?? {
-				id: historyId,
-				starred: projected?.starred ?? false,
-				note: projected?.note ?? null,
-			};
+			return historyItems.find((item) => item.id === historyId) ?? null;
 		}
 		if (work.showingDemo) return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
@@ -2484,7 +2496,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			? statusHistoryItem as Iteration
 			: null
 	);
-	const effectiveRefineWild = $derived(refineWildOverride ?? wildSettings.enabled);
+	const effectiveRefineWild = $derived(refineWildOverride ?? (work.drawOptions.wild === 'on'));
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
@@ -2807,9 +2819,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</div>
 					{/if}
 					<InputPanel
-						chatgptPlanSelected={stage1Provider === 'chatgpt'}
-						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.id === stage1Model))}
+						chatgptPlanSelected={(work.drawOptions.models.stage1 ?? '').startsWith('chatgpt:')}
+						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.qualified_id === work.drawOptions.models.stage1))}
 						sketchMode={work.sketchMode}
+						wild={work.drawOptions.wild === 'on'}
+						onSelectWild={(value) => (work.drawOptions.wild = value ? 'on' : 'off')}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
 						drawRoute={work.drawRoute}
 						onSelectDrawRoute={work.selectDrawRoute}
@@ -2822,15 +2836,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						imageUploading={work.imageUploading}
 						imageRunning={work.imageRunning}
 						imageCanvasAspectId={work.imageCanvasAspectId}
-						visionModelName={statusModelName(qualifiedModelRef(visionProvider, visionModel))}
-						visionModelAvailable={availableVisionModelCatalog.some((group) => group.id === visionProvider && group.models.some((model) => model.id === visionModel))}
+						visionModelName={statusModelName(work.drawOptions.models.vision ?? qualifiedModelRef(visionProvider, visionModel))}
+						visionModelAvailable={availableVisionModelCatalog.some((group) => group.models.some((model) => model.qualified_id === work.drawOptions.models.vision))}
 						onSelectImage={work.selectImage}
 						onImageProvenanceInput={work.noteImageProvenanceTyped}
 						onSubmitImage={work.requestSubmitImage}
 						onSelectImageCanvasAspect={(id) => { work.imageCanvasAspectId = id; canvasAspectMenuOpen = false; }}
 						imageFolder={work.imageFolder}
 						onRunImageFolder={work.runImageFolder}
-						onOpenImageModelSelection={() => openModelSelection(true, true)}
+						onOpenImageModelSelection={() => openModelSelection(true, true, true)}
 						bind:input={work.input}
 						bind:batchInput={batch.input}
 						lineNumbersText={batch.lineNumbersText}
@@ -2875,7 +2889,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						generationDisabled={modelCatalogStatus !== 'ready' || refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming || work.imageFolder.running}
 						error={work.error}
 						stageLabel={work.stageLabel}
-						{canvasAspectId}
+						canvasAspectId={work.drawOptions.canvas_aspect}
 						{canvasAspectOptions}
 						{canvasAspectMenuOpen}
 						stage1ModelLabel={work.stage1ModelLabel}
@@ -2889,7 +2903,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{nextCatalogName}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
-						onOpenModelSelection={() => openModelSelection(false)}
+						onOpenModelSelection={() => openModelSelection(false, false, true)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={work.clearInput}
 						onRememberBatchPrompt={(prompt) => batch.rememberPrompt(prompt)}
@@ -2962,11 +2976,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								</Tooltip>
 								{#if work.sketchText !== null}
 									<span class="sketch-grain">{#if normalizeSketchGrain(work.result?.sketch_grain)}{t().sketchGrainLabel}: {sketchGrainLabel(normalizeSketchGrain(work.result?.sketch_grain) ?? 'fine', getLang() === 'ja')}{:else}{sketchModeLabel(work.sketchMode, getLang() === 'ja')}{/if}</span>
-									<!-- Editing needs the prose on screen, so the button unfolds the
-									     section rather than acting on what the author cannot see. -->
-									<button type="button" class="sketch-edit-btn" onclick={() => { work.sketchEditing = !work.sketchEditing; if (work.sketchEditing) describePanelSettings.revealSketch(); }}>
-										{work.sketchEditing ? t().ddlDoneBtn : t().ddlEditBtn}
-									</button>
 								{/if}
 							</div>
 							{#if describePanelSettings.sketchOpen}
@@ -2978,11 +2987,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 									     layer off and a work drawn before the layer was
 									     recorded read the same here otherwise. -->
 									<p class="sketch-note">{work.result?.description_ddl ? readingStateNote(work.result.description_ddl.reading_state, getLang() === 'ja') : sketchStateNote(work.sketchState, getLang() === 'ja')}</p>
-								{:else if work.sketchEditing}
-									<textarea class="sketch-editor" rows="7" bind:value={work.sketchDraft} spellcheck="true"></textarea>
-									<p class="sketch-note">{t().sketchEditHint}</p>
 								{:else}
-									<p class="sketch-body">{work.sketchDraft}</p>
+									<p class="sketch-body">{work.sketchText}</p>
 								{/if}
 							{/if}
 						</section>
@@ -3325,7 +3331,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			previewForWord={saijikiPreview}
 			previewForPlugin={pluginPreview}
 			{pluginEntries}
-			wildValue={ddlDialogWildOverride ?? wildSettings.enabled}
+			wildValue={ddlDialogWildOverride ?? (work.drawOptions.wild === 'on')}
 			onSelectWild={(next) => (ddlDialogWildOverride = next)}
 			onDraw={handleDdlDialogDraw}
 			onClose={closeDdlDialog}
@@ -3391,6 +3397,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if settings.opened}
 	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
 		<SettingsModal
+			drawDefaults={work.drawDefaults}
+			drawCatalogs={colorCatalogs}
+			drawCanvases={canvasAspectOptions}
+			onSaveDrawDefaults={saveDrawDefaults}
 			chatgptAvailable={chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id}
 			{demoContent}
 			settings={settings}
@@ -3400,6 +3410,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{visionProvider}
 			{visionModel}
 			providerGroups={settings.mode === 'model' ? availableModelCatalog : settings.modelCatalog}
+			drawingProviderGroups={availableModelCatalog}
 			visionProviderGroups={availableVisionModelCatalog}
 			allowVisionSelection={modelSelectionAllowVision}
 			visionOnlySelection={modelSelectionVisionOnly}
@@ -4302,18 +4313,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.sketch-arrow.open { transform: rotate(90deg); }
 	.sketch-grain { font-size: var(--ui-font-size-12); color: var(--fg3); margin-left: auto; }
-	.sketch-edit-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-family: inherit;
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-	}
-	.sketch-edit-btn:hover { background: var(--bg2); }
-	.sketch-body, .sketch-editor {
+	.sketch-body {
 		padding: 8px 10px;
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--bg2) 68%, transparent);
@@ -4323,7 +4323,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		white-space: pre-wrap;
 		margin: 0;
 	}
-	.sketch-editor { font-family: inherit; width: 100%; resize: vertical; }
 	.sketch-note { margin: 0; font-size: var(--ui-font-size-12); line-height: 1.6; color: var(--fg3); }
 
 	/* A limit taking effect is not a warning: nothing went wrong, a setting was

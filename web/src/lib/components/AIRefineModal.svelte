@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount, tick } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 	import type { LineageNode } from '$lib/features/history/types';
@@ -7,7 +7,6 @@
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import WildToggle from './WildToggle.svelte';
-	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { loadAiRefineSettings, saveAiRefineSettings } from '$lib/features/canvas/ai-refine-settings';
 	import {
 		AUTONOMOUS_NOTE_LIMIT, AUTONOMOUS_POLL_MS, chunkMoveText, kindsOf, runToResume, sharePercent, triesOf,
@@ -43,7 +42,7 @@
 	// One model chooses the sentence, takes the laws stage and draws every child.
 	let selectedModel = $state('');
 	$effect(() => { if (!selectedModel) selectedModel = visionModel; });
-	let wildOverride = $state(wildSettings.enabled);
+	let wildOverride = $state(untrack(() => node.history?.draw_options?.wild === 'on'));
 	// A work its edited DDL holds takes no sentence; the run takes laws moves from it.
 	const held = $derived(node.history?.description_locked === true);
 	const isJapanese = $derived(t().code === 'ja');

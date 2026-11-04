@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
-from ..model_settings import update_user_model_settings
+from ..model_settings import update_user_model_settings, user_settings_with_legacy_canvas
 from .schema import AppSettingRow, UserAccountRow, UserGroupRow
 
 
@@ -963,6 +963,12 @@ class UserSettingsUpdater:
                     current_model_settings = json.loads(row.model_settings or "{}")
                 except json.JSONDecodeError:
                     current_model_settings = {}
+                try:
+                    plugin_storage = json.loads(getattr(row, "plugin_storage", None) or "{}")
+                except (json.JSONDecodeError, TypeError):
+                    plugin_storage = {}
+                if isinstance(plugin_storage, dict) and "canvas-aspect" in plugin_storage:
+                    current_model_settings = user_settings_with_legacy_canvas(current_model_settings, plugin_storage)
                 row.model_settings = json.dumps(
                     update_user_model_settings(current_model_settings, model_settings),
                     ensure_ascii=False,

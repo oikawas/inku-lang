@@ -35,6 +35,7 @@ export type PaintScore = {
 export type Seed = number | string;
 
 export type PaintResult = {
+	draw_options?: import('../draw-options').RecordedDrawOptions | null;
 	plugin_offers?: import('../canvas/plugin-offers').PluginOfferRecord[];
 	image_ddl?: Record<string, unknown> | null;
 	/** Read and draw's record (SPEC 12.6.7); null on any other work. */

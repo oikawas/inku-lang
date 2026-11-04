@@ -113,7 +113,7 @@ enum DrawingFailureMessage {
         "write_image_ddl": ("画像の指示書生成", "Image instruction writing"),
         "review_image_ddl": ("画像の見比べ", "Image review"),
         "render": ("SVG生成処理", "SVG drawing processing"),
-        "generate_sketch": ("写生生成処理", "Sketch generation processing"),
+        "generate_sketch": ("写生生成処理", "Sketch-from-life generation processing"),
         "select_description_catalog": ("配色選択処理", "Catalog selection processing"),
         "generate_normalized_ddl": ("指示書生成処理", "DDL generation processing"),
         "read_composition": ("構図読み取り処理", "Composition reading processing"),

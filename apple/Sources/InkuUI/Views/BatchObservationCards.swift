@@ -26,7 +26,7 @@ struct BatchObservationCards: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let sketch = work?.sketchText, !sketch.isEmpty {
-                block(title: display.webCopy("sketchLabel", "写生（Stage 0.5）"),
+                block(title: display.webCopy("sketchLabel", "写生"),
                       metadata: [lineLabel, sketchModeLabel].filter { !$0.isEmpty }.joined(separator: " · ")) {
                     ScrollView {
                         Text(sketch).inkuFont(12).lineSpacing(5).textSelection(.enabled)

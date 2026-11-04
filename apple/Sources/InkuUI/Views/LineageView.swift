@@ -609,8 +609,9 @@ struct LineageView: View {
     }
 
     private func stageModelTitle(_ work: SavedWork) -> String {
-        [naming.displayName(work.stage1Model), naming.displayName(work.stage2Model)].enumerated()
-            .compactMap { $0.element.isEmpty ? nil : "Stage \($0.offset + 1): \($0.element)" }.joined(separator: "\n")
+        let entries = [(model.display.webCopy("historyModelInterpretation", "指示書のモデル"), naming.displayName(work.stage1Model)),
+                       (model.display.webCopy("historyModelCompletion", "補完のモデル"), naming.displayName(work.stage2Model))]
+        return entries.compactMap { $0.1.isEmpty ? nil : "\($0.0): \($0.1)" }.joined(separator: "\n")
     }
 
     private func operation(_ kind: String?) -> String {

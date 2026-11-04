@@ -19,8 +19,8 @@ struct RegisteredModelMetadataView: View {
             if purpose == "vision" {
                 row("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "vision")))
             } else if entry.recommendationStage1 != nil || entry.recommendationStage2 != nil {
-                row("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1")))
-                row("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))
+                row(display.label("指示書を書く工程のオススメ度", "Recommendation for writing the instructions"), ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1")))
+                row(display.label("補完のオススメ度", "Recommendation for completion"), ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))
             } else {
                 row("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm")))
             }

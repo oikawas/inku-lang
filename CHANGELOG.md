@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
+
 - macOS: use the selected language or UI language for instructions written from an image.
 
 - Android: show unread words not kept as written before approving a DDL completion proposal.

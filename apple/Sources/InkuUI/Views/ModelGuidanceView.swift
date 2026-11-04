@@ -19,8 +19,8 @@ struct ModelGuidanceView: View {
                     Text(guidance.label).inkuFont(13).textSelection(.enabled)
                     row("用途", guidance.purposes.map { $0 == "vision" ? "Vision" : $0 == "llm" ? "LLM" : $0 }.joined(separator: " / "))
                     if guidance.hasStageRecommendations {
-                        row("解釈の適性（Stage 1）", ModelGuidance.recommendation(guidance.stage1Level))
-                        row("構造化の適性（Stage 2）", ModelGuidance.recommendation(guidance.stage2Level))
+                        row(display.label("指示書を書く工程の適性", "Suitability for writing the instructions"), ModelGuidance.recommendation(guidance.stage1Level))
+                        row(display.label("補完の適性", "Suitability for completion"), ModelGuidance.recommendation(guidance.stage2Level))
                     }
                     row("両段の適性", ModelGuidance.recommendation(guidance.bothStagesLevel))
                     if guidance.purposes.contains("vision") {

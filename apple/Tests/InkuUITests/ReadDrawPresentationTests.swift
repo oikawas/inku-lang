@@ -23,7 +23,7 @@ import InkuHost
         XCTAssertEqual(stages.map(\.label), ["記述", "写生", "型を埋める", "構図と法則", "配色", "画"])
         XCTAssertEqual(stages.map(\.kind), ["end", "switch", "fixed", "fixed", "fixed", "end"])
         let words = DrawPresentation.flow(route: "read_and_draw", sketch: false, composition: true, japanese: false)
-        XCTAssertEqual(words.map(\.label), ["Description", "Composition and laws", "Write in words", "Look and correct", "Colors", "Picture"])
+        XCTAssertEqual(words.map(\.label), ["Description", "Composition and laws", "Writing", "Review", "Colors", "Picture"])
         XCTAssertEqual(words.map(\.kind), ["end", "switch", "fixed", "fixed", "switch", "end"])
         XCTAssertEqual(DrawPresentation.sketchShort(nil, japanese: false), "Not recorded")
         XCTAssertEqual(DrawPresentation.sketchShort("off", japanese: true), "通さない")

@@ -127,14 +127,14 @@ struct CreationWorkInfoView: View {
                     ReadDrawInfoView(record: record, display: model.display, pluginOffers: information?.pluginOffers(japanese: model.display.preferences.language != "en") ?? [])
                 }
                 if information?.context?.descriptionDDL == nil && (work.sketchGrain != nil || work.sketchState != nil) {
-                    group(information?.context?.descriptionDDL != nil ? model.display.label("写生（読み）", "Sketch (reading)") : copy("sketchLabel", "写生")) {
+                    group(information?.context?.descriptionDDL != nil ? model.display.label("写生（読み）", "Sketch from life (reading)") : copy("sketchLabel", "写生")) {
                         if let grain = work.sketchGrain { row(copy("sketchGrainLabel", "区切り"), grain, hint: "provenanceHintSketchGrain") }
                         row(copy("provenanceLabelSketchRecord", "写生の記録"), work.sketchState, hint: "provenanceHintSketchRecord")
                     }
                 }
                 group(copy("provenanceSectionInterpretation", "解釈")) {
-                    row("Stage 1 (" + copy("provenanceSectionInterpretation", "解釈") + ")", work.stage1Model, hint: "provenanceHintStage1Model")
-                    row(model.display.localized("Stage 1 言語"), languageName(work.instructionLangResolved), hint: "provenanceHintStage1Lang")
+                    row(copy("historyModelInterpretation", "指示書のモデル"), work.stage1Model, hint: "provenanceHintStage1Model")
+                    row(model.display.label("指示書の言語", "Instructions language"), languageName(work.instructionLangResolved), hint: "provenanceHintStage1Lang")
                     row(copy("provenanceLabelLangRequested", "要求した言語"), languageName(work.instructionLangRequested), hint: "provenanceHintLangRequested")
                     if let reason = work.interpretFallback, !reason.isEmpty {
                         row(copy("provenanceLabelInterpretFallback", "解釈フォールバック"), reason, hint: "provenanceHintInterpretFallback")
@@ -142,8 +142,8 @@ struct CreationWorkInfoView: View {
                     row(copy("provenanceLabelComposeFallback", "作曲フォールバック"), composeFallback(work), hint: "provenanceHintComposeFallback")
                 }
                 group(copy("provenanceSectionPerformance", "演奏")) {
-                    row("Stage 2 (" + model.display.localized("描画") + ")", work.stage2Model, hint: "provenanceHintStage2Model")
-                    row(model.display.localized("Stage 2 言語"), languageName(work.instructionLangResolved), hint: "provenanceHintStage2Lang")
+                    row(copy("historyModelCompletion", "補完のモデル"), work.stage2Model, hint: "provenanceHintStage2Model")
+                    row(model.display.label("補完の言語", "Completion language"), languageName(work.instructionLangResolved), hint: "provenanceHintStage2Lang")
                     if let amplitude = work.variationAmplitude { row(copy("provenanceLabelVariation", "変奏"), amplitude, hint: "provenanceHintVariation") }
                     if let seed = work.variationSeed { row(copy("provenanceLabelVariationSeed", "変奏 seed"), seed, hint: "provenanceHintVariationSeed") }
                     row(model.display.localized("配置 seed"), work.compositionSeed, hint: "provenanceHintCompositionSeed")
@@ -232,18 +232,18 @@ struct CreationWorkInfoView: View {
                 systemPrompt("write_description_ddl", stage: "description_ddl", title: model.display.label("指示書を書く システムプロンプト", "Writing system prompt"))
                 systemPrompt("review_description_ddl", stage: "description_review", title: model.display.label("見比べ システムプロンプト", "Review system prompt"))
                 } else {
-                sentStage("generate_sketch", stage: "sketch", input: copy("promptSketchInput", "写生（Stage 0.5） 送った入力"),
-                          system: copy("promptSketchSystem", "写生（Stage 0.5） システムプロンプト"))
-                promptText(copy("promptStage1Input", "Stage 1 ユーザー入力"), work.effectiveSourceText, id: "stage1-input")
-                systemPrompt("generate_normalized_ddl", stage: "stage1", title: copy("promptStage1System", "Stage 1 システムプロンプト"))
+                sentStage("generate_sketch", stage: "sketch", input: copy("promptSketchInput", "写生 送った入力"),
+                          system: copy("promptSketchSystem", "写生 システムプロンプト"))
+                promptText(copy("promptStage1Input", "型を埋める 送った入力"), work.effectiveSourceText, id: "stage1-input")
+                systemPrompt("generate_normalized_ddl", stage: "stage1", title: copy("promptStage1System", "型を埋める システムプロンプト"))
                 sentStage("read_composition", stage: "composition", input: copy("promptCompositionInput", "構図の読み 送った入力"),
                           system: copy("promptCompositionSystem", "構図の読み システムプロンプト"))
                 sentStage("choose_laws", stage: "laws", input: copy("promptLawsInput", "法則の段 送った入力"),
                           system: copy("promptLawsSystem", "法則の段 システムプロンプト"))
                 sentStage("choose_colors", stage: "colors", input: copy("promptColorsInput", "配色の段 送った入力"),
                           system: copy("promptColorsSystem", "配色の段 システムプロンプト"))
-                if let ddl = work.ddl, !ddl.isEmpty { promptText(copy("promptStage2Input", "Stage 2 ユーザー入力 (正規化DDL)"), ddl, id: "stage2-input") }
-                systemPrompt("complete_visible_ddl_holes", stage: "stage2", title: copy("promptStage2System", "Stage 2 システムプロンプト"))
+                if let ddl = work.ddl, !ddl.isEmpty { promptText(copy("promptStage2Input", "補完 送った入力（正規化DDL）"), ddl, id: "stage2-input") }
+                systemPrompt("complete_visible_ddl_holes", stage: "stage2", title: copy("promptStage2System", "補完 システムプロンプト"))
                 }
             }.padding(14)
         }
@@ -362,7 +362,7 @@ struct CreationWorkInfoView: View {
                     // A stage the work kept called no model; one it did not keep was drawn before its record began.
                     : information?.prompts == nil || information?.presentation?.promptStages.contains(stage) != true
                         ? copy("promptSystemNotRecorded", "この作品は、送った内容を記録する前に描かれたため、記録がありません。")
-                    : copy("promptSystemNotSent", "この作品では、このStageはモデルを呼んでいません。"))
+                    : copy("promptSystemNotSent", "この作品では、この工程はモデルを呼んでいません。"))
                     .inkuFont(13).foregroundStyle(.secondary)
             }
         }

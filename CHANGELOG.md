@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: show unread words not kept as written before a DDL completion proposal is approved.
+
 - Core: attach unread fragments not retained verbatim to each affected hole in a DDL completion proposal awaiting approval.
 
 - macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.

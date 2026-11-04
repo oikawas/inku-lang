@@ -474,6 +474,18 @@ class ProductPipelineEffects:
             if not model_ref:
                 raise CandidateHostError("image_model_not_vision")
         model = resolved_drawing_model(model_ref, actor)
+        from .model_settings import normalize_user_model_settings, provider_for_model, qualify_model_ref
+        model_settings = db.get_model_settings()
+        user_models = normalize_user_model_settings((actor or {}).get("model_settings") or {})
+        resolution_settings = {
+            **model_settings,
+            "stage1_provider": user_models["stage1_provider"],
+            "stage1_model": user_models["stage1_model"],
+            "stage2_provider": user_models["stage1_provider"],
+            "stage2_model": user_models["stage1_model"],
+        }
+        provider, model_id = provider_for_model(model, stage="stage1", settings=resolution_settings)
+        model = qualify_model_ref(provider, model_id, resolution_settings)
         selected.update(
             stage1_model=model,
             stage2_model=model,
@@ -485,8 +497,6 @@ class ProductPipelineEffects:
         # description is read by Stage 1; hand-written DDL reaches only Stage 2,
         # which completes its holes. The laws stage from a saved work is sent
         # with Stage 1's model, as a description run's is.
-        model_settings = db.get_model_settings()
-        from .model_settings import provider_for_model
         from .chatgpt_store import ChatGPTError
         selected.pop("chatgpt_profile", None)
         selected.pop("chatgpt_generation", None)

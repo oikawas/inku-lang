@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server: when an unqualified model name has multiple or no listed providers, resolve it using the user's Stage 1 provider at drawing intake and record the provider for both stages.
+
 - DDL engine 77: read an arc's sagitta as half its chord when decimal rounding makes it exceed that half by at most 0.000001.
 
 - Web: add a button next to Library's `Select all` to clear selections across all pages.

@@ -590,7 +590,7 @@ class RoomSharedPipelineStore(
             commit.reason in setOf("stage1_generated", "stage1_residual_execution") &&
                 current.authority == "description_authoritative" &&
                 commit.authority == "description_authoritative",
-        ) { "description can change only during an authoritative Stage 1 commit" }
+        ) { "description can change only when committing authoritative instructions" }
         return proposed
     }
 

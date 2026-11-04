@@ -142,6 +142,8 @@ export const en: LangPack = {
 	pipelineRequestFailed: 'The work could not be updated.',
 	pipelinePatchTitle: 'Proposed DDL completion',
 	pipelinePatchHint: 'Accepting this proposal saves the DDL shown here.',
+	pipelineUnreadNotKeptTitle: 'Words not kept as written',
+	pipelineUnreadNotKeptHint: 'Words the original DDL could not read that the proposal does not keep as written. They were dropped or rewritten. Compare them with the proposal before approving.',
 	pipelineCommittedDdl: 'Saved DDL',
 	pipelineProposedDdl: 'Proposed DDL',
 	pipelineApprove: 'Accept this proposal',

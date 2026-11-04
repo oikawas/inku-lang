@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t } from '$lib/i18n/index.svelte';
+	import { getLang, t } from '$lib/i18n/index.svelte';
 	import type { PipelinePhase } from '$lib/features/pipeline/api';
 	import { formatPipelineDiagnostic, type PipelineDiagnostic } from '$lib/features/pipeline/diagnostics';
 	import { pipelineAttentionText, type PipelineProviderFailure } from '$lib/features/pipeline/attention';
@@ -43,6 +43,13 @@
 			<div><strong>{t().pipelineCommittedDdl}</strong><pre>{committedDdl}</pre></div>
 			<div><strong>{t().pipelineProposedDdl}</strong><pre>{patch.candidate?.source ?? ''}</pre></div>
 		</div>
+		{#if patch.unread_words_not_kept?.some((entry) => entry.words.length > 0)}
+			<div class="pipeline-unread-not-kept">
+				<h4>{t().pipelineUnreadNotKeptTitle}</h4>
+				<p>{t().pipelineUnreadNotKeptHint}</p>
+				<code>{patch.unread_words_not_kept.flatMap((entry) => entry.words).join(getLang() === 'ja' ? '、' : ', ')}</code>
+			</div>
+		{/if}
 		<div class="pipeline-actions">
 			<button type="button" disabled={busy} onclick={onApprove}>{t().pipelineApprove}</button>
 			<button type="button" disabled={busy} onclick={onDecline}>{t().pipelineDecline}</button>
@@ -104,6 +111,9 @@
 	.pipeline-completion-issues pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 	.pipeline-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
 	.pipeline-comparison pre, .pipeline-diagnostic-list pre { max-height: 15rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: .3rem 0; padding: .55rem; background: color-mix(in srgb, currentColor 6%, transparent); }
+	.pipeline-unread-not-kept { margin-top: .75rem; }
+	.pipeline-unread-not-kept h4 { margin: 0; font-size: .9rem; }
+	.pipeline-unread-not-kept code { white-space: pre-wrap; overflow-wrap: anywhere; }
 	.pipeline-actions { display: flex; gap: .5rem; margin-top: .6rem; }
 	.pipeline-actions button { padding: .45rem .7rem; }
 	.pipeline-attention { margin: .65rem 0 0; color: var(--danger, #a12d27); }

@@ -142,6 +142,8 @@ export const ja: LangPack = {
 	pipelineRequestFailed: '作品を更新できませんでした。',
 	pipelinePatchTitle: 'DDLの補完候補',
 	pipelinePatchHint: '候補を採用すると、表示されたDDLを保存します。',
+	pipelineUnreadNotKeptTitle: '案にそのまま残らない語',
+	pipelineUnreadNotKeptHint: '元の DDL で読めなかった語のうち、案に同じ字では残らない語です。消えたか、別の語に書き換わっています。採用の前に案と見比べてください。',
 	pipelineCommittedDdl: '保存済みのDDL',
 	pipelineProposedDdl: '候補のDDL',
 	pipelineApprove: 'この候補を採用する',

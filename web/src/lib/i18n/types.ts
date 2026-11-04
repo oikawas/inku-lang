@@ -114,6 +114,8 @@ export interface LangPack {
 	pipelineRequestFailed: string;
 	pipelinePatchTitle: string;
 	pipelinePatchHint: string;
+	pipelineUnreadNotKeptTitle: string;
+	pipelineUnreadNotKeptHint: string;
 	pipelineCommittedDdl: string;
 	pipelineProposedDdl: string;
 	pipelineApprove: string;

@@ -16,6 +16,7 @@ export type PipelinePhase = {
 	reason?: string;
 	candidate?: { source: string };
 	proposal_digest?: string;
+	unread_words_not_kept?: { hole_id: string; words: string[] }[];
 };
 
 export type PipelineResult = PaintResult & {

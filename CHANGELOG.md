@@ -8,19 +8,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server, Web and CLI: image instructions follow the explicitly requested language or UI language, without using the source note as a language hint.
-
-- Render engine 99: check an open arc's extent by its swept stroke so shallow arcs with large circle radii can draw.
-
-- Read and draw, and draw from an image: give the drawer and tracer the tools' physical marks and ask for a tool word in each sentence using a forms word.
-
 - Android: show unread words not kept as written before approving a DDL completion proposal.
 
-- Web: before approving a DDL completion proposal, show unread words that the proposal does not keep as written.
-
 - macOS: show unread words not kept as written before a DDL completion proposal is approved.
-
-- Core: attach unread fragments not retained verbatim to each affected hole in a DDL completion proposal awaiting approval.
 
 - macOS: request MSAA 8 for zoomed Graphite windows, bringing steep-line edges closer to the CPU rendering.
 
@@ -598,6 +588,18 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.314 (2026-11-04 / Build 1390)
+
+- Server, Web and CLI: image instructions follow the explicitly requested language or UI language, without using the source note as a language hint.
+
+- Render engine 99: check an open arc's extent by its swept stroke so shallow arcs with large circle radii can draw.
+
+- Read and draw, and draw from an image: give the drawer and tracer the tools' physical marks and ask for a tool word in each sentence using a forms word.
+
+- Web: before approving a DDL completion proposal, show unread words that the proposal does not keep as written.
+
+- Core: attach unread fragments not retained verbatim to each affected hole in a DDL completion proposal awaiting approval.
 
 ## v2.15.313 (2026-11-04 / Build 1389)
 

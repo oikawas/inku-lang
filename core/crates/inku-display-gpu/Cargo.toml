@@ -18,7 +18,7 @@ path = "src/main.rs"
 default = []
 # Graphite on Metal. Only the macOS app build (Apple silicon) enables it; without it
 # the program only answers that it cannot draw, so the workspace builds everywhere.
-graphite = ["dep:inku-display", "inku-display/skia", "dep:skia-safe"]
+graphite = ["dep:inku-display", "inku-display/skia", "dep:skia-safe", "dep:skia-bindings"]
 
 # Skia with Graphite and Metal has no published prebuilt binaries next to SVG and
 # WebP; scripts/skia-graphite-binaries.sh builds them once into the checked cache
@@ -26,3 +26,4 @@ graphite = ["dep:inku-display", "inku-display/skia", "dep:skia-safe"]
 [target.'cfg(target_os = "macos")'.dependencies]
 inku-display = { workspace = true, optional = true }
 skia-safe = { version = "=0.153.3", features = ["svg", "webp", "metal", "graphite"], optional = true }
+skia-bindings = { version = "=0.153.3", optional = true }

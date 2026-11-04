@@ -16,6 +16,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Core: attach unread fragments not retained verbatim to each affected hole in a DDL completion proposal awaiting approval.
 
+- macOS: request MSAA 8 for zoomed Graphite windows, bringing steep-line edges closer to the CPU rendering.
+
 - macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.

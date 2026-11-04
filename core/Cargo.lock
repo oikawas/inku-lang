@@ -801,6 +801,7 @@ name = "inku-display-gpu"
 version = "0.1.0"
 dependencies = [
  "inku-display",
+ "skia-bindings",
  "skia-safe",
 ]
 

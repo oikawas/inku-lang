@@ -499,6 +499,7 @@ Geminiへの描画pipeline・Vision・デモの指示文は、共有coreの[`pro
 作者の指示「Graphiteを導入して」と、作者の決定（2026-10-11）による。拡大の速さをWebのChromeに近づけるため。
 
 - 範囲：Apple Siliconの作品域で、拡大した窓だけをSkiaのGraphite（GPU、Metal）で描く。100%の全体は今までどおりCPUのSkia（粗い全体の後にタイル）。Intel（x86_64）とRosettaでは、窓も今までどおりCPUのタイル並列。
+- 線の縁：急な斜線の縁の覆いをCPUに近づけるため、Graphiteの窓はMSAA 8を指定する（I-726）。GPUが8に対応しない場合はSkiaが上限を使う。
 - 別のプロセス：窓は、アプリの`Contents/MacOS/inku-display-gpu`（Rust。共有coreの[`inku-display-gpu`](../core/crates/inku-display-gpu/Cargo.toml)、arm64だけ）が描く。[`DisplayRenderer`](Sources/InkuUI/DisplayRenderer.swift)は最初の窓で起動し、標準入力でSVGのSHA-256・窓・SVG（そのプロセスに初めての作品だけ）を渡し、標準出力から窓の画素（premultiplied RGBA8）を受け取る（[`DisplayGPUProcess`](Sources/InkuUI/DisplayGPUProcess.swift)）。窓の置き方はCPUの窓と同じ関数（`DisplayScene::paint_region`）を通る。頼みは1度に1つで、待つ間に画面が先へ進んだ頼みは送らない。窓は途中の絵を出さず、完成した窓を1回渡す。
 - 落ちたとき：GPUのドライバが描画用のプロセスを終わらせても、アプリは終わらない。その頼みは`gpu_process_exited`（60秒答えなければ止めて`gpu_process_timeout`）の失敗になり、表示の失敗ログ（`display-failures`）に終わり方と描画用のプロセスの標準エラーの末尾を書く。窓は描かず、引き伸ばした全体を残す（2026-10-06の裁定と同じく、CPUで描き直さない）。その作品はその起動の間は頼み直さず、別の作品の窓で描画用のプロセスを起動し直す。頼みの無い間に描画用のプロセスが終わっていたとき（システムが止めたときなど）は、どの作品も頼み直さない印を付けず、次の頼みで起動し直す（2026-10-18）。描画用のプロセスが描けなかったとき（`gpu_*`の符号）も、止めてログに書く。
 - 見え方：Graphiteの窓は、feTurbulenceで作る質感の粒の位置が、CPUとChromeとわずかに違う（2026-10-11の調査で、作者の124件のうち43件がChromeとの一致の基準の外。縮小した全体ではほとんど同じ）。100%の全体はCPUのままなので、Chromeとの一致の確認（C1）は全体について今までどおり。

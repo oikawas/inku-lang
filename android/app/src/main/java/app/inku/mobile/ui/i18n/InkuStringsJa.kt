@@ -22,7 +22,7 @@ object InkuStringsJa : InkuStrings {
     override val drawCompositionSwitch = "構図・法則・配色"
     override val drawFlowLabel = "流れ"
     override val drawOptions = "オプション"
-    override val descriptionHint = "短い文章で、表現したいものを入力。"
+    override val descriptionHint = "短い文で、表現したいものを入力。"
     override val descriptionCommentHint = "[括弧内文字列はコメント扱い]"
     override val flowDescription = "記述"
     override val flowSketch = "写生"

@@ -832,34 +832,37 @@ fn shallow_arc_extent_uses_swept_stroke_and_still_rejects_large_arcs() {
             instruction_index: 0
         })
     ));
-    let budget = inku_score::ResourceBudget {
-        maximum: inku_score::ResourceDemand {
-            logical_objects: 16,
-            primitive_marks: 16,
-            object_templates: 16,
-            maximum_per_template_primitive_marks: 16,
-            maximum_resolved_count: 16,
-            template_nodes: 16,
-            anchor_instances: 16,
-            transform_instances: 16,
-            placement_instances: 16,
-            fill_instances: 16,
-        },
-    };
-    let hard = inku_score::HardResourcePolicy {
-        identity: "arc-extent-test.v1".into(),
-        budget,
-    };
-    let export = |request| {
-        inku_render::geometry_export::export_geometry(
-            request,
-            &hard,
-            inku_score::OperationalResourceBudget(budget),
-            16,
-        )
-    };
-    assert!(export(&shallow).is_ok());
-    assert_eq!(export(&huge).unwrap_err(), "mark_extent_exceeded");
+    #[cfg(feature = "geometry-export")]
+    {
+        let budget = inku_score::ResourceBudget {
+            maximum: inku_score::ResourceDemand {
+                logical_objects: 16,
+                primitive_marks: 16,
+                object_templates: 16,
+                maximum_per_template_primitive_marks: 16,
+                maximum_resolved_count: 16,
+                template_nodes: 16,
+                anchor_instances: 16,
+                transform_instances: 16,
+                placement_instances: 16,
+                fill_instances: 16,
+            },
+        };
+        let hard = inku_score::HardResourcePolicy {
+            identity: "arc-extent-test.v1".into(),
+            budget,
+        };
+        let export = |request| {
+            inku_render::geometry_export::export_geometry(
+                request,
+                &hard,
+                inku_score::OperationalResourceBudget(budget),
+                16,
+            )
+        };
+        assert!(export(&shallow).is_ok());
+        assert_eq!(export(&huge).unwrap_err(), "mark_extent_exceeded");
+    }
 }
 
 #[test]

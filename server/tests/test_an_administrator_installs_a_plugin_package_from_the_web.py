@@ -138,10 +138,12 @@ def test_object_over_budget_reports_the_structured_reason(admin):
     definition["body"] = [{"op": "repeat", "count": {"expr": "integer", "value": 64},
                            "maximum": 64, "index": "i", "body": definition["body"]}]
     word["definition"] = definition
+    # Engine 97 counts the object template once; ten placements exceed the mark budget.
+    word["example_ja"] = "中心に、｛星｝を10個置く。"
     report = _check(admin, package)
     assert report["ok"] is False
     problem = next(p for p in report["words"][0]["problems"] if p["code"] == "budget_exceeded")
-    assert json.loads(problem["detail"])["value"]["dimension"] == "object_templates"
+    assert json.loads(problem["detail"])["value"]["dimension"] == "primitive_marks"
 
 
 def test_bundled_v2_leaves_pass_shape_definition_and_real_example_drawings(admin):

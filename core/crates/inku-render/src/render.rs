@@ -25,7 +25,7 @@ use crate::performance::PerformanceRequest;
 pub use crate::render_fill_scopes::CompatFillClipPolicy;
 use crate::render_fill_scopes::FillPaintForest;
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
-use crate::surface_geometry::mark_bbox;
+use crate::surface_geometry::mark_extent_bbox;
 use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
 use crate::types::{
@@ -317,6 +317,7 @@ fn document_metadata(profile: SvgProfile) -> (String, String) {
 /// Fill and texture scanlines stop at 4,096 per layer, but each scanline makes
 /// one stroke per span inside the contour, so a wash cloudform 4,096 canvases
 /// tall drew 122,960 strokes (a 302 MB SVG). Saved marks span at most 1.7.
+/// An open arc is measured by its swept stroke rather than its whole circle.
 pub const MAX_MARK_EXTENT: f64 = 8.0;
 
 /// Serialized bytes the drawn marks and their definitions may reach.
@@ -378,7 +379,7 @@ fn check_mark_extent(
     context: MarkContext<'_>,
 ) -> Result<(), RenderError> {
     let limit = MAX_MARK_EXTENT * context.canvas.unit();
-    match mark_bbox(geometry, instruction, context) {
+    match mark_extent_bbox(geometry, instruction, context) {
         Some((_, _, width, height)) if !(width.abs() <= limit && height.abs() <= limit) => {
             Err(RenderError::MarkTooLarge {
                 instruction_index: context.instruction_index,

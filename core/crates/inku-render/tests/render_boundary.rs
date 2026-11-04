@@ -818,6 +818,51 @@ fn a_mark_spanning_many_canvases_is_refused_before_drawing() {
 }
 
 #[test]
+fn shallow_arc_extent_uses_swept_stroke_and_still_rejects_large_arcs() {
+    let shallow = request_for(
+        r#"{"version":"0.9.0","instructions":[{"primitive":"arc","center":[0.5,5.5725],"radius":5.0725,"angle_start":84.9104,"angle_end":95.0896}]}"#,
+    );
+    assert!(render(shallow.clone()).is_ok());
+    let huge = request_for(
+        r#"{"version":"0.9.0","instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":10,"angle_start":0,"angle_end":180}]}"#,
+    );
+    assert!(matches!(
+        render(huge.clone()),
+        Err(inku_render::render::RenderError::MarkTooLarge {
+            instruction_index: 0
+        })
+    ));
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 16,
+            primitive_marks: 16,
+            object_templates: 16,
+            maximum_per_template_primitive_marks: 16,
+            maximum_resolved_count: 16,
+            template_nodes: 16,
+            anchor_instances: 16,
+            transform_instances: 16,
+            placement_instances: 16,
+            fill_instances: 16,
+        },
+    };
+    let hard = inku_score::HardResourcePolicy {
+        identity: "arc-extent-test.v1".into(),
+        budget,
+    };
+    let export = |request| {
+        inku_render::geometry_export::export_geometry(
+            request,
+            &hard,
+            inku_score::OperationalResourceBudget(budget),
+            16,
+        )
+    };
+    assert!(export(&shallow).is_ok());
+    assert_eq!(export(&huge).unwrap_err(), "mark_extent_exceeded");
+}
+
+#[test]
 fn a_mark_missing_its_geometry_is_refused_by_name() {
     // Drawing reads each primitive's fields once; the first one missing, in
     // the order drawing reads them, names the refusal instead of a panic.

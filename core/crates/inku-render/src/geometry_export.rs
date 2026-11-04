@@ -494,7 +494,7 @@ pub fn export_geometry(
             }
             let style = mark_style(instruction, context);
             if let Some((_, _, width, height)) =
-                crate::surface_geometry::mark_bbox(geometry, instruction, context)
+                crate::surface_geometry::mark_extent_bbox(geometry, instruction, context)
                 && !(width.abs() <= crate::render::MAX_MARK_EXTENT * unit
                     && height.abs() <= crate::render::MAX_MARK_EXTENT * unit)
             {

@@ -13,6 +13,10 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 
 [SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated. Record a new version's values, reasons, and results in [CHANGELOG.md](../../CHANGELOG.md).
 
+## engine 99 — shallow arc extent
+
+Check an open arc's extent against its swept stroke instead of the whole circle, allowing shallow arcs previously refused. See Unreleased in the changelog.
+
 ## engine 98 — legacy color hints
 
 Exclude clauses matching known machine-note templates when reading color. Saved SVGs do not change; redrawing an old work can correct its colors. See Unreleased in the changelog.

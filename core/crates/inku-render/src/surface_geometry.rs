@@ -128,6 +128,58 @@ pub(crate) fn mark_bbox(
     Some((min.x, min.y, max.x - min.x, max.y - min.y))
 }
 
+/// Bounds for the extent guard: an open arc uses only its swept stroke.
+pub(crate) fn mark_extent_bbox(
+    geometry: MarkGeometry,
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+) -> Option<(f64, f64, f64, f64)> {
+    let MarkGeometry::Arc(arc) = geometry else {
+        return mark_bbox(geometry, instruction, context);
+    };
+    let center = point_to_pixels(arc.center, context.canvas);
+    let radius = arc.radius * context.canvas.unit();
+    let point = |degrees: f64| {
+        let angle = degrees.to_radians();
+        Point::new(
+            center.x + angle.cos() * radius,
+            center.y - angle.sin() * radius,
+        )
+    };
+    let lo = arc.start.min(arc.end);
+    let hi = arc.start.max(arc.end);
+    let mut min = point(lo);
+    let mut max = min;
+    let mut include = |p: Point| {
+        min.x = min.x.min(p.x);
+        min.y = min.y.min(p.y);
+        max.x = max.x.max(p.x);
+        max.y = max.y.max(p.y);
+    };
+    include(point(hi));
+    let span = hi - lo;
+    let start = lo.rem_euclid(360.0);
+    for angle in [0.0_f64, 90.0, 180.0, 270.0] {
+        let offset = (angle - start).rem_euclid(360.0);
+        if span >= 360.0 || (offset > 0.0 && offset < span) {
+            include(point(angle));
+        }
+    }
+    let corners = [
+        Point::new(min.x, min.y),
+        Point::new(max.x, min.y),
+        Point::new(max.x, max.y),
+        Point::new(min.x, max.y),
+    ]
+    .map(|p| geometry_point(instruction, context, p));
+    let (mut min, mut max) = (corners[0], corners[0]);
+    for corner in &corners[1..] {
+        min = Point::new(min.x.min(corner.x), min.y.min(corner.y));
+        max = Point::new(max.x.max(corner.x), max.y.max(corner.y));
+    }
+    Some((min.x, min.y, max.x - min.x, max.y - min.y))
+}
+
 /// The closed outline a surface fills, in pixels after the group transform.
 ///
 /// Lines and open Arcs have none.

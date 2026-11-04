@@ -2593,6 +2593,8 @@ Render engine 97 checks transforms on non-square canvases and object boxes in sh
 
 Render engine 98 excludes clauses matching known machine-note templates when reading color from a legacy Score's color hint, using the remaining nuance and instruction color. Saved SVGs do not change; a redraw can correct a color previously taken from a machine note.
 
+Render engine 99 checks an open arc's extent (a mark spanning more than eight times the canvas's short side is refused) against the stroke's sweep, using its endpoints and the quarter-turn points between them, rather than the whole circle. Works with shallow arcs, whose sagitta is very small compared to the chord and whose radius is large, can now draw. SVGs of works already drawable do not change.
+
 ## 13. The Design of Sway
 
 Sway is intentional.  DDL does not attempt to eliminate all model or

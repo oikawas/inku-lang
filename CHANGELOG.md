@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Render engine 99: check an open arc's extent by its swept stroke so shallow arcs with large circle radii can draw.
+
 - Read and draw, and draw from an image: give the drawer and tracer the tools' physical marks and ask for a tool word in each sentence using a forms word.
 
 - Android: show unread words not kept as written before approving a DDL completion proposal.

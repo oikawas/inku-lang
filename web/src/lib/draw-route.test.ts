@@ -140,7 +140,7 @@ test('the flow under the switches names the steps a run passes, in their order',
 	assert.equal(labels('read_and_draw', 'on', 'on'), '記述 › 写生 › 構図と法則 › 書く › 見比べ › 配色 › 画');
 	// A step a switch put there is marked so; the stages' own steps are not.
 	const kinds = drawFlow('read_and_draw', 'on', 'on', false).map((step) => `${step.label}:${step.kind}`);
-	assert.deepEqual(kinds, ['Description:end', 'Sketch:switch', 'Composition and laws:switch', 'Writing:fixed',
+	assert.deepEqual(kinds, ['Description:end', 'Sketch from life:switch', 'Composition and laws:switch', 'Writing:fixed',
 		'Review:fixed', 'Colors:switch', 'Picture:end']);
 	assert.ok(drawFlow('stages', 'off', 'on', true).every((step) => step.kind !== 'switch'));
 });

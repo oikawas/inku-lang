@@ -69,7 +69,7 @@ export type DrawFlowStep = { label: string; kind: 'end' | 'switch' | 'fixed' };
 export function drawFlow(route: DrawRoute, sketch: SketchMode, composition: CompositionMode, isJapanese: boolean): DrawFlowStep[] {
 	const step = (ja: string, en: string, kind: DrawFlowStep['kind']): DrawFlowStep => ({ label: isJapanese ? ja : en, kind });
 	const steps = [step('記述', 'Description', 'end')];
-	if (sketch === 'on') steps.push(step('写生', 'Sketch', 'switch'));
+	if (sketch === 'on') steps.push(step('写生', 'Sketch from life', 'switch'));
 	if (route === 'stages') {
 		steps.push(step('型を埋める', 'Fill the plan', 'fixed'), step('構図と法則', 'Composition and laws', 'fixed'), step('配色', 'Colors', 'fixed'));
 	} else {

@@ -768,7 +768,7 @@
 						<strong title={statusDrawRoute}>{statusDrawRoute}</strong>
 					</span>
 					<span class="render-meta-item render-meta-sketch">
-						<span class="render-meta-label">{isJapanese ? '写生' : 'Sketch'}</span>
+						<span class="render-meta-label">{isJapanese ? '写生' : 'Sketch from life'}</span>
 						<strong title={sketchStateNote(statusSketchState, isJapanese) || sketchStateShort(statusSketchState, isJapanese)}>{sketchStateShort(statusSketchState, isJapanese)}</strong>
 					</span>
 					<!-- The same byte measurement the drawer shows, rounded to a compact

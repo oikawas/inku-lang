@@ -8,7 +8,9 @@ use crate::determinism::{hash01, seed_salt_index_digest};
 use crate::geometry::{point_to_pixels, stroke_sample_count};
 use crate::mark_paths::{contour_stroke_path, grid_step, polygon_path, uses_hand_stroke};
 use crate::marks::{MarkContext, MarkStyle, reaches_canvas};
-use crate::materials::{OilPaintStyle, oil_paint_load, oil_paint_stroke, with_texture_filter};
+use crate::materials::{
+    OIL_FILL_WIDTH_STRETCH, OilPaintStyle, oil_paint_load, oil_paint_stroke, with_texture_filter,
+};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::svg::{Element, format_number};
@@ -334,7 +336,7 @@ fn oil_paint_fill(
             .attr("fill", &style.color)
             .attr("stroke", "none"),
     );
-    let mut passes = Vec::new();
+    let mut strokes = Vec::new();
     let (mut xx, mut xy, mut yy) = (0.0_f64, 0.0_f64, 0.0_f64);
     for (order, (row, mut start, mut end)) in scanline_segments(contour, angle, spacing, seed, 0.24)
         .into_iter()
@@ -399,41 +401,48 @@ fn oil_paint_fill(
                 yy += dy * dy;
             }
         }
-        if !visible {
-            continue;
-        }
-        passes.push(oil_paint_stroke(
-            contour_stroke_path(&stroke),
-            &stroke.left,
-            &stroke.right,
-            if accepted {
-                OilPaintStyle::filled(
-                    &pass_style.color,
-                    1.0,
-                    instruction.surface_intensity,
-                    context.canvas,
-                )
-            } else {
-                OilPaintStyle::plain(&pass_style.color, 1.0)
-            },
-            pass_seed,
-            false,
-        ));
+        strokes.push((stroke, pass_style.color, pass_seed, visible));
     }
     // A single bank-derived field widens passes and their spacing together.
     // Degenerate marks retain their native passes and solid underlay.
-    if context.profile != SvgProfile::Compat
+    let width_normal = if context.profile != SvgProfile::Compat
         && accepted
-        && !passes.is_empty()
+        && strokes.iter().any(|(_, _, _, visible)| *visible)
         && xx + yy > 0.0
         && (xx - yy).hypot(2.0 * xy) >= 0.9 * (xx + yy)
     {
         let tangent = (2.0 * xy).atan2(xx - yy) * 0.5;
-        let nx = -tangent.sin();
-        let ny = tangent.cos();
-        let a = 1.0 + 2.0 * nx * nx;
-        let b = 2.0 * nx * ny;
-        let d = 1.0 + 2.0 * ny * ny;
+        Some(Point::new(-tangent.sin(), tangent.cos()))
+    } else {
+        None
+    };
+    let passes = strokes
+        .into_iter()
+        .filter(|(_, _, _, visible)| *visible)
+        .map(|(stroke, color, pass_seed, _)| {
+            let pass_style = if accepted {
+                OilPaintStyle::filled(&color, 1.0, instruction.surface_intensity, context.canvas)
+            } else {
+                OilPaintStyle::plain(&color, 1.0)
+            }
+            .with_width_normal(width_normal);
+            oil_paint_stroke(
+                contour_stroke_path(&stroke),
+                &stroke.left,
+                &stroke.right,
+                pass_style,
+                pass_seed,
+                false,
+            )
+        })
+        .collect::<Vec<_>>();
+    if let Some(normal) = width_normal {
+        let nx = normal.x;
+        let ny = normal.y;
+        let gain = OIL_FILL_WIDTH_STRETCH - 1.0;
+        let a = 1.0 + gain * nx * nx;
+        let b = gain * nx * ny;
+        let d = 1.0 + gain * ny * ny;
         let center = point_to_pixels(
             instruction_anchor_on_canvas(instruction, Some(context.canvas)),
             context.canvas,

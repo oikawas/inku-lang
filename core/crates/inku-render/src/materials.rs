@@ -4,6 +4,47 @@ use crate::determinism::hash01;
 use crate::svg::{Element, format_number};
 use crate::types::{CanvasSize, Point, Seed, SurfaceIntensity, Weight};
 
+/// The stretch along the normal of an accepted oil fill's width field.
+pub(crate) const OIL_FILL_WIDTH_STRETCH: f64 = 3.0;
+
+#[cfg(test)]
+type OilBandObservation = (Vec<Point>, Vec<Point>, Vec<Point>, Vec<Point>, Point);
+#[cfg(test)]
+thread_local! {
+    static OIL_BAND_OBSERVATIONS: std::cell::RefCell<Option<Vec<OilBandObservation>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Reduce the normal displacement of both edges around their shared chord.
+pub(crate) fn damp_oil_band(left: &mut [Point], right: &mut [Point], normal: Option<Point>) {
+    let Some(normal) = normal else { return };
+    if left.len() < 2 || left.len() != right.len() {
+        return;
+    }
+    #[cfg(test)]
+    let before = (left.to_vec(), right.to_vec());
+    let midpoint = |a: Point, b: Point| Point::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+    let start = midpoint(left[0], right[0]);
+    let end = midpoint(left[left.len() - 1], right[right.len() - 1]);
+    let last = (left.len() - 1) as f64;
+    for (index, (a, b)) in left.iter_mut().zip(right.iter_mut()).enumerate() {
+        let t = index as f64 / last;
+        let center = midpoint(*a, *b);
+        let dx = center.x - (start.x + (end.x - start.x) * t);
+        let dy = center.y - (start.y + (end.y - start.y) * t);
+        let shift = -(1.0 - 1.0 / OIL_FILL_WIDTH_STRETCH) * (dx * normal.x + dy * normal.y);
+        a.x += shift * normal.x;
+        a.y += shift * normal.y;
+        b.x += shift * normal.x;
+        b.y += shift * normal.y;
+    }
+    #[cfg(test)]
+    OIL_BAND_OBSERVATIONS.with(|observations| {
+        if let Some(observations) = observations.borrow_mut().as_mut() {
+            observations.push((before.0, before.1, left.to_vec(), right.to_vec(), normal));
+        }
+    });
+}
+
 /// How far the ridges of an oil stroke step away from its pigment.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum OilTone {
@@ -73,6 +114,7 @@ pub(crate) struct OilPaintStyle<'a> {
     /// Pixels per unit of a 1,000-unit short side: a line's ridges are counted
     /// and capped in units (render engine 92).
     scale: f64,
+    width_normal: Option<Point>,
 }
 
 impl<'a> OilPaintStyle<'a> {
@@ -84,6 +126,7 @@ impl<'a> OilPaintStyle<'a> {
             tolerance: 0.0,
             line: false,
             scale: 1.0,
+            width_normal: None,
         }
     }
 
@@ -119,7 +162,13 @@ impl<'a> OilPaintStyle<'a> {
             tolerance: if dense { canvas.unit() * 0.00025 } else { 0.0 },
             line: false,
             scale: canvas.unit() / 1000.0,
+            width_normal: None,
         }
+    }
+
+    pub(crate) fn with_width_normal(mut self, normal: Option<Point>) -> Self {
+        self.width_normal = normal;
+        self
     }
 }
 
@@ -503,6 +552,7 @@ pub(crate) fn oil_paint_stroke(
             if bank_a.len() < 2 {
                 continue;
             }
+            damp_oil_band(&mut bank_a, &mut bank_b, style.width_normal);
             simplify_oil_ridge(&mut bank_a, &mut bank_b, false, style.tolerance);
             bank_a.extend(bank_b.into_iter().rev());
             group.push(
@@ -531,7 +581,9 @@ pub(crate) fn oil_paint_stroke(
     }
     // A share of the passes carry a streak of another colour of the same Score
     // (the author's choice of 12%, てざわりの整理 step 6).
-    if let Some(streak) = crate::media::oil_mix_streak(left, right, style.color, seed, closed) {
+    if let Some(streak) =
+        crate::media::oil_mix_streak(left, right, style.color, seed, closed, style.width_normal)
+    {
         group.push(streak);
     }
     group
@@ -728,6 +780,70 @@ pub fn performance_touch_filter(seed: Seed, canvas: CanvasSize) -> (String, Elem
 mod tests {
     use super::*;
     use crate::svg::Node;
+
+    #[test]
+    fn small_oil_fill_ridges_keep_wobble_and_width_after_stretch() {
+        use crate::render::render;
+        use crate::types::{RenderOptions, RenderRequest, SvgProfile};
+        use std::collections::BTreeMap;
+
+        let score = serde_json::from_str(r#"{"instructions":[{"primitive":"polygon","center":[0.5,0.5],"radius":0.019,"sides":3,"rotation":23,"weight":"oil_paint","color":"blue","filled":true}]}"#).unwrap();
+        let request = RenderRequest {
+            score,
+            options: RenderOptions {
+                resolved_color_map: BTreeMap::from([("blue".to_owned(), "#2468ac".to_owned())]),
+                catalog_id: None,
+                canvas: CanvasSize::new(1200.0, 800.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(431),
+                composition_seed: None,
+                wild: false,
+                error_policy: Default::default(),
+            },
+        };
+        OIL_BAND_OBSERVATIONS.with(|v| *v.borrow_mut() = Some(Vec::new()));
+        let svg = render(request).unwrap().svg;
+        let bands = OIL_BAND_OBSERVATIONS.with(|v| v.borrow_mut().take().unwrap());
+        assert!(svg.contains("oil-intensity-width-field-v1"));
+        assert!(!bands.is_empty());
+        let mut largest = 0.0_f64;
+        let mut largest_after = 0.0_f64;
+        for (left, right, moved_left, moved_right, normal) in bands {
+            let midpoint = |a: Point, b: Point| Point::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+            let project = |p: Point| p.x * normal.x + p.y * normal.y;
+            let original: Vec<f64> = left
+                .iter()
+                .zip(&right)
+                .map(|(&a, &b)| project(midpoint(a, b)))
+                .collect();
+            let stretched: Vec<f64> = moved_left
+                .iter()
+                .zip(&moved_right)
+                .map(|(&a, &b)| project(midpoint(a, b)) * OIL_FILL_WIDTH_STRETCH)
+                .collect();
+            for k in 0..left.len() {
+                let t = k as f64 / (left.len() - 1) as f64;
+                let deviation = |p: &[f64]| (p[k] - (p[0] + (p[p.len() - 1] - p[0]) * t)).abs();
+                largest = largest.max(deviation(&original));
+                largest_after = largest_after.max(deviation(&stretched));
+                let width = Point::new(right[k].x - left[k].x, right[k].y - left[k].y);
+                let moved_width = Point::new(
+                    moved_right[k].x - moved_left[k].x,
+                    moved_right[k].y - moved_left[k].y,
+                );
+                assert!(
+                    (width.x - moved_width.x).abs() < 1e-10
+                        && (width.y - moved_width.y).abs() < 1e-10
+                );
+            }
+        }
+        assert!(largest > 1e-8);
+        assert!(
+            (largest_after - largest).abs() <= largest * 0.01,
+            "{largest} {largest_after}"
+        );
+    }
 
     /// The ridges of a straight oil line `width` units wide, and the widest of
     /// them in units.

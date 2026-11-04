@@ -343,6 +343,7 @@ pub(crate) fn oil_mix_streak(
     color: &str,
     seed: Seed,
     closed: bool,
+    width_normal: Option<Point>,
 ) -> Option<Element> {
     let share = mix_share(Weight::OilPaint);
     if share <= 0.0 || hash01(0, seed, "oil-mix") >= share {
@@ -355,7 +356,14 @@ pub(crate) fn oil_mix_streak(
         let center = 0.08 + (0.84 - width) * hash01(k, seed, "oil-mix-at");
         let start = 0.15 * hash01(k, seed, "oil-mix-start");
         let end = (0.65 + 0.35 * hash01(k, seed, "oil-mix-end")).min(1.0);
-        if let Some(band) = streak_band(left, right, closed, center, width, start, end) {
+        if let Some(mut band) = streak_band(left, right, closed, center, width, start, end) {
+            if width_normal.is_some() {
+                let half = band.len() / 2;
+                let (near, far) = band.split_at_mut(half);
+                far.reverse();
+                crate::materials::damp_oil_band(near, far, width_normal);
+                far.reverse();
+            }
             group.push(
                 path(&closed_d(&band))
                     .attr(

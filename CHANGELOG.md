@@ -8,16 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Render engine 98: exclude known machine notes when resolving legacy color hints, correcting colors on redraw. Saved Scores and SVGs remain unchanged.
-
-- Web and Server: require the current password for password changes, except when an administrator resets another account.
-
-- Server: when an unqualified model name has multiple or no listed providers, resolve it using the user's Stage 1 provider at drawing intake and record the provider for both stages.
-
-- DDL engine 77: read an arc's sagitta as half its chord when decimal rounding makes it exceed that half by at most 0.000001.
-
-- Web: add a button next to Library's `Select all` to clear selections across all pages.
-
 - macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.
@@ -592,6 +582,18 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.313 (2026-11-04 / Build 1389)
+
+- Render engine 98: exclude known machine notes when resolving legacy color hints, correcting colors on redraw. Saved Scores and SVGs remain unchanged.
+
+- Web and Server: require the current password for password changes, except when an administrator resets another account.
+
+- Server: when an unqualified model name has multiple or no listed providers, resolve it using the user's Stage 1 provider at drawing intake and record the provider for both stages.
+
+- DDL engine 77: read an arc's sagitta as half its chord when decimal rounding makes it exceed that half by at most 0.000001.
+
+- Web: add a button next to Library's `Select all` to clear selections across all pages.
 
 ## v2.15.312 (2026-11-04 / Build 1388)
 

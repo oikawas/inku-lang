@@ -1,4 +1,5 @@
 //! Shared interpretation of saved draw options and per-tab defaults.
+use crate::model_catalog::{draw_option_providers, qualify_ref, split_ref};
 use serde_json::{Map, Value, json};
 
 /// The complete set of draw options and whether each has an off state.
@@ -83,9 +84,17 @@ pub fn options_of_work(record: &Value) -> Value {
 /// Build defaults from existing user model and color settings.
 #[must_use]
 pub fn default_draw_defaults(user: &Value) -> Value {
-    let stage1 = text(&user["stage1_model"]).unwrap_or("google/gemma-4-31b-it");
-    let stage2 = text(&user["stage2_model"]).unwrap_or(stage1);
-    let vision = text(&user["vision_model"]).unwrap_or("meta/llama-3.2-90b-vision-instruct");
+    let providers = draw_option_providers(user);
+    let stage1 = qualify_ref(
+        text(&user["stage1_provider"]).unwrap_or("nvidia"),
+        text(&user["stage1_model"]).unwrap_or("google/gemma-4-31b-it"),
+        &providers,
+    );
+    let vision = qualify_ref(
+        text(&user["vision_provider"]).unwrap_or("nvidia"),
+        text(&user["vision_model"]).unwrap_or("meta/llama-3.2-90b-vision-instruct"),
+        &providers,
+    );
     let color = text(&user["color_catalog_id"]).unwrap_or("default");
     let mut tabs = Map::new();
     for &tab in TABS {
@@ -93,7 +102,7 @@ pub fn default_draw_defaults(user: &Value) -> Value {
         tabs.insert(tab.into(), json!({"route":"read_and_draw", "sketch":"on", "composition":"off", "wild":"off",
             "catalog":{"id":color,"mode":if color == "auto" {"auto"} else {"fixed"}},
             "canvas_aspect":if image {"image"} else {"square"},
-            "models":if image {json!({"vision":vision})} else {json!({"stage1":stage1,"stage2":stage2})}}));
+            "models":if image {json!({"vision":vision})} else {json!({"stage1":stage1,"stage2":stage1})}}));
     }
     Value::Object(tabs)
 }
@@ -102,10 +111,44 @@ fn valid_string<'a>(value: &'a Value, valid: &[&str]) -> Option<&'a str> {
     value.as_str().filter(|s| valid.contains(s))
 }
 
+fn model_ref(value: &Value, user: &Value, image: bool, providers: &Value) -> Option<String> {
+    let candidate = text(value)?;
+    if split_ref(candidate, providers).0.is_some() {
+        return Some(candidate.to_owned());
+    }
+    let (model_key, provider_key) = if image {
+        ("vision_model", "vision_provider")
+    } else {
+        ("stage1_model", "stage1_provider")
+    };
+    if text(&user[model_key]) == Some(candidate) {
+        return text(&user[provider_key])
+            .map(|provider| qualify_ref(provider, candidate, providers));
+    }
+    let owners: Vec<&str> = providers
+        .as_object()?
+        .iter()
+        .filter(|(_, row)| {
+            row["models"].as_array().is_some_and(|models| {
+                models
+                    .iter()
+                    .any(|model| model["id"].as_str() == Some(candidate))
+            })
+        })
+        .map(|(id, _)| id.as_str())
+        .collect();
+    if owners.len() == 1 {
+        Some(qualify_ref(owners[0], candidate, providers))
+    } else {
+        None
+    }
+}
+
 /// Normalize each field separately, using the provided existing user settings as fallback.
 #[must_use]
 pub fn normalize_draw_defaults(input: &Value, user: &Value, color_ids: &Value) -> Value {
     let mut result = default_draw_defaults(user);
+    let providers = draw_option_providers(user);
     for &tab in TABS {
         let source = &input[tab];
         for &(key, on_off) in DRAW_OPTIONS {
@@ -141,14 +184,13 @@ pub fn normalize_draw_defaults(input: &Value, user: &Value, color_ids: &Value) -
                         }
                     }
                     "models" => {
-                        for model in if image_tab(tab) {
-                            &["vision"][..]
-                        } else {
-                            &["stage1", "stage2"][..]
-                        } {
-                            if let Some(v) = text(&value[*model]) {
-                                result[tab][key][*model] = json!(v);
-                            }
+                        let model = if image_tab(tab) { "vision" } else { "stage1" };
+                        if let Some(v) = model_ref(&value[model], user, image_tab(tab), &providers)
+                        {
+                            result[tab][key][model] = json!(v);
+                        }
+                        if !image_tab(tab) {
+                            result[tab][key]["stage2"] = result[tab][key]["stage1"].clone();
                         }
                     }
                     _ => {}
@@ -201,6 +243,9 @@ pub fn options_for_tab(record: &Value, tab: &str, defaults: &Value) -> Option<Va
             }
             selected = Value::Object(fields);
         }
+        if key == "catalog" && selected["mode"] == "random" {
+            selected["mode"] = json!("fixed");
+        }
         result.insert(key.into(), selected);
     }
     Some(Value::Object(result))
@@ -249,7 +294,15 @@ mod tests {
                 },
                 "{key}"
             );
-            assert_eq!(present["options"][key], expected[key], "{key}");
+            assert_eq!(
+                present["options"][key],
+                if key == "catalog" {
+                    json!({"id":"ink","mode":"fixed"})
+                } else {
+                    expected[key].clone()
+                },
+                "{key}"
+            );
         }
         let image = json!({"image_ddl":"image", "stage1_model":"vision-model", "catalog_id":"ink", "catalog_mode":"fixed", "render_canvas_aspect":"wide"});
         assert_eq!(
@@ -300,9 +353,9 @@ mod tests {
             assert_eq!(
                 d["models"],
                 if image_tab(tab) {
-                    json!({"vision":"vision"})
+                    json!({"vision":"nvidia:vision"})
                 } else {
-                    json!({"stage1":"first","stage2":"first"})
+                    json!({"stage1":"nvidia:first","stage2":"nvidia:first"})
                 }
             );
             assert_eq!(
@@ -310,7 +363,7 @@ mod tests {
                 if image_tab(tab) { "image" } else { "square" }
             );
         }
-        let custom = json!({"describe":{"route":"stages", "sketch":"bad", "composition":"on", "wild":"on", "catalog":{"id":"ink","mode":"fixed"}, "canvas_aspect":"a4", "models":{"stage1":"custom", "stage2":""}}, "image":{"canvas_aspect":"not-a-format"}});
+        let custom = json!({"describe":{"route":"stages", "sketch":"bad", "composition":"on", "wild":"on", "catalog":{"id":"ink","mode":"fixed"}, "canvas_aspect":"a4", "models":{"stage1":"openai:custom", "stage2":""}}, "image":{"canvas_aspect":"not-a-format"}});
         let clean = call(
             json!({"action":"normalize_draw_defaults","draw_defaults":custom,"color_ids":["default","ink"]}),
         );
@@ -320,12 +373,37 @@ mod tests {
         assert_eq!(d["composition"], "on");
         assert_eq!(d["catalog"]["id"], "ink");
         assert_eq!(d["canvas_aspect"], "a4");
-        assert_eq!(d["models"]["stage1"], "custom");
-        assert_eq!(d["models"]["stage2"], "google/gemma-4-31b-it");
+        assert_eq!(d["models"]["stage1"], "openai:custom");
+        assert_eq!(d["models"]["stage2"], "openai:custom");
         assert_eq!(clean["draw_defaults"]["image"]["canvas_aspect"], "image");
         let updated = call(
             json!({"action":"update_user","settings":normalized["settings"],"color_ids":["default","ink"],"patch":{"draw_defaults":clean["draw_defaults"]}}),
         );
         assert_eq!(updated["settings"]["draw_defaults"], clean["draw_defaults"]);
+    }
+
+    #[test]
+    fn models_are_qualified_and_unresolvable_names_fall_back() {
+        let user = json!({"stage1_provider":"openai","stage1_model":"same", "vision_provider":"gemini", "vision_model":"same"});
+        let defaults = default_draw_defaults(&user);
+        assert_eq!(
+            defaults["describe"]["models"],
+            json!({"stage1":"openai:same","stage2":"openai:same"})
+        );
+        assert_eq!(defaults["image"]["models"], json!({"vision":"gemini:same"}));
+        let input = json!({"describe":{"models":{"stage1":"same", "stage2":"gemini:other"}}, "image":{"models":{"vision":"unresolvable-model"}}, "batch_text":{"models":{"stage1":"ollama:chosen","stage2":"broken"}}});
+        let normalized = normalize_draw_defaults(&input, &user, &Value::Null);
+        assert_eq!(
+            normalized["describe"]["models"],
+            json!({"stage1":"openai:same","stage2":"openai:same"})
+        );
+        assert_eq!(
+            normalized["image"]["models"],
+            json!({"vision":"gemini:same"})
+        );
+        assert_eq!(
+            normalized["batch_text"]["models"],
+            json!({"stage1":"ollama:chosen","stage2":"ollama:chosen"})
+        );
     }
 }

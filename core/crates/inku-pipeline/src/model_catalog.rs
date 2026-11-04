@@ -434,7 +434,7 @@ fn provider_definitions(host: &str) -> Vec<Value> {
     definitions
 }
 
-fn split_ref<'a>(reference: &'a str, providers: &Value) -> (Option<&'a str>, &'a str) {
+pub(crate) fn split_ref<'a>(reference: &'a str, providers: &Value) -> (Option<&'a str>, &'a str) {
     if let Some((head, rest)) = reference.split_once(':')
         && !head.is_empty()
         && !rest.is_empty()
@@ -445,6 +445,35 @@ fn split_ref<'a>(reference: &'a str, providers: &Value) -> (Option<&'a str>, &'a
         return (Some(head), rest);
     }
     (None, reference)
+}
+
+pub(crate) fn qualify_ref(provider: &str, reference: &str, providers: &Value) -> String {
+    let provider = provider.trim();
+    let reference = reference.trim();
+    if provider.is_empty() || reference.is_empty() || split_ref(reference, providers).0.is_some() {
+        reference.to_owned()
+    } else {
+        format!("{provider}:{reference}")
+    }
+}
+
+pub(crate) fn draw_option_providers(user: &Value) -> Value {
+    let mut providers = catalog()["providers"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    for key in ["stage1_provider", "vision_provider"] {
+        if let Some(id) = user[key]
+            .as_str()
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+        {
+            providers
+                .entry(id.to_owned())
+                .or_insert(json!({"models":[]}));
+        }
+    }
+    Value::Object(providers)
 }
 
 fn user_defaults() -> Value {
@@ -1189,16 +1218,11 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             json!({"provider":provider, "model":model})
         }
         Some("qualify_ref") => {
-            let provider = request["provider"].as_str().unwrap_or("").trim();
-            let reference = request["ref"].as_str().unwrap_or("").trim();
-            let qualified = if provider.is_empty()
-                || reference.is_empty()
-                || split_ref(reference, &request["providers"]).0.is_some()
-            {
-                reference.to_owned()
-            } else {
-                format!("{provider}:{reference}")
-            };
+            let qualified = qualify_ref(
+                request["provider"].as_str().unwrap_or(""),
+                request["ref"].as_str().unwrap_or(""),
+                &request["providers"],
+            );
             json!({"ref":qualified})
         }
         Some("resolve_ref") => {
@@ -1452,14 +1476,11 @@ mod tests {
             );
         }
         for row in array(cases.get("user_normalization")) {
-            let mut actual = normalize_user(&row["input"], &json!(["default"]), "default");
-            actual.as_object_mut().unwrap().remove("draw_defaults");
+            let actual = normalize_user(&row["input"], &json!(["default"]), "default");
             assert_eq!(actual, row["result"]);
         }
         for row in array(cases.get("user_updates")) {
-            let mut actual =
-                update_user(&row["input"], &row["patch"], &json!(["default"]), "default");
-            actual.as_object_mut().unwrap().remove("draw_defaults");
+            let actual = update_user(&row["input"], &row["patch"], &json!(["default"]), "default");
             assert_eq!(actual, row["result"]);
         }
         for row in array(cases.get("models_normalization")) {

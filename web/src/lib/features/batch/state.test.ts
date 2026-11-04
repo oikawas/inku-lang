@@ -838,3 +838,44 @@ test('a line cut three times in a row while the Server answers is counted as a f
 	assert.deepEqual(state.failures.map((failure) => [failure.line, failure.message]), [[1, 'paint stream ended before completion']]);
 	assert.equal(server.probes, 2);
 });
+
+test('a dismissed lease stays hidden after refresh and a new batch remains eligible', async () => {
+	const values = new Map<string, string>();
+	const oldStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+	Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+		getItem: (key: string) => values.get(key) ?? null,
+		setItem: (key: string, value: string) => values.set(key, value),
+	} });
+	try {
+		const conditions = { stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+			sketchGrain: null, wild: null, canvasAspectId: null };
+		let runId = 'dismiss-test-old';
+		const make = () => new BatchState({
+			apiFetch: async () => jsonResponse({ batches: [{ run_id: runId, kind: 'web', total: 2, completed: 1,
+				state: 'interrupted', prompt: 'first\nsecond', conditions }] }),
+			signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {},
+		});
+		const state = make();
+		await state.refreshResume();
+		assert.equal(state.resume?.runId, runId);
+		state.clearInput();
+		assert.match(values.get('inku.batch.dismissedRuns.v1') ?? '', /dismiss-test-old/);
+		await state.refreshResume();
+		assert.equal(state.resume, null);
+		const reopened = make();
+		await reopened.refreshResume();
+		assert.equal(reopened.resume, null);
+		// Simulate a fresh page: this id exists only in persisted storage, not in
+		// this module's in-memory set.
+		values.set('inku.batch.dismissedRuns.v1', JSON.stringify(['dismiss-test-from-storage']));
+		runId = 'dismiss-test-from-storage';
+		await reopened.refreshResume();
+		assert.equal(reopened.resume, null);
+		runId = 'dismiss-test-new';
+		await reopened.refreshResume();
+		assert.equal(reopened.resume?.runId, runId);
+	} finally {
+		if (oldStorage) Object.defineProperty(globalThis, 'localStorage', oldStorage);
+		else Reflect.deleteProperty(globalThis, 'localStorage');
+	}
+});

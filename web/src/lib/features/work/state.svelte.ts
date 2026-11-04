@@ -557,8 +557,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		afterImageUploadNotice(() => { void paintImageFolder(fromStart); });
 	}
 
-	async function refreshImageBatchResume(reconcile = false): Promise<boolean> {
-		const record = imageFolder.record;
+	async function refreshImageBatchResume(reconcile = false, forStart = false): Promise<boolean> {
+		const record = forStart ? imageFolder.rawRecord : imageFolder.record;
 		if (!record?.batchRunId) { imageFolder.resumeBlocked = false; return true; }
 		imageFolder.resumeBlocked = true;
 		try {
@@ -566,10 +566,10 @@ export function createWorkState(deps: WorkStateDeps) {
 			if (!response.ok) return false;
 			const data = await response.json() as { batches?: BatchLeaseRecord[] };
 			const found = data.batches?.find((item) => item.run_id === record.batchRunId);
-			if (imageFolder.record?.batchRunId !== record.batchRunId) return false;
+			if (imageFolder.rawRecord?.batchRunId !== record.batchRunId) return false;
 			if (!found || found.state === 'running' || found.state === 'uncertain') return false;
 			if (!record.batchKeys || record.batchKeys.length !== found.total) return false;
-			if (reconcile) {
+			if (reconcile && imageFolder.record) {
 				const saved = (found.conditions as unknown as { draw_options?: DrawOptions } | undefined)?.draw_options;
 				if (saved) drawChoices.batch_image = copyDrawOptions(saved);
 				const lines: number[] = [];
@@ -606,7 +606,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const runId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
 			? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 		try {
-			if (!(await refreshImageBatchResume(!fromStart))) throw new Error('The previous image batch may still be running.');
+			if (!(await refreshImageBatchResume(!fromStart, true))) throw new Error('The previous image batch may still be running.');
 			const choices = copyDrawOptions(drawChoices.batch_image);
 			const total = fromStart ? imageFolder.pictures.length : imageFolder.pending.length;
 			if (total === 0) return;
@@ -1471,8 +1471,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		drawChoices[activeDrawTab()] = copyDrawOptions(drawDefaults[activeDrawTab()]);
 		if (inputMode === 'single') input = '';
 		if (inputMode === 'batch') {
-			batch.clearInput();
 			if (imageFolder.source === 'image') imageFolder.clearInput();
+			else batch.clearInput();
 		}
 		if (inputMode === 'image') clearImage();
 		sketchText = null;

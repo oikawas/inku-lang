@@ -3,6 +3,7 @@ import { isConnectionFailure, ConnectionFailure } from '../../transport/connecti
 import type { PaintOptions, PaintResult } from '../run/current-work.ts';
 import type { BatchFailure, BatchFailureReport } from './failure-report.svelte.ts';
 import { startBatchLease, type BatchLeaseRecord } from './lease.ts';
+import { dismissBatchRun, isBatchRunDismissed } from './dismissed-runs.ts';
 import { dropFailedLine, planRetryRound } from './retry.ts';
 import {
 	batchStoppedPartWay,
@@ -250,6 +251,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	clearInput(): void {
+		dismissBatchRun(this.resume?.runId ?? this.interruptedSnapshot?.runId);
 		this.resumeDiscovery += 1;
 		this.resume = null;
 		this.interrupted = false;
@@ -331,7 +333,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 						const record = data.batches.find((item) => item.kind === 'web');
 						if (record) {
 							const lines = numberedBatchLines(record.prompt, this.deps.paintable);
-							this.resume = (record.state === 'interrupted' || record.state === 'lease_expired' || record.state === 'finished_with_failures') && lines.length === record.total
+							this.resume = !isBatchRunDismissed(record.run_id) && (record.state === 'interrupted' || record.state === 'lease_expired' || record.state === 'finished_with_failures') && lines.length === record.total
 								? { prompt: record.prompt, lines, runId: record.run_id, work: null,
 									conditions: record.conditions, pending: null, source: 'history',
 									...(record.state === 'finished_with_failures' ? { reason: 'failed' as const, failureCount: record.total - record.completed } : {}) }
@@ -364,7 +366,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		try {
 			const work = latestBatchWork(await this.fetchWorksPage(0, BATCH_RESUME_PROBE_LIMIT)) as TWork | null;
 			if (this.resumeDiscovery !== discovery || this.resuming || this.interruptedSnapshot) return;
-			this.resume = work && batchStoppedPartWay(lines, work)
+			this.resume = work && !isBatchRunDismissed(work.batch_run_id) && batchStoppedPartWay(lines, work)
 				? {
 					prompt,
 					lines,

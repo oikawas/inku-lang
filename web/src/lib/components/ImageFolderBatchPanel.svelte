@@ -38,7 +38,7 @@
 	const pending = $derived(folder.pending.length);
 	const done = $derived(folder.doneCount);
 	const disabled = $derived(busy || !visionModelAvailable || folder.resumeBlocked);
-	const pastFolders = $derived(folder.history.filter((item) => item.name !== folder.folderName || folder.pictures.length === 0));
+	const pastFolders = $derived(folder.visibleHistory.filter((item) => item.name !== folder.folderName || folder.pictures.length === 0));
 	const workElapsedMs = $derived.by(() => {
 		void liveMs;
 		return folder.workStartedAt === null ? 0 : Math.max(0, Date.now() - folder.workStartedAt);

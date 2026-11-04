@@ -711,6 +711,7 @@ export interface LangPack {
 	historyDescriptionExpandTitle: string;
 	historyDescriptionCollapseTitle: string;
 	historyModelInterpretation: string;
+	historyModelCompletion: string;
 	historyModelDrawing: string;
 	historyModelUnrecorded: string;
 	historyModelDetails: string;

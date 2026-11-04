@@ -75,7 +75,7 @@ export function drawFlow(route: DrawRoute, sketch: SketchMode, composition: Comp
 	} else {
 		const composed = composition === 'on';
 		if (composed) steps.push(step('構図と法則', 'Composition and laws', 'switch'));
-		steps.push(step('言葉で書く', 'Write in words', 'fixed'), step('見て直す', 'Look and correct', 'fixed'));
+		steps.push(step('書く', 'Writing', 'fixed'), step('見比べ', 'Review', 'fixed'));
 		if (composed) steps.push(step('配色', 'Colors', 'switch'));
 	}
 	steps.push(step('画', 'Picture', 'end'));

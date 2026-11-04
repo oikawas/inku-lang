@@ -325,8 +325,8 @@
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
 							<div class="tooltip-row tooltip-description"><span>{it.image_provenance != null ? t().imageProvenanceLabel : t().inputSectionLabel}</span><strong>{it.image_provenance ?? it.source_text ?? it.input}</strong></div>
-							<div class="tooltip-row"><span>Stage 1</span><strong>{historyModelStage1Full(it)}</strong></div>
-							<div class="tooltip-row"><span>Stage 2</span><strong>{historyModelStage2Full(it)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyModelInterpretation}</span><strong>{historyModelStage1Full(it)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyModelCompletion}</span><strong>{historyModelStage2Full(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Gen.'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
 							<!-- Only a work saved before the staffage axis was folded away (v2.11.0)

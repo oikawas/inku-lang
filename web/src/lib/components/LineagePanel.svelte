@@ -345,7 +345,7 @@ function stageModelNames(history: HistoryItem | null | undefined): string {
 function stageModelTitle(history: HistoryItem | null | undefined): string {
 	const stage1 = history?.stage1_model ? modelDisplayName(history.stage1_model) : '';
 	const stage2 = history?.stage2_model ? modelDisplayName(history.stage2_model) : '';
-	return [stage1 && `Stage 1: ${stage1}`, stage2 && `Stage 2: ${stage2}`].filter(Boolean).join('\n');
+	return [stage1 && `${t().historyModelInterpretation}: ${stage1}`, stage2 && `${t().historyModelCompletion}: ${stage2}`].filter(Boolean).join('\n');
 }
 
 function toggleCheckedHistory(historyId: string): void {
@@ -951,8 +951,8 @@ $effect(() => {
 				<dt>Render engine version</dt><dd>{detailsNode.history.render_engine_version || '—'}</dd>
 				<dt>{t().provenanceLabelTransformLayer}</dt><dd>{detailsNode.history.ddl_engine_version || '—'}</dd>
 				<dt>Build</dt><dd>{detailsNode.history.render_build_number || '—'}</dd>
-				<dt>Stage 1</dt><dd>{detailsNode.history.stage1_model ? modelDisplayName(detailsNode.history.stage1_model) : '—'}</dd>
-				<dt>Stage 2</dt><dd>{detailsNode.history.stage2_model ? modelDisplayName(detailsNode.history.stage2_model) : '—'}</dd>
+				<dt>{t().historyModelInterpretation}</dt><dd>{detailsNode.history.stage1_model ? modelDisplayName(detailsNode.history.stage1_model) : '—'}</dd>
+				<dt>{t().historyModelCompletion}</dt><dd>{detailsNode.history.stage2_model ? modelDisplayName(detailsNode.history.stage2_model) : '—'}</dd>
 				<dt>seed</dt><dd>{detailsNode.history.render_seed ?? '—'} / {detailsNode.history.composition_seed ?? '—'} / {detailsNode.history.interpretation_seed ?? '—'}</dd>
 				<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(detailEdge?.derivation_kind)}</dd>
 				{#if detailMove}

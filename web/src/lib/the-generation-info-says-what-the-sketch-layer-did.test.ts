@@ -85,8 +85,8 @@ test('T-38  the section is Stage 0.5, and it stands before Stage 1', () => {
 	assert.ok(sketch > 0, 'the drawer has no sketch section');
 	assert.ok(stage1 > 0, 'the drawer has no interpretation section');
 	assert.ok(sketch < stage1, 'the sketch section comes after interpretation');
-	// The heading is the shared one, so the English never says "Sketch" alone.
-	assert.match(read('./i18n/en.ts'), /sketchLabel: 'Sketch from life \(Stage 0\.5\)'/);
+	// The heading names the step rather than a historical stage number.
+	assert.match(read('./i18n/en.ts'), /sketchLabel: ["']Sketch from life["']/);
 });
 
 // ------------------------------------------------------------------- T-39

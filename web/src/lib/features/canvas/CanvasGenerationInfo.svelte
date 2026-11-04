@@ -519,8 +519,8 @@
 				<section class="detail-group">
 					<h4>{t().provenanceSectionInterpretation}</h4>
 					<dl>
-						{@render term(`Stage 1 (${isJapanese ? '解釈' : 'Interpretation'})`, t().provenanceHintStage1Model)}<dd>{statusStage1Model}</dd>
-						{@render term(`Stage 1 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage1Lang)}<dd>{displayLanguageName(detailStage1Lang)}</dd>
+						{@render term(t().historyModelInterpretation, t().provenanceHintStage1Model)}<dd>{statusStage1Model}</dd>
+						{@render term(isJapanese ? '指示書の言語' : 'Instructions language', t().provenanceHintStage1Lang)}<dd>{displayLanguageName(detailStage1Lang)}</dd>
 						{@render term(t().provenanceLabelLangRequested, t().provenanceHintLangRequested)}<dd>{detailRequestedLang ? displayLanguageName(detailRequestedLang) : '-'}</dd>
 						{#if interpretFallbackReason}
 							{@render term(t().provenanceLabelInterpretFallback, t().provenanceHintInterpretFallback)}<dd>{interpretFallbackReason}</dd>
@@ -533,8 +533,8 @@
 				<section class="detail-group">
 					<h4>{t().provenanceSectionPerformance}</h4>
 					<dl>
-						{@render term(`Stage 2 (${isJapanese ? '描画' : 'Performance'})`, t().provenanceHintStage2Model)}<dd>{statusStage2Model}</dd>
-						{@render term(`Stage 2 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage2Lang)}<dd>{displayLanguageName(detailStage2Lang)}</dd>
+						{@render term(t().historyModelCompletion, t().provenanceHintStage2Model)}<dd>{statusStage2Model}</dd>
+						{@render term(isJapanese ? '補完の言語' : 'Completion language', t().provenanceHintStage2Lang)}<dd>{displayLanguageName(detailStage2Lang)}</dd>
 						{#if detailFocus}{@render term(t().provenanceLabelFocus, t().provenanceHintFocus)}<dd>{detailFocus}</dd>{/if}
 						{#if detailVariationAmplitude}
 							{@render term(t().provenanceLabelVariation, t().provenanceHintVariation)}<dd>{variationAmplitudeLabel(detailVariationAmplitude)}</dd>

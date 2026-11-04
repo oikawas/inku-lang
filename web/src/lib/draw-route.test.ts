@@ -136,12 +136,12 @@ test('the flow under the switches names the steps a run passes, in their order',
 	assert.equal(labels('stages', 'off', 'off'), '記述 › 型を埋める › 構図と法則 › 配色 › 画');
 	assert.equal(labels('stages', 'on', 'on'), '記述 › 写生 › 型を埋める › 構図と法則 › 配色 › 画');
 	// In words decides the composition and laws before it writes, and their colors end it.
-	assert.equal(labels('read_and_draw', 'on', 'off'), '記述 › 写生 › 言葉で書く › 見て直す › 画');
-	assert.equal(labels('read_and_draw', 'on', 'on'), '記述 › 写生 › 構図と法則 › 言葉で書く › 見て直す › 配色 › 画');
+	assert.equal(labels('read_and_draw', 'on', 'off'), '記述 › 写生 › 書く › 見比べ › 画');
+	assert.equal(labels('read_and_draw', 'on', 'on'), '記述 › 写生 › 構図と法則 › 書く › 見比べ › 配色 › 画');
 	// A step a switch put there is marked so; the stages' own steps are not.
 	const kinds = drawFlow('read_and_draw', 'on', 'on', false).map((step) => `${step.label}:${step.kind}`);
-	assert.deepEqual(kinds, ['Description:end', 'Sketch:switch', 'Composition and laws:switch', 'Write in words:fixed',
-		'Look and correct:fixed', 'Colors:switch', 'Picture:end']);
+	assert.deepEqual(kinds, ['Description:end', 'Sketch:switch', 'Composition and laws:switch', 'Writing:fixed',
+		'Review:fixed', 'Colors:switch', 'Picture:end']);
 	assert.ok(drawFlow('stages', 'off', 'on', true).every((step) => step.kind !== 'switch'));
 });
 

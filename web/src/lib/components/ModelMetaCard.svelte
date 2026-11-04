@@ -7,6 +7,7 @@
 	to the window beside the parent, so no scrolling list or dialog edge cuts it.
 -->
 <script lang="ts">
+	import { t } from '$lib/i18n/index.svelte';
 	import type { ModelOption } from '$lib/models';
 	import { modelRecommendation, modelStageRecommendations, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, type ModelPurpose } from '$lib/modelMeta';
 	import { openFloatingCard } from '$lib/floatingCard';
@@ -46,8 +47,8 @@
 	{#if modelStatusLabel(model, isJapanese)}<span><strong>状態 / Status</strong><span class="status-muted">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:status-warning={part.blocking}>{part.text}</span>{/each}</span></span>{/if}
 	<span><strong>用途 / Use</strong><ModelPurposeBadges {model} {isJapanese} /></span>
 	{#if stages}
-		<span><strong>オススメ度 / Stage 1</strong>{stages.stage1}</span>
-		<span><strong>オススメ度 / Stage 2</strong>{stages.stage2}</span>
+		<span><strong>{t().settingsModelRecommendationFields.recommendation_stage1}</strong>{stages.stage1}</span>
+		<span><strong>{t().settingsModelRecommendationFields.recommendation_stage2}</strong>{stages.stage2}</span>
 	{:else}
 		<span><strong>オススメ度 / Recommendation</strong>{modelRecommendation(model, purpose)}</span>
 	{/if}

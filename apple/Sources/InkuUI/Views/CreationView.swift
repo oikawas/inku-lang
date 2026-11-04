@@ -467,7 +467,7 @@ struct CreationView: View {
                             Label(display.webCopy("descriptionLockedMark", "ロック"), systemImage: "lock").inkuFont(11, weight: .medium).foregroundStyle(.secondary)
                         }
                     }
-                    Text(display.webCopy("inputSectionHint", "短い文章で、表現したいものを入力。")).inkuFont(12).foregroundStyle(.secondary)
+                    Text(display.webCopy("inputSectionHint", "短い文で、表現したいものを入力。")).inkuFont(12).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
                 Button(display.webCopy("clearInputBtn", "新規")) {

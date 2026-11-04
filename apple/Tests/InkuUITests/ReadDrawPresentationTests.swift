@@ -15,7 +15,7 @@ import InkuHost
         XCTAssertEqual(RunJournalView.currentLabel(current("compose_description"), label: "batch", attempt: attempt, display: display), "構図と法則を決め直しています…")
         XCTAssertEqual(RunJournalView.currentLabel(current("write_description_ddl"), label: "batch", attempt: attempt, display: display), "指示書を書いています…")
         XCTAssertEqual(RunJournalView.currentLabel(current("select_description_catalog"), label: "batch", attempt: attempt, display: display), "色カタログ…")
-        XCTAssertEqual(RunJournalView.currentLabel(current("draw_image_review", kind: "local"), label: "batch", attempt: attempt, display: display), "見直し用に描いています…")
+        XCTAssertEqual(RunJournalView.currentLabel(current("draw_image_review", kind: "local"), label: "batch", attempt: attempt, display: display), "見比べ用に描いています…")
         XCTAssertEqual(RunJournalView.currentLabel(.null, label: "batch", attempt: attempt, display: display), display.message("batch"))
     }
     func testFlowAndSketchFollowWeb() {

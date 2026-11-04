@@ -56,7 +56,7 @@ struct RunJournalView: View {
         let action = current["action"].string ?? ""
         if current["kind"].string == "local" {
             switch action {
-            case "draw_image_review": return display.webCopy("runLocalReview", "見直し用に描いています…")
+            case "draw_image_review": return display.webCopy("runLocalReview", "見比べ用に描いています…")
             case "commit_visible_normalized_ddl", "save": return display.webCopy("runLocalSave", "保存しています…")
             default: return display.webCopy("runLocalRender", "描いています…")
             }

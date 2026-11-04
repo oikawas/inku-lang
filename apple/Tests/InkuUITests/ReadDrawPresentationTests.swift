@@ -15,7 +15,7 @@ import InkuHost
         XCTAssertEqual(RunJournalView.currentLabel(current("compose_description"), label: "batch", attempt: attempt, display: display), "構図と法則を決め直しています…")
         XCTAssertEqual(RunJournalView.currentLabel(current("write_description_ddl"), label: "batch", attempt: attempt, display: display), "指示書を書いています…")
         XCTAssertEqual(RunJournalView.currentLabel(current("select_description_catalog"), label: "batch", attempt: attempt, display: display), "色カタログ…")
-        XCTAssertEqual(RunJournalView.currentLabel(current("draw_image_review", kind: "local"), label: "batch", attempt: attempt, display: display), "見直し用に描いています…")
+        XCTAssertEqual(RunJournalView.currentLabel(current("draw_image_review", kind: "local"), label: "batch", attempt: attempt, display: display), "見比べ用に描いています…")
         XCTAssertEqual(RunJournalView.currentLabel(.null, label: "batch", attempt: attempt, display: display), display.message("batch"))
     }
     func testFlowAndSketchFollowWeb() {
@@ -23,7 +23,7 @@ import InkuHost
         XCTAssertEqual(stages.map(\.label), ["記述", "写生", "型を埋める", "構図と法則", "配色", "画"])
         XCTAssertEqual(stages.map(\.kind), ["end", "switch", "fixed", "fixed", "fixed", "end"])
         let words = DrawPresentation.flow(route: "read_and_draw", sketch: false, composition: true, japanese: false)
-        XCTAssertEqual(words.map(\.label), ["Description", "Composition and laws", "Write in words", "Look and correct", "Colors", "Picture"])
+        XCTAssertEqual(words.map(\.label), ["Description", "Composition and laws", "Writing", "Review", "Colors", "Picture"])
         XCTAssertEqual(words.map(\.kind), ["end", "switch", "fixed", "fixed", "switch", "end"])
         XCTAssertEqual(DrawPresentation.sketchShort(nil, japanese: false), "Not recorded")
         XCTAssertEqual(DrawPresentation.sketchShort("off", japanese: true), "通さない")

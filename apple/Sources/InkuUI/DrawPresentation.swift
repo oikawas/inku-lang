@@ -6,12 +6,12 @@ enum DrawPresentation {
     static func flow(route: String, sketch: Bool, composition: Bool, japanese: Bool) -> [Step] {
         func step(_ ja: String, _ en: String, _ kind: String) -> Step { Step(label: japanese ? ja : en, kind: kind) }
         var result = [step("記述", "Description", "end")]
-        if sketch { result.append(step("写生", "Sketch", "switch")) }
+        if sketch { result.append(step("写生", "Sketch from life", "switch")) }
         if route == "stages" {
             result += [step("型を埋める", "Fill the plan", "fixed"), step("構図と法則", "Composition and laws", "fixed"), step("配色", "Colors", "fixed")]
         } else {
             if composition { result.append(step("構図と法則", "Composition and laws", "switch")) }
-            result += [step("言葉で書く", "Write in words", "fixed"), step("見て直す", "Look and correct", "fixed")]
+            result += [step("書く", "Writing", "fixed"), step("見比べ", "Review", "fixed")]
             if composition { result.append(step("配色", "Colors", "switch")) }
         }
         result.append(step("画", "Picture", "end"))

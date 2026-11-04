@@ -170,8 +170,8 @@ public struct ComparisonView: View {
         }.joined(separator: " / ")
         let comments = language == "en" ? [entry.commentEN, entry.commentJA] : [entry.commentJA, entry.commentEN]
         let recommendations = entry.recommendationStage1 != nil || entry.recommendationStage2 != nil
-            ? [("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1"))),
-               ("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))]
+            ? [(model.display.label("指示書を書く工程のオススメ度", "Recommendation for writing the instructions"), ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1"))),
+               (model.display.label("補完のオススメ度", "Recommendation for completion"), ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))]
             : [("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm")))]
         let rows = [("用途", purpose)] + recommendations
             + [("概算コスト", ModelMetadataPresentation.cost(entry, language: language)),

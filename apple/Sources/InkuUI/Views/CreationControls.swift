@@ -349,14 +349,14 @@ enum FallbackCopy {
         let english = language == "en"
         switch reason {
         case "stage1_hard_timeout":
-            return english ? "The interpreter did not answer in time, so a stock set of instructions was performed."
-                : "Stage 1 が時間内に応答しなかったため、定型の代替DDLで描画しました。"
+            return english ? "Writing the instructions timed out, so a stock set of instructions was performed."
+                : "指示書を書く工程が時間内に応答しなかったため、定型の代替DDLで描画しました。"
         case "stage1_empty_output":
-            return english ? "The interpreter returned nothing, so a stock set of instructions was performed."
-                : "Stage 1 が空の応答を返したため、定型の代替DDLで描画しました。"
+            return english ? "Writing the instructions returned nothing, so a stock set of instructions was performed."
+                : "指示書を書く工程が空の応答を返したため、定型の代替DDLで描画しました。"
         default:
-            return english ? "The interpreter failed, so a stock set of instructions was performed."
-                : "Stage 1 が失敗したため、定型の代替DDLで描画しました。"
+            return english ? "Writing the instructions failed, so a stock set of instructions was performed."
+                : "指示書を書く工程が失敗したため、定型の代替DDLで描画しました。"
         }
     }
 
@@ -364,13 +364,13 @@ enum FallbackCopy {
         let english = language == "en"
         switch reason {
         case "stage2_hard_timeout":
-            return english ? "Stage 2 did not answer in time, so a stock score was performed."
-                : "Stage 2 が時間内に応答しなかったため、定型の楽譜で描画しました。"
+            return english ? "In an old work, the score-writing step timed out and a stock score was performed."
+                : "旧作品では楽譜を組む工程が時間内に応答せず、定型の楽譜で描画しました。"
         case "stage2_empty_output":
-            return english ? "Stage 2 returned nothing, so a stock score was performed."
-                : "Stage 2 が空の応答を返したため、定型の楽譜で描画しました。"
+            return english ? "In an old work, the score-writing step returned nothing and a stock score was performed."
+                : "旧作品では楽譜を組む工程が空の応答を返し、定型の楽譜で描画しました。"
         default:
-            return english ? "Stage 2 failed, so a stock score was performed." : "Stage 2 が失敗したため、定型の楽譜で描画しました。"
+            return english ? "In an old work, the score-writing step failed and a stock score was performed." : "旧作品では楽譜を組む工程が失敗し、定型の楽譜で描画しました。"
         }
     }
 }
@@ -427,7 +427,7 @@ struct CreationDisplayedProcess: View {
                                 .background(InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
                                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
                                 .disabled(disabled)
-                                .accessibilityLabel(model.display.webCopy("sketchLabel", "写生（Stage 0.5）"))
+                                .accessibilityLabel(model.display.webCopy("sketchLabel", "写生"))
                             Text(model.display.webCopy("sketchEditHint", "直した写生文がそのまま解釈へ渡ります")).inkuFont(12).foregroundStyle(.secondary)
                         } else if let shown = draft?.text ?? sketch {
                             Text(shown).inkuFont(13).lineSpacing(13 * 0.5).textSelection(.enabled)
@@ -437,7 +437,7 @@ struct CreationDisplayedProcess: View {
                                 .inkuFont(12).foregroundStyle(.secondary)
                         }
                     }.padding(.top, 6)
-                } label: { Text(readRecord != nil ? model.display.webCopy("readDrawReadingLabel", "写生（読み）") : model.display.webCopy("sketchLabel", "写生（Stage 0.5）")).inkuFont(12, weight: .semibold) }
+                } label: { Text(readRecord != nil ? model.display.webCopy("readDrawReadingLabel", "写生（読み）") : model.display.webCopy("sketchLabel", "写生")).inkuFont(12, weight: .semibold) }
                 .inkuTooltip(model.display.tooltip("写生層が書いた文章を表示します。", serverKey: "tooltipSketchToggle"))
                 if let sketch {
                     // `+page.svelte:2794`: editing needs the prose on screen, so the button unfolds the section.
@@ -487,7 +487,7 @@ struct CreationDisplayedProcess: View {
                     Button(model.display.localized("指示書から描画"), systemImage: "arrow.clockwise") { onWorkAction(work, "draw-ddl") }
                         .buttonStyle(InkuGhostButtonStyle())
                         .disabled(!saved || !DDLSource.hasBody(boxText) || disabled || model.ddlBoxRangeBlocked)
-                        .inkuTooltip(model.display.tooltip("表示中の指示書（正規化DDL）をそのままStage 2へ渡して描き直します。Stage 1は走らないので解釈は変わりません。", serverKey: "tooltipDdlPaint"))
+                        .inkuTooltip(model.display.tooltip(model.display.label("表示中の指示書（正規化DDL）を必要に応じて補完して描き直します。記述から指示書を書き直さないので、読みは変わりません。", "Completes the shown instructions (normalized DDL) if needed and redraws them. It does not rewrite them from the description, so the reading stays unchanged."), serverKey: "tooltipDdlPaint"))
                 }
             }
         }

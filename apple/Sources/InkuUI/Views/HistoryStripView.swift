@@ -384,8 +384,8 @@ import SwiftUI
         let unrecorded = display.localized("未記録")
         let saved = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened)
         return [title(work),
-                "Stage 1: " + (SavedWorkFacts.recordedModel(work.stage1Model).map(naming.displayName) ?? unrecorded),
-                "Stage 2: " + (SavedWorkFacts.recordedModel(work.stage2Model).map(naming.displayName) ?? unrecorded),
+                display.webCopy("historyModelInterpretation", fallback: "指示書のモデル") + ": " + (SavedWorkFacts.recordedModel(work.stage1Model).map(naming.displayName) ?? unrecorded),
+                display.webCopy("historyModelCompletion", fallback: "補完のモデル") + ": " + (SavedWorkFacts.recordedModel(work.stage2Model).map(naming.displayName) ?? unrecorded),
                 display.webCopy("historyTooltipSavedAt", fallback: "保存時間") + ": " + saved,
                 display.webCopy("historyStripFieldGeneration", fallback: "世代") + ": " + generationLabel(work),
                 display.webCopy("historyTooltipColorCatalog", fallback: "色カタログ") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? unrecorded),

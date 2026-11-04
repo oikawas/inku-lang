@@ -4,7 +4,13 @@ import SwiftUI
 private enum DemoModelPicker: String, Identifiable {
     case prompt, stage1, stage2
     var id: String { rawValue }
-    var title: String { self == .prompt ? "記述を作るモデル" : self == .stage1 ? "Stage 1" : "Stage 2" }
+    @MainActor func title(display: DisplaySettings) -> String {
+        switch self {
+        case .prompt: return display.localized("記述を作るモデル")
+        case .stage1: return display.webCopy("historyModelInterpretation", "指示書のモデル")
+        case .stage2: return display.webCopy("historyModelCompletion", "補完のモデル")
+        }
+    }
 }
 
 @MainActor struct AutomationView: View {
@@ -51,7 +57,7 @@ private enum DemoModelPicker: String, Identifiable {
             if !occupied { Task { await automation.refreshDemoModels(app: model) } }
         }
         .sheet(item: $modelPicker) { selection in
-            BatchModelPickerView(model: model, initialReference: reference(selection), immediateSelection: true, title: selection.title) { value in
+            BatchModelPickerView(model: model, initialReference: reference(selection), immediateSelection: true, title: selection.title(display: model.display)) { value in
                 switch selection {
                 case .prompt: automation.demoModel = value
                 case .stage1:
@@ -161,7 +167,7 @@ private enum DemoModelPicker: String, Identifiable {
     private func modelButton(_ selection: DemoModelPicker) -> some View {
         Button { modelPicker = selection } label: {
             VStack(alignment: .leading, spacing: 3) {
-                Text(model.display.localized(selection.title)).inkuFont(12).foregroundStyle(.secondary)
+                Text(selection.title(display: model.display)).inkuFont(12).foregroundStyle(.secondary)
                 Text(reference(selection).isEmpty ? model.display.localized("選択してください") : reference(selection))
                     .inkuFont(13).lineLimit(2).truncationMode(.middle)
             }.frame(maxWidth: .infinity, alignment: .leading)

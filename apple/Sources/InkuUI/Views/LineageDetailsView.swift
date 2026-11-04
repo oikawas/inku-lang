@@ -40,8 +40,8 @@ struct LineageDetailsView: View {
                             row("Render engine version", work.renderEngineVersion)
                             row(model.display.webCopy("provenanceLabelTransformLayer", "DDL engine version"), information?.presentation?.provenance?.ddlEngineVersion)
                             row("Build", information?.presentation?.provenance?.build)
-                            row("Stage 1", work.stage1Model.map(naming.displayName))
-                            row("Stage 2", work.stage2Model.map(naming.displayName))
+                            row(model.display.webCopy("historyModelInterpretation", "指示書のモデル"), work.stage1Model.map(naming.displayName))
+                            row(model.display.webCopy("historyModelCompletion", "補完のモデル"), work.stage2Model.map(naming.displayName))
                             row("seed", [work.renderSeed, work.compositionSeed, work.interpretationSeed].map { $0 ?? "—" }.joined(separator: " / "))
                             row(model.display.localized("派生"), operation)
                             if let edge = information?.edge, let metadata = try? ExactJSON(data: Data(edge.metadataJSON.utf8)),

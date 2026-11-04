@@ -745,7 +745,7 @@ struct CreationView: View {
             metaItem(display.label("描き方", "Drawing"), maxWidth: 130, compact: compact) {
                 Text(workspaceContext?.imageDDL != nil ? display.label("画像から書く", "Written from a picture") : (workspaceContext?.drawRoute == "read_and_draw" || (workspaceContext?.drawRoute != "stages" && workspaceContext?.descriptionDDL != nil)) ? display.label("言葉で描く", "In words") : display.label("型で描く", "With a plan"))
             }
-            metaItem(display.label("写生", "Sketch"), maxWidth: 130, compact: compact, title: DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")) {
+            metaItem(display.label("写生", "Sketch from life"), maxWidth: 130, compact: compact, title: DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")) {
                 Text(DrawPresentation.sketchShort(work.sketchState, japanese: display.preferences.language != "en"))
             }
             metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }

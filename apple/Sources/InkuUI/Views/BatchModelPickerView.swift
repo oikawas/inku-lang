@@ -70,7 +70,7 @@ struct BatchModelPickerView: View {
             }.padding(16)
             Divider()
             HStack {
-                selectionTabButton("shared", title: singlePurposeSelection ? model.display.localized(title) : "Stage 1/2")
+                selectionTabButton("shared", title: singlePurposeSelection ? model.display.localized(title) : model.display.label("描画モデル", "Drawing model"))
                 if hasVisionTab { selectionTabButton("vision", title: "Vision") }
             }.padding(.horizontal, 24).padding(.vertical, 12)
             Divider()
@@ -184,7 +184,7 @@ struct BatchModelPickerView: View {
 
     private var selectionSummary: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(singlePurposeSelection ? model.display.localized(title) : "Stage 1/2").inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
+            Text(singlePurposeSelection ? model.display.localized(title) : model.display.label("描画モデル", "Drawing model")).inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
             Text(entry(for: draftReference, purpose: purpose).map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
                  ?? model.display.localized("未設定"))
                 .inkuFont(13).fixedSize(horizontal: false, vertical: true)
@@ -202,7 +202,8 @@ struct BatchModelPickerView: View {
     private var sharedModelHint: some View {
         Text(selectedPurpose == "vision"
              ? model.display.webCopy("modelSelectionVisionHint", "画像を読むVision処理に使うモデルを選択します。")
-             : model.display.webCopy("modelSelectionSharedHint", "選んだモデルを Stage 1 と Stage 2 の両方に使います（段ごとに別のモデルは選べません）。段ごとに測ってあるモデルは、低いほうの段の順に並べます。"))
+             : singlePurposeSelection ? model.display.label("選んだモデルをこの操作に使います。", "The chosen model is used for this operation.")
+             : model.display.webCopy("modelSelectionSharedHint", model.display.label("ここで選んだモデルを指示書を書く工程と補完に設定します。補完のモデルは別に変更できます。", "The model chosen here is set for writing the instructions and completion. The completion model can be changed separately.")))
             .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
@@ -311,8 +312,8 @@ struct BatchModelPickerView: View {
     private func recommendationRows(_ entry: ProviderModelSettings) -> [(String, String)] {
         if selectedPurpose == "vision" { return [("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "vision")))] }
         if entry.recommendationStage1 != nil || entry.recommendationStage2 != nil {
-            return [("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1"))),
-                    ("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))]
+            return [(model.display.label("指示書を書く工程のオススメ度", "Recommendation for writing the instructions"), ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1"))),
+                    (model.display.label("補完のオススメ度", "Recommendation for completion"), ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))]
         }
         return [("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm")))]
     }

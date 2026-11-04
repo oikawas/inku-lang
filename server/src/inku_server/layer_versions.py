@@ -438,7 +438,10 @@
 # of them keeps its edition. They are performed by render engine 95.
 # 76: Color and tool phrases with Japanese で and English with or in bind to
 # the shape when a clause contains exactly one shape.
-DDL_ENGINE_VERSION = "76"
+# 77: Clamp a sagitta exceeding half its chord by at most 1/1,000,000 to
+# that half; four of 7,017 works saved on 5173 regain an arc when redrawn
+# (2026-11-04 census).
+DDL_ENGINE_VERSION = "77"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

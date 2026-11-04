@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- DDL engine 77: read an arc's sagitta as half its chord when decimal rounding makes it exceed that half by at most 0.000001.
+
 - macOS: animate a single work line by line and report differences from the saved picture and incomplete instructions.
 
 - macOS: preserve structured drawing and resource omission reasons when checking plugin examples.

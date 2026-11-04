@@ -7943,6 +7943,13 @@ fn resolve_shape_dimensions(
     resolve_geometry_dimensions(primitive, geometry, scale)
 }
 
+/// DDL decimals have at most six places. Rounding chord and sagitta separately
+/// can exceed half the chord by at most 0.75 millionths (0.5 + 0.25).
+const ARC_SAGITTA_ROUNDING_TOLERANCE: Rational = Rational {
+    numerator: 1,
+    denominator: 1_000_000,
+};
+
 fn resolve_geometry_dimensions(
     primitive: Primitive,
     geometry: Option<crate::geometry::ExactGeometry>,
@@ -7977,9 +7984,16 @@ fn resolve_geometry_dimensions(
         }
         (Primitive::Arc, crate::geometry::ExactGeometry::ChordSagitta { chord, sagitta }) => {
             let chord = positive(chord)?;
-            let sagitta = positive(sagitta)?;
-            if !sagitta.le(chord.div_i128(2)?)? {
-                return Err(ScoreFieldGap::GeometryDimensionMismatch { primitive });
+            let mut sagitta = positive(sagitta)?;
+            let half_chord = chord.div_i128(2)?;
+            if !sagitta.le(half_chord)? {
+                if !sagitta
+                    .sub(half_chord)?
+                    .le(ARC_SAGITTA_ROUNDING_TOLERANCE)?
+                {
+                    return Err(ScoreFieldGap::GeometryDimensionMismatch { primitive });
+                }
+                sagitta = half_chord;
             }
             Ok(ResolvedGeometryDimensions::Arc { chord, sagitta })
         }

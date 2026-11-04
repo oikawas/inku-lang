@@ -69,6 +69,94 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_total_nodes: 500,
 };
 
+fn rounded_arc_score(source: &str, language: ResolvedInstructionLanguage) -> inku_score::Score {
+    let result = stage15(source, language);
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{source}: {:?}",
+        lowered.diagnostics()
+    );
+    let score = lowered.score().unwrap().clone();
+    assert_eq!(score.instructions.len(), 1);
+    assert_eq!(score.instructions[0].primitive, Primitive::Arc);
+    score
+}
+
+fn assert_arc_dimension_mismatch(source: &str) {
+    let result = stage15(source, ResolvedInstructionLanguage::Ja);
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert!(lowered.score().is_none(), "{source}");
+    assert!(
+        lowered.diagnostics().iter().any(|d| matches!(
+            d.reason,
+            ScoreFieldGap::GeometryDimensionMismatch {
+                primitive: Primitive::Arc
+            }
+        )),
+        "{source}: {:?}",
+        lowered.diagnostics()
+    );
+}
+
+#[test]
+fn rounded_sagitta_japanese_crab_arc_is_half_chord() {
+    let score = rounded_arc_score(
+        "画面の横0.5、縦0.5の位置に、弦長0.083333、矢高0.041667の青い弧をひとつ置く。",
+        ResolvedInstructionLanguage::Ja,
+    );
+    assert!((score.instructions[0].radius.unwrap() - 0.0416665).abs() < 1e-15);
+    assert!((score.instructions[0].center.unwrap().y - 0.5).abs() < 1e-15);
+}
+
+#[test]
+fn rounded_sagitta_english_matches_japanese_score() {
+    let ja = rounded_arc_score(
+        "画面の横0.5、縦0.5の位置に、弦長0.083333、矢高0.041667の青い弧をひとつ置く。",
+        ResolvedInstructionLanguage::Ja,
+    );
+    let en = rounded_arc_score(
+        "place one blue arc with chord 0.083333, sagitta 0.041667 at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert_eq!(ja, en);
+}
+
+#[test]
+fn rounded_sagitta_satisfies_semicircle_constraint() {
+    let score = rounded_arc_score(
+        "画面の横0.5、縦0.5の位置に、弦長0.083333、矢高0.041667の青い半円の弧をひとつ置く。",
+        ResolvedInstructionLanguage::Ja,
+    );
+    assert!((score.instructions[0].radius.unwrap() - 0.0416665).abs() < 1e-15);
+}
+
+#[test]
+fn sagitta_well_above_half_chord_is_omitted() {
+    assert_arc_dimension_mismatch(
+        "画面の横0.5、縦0.5の位置に、弦長0.065、矢高0.035の青い弧をひとつ置く。",
+    );
+}
+
+#[test]
+fn sagitta_rounding_tolerance_boundary_is_inclusive() {
+    let score = rounded_arc_score(
+        "画面の横0.5、縦0.5の位置に、弦長0.1、矢高0.050001の青い弧をひとつ置く。",
+        ResolvedInstructionLanguage::Ja,
+    );
+    assert!((score.instructions[0].radius.unwrap() - 0.05).abs() < 1e-15);
+    assert_arc_dimension_mismatch(
+        "画面の横0.5、縦0.5の位置に、弦長0.1、矢高0.050002の青い弧をひとつ置く。",
+    );
+}
+
 #[test]
 fn width_extent_uses_canvas_horizontal_axis_before_rotation() {
     for format in ["square", "wide", "vertical"] {

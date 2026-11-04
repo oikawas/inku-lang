@@ -310,7 +310,7 @@ Dimensions use the canvas's short side as one unit. On a 1,000-pixel short side,
 
 English may place dimensions after the head, as in `circle radius 0.1`. Japanese attaches them before it: `半径0.1の円`. Paired dimensions require both members; width alone, height alone, or chord alone is incomplete.
 
-Arc sagitta is the bulge from its chord midpoint, positive and no larger than half the chord. A circle radius does not implicitly supply an arc chord.
+Arc sagitta is the bulge from its chord midpoint, positive and no larger than half the chord. A sagitta that exceeds half the chord slightly (by at most 0.000001) due to decimal rounding is read as half. A circle radius does not implicitly supply an arc chord.
 
 Use positive integer or decimal dimensions without `px`, `mm`, `%`, or exponent notation. Decimal meaning is exact base ten until the final numeric drawing boundary, while original spelling remains provenance. Fractions such as `1/3` in numeric ranges do not extend the general dimension grammar.
 

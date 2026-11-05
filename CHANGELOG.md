@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: the displayed work's conditions above the canvas share one row with the Work and Lineage tabs and the revision action, so the header is lower (121px to 69px in a 1372px window). The tabs stand the row's full height with the input panel's accent underline and a hover fill; the conditions sit past a rule as small unframed "label value" text that wraps. A narrow panel puts them on their own row below the tabs.
-
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.
@@ -594,6 +592,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.322 (2026-11-05 / Build 1398)
+
+- Web: the displayed work's conditions above the canvas share one row with the Work and Lineage tabs and the revision action, so the header is lower (121px to 69px in a 1372px window). The tabs stand the row's full height with the input panel's accent underline and a hover fill; the conditions sit past a rule as small unframed "label value" text that wraps. A narrow panel puts them on their own row below the tabs.
 
 ## v2.15.321 (2026-11-05 / Build 1397)
 

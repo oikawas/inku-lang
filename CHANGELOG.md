@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Core and Server: a drawing default on a provider the administrator added (one the built-in list lacks) was replaced with the legacy setting's model. The core's `normalize_user`, `update_user`, `normalize_draw_defaults` and `default_draw_defaults` take an optional `providers` field (`{id: {"models": [{"id"}]}}`), and the Server passes its providers' ids and model ids. Without the field nothing changes.
-
 - Android: use currently enabled plugins and imported definitions when rewriting a selected work from its description.
 
 - macOS: use currently enabled plugins when rewriting a saved work from its description, while retaining saved definitions for DDL-based derivations.
@@ -598,6 +596,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.324 (2026-11-05 / Build 1400)
+
+- Core and Server: a drawing default on a provider the administrator added (one the built-in list lacks) was replaced with the legacy setting's model. The core's `normalize_user`, `update_user`, `normalize_draw_defaults` and `default_draw_defaults` take an optional `providers` field (`{id: {"models": [{"id"}]}}`), and the Server passes its providers' ids and model ids. Without the field nothing changes.
 
 ## v2.15.323 (2026-11-05 / Build 1399)
 

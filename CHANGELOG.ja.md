@@ -8,8 +8,6 @@
 
 ## 未リリース
 
-- core・Server：描くときのデフォルトに、管理者が足した接続先（組み込みの一覧に無い接続先）のモデルを選ぶと、旧い設定のモデルに置き換わっていた。core の `normalize_user`・`update_user`・`normalize_draw_defaults`・`default_draw_defaults` に任意の欄 `providers`（`{id: {"models": [{"id"}]}}`）を足し、Server は自分の接続先の id とモデルの id を渡す。欄が無い時の振る舞いは変わらない。
-
 - Android：選んだ作品から記述で書き直すとき、現在有効なプラグインと読み込んだ定義を使う。
 
 - macOS：保存作品から記述を書き直すときは現在有効なプラグインを使い、保存DDLからの派生は保存時の定義を保つ。
@@ -598,6 +596,10 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.324（2026-11-05 / Build 1400）
+
+- core・Server：描くときのデフォルトに、管理者が足した接続先（組み込みの一覧に無い接続先）のモデルを選ぶと、旧い設定のモデルに置き換わっていた。core の `normalize_user`・`update_user`・`normalize_draw_defaults`・`default_draw_defaults` に任意の欄 `providers`（`{id: {"models": [{"id"}]}}`）を足し、Server は自分の接続先の id とモデルの id を渡す。欄が無い時の振る舞いは変わらない。
 
 ## v2.15.323（2026-11-05 / Build 1399）
 

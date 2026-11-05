@@ -58,12 +58,14 @@ func runComparisonChecks() async throws {
 
     // Failure: retained-DDL derivations falsely converted an unchanged description source into a user DDL lock.
     model.newWork()
+    model.selectDrawRoute("stages"); model.sketchMode = "off"
     model.inputMode = "description"
     model.descriptionText = "a red circle"
     // Drawing and comparison take only registered models.
     let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                     models: ["model", "m1", "m2", "m3", "m4"].map { ProviderModelSettings(id: $0) })
     try await model.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:model", stage2Model: "check:model")))
+    model.selectNextDrawingModel("check:model")
     await model.generate()
     guard model.errorText == nil, let described = model.selectedWork, !model.sourceLocked else { throw CheckFailure.message("Description source failed") }
     // Failure: the retired variation (8ca63a39, Server 1162) still drew a work from the selected one.

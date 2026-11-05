@@ -358,7 +358,7 @@ struct Bootstrap {
             try updatePluginDefinitions(in: &exactConfiguration, language: language, settings: settings,
                                         importedPlugins: saved == nil && inputMode == "ddl" ? importedPlugins : [])
         }
-        return GenerationRequest(authoring: authoring, configuration: exactConfiguration.data,
+        var request = GenerationRequest(authoring: authoring, configuration: exactConfiguration.data,
             renderOptions: try Self.bytes(options), clipPolicy: try Self.bytes(clip),
             models: settings.models, providers: settings.providers, renderColorMaps: colorMaps,
             description: description, parentWorkID: parentWorkID,
@@ -371,6 +371,8 @@ struct Bootstrap {
                 build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
                 referenceBuild: productReference.build),
             declareCanvas: inputMode == "ddl" && parentWorkID == nil ? true : nil)
+        request.catalogMode = catalogMode
+        return request
     }
 
     func macroCatalog(language: String, settings: HostSettings = .init(), importedPlugins: [ImportedMacroDefinition] = []) throws -> [String: Any] {

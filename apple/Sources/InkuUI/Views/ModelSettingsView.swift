@@ -351,35 +351,15 @@ struct ModelSettingsView: View {
     private var drawingDefaults: some View {
         DisclosureGroup(model.display.localized("描画の既定値")) {
             VStack(alignment: .leading, spacing: 12) {
-                if !drawingChoices.isEmpty {
-                    Picker(model.display.localized("描画モデル"), selection: Binding(
-                        get: { drawingChoices.contains(where: { $0.id == drawingModels.stage1Model }) ? drawingModels.stage1Model : "" },
-                        set: { drawingBinding(\.stage1Model).wrappedValue = $0 })) {
-                        Text(model.display.localized("選択してください")).tag("")
-                        ForEach(drawingChoices) { choice in
-                            Text("\(model.display.providerName(choice.provider)) / \(choice.model.name)").tag(choice.id)
-                                .disabled(!settings.isModelAvailable(choice.id))
-                        }
-                    }
-                } else {
-                    Text(model.display.localized("使用中のLLMモデルを設定してください。")).inkuFont(12).foregroundStyle(.secondary)
-                }
-                if !drawingModels.stage1Model.isEmpty {
-                    ModelGuidanceView(reference: drawingModels.stage1Model, providers: settings.host.providers,
-                                      discovered: settings.modelCatalog.first { $0.id == drawingModels.stage1Model },
-                                      display: model.display)
-                }
                 Stepper(model.display.localizedFormat("解釈の出力上限: %ld", drawingModels.stage1MaxTokens),
                         value: drawingBinding(\.stage1MaxTokens), in: 256...65536, step: 256)
                 Stepper(model.display.localizedFormat("補完の出力上限: %ld", drawingModels.holeMaxTokens),
                         value: drawingBinding(\.holeMaxTokens), in: 256...65536, step: 256)
-                Text(model.display.localized("解釈と構造化に同じモデルを使います。接続設定の保存では生成を開始しません。"))
-                    .inkuFont(13).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
                     Button(model.display.localized("取消")) { drawingDraft = settings.host.models }.disabled(!drawingChanged)
                     Button(model.display.localized("既定値を保存")) { saveDrawingDefaults() }
-                        .disabled(!drawingChanged || !SettingsModel.isBatchModelAvailable(drawingModels.stage1Model, settings: settings.host))
+                        .disabled(!drawingChanged)
                 }
             }
             .padding(.top, 10)

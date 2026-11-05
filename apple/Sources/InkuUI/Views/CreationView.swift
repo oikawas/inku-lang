@@ -125,7 +125,7 @@ struct CreationView: View {
         .sheet(isPresented: $showImageModelPicker) {
             BatchModelPickerView(model: model, initialReference: model.imageVisionModel, immediateSelection: true,
                 title: "Visionモデル", purpose: "vision", onSelection: { reference in
-                    model.display.preferences.visionModelReference = reference
+                    model.selectImageVisionModel(reference)
                 }).environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
         }
         .alert(display.webCopy("imageTab", "画像"), isPresented: $showImageNotice) {
@@ -156,6 +156,10 @@ struct CreationView: View {
         }
         .onChange(of: automation.workspaceInputMode) { _, mode in
             if mode == "batch" { batchWorkspace.invalidateReads() }
+            model.activeDrawTab = mode == "image" ? "image" : mode == "batch" ? (batchKind == "image" ? "batch_image" : "batch_text") : "describe"
+        }
+        .onChange(of: batchKind) { _, kind in
+            if isBatch { model.activeDrawTab = kind == "image" ? "batch_image" : "batch_text" }
         }
         .onChange(of: model.savedImageDDL) { _, value in
             if value != nil && !model.isBusy { automation.workspaceInputMode = "image" }
@@ -321,6 +325,9 @@ struct CreationView: View {
     #if os(macOS)
     private var imageFolderPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Button(display.webCopy("clearInputBtn", "新規作成")) {
+                imageBatch.clearSelection(); model.resetDrawOptions(tab: "batch_image")
+            }.disabled(controlsDisabled || imageBatch.selecting)
             Button(display.localized("画像フォルダを選ぶ")) {
                 let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
                 guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -372,6 +379,8 @@ struct CreationView: View {
             HStack {
                 Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
                 Spacer()
+                Button(display.webCopy("clearInputBtn", "新規作成")) { model.newWork() }
+                    .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
                 Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }

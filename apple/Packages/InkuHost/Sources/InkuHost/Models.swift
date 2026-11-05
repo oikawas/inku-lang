@@ -91,6 +91,7 @@ public struct GenerationRequest: Codable, Sendable {
     public var drawRoute: String?
     public var descriptionComposition: Bool?
     public var descriptionReview: Bool?
+    public var catalogMode: String?
     public var configuration: Data
     public var renderOptions: Data
     public var clipPolicy: Data

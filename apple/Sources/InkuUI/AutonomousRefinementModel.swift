@@ -110,7 +110,7 @@ public final class AutonomousRefinementModel {
             try await connect(database: database)
             source = work ?? app.selectedWork
             sourceLocked = false
-            inheritWild = false; wild = app.display.preferences.defaultWild ?? false
+            inheritWild = false; wild = source?.renderWild ?? false
             if let source { sourceLocked = try await app.savedConfiguration(workID: source.id).authority == "ddl_authoritative" }
             let latest = runs.last { $0.sourceID == source?.id }
             run = latest?.state == "interrupted" && latest?.acknowledged != true ? latest : nil
@@ -126,7 +126,7 @@ public final class AutonomousRefinementModel {
                 moves = min(10, max(1, saved.moves)); enabledKinds = Set(saved.kinds.filter(Self.kinds.contains)); note = saved.note
                 if enabledKinds.contains("chunks") { enabledKinds = ["chunks"] }
             }
-            modelReference = AuxiliaryModel.defaultVisionModel(saved: app.display.preferences.visionModelReference, settings: await app.hostSettings())
+            modelReference = AuxiliaryModel.defaultVisionModel(saved: app.display.preferences.auxiliaryVisionModelReference, settings: await app.hostSettings())
             if provider == nil { provider = try app.auxiliaryProvider() }
             errorText = nil
         } catch { errorText = error.localizedDescription }
@@ -137,7 +137,7 @@ public final class AutonomousRefinementModel {
             throw HostError("vision_model_not_available")
         }
         modelReference = reference
-        app.display.preferences.visionModelReference = reference
+        app.display.preferences.auxiliaryVisionModelReference = reference
     }
 
     public func remember(app: AppModel) {

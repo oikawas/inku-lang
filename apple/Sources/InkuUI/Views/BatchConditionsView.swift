@@ -13,7 +13,7 @@ struct BatchConditionsView: View {
 
     private var disabled: Bool { automation.isOccupied || model.isBusy }
     private var frozen: BatchDrawingConditions? { automation.running ? automation.batchConditions : nil }
-    private var shownSketchMode: String { frozen?.sketchMode ?? automation.batchSketchMode }
+    private var shownSketchMode: String { frozen?.sketchMode ?? model.sketchMode }
     private var shownWild: Bool? { if let frozen { frozen.wild } else { model.wild } }
     private var shownCanvasID: String? { if let frozen { frozen.canvasID } else { model.canvasID } }
     private var frozenRequest: GenerationRequest? { frozen == nil ? nil : automation.rows.first?.request }
@@ -36,7 +36,7 @@ struct BatchConditionsView: View {
                                 help: tip("次のバッチで使う配色を選びます。")) { showColorCatalogs = true }
             .disabled(model.catalogs.isEmpty)
             Rectangle().fill(InkuColor.border).frame(height: 1)
-            DrawConditionsView(model: model, sketch: shownSketchMode, onSketch: { automation.batchSketchMode = $0 },
+            DrawConditionsView(model: model, sketch: shownSketchMode, onSketch: { model.sketchMode = $0 },
                                frozenRoute: frozen == nil ? nil : (frozenRequest?.drawRoute ?? "stages"),
                                frozenComposition: frozen == nil ? nil : (frozenRequest?.descriptionComposition ?? false))
                 .padding(.bottom, 8)

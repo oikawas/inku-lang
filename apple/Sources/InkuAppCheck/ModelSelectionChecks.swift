@@ -27,12 +27,12 @@ import InkuUI
     // A picker choice must reach the same fresh request that batch and demo capture.
     app.selectNextDrawingModel(chosen)
     let captured = try app.requestForCurrentInput()
+    let authoritative = await app.hostSettings()
     guard case .description = captured.authoring,
           captured.models.stage1Model == chosen, captured.models.stage2Model == chosen,
-          captured.providers == [provider] else {
-        throw CheckFailure.message("Fresh generation template sent the Settings default instead of the selected drawing model")
+          captured.providers == authoritative.providers else {
+        throw CheckFailure.message("Fresh generation template did not use the selected drawing model and configured providers")
     }
-    let authoritative = await app.hostSettings()
     guard authoritative.models.stage1Model == configured, authoritative.models.stage2Model == configured else {
         throw CheckFailure.message("The next drawing-model choice changed authoritative Settings defaults")
     }

@@ -173,6 +173,7 @@ private func juxtapositionChildChecks() async throws {
                                    models: [.init(id: "generation"), .init(id: "vision", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "check:generation", stage2Model: "check:generation")))
+    app.selectNextDrawingModel("check:generation")
     app.inputMode = "description"; app.seedText = "42"
     for text in ["1. 夜の港で、灯台の光だけが揺れていた。", "雪原を渡るオオカミの群れ。", "廃駅のホームに時刻表だけが残った。",
                  "満月の塩田は一面の鏡になった。", "古い井戸の底で、空が小さく光っていた。"] {
@@ -213,7 +214,7 @@ private func juxtapositionChildChecks() async throws {
           record["sentence"].string == choice.sentence, record["rank"].number == "2", record["candidates"].number == "4",
           record["model"].string == "check:vision", record["history_ids"].array?.compactMap(\.string) == choice.historyIDs,
           child.effectiveSourceText == "1. 夜の港で、灯台の光だけが揺れていた。" + choice.sentence,
-          child.renderWild == false, parent.renderWild == true, child.renderColorCatalogID == parent.renderColorCatalogID,
+          child.renderWild == true, parent.renderWild == true, child.renderColorCatalogID == parent.renderColorCatalogID,
           child.renderCanvasAspectID == parent.renderCanvasAspectID else {
         throw CheckFailure.message("Juxtaposition child record: \(edge.derivationKind) \(metadata.text); \(child.effectiveSourceText)")
     }

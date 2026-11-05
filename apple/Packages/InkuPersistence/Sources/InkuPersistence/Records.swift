@@ -27,6 +27,10 @@ public struct SavedWork: Codable, Sendable, Equatable {
     public var renderCanvasAspectRatio: Double?
     public var renderSeed: String?
     public var renderWild: Bool?
+    public var drawRoute: String?
+    public var sketchRequested: String?
+    public var compositionRequested: String?
+    public var catalogMode: String?
     public var compositionSeed: String?
     public var interpretationSeed: String?
     public var variationAmplitude: String?
@@ -99,6 +103,8 @@ public struct SavedWork: Codable, Sendable, Equatable {
         case renderColorMap = "render_color_map", renderCanvasAspect = "render_canvas_aspect"
         case renderCanvasAspectID = "render_canvas_aspect_id", renderCanvasAspectRatio = "render_canvas_aspect_ratio"
         case renderSeed = "render_seed", renderWild = "render_wild", compositionSeed = "composition_seed"
+        case drawRoute = "draw_route", sketchRequested = "sketch_requested"
+        case compositionRequested = "composition_requested", catalogMode = "catalog_mode"
         case interpretationSeed = "interpretation_seed", variationAmplitude = "variation_amplitude"
         case variationSeed = "variation_seed", seedText = "seed_text"
         case instructionLangRequested = "instruction_lang_requested", instructionLangResolved = "instruction_lang_resolved"

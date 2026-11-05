@@ -82,7 +82,8 @@ import InkuPersistence
             requiresAPIKey: false, models: [ProviderModelSettings(id: "vision", purposes: ["vision"])])]
         settings.models.stage1Model = "fixture:vision"; settings.models.stage2Model = "fixture:vision"
         try await app.updateHostSettings(settings)
-        app.display.preferences.visionModelReference = "fixture:vision"
+        app.activeDrawTab = "batch_image"
+        app.selectImageVisionModel("fixture:vision")
         let automation = AutomationModel()
         let batch = automation.imageFolderBatch; try await batch.select(input, app: app)
         XCTAssertEqual(batch.total, 3)
@@ -113,6 +114,7 @@ import InkuPersistence
         XCTAssertNotEqual(portraitPaper, "sd_monitor")
         let reopened = ImageFolderBatch(); try await reopened.select(input, app: app)
         XCTAssertEqual(reopened.completed, 2)
+        app.activeDrawTab = "batch_image"
         app.imageCanvasID = "image"
         await reopened.run(app: app, restart: false) { _ in "fixture" }
         XCTAssertEqual(reopened.completed, 4); XCTAssertEqual(reopened.failed, 0)

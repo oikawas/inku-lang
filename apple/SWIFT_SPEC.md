@@ -1,6 +1,6 @@
 # inku Swift Implementation Specification
 
-On macOS the history strip moves across pages with the arrow keys, and `#` on the canvas and in the library copies the work UUID. Generation information includes the comment and each stage's prompt digest, and diagnostics use the Web wording. Retained automatic backups can be deleted or restored after confirmation; restore first saves a copy of the current database. The default for removing brush constraints is independent of the next-work switch. An autonomous chunk move requires a direction and runs alone. All refinement children are saved in normal history; the database migration moves existing intermediate works to normal history after taking a SQLite backup.
+On macOS the history strip moves across pages with the arrow keys, and `#` on the canvas and in the library copies the work UUID. Generation information includes the comment and each stage's prompt digest, and diagnostics use the Web wording. Retained automatic backups can be deleted or restored after confirmation; restore first saves a copy of the current database. An autonomous chunk move requires a direction and runs alone. All refinement children are saved in normal history; the database migration moves existing intermediate works to normal history after taking a SQLite backup.
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
@@ -574,7 +574,7 @@ For the first macOS distribution, screens, controls, and remembered choices foll
 
 ### Remembered choices
 
-- The display settings (`interface.json`) store the drawing conditions (color catalog and its automatic selection, paper, and wild), the last settings page, Work / Lineage, description / batch, the library display mode and layout, the refinement kind, the previous autonomous-refinement settings, and the model-comparison selection. A saved catalog or paper that no longer exists falls back to the default.
+- Drawing defaults are saved in `interface.json`; the current choices for description, image, text batch, and image folder are separate and temporary. New work restores that tab's defaults, while opening a work copies its recorded conditions to the tab. Core actions interpret records and migrate old settings. History database version 8 records route, sketch, composition, and catalog mode for new description works without rewriting old rows.
 - Display and demo settings are read field by field: a missing or mistyped field alone falls back to its default. An unreadable file is kept under a dated name instead of being overwritten. Upgrading the app keeps the other choices.
 - When the demo model is temporarily unavailable, only the shown value falls back to the settings' drawing model (`stage1Model`); the saved choice is not rewritten.
 - New display settings default to the dark theme and an open sketch section, as on the Web. Existing saved values are unchanged.

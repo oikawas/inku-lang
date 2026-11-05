@@ -630,6 +630,10 @@ private struct StoredExecution: Codable, Sendable {
     var inheritedImageDDL: Data? = nil
     var providerObservations: [ProviderAttemptObservation]? = nil
     var readAndDrawElapsedMS: UInt64? = nil
+    var requestedDrawRoute: String? = nil
+    var requestedSketch: String? = nil
+    var requestedComposition: String? = nil
+    var requestedCatalogMode: String? = nil
     var startedAt: Date
 }
 
@@ -727,6 +731,15 @@ private actor ExecutionDriver {
         self.state.provenance = request.provenance
         self.state.imageProvenance = request.imageProvenance
         self.state.inheritedImageDDL = request.inheritedImageDDL
+        if request.parentWorkID == nil, request.derivationKind == "new",
+           case .description(_, _, let sketch) = request.authoring {
+            let route = request.drawRoute ?? "stages"
+            self.state.requestedDrawRoute = route
+            if case .off = sketch { self.state.requestedSketch = "0" }
+            else { self.state.requestedSketch = "1" }
+            self.state.requestedComposition = route == "stages" || request.descriptionComposition == true ? "1" : "0"
+            self.state.requestedCatalogMode = request.catalogMode ?? "fixed"
+        }
         self.state.providerObservations = []
         if let metadata = request.derivationMetadata {
             guard try ExactJSON(data: metadata).object != nil else { throw HostError("invalid_derivation_metadata") }
@@ -1240,7 +1253,7 @@ private actor ExecutionDriver {
         let compositionSeed = score["composition_seed"].string ?? score["composition_seed"].number ?? compiler["composition_seed"].string
         let renderSeed = options["render_seed"].string ?? compiler["host"]["palette"]["render_seed"].string
         let sketch = savedSketchResult()
-        let work = SavedWork(id: id, at: now, input: state.description, score: score.text, svg: svg,
+        var work = SavedWork(id: id, at: now, input: state.description, score: score.text, svg: svg,
                              sourceText: state.description, ddl: snapshot["document"]["source"].string,
                              // This portable field records legacy body migration, not pipeline authority.
                              ddlSourceOrigin: nil,
@@ -1264,6 +1277,10 @@ private actor ExecutionDriver {
                              renderLimits: legacyRenderLimits(compiler["operational_resource_budget"]),
                              renderHash: renderHash, descriptionHash: descriptionHash,
                              historyVisibility: state.historyVisibility ?? "normal", lineageNodeID: nodeID)
+        work.drawRoute = state.requestedDrawRoute
+        work.sketchRequested = state.requestedSketch
+        work.compositionRequested = state.requestedComposition
+        work.catalogMode = state.requestedCatalogMode
         var edge: LineageEdge?
         var rootNodeID = nodeID
         if let parentID = state.parentWorkID {

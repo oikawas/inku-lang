@@ -52,12 +52,16 @@ private func checkDescriptionForkPluginPreferences(folder: URL) async throws {
                                     models: [ProviderModelSettings(id: "model")])
     try await model.updateHostSettings(HostSettings(providers: [provider],
         models: ModelSelection(stage1Model: "check:model", stage2Model: "check:model")))
+    model.selectNextDrawingModel("check:model")
     model.inputMode = "description"; model.drawRoute = "stages"; model.sketchMode = "off"
     model.language = "ja"; model.catalogID = "default"; model.canvasID = "square"; model.seedText = "42"
     model.descriptionText = "若葉を中心に置く"
     await model.generate()
     guard model.errorText == nil, let parent = model.selectedWork, let ddl = parent.ddl else {
         throw CheckFailure.message("Plugin description parent: \(model.errorText ?? model.status)")
+    }
+    guard parent.drawRoute == "stages", parent.sketchRequested == "0", parent.compositionRequested == "1", parent.catalogMode == "fixed" else {
+        throw CheckFailure.message("Description work did not record its drawing options")
     }
     let saved = try ExactJSON(data: (try await model.savedConfiguration(workID: parent.id)).configuration)
     guard saved["definitions"].array?.count == 7 else { throw CheckFailure.message("Plugin description parent must retain seven definitions") }

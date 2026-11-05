@@ -35,6 +35,12 @@ private struct ImageFolderJournal: Codable, Sendable {
     private var stopRequested = false
     var hasJournal: Bool { journal != nil }
 
+    func clearSelection() {
+        guard !running, !selecting else { return }
+        journal = nil; journalURL = nil; folder = ""; total = 0; completed = 0
+        failed = 0; uncertain = 0; failures = []; status = ""; error = nil
+    }
+
     init() { imagePreparer = { try Self.prepareImage(at: $0) } }
     init(imagePreparer: @escaping @Sendable (URL) throws -> PreparedImageInput) { self.imagePreparer = imagePreparer }
 
@@ -103,7 +109,7 @@ private struct ImageFolderJournal: Codable, Sendable {
             }
         }
         journal = current
-        let canvasID = app.imageCanvasID
+        let options = app.drawSelections["batch_image"]
         running = true; stopRequested = false; error = nil
         defer { running = false; drawing = false; refresh() }
         do {
@@ -138,7 +144,7 @@ private struct ImageFolderJournal: Codable, Sendable {
                     // Preparation can now yield to Stop. Do not start a provider
                     // request after a stop arrived while the image was decoded.
                     guard !stopRequested, !Task.isCancelled else { throw CancellationError() }
-                    let request = try app.requestForImage(image, provenance: provenance(url), canvasID: canvasID)
+                    let request = try app.requestForImage(image, provenance: provenance(url), options: options)
                     let pinned = try await app.pinPersonalPlanRequests([request])[0]
                     drawing = true
                     let work = await app.runAutomation(request: pinned, image: image, allowsBrowsing: true)

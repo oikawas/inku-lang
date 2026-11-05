@@ -26,6 +26,8 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var clipboardBackground = "original"
     public var clipboardFormat: String?
     public var visionModelReference: String?
+    public var auxiliaryVisionModelReference: String?
+    public var drawDefaults: [String: DrawOptions]?
     public var imageIncludeFileName: Bool?
     public var imageIncludeExif: Bool?
     public var colophonModelReference: String?
@@ -197,6 +199,10 @@ public final class DisplaySettings {
         guard !previewingTextSize, let fileURL else { return }
         do {
             var snapshot = preferences
+            snapshot.nextCanvasID = nil; snapshot.nextWild = nil; snapshot.defaultWild = nil
+            if snapshot.drawDefaults != nil {
+                snapshot.nextCatalogID = nil; snapshot.nextCatalogMode = nil; snapshot.visionModelReference = nil
+            }
             if let rememberedSettingsTab { snapshot.settingsTab = rememberedSettingsTab }
             if let rememberedInputTab { snapshot.inputTab = rememberedInputTab }
             let data = try JSONEncoder().encode(snapshot)

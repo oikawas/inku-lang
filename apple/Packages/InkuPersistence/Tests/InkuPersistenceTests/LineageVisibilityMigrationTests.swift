@@ -18,7 +18,8 @@ struct LineageVisibilityMigrationTests {
             for name in ["schema-v1", "migration-v2", "migration-v3", "migration-v4"] {
                 try db.execute(sql: String(contentsOf: resources.appendingPathComponent(name + ".sql"), encoding: .utf8))
             }
-            try hidden.insert(db); try normal.insert(db)
+            try db.execute(sql: "INSERT INTO history(id,at,input,score,svg,ddl,history_visibility,lineage_node_id) VALUES (?,?,?,?,?,?,?,?)", arguments: [hidden.id, hidden.at, hidden.input, hidden.score, hidden.svg, hidden.ddl, hidden.historyVisibility, hidden.lineageNodeID])
+            try db.execute(sql: "INSERT INTO history(id,at,input,score,svg,lineage_node_id) VALUES (?,?,?,?,?,?)", arguments: [normal.id, normal.at, normal.input, normal.score, normal.svg, normal.lineageNodeID])
             try LineageNode(id: "hidden-node", historyID: hidden.id, state: "lineage_only", at: 2).insert(db)
             try LineageNode(id: "normal-node", historyID: normal.id, at: 1).insert(db)
         }

@@ -12,6 +12,7 @@ struct BatchPanelView: View {
     var observationRevision: Binding<UUID>? = nil
     @State private var rowObservationID = UUID()
     @State private var replaceBatch = false
+    @State private var clearResume = false
     /// The creation panel keeps these on WorkspaceUIState, so switching 記述／バッチ does not reset them.
     var ui: WorkspaceUIState? = nil
     @State private var localResultsExpanded = false
@@ -79,9 +80,14 @@ struct BatchPanelView: View {
           }
         }
         .clipped()
+        .confirmationDialog(model.display.webCopy("batchClearResumeConfirm", "中断したバッチを再開できなくなります。"),
+                            isPresented: $clearResume, titleVisibility: .visible) {
+            Button(model.display.webCopy("clearInputBtn", "新規作成"), role: .destructive) { Task { await automation.newBatch(app: model) } }
+            Button(model.display.localized("キャンセル"), role: .cancel) {}
+        }
         .confirmationDialog(model.display.localized("前回のバッチ記録を新しいバッチで置き換えます"),
                             isPresented: $replaceBatch, titleVisibility: .visible) {
-            Button(model.display.localized("新しいバッチを描く")) { startNewBatch() }
+            Button(model.display.webCopy("batchNewRunBtn", "バッチを描く")) { startNewBatch() }
                 .disabled(!canStartNewBatch)
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: {
@@ -167,7 +173,10 @@ struct BatchPanelView: View {
                 }
                 HStack(spacing: 8) {
                     if !automation.running {
-                        Button(model.display.webCopy("clearInputBtn", "新規作成")) { automation.restoreBatchInput("") }
+                        Button(model.display.webCopy("clearInputBtn", "新規作成")) {
+                            if automation.canResume { clearResume = true }
+                            else { Task { await automation.newBatch(app: model) } }
+                        }
                             .buttonStyle(InkuGhostButtonStyle())
                             .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
                     }
@@ -322,10 +331,7 @@ struct BatchPanelView: View {
                               onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
                               journalActive: automation.batchRowStartedAt != nil) { runProgress }
             } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) { newBatchLabel; newBatchButton }
-                    VStack(alignment: .leading, spacing: 6) { newBatchLabel; newBatchButton }
-                }
+                newBatchButton
                 if !model.hasAvailableBatchDrawingModel {
                     Text(model.display.localized("使用中のLLMモデルを選択してから描いてください。"))
                         .inkuFont(12).foregroundStyle(.secondary)
@@ -338,18 +344,13 @@ struct BatchPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var newBatchLabel: some View {
-        Text(model.display.localized("新しいバッチ")).inkuFont(12).foregroundStyle(.secondary)
-            .fixedSize(horizontal: true, vertical: false)
-    }
-
     private var newBatchButton: some View {
         Button {
             guard canStartNewBatch else { return }
             if automation.canResume { replaceBatch = true }
             else { startNewBatch() }
         } label: {
-            Label(model.display.localized("新しいバッチを描く"), systemImage: "play.fill")
+            Label(model.display.webCopy("batchNewRunBtn", "バッチを描く"), systemImage: "play.fill")
                 .frame(maxWidth: .infinity, minHeight: 28)
         }
         .buttonStyle(InkuPaintButtonStyle())

@@ -14,6 +14,7 @@ import InkuUI
     let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                     models: ["first", "changed"].map { ProviderModelSettings(id: $0) })
     try await app.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:first", stage2Model: "check:first")))
+    app.selectNextDrawingModel("check:first")
     app.inputMode = "description"; app.display.preferences.batchRetries = 1
     let batch = AutomationModel()
     await batch.connect(app: app)
@@ -25,6 +26,7 @@ import InkuUI
           batch.rows[0].attempts == 2, batch.canResume else { throw CheckFailure.message("Initial failed-row retry bookkeeping changed") }
     let firstCallCount = await transport.models.count
     try await app.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:changed", stage2Model: "check:changed")))
+    app.selectNextDrawingModel("check:changed")
     await batch.resumeBatch(app: app)
     guard firstCallCount > 0, batch.rows[0].attempts == 4,
           await transport.models == Array(repeating: "check:first", count: firstCallCount * 2),
@@ -57,6 +59,7 @@ import InkuUI
     await app.initialize()
     app.selectDrawRoute("stages"); app.sketchMode = "off"
     try await app.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:first", stage2Model: "check:first")))
+    app.selectNextDrawingModel("check:first")
     app.inputMode = "description"; app.display.preferences.batchRetries = 0
     let batch = AutomationModel()
     await batch.connect(app: app)
@@ -74,6 +77,7 @@ import InkuUI
     let reopened = AutomationModel()
     await reopened.connect(app: app)
     try await app.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:changed", stage2Model: "check:changed")))
+    app.selectNextDrawingModel("check:changed")
     await transport.succeedFromNowOn()
     guard reopened.canRetryFailures else { throw CheckFailure.message("A stopped batch with a failed row offered no retry") }
     await reopened.retryFailures(app: app)

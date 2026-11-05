@@ -100,6 +100,7 @@ func runInputAidChecks() async throws {
         providers: [ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                      label: "Offline input-aid fixture", models: [ProviderModelSettings(id: "aid", label: "LLM", purposes: ["llm"])])],
         models: ModelSelection(stage1Model: "check:aid", stage2Model: "check:aid")))
+    relaunched.selectNextDrawingModel("check:aid")
     relaunched.inputMode = "description"
     relaunched.descriptionText = "1. [メモだけ]\n［下書き］"
     guard !relaunched.canGenerateDescription else { throw CheckFailure.message("A comment-only description was drawable") }
@@ -146,7 +147,7 @@ func runInputAidChecks() async throws {
         throw CheckFailure.message("The 240 comment limit or the 4000 meter limit is not counted in UTF-16")
     }
 
-    // Failure: an edited sketch was not what Stage 1 read.
+    // A saved sketch is displayed; a later drawing asks the sketch layer again.
     relaunched.descriptionText = "a red circle in an open field"
     relaunched.sketchMode = "on"
     relaunched.seedText = "42"
@@ -155,14 +156,11 @@ func runInputAidChecks() async throws {
         throw CheckFailure.message("Sketch parent did not draw: \(relaunched.errorText ?? relaunched.status)")
     }
     let sketchesBefore = await provider.sketchCalls
-    var draft = SketchDraft(workID: parent.id, source: parent.effectiveSourceText, original: prose)
-    draft.text = "A narrow field under a low winter sun, edited by the author."
-    relaunched.sketchDraft = draft
     await relaunched.generate()
     let sketchesAfter = await provider.sketchCalls
     guard relaunched.errorText == nil, let child = relaunched.selectedWork, child.id != parent.id,
-          child.sketchText == draft.text, sketchesAfter == sketchesBefore else {
-        throw CheckFailure.message("Edited sketch did not reach the pipeline: \(relaunched.selectedWork?.sketchText ?? "-"), sketch calls \(sketchesBefore)->\(sketchesAfter)")
+          sketchesAfter == sketchesBefore + 1 else {
+        throw CheckFailure.message("Redrawing did not request a new sketch: \(sketchesBefore)->\(sketchesAfter)")
     }
 
     // Failure: a held work could not start a new work from its description.
@@ -182,7 +180,7 @@ func runInputAidChecks() async throws {
 
     print("Input aids passed: interface.json kept 12 new choices and an older file's values; vanished catalog/paper fell back to default/square; "
           + "label rule matched \(cases.count) corpus cases; comment-only description not drawable; \(meterCases.count) meter labels and 9 syllable estimates "
-          + "matched the Web; batch count 3 (entries 6); comment 240 and meter 4000 counted in UTF-16; edited sketch drawn without a sketch call; "
+          + "matched the Web; batch count 3 (entries 6); comment 240 and meter 4000 counted in UTF-16; sketch is read-only; "
           + "held work forked into an unlocked work. Temporary SQLite and an offline provider mock only.")
 }
 

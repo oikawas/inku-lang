@@ -84,7 +84,7 @@ struct DdlAuthoringEditorSheet: View {
             let settings = await model.hostSettings()
             providers = settings.providers
             drawingModel = SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) ? settings.models.stage2Model : ""
-            inheritedWild = model.display.preferences.defaultWild ?? false
+            inheritedWild = model.displayedWork?.renderWild ?? false
             wildOverride = inheritedWild
         }
         .sheet(isPresented: $showModels) {

@@ -71,13 +71,13 @@ public final class ComparisonModel {
     public var targetModelReference: String { original?.stage1Model ?? original?.stage2Model ?? "" }
 
     public func initialize(app: AppModel) async {
-        inheritWild = false; wildOverride = app.display.preferences.defaultWild ?? false
         guard !initialized else { return }
         initialized = true
         guard !app.isPreview, let work = requestedWork ?? app.selectedWork else {
             errorText = "比較の元になる保存作品を選択してください。"
             return
         }
+        inheritWild = false; wildOverride = work.renderWild ?? false
         original = work
         do {
             let context = try await app.savedConfiguration(workID: work.id)

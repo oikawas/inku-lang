@@ -14,6 +14,8 @@ import InkuPersistence
         let service = ProviderSettings(id: "fixture", baseURL: URL(string: "http://127.0.0.1:1")!, requiresAPIKey: false,
                                        models: [ProviderModelSettings(id: "model")])
         try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "fixture:model", stage2Model: "fixture:model")))
+        app.activeDrawTab = "batch_text"
+        app.selectNextDrawingModel("fixture:model")
         app.selectDrawRoute("stages")
         app.sketchMode = "off"
         let original = AutomationModel()

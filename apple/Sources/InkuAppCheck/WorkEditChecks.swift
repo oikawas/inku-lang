@@ -55,7 +55,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
         print("Native modal fixture: \(nativeFixtureURL.path); description-authoritative parent \(parent.id). Mock provider localhost:1; no real transport/auth.")
     }
 
-    // Failure: reopened saved works had no description-edit flow and borrowed mutable next-work settings.
+    // Reopened edits retain saved drawing settings but use current plugin preferences.
     var next = settings
     next.models.stage1Model = "check:pinned-drawing"
     next.models.stage2Model = "check:pinned-drawing"
@@ -83,15 +83,15 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     edit.draftText = "  a blue square in the same open field  "
     let request = try await reopened.makeSavedWorkEditRequest(work: parent, mode: .description, description: edit.draftText)
     let configuration = try ExactJSON(data: request.configuration)
-    guard configuration["definitions"] == sourceConfiguration["definitions"],
-          configuration["macro_summaries"] == sourceConfiguration["macro_summaries"],
+    guard configuration["definitions"].array?.isEmpty == true,
+          configuration["macro_summaries"].array?.isEmpty == true,
           configuration["compiler"]["hard_resource_policy"] == sourceConfiguration["compiler"]["hard_resource_policy"],
           configuration["compiler"]["operational_resource_budget"] == sourceConfiguration["compiler"]["operational_resource_budget"],
           try ExactJSON(data: request.renderOptions) == sourceOptions, request.clipPolicy == sourceContext.clipPolicy,
           request.models.stage1Model == "check:pinned-drawing", request.models.stage2Model == "check:pinned-drawing",
           request.parentWorkID == parent.id, request.derivationKind == "description_edit",
           case .description("a blue square in the same open field", false, .on) = request.authoring else {
-        throw CheckFailure.message("Saved edit did not pin its parent configuration, models and exact child authoring")
+        throw CheckFailure.message("Saved edit did not use current plugins and retain parent drawing settings, models and exact child authoring")
     }
     guard await edit.draw(app: reopened), let edited = edit.result, edited.id != parent.id,
           edited.effectiveSourceText == "a blue square in the same open field", edited.sketchState == "supplemented",
@@ -102,9 +102,9 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
         throw CheckFailure.message("Reopened saved description edit failed to create an immutable-parent child: \(edit.errorText ?? reopened.errorText ?? reopened.status)")
     }
     let editedContext = try await reopened.savedConfiguration(workID: edited.id)
-    guard try ExactJSON(data: editedContext.document!)["macro_locks"] == sourceDocument["macro_locks"],
+    guard try ExactJSON(data: editedContext.document!)["macro_locks"].array?.isEmpty == true,
           try await reopened.savedConfiguration(workID: parent.id).configuration == sourceContext.configuration else {
-        throw CheckFailure.message("Saved description edit changed or lost exact parent/plugin authority context")
+        throw CheckFailure.message("Saved description edit retained disabled plugin locks or changed the parent configuration")
     }
 
     // Failure: a sketch on/off action replayed stored prose instead of asking or dropping the layer.
@@ -166,7 +166,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
           try await database.list().count == count, try await database.work(id: parent.id) == parent else {
         throw CheckFailure.message("Late saved-edit completion changed the workspace or saved a child")
     }
-    print("Work edit passed: reopened saved description child; exact parent configuration/plugin locks and pinned drawing models; fresh sketch on and omitted sketch off; locked source refusal; cancellation drains with no late child or workspace change. Mock transport + real Rust core only.")
+    print("Work edit passed: reopened saved description child; current plugin preferences, preserved parent configuration and pinned drawing models; fresh sketch on and omitted sketch off; locked source refusal; cancellation drains with no late child or workspace change. Mock transport + real Rust core only.")
 }
 
 private actor WorkEditSignal {

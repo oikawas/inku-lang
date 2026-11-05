@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Android: use currently enabled plugins and imported definitions when rewriting a selected work from its description.
+
 - Server: a work drawn again from a selected work's description no longer writes plugins that are switched off; it offers the plugins enabled now, as a new work does. A derivation that keeps the saved DDL still draws with the saved definitions.
 
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.

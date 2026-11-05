@@ -683,6 +683,8 @@ Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへ
 
 同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。v2 の語は `｛若葉｝`／`{young leaves}` と書く。設定には共有coreの資産から絵、日英の主の名、ほかの名、種類、説明、例文を出す。
 
+選んだ作品から記述で指示書を書き直す派生は、今有効なプラグインと読み込んだ定義から catalog を作り、保存した指示書を保つ派生は作品に保存した定義を使う。
+
 作品を保存するとき、上流診断が1件以上あれば共有`explain_plugin_diagnostics`（JNI `NativePipelineBridge.explainPluginDiagnostics`）を呼び、結果を`pipeline_diagnostics.plugin_diagnostics`に保存する。`enabled`・`disabled`には定義の識別名、`plugin_names`には全ての語の名を正規化し、識別名と有効状態を添えて渡す。作品自身の定義は有効として扱う。保存時の検査は必須チャンネルの完全一致に加え、任意チャンネル`plugin_diagnostics`を配列として受け付け、この項目の無い保存済みの行も読む。描画の診断は、同じ範囲の上流診断の代わりに、Webの`pipelinePluginDiagnostic`と同じ文言で理由（未登録・無効・名前の不一致と候補・版の不一致）を示す。
 
 描画coreが描画を止めずに残す警告（描画のmetadataの`render_warnings`。いまは`#rrggbb`でない色表の値を既定の色で描いた`invalid_color`と色の名前）は、Logcat（tag `InkuRender`）に記録し、作品の描画の診断にWebの`pipelineRenderWarning`と同じ文言で示す。警告があれば`pipeline_diagnostics.render_warnings`（配列）にも保存し、保存時の検査はこれも任意チャンネルとして受け付ける。保存Score再演（`renderSaved`）が断ったときは、coreの理由コードを「このScoreは描けません:」に続けてWebの`renderRefusalReason`と同じ文言で示し、coreの`message`はLogcatにだけ記録する。

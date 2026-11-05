@@ -13,6 +13,28 @@ struct LibrarySelectionPresentation {
     var clearDisabled: Bool { selectedIDs.isEmpty }
 }
 
+/// Web `click` and `dblclick` (HistoryManager.svelte:1202) on a library picture: the first click previews at once and
+/// the second click of a double click opens the work. One button reads the click count of the event that pressed it;
+/// a double-tap gesture beside the button made SwiftUI hold the first click until a double click was ruled out.
+enum LibraryClick {
+    static func opensWork(clickCount: Int) -> Bool { clickCount >= 2 }
+
+    /// The press's click count; a key or accessibility press counts as one click.
+    @MainActor static var currentClickCount: Int {
+        #if os(macOS)
+        guard let event = NSApp.currentEvent,
+              [.leftMouseDown, .leftMouseUp, .otherMouseDown, .otherMouseUp].contains(event.type) else { return 1 }
+        return event.clickCount
+        #else
+        return 1
+        #endif
+    }
+
+    @MainActor static func press(preview: () -> Void, open: () -> Void) {
+        if opensWork(clickCount: currentClickCount) { open() } else { preview() }
+    }
+}
+
 /// The library as Web `HistoryManager.svelte` (Build1162) lays it out: a heading row, a tool row, then the
 /// listing with the preview column beside it. The thumbnail grid holds as many complete rows as fit and pages
 /// instead of scrolling. The owner shows it over the whole window and passes `onClose`.
@@ -568,11 +590,13 @@ struct LibraryView: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 if !thumbs {
-                    Button { openWork(group.representative.work) } label: {
+                    Button {
+                        LibraryClick.press(preview: { openWork(group.representative.work) },
+                                           open: { openThumbnail(group.representative.work) })
+                    } label: {
                         ArtworkThumbnail(work: group.representative.work, thumbnails: model.thumbnails).frame(width: 56, height: 56)
                     }
                     .buttonStyle(.plain)
-                    .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(group.representative.work) })
                     .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -666,7 +690,7 @@ struct LibraryView: View {
     private func memberCard(_ work: SavedWork) -> some View {
         let selected = library.selectedIDs.contains(work.id)
         return VStack(alignment: .leading, spacing: 4) {
-            Button { openWork(work) } label: {
+            Button { LibraryClick.press(preview: { openWork(work) }, open: { openThumbnail(work) }) } label: {
                 VStack(alignment: .leading, spacing: 4) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                         .aspectRatio(82.0 / 58.0, contentMode: .fit)
@@ -676,7 +700,6 @@ struct LibraryView: View {
                 }
             }
             .buttonStyle(.plain).disabled(model.isBrowsingLocked)
-            .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(work) })
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             .overlay(alignment: .topLeading) { selectionCheck(work).padding(3) }
             .overlay(alignment: .topTrailing) {
@@ -704,7 +727,7 @@ struct LibraryView: View {
     private func memberRow(_ work: SavedWork) -> some View {
         HStack(spacing: 8) {
             selectionCheck(work)
-            Button { openWork(work) } label: {
+            Button { LibraryClick.press(preview: { openWork(work) }, open: { openThumbnail(work) }) } label: {
                 HStack(spacing: 8) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 48, height: 48)
                     Text(model.workPresentationTitle(work))
@@ -713,7 +736,6 @@ struct LibraryView: View {
                 }.contentShape(Rectangle())
             }
             .buttonStyle(.plain).disabled(model.isBrowsingLocked)
-            .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(work) })
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
             Menu { workMenu(work) } label: { Image(systemName: "ellipsis") }
@@ -1284,14 +1306,13 @@ private struct LibraryGridCard: View, Equatable {
         LibraryPerformanceProbe.cardBody()
         let title = model.workPresentationTitle(work)
         return VStack(alignment: .leading, spacing: 5) {
-            Button { actions.open(work) } label: {
+            // HistoryManager.svelte:1202: the click previews, a double click opens the work.
+            Button { LibraryClick.press(preview: { actions.open(work) }, open: { actions.openThumbnail(work) }) } label: {
                 ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                     .aspectRatio(82.0 / 58.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain).disabled(browsingLocked)
-            // HistoryManager.svelte:1202: the click previews, a double click opens the work.
-            .simultaneousGesture(TapGesture(count: 2).onEnded { actions.openThumbnail(work) })
             .accessibilityLabel(display.localizedFormat("%@ を開く", title))
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             .overlay(alignment: .topLeading) { selectionCheck(title: title).padding(1) }

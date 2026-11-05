@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: one click on a work's picture in the library changes the preview and the card frame without waiting; a double click opens the work.
+
 - macOS: show the work's conditions above the canvas in input order and move the refinement menu onto the work.
 
 - macOS: keep drawing choices per input tab and use configured defaults and each work's recorded conditions.

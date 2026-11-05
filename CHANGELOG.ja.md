@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- macOS：作品の条件をキャンバス上部に入力欄と同じ順で示し、推敲メニューを作品上へ移す。
+
 - macOS：描くときの条件を入力タブごとに持ち、設定したデフォルトと作品に記録した条件を使う。
 
 - core・Server：描くときのデフォルトに、管理者が足した接続先（組み込みの一覧に無い接続先）のモデルを選ぶと、旧い設定のモデルに置き換わっていた。core の `normalize_user`・`update_user`・`normalize_draw_defaults`・`default_draw_defaults` に任意の欄 `providers`（`{id: {"models": [{"id"}]}}`）を足し、Server は自分の接続先の id とモデルの id を渡す。欄が無い時の振る舞いは変わらない。

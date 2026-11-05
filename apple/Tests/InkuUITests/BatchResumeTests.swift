@@ -50,6 +50,14 @@ import InkuPersistence
         let database = try InkuDatabase(url: root.appendingPathComponent("works.sqlite"))
         let saved = try await database.work(id: savedID)
         XCTAssertNotNil(saved)
+        await resumed.newBatch(app: app)
+        XCTAssertTrue(resumed.rows.isEmpty)
+        XCTAssertTrue(resumed.batchText.isEmpty)
+        let afterNew = AutomationModel()
+        await afterNew.connect(app: app)
+        XCTAssertFalse(afterNew.canResume)
+        let preserved = try await database.work(id: savedID)
+        XCTAssertNotNil(preserved)
     }
 }
 

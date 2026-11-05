@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: show the work's conditions above the canvas in input order and move the refinement menu onto the work.
+
 - macOS: keep drawing choices per input tab and use configured defaults and each work's recorded conditions.
 
 - Core and Server: a drawing default on a provider the administrator added (one the built-in list lacks) was replaced with the legacy setting's model. The core's `normalize_user`, `update_user`, `normalize_draw_defaults` and `default_draw_defaults` take an optional `providers` field (`{id: {"models": [{"id"}]}}`), and the Server passes its providers' ids and model ids. Without the field nothing changes.

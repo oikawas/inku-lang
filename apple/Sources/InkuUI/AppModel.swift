@@ -531,16 +531,22 @@ public final class AppModel {
             await recordDescriptionFeedback(request: request, view: view)
             await notifyCommittedWork(view)
             guard generationToken == token, !Task.isCancelled else { return }
+            let saved: SavedWork?
+            if let id = view.savedWorkID { saved = try await database?.work(id: id) }
+            else { saved = nil }
+            let context: SavedAuthoringContext?
+            if let saved { context = try await host.savedAuthoringContext(workID: saved.id) }
+            else { context = nil }
+            guard generationToken == token, !Task.isCancelled else { return }
             apply(view)
-            try await reloadWorks()
-            if let id = view.savedWorkID, works.contains(where: { $0.id == id }),
-               let work = try await database?.work(id: id), generationToken == token, !Task.isCancelled {
+            if let work = saved {
                 displayWork(work)
-                selectedContext = try await host.savedAuthoringContext(workID: id)
+                selectedContext = context
                 savedImageDDL = selectedContext?.imageDDL
                 savedDescriptionDDL = selectedContext?.descriptionDDL
                 if savedImageDDL != nil { imageInput = nil; imageFileName = ""; imageProvenanceTyped = false }
             }
+            try await reloadWorks()
         } catch {
             guard generationToken == token, !Task.isCancelled else { return }
             report(error)
@@ -623,6 +629,10 @@ public final class AppModel {
             eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
+            if let recorded = try? DrawOptionsCore.recorded(work, isImage: false),
+               let options = try? DrawOptionsCore.forRecorded(recorded, tab: "describe", defaults: drawDefaults) {
+                drawSelections["describe"] = options
+            }
             if (error as? HostError)?.code == "saijiki_migration_required" { errorText = failureMessage(error) }
             promptAvailability = .unavailable
             authoringAuthority = "legacy_unknown"
@@ -1111,6 +1121,7 @@ public final class AppModel {
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         if mode == "description" { applyDescriptionRoute(&request, settings: nextGenerationHostSettings) }
+        request.recordsDrawOptions = mode == "description" && parentWorkID == nil && derivationKind == "new" ? true : nil
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         // Server `start`: a direct DDL drawn from the selected saved work carries its completion range record.
         if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID {
@@ -1566,16 +1577,28 @@ public final class AppModel {
     /// Only the start payload differs from a saved DDL child. The shared pipeline decides whether its laws can run.
     public func makeSavedLawsRequest(work: SavedWork, direction: ExactJSON, settings: HostSettings,
                                      wild: Bool?) async throws -> GenerationRequest {
+        let chosen = currentDrawOptions
         let saved = try await savedConfiguration(workID: work.id)
         var configuration = try ExactJSON(data: saved.configuration)
         var options = try ExactJSON(data: saved.renderOptions)
         if let wild { options["wild"] = .bool(wild) }
-        let catalog = try options.requiredString("catalog_id")
-        configuration["compiler"]["host"]["catalog_mode"] = .string(catalog == "default" ? "default" : "explicit")
+        guard let bootstrap, let canvas = options["canvas_aspect_id"].string,
+              let seed = options["render_seed"].string ?? options["render_seed"].number else {
+            throw HostError("saved_refinement_options_unavailable")
+        }
+        let selected = try bootstrap.request(inputMode: "ddl", source: work.ddl ?? "", description: work.effectiveSourceText,
+            language: work.instructionLangResolved ?? "ja", catalogID: chosen.catalog.id, canvasID: canvas, seed: seed,
+            wild: wild ?? work.renderWild ?? false, settings: settings, parentWorkID: work.id,
+            derivationKind: "laws_change", catalogMode: "fixed", savedConfiguration: saved.configuration)
+        let selectedConfiguration = try ExactJSON(data: selected.configuration)
+        let selectedOptions = try ExactJSON(data: selected.renderOptions)
+        configuration["compiler"]["host"] = selectedConfiguration["compiler"]["host"]
+        options["catalog_id"] = selectedOptions["catalog_id"]
+        options["resolved_color_map"] = selectedOptions["resolved_color_map"]
         configuration["catalogs"] = .array([])
         var request = GenerationRequest(authoring: .directDDL(work.ddl ?? ""), configuration: configuration.data,
             renderOptions: options.data, clipPolicy: saved.clipPolicy, models: settings.models, providers: settings.providers,
-            renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
+            renderColorMaps: selected.renderColorMaps, description: work.effectiveSourceText,
             parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "normal")
         request.savedLawsDirection = direction.data
         request.completionRanges = saved.completionRanges

@@ -92,6 +92,8 @@ public struct GenerationRequest: Codable, Sendable {
     public var descriptionComposition: Bool?
     public var descriptionReview: Bool?
     public var catalogMode: String?
+    /// Only a new description or text-batch input records the four draw options.
+    public var recordsDrawOptions: Bool?
     public var configuration: Data
     public var renderOptions: Data
     public var clipPolicy: Data

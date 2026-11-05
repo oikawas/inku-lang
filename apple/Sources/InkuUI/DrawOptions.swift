@@ -27,6 +27,14 @@ public struct DrawOptions: Codable, Equatable, Sendable {
     }
 }
 
+/// Web INPUT_PANEL_ORDER, shared by the canvas strip and its ordering check.
+enum DrawOptionPresentation {
+    static let inputOrder = ["models", "catalog", "route", "sketch", "composition", "wild", "canvas_aspect"]
+    static func keys(isImage: Bool) -> [String] {
+        inputOrder.filter { !isImage || !["route", "sketch", "composition"].contains($0) }
+    }
+}
+
 enum DrawOptionsCore {
     static let keys = (try! call("release_defaults"))["draw_options"] as! [String]
     static let release: [String: DrawOptions] = {
@@ -83,7 +91,17 @@ enum DrawOptionsCore {
     }
 
     static func recorded(_ work: InkuPersistence.SavedWork, isImage: Bool) throws -> [String: Any] {
-        var record = try object(work) as! [String: Any]
+        var record: [String: Any] = [:]
+        record["draw_route"] = work.drawRoute
+        record["sketch_requested"] = work.sketchRequested
+        record["composition_requested"] = work.compositionRequested
+        record["catalog_mode"] = work.catalogMode
+        record["render_color_catalog_id"] = work.renderColorCatalogID
+        record["catalog_id"] = work.catalogID
+        record["render_canvas_aspect_id"] = work.renderCanvasAspectID
+        record["render_canvas_aspect"] = work.renderCanvasAspect
+        record["stage1_model"] = work.stage1Model
+        record["stage2_model"] = work.stage2Model
         if let wild = work.renderWild { record["render_wild"] = wild ? "1" : "0" }
         if isImage { record["image_ddl"] = [:] }
         let result = try call("options_of_work", ["record": record])

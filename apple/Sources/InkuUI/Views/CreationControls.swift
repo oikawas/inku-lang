@@ -62,7 +62,6 @@ struct CreationCanvasControls: View {
     }
 
     @ViewBuilder private var captionAndMarks: some View {
-      if model.display.visible("work_tools") {
         HStack(spacing: 6) {
             Button { model.display.preferences.captionVisible.toggle() } label: {
                 Image(systemName: "text.bubble")
@@ -101,7 +100,6 @@ struct CreationCanvasControls: View {
                     .disabled(true)
             }
         }.fixedSize()
-      }
     }
 
     private var outputControls: some View {

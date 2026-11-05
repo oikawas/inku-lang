@@ -23,6 +23,25 @@ struct BatchWorkspaceSelection {
     mutating func invalidateReads() { revision = UUID() }
 }
 
+private struct CanvasHeaderTab: View {
+    let title: String
+    let selected: Bool
+    let compact: Bool
+    let action: () -> Void
+    @State private var hovered = false
+    var body: some View {
+        Button(action: action) {
+            Text(title).inkuFont(13, weight: selected ? .semibold : .regular)
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .padding(.horizontal, compact ? 12 : 16).frame(minHeight: 38, maxHeight: .infinity)
+                .background(hovered ? Color.primary.opacity(0.06) : Color.clear)
+                .overlay(alignment: .bottom) { Rectangle().fill(selected ? Color.accentColor : Color.clear).frame(height: 2) }
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain).onHover { hovered = $0 }
+            .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
 /// Web `.main-shell`: the input panel, its 18pt toggle, the canvas panel, and the history strip under both.
 @MainActor
 struct CreationView: View {
@@ -55,8 +74,10 @@ struct CreationView: View {
     @State private var showPaperPicker = false
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
+    @State private var rightPanelHeight: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
     @State private var workspaceContext: SavedAuthoringContext?
+    @State private var workspaceContextWorkID: String?
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
     @State private var lineageMounted = false
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
@@ -186,11 +207,11 @@ struct CreationView: View {
             workspaceGeneration = (nodeID, generation)
         }
         .task(id: workspaceWork?.id) {
-            workspaceContext = nil
+            workspaceContext = nil; workspaceContextWorkID = nil
             guard let work = workspaceWork else { return }
             let context = try? await model.savedConfiguration(workID: work.id)
             guard !Task.isCancelled, workspaceWork?.id == work.id else { return }
-            workspaceContext = context
+            workspaceContext = context; workspaceContextWorkID = work.id
         }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
@@ -679,11 +700,13 @@ struct CreationView: View {
 
     private var rightPanel: some View {
         VStack(spacing: 0) {
-            if display.visible("work_tools") && inlinePanel == nil && !ui.canvasFullScreen { tabsRow }
+            if inlinePanel == nil && !ui.canvasFullScreen { tabsRow }
             canvasArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rightPanelWidth = $0 }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            rightPanelWidth = size.width; rightPanelHeight = size.height
+        }
         .task(id: workspaceWork?.id) {
             guard let work = workspaceWork, hasSavedWorkspaceWork, !Task.isCancelled else { return }
             await history.locate(app: model, workID: work.id)
@@ -692,133 +715,129 @@ struct CreationView: View {
         }
     }
 
-    /// CanvasPanel.svelte:687-756,1025-1053: 作品／系譜 text tabs and the displayed work's conditions.
-    /// Below 880pt (67.69em at 13px) the conditions take a second row, as the Web's container query does.
+    /// The conditions share the tabs' row above 45em, and wrap below it on narrow panels.
     private var tabsRow: some View {
-        let wide = rightPanelWidth >= 880 * display.preferences.textScale
-        let showsMeta = workspaceWork != nil && display.visible("detail_status")
+        let scale = display.preferences.textScale
+        let wide = rightPanelWidth >= 45 * 13 * scale
+        let compact = rightPanelWidth < 32 * 13 * scale
+        let showsMeta = workspaceWork != nil
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
-                InkuTextTab(title: display.webCopy("tabCanvas", "作品"), selected: ui.workspaceTab != "lineage", compact: !wide) {
+                CanvasHeaderTab(title: display.webCopy("tabCanvas", "作品"), selected: ui.workspaceTab != "lineage", compact: compact) {
                     ui.workspaceTab = "artwork"
                 }
                 .inkuTooltip(display.tooltip("描画された作品のキャンバスを表示します", serverKey: "tooltipCanvasTabCanvas"), placement: .bottom)
-                InkuTextTab(title: display.localized("系譜"), selected: ui.workspaceTab == "lineage", compact: !wide) {
+                CanvasHeaderTab(title: display.localized("系譜"), selected: ui.workspaceTab == "lineage", compact: compact) {
                     ui.workspaceTab = "lineage"
                 }
                 .disabled(workspaceWork == nil || browsingDisabled)
                 .inkuTooltip(display.tooltip("作品の派生関係を表示"), placement: .bottom)
                 if wide && showsMeta, let work = workspaceWork {
-                    Spacer(minLength: 12)
-                    metaStrip(work)
-                } else {
-                    Spacer(minLength: 8)
-                }
-                workActionMenu.padding(.leading, 8)
-            }
+                    Rectangle().fill(InkuColor.border).frame(width: 1).padding(.vertical, 5)
+                    metaStrip(work).frame(maxWidth: .infinity, alignment: .leading)
+                } else { Spacer(minLength: 0) }
+            }.fixedSize(horizontal: false, vertical: true)
             if !wide && showsMeta, let work = workspaceWork {
-                metaStrip(work).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                metaStrip(work).frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) { Rectangle().fill(InkuColor.border).frame(height: 1) }
             }
         }
-        .padding(.horizontal, wide ? 16 : 10)
         .background(InkuColor.bg)
         .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1) }
     }
 
     private func metaStrip(_ work: SavedWork) -> some View {
+        let isImage = (workspaceContextWorkID == work.id && workspaceContext?.imageDDL != nil)
+            || (!usesBatchWork && model.selectedWorkID == work.id && model.savedImageDDL != nil)
+        let options = (try? DrawOptionsCore.recorded(work, isImage: isImage)) ?? [:]
         let naming = ModelNaming(providers: savedProviders, stageProvider: model.stageDefaultProviderID)
-        let stage1 = work.stage1Model.map { naming.displayName($0) } ?? "DDL"
-        let stage2 = work.stage2Model.map { naming.displayName($0) } ?? stage1
-        let catalogID = work.renderColorCatalogID ?? work.catalogID
-        let catalog = work.renderColorCatalogName ?? model.catalogs.first { $0.id == catalogID }?.name ?? catalogID ?? "—"
-        let canvasID = work.renderCanvasAspectID ?? ""
-        let canvas = model.canvases.first { $0.id == canvasID }?.label ?? work.renderCanvasAspect ?? (canvasID.isEmpty ? "—" : canvasID)
+        let unavailable = display.webCopy("drawOptionsUnavailable", "N/A")
         let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
         let created = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())
         let generation = workspaceGeneration?.nodeID == work.lineageNodeID ? workspaceGeneration?.value : nil
-        func fields(compact: Bool) -> some View {
-          HStack(spacing: 0) {
-            // CanvasPanel.svelte:707,726,730: each value carries its own title, the models as "解釈 / 描画".
-            metaItem(display.localized("モデル"), maxWidth: 280, compact: compact, title: stage1 + " / " + stage2) {
-                if stage1 == stage2 {
-                    Text(stage1)
-                } else {
-                    VStack(alignment: .leading, spacing: 1) {
-                        HStack(spacing: 4) { Text(display.localized("解釈")).foregroundStyle(.tertiary); Text(stage1) }
-                        HStack(spacing: 4) { Text(display.localized("描画")).foregroundStyle(.tertiary); Text(stage2) }
-                    }
-                }
-            }
-            metaItem(display.localized("色カタログ"), maxWidth: 130, compact: compact, title: catalog) { Text(catalog) }
-            metaItem(display.localized("キャンバス"), maxWidth: 100, compact: compact, title: canvas) { Text(canvas) }
-            metaItem(display.label("描き方", "Drawing"), maxWidth: 130, compact: compact) {
-                Text(workspaceContext?.imageDDL != nil ? display.label("画像から書く", "Written from a picture") : (workspaceContext?.drawRoute == "read_and_draw" || (workspaceContext?.drawRoute != "stages" && workspaceContext?.descriptionDDL != nil)) ? display.label("言葉で描く", "In words") : display.label("型で描く", "With a plan"))
-            }
-            metaItem(display.label("写生", "Sketch from life"), maxWidth: 130, compact: compact, title: DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")) {
-                Text(DrawPresentation.sketchShort(work.sketchState, japanese: display.preferences.language != "en"))
-            }
-            metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }
-            metaItem(display.label("作成", "Created"), maxWidth: nil) { Text(created).monospacedDigit() }
-          }
-        }
-        return HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件"))
-                    .inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                HStack(spacing: 4) {
-                    if let generation {
-                        Text(display.label("系譜", "Lineage")).inkuFont(12).foregroundStyle(.tertiary)
-                        Text(display.label("第\(generation)世代", "Gen. \(generation)")).inkuFont(13).foregroundStyle(.secondary)
-                    } else {
-                        Text(work.lineageNodeID == nil ? display.label("独立作品", "Standalone") : "—")
-                            .inkuFont(13).foregroundStyle(.secondary)
-                    }
-                }
-            }.lineLimit(1).fixedSize().padding(.trailing, 12)
-            Spacer(minLength: 0)
-            ViewThatFits(in: .horizontal) {
-                fields(compact: true).fixedSize(horizontal: true, vertical: false)
-                fields(compact: false)
+        func label(_ key: String) -> String {
+            switch key {
+            case "models": return isImage ? display.webCopy("drawDefaultsVision", "画像を読むモデル") : display.webCopy("drawDefaultsModel", "描画モデル")
+            case "catalog": return display.webCopy("colorCatalogButton", "色カタログ")
+            case "route": return display.webCopy("drawDefaultsRoute", "描き方")
+            case "sketch": return display.webCopy("sketchLabel", "写生")
+            case "composition": return display.webCopy("drawDefaultsComposition", "構図・法則・配色")
+            case "wild": return display.webCopy("wildButton", "筆致制限を外す")
+            default: return display.webCopy("drawDefaultsCanvas", "キャンバス")
             }
         }
-        .padding(.vertical, 7)
+        func value(_ key: String) -> String {
+            guard let raw = options[key], !(raw is NSNull) else { return unavailable }
+            if let text = raw as? String {
+                switch text {
+                case "on": return display.webCopy("drawDefaultsOn", "オン")
+                case "off": return display.webCopy("drawDefaultsOff", "オフ")
+                case "read_and_draw": return display.webCopy("drawDefaultsRead", "言葉で描く")
+                case "stages": return display.webCopy("drawDefaultsStages", "型で描く")
+                default: return key == "canvas_aspect" ? model.canvases.first(where: { $0.id == text })?.label ?? text : text
+                }
+            }
+            guard let object = raw as? [String: Any] else { return unavailable }
+            if key == "catalog" {
+                let id = object["id"] as? String
+                let name = id.flatMap { chosen in model.catalogs.first(where: { $0.id == chosen })?.name ?? chosen } ?? unavailable
+                let mode = object["mode"] as? String
+                let modeName = mode == "auto" ? display.webCopy("colorCatalogAuto", "記述から自動選択")
+                    : mode == "fixed" ? display.webCopy("drawDefaultsFixed", "固定") : unavailable
+                return name + " (" + modeName + ")"
+            }
+            if key == "models" {
+                func name(_ key: String) -> String { (object[key] as? String).map(naming.displayName) ?? unavailable }
+                if object["vision"] as? String != nil { return name("vision") }
+                let first = name("stage1"), second = name("stage2")
+                return first == second ? first : first + " / " + second
+            }
+            return unavailable
+        }
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(display.webCopy("displayedWorkConditions", "表示中作品の条件"))
+                .inkuFont(11, weight: .medium).foregroundStyle(.secondary)
+            WrappingHStack(spacing: 12) {
+                metaField(display.label("系譜", "Lineage"),
+                          generation.map { display.label("第\($0)世代", "Gen. \($0)") }
+                            ?? (work.lineageNodeID == nil ? display.label("独立作品", "Standalone") : "…"))
+                ForEach(DrawOptionPresentation.keys(isImage: isImage), id: \.self) { key in
+                    metaField(label(key), value(key))
+                }
+                metaField(display.label("サイズ", "Size"), size)
+                metaField(display.label("作成", "Created"), created)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
         .accessibilityElement(children: .combine)
     }
 
-    private func metaItem<Value: View>(_ label: String, maxWidth: CGFloat?, compact: Bool = false, title: String = "",
-                                       @ViewBuilder value: () -> Value) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).inkuFont(12).foregroundStyle(.tertiary).lineLimit(1)
-            value().inkuFont(13).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: maxWidth, alignment: .leading)
-                .fixedSize(horizontal: compact || maxWidth == nil, vertical: false)
-                .inkuTooltip(display.tooltipValue(title))
-        }
-        .padding(.horizontal, 12)
-        .overlay(alignment: .leading) { Rectangle().fill(InkuColor.border).frame(width: 1).padding(.vertical, 2) }
+    private func metaField(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(label).inkuFont(11).foregroundStyle(.tertiary)
+            Text(value).inkuFont(12).foregroundStyle(.secondary)
+        }.lineLimit(1).fixedSize(horizontal: true, vertical: false)
     }
 
     /// Web WorkActionMenu (header variant): editing only; viewing tools stay in the canvas toolbar.
     @ViewBuilder private var workActionMenu: some View {
         if let work = workspaceWork, hasSavedWorkspaceWork {
-            Menu {
-                Section {
-                    SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: automation.isOccupied)
-                } header: {
-                    Text(workActionTitle(work))
-                }
+            Button {
+                ui.refinementMenuWorkID = work.id
             } label: {
                 Text(display.webCopy("workActionRefine", "推敲する")).inkuFont(12)
             }
-            .menuStyle(.borderlessButton)
+            .buttonStyle(InkuGhostButtonStyle())
             .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } })) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(workActionTitle(work)).inkuFont(12, weight: .semibold)
-                    SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
-                        ui.refinementMenuWorkID = nil
-                        onWorkAction(target, action)
-                    }, writingLocked: automation.isOccupied)
-                }.padding(16).frame(width: 300)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(workActionTitle(work)).inkuFont(12, weight: .semibold)
+                        SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
+                            ui.refinementMenuWorkID = nil
+                            onWorkAction(target, action)
+                        }, writingLocked: automation.isOccupied)
+                    }.padding(16).frame(width: 300)
+                }.frame(maxHeight: max(120, rightPanelHeight - 80))
             }
             .fixedSize()
             .disabled(browsingDisabled)
@@ -852,7 +871,7 @@ struct CreationView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(InkuColor.border2))
                     .padding(.vertical, 14)
             } else {
-                let showsLineage = ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil
+                let showsLineage = ui.workspaceTab == "lineage" && workspaceWork != nil
                 artwork
                     .opacity(showsLineage ? 0 : 1)
                     .allowsHitTesting(!showsLineage)
@@ -915,7 +934,10 @@ struct CreationView: View {
                 .padding(.trailing, 18).padding(.bottom, 14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
-            CanvasFallbackBadges(display: display, work: workspaceWork)
+            VStack(alignment: .trailing, spacing: 6) {
+                workActionMenu
+                CanvasFallbackBadges(display: display, work: workspaceWork)
+            }
                 .padding([.top, .trailing], 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }

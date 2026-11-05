@@ -4,6 +4,8 @@ On macOS the history strip moves across pages with the arrow keys, and `#` on th
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
+Above the canvas, the displayed work's conditions follow input order alongside the Work and Lineage tabs, wrapping below them at narrow widths. Missing recorded values are N/A; image works omit route, sketch and composition. The refinement menu overlays the work at the upper right.
+
 Last updated: 2026-10-23.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app allocates its version and build number separately from Server and Web, with `apple/VERSION` and `apple/BUILD_NUMBER` as floors (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.

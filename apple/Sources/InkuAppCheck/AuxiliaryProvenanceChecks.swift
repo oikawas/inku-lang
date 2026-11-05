@@ -46,6 +46,7 @@ func runSavedLawsStageChecks() async throws {
         await app.initialize()
     app.selectDrawRoute("stages"); app.sketchMode = "off"
         try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "laws-check:parent", stage2Model: "laws-check:parent")))
+        app.selectNextDrawingModel("laws-check:parent")
         app.inputMode = "description"; app.language = "ja"; app.seedText = "7"; app.sketchMode = "off"
         app.descriptionText = "円がひとつ浮かび、下に点が散らばる"
         var parentRequest = try app.requestForCurrentInput()
@@ -99,6 +100,7 @@ func runAuxiliaryProvenanceChecks() async throws {
     let service = ProviderSettings(id: "auto-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
         models: [.init(id: "parent"), .init(id: "one", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "auto-check:parent", stage2Model: "auto-check:parent")))
+    app.selectNextDrawingModel("auto-check:parent")
     let database = try app.auxiliaryDatabase()
     app.inputMode = "description"; app.language = "ja"; app.seedText = "7"; app.sketchMode = "off"
 
@@ -134,13 +136,13 @@ func runAuxiliaryProvenanceChecks() async throws {
           lawsMetadata["ai_move"]["kind"].string == "laws", lawsMetadata["ai_move"]["outcome"].string == "kept",
           lawsMetadata["ai_move"]["model"].string == "auto-check:one", lawsMetadata["ai_move"]["note"].string == "余白を動かす",
           lawsMetadata["autonomous_refine_mode"] == .null,
-          await transport.lawsModels == ["auto-check:one"],
+          await transport.lawsModels == ["auto-check:parent"],
           try await database.work(id: first.id) == first,
           try await app.savedConfiguration(workID: first.id).configuration == before.configuration else {
         throw CheckFailure.message("Laws child lost saved_laws authority, basis/null main_layer, run record or pinned model: \(lawsMetadata.text)")
     }
 
-    // Juxtaposition uses other normal works, then the same one model draws its child.
+    // Juxtaposition uses the Vision model to choose; the tab's model draws its child.
     for text in ["夜の港に灯台が立つ。", "古い駅に時計が残る。", "森の奥で水が光る。", "遠い街で窓が開く。", "雪の庭に足跡が続く。", "秋の川に橋が架かる。"] { _ = try await parent(text) }
     await transport.changeDrawing(true)
     runner.inheritWild = false
@@ -161,7 +163,7 @@ func runAuxiliaryProvenanceChecks() async throws {
           moved["juxtaposition"]["sentence"].string != nil, moved["juxtaposition"]["model"].string == "auto-check:one",
           moved["edited_from_history_id"].string == first.id,
           child.effectiveSourceText.hasPrefix(first.effectiveSourceText),
-          await transport.auxiliaryModels == ["auto-check:one"], await transport.lastDrawingModel == "auto-check:one" else {
+          await transport.auxiliaryModels == ["auto-check:one"], await transport.lastDrawingModel == "auto-check:parent" else {
         throw CheckFailure.message("Juxtaposition child lost its sentence, ai_move or model: \(moved.text)")
     }
     // An identical draw is visible in history but never becomes the next parent.

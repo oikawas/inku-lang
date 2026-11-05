@@ -731,7 +731,7 @@ private actor ExecutionDriver {
         self.state.provenance = request.provenance
         self.state.imageProvenance = request.imageProvenance
         self.state.inheritedImageDDL = request.inheritedImageDDL
-        if request.parentWorkID == nil, request.derivationKind == "new",
+        if request.recordsDrawOptions == true, request.parentWorkID == nil, request.derivationKind == "new",
            case .description(_, _, let sketch) = request.authoring {
             let route = request.drawRoute ?? "stages"
             self.state.requestedDrawRoute = route

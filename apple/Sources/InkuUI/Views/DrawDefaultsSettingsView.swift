@@ -7,6 +7,10 @@ import SwiftUI
     @State private var saved = false
     @State private var failed = false
     private let tabs = ["describe", "image", "batch_text", "batch_image"]
+    static func optionKeys(tab: String) -> [String] {
+        let image = tab == "image" || tab == "batch_image"
+        return DrawOptionsCore.keys.filter { !image || !["route", "sketch", "composition", "wild"].contains($0) }
+    }
     private func imageTab(_ tab: String) -> Bool { tab == "image" || tab == "batch_image" }
     private func copy(_ key: String, _ fallback: String) -> String { model.display.webCopy(key, fallback) }
     private func binding<T>(_ tab: String, _ path: WritableKeyPath<DrawOptions, T>) -> Binding<T> {
@@ -39,7 +43,7 @@ import SwiftUI
                 VStack(alignment: .leading, spacing: 8) {
                     Text(tabTitle(tab)).inkuFont(14, weight: .semibold)
                     Text(hint(tab)).inkuFont(12).foregroundStyle(.secondary)
-                    if !imageTab(tab) {
+                    if Self.optionKeys(tab: tab).contains("route") {
                         Picker(copy("drawDefaultsRoute", "描き方"), selection: binding(tab, \.route)) {
                             Text(copy("drawDefaultsRead", "言葉で描く")).tag("read_and_draw")
                             Text(copy("drawDefaultsStages", "型で描く")).tag("stages")

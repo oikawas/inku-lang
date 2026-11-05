@@ -101,7 +101,7 @@ public final class RefinementModel {
             sourceIsLocked = context.authority != "description_authoritative"
             sourceIsDDLOrigin = context.origin == "direct_ddl"
             if modelReference.isEmpty {
-                let settings = await app.hostSettings()
+                let settings = await app.nextGenerationSettings()
                 if SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) {
                     modelReference = settings.models.stage2Model
                 }

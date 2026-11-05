@@ -3,7 +3,7 @@ import InkuHost
 import InkuPersistence
 import InkuUI
 
-/// Saved choices, the description label rule, the meter, the batch count, the comment limit, the edited sketch
+/// Saved choices, the description label rule, the meter, the batch count, the comment limit, the read-only sketch
 /// and the fork, each against the failure it prevents. Expected meter labels and the batch count were produced by
 /// the Build1162 Web functions (`verseForm.ts` `describeLength` with the ja/en templates, `numberedBatchLines`).
 @MainActor
@@ -29,9 +29,16 @@ func runInputAidChecks() async throws {
     fresh.preferences.libraryGrouped = true
     fresh.preferences.comparisonModels = ["a:one", "b:two"]
     fresh.preferences.autonomousRefine = AutonomousRefineChoices(moves: 7, kinds: ["laws"], note: "夜へ")
-    let reread = DisplaySettings()
-    reread.connect(directory: folder)
-    guard reread.preferences == fresh.preferences else {
+    var expectedPreferences = fresh.preferences
+    expectedPreferences.nextCanvasID = nil; expectedPreferences.nextWild = nil
+    var persisted = false
+    for _ in 0..<100 {
+        let reread = DisplaySettings()
+        reread.connect(directory: folder)
+        if reread.preferences == expectedPreferences { persisted = true; break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    guard persisted else {
         throw CheckFailure.message("Saved choices did not come back from interface.json")
     }
     let older = folder.appendingPathComponent("older", isDirectory: true)
@@ -53,7 +60,7 @@ func runInputAidChecks() async throws {
         throw CheckFailure.message("Old Vision choices must be discarded")
     }
 
-    // Failure: a catalog or paper that no longer exists was restored as the next condition.
+    // Legacy auto catalog is read; old paper and wild defaults are not migrated.
     let database = folder.appendingPathComponent("inku.sqlite")
     let provider = InputAidProvider()
     try JSONEncoder().encode({ () -> DisplayPreferences in
@@ -65,8 +72,8 @@ func runInputAidChecks() async throws {
     let gone = AppModel(databaseURL: database, transport: provider)
     await gone.initialize()
     gone.selectDrawRoute("stages"); gone.sketchMode = "off"
-    guard gone.catalogID == "default", gone.canvasID == "square", gone.catalogMode == "auto", gone.wild else {
-        throw CheckFailure.message("Vanished catalog/paper must fall back to the defaults while mode and wild are kept: \(gone.catalogID) \(gone.canvasID)")
+    guard gone.catalogID == "default", gone.canvasID == "square", gone.catalogMode == "auto", !gone.wild else {
+        throw CheckFailure.message("Legacy catalog should migrate without old paper or wild defaults: \(gone.catalogID) \(gone.canvasID)")
     }
     let otherCatalog = try required(gone.catalogs.first { $0.id != "default" }?.id, "a second catalog")
     let otherPaper = try required(gone.canvases.first { $0.id != "square" }?.id, "a second paper")
@@ -74,8 +81,8 @@ func runInputAidChecks() async throws {
     let relaunched = AppModel(databaseURL: database, transport: provider)
     await relaunched.initialize()
     relaunched.selectDrawRoute("stages"); relaunched.sketchMode = "off"
-    guard relaunched.catalogID == otherCatalog, relaunched.canvasID == otherPaper, relaunched.wild, relaunched.catalogMode == "fixed" else {
-        throw CheckFailure.message("Next-work conditions or independent wild default did not come back after a relaunch")
+    guard relaunched.catalogID == "default", relaunched.canvasID == "square", !relaunched.wild, relaunched.catalogMode == "auto" else {
+        throw CheckFailure.message("A temporary choice was saved, or legacy defaults changed on relaunch")
     }
 
     // Failure: the Swift label rule drifted from the Server/Web corpus.
@@ -149,6 +156,7 @@ func runInputAidChecks() async throws {
 
     // A saved sketch is displayed; a later drawing asks the sketch layer again.
     relaunched.descriptionText = "a red circle in an open field"
+    relaunched.catalogMode = "fixed"
     relaunched.sketchMode = "on"
     relaunched.seedText = "42"
     await relaunched.generate()
@@ -172,13 +180,15 @@ func runInputAidChecks() async throws {
     guard relaunched.sourceLocked, !relaunched.canGenerateDescription, relaunched.canForkDescription else {
         throw CheckFailure.message("A DDL-edited work must offer the fork instead of drawing from its description")
     }
+    relaunched.catalogMode = "fixed"
+    relaunched.selectDrawRoute("stages")
     await relaunched.forkDescription()
     guard relaunched.errorText == nil, let forked = relaunched.selectedWork, forked.id != held.id,
           !relaunched.sourceLocked, forked.effectiveSourceText == held.effectiveSourceText else {
         throw CheckFailure.message("Fork did not start an unlocked work from the description: \(relaunched.errorText ?? relaunched.status)")
     }
 
-    print("Input aids passed: interface.json kept 12 new choices and an older file's values; vanished catalog/paper fell back to default/square; "
+    print("Input aids passed: interface.json kept display choices; legacy auto catalog migrates while old paper and wild are ignored; "
           + "label rule matched \(cases.count) corpus cases; comment-only description not drawable; \(meterCases.count) meter labels and 9 syllable estimates "
           + "matched the Web; batch count 3 (entries 6); comment 240 and meter 4000 counted in UTF-16; sketch is read-only; "
           + "held work forked into an unlocked work. Temporary SQLite and an offline provider mock only.")

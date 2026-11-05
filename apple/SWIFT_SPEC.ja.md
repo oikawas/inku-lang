@@ -4,6 +4,8 @@ macOS の履歴帯は矢印キーでページをまたいで移動し、キャ�
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
+キャンバス上部は作品・系譜のタブの横に表示中作品の条件を入力欄の順に示し、狭い幅では帯を下へ折り返す。記録の無い値は N/A とし、画像作品には描き方・写生・構図を出さない。推敲メニューは作品の右上に重ねる。
+
 最終更新: 2026-10-23。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版とBuild番号は`apple/VERSION`・`apple/BUILD_NUMBER`を下限としてServer／Webとは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。

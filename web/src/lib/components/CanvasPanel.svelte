@@ -446,10 +446,14 @@
 	let directEditMode = $state<'description' | 'sketch-grain' | null>(null);
 	let directAIRefineNode = $state<LineageNode | null>(null);
 	let directJuxtaposeNode = $state<LineageNode | null>(null);
+	// A result just saved is not in the history list yet, so its generation is
+	// not known for a moment; it is not called standalone meanwhile.
+	const statusGenerationPending = $derived(!statusHistoryItem && !!result?.history_id);
 	const statusGenerationValue = $derived(
 		statusGeneration
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
-			: (isJapanese ? '独立作品' : 'Standalone')
+			: statusGenerationPending ? '…'
+				: (isJapanese ? '独立作品' : 'Standalone')
 	);
 	const statusWork = $derived(statusHistoryItem ?? result);
 	// One source for the strip: the saved work on screen, else the result on
@@ -735,7 +739,7 @@
 				<div class="render-meta-context">
 					<span class="render-meta-heading">{t().displayedWorkConditions}</span>
 					<span class="render-meta-generation">
-						{#if statusGeneration}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
+						{#if statusGeneration || statusGenerationPending}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
 						<strong>{statusGenerationValue}</strong>
 					</span>
 				</div>

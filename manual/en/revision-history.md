@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-05 — Drawing defaults and the strip of the displayed work's conditions (v2.15.316–v2.15.320 / Build 1392–1396)
+
+- Sections 2, 7 and 19 of "Creating Images" now describe the per-tab conditions and `Settings` → `Drawing defaults`, `New` returning to them, and opening a work copying its record into the input tab (an unrecorded on/off choice becomes off, any other the tab's default). Section 7's "reading a work preview in the library does not change the next conditions" had become wrong and was corrected.
+- Section 7's `Conditions of the displayed work` now lists the strip's items, `N/A` for an unrecorded one, and what it shows during and right after a drawing.
+- The default for `Lift the stroke limit` is now chosen in `Drawing defaults` rather than per browser in Display and operation, and refinement, lineage and instruction edits start from the original work's record (sections 7 and 9). The painting model chosen in section 6's instruction dialog also becomes the input tab's current choice.
+- Editing the sketch or the reading had been removed in v2.15.316, so "edit and draw again" in sections 4 and 21 was corrected.
+- Section 17 (Batch) now says `New` asks before removing a resume panel and that a picture folder keeps its progress.
+- The settings table in "Server Configuration" gains `Drawing defaults`, with the shipped defaults and the old per-member canvas not being carried over.
+
 ## 2026-11-04 — Stages named by what they do, not by number
 
 The numbers `Stage 0.5`, `Stage 1`, `Stage 1.5` and `Stage 2` no longer describe today's flow, which has grown into the sketch from life, reading, composition reading, laws, writing, review, colors and completion, so the documents now name each stage by what it does (the author's decision).

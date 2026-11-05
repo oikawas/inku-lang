@@ -70,7 +70,7 @@ The new password must be at least eight characters. **It does not change unless 
 
 1. Open the `Describe` tab.
 2. Write a short sentence in the description area.
-3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Lift the stroke limit`, and `Canvas` if needed.
+3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Lift the stroke limit`, and `Canvas` if needed. They start from `Drawing defaults` in `Settings` (§19); `New` clears the input and returns to them.
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
 
@@ -148,7 +148,7 @@ Leading serial numbers and bracketed annotations belong to the writer, not to th
 
 `Fine` and `Coarse` on older works record the sketch method used at the time. They are no longer current choices.
 
-After painting, the result appears under `Sketch from life` on the left and can be edited there. Drawing again with the same description and the sketch on sends the edited sketch to interpretation as a supplement. Changing the description generates a new sketch; switching the sketch off omits the supplement.
+After painting, the result appears under `Sketch from life` on the left, for reading; it has no editor. Drawing again with the same description and the sketch on sends the sketch on screen to interpretation as a supplement. Changing the description generates a new sketch; switching the sketch off omits the supplement.
 
 If the layer does not answer, the description goes to interpretation unchanged and the work records that. A work painted with the layer off carries the same kind of record.
 
@@ -183,7 +183,7 @@ While it waits, the display names the step at work.
 | `Correcting the instructions beside the drawing…` | The model is shown the drawing of its instructions and corrects them once. A model that cannot read images is not shown it |
 | `Saving the work…` | The committed instructions are drawn and saved |
 
-The reading appears under `Sketch from life (reading)` in the description panel. Editing it with `Edit` and drawing again writes from the edited reading without asking for a new one. `In words` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
+The reading appears under `Sketch from life (reading)` in the description panel, for reading; it has no editor. Drawing the same description again writes from the reading on screen without asking for a new one. `In words` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
 
 With `In words`, the `Composition, laws, colors` chip can be lit or left off (off by default). Lit, after the reading, a composition (its thesis, form, things and laws) is decided first from the description (and its reading), and the instructions are written toward it. The tool measures the written instructions against the laws thing by thing, moves a thing that is a little off into place, and has one far off written again; it builds the things that are patterns, rows and scatters. While it waits it shows "Deciding the composition and laws…". When no composition and laws can be decided, the instructions are written without them. After the review and before the commit, the colors (the colors and the ground) are chosen while the drawing's shapes and places stay ("Choosing the colors…"). When the colors cannot be applied, the instructions before them are committed. `Composition and laws` in Generation Info shows what was decided, the last measure, the pairs that did not fit, the cards, the colors, and the thing each sentence draws. Opening a work sets the chip to whether the work was drawn with the composition and laws passed.
 
@@ -222,7 +222,7 @@ The instructions box on the Describe tab also lets you edit the whole text direc
 
 `Discard edits` in the box and `Instruction editor` asks for confirmation. Press `Discard` to return to the saved instructions the target work was drawn from. Opening the editor from the box still returns to that work's instructions, rather than the box's draft. The box returns its draft; the editor returns only its own text and leaves the box's draft unchanged. Returning never draws. The button is disabled when the text matches, while read-only or while drawing, and is absent from `New instructions`. Cancel leaves the text unchanged. After discarding, ⌘Z (Ctrl+Z) in that editor restores the text from before the discard.
 
-There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Lift the stroke limit` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
+There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Lift the stroke limit` outside the text. The painting model chosen here also becomes the input tab's current choice (it is not saved as a setting). While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
 
 | Action | Contents |
 |---|---|
@@ -276,7 +276,7 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 
 ## 7. Choose Model, Color Catalog, Sketch, Stroke Limit, and Canvas
 
-`Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe`, `Image`, and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`. See §16 for the Image tab's conditions.
+`Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe`, `Image`, and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`. See §16 for the Image tab's conditions. Describe, Image, the description batch and the picture folder each keep their own conditions. Where they start, and what `New` returns to, is set under `Settings` → `Drawing defaults` (§19). What you choose here is the input tab's current choice and is not saved as a setting.
 
 | Control | Contents |
 |---|---|
@@ -288,11 +288,11 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 
 The drawing model is used for every stage that writes the instructions and for completion. Models measured separately for writing the instructions and for completion are ordered by the lower of the two ratings. The model for Vision, which reads images, is chosen separately. The Image tab (§16) paints with this Vision model.
 
-The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. The choice is saved per user. On the Image tab the same choice reads `Choose from image automatically`, and the model reads the image to choose the catalog.
+The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. When it cannot read the description, the painting uses `inku Default`. On the Image tab the same choice reads `Choose from image automatically`, and the model reads the image to choose the catalog.
 
 A work records the colors it was drawn in on its own row. **Redrawing an older work therefore draws it in those colors, not in today's definition of its catalog.** It still draws if the catalog has since been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries a note in those cases: `Retired` when the catalog is gone, and `No record of its colors` for an older work that has no recorded colors — that one is drawn from the current definition.
 
-`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). Set its default for this browser under Settings → Display and operation; it starts off. The input chip chooses for the current drawing and does not change the saved default. Derived works also start from the default rather than the parent, and you can choose again in the dialog. The choice applies to the whole work, is recorded on it, and is used when replaying the saved work as it stands.
+`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). Set its default per input tab under `Settings` → `Drawing defaults`; it starts off. The input chip chooses for the current drawing and does not change the saved default. AI refinement, redrawing from the lineage and instruction edits start from the value recorded on the original work (off for an older work without the record), and you can choose again in the dialog. The choice applies to the whole work, is recorded on it, and is used when replaying the saved work as it stands. The Image tab and the picture folder do not use it.
 
 There are eleven canvases.
 
@@ -318,7 +318,9 @@ Coordinates stay normalized to 0.0–1.0 whatever the canvas. **A mark's size is
 
 **Drawn on a paper of another ratio than its declaration, the app asks before drawing**: from `Draw` in the DDL tab, from an instruction edit, and from a new DDL. `Fit it in` places the composition, keeping its ratio, in a frame in the middle of the paper, and the ground and background fill the margins; marks reaching out of the frame are drawn to the paper's edges. `Draw to this paper` spreads it to the paper's ratio as before. Cancelling draws nothing. An older work without a declaration is taken to have the ratio of the paper it was drawn on, and a work with no such record is not asked about. A work fitted without an edit is drawn from its saved Score in the frame and kept in the lineage as a `Fit` child.
 
-The conditions of the displayed work and the conditions for the next work are separate. `Conditions of the displayed work` records how the selected saved work was painted; `Conditions for the next work` controls what comes next. Reading a work preview in the library does not change the next conditions. Different values on the two sides are not an error.
+The conditions of the displayed work and the conditions for the next work are separate. `Conditions of the displayed work` (the strip above the canvas) records how the work on screen was painted: drawing, sketch, composition, laws and colors, stroke limit, color catalog, canvas, model, size and creation time. A condition the work did not record (a work from before that record) reads `N/A`. A work drawn from a picture shows no drawing, sketch or composition row. While a drawing runs, the strip keeps showing the previous work whose picture stays on the canvas, and switches to the new work when it is done. Right after, until the new work's lineage generation is read, the lineage reads `…`.
+
+`Conditions for the next work` controls what comes next. Opening a work copies its record into the conditions of the tab it opens in (Describe or Image). An on/off choice the work did not record (sketch, composition, stroke limit) becomes off; any other (drawing, color catalog, canvas, model) becomes that tab's default. Opening a work while a description batch runs leaves the batch's conditions alone.
 
 ## 8. Refine
 
@@ -413,7 +415,7 @@ With the chunk move, a turn makes one try. When the AI's answer or the drawn pic
 
 The refinement stops when its moves are done, when no move can start, and when two turns in a row keep no child.
 
-In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Lift the stroke limit and a direction. **The model you choose picks the sentences, takes the laws stage, chooses the chunk moves and writes their rewrites, and draws the children.** The direction (up to 1,000 characters) reaches the laws move and the chunk move, not the juxtaposition move's request. The chunk move needs a direction and does not start with the field empty; the empty field shows an example in grey ("Move from the figurative toward the abstract. …"). Choosing `Chunk move` among the moves to take clears the other two. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). Lift the stroke limit starts from the saved default.
+In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Lift the stroke limit and a direction. **The model you choose picks the sentences, takes the laws stage, chooses the chunk moves and writes their rewrites, and draws the children.** The direction (up to 1,000 characters) reaches the laws move and the chunk move, not the juxtaposition move's request. The chunk move needs a direction and does not start with the field empty; the empty field shows an example in grey ("Move from the figurative toward the abstract. …"). Choosing `Chunk move` among the moves to take clears the other two. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). Lift the stroke limit starts from the value recorded on the original work (off for an older work without the record).
 
 After `Start refining`, the progress appears every few seconds: for each turn, the move taken, its outcome (Kept, Too little change, Could not start, Not usable), how much changed, the sentence added or the law chosen (for a chunk move, the move and the chunk's title, and a rewrite's new title; for example `Simplify “Mount Fuji” → “Overlapping slopes”`), and a thumbnail of the child. `Stop` cancels the child being drawn and keeps the children so far. Closing the dialog does not stop the refinement, and opening the work again shows its progress. One refinement of yours runs at a time.
 
@@ -657,7 +659,7 @@ While it runs, the current line, progress, elapsed time, token counts, and the i
 
 Descriptions used before can be restored from `Batch description history`. The last fifty are kept (v2.13.21; twenty before that). The list reaches half the window height at most and scrolls when it does not fit. Clicking outside it or pressing `Esc` closes it.
 
-A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It restores the original text and drawing conditions, checks saved works, and draws only unfinished lines with their original line numbers. After a reload, a registered interrupted or expired run can be offered for resumption even if no work was saved yet. Resume is not offered while a drawing is active or its state is uncertain. Older unregistered runs are offered only when history and text establish the unfinished lines.
+A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It restores the original text and drawing conditions, checks saved works, and draws only unfinished lines with their original line numbers. After a reload, a registered interrupted or expired run can be offered for resumption even if no work was saved yet. Resume is not offered while a drawing is active or its state is uncertain. Older unregistered runs are offered only when history and text establish the unfinished lines. Pressing `New` while the resume panel is shown asks first; once it is removed, this browser no longer continues that batch (the works it drew stay). Without the panel, the draw button reads `Paint batch`.
 
 When a stopped batch or one that reached the end still has failed lines, `Retry failed works` appears. It redraws only the failed lines, with their original text, line numbers and drawing conditions, leaving out lines that succeeded, were interrupted or never ran. Lines that succeed leave the error list, and the remaining errors can be tried again. When the previous batch's full text cannot be confirmed, the button is unavailable and says so.
 
@@ -675,7 +677,7 @@ Each picture goes the same way as the Image tab in §16 and is saved. The condit
 
 A browser cannot read a folder from a typed path, and cannot open a picked folder again later, so there is no path field.
 
-**Stopping and continuing**: the run stops with `Stop`, or by itself when the Server cannot be reached. While the same folder is chosen, `Continue (N left)` paints the pictures not yet painted. After a reload, choose the same folder again. The browser records the submitted file order and reconciles it with saved works before continuing; losing browser localStorage loses that reconciliation. A painted picture is recognised by its path inside the folder, its size and its modification time. A replacement with a changed size or modification time is painted again. `Paint from the start` forgets that folder's progress and paints every picture.
+**Stopping and continuing**: the run stops with `Stop`, or by itself when the Server cannot be reached. While the same folder is chosen, `Continue (N left)` paints the pictures not yet painted. After a reload, choose the same folder again. The browser records the submitted file order and reconciles it with saved works before continuing; losing browser localStorage loses that reconciliation. A painted picture is recognised by its path inside the folder, its size and its modification time. A replacement with a changed size or modification time is painted again. `Paint from the start` forgets that folder's progress and paints every picture. `New` lets go of the chosen folder but keeps its progress, so choosing the same folder again continues where it stopped.
 
 **Pictures that failed**: one failure does not stop the run. Open `N pictures could not be painted` to see each path and its reason. `Continue` paints them again.
 
@@ -698,14 +700,16 @@ Open it from `Settings` in the app rail. Settings are grouped as `Display and op
 | Category | Pages and contents |
 |---|---|
 | Display and operation | `Display and operation`. Text size, caption position, UI mode, facts under history thumbnails, mascot, and related controls |
-| Making | `Batch retry` and `Demo` |
+| Making | `Drawing defaults`, `Batch retry` and `Demo` |
 | Image | `Image`. Whether the Image tab's source note gets the file name and the Exif shooting details |
 | ChatGPT plan | When signed in and the feature is enabled, its dedicated page connects, reconnects, or disconnects your account. Publish models in your personal `Models` settings |
 | Export | `File saving` (save location, PNG export templates, animation, and the share card's page shape and seal) and `Clipboard` |
 | Connections and administration | Administrators manage shared `Models`, `User management`, `DB settings`, and `Log retention`. Leaders can also manage users within their scope. Where personal ChatGPT is enabled, members can open their own `Models` settings. Administrators' `Detailed` mode also shows `Other (server)` and `Limits` |
 | Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 
-To choose one drawing model for both stages, open `Model selection` from the making screen's conditions and select it. Choose the image-reading model separately from the Image tab when needed. When opened from Settings, use the `LLM` and `Vision` tabs. Ordinary model selection omits providers with no candidates. If a normal provider's selected model disappears, selection moves to the first available candidate, or keeps the original ID if none exists. Personal ChatGPT does not switch to another model automatically and explains why it is unavailable. The generic pickers in Demo and the Instruction editor instead show empty-list guidance and mark an absent selected ID `Not in the list`.
+`Drawing defaults` sets, per input tab (Describe, Image, the description batch and the picture folder), the drawing, sketch, composition and laws, stroke limit, color catalog, canvas and model that appear at first and when you press `New`; `Save defaults` saves them (your own setting; Image and the picture folder have no drawing, sketch, composition or stroke-limit fields). Saving does not change the input area until you press `New` next. Opening a work also uses these for the drawing, color catalog, canvas and model the work did not record. Until you save them once, they are the shipped defaults with the drawing model, image-reading model and color catalog you chose yourself in an earlier version laid over them.
+
+To choose one drawing model for both stages, open `Model selection` from the making screen's conditions and select it. The model chosen there is the input tab's current choice and is not saved as a setting. Choose the image-reading model separately from the Image tab when needed. When opened from Settings, use the `LLM` and `Vision` tabs. Ordinary model selection omits providers with no candidates. If a normal provider's selected model disappears, selection moves to the first available candidate, or keeps the original ID if none exists. Personal ChatGPT does not switch to another model automatically and explains why it is unavailable. The generic pickers in Demo and the Instruction editor instead show empty-list guidance and mark an absent selected ID `Not in the list`.
 
 The stars at the edge of each drawing-model button summarize its rating. Ordinary drawing-model selection uses the lower of the available ratings for writing the instructions and for completion, or the LLM rating for an end-to-end measurement. Its detailed hover can show the strengths of each separately measured stage. Generic pickers show a single rating for the purpose in both button and hover; they do not select a model per stage. Hover also shows `LLM` and `Vision` badges (greyed where unavailable), three recommendation tiers (★★★, ★★☆, ★☆☆), approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model), and speed (measured mean seconds when present, otherwise the speed label).
 
@@ -756,7 +760,7 @@ Flags you omit fall back to the server defaults. Sketch from life defaults to of
 | Symptom | What to do |
 |---|---|
 | Not what you meant | Read the instructions and make place, count, shape, and material concrete |
-| The description is read too coarsely | Turn the sketch on to supplement place and light; review its text and edit it before drawing again if needed |
+| The description is read too coarsely | Turn the sketch on to supplement place and light; review its text, and if it is not enough, add place and light to the description and draw again |
 | The picture is monotonous | Add one of touch, sway, composition, or color. Or try `Another composition` |
 | The lines are too tidy | Light `Lift the stroke limit` |
 | Too many elements | State the count explicitly, as in `three lines` or `twelve` |

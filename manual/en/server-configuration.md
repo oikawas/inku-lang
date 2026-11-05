@@ -253,11 +253,13 @@ Open `Settings` from the application rail. The top `Standard` / `Detailed` switc
 | Category | Main items | Scope |
 |---|---|---|
 | `Display and operation` | Text size, caption position, UI mode, and fields below history thumbnails | Text size, UI mode, and related choices belong to the member. Text size takes effect immediately. |
-| `Making` | Batch retry count and `Demo` | The batch retry count belongs to the member. `Demo` is in the Making category. |
+| `Making` | `Drawing defaults`, batch retry count and `Demo` | The drawing defaults and the batch retry count belong to the member. `Demo` is in the Making category. |
 | `Export` | Save location, PNG templates, animation, and cards | The save location belongs only to the browser that chose it. PNG templates apply to that member's PNG menu. |
 | `Connections and administration` | `Models`, `User management`, `DB settings`, `Log retention`, and, in Detailed mode, `Other (server)` and `Limits` | `User management` is available to `admins` and to `leaders` (for the ordinary users of their own organisation group); the other items to `admins` only. |
 
-`Model selection` is a separate drawing-time screen for choosing the drawing and Vision models. Opened from Settings, it has `LLM` and `Vision` tabs; the change buttons on the making screen show only the relevant model. Both drawing stages use the same model. The administrator's `Models` screen manages connection services, Base URLs, API keys encrypted for storage, models visible to members, and LLM / Vision purpose. Adding or changing a connection does not by itself make its models visible to members.
+`Drawing defaults` are each input tab's first drawing conditions (drawing, sketch, composition, stroke limit, color catalog, canvas and model). Until a member saves them, they are the shipped defaults (`core/crates/inku-pipeline/data/release-defaults.json`, reviewed at each public release) with the drawing model, Vision model and color catalog the member chose in an earlier version laid over them, and saving another setting never writes them. The old per-member canvas (plugin storage `canvas-aspect`) is not carried over and is removed the next time settings are saved.
+
+`Model selection` is a separate drawing-time screen for choosing the drawing and Vision models. The model chosen there is the input tab's current choice and is not saved as a setting. Opened from Settings, it has `LLM` and `Vision` tabs; the change buttons on the making screen show only the relevant model. Both drawing stages use the same model. The administrator's `Models` screen manages connection services, Base URLs, API keys encrypted for storage, models visible to members, and LLM / Vision purpose. Adding or changing a connection does not by itself make its models visible to members.
 
 To change the published models as an administrator:
 

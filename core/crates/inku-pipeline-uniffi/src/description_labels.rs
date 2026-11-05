@@ -6,6 +6,7 @@
 //! the description meter) call this one copy.
 
 use regex::Regex;
+use std::sync::LazyLock;
 
 fn regex(pattern: &str) -> Regex {
     Regex::new(pattern).expect("static description label pattern")
@@ -13,16 +14,17 @@ fn regex(pattern: &str) -> Regex {
 
 /// The labels' byte ranges in `text`, each with its kind, in order.
 fn byte_spans(text: &str) -> Vec<(usize, usize, &'static str)> {
-    let number = regex(r"^[ \t]*[0-9０-９]+[.．、)）:：　][ \t　]*");
-    let comment = regex(r"\[[^\[\]\n]*\]|［[^［］\n]*］");
+    static NUMBER: LazyLock<Regex> =
+        LazyLock::new(|| regex(r"^[ \t]*[0-9０-９]+[.．、)）:：　][ \t　]*"));
+    static COMMENT: LazyLock<Regex> = LazyLock::new(|| regex(r"\[[^\[\]\n]*\]|［[^［］\n]*］"));
     let mut spans = Vec::new();
     let mut offset = 0;
     for line in text.split_inclusive('\n') {
-        if let Some(found) = number.find(line) {
+        if let Some(found) = NUMBER.find(line) {
             spans.push((offset + found.start(), offset + found.end(), "number"));
         }
         spans.extend(
-            comment
+            COMMENT
                 .find_iter(line)
                 .map(|m| (offset + m.start(), offset + m.end(), "comment")),
         );
@@ -37,11 +39,16 @@ fn byte_spans(text: &str) -> Vec<(usize, usize, &'static str)> {
 /// Offsets count Unicode scalar values, as Server's `excluded_spans` counts
 /// Python characters, so an editor can paint exactly what is dropped.
 pub fn description_label_spans(text: &str) -> String {
-    let scalar_offset = |byte: usize| text[..byte].chars().count();
+    let mut byte_cursor = 0;
+    let mut scalar_cursor = 0;
     let spans: Vec<serde_json::Value> = byte_spans(text)
         .into_iter()
         .map(|(start, end, kind)| {
-            serde_json::json!([scalar_offset(start), scalar_offset(end), kind])
+            scalar_cursor += text[byte_cursor..start].chars().count();
+            let scalar_start = scalar_cursor;
+            scalar_cursor += text[start..end].chars().count();
+            byte_cursor = end;
+            serde_json::json!([scalar_start, scalar_cursor, kind])
         })
         .collect();
     serde_json::Value::Array(spans).to_string()
@@ -103,5 +110,56 @@ mod tests {
             );
         }
         eprintln!("compared {} shared label cases", cases.len());
+    }
+
+    #[test]
+    fn long_multilingual_labels_match_the_previous_algorithm() {
+        use std::time::Instant;
+
+        fn previous(text: &str) -> String {
+            let number = regex::Regex::new(r"^[ \t]*[0-9０-９]+[.．、)）:：　][ \t　]*").unwrap();
+            let comment = regex::Regex::new(r"\[[^\[\]\n]*\]|［[^［］\n]*］").unwrap();
+            let mut spans = Vec::new();
+            let mut offset = 0;
+            for line in text.split_inclusive('\n') {
+                if let Some(m) = number.find(line) {
+                    spans.push((offset + m.start(), offset + m.end(), "number"));
+                }
+                spans.extend(
+                    comment
+                        .find_iter(line)
+                        .map(|m| (offset + m.start(), offset + m.end(), "comment")),
+                );
+                offset += line.len();
+            }
+            spans.sort_unstable();
+            let offset = |byte| text[..byte].chars().count();
+            serde_json::Value::Array(
+                spans
+                    .into_iter()
+                    .map(|(start, end, kind)| serde_json::json!([offset(start), offset(end), kind]))
+                    .collect(),
+            )
+            .to_string()
+        }
+        let text = (1..=1000)
+            .map(|line| format!("{line}． 青い絵🎨 ［注釈{line}］ and [note {line}]\n"))
+            .collect::<String>();
+        let started = Instant::now();
+        let expected = previous(&text);
+        let before = started.elapsed();
+        let started = Instant::now();
+        let actual = description_label_spans(&text);
+        let after = started.elapsed();
+        assert_eq!(actual, expected);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&actual)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            3000
+        );
+        eprintln!("description-labels-1000-lines previous={before:?} optimized={after:?}");
     }
 }

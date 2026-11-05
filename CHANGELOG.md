@@ -8,12 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Drawing defaults: a new user's first choices come from one shipped file (`core/crates/inku-pipeline/data/release-defaults.json`). The author reviews it at each release (`scripts/release-defaults.py`), and the publishing tool stops on a version it was not reviewed for. The defaults are stored only when the user saves them in Settings, never when another setting is saved or the page opens. The old per-user canvas and the browser's old stroke-limit default are not carried over and are removed.
-- Web: the strip of the work's choices takes its own row under the tabs, so its items no longer overlap or cut off, and during and right after a drawing it shows one work's values only. The choices an input tab takes from an opened work come from the Server, by the core's rule. The instruction and refinement dialogs and derived drawings use the tab's choices and the work's recorded stroke limit, not the old model setting. The image tab no longer sends the sketch or lifts the stroke limit (as before). New on a text batch asks before it drops the resume panel; a picture folder keeps the record of what it drew. Settings' drawing defaults use the existing settings controls and say what they do. The generation information shows names, not ids.
-- Server: a work drawn with a plan records its composition as on.
-
-- Web: remember animation export choices per user in this browser for the next export.
-
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.
@@ -598,6 +592,14 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.317 (2026-11-05 / Build 1393)
+
+- Drawing defaults: a new user's first choices come from one shipped file (`core/crates/inku-pipeline/data/release-defaults.json`). The author reviews it at each release (`scripts/release-defaults.py`), and the publishing tool stops on a version it was not reviewed for. The defaults are stored only when the user saves them in Settings, never when another setting is saved or the page opens. The old per-user canvas and the browser's old stroke-limit default are not carried over and are removed.
+- Web: the strip of the work's choices takes its own row under the tabs, so its items no longer overlap or cut off, and during and right after a drawing it shows one work's values only. The choices an input tab takes from an opened work come from the Server, by the core's rule. The instruction and refinement dialogs and derived drawings use the tab's choices and the work's recorded stroke limit, not the old model setting. The image tab no longer sends the sketch or lifts the stroke limit (as before). New on a text batch asks before it drops the resume panel; a picture folder keeps the record of what it drew. Settings' drawing defaults use the existing settings controls and say what they do. The generation information shows names, not ids.
+- Server: a work drawn with a plan records its composition as on.
+
+- Web: remember animation export choices per user in this browser for the next export.
 
 ## v2.15.316 (2026-11-04 / Build 1392)
 

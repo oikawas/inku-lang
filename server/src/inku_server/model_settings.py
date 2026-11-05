@@ -91,9 +91,34 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     return _ordered_settings(core_catalog("normalize_settings", settings=settings, order=order, env=_settings_environment()))
 
 
+def _host_providers() -> dict[str, Any] | None:
+    """The server's providers as the core's drawing defaults read them.
+
+    Only ids and model ids leave: a tab's default on a provider the
+    administrator added (one the built-in catalog does not list) is kept rather
+    than replaced with the legacy setting's model (2026-11-05). Without a
+    database to read (a bare unit test), the field is left out and the core
+    behaves as before.
+    """
+    try:
+        from .db import get_model_settings
+        providers = get_model_settings().get("providers") or {}
+    except Exception:
+        return None
+    return {
+        str(provider_id): {"models": [{"id": model["id"]} for model in row.get("models") or []
+                                      if isinstance(model, dict) and model.get("id")]}
+        for provider_id, row in providers.items() if isinstance(row, dict)
+    }
+
+
 def _user_catalog_context() -> dict[str, Any]:
     from .color_catalogs import DEFAULT_COLOR_CATALOG_ID, color_catalog_ids
-    return {"color_ids": sorted(color_catalog_ids()), "default_color": DEFAULT_COLOR_CATALOG_ID}
+    context: dict[str, Any] = {"color_ids": sorted(color_catalog_ids()), "default_color": DEFAULT_COLOR_CATALOG_ID}
+    providers = _host_providers()
+    if providers is not None:
+        context["providers"] = providers
+    return context
 
 
 def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:

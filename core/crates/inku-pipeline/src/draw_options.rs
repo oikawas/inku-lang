@@ -107,7 +107,7 @@ pub fn options_of_work(record: &Value) -> Value {
 #[must_use]
 pub fn release_legacy_settings() -> Value {
     let tabs = release_draw_defaults();
-    let providers = draw_option_providers(&Value::Null);
+    let providers = draw_option_providers(&Value::Null, &Value::Null);
     let split = |reference: &str| {
         let (provider, model) = split_ref(reference, &providers);
         (provider.unwrap_or("").to_owned(), model.to_owned())
@@ -154,11 +154,12 @@ fn chosen_model(user: &Value, image: bool, providers: &Value) -> Option<String> 
 /// Build defaults from the release, with the model and color catalog a user
 /// saved themselves in the legacy settings laid over it. `user` is the stored
 /// settings before normalization, so a value the normalizer filled in is not
-/// taken for the user's choice.
+/// taken for the user's choice. `host_providers` are the host's own providers
+/// (see `draw_option_providers`); `Value::Null` when it has none to add.
 #[must_use]
-pub fn default_draw_defaults(user: &Value) -> Value {
+pub fn default_draw_defaults(user: &Value, host_providers: &Value) -> Value {
     let mut tabs = release_draw_defaults();
-    let providers = draw_option_providers(user);
+    let providers = draw_option_providers(user, host_providers);
     let stage1 = chosen_model(user, false, &providers);
     let vision = chosen_model(user, true, &providers);
     let color = text(&user["color_catalog_id"])
@@ -221,9 +222,14 @@ fn model_ref(value: &Value, user: &Value, image: bool, providers: &Value) -> Opt
 
 /// Normalize each field separately, using the provided existing user settings as fallback.
 #[must_use]
-pub fn normalize_draw_defaults(input: &Value, user: &Value, color_ids: &Value) -> Value {
-    let mut result = default_draw_defaults(user);
-    let providers = draw_option_providers(user);
+pub fn normalize_draw_defaults(
+    input: &Value,
+    user: &Value,
+    color_ids: &Value,
+    host_providers: &Value,
+) -> Value {
+    let mut result = default_draw_defaults(user, host_providers);
+    let providers = draw_option_providers(user, host_providers);
     let known = |id: &str| {
         id == "auto"
             || color_ids
@@ -496,7 +502,7 @@ mod tests {
         // The file survives the core's own validation unchanged.
         let ids = json!(["default"]);
         assert_eq!(
-            normalize_draw_defaults(&release_draw_defaults(), &Value::Null, &ids),
+            normalize_draw_defaults(&release_draw_defaults(), &Value::Null, &ids, &Value::Null),
             release_draw_defaults()
         );
     }
@@ -617,14 +623,14 @@ mod tests {
     #[test]
     fn models_are_qualified_and_unresolvable_names_fall_back() {
         let user = json!({"stage1_provider":"openai","stage1_model":"same", "vision_provider":"gemini", "vision_model":"same"});
-        let defaults = default_draw_defaults(&user);
+        let defaults = default_draw_defaults(&user, &Value::Null);
         assert_eq!(
             defaults["describe"]["models"],
             json!({"stage1":"openai:same","stage2":"openai:same"})
         );
         assert_eq!(defaults["image"]["models"], json!({"vision":"gemini:same"}));
         let input = json!({"describe":{"models":{"stage1":"same", "stage2":"gemini:other"}}, "image":{"models":{"vision":"unresolvable-model"}}, "batch_text":{"models":{"stage1":"ollama:chosen","stage2":"broken"}}});
-        let normalized = normalize_draw_defaults(&input, &user, &Value::Null);
+        let normalized = normalize_draw_defaults(&input, &user, &Value::Null, &Value::Null);
         assert_eq!(
             normalized["describe"]["models"],
             json!({"stage1":"openai:same","stage2":"openai:same"})
@@ -636,6 +642,70 @@ mod tests {
         assert_eq!(
             normalized["batch_text"]["models"],
             json!({"stage1":"ollama:chosen","stage2":"ollama:chosen"})
+        );
+    }
+
+    /// swiftセッション-codex's probe (2026-11-05): a tab's model on a provider
+    /// only the host knows fell back to the legacy setting's model.
+    #[test]
+    fn a_host_provider_keeps_its_tab_default() {
+        let settings = json!({"stage1_provider":"custom-a","stage1_model":"model-a",
+            "vision_provider":"custom-c","vision_model":"model-c"});
+        let patch = json!({"draw_defaults":{
+            "describe":{"models":{"stage1":"custom-a:model-a","stage2":"custom-a:model-a"}},
+            "batch_text":{"models":{"stage1":"custom-b:model-b","stage2":"custom-b:model-b"}},
+            "image":{"models":{"vision":"custom-c:model-c"}}}});
+        let request = |providers: Value| {
+            call(
+                json!({"action":"update_user","settings":settings,"patch":patch,
+                "color_ids":["default"],"providers":providers}),
+            )["settings"]["draw_defaults"]
+                .clone()
+        };
+        // Without the host's providers: what the probe saw.
+        assert_eq!(
+            request(Value::Null)["batch_text"]["models"]["stage1"],
+            "custom-a:model-a"
+        );
+        let host = json!({"custom-a":{"models":[{"id":"model-a"}]},
+            "custom-b":{"models":[{"id":"model-b"}]},"custom-c":{}});
+        let kept = request(host.clone());
+        assert_eq!(
+            kept["batch_text"]["models"],
+            json!({"stage1":"custom-b:model-b","stage2":"custom-b:model-b"})
+        );
+        assert_eq!(
+            kept["describe"]["models"],
+            json!({"stage1":"custom-a:model-a","stage2":"custom-a:model-a"})
+        );
+        assert_eq!(
+            kept["image"]["models"],
+            json!({"vision":"custom-c:model-c"})
+        );
+        // Reading the stored value back keeps it too; a bare model the host's
+        // provider alone lists is qualified with it.
+        let stored = json!({"draw_defaults":kept});
+        let read = call(json!({"action":"normalize_user","settings":stored,
+            "color_ids":["default"],"providers":host}))["settings"]["draw_defaults"]
+            .clone();
+        assert_eq!(read["batch_text"]["models"]["stage1"], "custom-b:model-b");
+        let bare = normalize_draw_defaults(
+            &json!({"batch_image":{"models":{"vision":"model-b"}}}),
+            &Value::Null,
+            &Value::Null,
+            &host,
+        );
+        assert_eq!(bare["batch_image"]["models"]["vision"], "custom-b:model-b");
+        // The two other actions take the same field.
+        let defaults = call(json!({"action":"normalize_draw_defaults","draw_defaults":
+            {"describe":{"models":{"stage1":"custom-b:model-b"}}},"providers":host}));
+        assert_eq!(
+            defaults["draw_defaults"]["describe"]["models"]["stage1"],
+            "custom-b:model-b"
+        );
+        assert!(
+            call(json!({"action":"default_draw_defaults","providers":host}))["draw_defaults"]
+                .is_object()
         );
     }
 }

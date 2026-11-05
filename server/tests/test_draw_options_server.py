@@ -63,6 +63,32 @@ def test_old_canvas_is_ignored_dropped_and_defaults_stay_unsaved_until_saved(use
                       json={"value": {"selected": "a4"}}).status_code == 403
 
 
+def test_a_tab_default_on_a_provider_the_administrator_added_is_kept(user):
+    # 2026-11-05: the core knew only the built-in providers and the legacy
+    # keys' ones, so a custom provider's model fell back to the legacy model.
+    user_id, headers = user
+    with db.SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        row.model_settings = json.dumps({"stage1_provider": "openai", "stage1_model": "gpt-test"})
+        session.commit()
+    original = db.get_model_settings()
+    added = json.loads(json.dumps(original))
+    added["providers"]["my-local"] = {"name": "Mine", "kind": "openai", "base_url": "http://127.0.0.1:9/v1",
+                                      "models": [{"id": "m1"}]}
+    db.update_model_settings(added)
+    try:
+        client = TestClient(app)
+        response = client.patch("/api/auth/me/settings", headers=headers, json={"model_settings": {
+            "draw_defaults": {"batch_text": {"models": {"stage1": "my-local:m1", "stage2": "my-local:m1"}}}}})
+        assert response.status_code == 200
+        current = client.get("/api/auth/me", headers=headers).json()["model_settings"]["draw_defaults"]
+        assert current["batch_text"]["models"] == {"stage1": "my-local:m1", "stage2": "my-local:m1"}
+        assert current["describe"]["models"]["stage1"] == "openai:gpt-test"
+        assert _stored(user_id)[0]["draw_defaults"]["batch_text"]["models"]["stage1"] == "my-local:m1"
+    finally:
+        db.update_model_settings(original)
+
+
 def test_opening_a_work_adopts_by_the_core_rule_with_the_users_defaults(user):
     _user_id, headers = user
     client = TestClient(app)

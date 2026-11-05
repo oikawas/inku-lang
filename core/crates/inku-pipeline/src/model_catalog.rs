@@ -457,11 +457,35 @@ pub(crate) fn qualify_ref(provider: &str, reference: &str, providers: &Value) ->
     }
 }
 
-pub(crate) fn draw_option_providers(user: &Value) -> Value {
+/// The providers a drawing default may name: the built-in catalog, the host's
+/// own (`extra`, shaped like the catalog's: `{id: {"models": [{"id"}]}}`,
+/// e.g. a custom provider an administrator or a macOS user added), and the
+/// legacy keys' providers. Without the host's, a model on a provider only the
+/// host knows could not be read and fell back to the legacy setting.
+pub(crate) fn draw_option_providers(user: &Value, extra: &Value) -> Value {
     let mut providers = catalog()["providers"]
         .as_object()
         .cloned()
         .unwrap_or_default();
+    for (id, row) in extra.as_object().into_iter().flatten() {
+        let id = id.trim();
+        if id.is_empty() {
+            continue;
+        }
+        let models = row["models"]
+            .as_array()
+            .map(|models| {
+                models
+                    .iter()
+                    .filter(|model| model["id"].as_str().is_some_and(|m| !m.trim().is_empty()))
+                    .map(|model| json!({"id":model["id"]}))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        providers
+            .entry(id.to_owned())
+            .or_insert(json!({"models":models}));
+    }
     for key in ["stage1_provider", "vision_provider"] {
         if let Some(id) = user[key]
             .as_str()
@@ -507,7 +531,12 @@ const LEGACY_DRAW_KEYS: &[&str] = &[
     "color_catalog_id",
 ];
 
-fn normalize_user(input: &Value, color_ids: &Value, default_color: &str) -> Value {
+fn normalize_user(
+    input: &Value,
+    color_ids: &Value,
+    default_color: &str,
+    host_providers: &Value,
+) -> Value {
     let mut clean = user_defaults();
     if !input.is_object() {
         return clean;
@@ -596,8 +625,12 @@ fn normalize_user(input: &Value, color_ids: &Value, default_color: &str) -> Valu
             .unwrap_or(1)
     );
     // The stored settings, not the filled ones: a filled value is not a choice.
-    clean["draw_defaults"] =
-        crate::draw_options::normalize_draw_defaults(&input["draw_defaults"], input, color_ids);
+    clean["draw_defaults"] = crate::draw_options::normalize_draw_defaults(
+        &input["draw_defaults"],
+        input,
+        color_ids,
+        host_providers,
+    );
     clean
 }
 
@@ -605,7 +638,13 @@ fn normalize_user(input: &Value, color_ids: &Value, default_color: &str) -> Valu
 /// the legacy model and catalog keys and `draw_defaults` stay absent until
 /// saved, so the release's defaults (and a later release's new ones) keep
 /// applying to them.
-fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &str) -> Value {
+fn update_user(
+    current: &Value,
+    patch: &Value,
+    colors: &Value,
+    default_color: &str,
+    providers: &Value,
+) -> Value {
     let mut stored = if current.is_object() {
         current.clone()
     } else {
@@ -652,7 +691,8 @@ fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &s
     }
     if let Some(patch_defaults) = patch.get("draw_defaults").filter(|v| v.is_object()) {
         // A patch may name some tabs and keys; the rest keep what is in effect now.
-        let mut merged = normalize_user(&stored, colors, default_color)["draw_defaults"].clone();
+        let mut merged =
+            normalize_user(&stored, colors, default_color, providers)["draw_defaults"].clone();
         for (tab, options) in patch_defaults.as_object().into_iter().flatten() {
             if merged.get(tab).is_none() {
                 continue;
@@ -663,7 +703,7 @@ fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &s
         }
         stored["draw_defaults"] = merged;
     }
-    let mut clean = normalize_user(&stored, colors, default_color);
+    let mut clean = normalize_user(&stored, colors, default_color, providers);
     let saved = |key: &str| stored[key].as_str().is_some_and(|s| !s.trim().is_empty());
     let object = clean.as_object_mut().expect("user settings");
     for &key in LEGACY_DRAW_KEYS {
@@ -1231,17 +1271,20 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             json!({"release":crate::draw_options::release_defaults(),
                 "draw_options":crate::draw_options::DRAW_OPTIONS.iter().map(|(key, _)| *key).collect::<Vec<_>>()})
         }
+        // `providers` (optional, all four): the host's own providers, shaped
+        // like the catalog's `{id: {"models": [{"id"}]}}`, so a drawing
+        // default on a provider only the host knows is kept.
         Some("default_draw_defaults") => {
-            json!({"draw_defaults":crate::draw_options::default_draw_defaults(&user_defaults())})
+            json!({"draw_defaults":crate::draw_options::default_draw_defaults(&user_defaults(), &request["providers"])})
         }
         Some("normalize_draw_defaults") => {
-            json!({"draw_defaults":crate::draw_options::normalize_draw_defaults(&request["draw_defaults"], &user_defaults(), &request["color_ids"])})
+            json!({"draw_defaults":crate::draw_options::normalize_draw_defaults(&request["draw_defaults"], &user_defaults(), &request["color_ids"], &request["providers"])})
         }
         Some("normalize_user") => {
-            json!({"settings":normalize_user(&request["settings"], &request["color_ids"], request["default_color"].as_str().unwrap_or("default"))})
+            json!({"settings":normalize_user(&request["settings"], &request["color_ids"], request["default_color"].as_str().unwrap_or("default"), &request["providers"])})
         }
         Some("update_user") => {
-            json!({"settings":update_user(&request["settings"], &request["patch"], &request["color_ids"], request["default_color"].as_str().unwrap_or("default"))})
+            json!({"settings":update_user(&request["settings"], &request["patch"], &request["color_ids"], request["default_color"].as_str().unwrap_or("default"), &request["providers"])})
         }
         Some("rate_limits") => {
             let gemini = request["provider"].as_str() == Some("gemini");
@@ -1532,11 +1575,18 @@ mod tests {
             );
         }
         for row in array(cases.get("user_normalization")) {
-            let actual = normalize_user(&row["input"], &json!(["default"]), "default");
+            let actual =
+                normalize_user(&row["input"], &json!(["default"]), "default", &Value::Null);
             assert_eq!(actual, row["result"]);
         }
         for row in array(cases.get("user_updates")) {
-            let actual = update_user(&row["input"], &row["patch"], &json!(["default"]), "default");
+            let actual = update_user(
+                &row["input"],
+                &row["patch"],
+                &json!(["default"]),
+                "default",
+                &Value::Null,
+            );
             assert_eq!(actual, row["result"]);
         }
         for row in array(cases.get("models_normalization")) {

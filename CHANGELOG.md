@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core and Server: a drawing default on a provider the administrator added (one the built-in list lacks) was replaced with the legacy setting's model. The core's `normalize_user`, `update_user`, `normalize_draw_defaults` and `default_draw_defaults` take an optional `providers` field (`{id: {"models": [{"id"}]}}`), and the Server passes its providers' ids and model ids. Without the field nothing changes.
+
 - Android: use currently enabled plugins and imported definitions when rewriting a selected work from its description.
 
 - macOS: use currently enabled plugins when rewriting a saved work from its description, while retaining saved definitions for DDL-based derivations.

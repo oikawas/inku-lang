@@ -726,16 +726,37 @@
 />
 
 <div class="right-panel">
-	<div class="right-tabs" class:english-meta={!isJapanese}>
-		<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
-			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
-		</Tooltip>
-		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show how this work was derived'}>
-			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
-		</Tooltip>
-		<div class="rtab-spacer"></div>
+	<!-- One row: the tabs and the work's actions, which are pressed, then the
+	     displayed work's conditions, which are only read. The tabs stand the
+	     row's full height on an accent underline like the input panel's tabs;
+	     the conditions are bare text past a rule, with no frame, fill or hover
+	     (the author, 2026-11-05). -->
+	<div class="right-tabs">
+		<div class="rtab-group" role="tablist">
+			<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
+				<button class="rtab" role="tab" aria-selected={outputTab === 'canvas'} class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
+			</Tooltip>
+			<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show how this work was derived'}>
+				<button class="rtab" role="tab" aria-selected={outputTab === 'lineage'} class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
+			</Tooltip>
+		</div>
+		{#if currentHistoryId}
+			<WorkActionMenu
+				node={directActionNode}
+				{isJapanese}
+				variant="header"
+				open={directActionMenuOpen}
+				available={!interactionLocked && !generationLocked}
+				unavailableReason={t().workActionGenerationLocked}
+				onRequestOpen={openDirectActionMenu}
+				onOpenChange={(open) => (directActionMenuOpen = open)}
+				onAction={runDirectWorkAction}
+			/>
+		{:else if result && !generationLocked}
+			<span class="work-action-save-first" role="status">{t().workActionSaveFirst}</span>
+		{/if}
 		{#if result}
-			<div class="render-meta-strip" class:english={!isJapanese} aria-label={t().displayedWorkConditions}>
+			<div class="render-meta-strip" role="group" aria-label={t().displayedWorkConditions}>
 				<div class="render-meta-context">
 					<span class="render-meta-heading">{t().displayedWorkConditions}</span>
 					<span class="render-meta-generation">
@@ -782,21 +803,6 @@
 					</span>
 				</div>
 			</div>
-		{/if}
-		{#if currentHistoryId}
-			<WorkActionMenu
-				node={directActionNode}
-				{isJapanese}
-				variant="header"
-				open={directActionMenuOpen}
-				available={!interactionLocked && !generationLocked}
-				unavailableReason={t().workActionGenerationLocked}
-				onRequestOpen={openDirectActionMenu}
-				onOpenChange={(open) => (directActionMenuOpen = open)}
-				onAction={runDirectWorkAction}
-			/>
-		{:else if result && !generationLocked}
-			<span class="work-action-save-first" role="status">{t().workActionSaveFirst}</span>
 		{/if}
 	</div>
 
@@ -1101,16 +1107,24 @@
 	}
 	.right-tabs {
 		display: flex;
-		align-items: center;
+		align-items: stretch;
 		border-bottom: 1px solid var(--border);
 		background: var(--bg);
 		padding: 0 16px;
 		flex-shrink: 0;
 	}
+	/* The tabs stand the row's full height, so their underline sits on the
+	   row's rule however many lines the conditions beside them take. */
+	.rtab-group { display: flex; align-items: stretch; flex: 0 0 auto; }
+	.rtab-group > :global(.tooltip-wrap) { display: flex; align-items: stretch; }
 	.rtab {
+		display: flex;
+		align-items: center;
 		padding: 9px 16px;
 		border: none;
 		border-bottom: 2px solid transparent;
+		border-radius: 6px 6px 0 0;
+		margin-bottom: -1px;
 		background: none;
 		color: var(--fg2);
 		font-size: var(--ui-font-size-13);
@@ -1118,75 +1132,66 @@
 		font-family: inherit;
 		white-space: nowrap;
 	}
-	.rtab.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 500; }
-	.rtab:hover:not(.active):not(:disabled) { color: var(--fg); }
+	.rtab.active { border-bottom-color: var(--accent); color: var(--fg); font-weight: 500; }
+	.rtab:hover:not(.active):not(:disabled) { color: var(--fg); background: var(--bg2); }
 	.rtab:disabled { opacity: 0.35; cursor: not-allowed; }
-	.rtab-spacer { flex: 0 0 12px; }
+	.right-tabs > :global(.work-action-menu),
+	.work-action-save-first { align-self: center; margin-left: 8px; }
+	/* Read only: bare text past a rule, with no frame, fill, underline or
+	   hover, set smaller than the tabs. It takes the rest of the tabs' row and
+	   its items wrap whole, so no label overlaps another at any width or text
+	   size. */
 	.render-meta-strip {
-		display: grid;
-		grid-template-columns: max-content minmax(0, 1fr);
-		align-items: stretch;
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		flex: 1 1 0;
 		min-width: 0;
-		min-height: 44px;
-		order: 2;
-		flex: 1 0 100%;
+		margin-left: 16px;
+		padding: 5px 0 5px 16px;
+		border-left: 1px solid var(--border);
 		color: var(--fg3);
+		cursor: default;
 	}
-	.right-tabs:has(.render-meta-strip) { flex-wrap: wrap; }
 	.render-meta-context {
-		display: grid;
-		grid-template-rows: auto auto;
-		align-content: center;
-		gap: 3px;
-		padding: 7px 12px 7px 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		flex: 0 0 auto;
 	}
 	.render-meta-heading {
-		color: var(--fg2);
-		font-size: var(--ui-font-size-12);
-		font-weight: 500;
+		color: var(--fg3);
+		font-size: var(--ui-font-size-11);
+		line-height: 1.5;
 		white-space: nowrap;
 	}
 	.render-meta-generation {
 		display: flex;
 		align-items: baseline;
-		gap: 4px;
+		gap: 5px;
 		white-space: nowrap;
 	}
-	.render-meta-generation strong { color: var(--fg2); font-size: var(--ui-font-size-13); font-weight: 450; line-height: 1.2; }
-	/* Nine items do not fit beside the tabs: the strip takes its own row and
-	   the items wrap whole, so no label overlaps another at any width or text
-	   size. */
+	.render-meta-generation strong { color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 450; line-height: 1.5; }
 	.render-meta-fields {
 		display: flex;
 		flex-wrap: wrap;
-		row-gap: 4px;
+		column-gap: 14px;
+		row-gap: 1px;
+		flex: 1 1 0;
 		min-width: 0;
-		padding-block: 7px;
 	}
 	.render-meta-item {
-		display: grid;
-		grid-template-rows: auto auto;
-		align-content: center;
-		gap: 2px;
-		flex: 1 1 auto;
-		min-width: calc(64px * var(--ui-text-scale));
-		max-width: calc(220px * var(--ui-text-scale));
-		padding: 0 12px;
-		position: relative;
-	}
-	.render-meta-item::before {
-		position: absolute;
-		top: 8px;
-		bottom: 8px;
-		left: 0;
-		width: 1px;
-		background: var(--border);
-		content: '';
+		display: inline-flex;
+		align-items: baseline;
+		gap: 5px;
+		flex: 0 1 auto;
+		min-width: 0;
+		max-width: calc(280px * var(--ui-text-scale));
 	}
 	.render-meta-label {
 		color: var(--fg3);
-		font-size: var(--ui-font-size-12);
-		line-height: 1.1;
+		font-size: var(--ui-font-size-11);
+		line-height: 1.5;
 		white-space: nowrap;
 	}
 	.render-meta-item strong {
@@ -1195,9 +1200,9 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		color: var(--fg2);
-		font-size: var(--ui-font-size-13);
+		font-size: var(--ui-font-size-12);
 		font-weight: 450;
-		line-height: 1.2;
+		line-height: 1.5;
 		white-space: nowrap;
 	}
 	/* The two numeric items: never ellipsised, and set on the digit grid so a
@@ -1209,46 +1214,29 @@
 		max-width: none;
 		font-variant-numeric: tabular-nums;
 	}
-	/* A work drawn with two models reads as two short lines. */
-	.render-meta-item strong:has(.render-meta-model-line) { display: grid; gap: 1px; }
+	/* A work drawn with two models names both stages on one line. */
+	.render-meta-item strong:has(.render-meta-model-line) { display: inline-flex; gap: 8px; }
 	.render-meta-model-line { display: flex; gap: 4px; min-width: 0; white-space: nowrap; }
 	.render-meta-model-stage { flex: 0 0 auto; color: var(--fg3); }
 	.render-meta-model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 	.work-action-save-first { color: var(--fg3); font-size: 0.78rem; }
-	/* Follow the UI text scale so enlarged labels wrap before columns shrink. */
-	@container canvas-panel (max-width: 67.6923em) {
+	/* Container units follow the UI text scale. Too narrow to share the row:
+	   the conditions drop to their own row below the tabs, ruled above. */
+	@container canvas-panel (max-width: 45em) {
 		.right-tabs { flex-wrap: wrap; padding-inline: 10px; }
 		.rtab { padding-inline: 12px; }
-		.rtab-spacer { display: none; }
-		.render-meta-strip { padding: 0; }
-		.render-meta-context { padding-right: 10px; }
-		.render-meta-item { padding: 0 10px; }
-		.render-meta-strip.english { grid-template-columns: 1fr; }
-		.render-meta-strip.english .render-meta-context {
-			display: flex;
-			align-items: baseline;
-			gap: 8px;
-			padding: 7px 0;
-			flex-wrap: wrap;
+		.render-meta-strip {
+			flex: 1 0 100%;
+			margin-left: 0;
+			padding: 5px 0 6px;
+			border-left: none;
+			border-top: 1px solid var(--border);
 		}
 	}
-	@container canvas-panel (max-width: 80em) {
-		.right-tabs.english-meta { flex-wrap: wrap; padding-inline: 10px; }
-		.right-tabs.english-meta .rtab { padding-inline: 12px; }
-		.right-tabs.english-meta .rtab-spacer { display: none; }
-	}
-	@container canvas-panel (max-width: 50em) {
-		.render-meta-item { padding: 4px 8px; }
-	}
-	@container canvas-panel (max-width: 35.3846em) {
-		.render-meta-strip { grid-template-columns: 1fr; }
-		.render-meta-context {
-			display: flex;
-			align-items: baseline;
-			gap: 8px;
-			padding: 7px 0;
-			flex-wrap: wrap;
-		}
+	/* Narrower still: the heading and the lineage take a line above the items. */
+	@container canvas-panel (max-width: 32em) {
+		.render-meta-strip { flex-direction: column; align-items: stretch; gap: 2px; }
+		.render-meta-context { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 10px; }
 	}
 	.canvas-area {
 		flex: 1;

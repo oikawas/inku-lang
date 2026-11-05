@@ -32,6 +32,13 @@ test('the saved-work strip retains sketch results and readable condition names',
 	assert.match(PANEL, /sketchStateShort\(statusSketchState, isJapanese\)\} \({option.text}\)/);
 });
 
+test('while a drawing runs, the strip keeps naming the work whose picture is on the canvas', () => {
+	const PAGE = fs.readFileSync(path.join(here, '../routes/+page.svelte'), 'utf8');
+	// Held only while the same result is on screen; a new result replaces it.
+	assert.match(PAGE, /if \(item\) heldStatus = \{ item, result: work\.result \}/);
+	assert.match(PAGE, /liveStatusHistoryItem\s*\?\? \(heldStatus && work\.result && heldStatus\.result === work\.result \? heldStatus\.item : null\)/);
+});
+
 test('the route names the work on screen, a picture going through neither', () => {
 	assert.equal(workRouteLabel({ description_ddl: { reading_state: 'read' } }, true), '言葉で描く');
 	assert.equal(workRouteLabel({}, true), '型で描く');

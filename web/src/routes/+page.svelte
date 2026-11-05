@@ -2492,7 +2492,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			?? work.result?.render_hash?.slice(-4)
 			?? ''
 	).toUpperCase());
-	const statusHistoryItem = $derived.by(() => {
+	const liveStatusHistoryItem = $derived.by(() => {
 		if (work.displayedHistoryItem) return work.displayedHistoryItem;
 		if (work.result?.history_id) {
 			const historyId = work.result.history_id;
@@ -2501,6 +2501,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (work.showingDemo) return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
+	// A drawing that starts lets go of the saved work while its picture stays on
+	// the canvas. Until another result replaces that picture, the strip and the
+	// work's tools keep naming the work it belongs to (author, 2026-11-05).
+	let heldStatus = $state<{ item: Iteration | HistoryItem; result: unknown } | null>(null);
+	$effect(() => {
+		const item = liveStatusHistoryItem;
+		if (item) heldStatus = { item, result: work.result };
+	});
+	const statusHistoryItem = $derived(liveStatusHistoryItem
+		?? (heldStatus && work.result && heldStatus.result === work.result ? heldStatus.item : null));
 	const replayableStatusHistoryItem = $derived(
 		statusHistoryItem && "score" in statusHistoryItem && "svg" in statusHistoryItem
 			? statusHistoryItem as Iteration

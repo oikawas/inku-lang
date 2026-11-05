@@ -8,6 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: when a drawing starts from an opened work, the strip keeps showing that work's sketch, creation time and lineage while its picture stays on the canvas (not "no record", "-" or "standalone").
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.

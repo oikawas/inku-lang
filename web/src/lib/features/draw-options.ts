@@ -49,13 +49,17 @@ export type DrawOptionNames = {
 	model?: (ref: string) => string;
 };
 
+/** The input panel's "next work" conditions, top to bottom. The canvas strip
+ *  of the displayed work traces them left to right (author, 2026-11-05). */
+export const INPUT_PANEL_ORDER = ['models', 'catalog', 'route', 'sketch', 'composition', 'wild', 'canvas_aspect'] as const satisfies readonly (typeof DRAW_OPTIONS[number])[];
+
 export function drawOptionRows(options: RecordedDrawOptions | null | undefined, labels: import('../i18n/types.ts').LangPack,
-	view: { image?: boolean; names?: DrawOptionNames } = {}) {
+	view: { image?: boolean; names?: DrawOptionNames; order?: readonly (typeof DRAW_OPTIONS[number])[] } = {}) {
 	const names = { route: labels.drawDefaultsRoute, sketch: labels.sketchLabel, composition: labels.drawDefaultsComposition,
 		wild: labels.wildButton, catalog: labels.colorCatalogButton, canvas_aspect: labels.drawDefaultsCanvas,
 		models: view.image ? labels.drawDefaultsVision : labels.drawDefaultsModel };
 	const model = (ref: string | null | undefined) => (ref ? (view.names?.model?.(ref) ?? ref) : labels.drawOptionsUnavailable);
-	const keys = DRAW_OPTIONS.filter((key) => !view.image || !(TEXT_ONLY_OPTIONS as readonly string[]).includes(key));
+	const keys = (view.order ?? DRAW_OPTIONS).filter((key) => !view.image || !(TEXT_ONLY_OPTIONS as readonly string[]).includes(key));
 	return keys.map((key) => {
 		const value = options?.[key];
 		let text = labels.drawOptionsUnavailable;

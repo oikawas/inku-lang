@@ -29,7 +29,7 @@ struct RunJournalView: View {
                 }
                 Text("… " + Self.currentLabel(current, label: label, attempt: matchingAttempt, display: display)).inkuFont(12, weight: .semibold).foregroundStyle(.primary)
                     .lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 8) {
+                RunMetadataFlow(spacing: 8) {
                     if let snapshot = matchingAttempt {
                         Text(format(snapshot.askedAgain ? "runStatusAskingAgain" : snapshot.attempt > 1 ? "runStatusRetrying" : "runStatusAwaitingReply",
                                     "応答待ち（%@/%@回目）", String(snapshot.attempt), String(snapshot.maxAttempts)))
@@ -40,10 +40,10 @@ struct RunJournalView: View {
                             Text(format("runStatusReceived", "受信 %@ KB", String(bytes / 1024)))
                         }
                     }
-                }.fixedSize().lineLimit(1)
+                }.lineLimit(1).truncationMode(.tail)
                 Text(format(journal.total.unreported > 0 ? "runStatusPartialTokens" : "runStatusTotalTokens",
                             journal.total.unreported > 0 ? "合計（一部不明）入力 %@・出力 %@" : "合計 入力 %@・出力 %@",
-                            count(journal.total.input), count(journal.total.output))).fixedSize().lineLimit(1)
+                            count(journal.total.input), count(journal.total.output))).lineLimit(1).truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .inkuFont(11).foregroundStyle(.secondary).monospacedDigit()
@@ -110,5 +110,40 @@ struct RunJournalView: View {
         if let catalog = facts["catalog_id"].string { return format("runFinishedCatalog", "%@：%@", title, catalog) }
         if let law = facts["main_law"].string { return format("runFinishedLaw", "%@：主の法則 %@", title, law) }
         return format("runFinishedReady", "%@：完了", title)
+    }
+}
+
+/// Wrap whole metadata items, limiting each one to the available width.
+struct RunMetadataFlow: Layout {
+    var spacing: CGFloat = 8
+
+    private func positions(width: CGFloat, subviews: Subviews) -> ([(CGPoint, CGSize)], CGSize) {
+        var result: [(CGPoint, CGSize)] = []
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, usedWidth: CGFloat = 0
+        for view in subviews {
+            let ideal = view.sizeThatFits(.unspecified)
+            let size = view.sizeThatFits(ProposedViewSize(width: min(width, ideal.width), height: nil))
+            let actual = CGSize(width: min(width, size.width), height: size.height)
+            if x > 0 && x + actual.width > width {
+                y += rowHeight + spacing; x = 0; rowHeight = 0
+            }
+            result.append((CGPoint(x: x, y: y), actual))
+            usedWidth = max(usedWidth, x + actual.width)
+            x += actual.width + spacing
+            rowHeight = max(rowHeight, actual.height)
+        }
+        return (result, CGSize(width: usedWidth, height: y + rowHeight))
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        positions(width: max(0, proposal.width ?? .greatestFiniteMagnitude), subviews: subviews).1
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let (items, _) = positions(width: max(0, bounds.width), subviews: subviews)
+        for (view, item) in zip(subviews, items) {
+            view.place(at: CGPoint(x: bounds.minX + item.0.x, y: bounds.minY + item.0.y), anchor: .topLeading,
+                       proposal: ProposedViewSize(item.1))
+        }
     }
 }

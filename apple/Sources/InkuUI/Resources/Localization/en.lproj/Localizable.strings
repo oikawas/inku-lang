@@ -702,7 +702,6 @@
 "変更を保存中" = "Saving changes";
 "複数の印はすべての条件を満たす作品に絞り込みます。" = "Multiple marks show works that match every selected condition.";
 "チェックした作品: %ld 件" = "Checked works: %ld";
-"表示中のチェックを外す" = "Uncheck visible works";
 "ごみ箱を空にする" = "Empty Trash";
 "ごみ箱の操作" = "Trash actions";
 "ライブラリを読み込めません" = "Unable to load the library";
@@ -952,7 +951,6 @@
 "同じ系譜の作品をまとめて表示します。" = "Group works from the same lineage.";
 "保存日時の順序を切り替えます。" = "Change the order of saved dates.";
 "現在のページに表示された作品のチェックを切り替えます。" = "Toggle checks for works on the current page.";
-"ページをまたいでチェックした作品をすべて解除します。" = "Clear all checked works across pages.";
 "作品をプレビューします。制作中の内容は変わりません。" = "Preview the work without changing the current drawing.";
 "1ページに表示する件数を変えます。" = "Change the number of works shown per page.";
 "この作品のコメントを保存します。" = "Save the comment for this work.";

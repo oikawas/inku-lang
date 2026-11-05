@@ -588,8 +588,7 @@ public final class LibraryModel {
         let visible = isGrouped
             ? groups.flatMap { groupMembers[$0.id]?.map(\.id) ?? [$0.representative.id] }
             : works.map(\.id)
-        if !visible.isEmpty, visible.allSatisfy(selectedIDs.contains) { selectedIDs.subtract(visible) }
-        else { selectedIDs.formUnion(visible) }
+        selectedIDs.formUnion(visible)
     }
 
     public func selectedWorks() async throws -> [SavedWork] {

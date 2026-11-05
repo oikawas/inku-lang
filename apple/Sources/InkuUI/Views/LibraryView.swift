@@ -5,6 +5,14 @@ import SwiftUI
 import AppKit
 #endif
 
+@MainActor
+struct LibrarySelectionPresentation {
+    let display: DisplaySettings
+    let selectedIDs: Set<String>
+    var selectTitle: String { display.webCopy("historySelectAll", fallback: "すべて選択") }
+    var clearDisabled: Bool { selectedIDs.isEmpty }
+}
+
 /// The library as Web `HistoryManager.svelte` (Build1162) lays it out: a heading row, a tool row, then the
 /// listing with the preview column beside it. The thumbnail grid holds as many complete rows as fit and pages
 /// instead of scrolling. The owner shows it over the whole window and passes `onClose`.
@@ -43,7 +51,6 @@ struct LibraryView: View {
             ? library.groups.flatMap { library.groupMembers[$0.id]?.map(\.id) ?? [$0.representative.id] }
             : library.works.map(\.id)
     }
-    private var allVisibleSelected: Bool { !visibleIDs.isEmpty && visibleIDs.allSatisfy(library.selectedIDs.contains) }
     /// Web `lineageGroupPageSize` (HistoryManager.svelte:326).
     private static let lineageGroupPageSize = 8
 
@@ -173,17 +180,16 @@ struct LibraryView: View {
         @Bindable var library = library
         return HStack(spacing: 8) {
             LibraryDisabledWhileLoading(library: library, disabled: visibleIDs.isEmpty) {
-                Button(allVisibleSelected ? display.localized("表示中のチェックを外す") : display.webCopy("historySelectAll", fallback: "すべて選択")) {
+                Button(LibrarySelectionPresentation(display: display, selectedIDs: library.selectedIDs).selectTitle) {
                     library.selectVisible()
                 }
                 .buttonStyle(LibraryGhostButtonStyle())
             }
             .inkuTooltip(display.tooltip("このページの作品をすべて選択します", serverKey: "tooltipHistorySelectAll"), placement: .bottom)
-            if !library.selectedIDs.isEmpty {
-                Button(display.localized("解除")) { library.selectedIDs.removeAll() }
-                    .buttonStyle(LibraryGhostButtonStyle())
-                    .inkuTooltip(tip("ページをまたいでチェックした作品をすべて解除します。"), placement: .bottom)
-            }
+            Button(display.webCopy("historyClearSelection", fallback: "すべて解除")) { library.selectedIDs.removeAll() }
+                .buttonStyle(LibraryGhostButtonStyle())
+                .disabled(LibrarySelectionPresentation(display: display, selectedIDs: library.selectedIDs).clearDisabled)
+                .inkuTooltip(display.tooltip("すべてのページで作品の選択を解除します", serverKey: "tooltipHistoryClearSelection"), placement: .bottom)
             HStack(spacing: 4) {
                 Text(display.webCopy("historyFilterLabel", fallback: "絞り込み")).inkuFont(12).foregroundStyle(.tertiary).fixedSize()
                 filterButton(display.webCopy("historyStarredOnly", fallback: "スターのみ"), isOn: $library.starredOnly,

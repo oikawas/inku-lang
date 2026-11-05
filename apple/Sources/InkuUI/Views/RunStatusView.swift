@@ -3,9 +3,11 @@ import SwiftUI
 /// Web `RunStatus.svelte`: the single "drawing in progress" indicator. Every drawing run shows the chosen mascot,
 /// its label, the run's facts and the stop button in one shape. `bar` is a framed block inside a panel; `inline`
 /// sits at the end of an existing button row (dialog footers) without a frame of its own.
+enum RunStatusVariant { case bar, inline }
+
 @MainActor
 struct RunStatusView<Info: View>: View {
-    enum Variant { case bar, inline }
+    typealias Variant = RunStatusVariant
     let display: DisplaySettings
     let label: String
     var variant = Variant.bar
@@ -19,8 +21,9 @@ struct RunStatusView<Info: View>: View {
 
     var body: some View {
         let mascot = display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
-        HStack(alignment: .center, spacing: 10) {
+        RunStatusRow(variant: variant) {
             MascotView(kind: mascot, accessibilityText: display.localized(mascot == "yuragi" ? "Yuragiが描画中" : "Incuが描画中"))
+        } content: {
             VStack(alignment: variant == .inline ? .trailing : .leading, spacing: 2) {
                 if let journalModel, journalActive, let journal = journalModel.runJournal {
                     RunJournalView(model: journalModel, journal: journal, label: label)
@@ -29,7 +32,7 @@ struct RunStatusView<Info: View>: View {
                     info()
                 }
             }
-            .frame(maxWidth: variant == .inline ? nil : .infinity, alignment: variant == .inline ? .trailing : .leading)
+        } stop: {
             if let onStop {
                 stopButton(onStop)
             }
@@ -46,6 +49,22 @@ struct RunStatusView<Info: View>: View {
             .disabled(stopping)
             .inkuTooltip(stopTooltip)
         if stopsWithEscape { button.keyboardShortcut(.escape, modifiers: []) } else { button }
+    }
+}
+
+@MainActor
+struct RunStatusRow<Leading: View, Content: View, Stop: View>: View {
+    let variant: RunStatusVariant
+    @ViewBuilder var leading: () -> Leading
+    @ViewBuilder var content: () -> Content
+    @ViewBuilder var stop: () -> Stop
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            leading().fixedSize()
+            content().frame(minWidth: 0, maxWidth: .infinity, alignment: variant == .inline ? .trailing : .leading)
+            stop().fixedSize().layoutPriority(1)
+        }
     }
 }
 

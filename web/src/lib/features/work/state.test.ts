@@ -436,6 +436,26 @@ test('the four tabs retain independent choices and new work restores its default
 	assert.equal(work.drawOptions.canvas_aspect, 'hd_monitor');
 });
 
+test('New on a text batch with a resume panel asks first, and only the confirmation clears it', () => {
+	let cleared = 0;
+	let asked: { message: string; run: () => void } | null = null;
+	const batch = { resuming: false, resume: { runId: 'stopped' }, interrupted: false, clearInput: () => { cleared += 1; } };
+	const work = imageWork(async () => { throw new Error('no request expected'); },
+		{ batch, requestConfirmation: (confirmation) => { asked = confirmation; } } as unknown as Partial<WorkStateDeps>);
+	work.inputMode = 'batch';
+	work.imageFolder.setSource('text');
+	work.clearInput();
+	assert.ok(asked, 'a confirmation is requested');
+	assert.equal(cleared, 0, 'nothing is cleared before the answer');
+	(asked as unknown as { run: () => void }).run();
+	assert.equal(cleared, 1);
+	batch.resume = null as unknown as { runId: string };
+	asked = null;
+	work.clearInput();
+	assert.equal(asked, null, 'without a resume panel New clears at once');
+	assert.equal(cleared, 2);
+});
+
 test('demo drawing sends its shared model to both stages even with a legacy stage 2 value', async () => {
 	let body: { stage1_model: string; stage2_model: string } | null = null;
 	const work = createWorkState({

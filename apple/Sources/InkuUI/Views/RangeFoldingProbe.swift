@@ -8,7 +8,7 @@ import SwiftUI
     public static func hiddenCharacters(text: String, display: DisplaySettings) -> [Int] {
         _ = NSApplication.shared
         let editor = InkuTextEditor(text: .constant(text), isEditable: false, accessibilityLabel: "probe", style: .ddlCompact,
-                                    marks: { _ in [] }, rangeTable: CompositionRanges.table)
+                                    marks: { _ in [] }, marksKey: .none, rangeTable: CompositionRanges.table)
             .environment(display)
             .frame(width: 600, height: 300)
         let host = NSHostingView(rootView: editor)

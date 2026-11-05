@@ -66,8 +66,8 @@ struct PluginCall: Sendable, Equatable {
 /// Web `annotate` for a DDL: a title line (DDL 27) whole, then plugin references, then saijiki words longest
 /// first (an ASCII word only on word boundaries), then emotion words. Returns the painted ranges; plain text
 /// is left alone.
-struct DdlHighlighter: Sendable {
-    private struct Entry: Sendable { let word: String; let lower: String; let length: Int; let token: DdlTokenClass; let ascii: Bool }
+struct DdlHighlighter: Sendable, Equatable {
+    private struct Entry: Sendable, Equatable { let word: String; let lower: String; let length: Int; let token: DdlTokenClass; let ascii: Bool }
     private let buckets: [Character: [Entry]]
     private let calls: [PluginCall]
     private static let emotionWords = ["美しい", "美しく", "激しい", "激しく", "静かな", "静かに", "素敵", "きれい", "やさしい",

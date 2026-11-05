@@ -130,23 +130,24 @@ public enum LineagePresentation {
 
 /// The Web toolbar wraps whole scope groups rather than clipping their controls.
 struct LineageToolbarLayout: Layout {
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        arrangement(width: proposal.width ?? 900, subviews: subviews).size
+    func makeCache(subviews: Subviews) -> [CGSize] { subviews.map { $0.sizeThatFits(.unspecified) } }
+    func updateCache(_ cache: inout [CGSize], subviews: Subviews) { cache = makeCache(subviews: subviews) }
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) -> CGSize {
+        arrangement(width: proposal.width ?? 900, sizes: cache).size
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrangement(width: bounds.width, subviews: subviews)
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) {
+        let result = arrangement(width: bounds.width, sizes: cache)
         for (index, point) in result.points.enumerated() {
             subviews[index].place(at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y), anchor: .topLeading,
                                  proposal: .unspecified)
         }
     }
 
-    private func arrangement(width: CGFloat, subviews: Subviews) -> (points: [CGPoint], size: CGSize) {
+    private func arrangement(width: CGFloat, sizes: [CGSize]) -> (points: [CGPoint], size: CGSize) {
         var points: [CGPoint] = []
         var x: CGFloat = 0, y: CGFloat = 0, height: CGFloat = 0, used: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
+        for size in sizes {
             if x > 0, x + size.width > width { x = 0; y += height + 8; height = 0 }
             points.append(CGPoint(x: x, y: y)); x += size.width + 8
             used = max(used, x - 8); height = max(height, size.height)

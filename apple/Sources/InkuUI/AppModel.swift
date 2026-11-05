@@ -42,7 +42,44 @@ public final class AppModel {
     public var imageInput: PreparedImageInput?
     public var activeDrawTab = "describe"
     public private(set) var drawDefaults = DrawOptionsCore.release
-    public private(set) var drawSelections = DrawOptionsCore.release
+    public private(set) var drawSelections = DrawOptionsCore.release {
+        didSet {
+            let before = Set(oldValue.values.compactMap { $0.models.stage1 })
+            let after = Set(drawSelections.values.compactMap { $0.models.stage1 })
+            if before != after { refreshDrawingAvailability() }
+        }
+    }
+    private struct DrawingAvailability {
+        let drawing: Bool
+        let batch: Bool
+        let vision: Bool
+    }
+    private var drawingAvailability: [String: DrawingAvailability] = [:]
+    struct RecordedOptionsKey: Hashable { let workID: String; let isImage: Bool }
+    private var recordedOptionsByWork: [RecordedOptionsKey: [String: Any]] = [:]
+
+    func cachedRecordedOptions(workID: String, isImage: Bool) -> [String: Any]? {
+        recordedOptionsByWork[RecordedOptionsKey(workID: workID, isImage: isImage)]
+    }
+    @discardableResult func prepareRecordedOptions(_ work: SavedWork, isImage: Bool) throws -> [String: Any] {
+        let key = RecordedOptionsKey(workID: work.id, isImage: isImage)
+        if let cached = recordedOptionsByWork[key] { return cached }
+        let value = try DrawOptionsCore.recorded(work, isImage: isImage)
+        recordedOptionsByWork[key] = value
+        return value
+    }
+    private func refreshDrawingAvailability() {
+        let references = Set(drawSelections.values.compactMap { $0.models.stage1 })
+        drawingAvailability = Dictionary(uniqueKeysWithValues: references.map { reference in
+            var visionSettings = settings
+            visionSettings.models.stage1Model = reference
+            visionSettings.models.stage2Model = reference
+            return (reference, DrawingAvailability(
+                drawing: SettingsModel.isModelAvailable(reference, settings: settings),
+                batch: SettingsModel.isBatchModelAvailable(reference, settings: settings),
+                vision: SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: visionSettings)))
+        })
+    }
     private var currentDrawOptions: DrawOptions {
         get { drawSelections[activeDrawTab] ?? DrawOptionsCore.release[activeDrawTab]! }
         set { drawSelections[activeDrawTab] = newValue }
@@ -96,7 +133,7 @@ public final class AppModel {
         drawRoute = route
     }
     public var descriptionCanReview: Bool {
-        SettingsModel.isRegisteredModelAvailable(nextGenerationHostSettings.models.stage1Model, purpose: "vision", settings: nextGenerationHostSettings)
+        drawingAvailability[nextDrawingModelReference]?.vision ?? false
     }
     private func applyDescriptionRoute(_ request: inout GenerationRequest, settings: HostSettings) {
         guard case .description = request.authoring, drawRoute == "read_and_draw" else { return }
@@ -341,10 +378,10 @@ public final class AppModel {
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
     public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
     public var hasAvailableNextDrawingModel: Bool {
-        hasNextDrawingModel && SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings)
+        hasNextDrawingModel && (drawingAvailability[nextDrawingModelReference]?.drawing ?? false)
     }
     public var hasAvailableBatchDrawingModel: Bool {
-        SettingsModel.isBatchModelAvailable(nextDrawingModelReference, settings: settings)
+        drawingAvailability[nextDrawingModelReference]?.batch ?? false
     }
     public var nextBatchDrawingModelReference: String {
         hasAvailableBatchDrawingModel ? nextDrawingModelReference : ""
@@ -608,7 +645,7 @@ public final class AppModel {
             savedDescriptionDDL = context.descriptionDDL
             imageProvenanceTyped = false
             let recordedTab = context.imageDDL == nil ? "describe" : "image"
-            let recordedOptions = try DrawOptionsCore.recorded(work, isImage: context.imageDDL != nil)
+            let recordedOptions = try prepareRecordedOptions(work, isImage: context.imageDDL != nil)
             if adoptDrawOptions { drawSelections[recordedTab] = try DrawOptionsCore.forRecorded(recordedOptions, tab: recordedTab, defaults: drawDefaults) }
             if context.imageDDL != nil {
                 imageInput = nil; imageFileName = ""; imageProvenance = context.imageProvenance ?? ""
@@ -629,7 +666,7 @@ public final class AppModel {
             eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
-            if adoptDrawOptions, let recorded = try? DrawOptionsCore.recorded(work, isImage: false),
+            if adoptDrawOptions, let recorded = try? prepareRecordedOptions(work, isImage: false),
                let options = try? DrawOptionsCore.forRecorded(recorded, tab: "describe", defaults: drawDefaults) {
                 drawSelections["describe"] = options
             }
@@ -828,6 +865,7 @@ public final class AppModel {
     }
 
     private func synchronizeNextDrawingModel(previousSettings: HostSettings?) {
+        refreshDrawingAvailability()
         providerSettingsRevision += 1
     }
 

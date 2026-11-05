@@ -438,7 +438,7 @@ struct LineageView: View {
                 }
             }.buttonStyle(.borderless).frame(minHeight: 22)
             if let work = item.work {
-                Button { openWork(item) } label: {
+                Button { LibraryClick.press(preview: { openWork(item) }, open: { openInCanvas(work) }) } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         operationRow(item, graph: graph)
                         ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(height: 118)
@@ -448,7 +448,6 @@ struct LineageView: View {
                             .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText.isEmpty ? (work.descriptionHash ?? "") : work.effectiveSourceText), focus: .none)
                     }
                 }.buttonStyle(.plain).disabled(model.isBrowsingLocked)
-                    .simultaneousGesture(TapGesture(count: 2).onEnded { openInCanvas(work) })
             } else {
                 operationRow(item, graph: graph)
                 VStack(spacing: 8) {

@@ -66,6 +66,24 @@ struct InkuEditorMark: Equatable {
     }
 }
 
+enum InkuEditorMarksKey: Equatable {
+    case description, none
+    case ddl(DdlHighlighter, [CompletionRangeState], String)
+}
+
+struct InkuEditorMarksCache {
+    private var source: Data?
+    private var key: InkuEditorMarksKey?
+    private(set) var marks: [InkuEditorMark] = []
+
+    mutating func update(source: String, key: InkuEditorMarksKey, make: (String) -> [InkuEditorMark]) -> Bool {
+        let bytes = Data(source.utf8)
+        guard self.source != bytes || self.key != key else { return false }
+        self.source = bytes; self.key = key; marks = make(source)
+        return true
+    }
+}
+
 /// Web `RangeEditorStatus`: the frame to show, whether a range is invalid, and whether the IME is composing.
 struct RangeEditorStatus: Equatable {
     var preview: CompositionRanges.Preview?
@@ -103,6 +121,7 @@ struct InkuTextEditor: View {
     var accessibilityLabel: String
     var style = InkuEditorStyle.batch
     var marks: (String) -> [InkuEditorMark] = InkuEditorMark.descriptionLabels
+    var marksKey: InkuEditorMarksKey = .description
     var insertion: Binding<InkuEditorInsertion?>? = nil
     /// Web `numericRangeEditing`: the core's range table folds matching numeric places; nil leaves the text open.
     var rangeTable: [CompositionRanges.Entry]? = nil
@@ -118,7 +137,7 @@ struct InkuTextEditor: View {
         BatchNativeInputEditor(text: $text, isEditable: isEditable && isEnabled,
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme,
-                               style: style, marks: marks, insertion: insertion,
+                               style: style, marks: marks, marksKey: marksKey, insertion: insertion,
                                rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions, onCharacterHover: onCharacterHover)
             .clipped()
     }
@@ -189,6 +208,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
     let colorScheme: ColorScheme
     let style: InkuEditorStyle
     let marks: (String) -> [InkuEditorMark]
+    let marksKey: InkuEditorMarksKey
     let insertion: Binding<InkuEditorInsertion?>?
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
@@ -289,8 +309,8 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var typedInsertion = false
         private var programmaticEdit = false
         private var completionValues: [String: String] = [:]
-        private var markedSource: Data?
-        private var cachedMarks: [InkuEditorMark] = []
+        private var marksCache = InkuEditorMarksCache()
+        private var paintedNames: [NSRange]?
 
         init(text: Binding<String>) { self.text = text }
 
@@ -326,15 +346,12 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             scroll = nil
             ruler = nil
             settings = nil
-            markedSource = nil
-            cachedMarks = []
+            marksCache = InkuEditorMarksCache()
+            paintedNames = nil
         }
 
         func update(from settings: BatchNativeInputEditor) {
             self.settings = settings
-            // The closure may capture new plugin or completion state even when
-            // the text itself did not change.
-            markedSource = nil
             text = settings.$text
             guard let editor, let scroll else { return }
             let source = text.wrappedValue
@@ -386,16 +403,15 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         /// Temporary attributes paint without touching the text, its undo or the IME's marked range.
         private func applyMarks() {
             guard let editor, let settings, let layout = editor.layoutManager, !editor.hasMarkedText() else { return }
+            let changed = marksCache.update(source: editor.string, key: settings.marksKey, make: settings.marks)
+            let names = settings.rangeTable == nil ? [] : rangeState.names
+            guard changed || paintedNames != names else { return }
+            paintedNames = names
             let full = NSRange(location: 0, length: (editor.string as NSString).length)
             for key in [NSAttributedString.Key.backgroundColor, .foregroundColor, .underlineStyle, .underlineColor] {
                 layout.removeTemporaryAttribute(key, forCharacterRange: full)
             }
-            let sourceBytes = Data(editor.string.utf8)
-            if markedSource != sourceBytes {
-                cachedMarks = settings.marks(editor.string)
-                markedSource = sourceBytes
-            }
-            for mark in cachedMarks where mark.range.location >= 0 && NSMaxRange(mark.range) <= full.length {
+            for mark in marksCache.marks where mark.range.location >= 0 && NSMaxRange(mark.range) <= full.length {
                 layout.addTemporaryAttributes(mark.style.attributes, forCharacterRange: mark.range)
             }
             // `.cm-ddl-range-name`: the place word of a folded range, with a dotted underline.
@@ -497,6 +513,8 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !replacingText, let editor else { return }
+            // TextKit can drop temporary attributes even if IME edits return to the same text.
+            paintedNames = nil
             refreshLayout()
             refreshRanges()
             if pendingExternalText == nil {
@@ -806,6 +824,7 @@ private struct BatchNativeInputEditor: UIViewRepresentable {
     // iOS keeps the plain editor: no marks, and words are appended by the caller's binding.
     let style: InkuEditorStyle
     let marks: (String) -> [InkuEditorMark]
+    let marksKey: InkuEditorMarksKey
     let insertion: Binding<InkuEditorInsertion?>?
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil

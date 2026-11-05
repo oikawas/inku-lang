@@ -8,7 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: right after a drawing finishes, until the new work's generation is read from the history, the strip's lineage shows "…" instead of "Standalone".
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.
@@ -593,6 +592,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.320 (2026-11-05 / Build 1396)
+
+- Web: right after a drawing finishes, until the new work's generation is read from the history, the strip's lineage shows "…" instead of "Standalone".
 
 ## v2.15.319 (2026-11-05 / Build 1395)
 

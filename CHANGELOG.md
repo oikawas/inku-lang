@@ -10,8 +10,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Android: use currently enabled plugins and imported definitions when rewriting a selected work from its description.
 
-- Web: the displayed work's conditions run left to right in the top-to-bottom order of the next work's conditions on the left (model, color catalog, drawing, sketch, composition, stroke limit, canvas). The work's Refine control moves from the tabs' row to the top right of the Work tab's canvas, and its menu scrolls where the canvas area is too short. A work just saved and not yet in the history strip can be starred and marked for revision again (it could not from Build 1392).
-
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.
@@ -596,6 +594,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.323 (2026-11-05 / Build 1399)
+
+- Web: the displayed work's conditions run left to right in the top-to-bottom order of the next work's conditions on the left (model, color catalog, drawing, sketch, composition, stroke limit, canvas). The work's Refine control moves from the tabs' row to the top right of the Work tab's canvas, and its menu scrolls where the canvas area is too short. A work just saved and not yet in the history strip can be starred and marked for revision again (it could not from Build 1392).
 
 ## v2.15.322 (2026-11-05 / Build 1398)
 

@@ -36,6 +36,7 @@ struct DdlBoxEditor: View {
                            marks: { [highlighter, completionStates, completionSource] source in
                                highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
                            },
+                           marksKey: .ddl(highlighter, completionStates, completionSource),
                            insertion: Binding(get: { model.ddlBoxInsertion }, set: { model.ddlBoxInsertion = $0 }),
                            rangeTable: CompositionRanges.table,
                            onRangeStatus: { status in

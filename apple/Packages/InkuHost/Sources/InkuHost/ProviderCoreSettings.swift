@@ -15,9 +15,8 @@ public enum ProviderCoreSettings {
         return response
     }
 
-    public static var definitions: [[String: Any]] {
+    nonisolated(unsafe) public static let definitions: [[String: Any]] =
         (try? call("providers", ["host": "macos"])["providers"] as? [[String: Any]]) ?? []
-    }
     private static var catalogProviders: [String: [String: Any]] {
         (try? JSONSerialization.jsonObject(with: SharedModelCatalog.catalogData) as? [String: Any])?["providers"] as? [String: [String: Any]] ?? [:]
     }

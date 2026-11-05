@@ -13,28 +13,6 @@ struct LibrarySelectionPresentation {
     var clearDisabled: Bool { selectedIDs.isEmpty }
 }
 
-/// Web `click` and `dblclick` (HistoryManager.svelte:1202) on a library picture: the first click previews at once and
-/// the second click of a double click opens the work. One button reads the click count of the event that pressed it;
-/// a double-tap gesture beside the button made SwiftUI hold the first click until a double click was ruled out.
-enum LibraryClick {
-    static func opensWork(clickCount: Int) -> Bool { clickCount >= 2 }
-
-    /// The press's click count; a key or accessibility press counts as one click.
-    @MainActor static var currentClickCount: Int {
-        #if os(macOS)
-        guard let event = NSApp.currentEvent,
-              [.leftMouseDown, .leftMouseUp, .otherMouseDown, .otherMouseUp].contains(event.type) else { return 1 }
-        return event.clickCount
-        #else
-        return 1
-        #endif
-    }
-
-    @MainActor static func press(preview: () -> Void, open: () -> Void) {
-        if opensWork(clickCount: currentClickCount) { open() } else { preview() }
-    }
-}
-
 /// The library as Web `HistoryManager.svelte` (Build1162) lays it out: a heading row, a tool row, then the
 /// listing with the preview column beside it. The thumbnail grid holds as many complete rows as fit and pages
 /// instead of scrolling. The owner shows it over the whole window and passes `onClose`.

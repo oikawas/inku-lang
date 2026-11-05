@@ -41,7 +41,7 @@ struct BatchObservationCards: View {
                         accessibilityLabel: display.webCopy("batchActiveDdlLabel", "処理中の指示書"),
                         style: InkuEditorStyle(fontSize: 12, monospaced: false, lineHeightMultiple: 1.55,
                                                wraps: true, lineNumbers: false, inset: CGSize(width: 10, height: 9), drawsBackground: false),
-                        marks: { [highlighter] in highlighter.marks($0) })
+                        marks: { [highlighter] in highlighter.marks($0) }, marksKey: .ddl(highlighter, [], ""))
                         .frame(height: 132)
                 } else {
                     Text(display.webCopy("batchActiveDdlPending", "指示書を待機中…"))

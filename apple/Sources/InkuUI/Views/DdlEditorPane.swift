@@ -92,7 +92,7 @@ struct DdlEditorPane: View {
                            style: .ddl, marks: { [highlighter, completionStates, completionSource] source in
                                // Tags describe the text they were read for and vanish once it changes (Web).
                                highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
-                           }, insertion: $insertion,
+                           }, marksKey: .ddl(highlighter, completionStates, completionSource), insertion: $insertion,
                            rangeTable: CompositionRanges.table,
                            onRangeStatus: { status in
                                rangeStatus = status

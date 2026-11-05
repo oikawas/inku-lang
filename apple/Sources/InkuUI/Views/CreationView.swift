@@ -754,7 +754,7 @@ struct CreationView: View {
     private func metaStrip(_ work: SavedWork) -> some View {
         let recordedState = model.workActionState(for: work)
         let isImage = recordedState == .image || (!usesBatchWork && model.selectedWorkID == work.id && model.savedImageDDL != nil)
-        let options = (try? DrawOptionsCore.recorded(work, isImage: isImage)) ?? [:]
+        let options = model.cachedRecordedOptions(workID: work.id, isImage: isImage) ?? [:]
         let naming = ModelNaming(providers: savedProviders, stageProvider: model.stageDefaultProviderID)
         let unavailable = display.webCopy("drawOptionsUnavailable", "N/A")
         let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
@@ -835,6 +835,9 @@ struct CreationView: View {
         .padding(.leading, rightPanelWidth > 45 * 13 * display.preferences.textScale ? 16 : 0)
         .padding(.vertical, 5)
         .accessibilityElement(children: .combine)
+        .task(id: AppModel.RecordedOptionsKey(workID: work.id, isImage: isImage)) {
+            _ = try? model.prepareRecordedOptions(work, isImage: isImage)
+        }
     }
 
     private func metaField(_ label: String, _ value: String, tooltip: String? = nil) -> some View {

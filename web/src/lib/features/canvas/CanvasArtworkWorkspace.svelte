@@ -14,6 +14,8 @@
 
 	type Props = {
 		leadingCornerControls?: Snippet;
+		/** The work's actions, over the canvas's top right above the fallback badges. */
+		topRightControls?: Snippet;
 		artworkContent?: Snippet;
 		zoomControls?: Pick<CanvasViewport, 'zoom' | 'setZoom' | 'fit'>;
 		result: PaintResult | null;
@@ -66,6 +68,7 @@
 
 	let {
 		leadingCornerControls,
+		topRightControls,
 		artworkContent,
 		zoomControls,
 		result,
@@ -201,23 +204,29 @@
 {#if unsavedRefinementPreview}
 	<div class="unsaved-refinement-badge" role="status">{t().unsavedRefinementPreviewLabel}</div>
 {/if}
-{#if interpretFallbackReason || composeFallbackDrawnReason}
-	<!-- Stacked, and one badge per layer: a work whose interpretation and whose
-	     composition both fell has lost the words twice, and a single badge would
-	     say it once. The wording names the layer for the same reason. -->
-	<div class="fallback-badges" role="status">
-		{#if interpretFallbackReason}
-			<Tooltip placement="bottom-left" text={t().interpretFallbackHint(interpretFallbackReason)} wide>
-				<span class="interpret-fallback-badge">{t().interpretFallbackBadge}</span>
-			</Tooltip>
-		{/if}
-		{#if composeFallbackDrawnReason}
-			<Tooltip placement="bottom-left" text={t().composeFallbackHint(composeFallbackDrawnReason)} wide>
-				<span class="compose-fallback-badge">{t().composeFallbackBadge}</span>
-			</Tooltip>
-		{/if}
-	</div>
-{/if}
+<!-- The top right: the work's actions, then the fallback badges under them.
+     Pressing here never starts a pan of the drawing. -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="canvas-top-right" onpointerdown={(event) => event.stopPropagation()}>
+	{@render topRightControls?.()}
+	{#if interpretFallbackReason || composeFallbackDrawnReason}
+		<!-- Stacked, and one badge per layer: a work whose interpretation and whose
+		     composition both fell has lost the words twice, and a single badge would
+		     say it once. The wording names the layer for the same reason. -->
+		<div class="fallback-badges" role="status">
+			{#if interpretFallbackReason}
+				<Tooltip placement="bottom-left" text={t().interpretFallbackHint(interpretFallbackReason)} wide>
+					<span class="interpret-fallback-badge">{t().interpretFallbackBadge}</span>
+				</Tooltip>
+			{/if}
+			{#if composeFallbackDrawnReason}
+				<Tooltip placement="bottom-left" text={t().composeFallbackHint(composeFallbackDrawnReason)} wide>
+					<span class="compose-fallback-badge">{t().composeFallbackBadge}</span>
+				</Tooltip>
+			{/if}
+		</div>
+	{/if}
+</div>
 				<!-- The marks a reader puts on the work in front of them: it is a
 				     favourite, it wants another pass. They sit beside the caption
 				     toggle rather than in a bar of their own, because all three are
@@ -454,7 +463,10 @@
 	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	/* The stack owns the corner; each badge only paints itself, so a second one
 	   sits under the first instead of on top of it. */
-	.fallback-badges { position: absolute; top: 12px; right: 12px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+	/* Above the caption and the corner rows, so the action menu that opens
+	   downward from here is never painted under either. */
+	.canvas-top-right { position: absolute; top: 12px; right: 12px; z-index: 14; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+	.fallback-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 	.interpret-fallback-badge, .compose-fallback-badge { padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	:global(html[data-theme='dark']) .interpret-fallback-badge, :global(html[data-theme='dark']) .compose-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
 	.canvas-content {

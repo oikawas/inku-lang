@@ -2512,6 +2512,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	});
 	const statusHistoryItem = $derived(liveStatusHistoryItem
 		?? (heldStatus && work.result && heldStatus.result === work.result ? heldStatus.item : null));
+	// A newly saved result can be on the canvas before it appears in the
+	// history strip, and never does under a filter or on an older page. The
+	// strip and the other readers read the result itself then; the star and
+	// revision marks still need the work's id and a reactive projection of the
+	// star, or the PATCH succeeds while the button redraws itself as unstarred.
+	const markHistoryItem = $derived.by((): Iteration | HistoryItem | null => {
+		if (statusHistoryItem) return statusHistoryItem;
+		const historyId = work.result?.history_id;
+		if (!historyId) return null;
+		const projected = currentResultStarState?.id === historyId ? currentResultStarState : null;
+		return { id: historyId, starred: projected?.starred ?? false, note: projected?.note ?? null } as HistoryItem;
+	});
 	const replayableStatusHistoryItem = $derived(
 		statusHistoryItem && "score" in statusHistoryItem && "svg" in statusHistoryItem
 			? statusHistoryItem as Iteration
@@ -3183,6 +3195,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusGeneration}
 				stageLabel={work.stageLabel}
 				{statusHistoryItem}
+				{markHistoryItem}
 				{statusHashLabel}
 				{statusHashCopied}
 				onGotoNext={gotoNext}
@@ -3894,6 +3907,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-detail-status :global(.canvas-hash-btn),
 	.ui-hide-detail-status :global(.canvas-provenance-btn),
 	.ui-hide-work-tools :global(.right-tabs),
+	/* The work's action menu left the tabs' row for the canvas's top right. */
+	.ui-hide-work-tools :global(.canvas-work-actions),
 	/* The canvas corner rows are named button by button rather than as whole
 	   rows. Two of the controls now standing there answer to detail_status and
 	   not to work_tools, and a rule on the row would take them with it in any

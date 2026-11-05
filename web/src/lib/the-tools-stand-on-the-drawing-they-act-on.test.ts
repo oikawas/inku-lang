@@ -159,6 +159,11 @@ test('T-101: the two marks are the two flags a work carries', () => {
 	// while this button redraws itself as unstarred.
 	assert.match(PAGE, /applyCurrentResultStarState: \(item\) =>/);
 	assert.match(PAGE, /currentResultStarState\?\.id === historyId/);
+	// That projection is the marks' alone: the strip and the other readers of
+	// the status item keep reading the result itself until the work is listed.
+	assert.match(PAGE, /const markHistoryItem = \$derived\.by\(/);
+	assert.match(PANEL, /statusHistoryItem=\{markHistoryItem\}/);
+	assert.match(PANEL, /onToggleStar=\{\(event\) => onToggleStar\(markHistoryItem, event\)\}/);
 	// The canvas has to be able to read the flag it draws, or the mark would
 	// never come back on for a work that already carries it.
 	assert.match(HISTORY_STATE, /for_revision\?: boolean;/);

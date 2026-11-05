@@ -18,7 +18,7 @@
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { HistoryMutations } from '$lib/features/history/mutations';
 	import { normalizeSketchState, sketchStateNote, sketchStateShort, type SketchMode } from '$lib/sketch';
-	import { drawOptionRows } from '$lib/features/draw-options';
+	import { drawOptionRows, INPUT_PANEL_ORDER } from '$lib/features/draw-options';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatCanvasCapacity, groupDigits } from '$lib/formatNumber';
@@ -95,6 +95,9 @@
 		statusGeneration: number | null;
 		stageLabel: string;
 		statusHistoryItem: HistoryItem | null;
+		/** The work the star and revision marks act on: the status item, else a
+		 *  just-saved result not yet in the history strip. */
+		markHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
 		// True when the work tools are hidden. The export button stays on the
@@ -244,6 +247,7 @@
 		statusGeneration,
 		stageLabel,
 		statusHistoryItem,
+		markHistoryItem,
 		statusHashLabel,
 		statusHashCopied,
 		exportCardOnly = false,
@@ -726,11 +730,12 @@
 />
 
 <div class="right-panel">
-	<!-- One row: the tabs and the work's actions, which are pressed, then the
-	     displayed work's conditions, which are only read. The tabs stand the
-	     row's full height on an accent underline like the input panel's tabs;
-	     the conditions are bare text past a rule, with no frame, fill or hover
-	     (the author, 2026-11-05). -->
+	<!-- One row: the tabs, which are pressed, then the displayed work's
+	     conditions, which are only read. The tabs stand the row's full height on
+	     an accent underline like the input panel's tabs; the conditions are bare
+	     text past a rule, with no frame, fill or hover, in the input panel's
+	     top-to-bottom order. The work's actions stand over the canvas's top
+	     right instead (the author, 2026-11-05). -->
 	<div class="right-tabs">
 		<div class="rtab-group" role="tablist">
 			<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
@@ -740,21 +745,6 @@
 				<button class="rtab" role="tab" aria-selected={outputTab === 'lineage'} class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 			</Tooltip>
 		</div>
-		{#if currentHistoryId}
-			<WorkActionMenu
-				node={directActionNode}
-				{isJapanese}
-				variant="header"
-				open={directActionMenuOpen}
-				available={!interactionLocked && !generationLocked}
-				unavailableReason={t().workActionGenerationLocked}
-				onRequestOpen={openDirectActionMenu}
-				onOpenChange={(open) => (directActionMenuOpen = open)}
-				onAction={runDirectWorkAction}
-			/>
-		{:else if result && !generationLocked}
-			<span class="work-action-save-first" role="status">{t().workActionSaveFirst}</span>
-		{/if}
 		{#if result}
 			<div class="render-meta-strip" role="group" aria-label={t().displayedWorkConditions}>
 				<div class="render-meta-context">
@@ -765,7 +755,7 @@
 					</span>
 				</div>
 				<div class="render-meta-fields">
-					{#each drawOptionRows(stripOptions, t(), { image: stripIsImage }) as option (option.key)}
+					{#each drawOptionRows(stripOptions, t(), { image: stripIsImage, order: INPUT_PANEL_ORDER }) as option (option.key)}
 						<span class="render-meta-item" data-draw-option={option.key}>
 							<span class="render-meta-label">{option.label}</span>
 							{#if option.key === 'models' && stripOptions?.models && (stripOptions.models.vision || stripOptions.models.stage1 || stripOptions.models.stage2)}
@@ -806,6 +796,27 @@
 		{/if}
 	</div>
 
+	<!-- The work's actions over the canvas's top right, on the Work tab only:
+	     the lineage tab gives every node its own. -->
+	{#snippet workActions()}
+		{#if currentHistoryId}
+			<div class="canvas-work-actions">
+				<WorkActionMenu
+					node={directActionNode}
+					{isJapanese}
+					variant="header"
+					open={directActionMenuOpen}
+					available={!interactionLocked && !generationLocked}
+					unavailableReason={t().workActionGenerationLocked}
+					onRequestOpen={openDirectActionMenu}
+					onOpenChange={(open) => (directActionMenuOpen = open)}
+					onAction={runDirectWorkAction}
+				/>
+			</div>
+		{:else if result && !generationLocked}
+			<span class="canvas-work-actions work-action-save-first" role="status">{t().workActionSaveFirst}</span>
+		{/if}
+	{/snippet}
 	{#snippet modeControl()}
 		{#if ddl3dViewer && result}
 			<Ddl3DModeSwitch bind:viewMode />
@@ -832,6 +843,7 @@
 		{#if outputTab === 'canvas'}
 			<CanvasArtworkWorkspace
 				leadingCornerControls={modeControl}
+				topRightControls={workActions}
 				artworkContent={ddl3dActive ? threeDimensionalContent : undefined}
 				zoomControls={ddl3dActive ? ddl3dZoomControls : undefined}
 				savedWorkExport={currentHistoryId && !statusHistoryItem?.trashed ? {
@@ -864,7 +876,7 @@
 				{instructionCaptionPosition}
 				{canUseVerticalInstructionCaption}
 				{instructionCaptionVertical}
-				{statusHistoryItem}
+				statusHistoryItem={markHistoryItem}
 				{replayDisabled}
 				{allowEmptyOutputTabs}
 				{generationInfoOpen}
@@ -1084,11 +1096,11 @@
 		{navOlderDisabled}
 		{historyTotal}
 		{navPos}
-		workMark={statusHistoryItem}
+		workMark={markHistoryItem}
 		{onGotoNext}
 		{onGotoLatest}
 		{onGotoPrev}
-		onToggleStar={(event) => onToggleStar(statusHistoryItem, event)}
+		onToggleStar={(event) => onToggleStar(markHistoryItem, event)}
 		onToggleCaption={toggleInstructionCaption}
 		onInstructionCaptionWritingModeChange={setInstructionCaptionWritingMode}
 		onClose={closePresentationMode}
@@ -1135,8 +1147,6 @@
 	.rtab.active { border-bottom-color: var(--accent); color: var(--fg); font-weight: 500; }
 	.rtab:hover:not(.active):not(:disabled) { color: var(--fg); background: var(--bg2); }
 	.rtab:disabled { opacity: 0.35; cursor: not-allowed; }
-	.right-tabs > :global(.work-action-menu),
-	.work-action-save-first { align-self: center; margin-left: 8px; }
 	/* Read only: bare text past a rule, with no frame, fill, underline or
 	   hover, set smaller than the tabs. It takes the rest of the tabs' row and
 	   its items wrap whole, so no label overlaps another at any width or text
@@ -1219,7 +1229,19 @@
 	.render-meta-model-line { display: flex; gap: 4px; min-width: 0; white-space: nowrap; }
 	.render-meta-model-stage { flex: 0 0 auto; color: var(--fg3); }
 	.render-meta-model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-	.work-action-save-first { color: var(--fg3); font-size: 0.78rem; }
+	/* Over the artwork, so the note reads on a pill of its own and the menu's
+	   trigger keeps an opaque face (its border and hover are the menu's). */
+	.canvas-work-actions :global(.work-action-trigger) { background: var(--bg); box-shadow: 0 2px 10px #0002; }
+	.work-action-save-first {
+		padding: 5px 9px;
+		border: 1px solid var(--border2);
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--panel) 94%, transparent);
+		box-shadow: 0 2px 10px #0002;
+		color: var(--fg3);
+		font-size: var(--ui-font-size-11);
+		white-space: nowrap;
+	}
 	/* Container units follow the UI text scale. Too narrow to share the row:
 	   the conditions drop to their own row below the tabs, ruled above. */
 	@container canvas-panel (max-width: 45em) {
@@ -1246,7 +1268,15 @@
 		background: var(--bg2);
 		position: relative;
 		overflow: hidden;
+		/* Sized for the work's action menu below: nothing inside uses container
+		   units or an unnamed container query otherwise. */
+		container: canvas-area / size;
 	}
+	/* The menu opens downward from the canvas's top right, which starts lower
+	   than the tabs' row it opened from before. It scrolls inside the canvas
+	   area rather than being cut off by it: the area's height less the top
+	   offset, the trigger and the gap (12 + 34 + 6) and a margin below. */
+	.canvas-work-actions :global(.work-action-menu .work-action-dropdown) { max-height: calc(100cqh - 64px); overflow-y: auto; }
 	.nav-left,
 	.nav-right {
 		position: absolute;

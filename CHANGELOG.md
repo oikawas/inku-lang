@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: the displayed work's conditions run left to right in the top-to-bottom order of the next work's conditions on the left (model, color catalog, drawing, sketch, composition, stroke limit, canvas). The work's Refine control moves from the tabs' row to the top right of the Work tab's canvas, and its menu scrolls where the canvas area is too short. A work just saved and not yet in the history strip can be starred and marked for revision again (it could not from Build 1392).
+
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.

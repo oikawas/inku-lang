@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-05 — Order and place of the displayed work's conditions
+
+- Section 7 of "Creating Images" now places `Conditions of the displayed work` on the row of the Work and Lineage tabs, in the top-to-bottom order of the next work's conditions on the left.
+
 ## 2026-11-05 — Drawing defaults and the strip of the displayed work's conditions (v2.15.316–v2.15.320 / Build 1392–1396)
 
 - Sections 2, 7 and 19 of "Creating Images" now describe the per-tab conditions and `Settings` → `Drawing defaults`, `New` returning to them, and opening a work copying its record into the input tab (an unrecorded on/off choice becomes off, any other the tab's default). Section 7's "reading a work preview in the library does not change the next conditions" had become wrong and was corrected.

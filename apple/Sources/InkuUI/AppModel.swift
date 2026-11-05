@@ -1499,6 +1499,8 @@ public final class AppModel {
         guard ["ja", "en"].contains(selectedLanguage) else { throw HostError("invalid_instruction_language") }
         guard !text.isEmpty else { throw HostError("description_required") }
         var configuration = try ExactJSON(data: saved.configuration)
+        guard let bootstrap else { throw HostError("installation_unavailable") }
+        try bootstrap.updatePluginDefinitions(in: &configuration, language: selectedLanguage, settings: drawing)
         var options = try ExactJSON(data: saved.renderOptions)
         guard let catalog = options["catalog_id"].string,
               options["resolved_color_map"].object != nil,

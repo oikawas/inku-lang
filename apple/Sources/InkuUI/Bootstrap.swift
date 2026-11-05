@@ -318,7 +318,6 @@ struct Bootstrap {
         compiler.removeValue(forKey: "stage15_variation")
         config["language"] = language
         config["compiler"] = compiler
-        let exactCatalog = saved == nil ? try macroCatalogValue(language: language, settings: settings, importedPlugins: importedPlugins) : nil
         config["catalogs"] = [] as [Any]
         config.removeValue(forKey: "catalog_seed")
         if catalogMode == "auto" {
@@ -355,9 +354,9 @@ struct Bootstrap {
             return (id, try Self.bytes(map))
         })
         var exactConfiguration = try ExactJSON(data: Self.bytes(config))
-        if let entries = exactCatalog?["entries"].array {
-            exactConfiguration["definitions"] = .array(entries.map { $0["definition"] })
-            exactConfiguration["macro_summaries"] = .array(entries.map { $0["summary"] })
+        if saved == nil || inputMode == "description" {
+            try updatePluginDefinitions(in: &exactConfiguration, language: language, settings: settings,
+                                        importedPlugins: saved == nil && inputMode == "ddl" ? importedPlugins : [])
         }
         return GenerationRequest(authoring: authoring, configuration: exactConfiguration.data,
             renderOptions: try Self.bytes(options), clipPolicy: try Self.bytes(clip),
@@ -376,6 +375,14 @@ struct Bootstrap {
 
     func macroCatalog(language: String, settings: HostSettings = .init(), importedPlugins: [ImportedMacroDefinition] = []) throws -> [String: Any] {
         try Self.object(macroCatalogValue(language: language, settings: settings, importedPlugins: importedPlugins).data)
+    }
+
+    func updatePluginDefinitions(in configuration: inout ExactJSON, language: String, settings: HostSettings,
+                                 importedPlugins: [ImportedMacroDefinition] = []) throws {
+        let catalog = try macroCatalogValue(language: language, settings: settings, importedPlugins: importedPlugins)
+        guard let entries = catalog["entries"].array else { throw HostError("macro_catalog_invalid") }
+        configuration["definitions"] = .array(entries.map { $0["definition"] })
+        configuration["macro_summaries"] = .array(entries.map { $0["summary"] })
     }
 
     func macroCatalogValue(language: String, settings: HostSettings = .init(), importedPlugins: [ImportedMacroDefinition] = []) throws -> ExactJSON {

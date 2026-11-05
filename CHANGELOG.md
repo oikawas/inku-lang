@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: use currently enabled plugins when rewriting a saved work from its description, while retaining saved definitions for DDL-based derivations.
+
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.

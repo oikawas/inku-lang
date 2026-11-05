@@ -237,6 +237,32 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
     return UserAccountItem(**user)
 
 
+class DrawOptionsForTabBody(BaseModel):
+    options: dict = Field(description="A saved work's recorded drawing choices, as the history returns them in `draw_options`. Unknown choices are null.")
+    tab: str = Field(description="The input tab the choices go to: `describe`, `image`, `batch_text` or `batch_image`.")
+
+
+class DrawOptionsForTabResponse(BaseModel):
+    options: dict = Field(description="The tab's choices: recorded values, off for an unrecorded on/off choice, and the signed-in user's tab default for any other unrecorded choice.")
+
+
+@router.post("/api/auth/me/draw-options/for-tab", response_model=DrawOptionsForTabResponse,
+             summary="Choices to adopt from a saved work")
+def api_auth_me_draw_options_for_tab(body: DrawOptionsForTabBody,
+                                     actor: dict = Depends(_current_user)) -> DrawOptionsForTabResponse:
+    """Return the choices an input tab takes when a saved work is opened, by the shared core's rule.
+
+    An unknown tab is rejected with 400.
+    """
+    from ...verified_model_catalog import core_catalog
+    # The account projection has already normalized the settings, defaults included.
+    defaults = (actor.get("model_settings") or {}).get("draw_defaults") or {}
+    if body.tab not in defaults:
+        raise HTTPException(status_code=400, detail="invalid_tab")
+    answer = core_catalog("options_for_recorded", options=body.options, tab=body.tab, defaults=defaults)
+    return DrawOptionsForTabResponse(options=answer["options"])
+
+
 @router.patch("/api/auth/me/profile", response_model=UserAccountItem, summary="Update own email or password")
 def api_auth_me_profile(
     body: UserProfileUpdateBody,

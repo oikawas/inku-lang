@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 151,
-  "operation_count": 151,
-  "schema_count": 216,
+  "endpoint_count": 152,
+  "operation_count": 152,
+  "schema_count": 218,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -138,6 +138,20 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/auth/me/draw-options/for-tab",
+      "method": "POST",
+      "operationId": "api_auth_me_draw_options_for_tab_api_auth_me_draw_options_for_tab_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DrawOptionsForTabBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DrawOptionsForTabResponse\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -2269,6 +2283,8 @@
     "DescriptionSyllablesBody": "{\"properties\":{\"text\":{\"default\":\"\",\"description\":\"The English description to count, up to 4,000 characters. Omitted or empty counts as zero syllables.\",\"maxLength\":4000,\"title\":\"Text\",\"type\":\"string\"}},\"title\":\"DescriptionSyllablesBody\",\"type\":\"object\"}",
     "DescriptionSyllablesResponse": "{\"properties\":{\"lines\":{\"description\":\"空でない行ごとの音節\",\"items\":{\"type\":\"integer\"},\"title\":\"Lines\",\"type\":\"array\"},\"syllables\":{\"description\":\"音節の合計（辞書に無い語は推定で数える）\",\"title\":\"Syllables\",\"type\":\"integer\"},\"unknown\":{\"description\":\"発音辞書に無かった語。空でなければ合計は推定を含む\",\"items\":{\"type\":\"string\"},\"title\":\"Unknown\",\"type\":\"array\"}},\"required\":[\"syllables\",\"lines\",\"unknown\"],\"title\":\"DescriptionSyllablesResponse\",\"type\":\"object\"}",
     "DiagonalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"diagonal_line\",\"description\":\"Always \\\"diagonal_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"step\":{\"description\":\"Offset [x, y] from one copy to the next along the diagonal, in canvas-short-edge units.\",\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Step\",\"type\":\"array\"}},\"required\":[\"kind\",\"step\"],\"title\":\"DiagonalLineRecipe\",\"type\":\"object\"}",
+    "DrawOptionsForTabBody": "{\"properties\":{\"options\":{\"additionalProperties\":true,\"description\":\"A saved work's recorded drawing choices, as the history returns them in `draw_options`. Unknown choices are null.\",\"title\":\"Options\",\"type\":\"object\"},\"tab\":{\"description\":\"The input tab the choices go to: `describe`, `image`, `batch_text` or `batch_image`.\",\"title\":\"Tab\",\"type\":\"string\"}},\"required\":[\"options\",\"tab\"],\"title\":\"DrawOptionsForTabBody\",\"type\":\"object\"}",
+    "DrawOptionsForTabResponse": "{\"properties\":{\"options\":{\"additionalProperties\":true,\"description\":\"The tab's choices: recorded values, off for an unrecorded on/off choice, and the signed-in user's tab default for any other unrecorded choice.\",\"title\":\"Options\",\"type\":\"object\"}},\"required\":[\"options\"],\"title\":\"DrawOptionsForTabResponse\",\"type\":\"object\"}",
     "EnclosingGroupPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"enclosing_group\",\"description\":\"Always \\\"enclosing_group\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"EnclosingGroupPlacementAnchor\",\"type\":\"object\"}",
     "ExplicitCanvasTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"explicit_canvas\",\"description\":\"Always \\\"explicit_canvas\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"source\":{\"$ref\":\"#/components/schemas/ScoreSourceSite\",\"description\":\"Location of the canvas target in the DDL source text.\"}},\"required\":[\"kind\",\"source\"],\"title\":\"ExplicitCanvasTargetOwner\",\"type\":\"object\"}",
     "ExplicitCountOrigin": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"explicit\",\"description\":\"Always \\\"explicit\\\": the count was written in the DDL.\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"ExplicitCountOrigin\",\"type\":\"object\"}",
@@ -2425,5 +2441,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "45abcb34343b9d78b23719f941a71eaa46797860da1f226320aa4072a5869918"
+  "digest": "579e0120e6bf549c31811b46a7686e6a3de0616ccee8aaf8de2dfc8c6e570621"
 }

@@ -29,7 +29,6 @@ runeHost.$derived = derivedShim;
 const { BatchState } = await import('../batch/state.svelte.ts');
 const { batchSettings } = await import('../batch/settings.svelte.ts');
 const { createWorkState } = await import('./state.svelte.ts');
-const { wildSettings } = await import('../wild/settings.svelte.ts');
 const { pipelineAttentionReason } = await import('../pipeline/attention.ts');
 const { DRAW_OPTIONS } = await import('../draw-options.ts');
 
@@ -174,7 +173,8 @@ test('image authoring keeps provenance out of description and reuploads consumed
 		const options = body.options as Record<string, unknown>;
 		assert.equal(options.stage1_model, 'chatgpt:vision');
 		assert.equal(options.stage2_model, 'chatgpt:vision');
-		assert.equal(options.sketch, 'on');
+		// A picture never sends the sketch, whatever the describe tab's switch says.
+		assert.equal(options.sketch, 'off');
 		assert.equal(options.sketch_text, undefined);
 		assert.equal(options.wild, false);
 		assert.equal(options.canvas_fit, 'contain');
@@ -416,10 +416,16 @@ test('the four tabs retain independent choices and new work restores its default
 	work.inputMode = 'batch';
 	assert.equal(work.drawOptions.canvas_aspect, 'a4');
 	work.drawOptions.composition = 'on';
-	work.selectWorkOptions(null, false);
+	// Opening a work takes the core's answer into the describe tab only, and
+	// only the latest opening's answer counts.
+	const stale = work.beginWorkOptions();
+	const latest = work.beginWorkOptions();
+	work.adoptWorkOptions(latest, 'describe', { ...options('square'), composition: 'off', wild: 'on' });
+	work.adoptWorkOptions(stale, 'describe', { ...options('square'), composition: 'on' });
 	assert.equal(work.drawOptions.composition, 'on', 'opening a work does not alter batch selection');
 	work.inputMode = 'single';
-	assert.equal(work.drawOptions.composition, 'off', 'an unrecorded switch restores as off');
+	assert.equal(work.drawOptions.composition, 'off', 'the latest answer is the one adopted');
+	assert.equal(work.drawOptions.wild, 'on');
 	work.drawOptions.wild = 'on';
 	work.clearInput();
 	for (const key of DRAW_OPTIONS) assert.deepEqual(work.drawOptions[key], work.drawDefaults.describe[key], `${key} resets to its default`);

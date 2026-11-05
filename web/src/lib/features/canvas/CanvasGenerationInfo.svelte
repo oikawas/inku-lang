@@ -191,9 +191,10 @@
 	});
 
 	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
-	const optionRows = $derived(drawOptionRows(statusHistoryItem?.draw_options, t()));
-	const optionText = (key: string) => optionRows.find((row) => row.key === key)?.text ?? 'N/A';
-	const recordedModels = $derived(statusHistoryItem?.draw_options?.models);
+	// The same recorded choices as the strip, named as the strip names them.
+	const optionRows = $derived(drawOptionRows(statusHistoryItem?.draw_options ?? result?.draw_options, t(),
+		{ names: { catalog: () => statusCatalogName, canvas: () => statusCanvasName } }));
+	const optionText = (key: string) => optionRows.find((row) => row.key === key)?.text ?? t().drawOptionsUnavailable;
 	const detailVarySeed = $derived(statusHistoryItem?.composition_seed ?? result?.composition_seed ?? null);
 	// The stored form is `<scheme>:<digest>`. The scheme is named in the row's
 	// label and the digest stands alone in the cell, so the value shown is the
@@ -256,7 +257,8 @@
 	const detailFocus = $derived(statusHistoryItem?.focus ?? result?.focus ?? '');
 	const detailSeedText = $derived(statusHistoryItem?.seed_text ?? result?.seed_text ?? '');
 	// Null predates the Wild field and is different from an explicit Off.
-	const detailWild = $derived(statusHistoryItem?.draw_options?.wild == null ? null : statusHistoryItem.draw_options.wild === 'on');
+	const recordedWild = $derived((statusHistoryItem?.draw_options ?? result?.draw_options)?.wild ?? null);
+	const detailWild = $derived(recordedWild == null ? null : recordedWild === 'on');
 	const detailVariationAmplitude = $derived(statusHistoryItem?.variation_amplitude ?? result?.variation_amplitude ?? '');
 	const detailVariationSeed = $derived(statusHistoryItem?.variation_seed ?? result?.variation_seed ?? null);
 	// Sketch from life (Stage 0.5) records both what the layer did (fine, coarse,
@@ -376,10 +378,6 @@
 					{:else}
 						<p class="detail-note">{detailNote || (hasSketchDetails && !workId ? t().provenanceWorkNotSaved : '-')}</p>
 					{/if}
-				</section>
-				<section class="detail-group">
-					<h4>{t().displayedWorkConditions}</h4>
-					<dl>{#each drawOptionRows(statusHistoryItem?.draw_options, t()) as option (option.key)}<dt>{option.label}</dt><dd>{option.text}</dd>{/each}</dl>
 				</section>
 				<!-- A read-and-draw work's sketch text is its reading, which its own section shows. -->
 				{#if hasSketchDetails && !detailReadRecord}
@@ -528,7 +526,7 @@
 				<section class="detail-group">
 					<h4>{t().provenanceSectionInterpretation}</h4>
 					<dl>
-						{@render term(t().historyModelInterpretation, t().provenanceHintStage1Model)}<dd>{recordedModels?.stage1 ?? recordedModels?.vision ?? 'N/A'}</dd>
+						{@render term(t().historyModelInterpretation, t().provenanceHintStage1Model)}<dd>{statusStage1Model}</dd>
 						{@render term(isJapanese ? '指示書の言語' : 'Instructions language', t().provenanceHintStage1Lang)}<dd>{displayLanguageName(detailStage1Lang)}</dd>
 						{@render term(t().provenanceLabelLangRequested, t().provenanceHintLangRequested)}<dd>{detailRequestedLang ? displayLanguageName(detailRequestedLang) : '-'}</dd>
 						{#if interpretFallbackReason}
@@ -542,7 +540,7 @@
 				<section class="detail-group">
 					<h4>{t().provenanceSectionPerformance}</h4>
 					<dl>
-						{@render term(t().historyModelCompletion, t().provenanceHintStage2Model)}<dd>{recordedModels?.stage2 ?? 'N/A'}</dd>
+						{@render term(t().historyModelCompletion, t().provenanceHintStage2Model)}<dd>{statusStage2Model}</dd>
 						{@render term(isJapanese ? '補完の言語' : 'Completion language', t().provenanceHintStage2Lang)}<dd>{displayLanguageName(detailStage2Lang)}</dd>
 						{#if detailFocus}{@render term(t().provenanceLabelFocus, t().provenanceHintFocus)}<dd>{detailFocus}</dd>{/if}
 						{#if detailVariationAmplitude}

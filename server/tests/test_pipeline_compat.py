@@ -41,7 +41,6 @@ def test_compose_http_forwards_requested_limits_to_the_pipeline(monkeypatch) -> 
             "operational_resource_budget": deepcopy(budget),
         }}},
         admin_limits_for=lambda _owner: {"max_expanded_primitives": 40},
-        plugin_storage_for=lambda _owner: {},
     )
 
     class Service:

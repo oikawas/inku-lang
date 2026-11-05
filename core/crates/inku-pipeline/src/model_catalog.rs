@@ -477,17 +477,35 @@ pub(crate) fn draw_option_providers(user: &Value) -> Value {
 }
 
 fn user_defaults() -> Value {
-    let mut settings = json!({"stage1_provider":"nvidia", "stage1_model":"google/gemma-4-31b-it",
-        "stage2_provider":"nvidia", "stage2_model":"google/gemma-4-31b-it",
-        "vision_provider":"nvidia", "vision_model":"meta/llama-3.2-90b-vision-instruct",
+    let mut settings = json!({
         "okugaki_provider":"nvidia", "okugaki_model":"meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models":[], "instruction_caption_visible":true,
         "instruction_caption_writing_mode":"horizontal", "instruction_caption_position":"left",
-        "color_catalog_id":"default", "ui_text_size":1, "sketch_open":true,
+        "ui_text_size":1, "sketch_open":true,
         "generation_info_follows_selection":true, "generation_info_token_detail":false});
-    settings["draw_defaults"] = crate::draw_options::default_draw_defaults(&settings);
+    // The drawing and vision models and the catalog a user has not chosen
+    // come from the release's drawing defaults (one file decides them).
+    if let (Some(settings), Some(legacy)) = (
+        settings.as_object_mut(),
+        crate::draw_options::release_legacy_settings().as_object(),
+    ) {
+        settings.extend(legacy.clone());
+    }
+    settings["draw_defaults"] = crate::draw_options::release_draw_defaults();
     settings
 }
+
+/// Legacy model and catalog keys that a stored settings object keeps only
+/// when the user (or an older build) saved them.
+const LEGACY_DRAW_KEYS: &[&str] = &[
+    "stage1_provider",
+    "stage1_model",
+    "stage2_provider",
+    "stage2_model",
+    "vision_provider",
+    "vision_model",
+    "color_catalog_id",
+];
 
 fn normalize_user(input: &Value, color_ids: &Value, default_color: &str) -> Value {
     let mut clean = user_defaults();
@@ -577,13 +595,22 @@ fn normalize_user(input: &Value, color_ids: &Value, default_color: &str) -> Valu
             .filter(|v| (0..5).contains(v))
             .unwrap_or(1)
     );
+    // The stored settings, not the filled ones: a filled value is not a choice.
     clean["draw_defaults"] =
-        crate::draw_options::normalize_draw_defaults(&input["draw_defaults"], &clean, color_ids);
+        crate::draw_options::normalize_draw_defaults(&input["draw_defaults"], input, color_ids);
     clean
 }
 
+/// The settings to store after `patch`. Only what the user saved is stored:
+/// the legacy model and catalog keys and `draw_defaults` stay absent until
+/// saved, so the release's defaults (and a later release's new ones) keep
+/// applying to them.
 fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &str) -> Value {
-    let mut clean = normalize_user(current, colors, default_color);
+    let mut stored = if current.is_object() {
+        current.clone()
+    } else {
+        json!({})
+    };
     for key in [
         "stage1_provider",
         "stage2_provider",
@@ -595,7 +622,7 @@ fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &s
         "okugaki_model",
     ] {
         if let Some(text) = patch[key].as_str().filter(|s| !s.trim().is_empty()) {
-            clean[key] = json!(if key.ends_with("_model") {
+            stored[key] = json!(if key.ends_with("_model") {
                 text.trim()
             } else {
                 text
@@ -609,7 +636,7 @@ fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &s
         "generation_info_token_detail",
     ] {
         if let Some(value) = patch.get(key) {
-            clean[key] = json!(truthy(value));
+            stored[key] = json!(truthy(value));
         }
     }
     for key in [
@@ -620,18 +647,35 @@ fn update_user(current: &Value, patch: &Value, colors: &Value, default_color: &s
         "ui_text_size",
     ] {
         if let Some(value) = patch.get(key) {
-            clean[key] = value.clone();
+            stored[key] = value.clone();
         }
     }
-    if let Some(draw_defaults) = patch.get("draw_defaults") {
-        clean["draw_defaults"] = draw_defaults.clone();
-    } else if current.get("draw_defaults").is_none() {
-        clean
-            .as_object_mut()
-            .expect("user settings")
-            .remove("draw_defaults");
+    if let Some(patch_defaults) = patch.get("draw_defaults").filter(|v| v.is_object()) {
+        // A patch may name some tabs and keys; the rest keep what is in effect now.
+        let mut merged = normalize_user(&stored, colors, default_color)["draw_defaults"].clone();
+        for (tab, options) in patch_defaults.as_object().into_iter().flatten() {
+            if merged.get(tab).is_none() {
+                continue;
+            }
+            for (key, value) in options.as_object().into_iter().flatten() {
+                merged[tab][key] = value.clone();
+            }
+        }
+        stored["draw_defaults"] = merged;
     }
-    normalize_user(&clean, colors, default_color)
+    let mut clean = normalize_user(&stored, colors, default_color);
+    let saved = |key: &str| stored[key].as_str().is_some_and(|s| !s.trim().is_empty());
+    let object = clean.as_object_mut().expect("user settings");
+    for &key in LEGACY_DRAW_KEYS {
+        let source = key.replace("stage2_", "stage1_");
+        if !saved(&source) {
+            object.remove(key);
+        }
+    }
+    if stored.get("draw_defaults").is_none() {
+        object.remove("draw_defaults");
+    }
+    clean
 }
 
 fn model_rows(payload: &Value) -> Result<Vec<Value>, &'static str> {
@@ -1175,6 +1219,18 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             Some(options) => json!({"options":options}),
             None => json!({"outcome":"refused", "reason":"invalid_tab"}),
         },
+        Some("options_for_recorded") => match crate::draw_options::options_for_recorded(
+            &request["options"],
+            request["tab"].as_str().unwrap_or(""),
+            &request["defaults"],
+        ) {
+            Some(options) => json!({"options":options}),
+            None => json!({"outcome":"refused", "reason":"invalid_tab"}),
+        },
+        Some("release_defaults") => {
+            json!({"release":crate::draw_options::release_defaults(),
+                "draw_options":crate::draw_options::DRAW_OPTIONS.iter().map(|(key, _)| *key).collect::<Vec<_>>()})
+        }
         Some("default_draw_defaults") => {
             json!({"draw_defaults":crate::draw_options::default_draw_defaults(&user_defaults())})
         }

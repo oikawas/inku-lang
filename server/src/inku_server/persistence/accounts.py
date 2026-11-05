@@ -420,13 +420,6 @@ class UserAccountProjector:
             model_settings = json.loads(row.model_settings or "{}")
         except json.JSONDecodeError:
             model_settings = {}
-        from ..model_settings import user_settings_with_legacy_canvas
-        try:
-            plugin_storage = json.loads(getattr(row, "plugin_storage", None) or "{}")
-        except (json.JSONDecodeError, TypeError):
-            plugin_storage = {}
-        if isinstance(plugin_storage, dict) and "canvas-aspect" in plugin_storage:
-            model_settings = user_settings_with_legacy_canvas(model_settings, plugin_storage)
         try:
             ui_custom_raw = json.loads(row.ui_custom or "{}")
         except json.JSONDecodeError:

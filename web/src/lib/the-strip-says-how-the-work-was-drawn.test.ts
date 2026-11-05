@@ -16,11 +16,15 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 const PANEL = fs.readFileSync(path.join(here, './components/CanvasPanel.svelte'), 'utf8');
 
 test('the saved-work strip retains sketch results and readable condition names', () => {
-	assert.match(PANEL, /drawOptionRows\(statusHistoryItem\?\.draw_options/);
+	// One source: the saved work on screen, else the result on screen.
+	assert.match(PANEL, /stripOptions = \$derived\(statusHistoryItem\?\.draw_options \?\? result\?\.draw_options \?\? null\)/);
+	assert.match(PANEL, /drawOptionRows\(stripOptions, t\(\), \{ image: stripIsImage \}\)/);
 	assert.match(PANEL, /statusStage1ModelOnly/);
 	assert.match(PANEL, /statusStage2ModelOnly/);
-	assert.match(PANEL, /isJapanese \? '解釈' : 'Interpretation'/);
-	assert.match(PANEL, /isJapanese \? '描画' : 'Performance'/);
+	assert.match(PANEL, /t\(\)\.drawOptionsStage1Short/);
+	assert.match(PANEL, /t\(\)\.drawOptionsStage2Short/);
+	// The model lines keep their layout (they ran together without it).
+	assert.match(PANEL, /\.render-meta-model-line \{ display: flex/);
 	assert.match(PANEL, /statusCatalogName/);
 	assert.match(PANEL, /statusCanvasName/);
 	assert.match(PANEL, /sketchStateShort\(statusSketchState, isJapanese\)/);

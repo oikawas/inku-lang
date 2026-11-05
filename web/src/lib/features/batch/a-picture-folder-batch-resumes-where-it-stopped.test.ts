@@ -212,25 +212,21 @@ test('the switch is remembered and does not move during a run', async () => {
 	await run;
 });
 
-test('new work hides only the dismissed picture run after repicking and reopening', () => {
-	const files = [file('dismissed/1.jpg'), file('dismissed/2.jpg')];
-	const old = { name: 'dismissed', total: 2, done: [pictureKey(files[0])], failures: [], updatedAt: 1,
-		batchRunId: 'dismiss-image-old', batchKeys: files.map(pictureKey) };
+test('new work keeps the folder record, so picking the same folder again continues', () => {
+	// Redrawing the pictures already drawn would duplicate works (author, 2026-11-05).
+	const files = [file('kept/1.jpg'), file('kept/2.jpg')];
+	const old = { name: 'kept', total: 2, done: [pictureKey(files[0])], failures: [], updatedAt: 1,
+		batchRunId: 'kept-image-run', batchKeys: files.map(pictureKey) };
 	const { saved, store } = memoryStore([old]);
 	const folder = new ImageFolderBatch<FolderFile>(store);
 	folder.pick(files);
 	assert.equal(folder.doneCount, 1);
 	folder.clearInput();
-	assert.equal(folder.visibleHistory.length, 0);
+	assert.equal(folder.folderName, '');
+	assert.equal(folder.visibleHistory.length, 1);
 	assert.equal(saved.history.length, 1);
-	const reopened = new ImageFolderBatch<FolderFile>(store);
-	reopened.pick(files);
-	assert.equal(reopened.record, null);
-	assert.equal(reopened.doneCount, 0);
-	assert.equal(reopened.resumeBlocked, false);
-	saved.history = [{ ...old, batchRunId: 'dismiss-image-new' }];
-	const next = new ImageFolderBatch<FolderFile>(store);
-	next.pick(files);
-	assert.equal(next.record?.batchRunId, 'dismiss-image-new');
-	assert.equal(next.doneCount, 1);
+	folder.pick(files);
+	assert.equal(folder.record?.batchRunId, 'kept-image-run');
+	assert.equal(folder.doneCount, 1);
+	assert.equal(folder.pending.length, 1);
 });

@@ -37,12 +37,11 @@ def _saved_limits(work: dict | None) -> dict | None:
 
 class PipelineSettings:
     def __init__(self, binding: PipelineBinding, manifest: dict, *,
-                 admin_limits_for: Callable[[str], dict],
-                 plugin_storage_for: Callable[[str], dict]):
+                 admin_limits_for: Callable[[str], dict]):
         if manifest.get("schema") != "inku.pipeline-host.v1":
             raise CandidateHostError("pipeline_manifest_mismatch")
         self.binding, self.manifest = binding, deepcopy(manifest)
-        self.admin_limits_for, self.plugin_storage_for = admin_limits_for, plugin_storage_for
+        self.admin_limits_for = admin_limits_for
 
     def config_for(self, owner: str, work: dict | None, requested: dict | None = None) -> dict:
         if work and "saved_config" in work:
@@ -75,11 +74,13 @@ class PipelineSettings:
             maximum.update({field: limits[setting] for field, setting in mapping.items()})
         policy_bytes = json.dumps(compiler["hard_resource_policy"]["budget"], sort_keys=True, separators=(",", ":")).encode()
         compiler["hard_resource_policy"]["identity"] = "host-settings:" + hashlib.sha256(policy_bytes).hexdigest()
-        storage = self.plugin_storage_for(owner).get("canvas-aspect", {})
         metadata = (work or {}).get("metadata", {})
         selected = metadata.get("render_canvas_aspect_id") or metadata.get("render_canvas_aspect")
         if selected is None:
-            selected = "square" if storage.get("enabled") is False else storage.get("selected", "square")
+            # No longer the old per-user canvas (plugin storage): the release's
+            # describe-tab default, as a request without a canvas meets it.
+            from .model_settings import release_draw_defaults
+            selected = release_draw_defaults()["describe"]["canvas_aspect"]
             registry = self.binding.canvas_registry
             if registry is not None and selected not in {entry["id"] for entry in registry["registry"]["formats"]}:
                 selected = "square"

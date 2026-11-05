@@ -1,0 +1,42 @@
+{
+  "schema": "inku.release-draw-defaults.v1",
+  "reviewed_for_version": "",
+  "tabs": {
+    "describe": {
+      "route": "read_and_draw",
+      "sketch": "on",
+      "composition": "off",
+      "wild": "off",
+      "catalog": {"id": "default", "mode": "fixed"},
+      "canvas_aspect": "square",
+      "models": {"stage1": "nvidia:google/gemma-4-31b-it", "stage2": "nvidia:google/gemma-4-31b-it"}
+    },
+    "image": {
+      "route": "read_and_draw",
+      "sketch": "off",
+      "composition": "off",
+      "wild": "off",
+      "catalog": {"id": "default", "mode": "fixed"},
+      "canvas_aspect": "image",
+      "models": {"vision": "nvidia:meta/llama-3.2-90b-vision-instruct"}
+    },
+    "batch_text": {
+      "route": "read_and_draw",
+      "sketch": "on",
+      "composition": "off",
+      "wild": "off",
+      "catalog": {"id": "default", "mode": "fixed"},
+      "canvas_aspect": "square",
+      "models": {"stage1": "nvidia:google/gemma-4-31b-it", "stage2": "nvidia:google/gemma-4-31b-it"}
+    },
+    "batch_image": {
+      "route": "read_and_draw",
+      "sketch": "off",
+      "composition": "off",
+      "wild": "off",
+      "catalog": {"id": "default", "mode": "fixed"},
+      "canvas_aspect": "image",
+      "models": {"vision": "nvidia:meta/llama-3.2-90b-vision-instruct"}
+    }
+  }
+}

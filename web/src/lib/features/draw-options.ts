@@ -22,21 +22,11 @@ export type DrawOptions = {
 };
 export type DrawDefaults = Record<DrawTab, DrawOptions>;
 
-/** Apply the core's missing-value rule to the already-projected server record. */
-export function optionsForWork(record: RecordedDrawOptions | null | undefined, defaults: DrawOptions, tab: DrawTab): DrawOptions {
-	const image = tab === 'image' || tab === 'batch_image';
-	const catalog = record?.catalog;
-	return {
-		route: record?.route ?? defaults.route,
-		sketch: record?.sketch ?? 'off',
-		composition: record?.composition ?? 'off',
-		wild: record?.wild ?? 'off',
-		catalog: { id: catalog?.id ?? defaults.catalog.id,
-			mode: catalog?.mode === 'auto' ? 'auto' : catalog?.mode ? 'fixed' : defaults.catalog.mode },
-		canvas_aspect: record?.canvas_aspect ?? defaults.canvas_aspect,
-		models: image ? { vision: record?.models?.vision ?? defaults.models.vision }
-			: { stage1: record?.models?.stage1 ?? defaults.models.stage1, stage2: record?.models?.stage2 ?? defaults.models.stage2 },
-	};
+/** The options a picture never sends: it has no route, sketch or composition. */
+export const TEXT_ONLY_OPTIONS = ['route', 'sketch', 'composition'] as const;
+
+export function isImageTab(tab: DrawTab): boolean {
+	return tab === 'image' || tab === 'batch_image';
 }
 
 export function copyDrawOptions(options: DrawOptions): DrawOptions {
@@ -48,28 +38,41 @@ export function copyDrawDefaults(defaults: DrawDefaults): DrawDefaults {
 		batch_text: copyDrawOptions(defaults.batch_text), batch_image: copyDrawOptions(defaults.batch_image) };
 }
 
-export function migrateLegacyWild(defaults: DrawDefaults, raw: string | null): DrawDefaults | null {
-	if (raw !== '0' && raw !== '1') return null;
-	const migrated = copyDrawDefaults(defaults);
-	for (const options of Object.values(migrated)) options.wild = raw === '1' ? 'on' : 'off';
-	return migrated;
-}
+/** The browser-only stroke-limit default of older builds. It is not carried
+ *  into the drawing defaults; the page only removes it (author, 2026-11-05). */
+export const LEGACY_WILD_DEFAULT_KEY = 'inku-wild-default';
 
-export function drawOptionRows(options: RecordedDrawOptions | null | undefined, labels: import('../i18n/types.ts').LangPack) {
+/** How a row names a value the work recorded; ids are shown only when nothing else names them. */
+export type DrawOptionNames = {
+	catalog?: (id: string) => string;
+	canvas?: (id: string) => string;
+	model?: (ref: string) => string;
+};
+
+export function drawOptionRows(options: RecordedDrawOptions | null | undefined, labels: import('../i18n/types.ts').LangPack,
+	view: { image?: boolean; names?: DrawOptionNames } = {}) {
 	const names = { route: labels.drawDefaultsRoute, sketch: labels.sketchLabel, composition: labels.drawDefaultsComposition,
-		wild: labels.wildButton, catalog: labels.colorCatalogButton, canvas_aspect: labels.drawDefaultsCanvas, models: labels.drawDefaultsModel };
-	return DRAW_OPTIONS.map((key) => {
+		wild: labels.wildButton, catalog: labels.colorCatalogButton, canvas_aspect: labels.drawDefaultsCanvas,
+		models: view.image ? labels.drawDefaultsVision : labels.drawDefaultsModel };
+	const model = (ref: string | null | undefined) => (ref ? (view.names?.model?.(ref) ?? ref) : labels.drawOptionsUnavailable);
+	const keys = DRAW_OPTIONS.filter((key) => !view.image || !(TEXT_ONLY_OPTIONS as readonly string[]).includes(key));
+	return keys.map((key) => {
 		const value = options?.[key];
 		let text = labels.drawOptionsUnavailable;
-		if (typeof value === 'string') {
+		if (key === 'canvas_aspect' && typeof value === 'string') {
+			text = view.names?.canvas?.(value) ?? value;
+		} else if (typeof value === 'string') {
 			text = value === 'on' ? labels.drawDefaultsOn : value === 'off' ? labels.drawDefaultsOff
 				: value === 'read_and_draw' ? labels.drawDefaultsRead : value === 'stages' ? labels.drawDefaultsStages : value;
 		} else if (key === 'catalog' && options?.catalog) {
 			const catalog = options.catalog;
-			text = `${catalog.id ?? labels.drawOptionsUnavailable} (${catalog.mode === 'auto' ? labels.colorCatalogAuto : catalog.mode === 'fixed' ? labels.drawDefaultsFixed : catalog.mode ?? labels.drawOptionsUnavailable})`;
+			const name = catalog.id ? (view.names?.catalog?.(catalog.id) ?? catalog.id) : labels.drawOptionsUnavailable;
+			text = `${name} (${catalog.mode === 'auto' ? labels.colorCatalogAuto : catalog.mode === 'fixed' ? labels.drawDefaultsFixed : labels.drawOptionsUnavailable})`;
 		} else if (key === 'models' && options?.models) {
 			const models = options.models;
-			text = models.vision ?? (models.stage1 === models.stage2 ? models.stage1 : [models.stage1, models.stage2].map((v) => v ?? labels.drawOptionsUnavailable).join(' / ')) ?? labels.drawOptionsUnavailable;
+			text = models.vision ? model(models.vision)
+				: models.stage1 === models.stage2 ? model(models.stage1)
+					: `${model(models.stage1)} / ${model(models.stage2)}`;
 		}
 		return { key, label: names[key], text };
 	});

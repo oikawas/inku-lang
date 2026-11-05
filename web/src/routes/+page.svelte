@@ -79,7 +79,7 @@
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
-	import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
+	import { AUTO_CATALOG_ID, colorCatalogOverride, resolveCatalogId } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload } from '$lib/features/render-payload';
 	import {
 		runCurrentWork,
@@ -95,7 +95,7 @@
 	import { demoInstructionModelGroups } from '$lib/demo';
 	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
 	import { loadBatchSavedWork } from '$lib/features/batch/saved-work';
-	import { copyDrawOptions, migrateLegacyWild, type DrawDefaults } from '$lib/features/draw-options';
+	import { copyDrawOptions, LEGACY_WILD_DEFAULT_KEY, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
 	import { bindWildRenderState, wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
 	import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
@@ -246,7 +246,6 @@
 	let modelSelectionAllowVision = $state(true);
 	let modelSelectionVisionOnly = $state(false);
 	let modelSelectionForDrawing = false;
-	let legacyWildMigration = false;
 	// The Server config supplies the candidate-grid cap so it tracks render slots;
 	// apiFetch handles 503 retries when other work temporarily occupies a slot.
 	let renderFanoutLimit = $state(4);
@@ -672,18 +671,6 @@
 		applyUserSettings(settings, { excludeIds: options.excludeUserSettingIds });
 		if (!settings) return;
 		if (user && settings.draw_defaults) work.setDrawDefaults(user.id, settings.draw_defaults);
-		if (user && settings.draw_defaults && !legacyWildMigration && typeof localStorage !== 'undefined') {
-			const raw = localStorage.getItem('inku-wild-default');
-			const defaults = migrateLegacyWild(settings.draw_defaults, raw);
-			if (defaults) {
-				legacyWildMigration = true;
-				void saveDrawDefaults(defaults).then(() => {
-					work.applyMigratedWild(settings.draw_defaults!, defaults);
-					localStorage.removeItem('inku-wild-default');
-				})
-					.catch(() => { legacyWildMigration = false; });
-			}
-		}
 		stage1Provider = settings.stage1_provider;
 		stage1Model = settings.stage1_model;
 		stage2Provider = settings.stage2_provider;
@@ -1347,7 +1334,6 @@
 
 	function resetAfterSignedOut(): void {
 		work.resetDrawDefaultsOwner();
-		legacyWildMigration = false;
 		work.clearImage();
 		compositionRanges = [];
 		ddlRangePreview = null;
@@ -1476,8 +1462,8 @@
 
 	async function pushHistory(it: Iteration, options: SaveHistoryOptions = {}): Promise<Iteration | null> {
 		return saveHistoryItem(it, options, {
-			catalogId: colorCatalogSettings.effectiveId,
-			catalogMode: colorCatalogSettings.isAuto ? 'auto' : 'fixed',
+			catalogId: resolveCatalogId(work.tabCatalogSelection()),
+			catalogMode: work.drawOptions.catalog.mode,
 			canvasAspectId: effectiveCanvasAspectId(),
 			instructionLang: work.instructionLang,
 			uiLang: getLang()
@@ -1574,15 +1560,17 @@
 		history: {
 			syncToItem: (item) => history.syncToItem(item)
 		},
+		// Derived drawings use the tab's choices (an opened work's, by default),
+		// not the legacy user setting (one source, 2026-11-05).
 		models: {
-			stage1: () => qualifiedModelRef(stage1Provider, stage1Model),
-			stage2: () => qualifiedModelRef(stage2Provider, stage2Model),
+			stage1: () => work.tabModelRef('stage1'),
+			stage2: () => work.tabModelRef('stage2'),
 			label: statusModelName,
 			shortLabel: (model) => modelShortName(model)
 		},
 		catalog: {
 			defaultId: () => defaultCatalogId,
-			effectiveId: () => colorCatalogSettings.effectiveId,
+			effectiveId: () => resolveCatalogId(work.tabCatalogSelection()),
 			available: () => colorCatalogs,
 			name: catalogName
 		},
@@ -1603,10 +1591,10 @@
 	const modelInspection = createModelInspection({
 		availableModelCatalog: () => availableModelCatalog,
 		result: () => work.result,
-		stage1Provider: () => stage1Provider,
-		stage1Model: () => stage1Model,
-		stage2Provider: () => stage2Provider,
-		stage2Model: () => stage2Model,
+		stage1Provider: () => splitModelReference(work.tabModelRef('stage1'), availableModelCatalog).provider ?? stage1Provider,
+		stage1Model: () => splitModelReference(work.tabModelRef('stage1'), availableModelCatalog).model,
+		stage2Provider: () => splitModelReference(work.tabModelRef('stage2'), availableModelCatalog).provider ?? stage2Provider,
+		stage2Model: () => splitModelReference(work.tabModelRef('stage2'), availableModelCatalog).model,
 		currentUser: () => session.currentUser,
 		setCurrentUser: (user) => session.setCurrentUser(user as UserItem),
 		apiFetch,
@@ -1625,7 +1613,7 @@
 		work.reloadError = null;
 		try {
 			const comparison = await replaySavedHistoryItem(it, source, {
-				effectiveCatalogId: colorCatalogSettings.effectiveId,
+				effectiveCatalogId: resolveCatalogId(work.tabCatalogSelection()),
 				effectiveCanvasAspectId: effectiveCanvasAspectId(),
 				currentRenderEngineVersion,
 				renderPayload: (item, catalogId) => ({
@@ -1747,10 +1735,11 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 			derivationKind: 'description_edit',
 			// A juxtaposition adds what it added, so the lineage can leave it out next time.
 			derivationMetadata: { edited_from_history_id: node.history.id ?? null, ...(metadata ?? {}) },
-			// The dialog supplies its own choice; otherwise use the saved default.
+			// The dialog supplies its own choice; otherwise the parent's recorded one
+			// (not recorded reads as off, as opening the work reads it).
 			renderOverrides: {
 				...colorCatalogOverride(lineageCatalogId(node)),
-				...wildOverride(wild ?? (work.drawOptions.wild === 'on'))
+				...wildOverride(wild ?? recordedWild(node.history))
 			},
 		}, signal);
 		// A cancelled run hands back its last view instead of throwing; a stop
@@ -1765,7 +1754,12 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 /** Redraw a saved work with the sketch off or on, as its child. The
  *  sketch is asked again (or dropped) -- replaying the stored one would leave
  *  the choice dead. */
-async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = work.drawOptions.wild === 'on'): Promise<void> {
+/** A derived drawing's stroke limit: the work's recorded choice; unrecorded is off. */
+function recordedWild(item: { draw_options?: RecordedDrawOptions | null } | null | undefined): boolean {
+	return item?.draw_options?.wild === 'on';
+}
+
+async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = recordedWild(node.history)): Promise<void> {
 	if (!node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
@@ -1814,7 +1808,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(ddlDialogWildOverride ?? (work.drawOptions.wild === 'on'))
+			...wildOverride(ddlDialogWildOverride ?? recordedWild(node.history))
 		},
 	}, signal);
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
@@ -1916,15 +1910,12 @@ function refreshLineageAfterRefine(): void {
 	if (focusId) void lineageState.load(focusId, true);
 }
 
-// The DDL dialog draws through Stage 2 only, so its picker moves the global
-// Stage 2 selection (same target as the main-screen model selection) and
-// persists it. Unlike setStage2Model it leaves the history selection alone:
-// the dialog stays open over the current view and its draw selects the saved
-// result anyway.
+// The DDL and refinement dialogs choose the drawing model of the tab on
+// screen, as the input panel's picker does. It is a choice for the next
+// drawing, not a saved setting (the defaults live in Settings, 2026-11-05).
 async function selectDdlDialogDrawingModel(provider: Provider, model: string): Promise<void> {
-	stage2Provider = provider;
-	stage2Model = model;
-	await persistModelSelection();
+	const ref = qualifiedModelRef(provider, model);
+	if (ref) work.drawOptions.models.stage1 = work.drawOptions.models.stage2 = ref;
 }
 
 async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
@@ -2027,6 +2018,24 @@ $effect(() => {
 		if (!options.preserveLineageBrowsing) lineageBrowsingState.reset();
 	}
 
+	/** Put an opened work's choices into its tab, by the shared core's rule
+	 *  (recorded value; off for an unrecorded switch; the tab default otherwise). */
+	async function adoptWorkOptions(recorded: RecordedDrawOptions | null | undefined, tab: DrawTab): Promise<void> {
+		const sequence = work.beginWorkOptions();
+		if (!session.currentUser) return;
+		try {
+			const response = await apiFetch('/api/auth/me/draw-options/for-tab', {
+				method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ options: recorded ?? {}, tab }),
+			});
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const answer = await response.json() as { options: DrawOptions };
+			work.adoptWorkOptions(sequence, tab, answer.options);
+		} catch (cause) {
+			console.warn('failed to adopt the opened work\'s drawing choices', cause);
+		}
+	}
+
 	function loadIterationItem(it: Iteration, options: { preserveAuthoring?: boolean } = {}) {
 		if (demoRunning) return;
 		const preserveLineageTab = outputTab === 'lineage';
@@ -2036,7 +2045,7 @@ $effect(() => {
 		work.pendingCanvasAspectDerivation = null;
 		work.displayedHistoryItem = it;
 		const imageWork = !!it.image_ddl || it.image_provenance != null;
-		work.selectWorkOptions(it.draw_options, imageWork);
+		void adoptWorkOptions(it.draw_options, imageWork ? 'image' : 'describe');
 		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id);
 		void history.syncToItem(it);
 		work.lineageDetached = false;
@@ -2497,7 +2506,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			? statusHistoryItem as Iteration
 			: null
 	);
-	const effectiveRefineWild = $derived(refineWildOverride ?? (work.drawOptions.wild === 'on'));
+	const effectiveRefineWild = $derived(refineWildOverride ?? recordedWild(statusHistoryItem));
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
@@ -2671,6 +2680,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	onMount(() => {
 		windowWidth = window.innerWidth;
 		windowHeight = window.innerHeight;
+		// The old browser-only stroke-limit default is ignored and removed.
+		try { localStorage.removeItem(LEGACY_WILD_DEFAULT_KEY); } catch { /* storage unavailable */ }
 		function onResize() {
 			windowWidth = window.innerWidth;
 			windowHeight = window.innerHeight;
@@ -3220,7 +3231,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				statusDescriptionLocked={work.descriptionLocked}
 				statusTenkei={work.displayedHistoryItem?.tenkei ?? null}
 				{developerMode}
-				refineDrawingModelId={qualifiedModelRef(stage2Provider, stage2Model)}
+				refineDrawingModelId={work.tabModelRef('stage2')}
 				refineDrawingModelGroups={availableModelCatalog}
 				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
 				refineWildValue={effectiveRefineWild}
@@ -3322,7 +3333,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			returnFocusTo={ddlDialogReturnFocus}
 			drawing={ddlDialogDrawing}
 			stage2ModelLabel={work.stage2ModelLabel}
-			drawingModelId={qualifiedModelRef(stage2Provider, stage2Model)}
+			drawingModelId={work.tabModelRef('stage2')}
 			drawingModelGroups={availableModelCatalog}
 			onSelectDrawingModel={selectDdlDialogDrawingModel}
 			runTokensIn={work.activeRunTokensIn}
@@ -3333,7 +3344,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			previewForWord={saijikiPreview}
 			previewForPlugin={pluginPreview}
 			{pluginEntries}
-			wildValue={ddlDialogWildOverride ?? (work.drawOptions.wild === 'on')}
+			wildValue={ddlDialogWildOverride ?? (ddlDialogMode === 'edit' && ddlDialogNode ? recordedWild(ddlDialogNode.history) : work.drawOptions.wild === 'on')}
 			onSelectWild={(next) => (ddlDialogWildOverride = next)}
 			onDraw={handleDdlDialogDraw}
 			onClose={closeDdlDialog}

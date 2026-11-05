@@ -1,6 +1,7 @@
 //! Shared interpretation of saved draw options and per-tab defaults.
 use crate::model_catalog::{draw_option_providers, qualify_ref, split_ref};
 use serde_json::{Map, Value, json};
+use std::sync::OnceLock;
 
 /// The complete set of draw options and whether each has an off state.
 pub const DRAW_OPTIONS: &[(&str, bool)] = &[
@@ -13,6 +14,25 @@ pub const DRAW_OPTIONS: &[(&str, bool)] = &[
     ("models", false),
 ];
 const TABS: &[&str] = &["describe", "image", "batch_text", "batch_image"];
+
+/// The first drawing options a new user gets. The release decides them: the
+/// release procedure shows this file to the author and records the version
+/// it was reviewed for (`scripts/release-defaults.py`).
+const RELEASE_DEFAULTS: &str = include_str!("../data/release-defaults.json");
+
+/// The release file as shipped: `schema`, `reviewed_for_version` and `tabs`.
+#[must_use]
+pub fn release_defaults() -> &'static Value {
+    static PARSED: OnceLock<Value> = OnceLock::new();
+    PARSED
+        .get_or_init(|| serde_json::from_str(RELEASE_DEFAULTS).expect("embedded release defaults"))
+}
+
+/// The release's per-tab defaults, before any user's own choices.
+#[must_use]
+pub fn release_draw_defaults() -> Value {
+    release_defaults()["tabs"].clone()
+}
 
 fn image_tab(tab: &str) -> bool {
     matches!(tab, "image" | "batch_image")
@@ -81,30 +101,85 @@ pub fn options_of_work(record: &Value) -> Value {
     Value::Object(out)
 }
 
-/// Build defaults from existing user model and color settings.
+/// The legacy model and color settings a release fills in for a user who
+/// never chose them: the describe tab's drawing model and catalog and the
+/// image tab's vision model.
+#[must_use]
+pub fn release_legacy_settings() -> Value {
+    let tabs = release_draw_defaults();
+    let providers = draw_option_providers(&Value::Null);
+    let split = |reference: &str| {
+        let (provider, model) = split_ref(reference, &providers);
+        (provider.unwrap_or("").to_owned(), model.to_owned())
+    };
+    let (stage1_provider, stage1_model) =
+        split(tabs["describe"]["models"]["stage1"].as_str().unwrap_or(""));
+    let (vision_provider, vision_model) =
+        split(tabs["image"]["models"]["vision"].as_str().unwrap_or(""));
+    let catalog = &tabs["describe"]["catalog"];
+    let color = if catalog["mode"] == "auto" {
+        "auto"
+    } else {
+        catalog["id"].as_str().unwrap_or("default")
+    };
+    json!({"stage1_provider":stage1_provider, "stage1_model":stage1_model,
+        "stage2_provider":stage1_provider, "stage2_model":stage1_model,
+        "vision_provider":vision_provider, "vision_model":vision_model, "color_catalog_id":color})
+}
+
+/// The legacy model a user chose themselves, qualified. A value equal to the
+/// release's fill-in is not a choice: older builds saved the filled value
+/// whenever any setting was saved.
+fn chosen_model(user: &Value, image: bool, providers: &Value) -> Option<String> {
+    let (provider_key, model_key) = if image {
+        ("vision_provider", "vision_model")
+    } else {
+        ("stage1_provider", "stage1_model")
+    };
+    let model = text(&user[model_key])?;
+    let legacy = release_legacy_settings();
+    // A stored model without its provider was read with the filled provider,
+    // as `normalize_user` reads it.
+    let provider = text(&user[provider_key]).unwrap_or(legacy[provider_key].as_str().unwrap_or(""));
+    let reference = qualify_ref(provider, model, providers);
+    split_ref(&reference, providers).0?;
+    let fill = qualify_ref(
+        legacy[provider_key].as_str().unwrap_or(""),
+        legacy[model_key].as_str().unwrap_or(""),
+        providers,
+    );
+    (reference != fill).then_some(reference)
+}
+
+/// Build defaults from the release, with the model and color catalog a user
+/// saved themselves in the legacy settings laid over it. `user` is the stored
+/// settings before normalization, so a value the normalizer filled in is not
+/// taken for the user's choice.
 #[must_use]
 pub fn default_draw_defaults(user: &Value) -> Value {
+    let mut tabs = release_draw_defaults();
     let providers = draw_option_providers(user);
-    let stage1 = qualify_ref(
-        text(&user["stage1_provider"]).unwrap_or("nvidia"),
-        text(&user["stage1_model"]).unwrap_or("google/gemma-4-31b-it"),
-        &providers,
-    );
-    let vision = qualify_ref(
-        text(&user["vision_provider"]).unwrap_or("nvidia"),
-        text(&user["vision_model"]).unwrap_or("meta/llama-3.2-90b-vision-instruct"),
-        &providers,
-    );
-    let color = text(&user["color_catalog_id"]).unwrap_or("default");
-    let mut tabs = Map::new();
+    let stage1 = chosen_model(user, false, &providers);
+    let vision = chosen_model(user, true, &providers);
+    let color = text(&user["color_catalog_id"])
+        .filter(|color| *color != release_legacy_settings()["color_catalog_id"]);
     for &tab in TABS {
-        let image = image_tab(tab);
-        tabs.insert(tab.into(), json!({"route":"read_and_draw", "sketch":"on", "composition":"off", "wild":"off",
-            "catalog":{"id":color,"mode":if color == "auto" {"auto"} else {"fixed"}},
-            "canvas_aspect":if image {"image"} else {"square"},
-            "models":if image {json!({"vision":vision})} else {json!({"stage1":stage1,"stage2":stage1})}}));
+        if image_tab(tab) {
+            if let Some(vision) = &vision {
+                tabs[tab]["models"] = json!({"vision":vision});
+            }
+        } else if let Some(stage1) = &stage1 {
+            tabs[tab]["models"] = json!({"stage1":stage1,"stage2":stage1});
+        }
+        if let Some(color) = color {
+            tabs[tab]["catalog"] = if color == "auto" {
+                json!({"id":tabs[tab]["catalog"]["id"].clone(),"mode":"auto"})
+            } else {
+                json!({"id":color,"mode":"fixed"})
+            };
+        }
     }
-    Value::Object(tabs)
+    tabs
 }
 
 fn valid_string<'a>(value: &'a Value, valid: &[&str]) -> Option<&'a str> {
@@ -149,7 +224,18 @@ fn model_ref(value: &Value, user: &Value, image: bool, providers: &Value) -> Opt
 pub fn normalize_draw_defaults(input: &Value, user: &Value, color_ids: &Value) -> Value {
     let mut result = default_draw_defaults(user);
     let providers = draw_option_providers(user);
+    let known = |id: &str| {
+        id == "auto"
+            || color_ids
+                .as_array()
+                .is_none_or(|ids| ids.iter().any(|v| v.as_str() == Some(id)))
+    };
+    let release = release_draw_defaults();
     for &tab in TABS {
+        // A legacy catalog the server no longer has falls back to the release's.
+        if !result[tab]["catalog"]["id"].as_str().is_some_and(known) {
+            result[tab]["catalog"] = release[tab]["catalog"].clone();
+        }
         let source = &input[tab];
         for &(key, on_off) in DRAW_OPTIONS {
             let value = &source[key];
@@ -204,6 +290,13 @@ pub fn normalize_draw_defaults(input: &Value, user: &Value, color_ids: &Value) -
 /// Combine recorded values with the specified tab's defaults without changing them.
 #[must_use]
 pub fn options_for_tab(record: &Value, tab: &str, defaults: &Value) -> Option<Value> {
+    options_for_recorded(&options_of_work(record), tab, defaults)
+}
+
+/// The same as [`options_for_tab`], from options already read with
+/// [`options_of_work`] (what the history API returns as `draw_options`).
+#[must_use]
+pub fn options_for_recorded(work: &Value, tab: &str, defaults: &Value) -> Option<Value> {
     if !TABS.contains(&tab) {
         return None;
     }
@@ -213,7 +306,6 @@ pub fn options_for_tab(record: &Value, tab: &str, defaults: &Value) -> Option<Va
         defaults
     };
     let mut result = Map::new();
-    let work = options_of_work(record);
     for &(key, on_off) in DRAW_OPTIONS {
         let value = &work[key];
         let mut selected = if value.is_null() {
@@ -349,7 +441,7 @@ mod tests {
         for &tab in TABS {
             let d = &normalized["settings"]["draw_defaults"][tab];
             assert_eq!(d.as_object().unwrap().len(), DRAW_OPTIONS.len());
-            assert_eq!(d["catalog"], json!({"id":"auto","mode":"auto"}));
+            assert_eq!(d["catalog"]["mode"], "auto");
             assert_eq!(
                 d["models"],
                 if image_tab(tab) {
@@ -380,6 +472,146 @@ mod tests {
             json!({"action":"update_user","settings":normalized["settings"],"color_ids":["default","ink"],"patch":{"draw_defaults":clean["draw_defaults"]}}),
         );
         assert_eq!(updated["settings"]["draw_defaults"], clean["draw_defaults"]);
+    }
+
+    #[test]
+    fn the_release_file_names_every_option_for_every_tab() {
+        let release = release_defaults();
+        assert_eq!(release["schema"], "inku.release-draw-defaults.v1");
+        assert!(release["reviewed_for_version"].is_string());
+        let tabs = release["tabs"].as_object().unwrap();
+        assert_eq!(tabs.len(), TABS.len());
+        for &tab in TABS {
+            let options = tabs[tab].as_object().unwrap();
+            let keys: Vec<&str> = options.keys().map(String::as_str).collect();
+            for &(key, _) in DRAW_OPTIONS {
+                assert!(keys.contains(&key), "{tab} lacks {key}");
+            }
+            assert_eq!(
+                options.len(),
+                DRAW_OPTIONS.len(),
+                "{tab} has an unknown key"
+            );
+        }
+        // The file survives the core's own validation unchanged.
+        let ids = json!(["default"]);
+        assert_eq!(
+            normalize_draw_defaults(&release_draw_defaults(), &Value::Null, &ids),
+            release_draw_defaults()
+        );
+    }
+
+    #[test]
+    fn a_new_user_gets_the_release_and_a_saved_choice_is_kept() {
+        let ids = json!(["default", "ink"]);
+        let new_user = call(json!({"action":"normalize_user","settings":{},"color_ids":ids}));
+        assert_eq!(
+            new_user["settings"]["draw_defaults"],
+            release_draw_defaults()
+        );
+        // Older builds stored the filled values on any save; those are not choices.
+        let legacy = release_legacy_settings();
+        let filled = call(json!({"action":"normalize_user","settings":legacy,"color_ids":ids}));
+        assert_eq!(filled["settings"]["draw_defaults"], release_draw_defaults());
+        let chose = call(
+            json!({"action":"normalize_user","settings":{"stage1_provider":"openai","stage1_model":"chosen","color_catalog_id":"ink"},"color_ids":ids}),
+        );
+        let d = &chose["settings"]["draw_defaults"];
+        for &tab in TABS {
+            assert_eq!(
+                d[tab]["catalog"],
+                json!({"id":"ink","mode":"fixed"}),
+                "{tab}"
+            );
+            if image_tab(tab) {
+                assert_eq!(
+                    d[tab]["models"],
+                    release_draw_defaults()[tab]["models"],
+                    "{tab}"
+                );
+            } else {
+                assert_eq!(
+                    d[tab]["models"],
+                    json!({"stage1":"openai:chosen","stage2":"openai:chosen"}),
+                    "{tab}"
+                );
+            }
+            assert_eq!(
+                d[tab]["sketch"],
+                release_draw_defaults()[tab]["sketch"],
+                "{tab}"
+            );
+        }
+        let retired = call(
+            json!({"action":"normalize_user","settings":{"color_catalog_id":"retired"},"color_ids":ids}),
+        );
+        assert_eq!(
+            retired["settings"]["draw_defaults"],
+            release_draw_defaults()
+        );
+    }
+
+    #[test]
+    fn saving_one_setting_stores_no_defaults_and_a_partial_patch_keeps_the_rest() {
+        let ids = json!(["default", "ink"]);
+        let saved = call(
+            json!({"action":"update_user","settings":{},"patch":{"ui_text_size":2},"color_ids":ids}),
+        );
+        let stored = saved["settings"].as_object().unwrap();
+        assert!(!stored.contains_key("draw_defaults"));
+        for key in [
+            "stage1_model",
+            "stage2_model",
+            "vision_model",
+            "color_catalog_id",
+        ] {
+            assert!(!stored.contains_key(key), "{key}");
+        }
+        assert_eq!(stored["ui_text_size"], 2);
+        let mut defaults = release_draw_defaults();
+        defaults["describe"]["wild"] = json!("on");
+        let first = call(
+            json!({"action":"update_user","settings":{},"patch":{"draw_defaults":defaults},"color_ids":ids}),
+        );
+        assert_eq!(first["settings"]["draw_defaults"]["describe"]["wild"], "on");
+        let partial = call(
+            json!({"action":"update_user","settings":first["settings"],"patch":{"draw_defaults":{"batch_text":{"composition":"on"}}},"color_ids":ids}),
+        );
+        let d = &partial["settings"]["draw_defaults"];
+        assert_eq!(d["describe"]["wild"], "on");
+        assert_eq!(d["batch_text"]["composition"], "on");
+        assert_eq!(
+            d["batch_text"]["wild"],
+            release_draw_defaults()["batch_text"]["wild"]
+        );
+        let model = call(
+            json!({"action":"update_user","settings":{},"patch":{"stage1_provider":"openai","stage1_model":"chosen"},"color_ids":ids}),
+        );
+        assert_eq!(model["settings"]["stage1_model"], "chosen");
+        assert_eq!(model["settings"]["stage2_model"], "chosen");
+        assert!(model["settings"].get("vision_model").is_none());
+    }
+
+    #[test]
+    fn recorded_options_adopt_as_the_raw_record_does() {
+        let record = json!({"draw_route":"stages", "sketch_requested":"0", "render_wild":"1", "catalog_id":"ink", "catalog_mode":"auto"});
+        let defaults = release_draw_defaults();
+        for &tab in TABS {
+            assert_eq!(
+                options_for_recorded(&options_of_work(&record), tab, &defaults),
+                options_for_tab(&record, tab, &defaults),
+                "{tab}"
+            );
+        }
+        let answer = call(
+            json!({"action":"options_for_recorded","options":options_of_work(&record),"tab":"describe","defaults":defaults}),
+        );
+        assert_eq!(answer["options"]["route"], "stages");
+        assert_eq!(answer["options"]["composition"], "off");
+        assert_eq!(
+            call(json!({"action":"options_for_recorded","tab":"nope"}))["reason"],
+            "invalid_tab"
+        );
     }
 
     #[test]

@@ -194,7 +194,7 @@
 				? { title: strings.settingsTabClipboard, hint: strings.settingsClipboardHint }
 				: { title: strings.settingsTabFileSaving, hint: strings.settingsExportHint };
 			case 'image': return { title: strings.imageTab, hint: strings.settingsImageHint };
-			case 'draw_defaults': return { title: strings.drawDefaultsTitle, hint: '' };
+			case 'draw_defaults': return { title: strings.drawDefaultsTitle, hint: strings.drawDefaultsHint };
 			case 'demo': return { title: strings.modeDemo, hint: strings.tooltipInputTabDemo };
 			default: return appearanceSection === 'making'
 				? { title: strings.settingsCategoryMaking, hint: strings.settingsMakingHint }

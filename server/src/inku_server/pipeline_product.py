@@ -331,8 +331,7 @@ class ProductPipelineEffects:
         from . import db
         self.binding, self.manifest = binding, deepcopy(manifest)
         self.settings = PipelineSettings(binding, manifest,
-                                         admin_limits_for=lambda owner: db.get_render_limit_settings(),
-                                         plugin_storage_for=db.get_user_plugin_storage)
+                                         admin_limits_for=lambda owner: db.get_render_limit_settings())
 
     def reading_config(self, owner: str, text: str, work: dict | None) -> dict:
         """The config that reads a work's instructions back, as `prepare` builds it.
@@ -695,10 +694,12 @@ class ProductPipelineEffects:
             result.update(image_ddl=deepcopy(image_ddl), image_provenance=context.get("image_provenance", ""),
                           elapsed_image_ms=metrics.get("image", 0))
         if context.get("input_kind") == "description":
+            route = settings.get("route") or "stages"
             result.update(
-                draw_route=settings.get("route") or "stages",
+                draw_route=route,
                 sketch_requested="0" if context["sketch_request"].get("mode") == "off" else "1",
-                composition_requested="1" if settings.get("composition") == "on" else "0",
+                # With a plan always passes the composition, laws and colors.
+                composition_requested="1" if route == "stages" or settings.get("composition") == "on" else "0",
             )
         from .verified_model_catalog import core_catalog
         options_record = {**result, "catalog_mode": settings.get("catalog_mode"),

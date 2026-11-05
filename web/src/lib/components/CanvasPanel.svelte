@@ -452,7 +452,12 @@
 			: (isJapanese ? '独立作品' : 'Standalone')
 	);
 	const statusWork = $derived(statusHistoryItem ?? result);
-	const statusSketchState = $derived(normalizeSketchState(statusHistoryItem?.sketch_state));
+	// One source for the strip: the saved work on screen, else the result on
+	// screen (a finished run carries its recorded choices before the history
+	// list is read again, and during a run the previous picture keeps its own).
+	const stripOptions = $derived(statusHistoryItem?.draw_options ?? result?.draw_options ?? null);
+	const stripIsImage = $derived(!!stripOptions?.models?.vision || !!(statusWork?.image_ddl));
+	const statusSketchState = $derived(normalizeSketchState(statusHistoryItem?.sketch_state ?? result?.sketch_state));
 	// How the work on screen was drawn and what its sketch did, from the saved
 	// work when there is one, as the generation information reads them.
 	async function openLineageRefinement(node: LineageNode, view: RefinementView): Promise<void> {
@@ -735,26 +740,26 @@
 					</span>
 				</div>
 				<div class="render-meta-fields">
-					{#each drawOptionRows(statusHistoryItem?.draw_options, t()) as option (option.key)}
+					{#each drawOptionRows(stripOptions, t(), { image: stripIsImage }) as option (option.key)}
 						<span class="render-meta-item" data-draw-option={option.key}>
 							<span class="render-meta-label">{option.label}</span>
-							{#if option.key === 'models' && statusHistoryItem?.draw_options?.models && (statusHistoryItem.draw_options.models.vision || statusHistoryItem.draw_options.models.stage1 || statusHistoryItem.draw_options.models.stage2)}
+							{#if option.key === 'models' && stripOptions?.models && (stripOptions.models.vision || stripOptions.models.stage1 || stripOptions.models.stage2)}
 								<strong title={statusStage1Model + ' / ' + statusStage2Model}>
-									{#if statusHistoryItem.draw_options.models.vision}
-										<span class="render-meta-model-line"><span class="render-meta-model-name">{modelShortName(statusHistoryItem.draw_options.models.vision)}</span></span>
-									{:else if statusHistoryItem.draw_options.models.stage1 === statusHistoryItem.draw_options.models.stage2}
+									{#if stripOptions.models.vision}
+										<span class="render-meta-model-line"><span class="render-meta-model-name">{modelShortName(stripOptions.models.vision)}</span></span>
+									{:else if stripOptions.models.stage1 === stripOptions.models.stage2}
 										<span class="render-meta-model-line"><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
 									{:else}
-										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '解釈' : 'Interpretation'}</span><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
-										<span class="render-meta-model-line"><span class="render-meta-model-stage">{isJapanese ? '描画' : 'Performance'}</span><span class="render-meta-model-name">{statusStage2ModelOnly}</span></span>
+										<span class="render-meta-model-line"><span class="render-meta-model-stage">{t().drawOptionsStage1Short}</span><span class="render-meta-model-name">{statusStage1ModelOnly}</span></span>
+										<span class="render-meta-model-line"><span class="render-meta-model-stage">{t().drawOptionsStage2Short}</span><span class="render-meta-model-name">{statusStage2ModelOnly}</span></span>
 									{/if}
 								</strong>
-							{:else if option.key === 'catalog' && statusHistoryItem?.draw_options?.catalog}
-								{@const catalog = statusHistoryItem.draw_options.catalog}
+							{:else if option.key === 'catalog' && stripOptions?.catalog}
+								{@const catalog = stripOptions.catalog}
 								<strong title={statusCatalogName}>{catalog.id ? statusCatalogName : t().drawOptionsUnavailable} ({catalog.mode === 'auto' ? t().colorCatalogAuto : catalog.mode === 'fixed' ? t().drawDefaultsFixed : t().drawOptionsUnavailable})</strong>
-							{:else if option.key === 'canvas_aspect' && statusHistoryItem?.draw_options?.canvas_aspect}
+							{:else if option.key === 'canvas_aspect' && stripOptions?.canvas_aspect}
 								<strong title={statusCanvasName}>{statusCanvasName}</strong>
-							{:else if option.key === 'sketch' && statusHistoryItem?.draw_options?.sketch}
+							{:else if option.key === 'sketch' && stripOptions?.sketch}
 								<strong title={`${sketchStateNote(statusSketchState, isJapanese) || sketchStateShort(statusSketchState, isJapanese)} — ${option.text}`}>{sketchStateShort(statusSketchState, isJapanese)} ({option.text})</strong>
 							{:else}
 								<strong title={option.text}>{option.text}</strong>
@@ -1118,14 +1123,12 @@
 		grid-template-columns: max-content minmax(0, 1fr);
 		align-items: stretch;
 		min-width: 0;
-		min-height: 52px;
-		/* Keep the displayed work's details together at the right edge. At the
-		   compact breakpoints below it resumes the full-width metadata row. */
-		flex: 0 1 auto;
-		margin-left: auto;
-		overflow: hidden;
+		min-height: 44px;
+		order: 2;
+		flex: 1 0 100%;
 		color: var(--fg3);
 	}
+	.right-tabs:has(.render-meta-strip) { flex-wrap: wrap; }
 	.render-meta-context {
 		display: grid;
 		grid-template-rows: auto auto;
@@ -1146,9 +1149,13 @@
 		white-space: nowrap;
 	}
 	.render-meta-generation strong { color: var(--fg2); font-size: var(--ui-font-size-13); font-weight: 450; line-height: 1.2; }
+	/* Nine items do not fit beside the tabs: the strip takes its own row and
+	   the items wrap whole, so no label overlaps another at any width or text
+	   size. */
 	.render-meta-fields {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(calc(90px * var(--ui-text-scale)), 1fr));
+		display: flex;
+		flex-wrap: wrap;
+		row-gap: 4px;
 		min-width: 0;
 		padding-block: 7px;
 	}
@@ -1157,7 +1164,9 @@
 		grid-template-rows: auto auto;
 		align-content: center;
 		gap: 2px;
-		min-width: 0;
+		flex: 1 1 auto;
+		min-width: calc(64px * var(--ui-text-scale));
+		max-width: calc(220px * var(--ui-text-scale));
 		padding: 0 12px;
 		position: relative;
 	}
@@ -1178,7 +1187,7 @@
 	}
 	.render-meta-item strong {
 		min-width: 0;
-		max-width: 160px;
+		max-width: 100%;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		color: var(--fg2);
@@ -1189,26 +1198,26 @@
 	}
 	/* The two numeric items: never ellipsised, and set on the digit grid so a
 	   size and a timestamp do not jitter as the work on screen changes. */
+	.render-meta-created,
+	.render-meta-svg-size { flex: 0 0 auto; max-width: none; }
 	.render-meta-created strong,
 	.render-meta-svg-size strong {
 		max-width: none;
 		font-variant-numeric: tabular-nums;
 	}
+	/* A work drawn with two models reads as two short lines. */
+	.render-meta-item strong:has(.render-meta-model-line) { display: grid; gap: 1px; }
+	.render-meta-model-line { display: flex; gap: 4px; min-width: 0; white-space: nowrap; }
+	.render-meta-model-stage { flex: 0 0 auto; color: var(--fg3); }
+	.render-meta-model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 	.work-action-save-first { color: var(--fg3); font-size: 0.78rem; }
 	/* Follow the UI text scale so enlarged labels wrap before columns shrink. */
 	@container canvas-panel (max-width: 67.6923em) {
 		.right-tabs { flex-wrap: wrap; padding-inline: 10px; }
 		.rtab { padding-inline: 12px; }
 		.rtab-spacer { display: none; }
-		.render-meta-strip {
-			order: 2;
-			flex: 1 0 100%;
-			min-height: 44px;
-			padding: 0;
-			overflow: visible;
-		}
+		.render-meta-strip { padding: 0; }
 		.render-meta-context { padding-right: 10px; }
-		.render-meta-fields { grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content max-content max-content; }
 		.render-meta-item { padding: 0 10px; }
 		.render-meta-strip.english { grid-template-columns: 1fr; }
 		.render-meta-strip.english .render-meta-context {
@@ -1223,22 +1232,9 @@
 		.right-tabs.english-meta { flex-wrap: wrap; padding-inline: 10px; }
 		.right-tabs.english-meta .rtab { padding-inline: 12px; }
 		.right-tabs.english-meta .rtab-spacer { display: none; }
-		.render-meta-strip.english {
-			order: 2;
-			flex: 1 0 100%;
-			min-height: 44px;
-			overflow: visible;
-		}
-		.render-meta-strip.english .render-meta-fields {
-			grid-template-columns: minmax(150px, 1.8fr) minmax(112px, 1fr) minmax(92px, 0.8fr) max-content max-content max-content max-content;
-		}
 	}
 	@container canvas-panel (max-width: 50em) {
-		.render-meta-strip { grid-template-columns: max-content minmax(0, 1fr); }
-		.render-meta-fields,
-		.render-meta-strip.english .render-meta-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 		.render-meta-item { padding: 4px 8px; }
-		.render-meta-created { grid-column: span 2; }
 	}
 	@container canvas-panel (max-width: 35.3846em) {
 		.render-meta-strip { grid-template-columns: 1fr; }
@@ -1249,8 +1245,6 @@
 			padding: 7px 0;
 			flex-wrap: wrap;
 		}
-		.render-meta-fields,
-		.render-meta-strip.english .render-meta-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	}
 	.canvas-area {
 		flex: 1;

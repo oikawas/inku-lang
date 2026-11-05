@@ -100,21 +100,9 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     return core_catalog("normalize_user", settings=settings, **_user_catalog_context())["settings"]
 
 
-def user_settings_with_legacy_canvas(settings: Any, storage: Any) -> dict[str, Any]:
-    """Project the old per-user canvas only until draw defaults are saved."""
-    settings = settings if isinstance(settings, dict) else {}
-    normalized = normalize_user_model_settings(settings)
-    if "draw_defaults" in settings or not isinstance(storage, dict):
-        return normalized
-    canvas = storage.get("canvas-aspect")
-    if not isinstance(canvas, dict):
-        return normalized
-    selected = "square" if canvas.get("enabled") is False else canvas.get("selected")
-    if isinstance(selected, str):
-        for tab in ("describe", "batch_text"):
-            normalized["draw_defaults"][tab]["canvas_aspect"] = selected
-        normalized = normalize_user_model_settings(normalized)
-    return normalized
+def release_draw_defaults() -> dict[str, Any]:
+    """The per-tab drawing defaults the release ships to a user who saved none."""
+    return core_catalog("release_defaults")["release"]["tabs"]
 
 
 def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:

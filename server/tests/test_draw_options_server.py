@@ -1,4 +1,4 @@
-"""Persisted drawing choices and legacy user canvas migration."""
+"""Persisted drawing choices, release defaults and the old per-user canvas."""
 
 import json
 import sqlite3
@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 
 from inku_server import db
 from inku_server.api import app
-from inku_server.model_settings import user_settings_with_legacy_canvas
+from inku_server.model_settings import release_draw_defaults
 from inku_server.persistence import migrations
 from inku_server.persistence.schema import UserAccountRow
 
@@ -26,33 +26,59 @@ def user():
     db.delete_user(account["id"], cascade=True)
 
 
-def test_user_canvas_migration_and_non_admin_patch_get(user):
+def _stored(user_id):
+    with db.SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        return json.loads(row.model_settings or "{}"), json.loads(row.plugin_storage or "{}")
+
+
+def test_old_canvas_is_ignored_dropped_and_defaults_stay_unsaved_until_saved(user):
     user_id, headers = user
     with db.SessionLocal() as session:
         row = session.get(UserAccountRow, user_id)
         row.model_settings = json.dumps({"stage1_provider": "openai", "stage1_model": "gpt-test"})
-        row.plugin_storage = json.dumps({"canvas-aspect": {"enabled": True, "selected": "a4"}})
+        row.plugin_storage = json.dumps({"canvas-aspect": {"enabled": True, "selected": "a4"}, "other": {"kept": 1}})
         session.commit()
     client = TestClient(app)
+    release = release_draw_defaults()
     current = client.get("/api/auth/me", headers=headers).json()["model_settings"]["draw_defaults"]
-    assert current["describe"]["canvas_aspect"] == current["batch_text"]["canvas_aspect"] == "a4"
-    assert current["image"]["canvas_aspect"] == "image"
-    assert current["describe"]["models"]["stage1"] == "openai:gpt-test"
+    # The old canvas is not carried over; the model the user chose is.
+    assert current["describe"]["canvas_aspect"] == release["describe"]["canvas_aspect"]
+    assert current["describe"]["models"]["stage1"] == current["batch_text"]["models"]["stage1"] == "openai:gpt-test"
+    assert current["image"]["models"] == release["image"]["models"]
     other_patch = client.patch("/api/auth/me/settings", headers=headers,
-                               json={"model_settings": {"color_catalog_id": "auto"}})
+                               json={"model_settings": {"ui_text_size": 2}})
     assert other_patch.status_code == 200
-    with db.SessionLocal() as session:
-        stored = json.loads(session.get(UserAccountRow, user_id).model_settings)
-        assert stored["draw_defaults"]["describe"]["canvas_aspect"] == "a4"
-    current["describe"]["canvas_aspect"] = "square"
+    stored, storage = _stored(user_id)
+    assert "draw_defaults" not in stored and "vision_model" not in stored
+    assert stored["stage1_model"] == "gpt-test"
+    assert storage == {"other": {"kept": 1}}
+    current["describe"]["canvas_aspect"] = "a4"
     response = client.patch("/api/auth/me/settings", headers=headers,
-                            json={"model_settings": {"draw_defaults": current}})
+                            json={"model_settings": {"draw_defaults": {"describe": {"canvas_aspect": "a4"}}}})
     assert response.status_code == 200
     assert client.get("/api/auth/me", headers=headers).json()["model_settings"]["draw_defaults"] == current
+    assert _stored(user_id)[0]["draw_defaults"] == current
     assert client.put("/api/auth/me/plugin-storage/canvas-aspect", headers=headers,
                       json={"value": {"selected": "a4"}}).status_code == 403
-    assert user_settings_with_legacy_canvas({}, {"canvas-aspect": {"enabled": False, "selected": "a4"}})["draw_defaults"]["describe"]["canvas_aspect"] == "square"
-    assert user_settings_with_legacy_canvas({}, {"canvas-aspect": {"selected": "invalid"}})["draw_defaults"]["describe"]["canvas_aspect"] == "square"
+
+
+def test_opening_a_work_adopts_by_the_core_rule_with_the_users_defaults(user):
+    _user_id, headers = user
+    client = TestClient(app)
+    recorded = {"route": "stages", "sketch": None, "composition": "on", "wild": None,
+                "catalog": {"id": "ink", "mode": "auto"}, "canvas_aspect": None, "models": None}
+    defaults = client.get("/api/auth/me", headers=headers).json()["model_settings"]["draw_defaults"]
+    answer = client.post("/api/auth/me/draw-options/for-tab", headers=headers,
+                         json={"options": recorded, "tab": "describe"})
+    assert answer.status_code == 200
+    assert answer.json()["options"] == {
+        "route": "stages", "sketch": "off", "composition": "on", "wild": "off",
+        "catalog": {"id": "ink", "mode": "auto"},
+        "canvas_aspect": defaults["describe"]["canvas_aspect"], "models": defaults["describe"]["models"]}
+    refused = client.post("/api/auth/me/draw-options/for-tab", headers=headers,
+                          json={"options": recorded, "tab": "nope"})
+    assert refused.status_code == 400
 
 
 def test_history_options_raw_flags_list_and_one_work(user):

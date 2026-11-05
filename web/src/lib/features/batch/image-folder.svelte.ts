@@ -15,7 +15,6 @@ import {
 	type ImageFolderFailure,
 	type ImageFolderRecord,
 } from './image-folder.ts';
-import { dismissBatchRun, isBatchRunDismissed } from './dismissed-runs.ts';
 
 export type ImageFolderRunOptions<TFile extends FolderFile> = {
 	/** Start over: forget which pictures of this folder are done. */
@@ -85,9 +84,10 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 		this.store.saveSource(source);
 	}
 
+	/** New work clears the picked folder but keeps its record, so picking the
+	 *  same folder again continues where it stopped (author, 2026-11-05). */
 	clearInput(): void {
 		if (this.running) return;
-		dismissBatchRun(this.record?.batchRunId);
 		this.pictures = [];
 		this.folderName = '';
 		this.interrupted = false;
@@ -112,12 +112,11 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 	}
 
 	get record(): ImageFolderRecord | null {
-		const record = this.rawRecord;
-		return isBatchRunDismissed(record?.batchRunId) ? null : record;
+		return this.rawRecord;
 	}
 
 	get visibleHistory(): ImageFolderRecord[] {
-		return this.history.filter((record) => !isBatchRunDismissed(record.batchRunId));
+		return this.history;
 	}
 
 	get pending(): TFile[] {

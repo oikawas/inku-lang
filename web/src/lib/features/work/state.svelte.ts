@@ -40,7 +40,7 @@ import { readExifFacts } from '$lib/features/image-provenance/exif';
 import { imageProvenanceText } from '$lib/features/image-provenance/provenance';
 import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
 import { runningStageLabel, type ProviderAttemptCount } from '$lib/paintStream';
-import { copyDrawDefaults, copyDrawOptions, optionsForWork, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
+import { copyDrawDefaults, copyDrawOptions, type DrawDefaults, type DrawOptions, type DrawTab } from '$lib/features/draw-options';
 
 type Iteration = HistoryItem;
 type BatchPaintResult = PaintResult & { ddl: string; thinking: string | null; };
@@ -103,6 +103,18 @@ export function createWorkState(deps: WorkStateDeps) {
 			: imageFolder.source === 'image' ? 'batch_image' : 'batch_text';
 	}
 	function currentOptions(): DrawOptions { return drawChoices[activeDrawTab()]; }
+	/** The drawing model of the tab on screen; the legacy setting only before the
+	 *  user's defaults have loaded. Derived drawings use this, not the legacy one. */
+	function tabModelRef(stage: 'stage1' | 'stage2'): string {
+		return currentOptions().models[stage] ?? (stage === 'stage1'
+			? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model())
+			: qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()));
+	}
+	/** The catalog choice of the tab on screen, as a catalog override reads it. */
+	function tabCatalogSelection(): string {
+		const catalog = currentOptions().catalog;
+		return catalog.mode === 'auto' ? AUTO_CATALOG_ID : catalog.id;
+	}
 	function setDrawDefaults(owner: string, defaults: DrawDefaults): void {
 		drawDefaults = copyDrawDefaults(defaults);
 		if (defaultsOwner !== owner) {
@@ -110,14 +122,12 @@ export function createWorkState(deps: WorkStateDeps) {
 			defaultsOwner = owner;
 		}
 	}
-	function selectWorkOptions(record: RecordedDrawOptions | null | undefined, image: boolean): void {
-		const tab = image ? 'image' : 'describe';
-		drawChoices[tab] = optionsForWork(record, drawDefaults[tab], tab);
-	}
-	function applyMigratedWild(previous: DrawDefaults, migrated: DrawDefaults): void {
-		for (const tab of ['describe', 'image', 'batch_text', 'batch_image'] as const) {
-			if (drawChoices[tab].wild === previous[tab].wild) drawChoices[tab].wild = migrated[tab].wild;
-		}
+	// Opening a work takes its recorded choices through the shared core's rule
+	// (the Server answers). Only the latest opening's answer is applied.
+	let adoptSequence = 0;
+	function beginWorkOptions(): number { return ++adoptSequence; }
+	function adoptWorkOptions(sequence: number, tab: DrawTab, options: DrawOptions): void {
+		if (sequence === adoptSequence) drawChoices[tab] = copyDrawOptions(options);
 	}
 	let imageUploadOrdinal = 0;
 	let imageFile: File | null = null;
@@ -436,8 +446,9 @@ export function createWorkState(deps: WorkStateDeps) {
 			const view = await finishPipeline(() => pipelineController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 				...pipelineOptions(), stage1_model: model, stage2_model: model,
 				catalog_id: typeof catalog.catalog_id === 'string' ? catalog.catalog_id : 'default', catalog_mode: choices.catalog.mode,
-				route: choices.route, ...compositionOption(choices.route, choices.composition),
-				sketch: choices.sketch, sketch_text: undefined, wild: choices.wild === 'on',
+				// A picture has no sketch and keeps the stroke limit, as before the
+				// per-tab choices: the image tab shows neither switch.
+				sketch: 'off', sketch_text: undefined, wild: false,
 				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 				canvas_fit: 'contain',
 			}, abortController.signal));
@@ -523,8 +534,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 				...pipelineOptions(), stage1_model: model, stage2_model: model,
 				catalog_id: typeof catalog.catalog_id === 'string' ? catalog.catalog_id : 'default', catalog_mode: choices.catalog.mode,
-				route: choices.route, ...compositionOption(choices.route, choices.composition),
-				sketch: choices.sketch, sketch_text: undefined, wild: choices.wild === 'on',
+				sketch: 'off', sketch_text: undefined, wild: false,
 				batch_run_id: runId, batch_line_number: runId ? imageFolder.current : undefined, batch_lease: lease,
 				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 				canvas_fit: 'contain',
@@ -908,7 +918,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
 		const uiLang = getLang();
 		stage1UserPrompt = text;
-		const resolvedStage1Model = modelOverride ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
+		const resolvedStage1Model = modelOverride ?? tabModelRef('stage1');
 		const r = await apiFetch('/api/interpret', {
 			method: 'POST',
 			signal,
@@ -1467,7 +1477,18 @@ export function createWorkState(deps: WorkStateDeps) {
 		}
 	}
 
+	/** New work. Clearing a text batch also drops its resume panel for good in
+	 *  this browser, so that one asks first (author, 2026-11-05). */
 	function clearInput() {
+		if (inputMode === 'batch' && imageFolder.source !== 'image' && (batch.resume || batch.interrupted)) {
+			deps.requestConfirmation({ message: t().batchClearResumeConfirm, runLabel: t().clearInputBtn,
+				destructive: true, run: clearInputNow });
+			return;
+		}
+		clearInputNow();
+	}
+
+	function clearInputNow() {
 		drawChoices[activeDrawTab()] = copyDrawOptions(drawDefaults[activeDrawTab()]);
 		if (inputMode === 'single') input = '';
 		if (inputMode === 'batch') {
@@ -1550,12 +1571,14 @@ export function createWorkState(deps: WorkStateDeps) {
 		get imageCanvasAspectId() { return currentOptions().canvas_aspect; },
 		set imageCanvasAspectId(value) { currentOptions().canvas_aspect = value; },
 		get drawOptions() { return currentOptions(); },
+		tabModelRef,
+		tabCatalogSelection,
 		get batchTextOptions() { return drawChoices.batch_text; },
 		get drawDefaults() { return drawDefaults; },
 		setDrawDefaults,
 		resetDrawDefaultsOwner: () => { defaultsOwner = null; },
-		selectWorkOptions,
-		applyMigratedWild,
+		beginWorkOptions,
+		adoptWorkOptions,
 		get imageBeforeReviewDdl() { return imageBeforeReviewDdl(); },
 		replayImageBeforeReview,
 		selectImage,

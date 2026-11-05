@@ -10,7 +10,9 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
-from ..model_settings import update_user_model_settings, user_settings_with_legacy_canvas
+from ..model_settings import update_user_model_settings
+
+LEGACY_CANVAS_STORAGE_KEY = "canvas-aspect"
 from .schema import AppSettingRow, UserAccountRow, UserGroupRow
 
 
@@ -963,12 +965,16 @@ class UserSettingsUpdater:
                     current_model_settings = json.loads(row.model_settings or "{}")
                 except json.JSONDecodeError:
                     current_model_settings = {}
+                # The old per-user canvas (plugin storage) is not carried into the
+                # drawing defaults; it is dropped the next time settings are saved
+                # (author, 2026-11-05).
                 try:
                     plugin_storage = json.loads(getattr(row, "plugin_storage", None) or "{}")
                 except (json.JSONDecodeError, TypeError):
                     plugin_storage = {}
-                if isinstance(plugin_storage, dict) and "canvas-aspect" in plugin_storage:
-                    current_model_settings = user_settings_with_legacy_canvas(current_model_settings, plugin_storage)
+                if isinstance(plugin_storage, dict) and LEGACY_CANVAS_STORAGE_KEY in plugin_storage:
+                    plugin_storage.pop(LEGACY_CANVAS_STORAGE_KEY)
+                    row.plugin_storage = json.dumps(plugin_storage, ensure_ascii=False)
                 row.model_settings = json.dumps(
                     update_user_model_settings(current_model_settings, model_settings),
                     ensure_ascii=False,

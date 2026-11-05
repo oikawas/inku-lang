@@ -37,6 +37,8 @@ test('while a drawing runs, the strip keeps naming the work whose picture is on 
 	// Held only while the same result is on screen; a new result replaces it.
 	assert.match(PAGE, /if \(item\) heldStatus = \{ item, result: work\.result \}/);
 	assert.match(PAGE, /liveStatusHistoryItem\s*\?\? \(heldStatus && work\.result && heldStatus\.result === work\.result \? heldStatus\.item : null\)/);
+	// The creation time reads the same work, not only the selected one.
+	assert.match(PAGE, /const at = statusHistoryItem\?\.at \?\? work\.result\?\.history_at \?\? null;/);
 });
 
 test('the route names the work on screen, a picture going through neither', () => {

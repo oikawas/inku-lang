@@ -2083,7 +2083,8 @@ $effect(() => {
 	}
 
 	const currentRenderedAt = $derived.by(() => {
-		const at = work.displayedHistoryItem?.at ?? work.result?.history_at ?? null;
+		// The same work the strip names (held while a drawing runs over its picture).
+		const at = statusHistoryItem?.at ?? work.result?.history_at ?? null;
 		return at == null ? null : new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', {
 			year: 'numeric',
 			month: 'numeric',

@@ -8,6 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: while a drawing runs, the strip's creation time also stays on the previous work whose picture is on the canvas (v2.15.318 showed "-").
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.

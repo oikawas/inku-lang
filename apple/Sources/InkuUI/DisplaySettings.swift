@@ -26,6 +26,10 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var clipboardBackground = "original"
     public var clipboardFormat: String?
     public var visionModelReference: String?
+    public var auxiliaryVisionModelReference: String?
+    /// Carries the old image choice until the author saves draw defaults.
+    public var legacyImageVisionModelReference: String?
+    public var drawDefaults: [String: DrawOptions]?
     public var imageIncludeFileName: Bool?
     public var imageIncludeExif: Bool?
     public var colophonModelReference: String?
@@ -76,12 +80,34 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
 
     public var textScale: Double { [0.9, 1, 1.1, 1.2, 1.3][min(4, max(0, textSizeStep))] }
 
+    func forPersistence() -> Self {
+        var snapshot = self
+        snapshot.nextCanvasID = nil; snapshot.nextWild = nil; snapshot.defaultWild = nil
+        if snapshot.auxiliaryVisionModelReference == nil {
+            snapshot.auxiliaryVisionModelReference = snapshot.visionModelReference
+        }
+        if snapshot.drawDefaults == nil, snapshot.legacyImageVisionModelReference == nil {
+            snapshot.legacyImageVisionModelReference = snapshot.visionModelReference
+        }
+        if snapshot.drawDefaults != nil {
+            snapshot.nextCatalogID = nil; snapshot.nextCatalogMode = nil; snapshot.legacyImageVisionModelReference = nil
+        }
+        snapshot.visionModelReference = nil
+        return snapshot
+    }
+
     /// Inspect the raw keys before tolerant decoding supplies new defaults.
     public static func decodeInterfaceFile(_ data: Data) throws -> Self {
         guard let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw CocoaError(.coderReadCorrupt)
         }
         var value = try TolerantPreferences.decode(Self.self, from: data, defaults: Self())
+        if value.auxiliaryVisionModelReference == nil {
+            value.auxiliaryVisionModelReference = value.visionModelReference
+        }
+        if value.drawDefaults == nil, value.legacyImageVisionModelReference == nil {
+            value.legacyImageVisionModelReference = value.visionModelReference
+        }
         if (raw["pngPreferencesVersion"] as? Int ?? 0) < 1 {
             let configuration = raw["exportConfiguration"] as? [String: Any]
             let options = configuration?["options"] as? [String: Any]
@@ -196,7 +222,7 @@ public final class DisplaySettings {
     private func persist() {
         guard !previewingTextSize, let fileURL else { return }
         do {
-            var snapshot = preferences
+            var snapshot = preferences.forPersistence()
             if let rememberedSettingsTab { snapshot.settingsTab = rememberedSettingsTab }
             if let rememberedInputTab { snapshot.inputTab = rememberedInputTab }
             let data = try JSONEncoder().encode(snapshot)

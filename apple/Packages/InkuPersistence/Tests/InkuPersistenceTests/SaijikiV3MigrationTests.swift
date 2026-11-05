@@ -173,7 +173,7 @@ struct SaijikiV3MigrationTests {
              try Data.fetchOne(db, sql: "SELECT snapshot FROM effect_acknowledgements WHERE execution_id='good'"),
              try String.fetchOne(db, sql: "SELECT json_extract(CAST(acknowledgement AS TEXT), '$.performance.document.saijiki') FROM effect_acknowledgements WHERE execution_id='good'"))
         }
-        #expect(fields.0 == 7)
+        #expect(fields.0 == 8)
         #expect(fields.1 == Data("historical".utf8))
         #expect(fields.2 == Data("historical".utf8))
         #expect(fields.3 == "inku.saijiki.v3")

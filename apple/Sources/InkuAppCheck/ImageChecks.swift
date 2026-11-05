@@ -26,7 +26,8 @@ func runImageChecks(realOpus: Bool = false) async throws {
         models: [ProviderModelSettings(id: modelID, purposes: ["vision"])])]
     settings.models.stage1Model = reference; settings.models.stage2Model = reference
     try await app.updateHostSettings(settings)
-    app.display.preferences.visionModelReference = reference
+    app.activeDrawTab = "image"
+    app.selectImageVisionModel(reference)
     let canvas = try XCTImage.context(width: 4000, height: 3000)
     canvas.setFillColor(CGColor(gray: 1, alpha: 1)); canvas.fill(CGRect(x: 0, y: 0, width: 4000, height: 3000))
     canvas.setFillColor(CGColor(red: 0.8, green: 0.1, blue: 0.1, alpha: 1))
@@ -43,11 +44,12 @@ func runImageChecks(realOpus: Bool = false) async throws {
     try (bytes as Data).write(to: imageURL)
     let prepared = try ImageInput.prepare(bytes as Data)
     guard prepared.width == 1568, prepared.height == 1176, prepared.nearestFormatID == "sd_monitor" else { throw CheckFailure.message("image canvas") }
-    app.newWork(); app.inputMode = "image"; app.canvasID = "square"
+    app.newWork(); app.inputMode = "image"; app.activeDrawTab = "describe"; app.canvasID = "square"
+    app.activeDrawTab = "image"; app.selectImageVisionModel(reference)
     guard app.imageCanvasID == "image" else { throw CheckFailure.message("image paper default") }
     let provenance = ImageProvenance.text(url: imageURL, includeFileName: true, includeExif: true, language: "ja")
     app.setImageInput(prepared, fileName: imageURL.lastPathComponent, automaticProvenance: provenance)
-    guard app.canvasID == "square" else { throw CheckFailure.message("image changed description paper") }
+    guard app.drawSelections["describe"]?.canvasAspect == "square" else { throw CheckFailure.message("image changed description paper") }
     var languageFailures: [String] = []
     for uiLanguage in ["en", "ja"] {
         app.display.preferences.language = uiLanguage
@@ -100,7 +102,8 @@ func runImageChecks(realOpus: Bool = false) async throws {
         }
     }
     guard let work = app.selectedWork, let ddl = work.ddl, ddl.contains("画面比4:3"), work.effectiveSourceText.isEmpty,
-          work.renderCanvasAspectID == "sd_monitor" else {
+          work.renderCanvasAspectID == "sd_monitor", work.drawRoute == nil, work.sketchRequested == nil,
+          work.compositionRequested == nil, work.catalogMode == nil else {
         throw CheckFailure.message("image run: \(app.errorText ?? app.status)")
     }
     let context = try await app.savedConfiguration(workID: work.id)

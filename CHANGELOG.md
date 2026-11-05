@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: show the work's conditions above the canvas in input order and move the refinement menu onto the work.
+
+- macOS: keep drawing choices per input tab and use configured defaults and each work's recorded conditions.
+
 - Android: use currently enabled plugins and imported definitions when rewriting a selected work from its description.
 
 - macOS: use currently enabled plugins when rewriting a saved work from its description, while retaining saved definitions for DDL-based derivations.

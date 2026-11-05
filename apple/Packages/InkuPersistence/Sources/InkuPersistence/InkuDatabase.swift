@@ -120,6 +120,10 @@ public actor InkuDatabase {
                     try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
                     try db.execute(sql: Self.resourceSQL("migration-v7"))
                 }
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
+                    try Self.validateSchema(db)
+                    try db.execute(sql: Self.resourceSQL("migration-v8"))
+                }
             } } catch {
                 try? FileManager.default.removeItem(at: reportURL)
                 try? FileManager.default.removeItem(at: v7ReportURL)
@@ -1022,6 +1026,9 @@ public actor InkuDatabase {
                 try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
                 try db.execute(sql: Self.resourceSQL("migration-v7"))
             }
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
+                try db.execute(sql: Self.resourceSQL("migration-v8"))
+            }
         }
         try isolated.read { try Self.validateRestore($0) }
         // Artwork rollback must not reopen reservations already charged by this DB.
@@ -1113,7 +1120,7 @@ public actor InkuDatabase {
         return try String(contentsOf: resource, encoding: .utf8)
     }
 
-    private static func schemaSQL(version: Int = 7) throws -> String {
+    private static func schemaSQL(version: Int = 8) throws -> String {
         let baseline = try resourceSQL("schema-v1")
         if version == 1 { return baseline }
         let second = baseline + "\n" + (try resourceSQL("migration-v2"))
@@ -1125,7 +1132,9 @@ public actor InkuDatabase {
         let fifth = fourth + "\n" + (try resourceSQL("migration-v5"))
         if version == 5 { return fifth }
         let sixth = fifth + "\n" + (try resourceSQL("migration-v6"))
-        return version == 6 ? sixth : sixth + "\n" + (try resourceSQL("migration-v7"))
+        if version == 6 { return sixth }
+        let seventh = sixth + "\n" + (try resourceSQL("migration-v7"))
+        return version == 7 ? seventh : seventh + "\n" + (try resourceSQL("migration-v8"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1147,7 +1156,7 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5, 6, 7].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5, 6, 7, 8].contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
@@ -1160,6 +1169,7 @@ public actor InkuDatabase {
         if version >= 5 { identifiers.append("swift-v5-show-lineage-works") }
         if version >= 6 { identifiers.append("swift-v6-plugin-names-v2") }
         if version >= 7 { identifiers.append("swift-v7-saijiki-v3") }
+        if version >= 8 { identifiers.append("swift-v8-draw-options") }
         guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
                 == identifiers else {

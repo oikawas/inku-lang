@@ -110,7 +110,7 @@ public final class AutonomousRefinementModel {
             try await connect(database: database)
             source = work ?? app.selectedWork
             sourceLocked = false
-            inheritWild = false; wild = app.display.preferences.defaultWild ?? false
+            inheritWild = false; wild = source?.renderWild ?? false
             if let source { sourceLocked = try await app.savedConfiguration(workID: source.id).authority == "ddl_authoritative" }
             let latest = runs.last { $0.sourceID == source?.id }
             run = latest?.state == "interrupted" && latest?.acknowledged != true ? latest : nil
@@ -126,7 +126,7 @@ public final class AutonomousRefinementModel {
                 moves = min(10, max(1, saved.moves)); enabledKinds = Set(saved.kinds.filter(Self.kinds.contains)); note = saved.note
                 if enabledKinds.contains("chunks") { enabledKinds = ["chunks"] }
             }
-            modelReference = AuxiliaryModel.defaultVisionModel(saved: app.display.preferences.visionModelReference, settings: await app.hostSettings())
+            modelReference = AuxiliaryModel.defaultVisionModel(saved: app.display.preferences.auxiliaryVisionModelReference, settings: await app.hostSettings())
             if provider == nil { provider = try app.auxiliaryProvider() }
             errorText = nil
         } catch { errorText = error.localizedDescription }
@@ -137,7 +137,7 @@ public final class AutonomousRefinementModel {
             throw HostError("vision_model_not_available")
         }
         modelReference = reference
-        app.display.preferences.visionModelReference = reference
+        app.display.preferences.auxiliaryVisionModelReference = reference
     }
 
     public func remember(app: AppModel) {
@@ -154,6 +154,7 @@ public final class AutonomousRefinementModel {
         guard !kinds.contains("chunks") || kinds.count == 1 else { errorText = "aiRefineKindsError"; return }
         guard !kinds.contains("chunks") || !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { errorText = "aiRefineChunksNoteRequired"; return }
         var settings = await app.hostSettings()
+        let drawingSettings = await app.nextGenerationSettings()
         guard !stopping else { stopping = false; return }
         guard SettingsModel.isRegisteredModelAvailable(modelReference, purpose: "vision", settings: settings) else {
             errorText = "vision_model_not_available"; return
@@ -204,7 +205,7 @@ public final class AutonomousRefinementModel {
                         var request: GenerationRequest
                         var chunkResult: (SavedWork, ExactJSON)?
                         if kind == "chunks" {
-                            request = try await app.makeSavedLawsRequest(work: parent, direction: .object([:]), settings: settings, wild: current.wild)
+                            request = try await app.makeSavedLawsRequest(work: parent, direction: .object([:]), settings: drawingSettings, wild: current.wild)
                             request.savedLawsDirection = nil
                             request.derivationKind = "chunk_move"
                             request.models.stage1MaxTokens = 8192
@@ -213,7 +214,7 @@ public final class AutonomousRefinementModel {
                             record["chunks"] = chunkResult.1
                             attempt["move"] = chunkResult.1["move"]; attempt["targets"] = chunkResult.1["targets"]; attempt["title"] = chunkResult.1["title"]
                         } else if kind == "laws" {
-                            request = try await app.makeSavedLawsRequest(work: parent, direction: step["direction"], settings: settings, wild: current.wild)
+                            request = try await app.makeSavedLawsRequest(work: parent, direction: step["direction"], settings: drawingSettings, wild: current.wild)
                         } else {
                             if step["reuse"].bool != true || answers[turn] == nil {
                                 let inputs: JuxtapositionInputs
@@ -249,7 +250,7 @@ public final class AutonomousRefinementModel {
                             record["juxtaposition"] = juxtaposition
                             attempt["sentence"] = .string(choice.sentence); attempt["rank"] = .integer(choice.rank)
                             request = try await app.makeSavedWorkEditRequest(work: parent, mode: .description, description: choice.joined,
-                                wildOverride: current.wild, metadata: moved.object ?? [:], drawingSettings: settings)
+                                wildOverride: current.wild, metadata: moved.object ?? [:], drawingSettings: drawingSettings)
                         }
                         if let session, let pinned = request.chatGPTSession, session != pinned { throw HostError("chatgpt_session_changed") }
                         if session == nil { session = request.chatGPTSession }

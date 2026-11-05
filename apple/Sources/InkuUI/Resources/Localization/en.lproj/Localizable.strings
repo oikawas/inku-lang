@@ -249,7 +249,6 @@
 "描画間隔（0.1〜30秒）" = "Drawing interval (0.1–30 seconds)";
 "文字サイズ" = "Text size";
 "新しい20件" = "20 newer works";
-"新しいバッチを開始" = "Start new batch";
 "新しい作品" = "Newer work";
 "新しい作品の処理量を調整します。保存作品は保存時の条件で再演奏します。" = "Adjusts processing limits for new works. Saved works replay with their original settings.";
 "新しい順" = "Newest first";
@@ -1141,8 +1140,6 @@
 "通常の描画モデルを保存しました。" = "Drawing defaults saved.";
 "drawing_model_not_available" = "Choose an enabled LLM model before drawing.";
 "履歴から選択" = "Select from history";
-"新しいバッチ" = "New batch";
-"新しいバッチを描く" = "Draw new batch";
 "%@を変更" = "Change %@";
 "記述から自動選択" = "Automatically select from description";
 "新規作成" = "New";
@@ -1354,7 +1351,6 @@
 "指示書（英語DDL）" = "Instructions (English DDL)";
 "指示書（正規化DDL）" = "Instructions (normalized DDL)";
 "写生層が書いた文章を表示します。" = "Show the text written by the sketch-from-life layer.";
-"表示中作品の写生を編集します。" = "Edit the sketch from life of the displayed work.";
 "指示書はこの言語の文法で読みます。" = "Read the instructions using this language’s grammar.";
 "表示中の作品の指示書を編集して、その子として描き直します" = "Edit the instructions of the displayed work and perform them again as a child of that work.";
 "指示書から描画" = "Paint from instructions";

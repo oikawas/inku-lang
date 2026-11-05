@@ -17,6 +17,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
                                    models: ["original", "pinned-drawing"].map { ProviderModelSettings(id: $0, purposes: ["llm"]) })
     let settings = HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:original", stage2Model: "check:original"))
     try await app.updateHostSettings(settings)
+    app.selectNextDrawingModel("check:original")
     app.inputMode = "description"
     app.descriptionText = "a red circle in an open field"
     app.sketchMode = "on"
@@ -61,6 +62,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     next.models.stage2Model = "check:pinned-drawing"
     next.plugins = PluginPreferences(disabledPackageIDs: Set(reopened.pluginWords.compactMap(\.packageID)))
     try await reopened.updateHostSettings(next)
+    reopened.selectNextDrawingModel("check:pinned-drawing")
     reopened.canvasID = reopened.canvases.first(where: { $0.id != parent.renderCanvasAspectID })!.id
     reopened.catalogID = reopened.catalogs.first(where: { $0.id != parent.catalogID })!.id
     reopened.seedText = "999"
@@ -72,12 +74,12 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     let edit = WorkEditModel(work: parent, mode: .description)
     reopened.display.preferences.defaultWild = true
     await edit.initialize(app: reopened)
-    guard !edit.inheritWild, edit.wildOverride else { throw CheckFailure.message("Work edit did not use the independent wild default") }
+    guard !edit.inheritWild, edit.wildOverride == (parent.renderWild ?? false) else { throw CheckFailure.message("Work edit did not use the recorded wild value") }
     var otherParent = parent
     otherParent.renderWild = false
     let otherEdit = WorkEditModel(work: otherParent, mode: .description)
     await otherEdit.initialize(app: reopened)
-    guard !otherEdit.inheritWild, otherEdit.wildOverride else { throw CheckFailure.message("Work edit followed the parent's off value instead of the default") }
+    guard !otherEdit.inheritWild, !otherEdit.wildOverride else { throw CheckFailure.message("Work edit did not use the parent's off value") }
     reopened.display.preferences.defaultWild = false
     edit.wildOverride = parent.renderWild ?? false
     edit.draftText = "  a blue square in the same open field  "
@@ -87,7 +89,9 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
           configuration["macro_summaries"].array?.isEmpty == true,
           configuration["compiler"]["hard_resource_policy"] == sourceConfiguration["compiler"]["hard_resource_policy"],
           configuration["compiler"]["operational_resource_budget"] == sourceConfiguration["compiler"]["operational_resource_budget"],
-          try ExactJSON(data: request.renderOptions) == sourceOptions, request.clipPolicy == sourceContext.clipPolicy,
+          try ExactJSON(data: request.renderOptions)["catalog_id"].string == reopened.catalogID,
+          try ExactJSON(data: request.renderOptions)["canvas_aspect_id"] == sourceOptions["canvas_aspect_id"],
+          request.clipPolicy == sourceContext.clipPolicy,
           request.models.stage1Model == "check:pinned-drawing", request.models.stage2Model == "check:pinned-drawing",
           request.parentWorkID == parent.id, request.derivationKind == "description_edit",
           case .description("a blue square in the same open field", false, .on) = request.authoring else {
@@ -96,6 +100,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     guard await edit.draw(app: reopened), let edited = edit.result, edited.id != parent.id,
           edited.effectiveSourceText == "a blue square in the same open field", edited.sketchState == "supplemented",
           edited.stage1Model == "check:pinned-drawing", edited.stage2Model == "check:pinned-drawing",
+          edited.drawRoute == nil, edited.sketchRequested == nil, edited.compositionRequested == nil, edited.catalogMode == nil,
           try await database.edge(childNodeID: edited.lineageNodeID!)?.derivationKind == "description_edit",
           try await database.edge(childNodeID: edited.lineageNodeID!)?.parentNodeID == parent.lineageNodeID,
           try await database.work(id: parent.id) == parent else {
@@ -120,7 +125,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     with.sketchMode = "on"
     guard await with.draw(app: reopened), let on = with.result, on.sketchState == "supplemented",
           on.sketchText != parent.sketchText, on.effectiveSourceText == parent.effectiveSourceText,
-          on.renderWild == (reopened.display.preferences.defaultWild ?? false), await transport.sketchCalls == 3,
+          on.renderWild == (parent.renderWild ?? false), await transport.sketchCalls == 3,
           try await database.edge(childNodeID: on.lineageNodeID!)?.parentNodeID == parent.lineageNodeID else {
         throw CheckFailure.message("Sketch-on saved action reused its old supplement or lost parent conditions")
     }

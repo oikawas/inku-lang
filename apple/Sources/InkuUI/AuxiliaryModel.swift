@@ -65,7 +65,7 @@ public final class AuxiliaryModel {
         sourceWorkID = work?.id
         sourceWork = work
         let settings = await app.hostSettings()
-        let savedReference = mode == .colophon ? app.display.preferences.colophonModelReference : app.display.preferences.visionModelReference
+        let savedReference = mode == .colophon ? app.display.preferences.colophonModelReference : app.display.preferences.auxiliaryVisionModelReference
         if modelReference.isEmpty { modelReference = Self.defaultVisionModel(saved: savedReference, settings: settings) }
         language = app.display.preferences.language
         enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
@@ -139,7 +139,7 @@ public final class AuxiliaryModel {
         }
         modelReference = reference
         if mode == .colophon { app.display.preferences.colophonModelReference = reference }
-        else { app.display.preferences.visionModelReference = reference }
+        else { app.display.preferences.auxiliaryVisionModelReference = reference }
     }
 
     public func requestAdvice(app: AppModel) async {

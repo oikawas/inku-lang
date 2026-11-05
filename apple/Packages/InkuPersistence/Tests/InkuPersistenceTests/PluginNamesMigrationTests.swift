@@ -80,7 +80,7 @@ struct PluginNamesMigrationTests {
         #expect(!(afterScore["instructions"] as? [Any] ?? []).isEmpty)
         let reader = try DatabaseQueue(path: file.path)
         try await reader.read { db in
-            #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == 7)
+            #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == 8)
             let ack = try #require(try Data.fetchOne(db, sql: "SELECT acknowledgement FROM effect_acknowledgements WHERE execution_id = 'good'"))
             let payload = try #require(try Data.fetchOne(db, sql: "SELECT save_payload FROM effect_acknowledgements WHERE execution_id = 'good'"))
             #expect(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.performance.document.source')", arguments: [ack]) == "｛若葉｝。")

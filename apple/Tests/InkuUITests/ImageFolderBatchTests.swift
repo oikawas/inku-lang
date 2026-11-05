@@ -82,7 +82,8 @@ import InkuPersistence
             requiresAPIKey: false, models: [ProviderModelSettings(id: "vision", purposes: ["vision"])])]
         settings.models.stage1Model = "fixture:vision"; settings.models.stage2Model = "fixture:vision"
         try await app.updateHostSettings(settings)
-        app.display.preferences.visionModelReference = "fixture:vision"
+        app.activeDrawTab = "batch_image"
+        app.selectImageVisionModel("fixture:vision")
         let automation = AutomationModel()
         let batch = automation.imageFolderBatch; try await batch.select(input, app: app)
         XCTAssertEqual(batch.total, 3)
@@ -106,6 +107,11 @@ import InkuPersistence
         let fixedWorks = try await db.libraryPage(limit: 10).items.map(\.work)
         XCTAssertEqual(fixedWorks.count, 2)
         XCTAssertTrue(fixedWorks.allSatisfy { $0.renderCanvasAspectID == "square" })
+        batch.newWork(app: app)
+        XCTAssertNil(app.displayedWork)
+        XCTAssertNil(app.selectedWorkID)
+        XCTAssertTrue(app.currentSVG.isEmpty)
+        XCTAssertFalse(batch.hasJournal)
         try png.write(to: bad)
         let portrait = try makePNG(width: 48, height: 64)
         try portrait.write(to: input.appendingPathComponent("4.png"))
@@ -113,6 +119,8 @@ import InkuPersistence
         XCTAssertNotEqual(portraitPaper, "sd_monitor")
         let reopened = ImageFolderBatch(); try await reopened.select(input, app: app)
         XCTAssertEqual(reopened.completed, 2)
+        app.activeDrawTab = "batch_image"
+        app.selectImageVisionModel("fixture:vision")
         app.imageCanvasID = "image"
         await reopened.run(app: app, restart: false) { _ in "fixture" }
         XCTAssertEqual(reopened.completed, 4); XCTAssertEqual(reopened.failed, 0)

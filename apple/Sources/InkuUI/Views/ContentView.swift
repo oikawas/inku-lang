@@ -93,6 +93,7 @@ public struct ContentView: View {
     @State private var libraryPreview = LibraryPreviewModel()
     @State private var workspaceWork: SavedWork?
     @State private var batchWorkspace = BatchWorkspaceSelection()
+    @State private var confirmNewBatch = false
     @State private var maintenance = LocalMaintenance()
     @State private var dialog: WorkDialog?
     @State private var presentation = false
@@ -129,6 +130,11 @@ public struct ContentView: View {
         .onDisappear { importer.cancel() }
         #endif
         .environment(model.display)
+        .confirmationDialog(model.display.webCopy("batchClearResumeConfirm", "中断したバッチを再開できなくなります。"),
+                            isPresented: $confirmNewBatch, titleVisibility: .visible) {
+            Button(model.display.webCopy("clearInputBtn", "新規作成"), role: .destructive) { completeNewWork() }
+            Button(model.display.localized("キャンセル"), role: .cancel) {}
+        }
         .environment(\.locale, Locale(identifier: model.display.preferences.language))
         .preferredColorScheme(model.display.colorScheme)
         .font(.system(size: 13 * model.display.preferences.textScale))
@@ -380,11 +386,8 @@ public struct ContentView: View {
         guard commandContext.isEnabled(action) else { return }
         switch action {
         case .newWork:
-            batchWorkspace.showHistory()
-            #if os(macOS)
-            importer.clearMessage()
-            #endif
-            model.newWork(); showCreation(tab: "artwork")
+            if model.activeDrawTab == "batch_text" && automation.canResume { confirmNewBatch = true }
+            else { completeNewWork() }
         case .openDDL:
             #if os(macOS)
             showCreation(tab: nil)
@@ -399,6 +402,25 @@ public struct ContentView: View {
         case .export: Task { await openExport() }
         case .copyImage: if let work = workTarget { Task { await model.copyImage(work: work) } }
         case .presentation: if threeDimensionalShown { ui.toggleCanvasFullScreen() } else { Task { await preparePresentation() } }
+        }
+    }
+
+    private func completeNewWork() {
+        if model.activeDrawTab == "batch_text" {
+            Task {
+                guard await automation.newBatch(app: model) else { return }
+                batchWorkspace.showHistory(); showCreation(tab: "artwork")
+            }
+        } else {
+            #if os(macOS)
+            if model.activeDrawTab == "batch_image" {
+                automation.imageFolderBatch.newWork(app: model)
+                importer.clearMessage(); batchWorkspace.showHistory(); showCreation(tab: "artwork")
+                return
+            }
+            importer.clearMessage()
+            #endif
+            model.newWork(); batchWorkspace.showHistory(); showCreation(tab: "artwork")
         }
     }
 

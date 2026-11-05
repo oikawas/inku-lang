@@ -14,6 +14,8 @@ import InkuPersistence
         let service = ProviderSettings(id: "fixture", baseURL: URL(string: "http://127.0.0.1:1")!, requiresAPIKey: false,
                                        models: [ProviderModelSettings(id: "model")])
         try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "fixture:model", stage2Model: "fixture:model")))
+        app.activeDrawTab = "batch_text"
+        app.selectNextDrawingModel("fixture:model")
         app.selectDrawRoute("stages")
         app.sketchMode = "off"
         let original = AutomationModel()
@@ -48,6 +50,17 @@ import InkuPersistence
         let database = try InkuDatabase(url: root.appendingPathComponent("works.sqlite"))
         let saved = try await database.work(id: savedID)
         XCTAssertNotNil(saved)
+        await resumed.newBatch(app: app)
+        XCTAssertTrue(resumed.rows.isEmpty)
+        XCTAssertTrue(resumed.batchText.isEmpty)
+        XCTAssertNil(app.displayedWork)
+        XCTAssertNil(app.selectedWorkID)
+        XCTAssertTrue(app.currentSVG.isEmpty)
+        let afterNew = AutomationModel()
+        await afterNew.connect(app: app)
+        XCTAssertFalse(afterNew.canResume)
+        let preserved = try await database.work(id: savedID)
+        XCTAssertNotNil(preserved)
     }
 }
 

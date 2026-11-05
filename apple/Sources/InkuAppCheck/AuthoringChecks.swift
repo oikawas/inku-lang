@@ -65,6 +65,7 @@ func runAuthoringChecks() async throws {
                                     models: [ProviderModelSettings(id: "model")])
     try await model.updateHostSettings(HostSettings(providers: [provider],
         models: ModelSelection(stage1Model: "check:model", stage2Model: "check:model")))
+    model.selectNextDrawingModel("check:model")
     await model.generate()
     guard let parent = model.selectedWork, model.errorText == nil, !model.sourceLocked else {
         throw CheckFailure.message("Description did not retain authoring authority: \(model.errorText ?? model.status), transport calls \(await transport.calls), tag \(await transport.lastTag), route \(model.drawRoute), busy \(model.isBusy)")
@@ -83,6 +84,7 @@ func runAuthoringChecks() async throws {
     var withoutSettings = HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:model", stage2Model: "check:model"))
     withoutSettings.plugins = PluginPreferences(disabledPackageIDs: ["Nature.leaves"])
     try await without.updateHostSettings(withoutSettings)
+    without.selectNextDrawingModel("check:model")
     await without.generate()
     guard await withoutTransport.stageOnePrompt == stageOnePrompt else {
         throw CheckFailure.message("Unmentioned plugin changed Stage 1 prompt bytes")

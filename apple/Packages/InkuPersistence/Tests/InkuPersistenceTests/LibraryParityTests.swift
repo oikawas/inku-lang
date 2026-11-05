@@ -202,7 +202,8 @@ struct LibraryParityTests {
         let (work, node) = record("legacy", at: 1)
         try await old.write { db in
             try db.execute(sql: String(contentsOf: baseline, encoding: .utf8))
-            try work.insert(db); try node.insert(db)
+            try db.execute(sql: "INSERT INTO history(id,at,input,score,svg,ddl,render_seed,composition_seed,render_hash,description_hash,lineage_node_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", arguments: [work.id, work.at, work.input, work.score, work.svg, work.ddl, work.renderSeed, work.compositionSeed, work.renderHash, work.descriptionHash, work.lineageNodeID])
+            try node.insert(db)
             try db.execute(sql: "INSERT INTO execution_snapshots VALUES ('execution', 1, ?)", arguments: [Data([0, 255])])
             try db.execute(sql: "INSERT INTO effect_acknowledgements VALUES ('execution', 'effect', 1, ?, ?, ?)",
                            arguments: [Data([0, 255]), Data([9, 255]), Data([8])])

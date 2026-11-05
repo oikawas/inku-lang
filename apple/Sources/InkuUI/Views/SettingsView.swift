@@ -2,7 +2,7 @@ import InkuHost
 import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case display, making, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, other, native
+    case display, making, drawDefaults, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, other, native
     #if os(macOS)
     case image
     #endif
@@ -12,7 +12,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .display: "表示と操作"; case .making: "バッチの再試行"; case .models: "モデル設定"
+        case .display: "表示と操作"; case .making: "バッチの再試行"; case .drawDefaults: "描くときのデフォルト"; case .models: "モデル設定"
         case .demo: "デモ"
         #if os(macOS)
         case .image: "画像"
@@ -31,7 +31,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
     var symbol: String {
         switch self {
-        case .display: "slider.horizontal.3"; case .making: "paintbrush.pointed"
+        case .display: "slider.horizontal.3"; case .making: "paintbrush.pointed"; case .drawDefaults: "paintpalette"
         case .demo: "play.rectangle"
         #if os(macOS)
         case .image: "photo"
@@ -181,9 +181,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var makingSections: [SettingsSection] {
         #if os(macOS)
-        [.making, .demo]
+        [.drawDefaults, .making, .demo]
         #else
-        [.making, .demo]
+        [.drawDefaults, .making, .demo]
         #endif
     }
 
@@ -238,6 +238,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch item {
         case .display: model.display.webCopy("settingsCategoryDisplayOperation", item.title)
         case .making: model.display.webCopy("settingsBatchRetryLabel", item.title)
+        case .drawDefaults: model.display.webCopy("drawDefaultsTitle", item.title)
         case .personalPlan: model.display.webCopy("chatgptPlanLabel", item.title)
         case .export: model.display.webCopy("settingsTabFileSaving", "ファイル保存")
         case .plugins: model.display.webCopy("settingsTabPlugins", item.title)
@@ -251,6 +252,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch section {
         case .display: model.display.webCopy("settingsDisplayHint", "")
         case .making: model.display.webCopy("settingsMakingHint", "")
+        case .drawDefaults: model.display.webCopy("drawDefaultsHint", "")
         #if os(macOS)
         case .image: ""
         #endif
@@ -295,6 +297,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 switch section {
                 case .display: appearance
                 case .making: making
+                case .drawDefaults: DrawDefaultsSettingsView(model: model)
                 #if os(macOS)
                 case .image:
                     Toggle(model.display.localized("ファイル名を来歴に入れる"), isOn: Binding(
@@ -328,14 +331,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var appearance: some View {
         return Group {
-            Section(model.display.webCopy("settingsWildDefault", "筆致制限を外すの既定値")) {
-                Text(model.display.label("このMacで、新しい描画や派生の条件を開くときの既定値です。入力欄の札を変えても、この設定は変わりません。",
-                                         "The starting choice for new drawings and derived works on this Mac. Changing the chip in the input area does not change this setting."))
-                    .inkuFont(13).foregroundStyle(.secondary)
-                Toggle(model.display.webCopy("wildButton", "筆致制限を外す"), isOn: Binding(get: { model.display.preferences.defaultWild ?? false }, set: { value in
-                    model.display.preferences.defaultWild = value; model.wild = value
-                }))
-            }
             textSizeSettings
             captionPositionSettings
             uiModeSettings

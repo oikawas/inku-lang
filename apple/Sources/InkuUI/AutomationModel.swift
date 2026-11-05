@@ -67,6 +67,9 @@ private actor BatchJournalStore {
     func save(_ journal: BatchJournal) throws {
         try JSONEncoder().encode(journal).write(to: url, options: .atomic)
     }
+    func clear() throws {
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+    }
     func loadHistory() throws -> [String] {
         let historyURL = url.deletingLastPathComponent().appendingPathComponent("batch-prompt-history.json")
         guard FileManager.default.fileExists(atPath: historyURL.path) else { return [] }
@@ -113,6 +116,7 @@ public final class AutomationModel {
     public var workspaceInputMode = "description"
     public func selectInputTab(_ mode: String, app: AppModel) {
         workspaceInputMode = mode
+        app.activeDrawTab = mode == "image" ? "image" : mode == "batch" ? "batch_text" : "describe"
         if mode == "description" || mode == "image" { app.inputMode = mode }
     }
 
@@ -189,6 +193,15 @@ public final class AutomationModel {
     public var observedRow: BatchRow? { rows.first { $0.id == observedRowID } }
     public var uncertainCount: Int { rows.filter { $0.state == .uncertain }.count }
     public var canResume: Bool { rows.contains { [.waiting, .failed, .uncertain].contains($0.state) } }
+    @discardableResult public func newBatch(app: AppModel) async -> Bool {
+        guard !isOccupied, !app.isBusy else { return false }
+        do {
+            try await store?.clear()
+            rows = []; journal = nil; batchConditions = nil; observedRowID = nil; observedWork = nil
+            batchText = ""; app.newWork(resetTab: "batch_text")
+            return true
+        } catch { errorText = error.localizedDescription; return false }
+    }
     /// Web `canRetryFailures`: a stopped batch with failed rows can draw those rows alone again.
     public var canRetryFailures: Bool { !running && !preparing && failedCount > 0 }
     public var canSaveDemoCurrent: Bool { demoWork != nil && !demoCurrentSaved && !savingDemo && !preparing }
@@ -316,8 +329,8 @@ public final class AutomationModel {
         defer { preparing = false }
         do {
             let originalText = batchText
-            let catalogMode = app.catalogMode == "auto" ? "auto" : "fixed"
-            let sketchMode = batchSketchMode
+            let catalogMode = app.catalogMode
+            let sketchMode = app.sketchMode
             let entries = BatchInputLines.paintableEntries(in: originalText)
             guard !entries.isEmpty else { throw HostError("empty_batch") }
             guard entries.count <= 1000 else { throw HostError("batch_exceeds_1000_rows") }
@@ -379,11 +392,10 @@ public final class AutomationModel {
             errorText = "バッチの保存結果を確認できませんでした: \(error.localizedDescription)"
             return
         }
-        // Web restores the route from the last saved work before resuming; each pending row still uses its frozen request.
-        if let workID = rows.reversed().first(where: { $0.state == .succeeded && $0.workID != nil })?.workID,
-           let context = try? await app.savedConfiguration(workID: workID), context.imageDDL == nil {
-            app.drawRoute = context.drawRoute ?? "stages"
-            app.descriptionComposition = context.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"].object != nil
+        // Pending rows continue with the conditions captured when this batch started.
+        if let request = rows.first?.request {
+            app.drawRoute = request.drawRoute ?? "stages"
+            app.descriptionComposition = request.descriptionComposition ?? false
         }
         if let originalText = journal?.originalText {
             batchText = BatchInputLines.normalizedText(originalText)

@@ -52,14 +52,14 @@ public final class JuxtaposeModel {
     public var choice: Juxtaposition.Choice? { chosen.flatMap { index in result?.choices.indices.contains(index) == true ? result?.choices[index] : nil } }
 
     public func initialize(app: AppModel) async {
-        wild = app.display.preferences.defaultWild ?? false
+        wild = work.renderWild ?? false
         if provider == nil {
             do { provider = try app.auxiliaryProvider() }
             catch { errorText = error.localizedDescription; return }
         }
         language = app.display.preferences.language
         if modelReference.isEmpty {
-            modelReference = AuxiliaryModel.defaultVisionModel(saved: app.display.preferences.visionModelReference,
+            modelReference = AuxiliaryModel.defaultVisionModel(saved: app.display.preferences.auxiliaryVisionModelReference,
                                                                settings: await app.hostSettings())
         }
     }
@@ -70,7 +70,7 @@ public final class JuxtaposeModel {
             throw HostError("vision_model_not_available")
         }
         modelReference = reference
-        app.display.preferences.visionModelReference = reference
+        app.display.preferences.auxiliaryVisionModelReference = reference
     }
 
     @discardableResult public func ask(app: AppModel) async -> Bool {

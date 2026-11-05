@@ -88,7 +88,7 @@ public final class RefinementModel {
 
     public func initialize(app: AppModel) async {
         guard !initialized, !initializing, !closed else { return }
-        inheritWild = false; wildOverride = app.display.preferences.defaultWild ?? false
+        inheritWild = false; wildOverride = work.renderWild ?? false
         initializing = true
         defer { initializing = false }
         do {
@@ -101,7 +101,7 @@ public final class RefinementModel {
             sourceIsLocked = context.authority != "description_authoritative"
             sourceIsDDLOrigin = context.origin == "direct_ddl"
             if modelReference.isEmpty {
-                let settings = await app.hostSettings()
+                let settings = await app.nextGenerationSettings()
                 if SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) {
                     modelReference = settings.models.stage2Model
                 }

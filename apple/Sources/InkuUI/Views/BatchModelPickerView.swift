@@ -157,7 +157,7 @@ struct BatchModelPickerView: View {
             if settings == nil {
                 draftReference = initialReference ?? model.nextBatchDrawingModelReference
                 draftThinking = model.display.preferences.includeThinking ?? false
-                draftVisionReference = model.display.preferences.visionModelReference ?? ""
+                draftVisionReference = model.imageVisionModel
             }
             else if !SettingsModel.isRegisteredModelAvailable(draftReference, purpose: purpose, settings: current) { draftReference = "" }
             if !SettingsModel.isRegisteredModelAvailable(draftVisionReference, purpose: "vision", settings: current) { draftVisionReference = "" }
@@ -217,7 +217,7 @@ struct BatchModelPickerView: View {
                 try await model.selectSharedDrawingModel(draftReference)
                 guard model.nextBatchDrawingModelReference == draftReference else { throw HostError("drawing_model_not_available") }
                 model.display.preferences.includeThinking = draftThinking
-                if hasVisionTab { model.display.preferences.visionModelReference = draftVisionReference.isEmpty ? nil : draftVisionReference }
+                if hasVisionTab { model.selectImageVisionModel(draftVisionReference) }
                 if model.display.saveError != nil { throw HostError("interface_settings_save_failed") }
             }
             dismiss()

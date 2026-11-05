@@ -17,7 +17,7 @@ struct LibraryRemovalSearchTests {
             for name in ["schema-v1", "migration-v2", "migration-v3"] {
                 try db.execute(sql: String(contentsOf: resources.appendingPathComponent(name + ".sql"), encoding: .utf8))
             }
-            try work.insert(db)
+            try db.execute(sql: "INSERT INTO history(id,at,input,score,svg,lineage_node_id) VALUES (?,?,?,?,?,?)", arguments: [work.id, work.at, work.input, work.score, work.svg, work.lineageNodeID])
             try LineageNode(id: "node", historyID: work.id, at: 1).insert(db)
             try db.execute(sql: "INSERT INTO library_annotations VALUES (?, 'Keep comment', 1, 1)", arguments: [work.id])
             try db.execute(sql: "INSERT INTO execution_snapshots VALUES ('execution', 2, ?)", arguments: [Data([0, 255, 7])])
@@ -38,7 +38,7 @@ struct LibraryRemovalSearchTests {
                 (try Int.fetchOne(database, sql: "PRAGMA user_version"),
                  try String.fetchAll(database, sql: "SELECT name FROM pragma_table_info('library_annotations')"))
             }
-            #expect(fields.0 == 7)
+            #expect(fields.0 == 8)
             #expect(fields.1 == ["history_id", "note", "for_revision"])
             try inspect.close()
         }

@@ -12,18 +12,6 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
-/// The sketch prose of one saved work as the author is editing it, and the description it was written for.
-public struct SketchDraft: Sendable, Equatable {
-    public let workID: String
-    public let source: String
-    public let original: String
-    public var text: String
-    public var editing = true
-    public init(workID: String, source: String, original: String) {
-        self.workID = workID; self.source = source; self.original = original; text = original
-    }
-}
-
 /// Availability of the author-facing prompt journal, independent of whether a provider was called.
 public enum PromptAvailability: Sendable, Equatable {
     case loading, recorded, notRecorded, unavailable
@@ -52,7 +40,17 @@ public final class AppModel {
     @ObservationIgnored private var canvasFitContinuation: CheckedContinuation<CanvasFitChoice, Never>?
     public var inputMode = "description"
     public var imageInput: PreparedImageInput?
-    public var imageCanvasID = "image"
+    public var activeDrawTab = "describe"
+    public private(set) var drawDefaults = DrawOptionsCore.release
+    public private(set) var drawSelections = DrawOptionsCore.release
+    private var currentDrawOptions: DrawOptions {
+        get { drawSelections[activeDrawTab] ?? DrawOptionsCore.release[activeDrawTab]! }
+        set { drawSelections[activeDrawTab] = newValue }
+    }
+    public var imageCanvasID: String {
+        get { currentDrawOptions.canvasAspect }
+        set { currentDrawOptions.canvasAspect = newValue }
+    }
     public private(set) var imageProvenance = ""
     public private(set) var imageProvenanceTyped = false
     public var imageFileName = ""
@@ -63,14 +61,35 @@ public final class AppModel {
     public var ddlText = ""
     /// The Web always requests `auto`; an explicit language remains possible for restored inputs.
     public var language = "auto"
-    public var catalogID = "default" { didSet { rememberNextConditions() } }
-    public var canvasID = "square" { didSet { rememberNextConditions() } }
+    public var catalogID: String {
+        get { currentDrawOptions.catalog.id }
+        set { currentDrawOptions.catalog.id = newValue }
+    }
+    public var canvasID: String {
+        get { currentDrawOptions.canvasAspect }
+        set { currentDrawOptions.canvasAspect = newValue }
+    }
     public var seedText = ""
-    public var wild = false { didSet { rememberNextConditions() } }
-    public var catalogMode = "fixed" { didSet { rememberNextConditions() } }
-    public var sketchMode = "on"
-    public var drawRoute = "read_and_draw"
-    public var descriptionComposition = false
+    public var wild: Bool {
+        get { currentDrawOptions.wild == "on" }
+        set { currentDrawOptions.wild = newValue ? "on" : "off" }
+    }
+    public var catalogMode: String {
+        get { currentDrawOptions.catalog.mode }
+        set { currentDrawOptions.catalog.mode = newValue }
+    }
+    public var sketchMode: String {
+        get { currentDrawOptions.sketch }
+        set { currentDrawOptions.sketch = newValue }
+    }
+    public var drawRoute: String {
+        get { currentDrawOptions.route }
+        set { currentDrawOptions.route = newValue }
+    }
+    public var descriptionComposition: Bool {
+        get { currentDrawOptions.composition == "on" }
+        set { currentDrawOptions.composition = newValue ? "on" : "off" }
+    }
     public func selectDrawRoute(_ route: String) {
         guard ["read_and_draw", "stages"].contains(route) else { return }
         if route == "read_and_draw", drawRoute != route { sketchMode = "on" }
@@ -86,9 +105,6 @@ public final class AppModel {
         request.descriptionReview = SettingsModel.isRegisteredModelAvailable(request.models.stage1Model, purpose: "vision", settings: settings)
     }
     public var sketchText = ""
-    /// Web `sketchDraft`/`sketchEditing`: the author's edit of the displayed work's sketch prose. Drawing that work's
-    /// description again with the sketch on sends the edited prose instead of calling the layer (I8).
-    public var sketchDraft: SketchDraft?
     public var variationAmplitude = "small"
     public var variationSeedText = ""
     public var selectedHoleIDs: Set<String> = []
@@ -131,7 +147,10 @@ public final class AppModel {
     public var providerModel = ""
     public var providerKind = "openai_compatible"
     public var providerKey = ""
-    public private(set) var nextDrawingModelReference = ""
+    public private(set) var nextDrawingModelReference: String {
+        get { currentDrawOptions.models.stage1 ?? "" }
+        set { currentDrawOptions.models.stage1 = newValue; currentDrawOptions.models.stage2 = newValue }
+    }
     public private(set) var providerSettingsRevision = 0
     public private(set) var catalogs: [ColorCatalogOption] = []
     public private(set) var canvases: [CanvasOption] = []
@@ -240,7 +259,6 @@ public final class AppModel {
     @ObservationIgnored private var importedDDL: DDLPackageImport?
     @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
     /// Set once the saved next-work conditions have been read, so the defaults never overwrite them.
-    @ObservationIgnored private var nextConditionsRestored = false
     @ObservationIgnored private var colorArrangementCursors: [String: ColorArrangementCursor] = [:]
 
     public init(databaseURL: URL? = nil, transport: (any ProviderTransport)? = nil) {
@@ -344,7 +362,12 @@ public final class AppModel {
                 && !(selectedWorkID != nil && sourceLocked)))
     }
     public var imageVisionModel: String {
-        AuxiliaryModel.defaultVisionModel(saved: display.preferences.visionModelReference, settings: settings)
+        let tab = activeDrawTab == "batch_image" ? "batch_image" : "image"
+        return drawSelections[tab]?.models.vision ?? ""
+    }
+    public func selectImageVisionModel(_ reference: String) {
+        let tab = activeDrawTab == "batch_image" ? "batch_image" : "image"
+        drawSelections[tab]?.models.vision = reference
     }
     public var canGenerateDescription: Bool {
         database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
@@ -468,6 +491,15 @@ public final class AppModel {
         let token = UUID()
         let runningMode = inputMode
         let runningImage = runningMode == "image" ? imageInput : nil
+        let freshRequest: GenerationRequest
+        do {
+            if runningMode == "image", let image = runningImage {
+                freshRequest = try requestForImage(image, provenance: imageProvenance)
+            } else {
+                freshRequest = try requestForCurrentInput(inputMode: runningMode, parentWorkID: parentWorkID,
+                    derivationKind: parentWorkID == nil ? "new" : "description_edit")
+            }
+        } catch { report(error); return }
         activeSingleInputMode = runningMode
         generationToken = token
         providerProgress = nil
@@ -482,7 +514,7 @@ public final class AppModel {
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
             await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID,
-                                     runningMode: runningMode, image: runningImage)
+                                     runningMode: runningMode, image: runningImage, freshRequest: freshRequest)
         }
         activeOperation = operation
         await operation.value
@@ -490,15 +522,8 @@ public final class AppModel {
     }
 
     private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?,
-                               runningMode: String, image: PreparedImageInput?) async {
+                               runningMode: String, image: PreparedImageInput?, freshRequest: GenerationRequest) async {
         do {
-            var freshRequest: GenerationRequest
-            if runningMode == "image", let image {
-                freshRequest = try requestForImage(image, provenance: imageProvenance)
-            } else {
-                freshRequest = try requestForCurrentInput(inputMode: runningMode, parentWorkID: parentWorkID,
-                    derivationKind: parentWorkID == nil ? "new" : runningMode == "ddl" ? "ddl_edit" : "description_edit")
-            }
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
             let view = try await host.generate(request, image: image) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
@@ -506,16 +531,22 @@ public final class AppModel {
             await recordDescriptionFeedback(request: request, view: view)
             await notifyCommittedWork(view)
             guard generationToken == token, !Task.isCancelled else { return }
+            let saved: SavedWork?
+            if let id = view.savedWorkID { saved = try await database?.work(id: id) }
+            else { saved = nil }
+            let context: SavedAuthoringContext?
+            if let saved { context = try await host.savedAuthoringContext(workID: saved.id) }
+            else { context = nil }
+            guard generationToken == token, !Task.isCancelled else { return }
             apply(view)
-            try await reloadWorks()
-            if let id = view.savedWorkID, works.contains(where: { $0.id == id }),
-               let work = try await database?.work(id: id), generationToken == token, !Task.isCancelled {
+            if let work = saved {
                 displayWork(work)
-                selectedContext = try await host.savedAuthoringContext(workID: id)
+                selectedContext = context
                 savedImageDDL = selectedContext?.imageDDL
                 savedDescriptionDDL = selectedContext?.descriptionDDL
                 if savedImageDDL != nil { imageInput = nil; imageFileName = ""; imageProvenanceTyped = false }
             }
+            try await reloadWorks()
         } catch {
             guard generationToken == token, !Task.isCancelled else { return }
             report(error)
@@ -537,7 +568,7 @@ public final class AppModel {
         if let id = executionID { recordDrawingLog(executionID: id) }
     }
 
-    public func selectWork(_ work: SavedWork) async {
+    public func selectWork(_ work: SavedWork, adoptDrawOptions: Bool = true) async {
         guard !isBrowsingLocked else { return }
         if !backgroundDrawing {
             providerProgress = nil
@@ -576,11 +607,9 @@ public final class AppModel {
             savedImageDDL = context.imageDDL
             savedDescriptionDDL = context.descriptionDDL
             imageProvenanceTyped = false
-            if context.imageDDL == nil {
-                drawRoute = context.drawRoute ?? "stages"
-                if let record = context.descriptionDDL, let json = try? ExactJSON(data: record) { descriptionComposition = json["composition"].object != nil }
-                else { descriptionComposition = false }
-            }
+            let recordedTab = context.imageDDL == nil ? "describe" : "image"
+            let recordedOptions = try DrawOptionsCore.recorded(work, isImage: context.imageDDL != nil)
+            if adoptDrawOptions { drawSelections[recordedTab] = try DrawOptionsCore.forRecorded(recordedOptions, tab: recordedTab, defaults: drawDefaults) }
             if context.imageDDL != nil {
                 imageInput = nil; imageFileName = ""; imageProvenance = context.imageProvenance ?? ""
                 inputMode = "image"
@@ -600,6 +629,10 @@ public final class AppModel {
             eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
+            if adoptDrawOptions, let recorded = try? DrawOptionsCore.recorded(work, isImage: false),
+               let options = try? DrawOptionsCore.forRecorded(recorded, tab: "describe", defaults: drawDefaults) {
+                drawSelections["describe"] = options
+            }
             if (error as? HostError)?.code == "saijiki_migration_required" { errorText = failureMessage(error) }
             promptAvailability = .unavailable
             authoringAuthority = "legacy_unknown"
@@ -620,7 +653,6 @@ public final class AppModel {
         selectedWorkID = work.id
         selectedWork = work
         // Web `adoptSketch`: another work on screen brings its own prose; an edit belongs to the work it was made on.
-        if sketchDraft?.workID != work.id { sketchDraft = nil }
         if loadSelectedAnnotation {
             Task { @MainActor [weak self] in
                 guard let self, self.displayToken == selectionToken,
@@ -759,21 +791,13 @@ public final class AppModel {
 
     public func selectSharedDrawingModel(_ reference: String) async throws {
         guard !isBusy, SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
-        var changed = settings
-        changed.models.stage1Model = reference
-        changed.models.stage2Model = reference
-        try await updateHostSettings(changed)
         nextDrawingModelReference = reference
     }
 
     /// The DDL and adjustment pickers save Stage 2 immediately; the shared next-work picker is a draft.
     public func selectDdlDrawingModel(_ reference: String) async throws {
         guard !isBusy, SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
-        let next = nextDrawingModelReference
-        var changed = settings
-        changed.models.stage2Model = reference
-        try await updateHostSettings(changed)
-        nextDrawingModelReference = next
+        nextDrawingModelReference = reference
     }
 
     public func selectDemoDrawingModel(stage: Int, reference: String) async throws {
@@ -804,10 +828,6 @@ public final class AppModel {
     }
 
     private func synchronizeNextDrawingModel(previousSettings: HostSettings?) {
-        if previousSettings == nil || previousSettings?.models != settings.models || !hasNextDrawingModel {
-            nextDrawingModelReference = settings.models.stage1Model
-            if !hasNextDrawingModel { nextDrawingModelReference = "" }
-        }
         providerSettingsRevision += 1
     }
 
@@ -954,8 +974,8 @@ public final class AppModel {
 
     public func clearPreview() async {
         guard !isBusy else { return }
-        if let selectedWork { await selectWork(selectedWork) }
-        else { newWork() }
+        if let selectedWork { await selectWork(selectedWork, adoptDrawOptions: false) }
+        else { clearWorkOutput() }
     }
 
     public func savePreview() async {
@@ -1055,7 +1075,7 @@ public final class AppModel {
         guard !isBusy, let bootstrap else { throw HostError("ddl_import_busy_or_unavailable") }
         let language = value.language ?? instructionLanguage(for: value.source)
         let catalog = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
-        newWork()
+        clearWorkOutput()
         importedDDL = value; importedMacroNames = value.names
         inputMode = "ddl"; ddlText = value.source
         macroDiagnostics = try Self.pretty(catalog.data)
@@ -1091,7 +1111,6 @@ public final class AppModel {
             throw HostError("description_source_locked")
         }
         let sketch: SketchRequest = sketchOverride
-            ?? editedSketch(parentWorkID: parentWorkID, mode: mode, description: description ?? descriptionText)
             ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
@@ -1102,6 +1121,7 @@ public final class AppModel {
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         if mode == "description" { applyDescriptionRoute(&request, settings: nextGenerationHostSettings) }
+        request.recordsDrawOptions = mode == "description" && parentWorkID == nil && derivationKind == "new" ? true : nil
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         // Server `start`: a direct DDL drawn from the selected saved work carries its completion range record.
         if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID {
@@ -1119,23 +1139,24 @@ public final class AppModel {
     public func setImageInput(_ image: PreparedImageInput, fileName: String, automaticProvenance: String = "") {
         let typed = imageProvenanceTyped && !imageProvenance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? imageProvenance : nil
-        if selectedWork != nil { newWork(); inputMode = "image" }
+        if selectedWork != nil { clearWorkOutput(); inputMode = "image" }
         imageProvenance = typed ?? automaticProvenance
         imageProvenanceTyped = typed != nil
         imageInput = image; imageFileName = fileName
     }
 
-    public func requestForImage(_ image: PreparedImageInput, provenance: String, canvasID: String? = nil) throws -> GenerationRequest {
+    public func requestForImage(_ image: PreparedImageInput, provenance: String, canvasID: String? = nil, options: DrawOptions? = nil) throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
-        let vision = imageVisionModel
+        let options = options ?? currentDrawOptions
+        let vision = options.models.vision ?? ""
         guard SettingsModel.isRegisteredModelAvailable(vision, purpose: "vision", settings: settings) else { throw HostError("vision_model_not_available") }
-        let selectedCanvasID = canvasID ?? imageCanvasID
+        let selectedCanvasID = canvasID ?? options.canvasAspect
         let resolvedCanvasID = selectedCanvasID == "image" ? image.nearestFormatID : selectedCanvasID
         var request = try bootstrap.request(inputMode: "description", source: "", description: "", language: instructionLanguage(for: ""),
-            catalogID: catalogID, canvasID: resolvedCanvasID, seed: seedText, wild: false,
+            catalogID: options.catalog.id, canvasID: resolvedCanvasID, seed: seedText, wild: false,
             settings: nextGenerationHostSettings, parentWorkID: nil, derivationKind: "new",
-            catalogMode: catalogMode, sketch: .off)
-        request.authoring = .image(input: image.authoringJSON, autoCatalog: catalogMode == "auto")
+            catalogMode: options.catalog.mode, sketch: .off)
+        request.authoring = .image(input: image.authoringJSON, autoCatalog: options.catalog.mode == "auto")
         request.imageProvenance = provenance
         request.models.stage1Model = vision; request.models.stage2Model = vision
         var config = try ExactJSON(data: request.configuration)
@@ -1145,21 +1166,11 @@ public final class AppModel {
         return request
     }
 
-    /// Web `sketchTextFor`: prose written for this very description, as the author left it. Unedited prose is not
-    /// sent, so an ordinary redraw still asks the layer as before.
-    private func editedSketch(parentWorkID: String?, mode: String, description: String) -> SketchRequest? {
-        guard mode == "description", sketchMode == "on", let draft = sketchDraft, draft.workID == parentWorkID,
-              draft.text != draft.original, !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              draft.source.trimmingCharacters(in: .whitespacesAndNewlines) == description.trimmingCharacters(in: .whitespacesAndNewlines)
-        else { return nil }
-        return .supplied(draft.text)
-    }
-
     public func requestForBatchDescription(_ description: String, sketchMode: String) throws -> GenerationRequest {
         guard hasAvailableBatchDrawingModel else { throw HostError("drawing_model_not_available") }
         guard ["off", "on"].contains(sketchMode) else { throw HostError("invalid_batch_sketch_mode") }
         return try requestForCurrentInput(inputMode: "description", source: "", description: description,
-            parentWorkID: nil, derivationKind: "new", catalogModeOverride: catalogMode == "auto" ? "auto" : "fixed",
+            parentWorkID: nil, derivationKind: "new", catalogModeOverride: catalogMode,
             sketchOverride: sketchMode == "on" ? .on : .off)
     }
 
@@ -1278,14 +1289,15 @@ public final class AppModel {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
         guard ["layout_change", "variation"].contains(kind) else { throw HostError("unknown_refinement_kind") }
         guard [1, 4].contains(count) else { throw HostError("invalid_adjustment_count") }
-        let drawing = settings
+        let drawing = nextGenerationHostSettings
+        let selected = currentDrawOptions
         let source = try await checkedSavedAdjustmentParent(work)
         let saved = try await host.savedAuthoringContext(workID: source.id)
         try Task.checkCancellation()
         guard ["description_authoritative", "ddl_authoritative"].contains(saved.authority) else { throw HostError("saved_authoring_context_unavailable") }
         let baseConfiguration = try ExactJSON(data: saved.configuration)
         let baseOptions = try ExactJSON(data: saved.renderOptions)
-        guard let catalog = baseOptions["catalog_id"].string, baseOptions["resolved_color_map"].object != nil else {
+        guard baseOptions["catalog_id"].string != nil, baseOptions["resolved_color_map"].object != nil else {
             throw HostError("saved_refinement_options_unavailable")
         }
         if kind == "variation" {
@@ -1311,15 +1323,27 @@ public final class AppModel {
         }
         let description = source.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines)
         var models = drawing.models
-        models.stage1Model = source.stage1Model ?? ""
-        models.stage2Model = modelReference ?? (drawing.models.stage2Model.isEmpty ? source.stage2Model ?? "" : drawing.models.stage2Model)
+        models.stage2Model = modelReference ?? drawing.models.stage2Model
         if let modelReference { try validateAdjustmentModel(modelReference, providers: drawing.providers) }
         var usedSeeds = Set([source.compositionSeed].compactMap { $0 }.compactMap(UInt64.init))
+        guard let bootstrap, let canvas = baseOptions["canvas_aspect_id"].string,
+              let renderSeed = baseOptions["render_seed"].string ?? baseOptions["render_seed"].number else {
+            throw HostError("saved_refinement_options_unavailable")
+        }
+        let chosenCatalog = try bootstrap.request(inputMode: "ddl", source: ddl, description: description,
+            language: source.instructionLangResolved ?? "ja", catalogID: selected.catalog.id, canvasID: canvas,
+            seed: renderSeed, wild: wildOverride ?? source.renderWild ?? false, settings: drawing,
+            parentWorkID: source.id, derivationKind: kind, catalogMode: "fixed", savedConfiguration: saved.configuration)
+        let chosenConfiguration = try ExactJSON(data: chosenCatalog.configuration)
+        let chosenOptions = try ExactJSON(data: chosenCatalog.renderOptions)
         var requests: [GenerationRequest] = []
         var recompositions: [Recomposition?] = []
         for _ in 0..<count {
             var configuration = baseConfiguration
             var options = baseOptions
+            configuration["compiler"]["host"] = chosenConfiguration["compiler"]["host"]
+            options["catalog_id"] = chosenOptions["catalog_id"]
+            options["resolved_color_map"] = chosenOptions["resolved_color_map"]
             configuration["catalogs"] = .array([])
             configuration["compiler"]["stage15_variation"] = .null
             options["wild"] = .bool(wildOverride ?? source.renderWild ?? baseOptions["wild"].bool ?? false)
@@ -1343,7 +1367,7 @@ public final class AppModel {
             let retains = chosen == nil
             requests.append(GenerationRequest(authoring: authoring, configuration: configuration.data, renderOptions: options.data,
                 clipPolicy: saved.clipPolicy, models: models, providers: drawing.providers,
-                renderColorMaps: [catalog: baseOptions["resolved_color_map"].data], description: description,
+                renderColorMaps: chosenCatalog.renderColorMaps, description: description,
                 parentWorkID: source.id, derivationKind: kind, saveHistory: false,
                 retainedDocument: retains ? document : nil, retainedAuthority: retains ? saved.authorityJSON : nil,
                 derivationMetadata: metadata.data))
@@ -1355,7 +1379,7 @@ public final class AppModel {
         requests = try await pinPersonalPlanRequests(requests)
         try Task.checkCancellation()
         return zip(requests, recompositions).map { request, recomposition in
-            DrawingAdjustmentPlan(stage1Model: source.stage1Model,
+            DrawingAdjustmentPlan(stage1Model: request.models.stage1Model,
                 stage2Model: request.models.stage2Model.isEmpty ? nil : request.models.stage2Model, parent: source, operation: .author(request),
                 recomposition: recomposition)
         }
@@ -1446,12 +1470,13 @@ public final class AppModel {
             throw HostError("saved_refinement_options_unavailable")
         }
         let fresh = String(UInt64.random(in: 0...((UInt64(1) << 53) - 1)))
-        let chosenCatalog = catalogIDOverride ?? catalogID
+        let chosenCatalog = catalogIDOverride ?? (kind == "catalog_change" ? catalogID : self.catalogID)
         let description = work.effectiveSourceText
         let sketch: SketchRequest = work.sketchText.map(SketchRequest.supplied) ?? .off
         var request = try bootstrap.request(inputMode: reading ? "description" : "ddl", source: work.ddl ?? "", description: description,
             language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: renderSeed, wild: wildOverride ?? work.renderWild ?? false,
-            settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind, sketch: sketch,
+            settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind,
+            catalogMode: reading ? self.catalogMode : "fixed", sketch: sketch,
             variationAmplitude: kind == "variation" ? amplitude : nil, variationSeed: kind == "variation" ? fresh : nil,
             savedConfiguration: saved.configuration)
         var nextConfig = try ExactJSON(data: request.configuration)
@@ -1492,6 +1517,7 @@ public final class AppModel {
                                         metadata: [String: ExactJSON] = [:], drawingSettings: HostSettings? = nil) async throws -> GenerationRequest {
         guard !isBusy, !isPreview, database != nil else { throw HostError("authoring_busy_or_unavailable") }
         let drawing = drawingSettings ?? nextGenerationHostSettings
+        let chosen = currentDrawOptions
         guard drawingSettings != nil || hasNextDrawingModel else { throw HostError("model_reference_missing") }
         let saved = try await savedWorkEditContext(work)
         let text = (mode == .description ? description : work.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1502,14 +1528,23 @@ public final class AppModel {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         try bootstrap.updatePluginDefinitions(in: &configuration, language: selectedLanguage, settings: drawing)
         var options = try ExactJSON(data: saved.renderOptions)
-        guard let catalog = options["catalog_id"].string,
-              options["resolved_color_map"].object != nil,
-              options["canvas_aspect_id"].string != nil else { throw HostError("saved_refinement_options_unavailable") }
+        guard let canvas = options["canvas_aspect_id"].string,
+              let seed = options["render_seed"].string ?? options["render_seed"].number else { throw HostError("saved_refinement_options_unavailable") }
+        let current = try bootstrap.request(inputMode: "description", source: "", description: text,
+            language: selectedLanguage, catalogID: chosen.catalog.id, canvasID: canvas, seed: seed,
+            wild: wildOverride ?? work.renderWild ?? false, settings: drawing, parentWorkID: work.id,
+            derivationKind: "description_edit", catalogMode: chosen.catalog.mode, sketch: .off,
+            savedConfiguration: saved.configuration)
+        let currentConfiguration = try ExactJSON(data: current.configuration)
+        let currentOptions = try ExactJSON(data: current.renderOptions)
+        configuration["compiler"]["host"] = currentConfiguration["compiler"]["host"]
+        configuration["catalogs"] = currentConfiguration["catalogs"]
+        configuration["catalog_seed"] = currentConfiguration["catalog_seed"]
+        options["catalog_id"] = currentOptions["catalog_id"]
+        options["resolved_color_map"] = currentOptions["resolved_color_map"]
         configuration["language"] = .string(selectedLanguage)
         // The Server applies Stage 1.5 only when this operation explicitly asks for it.
         configuration["compiler"]["stage15_variation"] = .null
-        configuration["catalogs"] = .array([])
-        if drawingSettings != nil { configuration["compiler"]["host"]["catalog_mode"] = .string(catalog == "default" ? "default" : "explicit") }
         options["wild"] = .bool(wildOverride ?? work.renderWild ?? options["wild"].bool ?? false)
         options["svg_profile"] = .string("display")
         let sketch: SketchRequest
@@ -1520,17 +1555,20 @@ public final class AppModel {
         } else if let prose = work.sketchText, !prose.isEmpty {
             sketch = text == work.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines) ? .supplied(prose) : .on
         } else { sketch = .off }
-        var request = GenerationRequest(authoring: .description(text, autoCatalog: false, sketch: sketch),
+        var request = GenerationRequest(authoring: .description(text, autoCatalog: chosen.catalog.mode == "auto", sketch: sketch),
             configuration: configuration.data, renderOptions: options.data, clipPolicy: saved.clipPolicy,
             models: drawing.models, providers: drawing.providers,
-            renderColorMaps: [catalog: options["resolved_color_map"].data], description: text,
+            renderColorMaps: current.renderColorMaps, description: text,
             parentWorkID: work.id, derivationKind: mode == .description ? "description_edit" : "sketch_grain_change",
             derivationMetadata: ExactJSON.object(mode == .description
                 ? metadata.merging(["edited_from_history_id": .string(work.id)]) { _, edited in edited }
                 : ["edited_from_history_id": .string(work.id), "from_sketch_state": work.sketchState.map(ExactJSON.string) ?? .null,
                    "to_sketch_mode": .string(sketchMode)]).data)
         try Task.checkCancellation()
-        applyDescriptionRoute(&request, settings: drawing)
+        if chosen.route == "read_and_draw" {
+            request.drawRoute = "read_and_draw"; request.descriptionComposition = chosen.composition == "on"
+            request.descriptionReview = SettingsModel.isRegisteredModelAvailable(request.models.stage1Model, purpose: "vision", settings: drawing)
+        }
         let pinned = try await pinPersonalPlanRequests([request])[0]
         try Task.checkCancellation()
         return pinned
@@ -1539,16 +1577,28 @@ public final class AppModel {
     /// Only the start payload differs from a saved DDL child. The shared pipeline decides whether its laws can run.
     public func makeSavedLawsRequest(work: SavedWork, direction: ExactJSON, settings: HostSettings,
                                      wild: Bool?) async throws -> GenerationRequest {
+        let chosen = currentDrawOptions
         let saved = try await savedConfiguration(workID: work.id)
         var configuration = try ExactJSON(data: saved.configuration)
         var options = try ExactJSON(data: saved.renderOptions)
         if let wild { options["wild"] = .bool(wild) }
-        let catalog = try options.requiredString("catalog_id")
-        configuration["compiler"]["host"]["catalog_mode"] = .string(catalog == "default" ? "default" : "explicit")
+        guard let bootstrap, let canvas = options["canvas_aspect_id"].string,
+              let seed = options["render_seed"].string ?? options["render_seed"].number else {
+            throw HostError("saved_refinement_options_unavailable")
+        }
+        let selected = try bootstrap.request(inputMode: "ddl", source: work.ddl ?? "", description: work.effectiveSourceText,
+            language: work.instructionLangResolved ?? "ja", catalogID: chosen.catalog.id, canvasID: canvas, seed: seed,
+            wild: wild ?? work.renderWild ?? false, settings: settings, parentWorkID: work.id,
+            derivationKind: "laws_change", catalogMode: "fixed", savedConfiguration: saved.configuration)
+        let selectedConfiguration = try ExactJSON(data: selected.configuration)
+        let selectedOptions = try ExactJSON(data: selected.renderOptions)
+        configuration["compiler"]["host"] = selectedConfiguration["compiler"]["host"]
+        options["catalog_id"] = selectedOptions["catalog_id"]
+        options["resolved_color_map"] = selectedOptions["resolved_color_map"]
         configuration["catalogs"] = .array([])
         var request = GenerationRequest(authoring: .directDDL(work.ddl ?? ""), configuration: configuration.data,
             renderOptions: options.data, clipPolicy: saved.clipPolicy, models: settings.models, providers: settings.providers,
-            renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
+            renderColorMaps: selected.renderColorMaps, description: work.effectiveSourceText,
             parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "normal")
         request.savedLawsDirection = direction.data
         request.completionRanges = saved.completionRanges
@@ -1990,12 +2040,18 @@ public final class AppModel {
         guard !isBusy else { return }
         let description = descriptionText, mode = inputMode
         let ddl = selectedWork.map { ddlBoxText(for: $0) } ?? ddlText
-        let sketch = sketchDraft
-        newWork()
-        descriptionText = description; ddlText = ddl; inputMode = mode; sketchDraft = sketch
+        let sketch = sketchText
+        clearWorkOutput()
+        descriptionText = description; ddlText = ddl; inputMode = mode; sketchText = sketch
     }
 
-    public func newWork() {
+    public func newWork(resetTab: String? = nil) {
+        guard !isBusy else { return }
+        resetDrawOptions(tab: resetTab ?? activeDrawTab)
+        clearWorkOutput()
+    }
+
+    private func clearWorkOutput() {
         guard !isBusy else { return }
         backgroundDrawing = false
         displayToken = UUID()
@@ -2029,10 +2085,10 @@ public final class AppModel {
         eventsJSON = ""
         errorText = nil
         unreadOutputs = []
-        inputMode = "description"
+        inputMode = activeDrawTab == "image" ? "image" : "description"
         descriptionText = ""
         ddlText = ""
-        sketchDraft = nil
+        sketchText = ""
     }
 
     public func commitDDL(wildOverride: Bool? = nil, presentation: CanvasFitPresentation = .workspace) async {
@@ -2601,22 +2657,22 @@ public final class AppModel {
     }
     /// Web restores the catalog, paper and wild choice at start-up; a saved catalog or paper that is gone is the default.
     private func restoreNextConditions() {
-        let saved = display.preferences
-        if let id = saved.nextCatalogID, catalogs.contains(where: { $0.id == id }) { catalogID = id }
-        if let mode = saved.nextCatalogMode, ["fixed", "auto"].contains(mode) { catalogMode = mode }
-        if let id = saved.nextCanvasID, canvases.contains(where: { $0.id == id }) { canvasID = id }
-        wild = saved.defaultWild ?? false
-        nextConditionsRestored = true
+        do {
+            drawDefaults = try DrawOptionsCore.normalized(settings: settings, preferences: display.preferences,
+                                                           colorIDs: catalogs.map(\.id))
+            drawSelections = drawDefaults
+        } catch { report(error) }
     }
 
-    private func rememberNextConditions() {
-        guard nextConditionsRestored else { return }
-        var next = display.preferences
-        next.nextCatalogID = catalogID
-        // Batch-only modes are not a next-work choice of the creation screen.
-        if ["fixed", "auto"].contains(catalogMode) { next.nextCatalogMode = catalogMode }
-        next.nextCanvasID = canvasID
-        if next != display.preferences { display.preferences = next }
+    public func saveDrawDefaults(_ defaults: [String: DrawOptions]) throws {
+        let updated = try DrawOptionsCore.update(defaults, settings: settings, preferences: display.preferences,
+                                                 colorIDs: catalogs.map(\.id))
+        drawDefaults = updated
+        display.preferences.drawDefaults = updated
+    }
+
+    public func resetDrawOptions(tab: String) {
+        if let defaults = drawDefaults[tab] { drawSelections[tab] = defaults }
     }
 
     private func report(_ error: Error) {

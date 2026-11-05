@@ -415,6 +415,25 @@ class SharedPipelineConfigBuilder(
         return output.put("diagnostics", diagnostics)
     }
 
+    /** A description fork keeps its saved drawing policy, but offers today's plugin catalog. */
+    fun withCurrentMacros(
+        saved: PreparedPipelineConfig,
+        language: String,
+        enabled: Boolean,
+        imported: List<ImportedPluginDefinition>,
+    ): PreparedPipelineConfig {
+        val catalog = resolveMacros(SharedPipelineConfigRequest(
+            resolvedLanguage = language, canvasFormatId = saved.canvasFormatId,
+            catalogSelectionId = saved.catalogId, bundledPluginsEnabled = enabled, importedPlugins = imported,
+        ))
+        val entries = catalog.requiredArray("entries").objects()
+        val config = JSONObject(saved.configJson)
+            .put("definitions", JSONArray().also { definitions -> entries.forEach { definitions.put(it.requiredObject("definition")) } })
+            .put("macro_summaries", JSONArray().also { summaries -> entries.forEach { summaries.put(it.requiredString("summary")) } })
+        return saved.copy(configJson = config.toString(), macroLocksJson = catalog.requiredArray("locks").toString(),
+            macroDiagnosticsJson = catalog.requiredArray("diagnostics").toString())
+    }
+
     /** Every name of the bundled package, including aliases, whatever its enabled state. */
     internal fun bundledPluginWords(language: String): List<PluginWord> = bundledPluginEntries(language).objects().map {
         pluginWord(it.requiredObject("definition"), it.requiredString("qualified_name"))

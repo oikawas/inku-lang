@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Android: use currently enabled plugins and imported definitions when rewriting a selected work from its description.
+
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.

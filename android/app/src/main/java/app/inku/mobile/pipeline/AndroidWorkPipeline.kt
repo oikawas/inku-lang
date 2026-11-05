@@ -978,7 +978,11 @@ class AndroidWorkPipeline(
                     macroLocksJson = macroCatalog.requiredArray("definition_locks").toString(),
                     macroDiagnosticsJson = macroCatalog.requiredArray("diagnostics").toString(),
                 )
-                if (preserveSavedConfig) parentConfig else deriveSavedConfig(parentConfig, request, renderSeed, language, imageReview)
+                if (preserveSavedConfig) parentConfig else {
+                    val derived = deriveSavedConfig(parentConfig, request, renderSeed, language, imageReview)
+                    if (descriptionFlow) configBuilder.withCurrentMacros(derived, language, bundledPluginsEnabled(), request.importedPlugins)
+                    else derived
+                }
             }
         }
         val effectiveConfig = if (descriptionFlow && request.readAndDraw) {

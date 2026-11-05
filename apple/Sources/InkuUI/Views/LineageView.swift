@@ -438,7 +438,7 @@ struct LineageView: View {
                 }
             }.buttonStyle(.borderless).frame(minHeight: 22)
             if let work = item.work {
-                Button { LibraryClick.press(preview: { openWork(item) }, open: { openInCanvas(work) }) } label: {
+                LibraryClickButton(preview: { openWork(item) }, open: { openInCanvas(work) }) {
                     VStack(alignment: .leading, spacing: 6) {
                         operationRow(item, graph: graph)
                         ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(height: 118)

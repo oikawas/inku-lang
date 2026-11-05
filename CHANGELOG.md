@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: decide a single or double click on a library or lineage picture from the mouse-down on that picture, so quick clicks on different cards never open a work by mistake.
+
 - macOS: one click on a work's picture in the library changes the preview and the card frame without waiting; a double click opens the work.
 
 - macOS: show the work's conditions above the canvas in input order and move the refinement menu onto the work.

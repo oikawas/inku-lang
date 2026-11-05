@@ -568,10 +568,8 @@ struct LibraryView: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 if !thumbs {
-                    Button {
-                        LibraryClick.press(preview: { openWork(group.representative.work) },
-                                           open: { openThumbnail(group.representative.work) })
-                    } label: {
+                    LibraryClickButton(preview: { openWork(group.representative.work) },
+                                       open: { openThumbnail(group.representative.work) }) {
                         ArtworkThumbnail(work: group.representative.work, thumbnails: model.thumbnails).frame(width: 56, height: 56)
                     }
                     .buttonStyle(.plain)
@@ -668,7 +666,7 @@ struct LibraryView: View {
     private func memberCard(_ work: SavedWork) -> some View {
         let selected = library.selectedIDs.contains(work.id)
         return VStack(alignment: .leading, spacing: 4) {
-            Button { LibraryClick.press(preview: { openWork(work) }, open: { openThumbnail(work) }) } label: {
+            LibraryClickButton(preview: { openWork(work) }, open: { openThumbnail(work) }) {
                 VStack(alignment: .leading, spacing: 4) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                         .aspectRatio(82.0 / 58.0, contentMode: .fit)
@@ -705,7 +703,7 @@ struct LibraryView: View {
     private func memberRow(_ work: SavedWork) -> some View {
         HStack(spacing: 8) {
             selectionCheck(work)
-            Button { LibraryClick.press(preview: { openWork(work) }, open: { openThumbnail(work) }) } label: {
+            LibraryClickButton(preview: { openWork(work) }, open: { openThumbnail(work) }) {
                 HStack(spacing: 8) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 48, height: 48)
                     Text(model.workPresentationTitle(work))
@@ -1285,7 +1283,7 @@ private struct LibraryGridCard: View, Equatable {
         let title = model.workPresentationTitle(work)
         return VStack(alignment: .leading, spacing: 5) {
             // HistoryManager.svelte:1202: the click previews, a double click opens the work.
-            Button { LibraryClick.press(preview: { actions.open(work) }, open: { actions.openThumbnail(work) }) } label: {
+            LibraryClickButton(preview: { actions.open(work) }, open: { actions.openThumbnail(work) }) {
                 ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                     .aspectRatio(82.0 / 58.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)

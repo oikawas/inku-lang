@@ -402,7 +402,11 @@ class ProductPipelineEffects:
         # Images use the requested or UI language; their source note is not a language hint.
         language = _resolve_instruction_lang("" if kind == "image" else text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
         config["language"] = language
-        if work and "saved_config" in work:
+        # A run that keeps the work's DDL keeps the definitions it was drawn
+        # with. A run that writes new DDL from the description offers the
+        # plugins enabled now, as a new work does: a plugin switched off is not
+        # written again into a work drawn from a selected one (2026-11-05).
+        if work and "saved_config" in work and kind != "description":
             catalog_context = deepcopy(work.get("macro_catalog", {}))
         else:
             catalog = resolve_new_work_macro_catalog(self.binding, config, imported_plugins or ())

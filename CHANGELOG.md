@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: the displayed work's conditions above the canvas share one row with the Work and Lineage tabs and the revision action, so the header is lower (121px to 69px in a 1372px window). The tabs stand the row's full height with the input panel's accent underline and a hover fill; the conditions sit past a rule as small unframed "label value" text that wraps. A narrow panel puts them on their own row below the tabs.
+
 - macOS: show step names such as sketch from life, writing the instructions, and completion instead of numbered stages.
 
 - macOS: use the selected language or UI language for instructions written from an image.

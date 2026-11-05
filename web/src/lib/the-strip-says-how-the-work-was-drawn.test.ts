@@ -32,6 +32,29 @@ test('the saved-work strip retains sketch results and readable condition names',
 	assert.match(PANEL, /sketchStateShort\(statusSketchState, isJapanese\)\} \({option.text}\)/);
 });
 
+test('the strip shares the tabs\' row, and only the tabs look pressable (2026-11-05)', () => {
+	const row = PANEL.slice(PANEL.indexOf('<div class="right-tabs">'), PANEL.indexOf('{#snippet modeControl()}'));
+	// Tabs, then the work's actions, then the conditions: one row in source order.
+	const tabs = row.indexOf('class="rtab-group" role="tablist"');
+	const actions = row.indexOf('<WorkActionMenu');
+	const strip = row.indexOf('<div class="render-meta-strip" role="group"');
+	assert.ok(tabs >= 0 && tabs < actions && actions < strip, 'the row is not tabs, actions, conditions');
+	assert.equal((row.match(/role="tab" aria-selected=/g) ?? []).length, 2);
+	const css = (selector: string) => {
+		const at = PANEL.indexOf(`\t${selector} {`);
+		assert.ok(at >= 0, `${selector} has no rule`);
+		return PANEL.slice(at, PANEL.indexOf('}', at));
+	};
+	// Outside the narrow query the strip takes the rest of the row, not a row of its own.
+	assert.match(css('.render-meta-strip'), /flex: 1 1 0;/);
+	assert.match(css('.render-meta-strip'), /cursor: default;/);
+	assert.doesNotMatch(css('.render-meta-strip'), /background|border-radius/);
+	assert.doesNotMatch(PANEL, /\.render-meta-(?:strip|item)[^{]*:hover/);
+	// The tabs carry the input panel's accent underline and a hover fill.
+	assert.match(PANEL, /\.rtab\.active \{ border-bottom-color: var\(--accent\);/);
+	assert.match(PANEL, /\.rtab:hover:not\(\.active\):not\(:disabled\) \{[^}]*background: var\(--bg2\)/);
+});
+
 test('while a drawing runs, the strip keeps naming the work whose picture is on the canvas', () => {
 	const PAGE = fs.readFileSync(path.join(here, '../routes/+page.svelte'), 'utf8');
 	// Held only while the same result is on screen; a new result replaces it.

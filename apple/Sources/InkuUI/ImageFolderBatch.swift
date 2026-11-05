@@ -40,6 +40,11 @@ private struct ImageFolderJournal: Codable, Sendable {
         journal = nil; journalURL = nil; folder = ""; total = 0; completed = 0
         failed = 0; uncertain = 0; failures = []; status = ""; error = nil
     }
+    func newWork(app: AppModel) {
+        guard !running, !selecting, !app.isBusy else { return }
+        clearSelection()
+        app.newWork(resetTab: "batch_image")
+    }
 
     init() { imagePreparer = { try Self.prepareImage(at: $0) } }
     init(imagePreparer: @escaping @Sendable (URL) throws -> PreparedImageInput) { self.imagePreparer = imagePreparer }

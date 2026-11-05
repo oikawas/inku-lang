@@ -69,7 +69,8 @@ enum DrawOptionsCore {
             legacy[model] = String(value[value.index(after: colon)...])
         }
         putModel(settings.models.stage1Model, provider: "stage1_provider", model: "stage1_model")
-        putModel(preferences.visionModelReference, provider: "vision_provider", model: "vision_model")
+        putModel(preferences.visionModelReference ?? preferences.legacyImageVisionModelReference,
+                 provider: "vision_provider", model: "vision_model")
         if preferences.nextCatalogMode == "auto" { legacy["color_catalog_id"] = "auto" }
         else if let id = preferences.nextCatalogID { legacy["color_catalog_id"] = id }
         if let defaults = preferences.drawDefaults { legacy["draw_defaults"] = try object(defaults) }

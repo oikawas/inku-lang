@@ -107,6 +107,11 @@ import InkuPersistence
         let fixedWorks = try await db.libraryPage(limit: 10).items.map(\.work)
         XCTAssertEqual(fixedWorks.count, 2)
         XCTAssertTrue(fixedWorks.allSatisfy { $0.renderCanvasAspectID == "square" })
+        batch.newWork(app: app)
+        XCTAssertNil(app.displayedWork)
+        XCTAssertNil(app.selectedWorkID)
+        XCTAssertTrue(app.currentSVG.isEmpty)
+        XCTAssertFalse(batch.hasJournal)
         try png.write(to: bad)
         let portrait = try makePNG(width: 48, height: 64)
         try portrait.write(to: input.appendingPathComponent("4.png"))
@@ -115,6 +120,7 @@ import InkuPersistence
         let reopened = ImageFolderBatch(); try await reopened.select(input, app: app)
         XCTAssertEqual(reopened.completed, 2)
         app.activeDrawTab = "batch_image"
+        app.selectImageVisionModel("fixture:vision")
         app.imageCanvasID = "image"
         await reopened.run(app: app, restart: false) { _ in "fixture" }
         XCTAssertEqual(reopened.completed, 4); XCTAssertEqual(reopened.failed, 0)

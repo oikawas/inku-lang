@@ -1,4 +1,5 @@
 import SwiftUI
+import InkuHost
 
 @MainActor struct DrawDefaultsSettingsView: View {
     @Bindable var model: AppModel
@@ -6,6 +7,7 @@ import SwiftUI
     @State private var pickerTab: String?
     @State private var saved = false
     @State private var failed = false
+    @State private var providers: [ProviderSettings] = []
     private let tabs = ["describe", "image", "batch_text", "batch_image"]
     static func optionKeys(tab: String) -> [String] {
         let image = tab == "image" || tab == "batch_image"
@@ -37,8 +39,6 @@ import SwiftUI
     }
     var body: some View {
         Section {
-            Text(copy("drawDefaultsHint", "新規作成で使う条件をタブごとに設定します。"))
-                .foregroundStyle(.secondary)
             ForEach(tabs, id: \.self) { tab in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(tabTitle(tab)).inkuFont(14, weight: .semibold)
@@ -71,7 +71,7 @@ import SwiftUI
                     HStack {
                         Text(imageTab(tab) ? copy("drawDefaultsVision", "画像を読むモデル") : copy("drawDefaultsModel", "描画モデル"))
                         Spacer()
-                        Text((imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1) ?? "")
+                        Text(modelName((imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1) ?? ""))
                             .foregroundStyle(.secondary)
                         Button(copy("editButton", "変更")) { pickerTab = tab }
                     }
@@ -85,6 +85,7 @@ import SwiftUI
             if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
         }
         .onAppear { draft = model.drawDefaults }
+        .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
         .sheet(isPresented: Binding(get: { pickerTab != nil }, set: { if !$0 { pickerTab = nil } })) {
             if let tab = pickerTab {
                 BatchModelPickerView(model: model, initialReference: imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1,
@@ -95,6 +96,9 @@ import SwiftUI
                     })
             }
         }
+    }
+    private func modelName(_ reference: String) -> String {
+        ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID).displayName(reference)
     }
     private func togglePicker(_ title: String, tab: String, path: WritableKeyPath<DrawOptions, String>) -> some View {
         Picker(title, selection: binding(tab, path)) {

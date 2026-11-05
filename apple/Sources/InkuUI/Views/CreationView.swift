@@ -29,14 +29,16 @@ private struct CanvasHeaderTab: View {
     let compact: Bool
     let action: () -> Void
     @State private var hovered = false
+    @Environment(\.isEnabled) private var isEnabled
     var body: some View {
         Button(action: action) {
-            Text(title).inkuFont(13, weight: selected ? .semibold : .regular)
+            Text(title).inkuFont(13, weight: selected ? .medium : .regular)
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
                 .padding(.horizontal, compact ? 12 : 16).frame(minHeight: 38, maxHeight: .infinity)
-                .background(hovered ? Color.primary.opacity(0.06) : Color.clear)
+                .background(hovered && !selected && isEnabled ? InkuColor.bg2 : Color.clear)
                 .overlay(alignment: .bottom) { Rectangle().fill(selected ? Color.accentColor : Color.clear).frame(height: 2) }
                 .contentShape(Rectangle())
+                .opacity(isEnabled ? 1 : 0.35)
         }.buttonStyle(.plain).onHover { hovered = $0 }
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -319,13 +321,15 @@ struct CreationView: View {
                     BatchPanelView(model: model, automation: automation, inputOnly: true,
                                    onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                                    followsLatestWork: batchWorkspace.followsLatest,
-                                   selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                                   selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
+                                   onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
                 }
                 #else
                 BatchPanelView(model: model, automation: automation, inputOnly: true,
                     onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                     followsLatestWork: batchWorkspace.followsLatest,
-                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
+                    onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
                 #endif
             } else {
                 #if os(macOS)
@@ -347,7 +351,7 @@ struct CreationView: View {
     private var imageFolderPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button(display.webCopy("clearInputBtn", "新規作成")) {
-                imageBatch.clearSelection(); model.resetDrawOptions(tab: "batch_image")
+                imageBatch.newWork(app: model); batchWorkspace.showHistory()
             }.disabled(controlsDisabled || imageBatch.selecting)
             Button(display.localized("画像フォルダを選ぶ")) {
                 let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
@@ -394,14 +398,14 @@ struct CreationView: View {
 
     private var imageInputPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Button(display.webCopy("clearInputBtn", "新規作成")) { model.newWork(); batchWorkspace.showHistory() }
+                .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(14, weight: .semibold)
             editor(text: Binding(get: { model.imageProvenance }, set: { model.setImageProvenanceFromUser($0) }),
                    readOnly: model.savedImageDDL != nil && model.imageInput == nil)
             HStack {
                 Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
                 Spacer()
-                Button(display.webCopy("clearInputBtn", "新規作成")) { model.newWork() }
-                    .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
                 Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }
@@ -718,8 +722,8 @@ struct CreationView: View {
     /// The conditions share the tabs' row above 45em, and wrap below it on narrow panels.
     private var tabsRow: some View {
         let scale = display.preferences.textScale
-        let wide = rightPanelWidth >= 45 * 13 * scale
-        let compact = rightPanelWidth < 32 * 13 * scale
+        let wide = rightPanelWidth > 45 * 13 * scale
+        let compact = !wide
         let showsMeta = workspaceWork != nil
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
@@ -733,7 +737,7 @@ struct CreationView: View {
                 .disabled(workspaceWork == nil || browsingDisabled)
                 .inkuTooltip(display.tooltip("作品の派生関係を表示"), placement: .bottom)
                 if wide && showsMeta, let work = workspaceWork {
-                    Rectangle().fill(InkuColor.border).frame(width: 1).padding(.vertical, 5)
+                    Rectangle().fill(InkuColor.border).frame(width: 1).padding(.vertical, 5).padding(.leading, 16)
                     metaStrip(work).frame(maxWidth: .infinity, alignment: .leading)
                 } else { Spacer(minLength: 0) }
             }.fixedSize(horizontal: false, vertical: true)
@@ -742,13 +746,14 @@ struct CreationView: View {
                     .overlay(alignment: .top) { Rectangle().fill(InkuColor.border).frame(height: 1) }
             }
         }
+        .padding(.horizontal, wide ? 16 : 10)
         .background(InkuColor.bg)
         .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1) }
     }
 
     private func metaStrip(_ work: SavedWork) -> some View {
-        let isImage = (workspaceContextWorkID == work.id && workspaceContext?.imageDDL != nil)
-            || (!usesBatchWork && model.selectedWorkID == work.id && model.savedImageDDL != nil)
+        let recordedState = model.workActionState(for: work)
+        let isImage = recordedState == .image || (!usesBatchWork && model.selectedWorkID == work.id && model.savedImageDDL != nil)
         let options = (try? DrawOptionsCore.recorded(work, isImage: isImage)) ?? [:]
         let naming = ModelNaming(providers: savedProviders, stageProvider: model.stageDefaultProviderID)
         let unavailable = display.webCopy("drawOptionsUnavailable", "N/A")
@@ -794,29 +799,60 @@ struct CreationView: View {
             }
             return unavailable
         }
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(display.webCopy("displayedWorkConditions", "表示中作品の条件"))
-                .inkuFont(11, weight: .medium).foregroundStyle(.secondary)
-            WrappingHStack(spacing: 12) {
-                metaField(display.label("系譜", "Lineage"),
-                          generation.map { display.label("第\($0)世代", "Gen. \($0)") }
-                            ?? (work.lineageNodeID == nil ? display.label("独立作品", "Standalone") : "…"))
-                ForEach(DrawOptionPresentation.keys(isImage: isImage), id: \.self) { key in
-                    metaField(label(key), value(key))
+        let compact = rightPanelWidth <= 32 * 13 * display.preferences.textScale
+        let outer = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2)) : AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+        let contextLayout = compact ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 1))
+        return outer {
+            contextLayout {
+                Text(display.webCopy("displayedWorkConditions", "表示中作品の条件"))
+                    .inkuFont(11).foregroundStyle(.tertiary)
+                HStack(spacing: 5) {
+                    if generation != nil || work.lineageNodeID != nil {
+                        Text(display.label("系譜", "Lineage")).inkuFont(11).foregroundStyle(.tertiary)
+                    }
+                    Text(generation.map { display.label("第\($0)世代", "Gen. \($0)") }
+                         ?? (work.lineageNodeID == nil ? display.label("独立作品", "Standalone") : "…"))
+                        .inkuFont(12).foregroundStyle(.secondary)
+                }
+            }.fixedSize()
+            WrappingHStack(spacing: 14) {
+                ForEach(DrawOptionPresentation.keys(isImage: isImage).filter {
+                    recordedState != nil || !["route", "sketch", "composition", "models"].contains($0)
+                }, id: \.self) { key in
+                    if key == "models", let models = options[key] as? [String: Any],
+                       let first = models["stage1"] as? String, let second = models["stage2"] as? String, first != second {
+                        modelMetaField(label(key), first: naming.displayName(first), second: naming.displayName(second))
+                    } else if key == "sketch", let onOff = options[key] as? String {
+                        let short = DrawPresentation.sketchShort(work.sketchState, japanese: display.preferences.language != "en")
+                        let note = DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")
+                        metaField(label(key), short + " (" + value(key) + ")", tooltip: (note.isEmpty ? short : note) + " — " + (onOff == "on" ? display.webCopy("drawDefaultsOn", "オン") : display.webCopy("drawDefaultsOff", "オフ")))
+                    } else { metaField(label(key), value(key)) }
                 }
                 metaField(display.label("サイズ", "Size"), size)
                 metaField(display.label("作成", "Created"), created)
             }
         }
-        .padding(.horizontal, 10).padding(.vertical, 5)
+        .padding(.leading, rightPanelWidth > 45 * 13 * display.preferences.textScale ? 16 : 0)
+        .padding(.vertical, 5)
         .accessibilityElement(children: .combine)
     }
 
-    private func metaField(_ label: String, _ value: String) -> some View {
+    private func metaField(_ label: String, _ value: String, tooltip: String? = nil) -> some View {
         HStack(spacing: 4) {
             Text(label).inkuFont(11).foregroundStyle(.tertiary)
-            Text(value).inkuFont(12).foregroundStyle(.secondary)
-        }.lineLimit(1).fixedSize(horizontal: true, vertical: false)
+            Text(value).inkuFont(12).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                .inkuTooltip(display.tooltipValue(tooltip ?? value))
+        }.frame(maxWidth: 280 * display.preferences.textScale, alignment: .leading)
+    }
+
+    private func modelMetaField(_ label: String, first: String, second: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(label).inkuFont(11).foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 1) {
+                metaField(display.webCopy("drawOptionsStage1Short", "解釈"), first)
+                metaField(display.webCopy("drawOptionsStage2Short", "描画"), second)
+            }
+        }.frame(maxWidth: 280 * display.preferences.textScale, alignment: .leading)
     }
 
     /// Web WorkActionMenu (header variant): editing only; viewing tools stay in the canvas toolbar.
@@ -828,6 +864,7 @@ struct CreationView: View {
                 Text(display.webCopy("workActionRefine", "推敲する")).inkuFont(12)
             }
             .buttonStyle(InkuGhostButtonStyle())
+            .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
             .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } })) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -847,6 +884,10 @@ struct CreationView: View {
         } else if workspaceWork != nil, !model.isBusy {
             Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
                 .inkuFont(11).foregroundStyle(.tertiary).lineLimit(1)
+                .padding(.horizontal, 9).padding(.vertical, 5)
+                .background(InkuColor.panel.opacity(0.94), in: Capsule())
+                .overlay(Capsule().stroke(InkuColor.border2))
+                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
         }
     }
 

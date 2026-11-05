@@ -1,10 +1,72 @@
 import Foundation
+import CoreGraphics
+import ImageIO
 import InkuHost
 import InkuPersistence
+import UniformTypeIdentifiers
 import XCTest
 @testable import InkuUI
 
 @MainActor final class DrawOptionsTests: XCTestCase {
+    func testImplicitClearsPreserveChoicesAndExplicitNewResets() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("inku-clear-choice-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let app = AppModel(databaseURL: directory.appendingPathComponent("works.sqlite"))
+        await app.initialize()
+        let service = ProviderSettings(id: "choice", baseURL: URL(string: "http://127.0.0.1:1")!, requiresAPIKey: false,
+            models: [.init(id: "drawing"), .init(id: "vision", purposes: ["vision"])])
+        try await app.updateHostSettings(HostSettings(providers: [service]))
+        app.selectNextDrawingModel("choice:drawing")
+        app.catalogID = try XCTUnwrap(app.catalogs.first { $0.id != "default" }?.id)
+        app.canvasID = try XCTUnwrap(app.canvases.first { $0.id != "square" }?.id)
+        let chosen = try XCTUnwrap(app.drawSelections["describe"])
+        await app.clearPreview()
+        XCTAssertEqual(app.drawSelections["describe"], chosen)
+        try app.applyDDLImport(DDLPackageImport.parse(Data("place one red circle at center.".utf8)))
+        XCTAssertEqual(app.drawSelections["describe"], chosen)
+        let drawn = await app.drawNewDDL("place one red circle at center.")
+        XCTAssertTrue(drawn)
+        await app.clearPreview()
+        XCTAssertEqual(app.drawSelections["describe"], chosen)
+        app.activeDrawTab = "image"
+        app.selectImageVisionModel("choice:vision"); app.catalogID = chosen.catalog.id; app.imageCanvasID = chosen.canvasAspect
+        let imageChoice = try XCTUnwrap(app.drawSelections["image"])
+        let context = try XCTUnwrap(CGContext(data: nil, width: 20, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        let png = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(png, UTType.png.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        app.setImageInput(try ImageInput.prepare(png as Data), fileName: "test.png")
+        XCTAssertEqual(app.drawSelections["image"], imageChoice)
+        app.newWork()
+        XCTAssertEqual(app.drawSelections["image"], app.drawDefaults["image"])
+    }
+
+    func testLegacyVisionMigratesBeforeOldKeyIsRemoved() throws {
+        let data = Data(#"{"visionModelReference":"old:vision"}"#.utf8)
+        let decoded = try DisplayPreferences.decodeInterfaceFile(data)
+        XCTAssertEqual(decoded.auxiliaryVisionModelReference, "old:vision")
+        let beforeSave = decoded.forPersistence()
+        XCTAssertNil(beforeSave.visionModelReference)
+        XCTAssertEqual(beforeSave.legacyImageVisionModelReference, "old:vision")
+        let reopened = try DisplayPreferences.decodeInterfaceFile(JSONEncoder().encode(beforeSave))
+        XCTAssertEqual(reopened.legacyImageVisionModelReference, "old:vision")
+        let already = try DisplayPreferences.decodeInterfaceFile(Data(#"{"visionModelReference":"old:vision","auxiliaryVisionModelReference":"new:vision"}"#.utf8))
+        XCTAssertEqual(already.auxiliaryVisionModelReference, "new:vision")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("inku-vision-migration-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("interface.json")
+        try data.write(to: file)
+        let display = DisplaySettings(); display.connect(directory: directory)
+        display.preferences.drawDefaults = DrawOptionsCore.release
+        // The persisted snapshot is exposed for a deterministic check of the key migration.
+        let snapshot = display.preferences.forPersistence()
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as? [String: Any])
+        XCTAssertNil(object["visionModelReference"])
+        XCTAssertEqual(object["auxiliaryVisionModelReference"] as? String, "old:vision")
+    }
     func testCoreKeysReachStripRecordedSelectionSettingsAndReset() throws {
         let keys = Set(DrawOptionsCore.keys)
         XCTAssertEqual(Set(DrawOptionPresentation.keys(isImage: false)), keys)

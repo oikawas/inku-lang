@@ -193,13 +193,14 @@ public final class AutomationModel {
     public var observedRow: BatchRow? { rows.first { $0.id == observedRowID } }
     public var uncertainCount: Int { rows.filter { $0.state == .uncertain }.count }
     public var canResume: Bool { rows.contains { [.waiting, .failed, .uncertain].contains($0.state) } }
-    public func newBatch(app: AppModel) async {
-        guard !isOccupied, !app.isBusy else { return }
+    @discardableResult public func newBatch(app: AppModel) async -> Bool {
+        guard !isOccupied, !app.isBusy else { return false }
         do {
             try await store?.clear()
             rows = []; journal = nil; batchConditions = nil; observedRowID = nil; observedWork = nil
-            batchText = ""; app.resetDrawOptions(tab: "batch_text")
-        } catch { errorText = error.localizedDescription }
+            batchText = ""; app.newWork(resetTab: "batch_text")
+            return true
+        } catch { errorText = error.localizedDescription; return false }
     }
     /// Web `canRetryFailures`: a stopped batch with failed rows can draw those rows alone again.
     public var canRetryFailures: Bool { !running && !preparing && failedCount > 0 }

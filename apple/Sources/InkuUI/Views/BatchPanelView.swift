@@ -10,6 +10,7 @@ struct BatchPanelView: View {
     var followsLatestWork = true
     var selectedRowID: String? = nil
     var observationRevision: Binding<UUID>? = nil
+    var onNewBatch: () -> Void = {}
     @State private var rowObservationID = UUID()
     @State private var replaceBatch = false
     @State private var clearResume = false
@@ -82,10 +83,10 @@ struct BatchPanelView: View {
         .clipped()
         .confirmationDialog(model.display.webCopy("batchClearResumeConfirm", "中断したバッチを再開できなくなります。"),
                             isPresented: $clearResume, titleVisibility: .visible) {
-            Button(model.display.webCopy("clearInputBtn", "新規作成"), role: .destructive) { Task { await automation.newBatch(app: model) } }
+            Button(model.display.webCopy("clearInputBtn", "新規作成"), role: .destructive) { clearBatch() }
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         }
-        .confirmationDialog(model.display.localized("前回のバッチ記録を新しいバッチで置き換えます"),
+        .confirmationDialog(model.display.label("前回のバッチ記録を置き換えます", "Replace the previous batch record"),
                             isPresented: $replaceBatch, titleVisibility: .visible) {
             Button(model.display.webCopy("batchNewRunBtn", "バッチを描く")) { startNewBatch() }
                 .disabled(!canStartNewBatch)
@@ -175,7 +176,7 @@ struct BatchPanelView: View {
                     if !automation.running {
                         Button(model.display.webCopy("clearInputBtn", "新規作成")) {
                             if automation.canResume { clearResume = true }
-                            else { Task { await automation.newBatch(app: model) } }
+                            else { clearBatch() }
                         }
                             .buttonStyle(InkuGhostButtonStyle())
                             .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
@@ -361,6 +362,10 @@ struct BatchPanelView: View {
     private func startNewBatch() {
         guard canStartNewBatch else { return }
         Task { await automation.startBatch(app: model) }
+    }
+
+    private func clearBatch() {
+        Task { if await automation.newBatch(app: model) { onNewBatch() } }
     }
 
     private var resultSummary: some View {

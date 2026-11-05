@@ -568,7 +568,7 @@ public final class AppModel {
         if let id = executionID { recordDrawingLog(executionID: id) }
     }
 
-    public func selectWork(_ work: SavedWork) async {
+    public func selectWork(_ work: SavedWork, adoptDrawOptions: Bool = true) async {
         guard !isBrowsingLocked else { return }
         if !backgroundDrawing {
             providerProgress = nil
@@ -609,7 +609,7 @@ public final class AppModel {
             imageProvenanceTyped = false
             let recordedTab = context.imageDDL == nil ? "describe" : "image"
             let recordedOptions = try DrawOptionsCore.recorded(work, isImage: context.imageDDL != nil)
-            drawSelections[recordedTab] = try DrawOptionsCore.forRecorded(recordedOptions, tab: recordedTab, defaults: drawDefaults)
+            if adoptDrawOptions { drawSelections[recordedTab] = try DrawOptionsCore.forRecorded(recordedOptions, tab: recordedTab, defaults: drawDefaults) }
             if context.imageDDL != nil {
                 imageInput = nil; imageFileName = ""; imageProvenance = context.imageProvenance ?? ""
                 inputMode = "image"
@@ -629,7 +629,7 @@ public final class AppModel {
             eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
-            if let recorded = try? DrawOptionsCore.recorded(work, isImage: false),
+            if adoptDrawOptions, let recorded = try? DrawOptionsCore.recorded(work, isImage: false),
                let options = try? DrawOptionsCore.forRecorded(recorded, tab: "describe", defaults: drawDefaults) {
                 drawSelections["describe"] = options
             }
@@ -974,8 +974,8 @@ public final class AppModel {
 
     public func clearPreview() async {
         guard !isBusy else { return }
-        if let selectedWork { await selectWork(selectedWork) }
-        else { newWork() }
+        if let selectedWork { await selectWork(selectedWork, adoptDrawOptions: false) }
+        else { clearWorkOutput() }
     }
 
     public func savePreview() async {
@@ -1075,7 +1075,7 @@ public final class AppModel {
         guard !isBusy, let bootstrap else { throw HostError("ddl_import_busy_or_unavailable") }
         let language = value.language ?? instructionLanguage(for: value.source)
         let catalog = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
-        newWork()
+        clearWorkOutput()
         importedDDL = value; importedMacroNames = value.names
         inputMode = "ddl"; ddlText = value.source
         macroDiagnostics = try Self.pretty(catalog.data)
@@ -1139,7 +1139,7 @@ public final class AppModel {
     public func setImageInput(_ image: PreparedImageInput, fileName: String, automaticProvenance: String = "") {
         let typed = imageProvenanceTyped && !imageProvenance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? imageProvenance : nil
-        if selectedWork != nil { newWork(); inputMode = "image" }
+        if selectedWork != nil { clearWorkOutput(); inputMode = "image" }
         imageProvenance = typed ?? automaticProvenance
         imageProvenanceTyped = typed != nil
         imageInput = image; imageFileName = fileName
@@ -2040,14 +2040,19 @@ public final class AppModel {
         guard !isBusy else { return }
         let description = descriptionText, mode = inputMode
         let ddl = selectedWork.map { ddlBoxText(for: $0) } ?? ddlText
-        let options = currentDrawOptions, sketch = sketchText
-        newWork()
-        descriptionText = description; ddlText = ddl; inputMode = mode; currentDrawOptions = options; sketchText = sketch
+        let sketch = sketchText
+        clearWorkOutput()
+        descriptionText = description; ddlText = ddl; inputMode = mode; sketchText = sketch
     }
 
-    public func newWork() {
+    public func newWork(resetTab: String? = nil) {
         guard !isBusy else { return }
-        resetDrawOptions(tab: activeDrawTab)
+        resetDrawOptions(tab: resetTab ?? activeDrawTab)
+        clearWorkOutput()
+    }
+
+    private func clearWorkOutput() {
+        guard !isBusy else { return }
         backgroundDrawing = false
         displayToken = UUID()
         library.clearSelectedAnnotation()

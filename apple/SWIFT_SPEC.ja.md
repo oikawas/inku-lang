@@ -6,7 +6,7 @@ macOS の履歴帯は矢印キーでページをまたいで移動し、キャ�
 
 キャンバス上部は作品・系譜のタブの横に表示中作品の条件を入力欄の順に示し、狭い幅では帯を下へ折り返す。記録の無い値は N/A とし、画像作品には描き方・写生・構図を出さない。推敲メニューは作品の右上に重ねる。
 
-最終更新: 2026-10-23。
+最終更新: 2026-11-05。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版とBuild番号は`apple/VERSION`・`apple/BUILD_NUMBER`を下限としてServer／Webとは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -806,7 +806,7 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 ### 制作と保存作品の表示
 
-制作画面は左に記述／直接DDLと次に描く条件、右に表示中作品の条件と作品／系譜canvasを置く。生成／停止は入力のscroll領域の外へ固定する。canvas下の操作列に詞書と書字方向、保存作品の星／推敲印／書出し印、full hashコピー、再現比較、生成情報、歳時記、書出し、clipboard、presentationを置く。表示中作品の写生と指示書はcanvas下に表示し、写生編集・DDL編集・指示書からの描画はその保存作品を対象とする。写生の開閉はlocal表示設定に保存する。狭い幅では縦配置へ切り替える。保存作品のmodel、色catalog、用紙、サイズはcompactな要約と詳細popoverで読み、次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。「用紙に合わせる」はzoomと移動を初期位置へ戻す。
+制作画面は左に記述／直接DDLと次に描く条件、右に表示中作品の条件と作品／系譜canvasを置く。生成／停止は入力のscroll領域の外へ固定する。canvas下の操作列に詞書と書字方向、保存作品の星／推敲印／書出し印、full hashコピー、再現比較、生成情報、歳時記、書出し、clipboard、presentationを置く。表示中作品の写生と指示書はcanvas下に表示し、写生は読み取り専用で、DDL編集・指示書からの描画はその保存作品を対象とする。写生の開閉はlocal表示設定に保存する。狭い幅では縦配置へ切り替える。保存作品のmodel、色catalog、用紙、サイズはcompactな要約と詳細popoverで読み、次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。「用紙に合わせる」はzoomと移動を初期位置へ戻す。
 
 制作画面で登録済みのserviceと描画modelを選択する。設定したmodelと明示取得したmodel一覧を表示し、一覧取得は利用者のbutton操作だけで始める。選択した次のmodelは記述解釈と構造化の両段へ渡し、設定画面の保存defaultや親作品のmodelを書き換えない。新しい生成要求・推敲・比較の初期選択は次のmodelを使い、開始済みbatch／demoのmodelはそのsnapshotへ固定する。未接続時はモデル設定へ案内する。
 

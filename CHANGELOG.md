@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: show a readable reason when importing instructions in the new instruction editor fails.
+
 - macOS: DB v9 replaces duplicate saved data with digests and compacts the database. Drawing logs for failed or stopped executions without a saved effect are removed during migration.
 
 - Web: reduce requests during execution and cancel the previous work's requests when switching works. Show lineage thumbnails in groups of 200, with Show more for the rest. Pause periodic history refreshes while the page is hidden or filters are active.

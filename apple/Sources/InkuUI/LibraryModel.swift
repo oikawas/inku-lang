@@ -106,7 +106,7 @@ public final class LibraryModel {
                 page = (startOffset + page * oldValue) / pageSize
                 startOffset = 0
                 // While the opening reads the work's place, its own read follows with this size.
-                if positioning == nil { scheduleRefresh() }
+                if positioning == nil { scheduleRefresh(refreshLineage: false) }
             }
         }
     }
@@ -282,7 +282,7 @@ public final class LibraryModel {
         lineageIncludeID = nil
         if timelinePlace != nil { timelinePlace?.page = 0; timelinePlace?.startOffset = 0 }
         selectedIDs.removeAll()
-        scheduleRefresh()
+        scheduleRefresh(refreshLineage: false)
     }
 
     /// Display changes retain checked works. Web `setHistoryDisplayMode` / `selectHistoryManagerTab`: a lineage view
@@ -315,8 +315,7 @@ public final class LibraryModel {
         if readScheduled { readScheduled = false }
     }
 
-    /// A pending read that replaces another keeps its lineage reload: a new page size right after a filter change
-    /// still reloads the lineage.
+    /// A pending read that replaces another keeps its lineage reload, even if the newer request does not need one.
     private func scheduleRefresh(refreshLineage: Bool = true) {
         expandedGroups.removeAll()
         groupMembers.removeAll()

@@ -27,7 +27,7 @@ test('T-296: saved child focus clears a hiding filter before canvas and lineage 
 		fetchOffset: async (_offset, options) => {
 			attempts += 1;
 			order.push(`fetch:${options?.anchorId}`);
-			return attempts > 1;
+			return attempts > 1 ? 'found' : 'missing';
 		},
 		filtered: () => true,
 		clearFilters: () => order.push('clear'),

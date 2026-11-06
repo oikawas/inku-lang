@@ -291,6 +291,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		const target = refinementTarget();
 		const source = target.source;
 		const r = await work.paintOne(source, {
+			detached: true,
 			historyInput: source,
 			sourceText: source,
 			saveHistory: false,

@@ -59,6 +59,7 @@ export type FetchHistoryOptions = {
 	preserveSelection?: boolean;
 	anchorId?: string;
 };
+export type FetchHistoryResult = 'found' | 'missing' | 'superseded' | 'failed';
 
 /**
  * Route-instance owner for the history strip and its manager coordination.
@@ -188,11 +189,11 @@ export class HistoryBrowsingState {
 		this.total = 0;
 		const request = this.fetchRequest + 1;
 		const loaded = await this.fetchOffset(0, { preserveSelection: true });
-		if (request === this.fetchRequest) this.searchFailed = !loaded;
-		return loaded;
+		if (request === this.fetchRequest) this.searchFailed = loaded === 'failed';
+		return loaded === 'found';
 	}
 
-	async fetchOffset(offset: number, options: FetchHistoryOptions = {}): Promise<boolean> {
+	async fetchOffset(offset: number, options: FetchHistoryOptions = {}): Promise<FetchHistoryResult> {
 		if (!this.deps.signedIn()) {
 			this.fetchRequest += 1;
 			this.fetchController?.abort();
@@ -201,7 +202,7 @@ export class HistoryBrowsingState {
 			this.items = [];
 			this.total = 0;
 			this.offset = 0;
-			return false;
+			return 'failed';
 		}
 		const safeOffset = Math.max(0, offset);
 		// A request number protects the four strip quantities as one answer.
@@ -241,7 +242,8 @@ export class HistoryBrowsingState {
 			const response = await this.deps.apiFetch(`/api/history?${params.toString()}`, {
 				signal: controller.signal
 			});
-			if (requestId !== this.fetchRequest || !response.ok) return false;
+			if (requestId !== this.fetchRequest) return 'superseded';
+			if (!response.ok) return 'failed';
 			const data = await response.json() as {
 				items: HistoryItem[];
 				total: number;
@@ -256,7 +258,7 @@ export class HistoryBrowsingState {
 				? data.items.slice(0, this.windowSize)
 				: data.items;
 			// Keep the identity check adjacent to the state write it protects.
-			if (requestId !== this.fetchRequest) return false;
+			if (requestId !== this.fetchRequest) return 'superseded';
 			this.items = stripItems;
 			this.total = data.total;
 			this.offset = resolvedOffset;
@@ -279,11 +281,10 @@ export class HistoryBrowsingState {
 					this.deps.managerPageSize()
 				);
 			}
-			return options.anchorId
-				? this.cursor >= 0 && this.items[this.cursor]?.id === options.anchorId
-				: true;
+			return options.anchorId && !(this.cursor >= 0 && this.items[this.cursor]?.id === options.anchorId)
+				? 'missing' : 'found';
 		} catch {
-			return false;
+			return requestId !== this.fetchRequest || controller.signal.aborted ? 'superseded' : 'failed';
 		} finally {
 			if (requestId === this.fetchRequest) {
 				this.fetchInFlight = 0;
@@ -309,12 +310,8 @@ export class HistoryBrowsingState {
 		}
 		this.cursor = -1;
 		let found = await this.fetchOffset(0, { anchorId: item.id });
-		if (requestId !== this.selectionRequest) {
-			const current = this.deps.currentItem();
-			if (current) void this.syncToItem(current);
-			return;
-		}
-		if (!found && this.filtered) {
+		if (requestId !== this.selectionRequest) return;
+		if (found === 'missing' && this.filtered) {
 			// All strip filters come off together because the missing response
 			// does not say which independent mark hid the current work.
 			const clearedStarred = this.starredOnly;
@@ -325,12 +322,8 @@ export class HistoryBrowsingState {
 			else this.deps.onOtherFilterCleared();
 			found = await this.fetchOffset(0, { anchorId: item.id });
 		}
-		if (requestId !== this.selectionRequest) {
-			const current = this.deps.currentItem();
-			if (current) void this.syncToItem(current);
-			return;
-		}
-		if (!found) this.cursor = -1;
+		if (requestId !== this.selectionRequest) return;
+		if (found === 'missing') this.cursor = -1;
 	}
 
 	async fetchTrashPage(): Promise<void> {
@@ -408,13 +401,13 @@ export class HistoryBrowsingState {
 	async move(button: HistoryNavButton): Promise<HistoryItem | null> {
 		const target = historyNavTarget(this.navState, button);
 		if (!target) return null;
-		if (target.offset !== this.offset && !(await this.fetchOffset(target.offset))) return null;
+		if (target.offset !== this.offset && (await this.fetchOffset(target.offset)) !== 'found') return null;
 		return this.select(this.indexOf(target));
 	}
 
 	async movePage(button: HistoryPageButton): Promise<HistoryItem | null> {
 		const target = historyPageTarget(this.navState, button);
-		if (!target || !(await this.fetchOffset(target.offset))) return null;
+		if (!target || (await this.fetchOffset(target.offset)) !== 'found') return null;
 		return this.select(this.indexOf(target));
 	}
 
@@ -422,7 +415,7 @@ export class HistoryBrowsingState {
 		if (!Number.isFinite(page) || this.navState.busy || this.navState.locked || this.total <= 0) return null;
 		const targetPage = Math.max(1, Math.min(Math.trunc(page), this.totalPages));
 		const offset = (targetPage - 1) * Math.max(1, this.windowSize);
-		if (offset === this.offset || !(await this.fetchOffset(offset))) return null;
+		if (offset === this.offset || (await this.fetchOffset(offset)) !== 'found') return null;
 		return this.select(0);
 	}
 

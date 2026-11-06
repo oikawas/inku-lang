@@ -106,8 +106,6 @@
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
 	import { batchFailureReportStore } from '$lib/features/batch/failure-report.svelte';
 	import {
-		CANVAS_ASPECT_PLUGIN_ID,
-		DEFAULT_CANVAS_ASPECT_ID,
 		canvasAspectOptions as readCanvasAspectOptions,
 		getCanvasAspectOption,
 		installCanvasFormatRegistry,
@@ -226,7 +224,6 @@
 	let userMenuOpen = $state(false);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
-	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let canvasAspectOptions = $state<CanvasAspectOption[]>(readCanvasAspectOptions());
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let instructionCaptionVisible = $state(true);
@@ -593,6 +590,8 @@
 		apiFetch,
 		currentUser: () => session.currentUser,
 		setCurrentUser: (actor) => session.setCurrentUser(actor),
+		beginSettingsUpdate: () => session.beginSettingsUpdate(),
+		acceptSettingsUpdate: (token, actor) => session.acceptSettingsUpdate(token, actor),
 		loadAvailableModels,
 		refreshCurrentUserSettings: () => session.refreshCurrentUserSettings(),
 		loadExportTemplates,
@@ -685,22 +684,24 @@
 	async function saveDrawDefaults(defaults: DrawDefaults): Promise<void> {
 		const user = session.currentUser;
 		if (!user) throw new Error('not signed in');
+		const token = session.beginSettingsUpdate();
 		const response = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ model_settings: { draw_defaults: defaults } }) });
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		const updated = await response.json() as UserItem;
 		if (session.currentUser?.id !== user.id) throw new Error('account changed');
-		session.setCurrentUser(updated);
+		session.acceptSettingsUpdate(token, updated);
 		if (updated.model_settings?.draw_defaults) work.setDrawDefaults(user.id, updated.model_settings.draw_defaults);
 	}
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
 		instructionCaptionVisible = visible;
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { instruction_caption_visible: visible } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save instruction caption setting', e); }
 	}
 
@@ -710,6 +711,7 @@
 		const previous = okugakiModel;
 		okugakiModel = nextModel;
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -717,7 +719,7 @@
 				body: JSON.stringify({ model_settings: { okugaki_provider: provider, okugaki_model: model.trim() } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) {
 			okugakiModel = previous;
 			console.warn('failed to save okugaki model', e);
@@ -733,6 +735,7 @@
 		visionProvider = provider;
 		visionModel = model;
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -740,7 +743,7 @@
 				body: JSON.stringify({ model_settings: { vision_provider: provider, vision_model: model } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) {
 			visionProvider = prevProvider;
 			visionModel = prevModel;
@@ -797,34 +800,13 @@
 		}
 	}
 
-	async function loadPluginStorage() {
-		if (!session.currentUser) {
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			return;
-		}
-		try {
-			const r = await apiFetch('/api/auth/me/plugin-storage', { cache: 'no-store' });
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { storage?: Record<string, unknown> };
-			const canvasValue = data.storage?.[CANVAS_ASPECT_PLUGIN_ID] as { selected?: unknown; enabled?: unknown } | undefined;
-			canvasAspectId = canvasValue?.enabled === false
-				? DEFAULT_CANVAS_ASPECT_ID
-				: normalizeCanvasAspectId(canvasValue?.selected);
-		} catch (e) {
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			console.warn('failed to load plugin storage', e);
-		}
-	}
-
 	async function loadCanvasFormats(): Promise<void> {
 		try {
 			const response = await apiFetch('/api/pipeline/canvas-formats', { cache: 'no-store' });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			canvasAspectOptions = installCanvasFormatRegistry(await response.json() as CanvasFormatRegistryResponse);
-			canvasAspectId = normalizeCanvasAspectId(canvasAspectId);
 		} catch (error) {
 			canvasAspectOptions = readCanvasAspectOptions();
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			console.warn('failed to load canvas formats', error);
 		}
 	}
@@ -840,12 +822,12 @@
 		if (nextAspectId === currentAspectId) {
 			return;
 		}
+		work.invalidateWorkOptions();
 		const existingPending = work.pendingCanvasAspectDerivation;
 		const parentNodeId = existingPending?.parentNodeId ?? await ensureVisibleLineageParentId();
 		work.pendingCanvasAspectDerivation = parentNodeId
 			? { parentNodeId, fromAspectId: existingPending?.fromAspectId ?? currentAspectId, toAspectId: nextAspectId }
 			: null;
-		canvasAspectId = nextAspectId;
 		work.drawOptions.canvas_aspect = nextAspectId;
 		outputTab = 'canvas';
 		canvasViewport.fit();
@@ -940,6 +922,7 @@
 		if (!session.currentUser) return;
 		const previousUser = session.currentUser;
 		const userId = previousUser.id;
+		const token = session.beginSettingsUpdate();
 		try {
 		await loadModelReferences([{action: 'split_ref', ref: okugakiModel}]);
 		// What the page owns; the features add their own fields to the save.
@@ -972,15 +955,19 @@
 					? { ...actor.model_settings, ui_text_size: textSizeSettings.step }
 					: actor.model_settings
 			};
-			session.setCurrentUser(actorWithTextSizePreview);
-			applyUserModelSettings(actorWithTextSizePreview, { excludeUserSettingIds: ['text-size'] });
+			if (session.acceptSettingsUpdate(token, actorWithTextSizePreview)) applyUserModelSettings(actorWithTextSizePreview, { excludeUserSettingIds: ['text-size'] });
 		} catch (e) {
 			if (session.currentUser?.id === userId) {
 				session.setCurrentUser({
-					...previousUser,
-					model_settings: previousUser.model_settings
-						? { ...previousUser.model_settings, ui_text_size: textSizeSettings.step }
-						: previousUser.model_settings
+					...session.currentUser,
+					model_settings: previousUser.model_settings && session.currentUser.model_settings
+						? { ...session.currentUser.model_settings,
+							stage1_provider: previousUser.model_settings.stage1_provider, stage1_model: previousUser.model_settings.stage1_model,
+							stage2_provider: previousUser.model_settings.stage2_provider, stage2_model: previousUser.model_settings.stage2_model,
+							vision_provider: previousUser.model_settings.vision_provider, vision_model: previousUser.model_settings.vision_model,
+							okugaki_provider: previousUser.model_settings.okugaki_provider, okugaki_model: previousUser.model_settings.okugaki_model,
+							instruction_caption_visible: previousUser.model_settings.instruction_caption_visible, ui_text_size: textSizeSettings.step }
+						: session.currentUser.model_settings
 				});
 			}
 			console.warn('failed to update model selection', e);
@@ -989,6 +976,7 @@
 
 	async function confirmModelSelection() {
 		if (modelSelectionForDrawing) {
+			work.invalidateWorkOptions();
 			if (modelSelectionVisionOnly) work.drawOptions.models.vision = qualifiedModelRef(visionProvider, visionModel);
 			else work.drawOptions.models.stage1 = work.drawOptions.models.stage2 = qualifiedModelRef(stage1Provider, stage1Model);
 			restoreModelSelection();
@@ -1019,6 +1007,7 @@
 	}
 
 	function persistSelectedCatalog() {
+		if (work.tabCatalogSelection() !== colorCatalogSettings.selected) work.invalidateWorkOptions();
 		work.drawOptions.catalog.mode = colorCatalogSettings.selected === AUTO_CATALOG_ID ? 'auto' : 'fixed';
 		if (colorCatalogSettings.selected !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = colorCatalogSettings.selected;
 	}
@@ -1027,10 +1016,11 @@
 	// so a browser-wide value would only ever be the wrong user's.
 	async function persistColorCatalogSelection(selected: string) {
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { color_catalog_id: selected } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save color catalog selection', e); }
 	}
 	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
@@ -1041,10 +1031,11 @@
 	// state, and refolding it under them would be worse than forgetting it.
 	async function persistDescribePanelFolds(fields: Record<string, boolean>) {
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save describe panel folds', e); }
 	}
 	bindDescribePanelPersist((fields) => { void persistDescribePanelFolds(fields); });
@@ -1052,10 +1043,11 @@
 	// the choice as the user just made it.
 	async function persistGenerationInfoSettings(fields: Record<string, boolean>) {
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save generation info settings', e); }
 	}
 	bindGenerationInfoSettingsPersist((fields) => { void persistGenerationInfoSettings(fields); });
@@ -1067,6 +1059,7 @@
 		if (!userId) return;
 		captionSettingsWrite = captionSettingsWrite.then(async () => {
 			if (session.currentUser?.id !== userId) return;
+			const token = session.beginSettingsUpdate();
 			try {
 				const response = await apiFetch('/api/auth/me/settings', {
 					method: 'PATCH',
@@ -1075,13 +1068,14 @@
 				});
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
 				const actor = await response.json() as UserItem;
-				if (session.currentUser?.id === userId) session.setCurrentUser(actor);
+				session.acceptSettingsUpdate(token, actor);
 			} catch (cause) { console.warn('failed to save headnote direction', cause); }
 		});
 	});
 	bindTextSizePersist(async (step) => {
 		const userId = session.currentUser?.id;
 		if (!userId) throw new Error('No signed-in user');
+		const token = session.beginSettingsUpdate();
 		const response = await apiFetch('/api/auth/me/settings', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
@@ -1094,7 +1088,7 @@
 		if (actor.model_settings?.ui_text_size !== step) throw new Error('Text size was not persisted');
 		// Only merge this preference; another settings request may have completed
 		// while the slider save was in flight.
-		session.setCurrentUser({
+		session.acceptSettingsUpdate(token, {
 			...currentUser,
 			model_settings: { ...actor.model_settings, ...currentUser.model_settings, ui_text_size: step }
 		});
@@ -1319,7 +1313,6 @@
 			settings.loadStatus(),
 			batch.loadPromptHistory(),
 			demo.loadSettings(),
-			loadPluginStorage(),
 			loadPluginVocabulary(),
 			loadCompositionRanges(),
 			loadExportTemplates(),
@@ -1342,7 +1335,6 @@
 		demoPromptModelCatalog = [];
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 		exportTemplateStatus = null;
-		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		settings.resetForLoggedOut();
 		chatgptPlanAvailable = false;
 		modelCatalogRequest++;
@@ -1597,6 +1589,8 @@
 		stage2Model: () => splitModelReference(work.tabModelRef('stage2'), availableModelCatalog).model,
 		currentUser: () => session.currentUser,
 		setCurrentUser: (user) => session.setCurrentUser(user as UserItem),
+		beginSettingsUpdate: () => session.beginSettingsUpdate(),
+		acceptSettingsUpdate: (token, user) => session.acceptSettingsUpdate(token, user as UserItem),
 		apiFetch,
 	});
 
@@ -2010,7 +2004,7 @@ $effect(() => {
 	/** Put an opened work's choices into its tab, by the shared core's rule
 	 *  (recorded value; off for an unrecorded switch; the tab default otherwise). */
 	async function adoptWorkOptions(recorded: RecordedDrawOptions | null | undefined, tab: DrawTab): Promise<void> {
-		const sequence = work.beginWorkOptions();
+		const sequence = work.beginWorkOptions(tab);
 		if (!session.currentUser) return;
 		try {
 			const response = await apiFetch('/api/auth/me/draw-options/for-tab', {
@@ -2783,6 +2777,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:loginPassword={session.loginPassword}
 		bind:loginPasswordVisible={session.loginPasswordVisible}
 		loginStatus={session.loginStatus}
+		loggingIn={session.loggingIn}
 		connectionLost={session.connectionLost}
 		onLogin={() => session.login()}
 		appVersion={APP_VERSION}
@@ -2812,6 +2807,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		showAuxiliary={session.uiVisibility.auxiliary}
 		uiMode={session.uiMode}
 		tooltipsEnabled={session.tooltipsEnabled}
+		themeSaving={session.themeSaving}
+		tooltipsSaving={session.tooltipsSaving}
 		onSetUiMode={(mode) => void session.updateUiMode(mode)}
 		onToggleTooltips={() => void session.updateTooltipsEnabled(!session.tooltipsEnabled)}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
@@ -2848,7 +2845,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.qualified_id === work.drawOptions.models.stage1))}
 						sketchMode={work.sketchMode}
 						wild={work.drawOptions.wild === 'on'}
-						onSelectWild={(value) => (work.drawOptions.wild = value ? 'on' : 'off')}
+						onSelectWild={(value) => { if ((work.drawOptions.wild === 'on') !== value) work.invalidateWorkOptions(); work.drawOptions.wild = value ? 'on' : 'off'; }}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
 						drawRoute={work.drawRoute}
 						onSelectDrawRoute={work.selectDrawRoute}
@@ -3405,7 +3402,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				</label>
 				<div class="demo-compact-conditions">
 					<SketchSelect value={work.sketchMode} isJapanese={getLang() === 'ja'} showValue onSelect={(mode) => (work.sketchMode = mode)} />
-					<CanvasAspectPlugin selected={canvasAspectId} options={canvasAspectOptions} open={canvasAspectMenuOpen} showValue
+					<CanvasAspectPlugin selected={work.drawOptions.canvas_aspect} options={canvasAspectOptions} open={canvasAspectMenuOpen} showValue
 						onToggle={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)} onSelect={selectCanvasAspect} />
 				</div>
 			</div>

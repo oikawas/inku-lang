@@ -64,7 +64,7 @@ function harness(responder: (path: string, init?: RequestInit) => Promise<Respon
 		async fetchOffset(offset: number, options?: { anchorId?: string }) {
 			refreshes.push(`strip:${offset}:${options?.anchorId ?? ''}`);
 			if (this.cursor < 0 && this.items.length > 0) this.cursor = 0;
-			return true;
+			return 'found' as const;
 		},
 		async fetchTrashPage() { refreshes.push('trash'); }
 	};

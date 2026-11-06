@@ -85,7 +85,7 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 		currentOffset: () => 12,
 		fetchOffset: async (offset, options) => {
 			order.push(`fetch:${offset}:${options?.anchorId ?? ''}`);
-			return true;
+			return 'found';
 		},
 		clearSelection: () => order.push('clear')
 	});
@@ -139,7 +139,7 @@ test('T-292: old records preserve absent compose/sketch fields and reconcile the
 		currentOffset: () => 24,
 		fetchOffset: async (offset, options) => {
 			order.push(`fetch:${offset}:${String(options?.preserveSelection)}`);
-			return true;
+			return 'found';
 		},
 		clearSelection: () => order.push('clear')
 	});
@@ -161,7 +161,7 @@ test('a save followed by more reconciles nothing unless it fails', async () => {
 		currentOffset: () => 0,
 		fetchOffset: async (offset: number, options?: { anchorId?: string }) => {
 			order.push(`fetch:${offset}:${options?.anchorId ?? ''}`);
-			return true;
+			return 'found';
 		},
 		clearSelection: () => order.push('clear')
 	});

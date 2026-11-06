@@ -2,6 +2,7 @@ import type { ApiFetch } from '../../transport/api-fetch.ts';
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 import type {
 	FetchHistoryOptions,
+	FetchHistoryResult,
 	HistoryForRevisionProjection,
 	HistoryForShareProjection,
 	HistoryStarProjection
@@ -50,7 +51,7 @@ export type HistoryMutationBrowsing = {
 	clearForShareFilter: () => void;
 	clearSelection: () => void;
 	syncToItem: (item: Pick<HistoryItem, 'id' | 'trashed'>) => Promise<void>;
-	fetchOffset: (offset: number, options?: FetchHistoryOptions) => Promise<boolean>;
+	fetchOffset: (offset: number, options?: FetchHistoryOptions) => Promise<FetchHistoryResult>;
 	fetchTrashPage: () => Promise<void>;
 };
 

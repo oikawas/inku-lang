@@ -57,7 +57,7 @@ test('every redraw of a saved work names the work it is redrawing', () => {
 test('a redraw keeps sending the catalog id as the nameplate', () => {
 	// The colors stopped coming from it; the name did not. Dropping it here would
 	// leave the status line with nothing to show.
-	assert.match(body(coordinator, 'composeVariationCandidate'), /renderSettingsPayload\('compose', refinementRenderOverrides\(\)\)/);
+	assert.match(body(coordinator, 'composeVariationCandidate'), /renderSettingsPayload\('compose', refinementRenderOverrides\(deps\.render\.layoutWild\(\)\)\)/);
 	assert.match(body(coordinator, 'refinementRenderOverrides'), /colorCatalogOverride\(refinementCatalogId\(\)\)/);
 });
 

@@ -125,7 +125,9 @@ export function createWorkState(deps: WorkStateDeps) {
 	// Opening a work takes its recorded choices through the shared core's rule
 	// (the Server answers). Only the latest opening's answer is applied.
 	let adoptSequence = 0;
-	function beginWorkOptions(): number { return ++adoptSequence; }
+	let adoptTab: DrawTab | null = null;
+	function beginWorkOptions(tab: DrawTab): number { adoptTab = tab; return ++adoptSequence; }
+	function invalidateWorkOptions(): void { if (activeDrawTab() === adoptTab) adoptSequence += 1; }
 	function adoptWorkOptions(sequence: number, tab: DrawTab, options: DrawOptions): void {
 		if (sequence === adoptSequence) drawChoices[tab] = copyDrawOptions(options);
 	}
@@ -224,11 +226,13 @@ export function createWorkState(deps: WorkStateDeps) {
 	/** The author's choice of route. Read and draw starts with the sketch on
 	 *  (the author's answer, 2026-10-25); the current stages leave it alone. */
 	function selectDrawRoute(route: DrawRoute): void {
+		if (route !== currentOptions().route) invalidateWorkOptions();
 		if (route !== currentOptions().route) currentOptions().sketch = sketchModeForRoute(route, currentOptions().sketch);
 		currentOptions().route = route;
 	}
 
 	function selectCompositionMode(mode: CompositionMode): void {
+		if (mode !== currentOptions().composition) invalidateWorkOptions();
 		currentOptions().composition = mode;
 	}
 
@@ -621,7 +625,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			const total = fromStart ? imageFolder.pictures.length : imageFolder.pending.length;
 			if (total === 0) return;
 			lease = await startBatchLease(apiFetch, runId, '', { draw_options: choices }, total, () => imageFolder.success,
-				() => imageFolder.stop(), 'image');
+				() => { imageFolder.stop(); void imageBatchController.cancel(); }, 'image');
 			await imageFolder.run({
 				fromStart,
 				batchRunId: lease ? runId : undefined,
@@ -870,7 +874,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null; } & PaintResult> {
 		// This compatibility request starts its own execution. Its result must not
 		// be accompanied by a stopped view belonging to an earlier drawing.
-		if (!options.batchRunId) pipelineController.clear();
+		if (!options.batchRunId && !options.detached) pipelineController.clear();
 		return runCurrentWork(
 			text,
 			options,
@@ -901,7 +905,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				},
 				attachSavedLineage: () => { lineageDetached = false; },
 				updateGenerationCount: (count) => session.updateGenerationCount(count),
-				adoptPipelineView: options.batchRunId ? undefined : (view) => pipelineController.adopt(view),
+				adoptPipelineView: options.batchRunId || options.detached ? undefined : (view) => pipelineController.adopt(view),
 				setProviderAttempt: (attempt) => { activeRunAttempt = attempt; },
 				setProgress: options.onProgress ?? ((progress) => { activeRunProgress = progress; })
 			}
@@ -1048,7 +1052,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			}),
 			paintInstruction: (prompt, paintOptions) => {
 				const model = qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
-				return paintOne(prompt, { ...paintOptions, stage1Model: model, stage2Model: model });
+				return paintOne(prompt, { ...paintOptions, detached: true, stage1Model: model, stage2Model: model });
 			},
 			onLatestResult: (painted) => {
 				ddl = painted.ddl;
@@ -1569,7 +1573,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		get imageUploading() { return imageUploading; },
 		get imageRunning() { return imageRunActive || (reloading && !!(displayedHistoryItem?.image_ddl ?? result?.image_ddl)); },
 		get imageCanvasAspectId() { return currentOptions().canvas_aspect; },
-		set imageCanvasAspectId(value) { currentOptions().canvas_aspect = value; },
+		set imageCanvasAspectId(value) { if (currentOptions().canvas_aspect !== value) invalidateWorkOptions(); currentOptions().canvas_aspect = value; },
 		get drawOptions() { return currentOptions(); },
 		tabModelRef,
 		tabCatalogSelection,
@@ -1578,6 +1582,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		setDrawDefaults,
 		resetDrawDefaultsOwner: () => { defaultsOwner = null; },
 		beginWorkOptions,
+		invalidateWorkOptions,
 		adoptWorkOptions,
 		get imageBeforeReviewDdl() { return imageBeforeReviewDdl(); },
 		replayImageBeforeReview,
@@ -1616,7 +1621,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		get result() { return result; },
 		set result(value) { result = value; },
 		get sketchMode() { return currentOptions().sketch; },
-		set sketchMode(value) { currentOptions().sketch = value; },
+		set sketchMode(value) { if (currentOptions().sketch !== value) invalidateWorkOptions(); currentOptions().sketch = value; },
 		get drawRoute() { return currentOptions().route; },
 		selectDrawRoute,
 		get compositionMode() { return currentOptions().composition; },

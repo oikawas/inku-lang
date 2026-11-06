@@ -51,6 +51,8 @@ type SettingsControllerDeps<TActor extends SettingsActor> = {
 	apiFetch: ApiFetch;
 	currentUser: () => TActor | null;
 	setCurrentUser: (actor: TActor) => void;
+	beginSettingsUpdate: () => { id: number; owner: string | undefined };
+	acceptSettingsUpdate: (token: { id: number; owner: string | undefined }, actor: TActor) => boolean;
 	loadAvailableModels: () => void | Promise<void>;
 	refreshCurrentUserSettings: () => boolean | Promise<boolean>;
 	loadExportTemplates: () => void | Promise<void>;
@@ -102,6 +104,8 @@ export function createSettingsController<TActor extends SettingsActor>(
 		apiFetch: deps.apiFetch,
 		currentUser: deps.currentUser,
 		setCurrentUser: deps.setCurrentUser,
+		beginSettingsUpdate: deps.beginSettingsUpdate,
+		acceptSettingsUpdate: deps.acceptSettingsUpdate,
 		loadAvailableModels: deps.loadAvailableModels,
 		cancelModelSelection: deps.cancelModelSelection,
 		describeApiError: deps.describeApiError,

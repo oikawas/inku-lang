@@ -75,11 +75,14 @@ const RECONNECT_MS = 3000;
 
 export class SessionState {
 	private currentUserSettingsRequestId = 0;
+	private settingsWriteId = 0;
 	private deps: SessionStateDeps;
 
 	authToken = $state<string | null>(null);
 	currentUser = $state<UserItem | null>(null);
 	darkMode = $state(true);
+	themeSaving = $state(false);
+	tooltipsSaving = $state(false);
 	uiModeSaving = $state(false);
 	uiModeSaveError = $state(false);
 	historyStripFieldsSaving = $state(false);
@@ -88,6 +91,7 @@ export class SessionState {
 	loginPassword = $state('');
 	loginPasswordVisible = $state(false);
 	loginStatus = $state<string | null>(null);
+	loggingIn = $state(false);
 	/** Start-up could not reach the server; the page waits for it instead of asking to sign in. */
 	connectionLost = $state(false);
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -129,6 +133,14 @@ export class SessionState {
 	setCurrentUser(actor: UserItem | null): void {
 		this.currentUser = actor;
 	}
+	beginSettingsUpdate(): { id: number; owner: string | undefined } {
+		return { id: ++this.settingsWriteId, owner: this.currentUser?.id };
+	}
+	acceptSettingsUpdate(token: { id: number; owner: string | undefined }, actor: UserItem): boolean {
+		if (token.id !== this.settingsWriteId || !token.owner || this.currentUser?.id !== token.owner || actor.id !== token.owner) return false;
+		this.currentUser = actor;
+		return true;
+	}
 
 	updateGenerationCount(count: number): void {
 		if (this.currentUser) this.currentUser = { ...this.currentUser, image_generation_count: count };
@@ -151,6 +163,7 @@ export class SessionState {
 	}
 
 	private clearActor(): void {
+		this.settingsWriteId += 1;
 		this.authToken = null;
 		this.currentUser = null;
 		this.uiModeSaveError = false;
@@ -221,6 +234,8 @@ export class SessionState {
 	}
 
 	async login(): Promise<void> {
+		if (this.loggingIn) return;
+		this.loggingIn = true;
 		this.loginStatus = null;
 		try {
 			const response = await fetch('/api/auth/login', {
@@ -241,6 +256,8 @@ export class SessionState {
 			await this.deps.afterAuthenticated('login');
 		} catch (cause) {
 			this.loginStatus = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			this.loggingIn = false;
 		}
 	}
 
@@ -330,6 +347,7 @@ export class SessionState {
 	async updateDownloadFolder(update: { enabled?: boolean; name?: string | null }): Promise<void> {
 		if (!this.currentUser) return;
 		const previous = this.currentUser;
+		const token = this.beginSettingsUpdate();
 		const body: Record<string, unknown> = {};
 		if (update.enabled !== undefined) body.download_folder_enabled = update.enabled;
 		if (update.name !== undefined) body.download_folder_name = update.name ?? '';
@@ -349,11 +367,13 @@ export class SessionState {
 				const data = await response.json().catch(() => ({})) as { detail?: unknown };
 				throw new Error(this.deps.describeApiError(data.detail, response.status));
 			}
-			this.currentUser = await response.json() as UserItem;
-			downloadFolderSettings.applyUser(this.currentUser);
+			const actor = await response.json() as UserItem;
+			if (this.acceptSettingsUpdate(token, actor)) downloadFolderSettings.applyUser(actor);
 		} catch (cause) {
-			this.currentUser = previous;
-			downloadFolderSettings.applyUser(previous);
+			if (this.currentUser?.id === previous.id) {
+				this.currentUser = { ...this.currentUser, ...(update.enabled !== undefined ? { download_folder_enabled: previous.download_folder_enabled } : {}), ...(update.name !== undefined ? { download_folder_name: previous.download_folder_name } : {}) };
+				downloadFolderSettings.applyUser(this.currentUser);
+			}
 			console.warn('failed to update the download folder setting', cause);
 		}
 	}
@@ -369,10 +389,13 @@ export class SessionState {
 	}
 
 	async updateUiTheme(nextDarkMode: boolean): Promise<void> {
-		if (!this.currentUser) return;
+		if (!this.currentUser || this.themeSaving) return;
 		const previousDarkMode = this.darkMode;
 		const previous = this.currentUser;
+		const token = this.beginSettingsUpdate();
+		this.themeSaving = true;
 		this.darkMode = nextDarkMode;
+		this.currentUser = { ...this.currentUser, ui_theme: nextDarkMode ? 'dark' : 'light' };
 		try {
 			const response = await this.deps.apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -383,19 +406,26 @@ export class SessionState {
 				const data = await response.json().catch(() => ({})) as { detail?: unknown };
 				throw new Error(this.deps.describeApiError(data.detail, response.status));
 			}
-			this.currentUser = await response.json() as UserItem;
-			this.applyUserTheme(this.currentUser);
-			this.applyDownloadFolderSettings(this.currentUser);
+			const actor = await response.json() as UserItem;
+			if (this.acceptSettingsUpdate(token, actor)) {
+				this.applyUserTheme(actor);
+				this.applyDownloadFolderSettings(actor);
+			}
 		} catch (cause) {
-			this.currentUser = previous;
-			this.darkMode = previousDarkMode;
+			if (this.currentUser?.id === previous.id) {
+				this.currentUser = { ...this.currentUser, ui_theme: previous.ui_theme };
+				this.darkMode = previousDarkMode;
+			}
 			console.warn('failed to update UI theme', cause);
+		} finally {
+			this.themeSaving = false;
 		}
 	}
 
 	async updateUiMode(nextMode: UiMode, nextCustom: UiCustomVisibility = this.uiCustom): Promise<void> {
 		if (!this.currentUser || this.uiModeSaving) return;
 		const previous = this.currentUser;
+		const token = this.beginSettingsUpdate();
 		const normalizedCustom = nextMode === 'simple' ? {} : normalizeUiCustom(nextCustom);
 		this.uiModeSaving = true;
 		this.uiModeSaveError = false;
@@ -415,9 +445,10 @@ export class SessionState {
 			const savedCustom = normalizeUiCustom(actor.ui_custom);
 			const customMatches = UI_VISIBILITY_KEYS.every((key) => savedCustom[key] === normalizedCustom[key]);
 			if (actor.ui_mode !== nextMode || !customMatches) throw new Error('UI mode settings were not persisted by the server');
-			this.currentUser = actor;
+			this.acceptSettingsUpdate(token, actor);
 		} catch (cause) {
-			this.currentUser = previous;
+			if (this.currentUser?.id === previous.id) this.currentUser = { ...this.currentUser, ui_mode: previous.ui_mode, ui_custom: previous.ui_custom };
+			this.deps.onVisibilityChanged(this.uiVisibility);
 			this.uiModeSaveError = true;
 			console.warn('failed to update UI mode', cause);
 		} finally {
@@ -432,6 +463,7 @@ export class SessionState {
 	async updateHistoryStripFields(next: HistoryStripField[]): Promise<void> {
 		if (!this.currentUser || this.historyStripFieldsSaving) return;
 		const previous = this.currentUser;
+		const token = this.beginSettingsUpdate();
 		this.historyStripFieldsSaving = true;
 		this.historyStripFieldsSaveError = false;
 		this.currentUser = { ...this.currentUser, history_strip_fields: next };
@@ -450,9 +482,9 @@ export class SessionState {
 			if (saved.length !== next.length || saved.some((field, index) => field !== next[index])) {
 				throw new Error('history strip fields were not persisted by the server');
 			}
-			this.currentUser = actor;
+			this.acceptSettingsUpdate(token, actor);
 		} catch (cause) {
-			this.currentUser = previous;
+			if (this.currentUser?.id === previous.id) this.currentUser = { ...this.currentUser, history_strip_fields: previous.history_strip_fields };
 			this.historyStripFieldsSaveError = true;
 			console.warn('failed to update history strip fields', cause);
 		} finally {
@@ -461,8 +493,10 @@ export class SessionState {
 	}
 
 	async updateTooltipsEnabled(enabled: boolean): Promise<void> {
-		if (!this.currentUser) return;
+		if (!this.currentUser || this.tooltipsSaving) return;
 		const previous = this.currentUser;
+		const token = this.beginSettingsUpdate();
+		this.tooltipsSaving = true;
 		this.currentUser = { ...this.currentUser, tooltips_enabled: enabled };
 		try {
 			const response = await this.deps.apiFetch('/api/auth/me/settings', {
@@ -476,10 +510,12 @@ export class SessionState {
 			}
 			const actor = await response.json() as UserItem;
 			if (actor.tooltips_enabled !== enabled) throw new Error('Tooltip settings were not persisted by the server');
-			this.currentUser = actor;
+			this.acceptSettingsUpdate(token, actor);
 		} catch (cause) {
-			this.currentUser = previous;
+			if (this.currentUser?.id === previous.id) this.currentUser = { ...this.currentUser, tooltips_enabled: previous.tooltips_enabled };
 			console.warn('failed to update tooltip settings', cause);
+		} finally {
+			this.tooltipsSaving = false;
 		}
 	}
 }

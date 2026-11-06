@@ -1224,7 +1224,15 @@ pub struct SaijikiDerivedProjection {
 pub fn saijiki_derived_projection(
     language: ResolvedInstructionLanguage,
 ) -> Result<SaijikiDerivedProjection, SaijikiProjectionError> {
-    saijiki_derived_projection_from_asset(saijiki_asset(), language)
+    static JA: OnceLock<Result<SaijikiDerivedProjection, SaijikiProjectionError>> = OnceLock::new();
+    static EN: OnceLock<Result<SaijikiDerivedProjection, SaijikiProjectionError>> = OnceLock::new();
+    let cache = match language {
+        ResolvedInstructionLanguage::Ja => &JA,
+        ResolvedInstructionLanguage::En => &EN,
+    };
+    cache
+        .get_or_init(|| saijiki_derived_projection_from_asset(saijiki_asset(), language))
+        .clone()
 }
 
 /// Return neutral physical descriptions for prompt-visible tools in asset order.

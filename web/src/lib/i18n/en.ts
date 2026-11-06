@@ -1633,6 +1633,7 @@ export const en: LangPack = {
 	historyLineageForRevisionCount: (n) => `${groupDigits(n)} revision mark${n === 1 ? '' : 's'}`,
 	historyCurrentLineage: 'Lineage of the displayed work',
 	historyLineageExpand: 'Show works',
+	historyLineageShowMore: 'Show more',
 	historyLineageCollapse: 'Collapse',
 	historySelectLineage: 'Select this lineage',
 	historySelectItem: (selected) => selected ? 'deselect work' : 'select work',

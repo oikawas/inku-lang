@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: show lineage thumbnails in groups of 200, revealing more with Show more or the arrow keys.
+
 - Server: add a batch-run ID filter to the history API for reconciling the caller's own works.
 
 - Core: reduce repeated calculations and quadratic work without changing drawing or request output.

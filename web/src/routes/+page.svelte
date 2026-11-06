@@ -3598,6 +3598,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{#await import('$lib/components/HistoryManager.svelte') then { default: HistoryManager }}
 		<HistoryManager
 			active={historyManager.open}
+			historyDisplayMode={historyManager.displayMode}
+			onDisplayModeChange={historyManager.setDisplayMode}
 			{singleUserMode}
 			historyManagerLoadFailed={historyManager.loadFailed}
 			onRetryLoad={historyManager.retry}

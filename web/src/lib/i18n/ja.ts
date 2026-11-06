@@ -1631,6 +1631,7 @@ export const ja: LangPack = {
 	historyLineageForRevisionCount: (n) => `推敲マーク ${groupDigits(n)}件`,
 	historyCurrentLineage: '表示中作品の系譜',
 	historyLineageExpand: '作品を表示',
+	historyLineageShowMore: 'もっと見る',
 	historyLineageCollapse: '閉じる',
 	historySelectLineage: 'この系譜をすべて選択',
 	historySelectItem: (selected) => selected ? '作品の選択を解除' : '作品を選択',

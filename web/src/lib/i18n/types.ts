@@ -1441,6 +1441,7 @@ export interface LangPack {
 	historyLineageStarCount: (n: number) => string;
 	historyCurrentLineage: string;
 	historyLineageExpand: string;
+	historyLineageShowMore: string;
 	historyLineageCollapse: string;
 	historySelectLineage: string;
 	historySelectItem: (selected: boolean) => string;

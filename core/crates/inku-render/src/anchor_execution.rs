@@ -1410,11 +1410,14 @@ impl Execution<'_> {
             }
             // Execution order may differ from drawing order; legacy predecessor
             // relations still receive their original predecessors, never future nodes.
-            let previous = self.sources[..index]
+            let mut previous = self.sources[..index]
                 .iter()
-                .flat_map(|source| &source.performed)
+                .rev()
+                .flat_map(|source| source.performed.iter().rev())
+                .take(2)
                 .map(|value| value.instruction.clone())
                 .collect::<Vec<_>>();
+            previous.reverse();
             let resolved = resolve_relation_on_canvas(
                 &instruction,
                 &previous,

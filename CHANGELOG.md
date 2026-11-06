@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: reduce repeated calculations and quadratic work without changing drawing or request output.
+
 - macOS: skip reading execution records for the file log while result-log saving is disabled.
 
 - macOS: use arrow keys to preview works in the chronological library thumbnail grid.

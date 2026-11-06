@@ -468,6 +468,13 @@ impl<T> Ordered<T> {
             .map(|(_, item)| item)
     }
 
+    fn get_mut(&mut self, key: &str) -> Option<&mut T> {
+        self.members
+            .iter_mut()
+            .find(|(name, _)| name == key)
+            .map(|(_, item)| item)
+    }
+
     fn contains(&self, key: &str) -> bool {
         self.get(key).is_some()
     }
@@ -743,19 +750,36 @@ impl Decoder {
                 if !self.items.contains(&key) {
                     return fail("chatgpt_response_invalid");
                 }
-                let mut value = match self.arguments.get(&key) {
-                    None => String::new(),
-                    Some(Value::String(text)) => text.clone(),
-                    Some(_) => return shape(),
-                };
-                match index(event, "delta")? {
-                    Value::String(delta) => value.push_str(delta),
+                if self
+                    .arguments
+                    .get(&key)
+                    .is_some_and(|value| !matches!(value, Value::String(_)))
+                {
+                    return shape();
+                }
+                let delta = match index(event, "delta")? {
+                    Value::String(delta) => delta,
                     _ => return shape(),
+                };
+                match self.arguments.get_mut(&key) {
+                    Some(Value::String(text)) => {
+                        if text
+                            .len()
+                            .checked_add(delta.len())
+                            .is_none_or(|length| length > self.limits.answer)
+                        {
+                            return fail("chatgpt_response_too_large");
+                        }
+                        text.push_str(delta);
+                    }
+                    None => {
+                        if delta.len() > self.limits.answer {
+                            return fail("chatgpt_response_too_large");
+                        }
+                        self.arguments.insert(key, Value::String(delta.clone()));
+                    }
+                    Some(_) => return shape(),
                 }
-                if value.len() > self.limits.answer {
-                    return fail("chatgpt_response_too_large");
-                }
-                self.arguments.insert(key, Value::String(value));
             }
             "response.function_call_arguments.done" => {
                 let key = key_of(Some(index(event, "item_id")?))?;

@@ -95,7 +95,7 @@
 	import { BatchState } from '$lib/features/batch/state.svelte';
 	import { DemoState } from '$lib/features/demo/state.svelte';
 	import { demoInstructionModelGroups } from '$lib/demo';
-	import { resumedWild, type BatchRunConditions, type NumberedLine } from '$lib/features/batch/resume';
+	import { resumedComposition, resumedWild, type BatchRunConditions, type NumberedLine } from '$lib/features/batch/resume';
 	import { loadBatchSavedWork } from '$lib/features/batch/saved-work';
 	import { copyDrawOptions, LEGACY_WILD_DEFAULT_KEY, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
 	import { bindWildRenderState, wildOverride } from '$lib/features/wild/render';
@@ -758,7 +758,6 @@
 	/** Put back the conditions the last work of the stopped run was drawn under. */
 	async function applyBatchRunConditions(conditions: BatchRunConditions) {
 		const choices = work.batchTextOptions;
-		const currentWild = choices.wild;
 		Object.assign(choices, copyDrawOptions(work.drawDefaults.batch_text));
 		await loadModelReferences([conditions.stage1Model, conditions.stage2Model].filter((ref): ref is string => !!ref).map((ref) => ({action: 'split_ref', ref})));
 		// `auto` reads each description anew, so a run made under it must resume
@@ -772,11 +771,11 @@
 		// The route first: choosing read and draw turns the sketch on, and the
 		// line after puts back the sketch the run was drawn with.
 		if (conditions.route) choices.route = conditions.route;
-		choices.composition = conditions.composition ?? 'off';
+		choices.composition = resumedComposition(conditions.composition, choices.composition);
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
 		choices.sketch = sketchModeOf(conditions.sketchGrain);
-		choices.wild = resumedWild(conditions.wild, currentWild);
+		choices.wild = resumedWild(conditions.wild, choices.wild);
 		if (conditions.canvasAspectId) choices.canvas_aspect = normalizeCanvasAspectId(conditions.canvasAspectId);
 	}
 

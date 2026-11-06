@@ -150,9 +150,13 @@ export type BatchRunConditions = {
 	composition?: CompositionMode | null;
 };
 
-/** A missing record leaves the author's current switch alone. */
+/** A missing record leaves the batch default in place. */
 export function resumedWild(recorded: boolean | null, current: 'on' | 'off'): 'on' | 'off' {
 	return recorded === null ? current : recorded ? 'on' : 'off';
+}
+
+export function resumedComposition(recorded: CompositionMode | null | undefined, current: CompositionMode): CompositionMode {
+	return recorded ?? current;
 }
 
 /**

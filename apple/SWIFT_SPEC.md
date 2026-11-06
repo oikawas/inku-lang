@@ -680,6 +680,8 @@ New variation generation, adoption, autonomous refinement, and advice are retire
 
 AI direction uses the Web’s 160 UTF-16-code-unit limit, with the same counter and without splitting a visible character. Previewing a saved autonomous-refinement generation does not change its parent. Continue from this work explicitly rereads the saved work and conditions before changing the next parent; failed reads retain the original parent and reason. A colophon reads a fixed root-to-target path and displays its generation count. It cannot generate a new reading while that path is unavailable.
 
+Text-batch journals store shared requests separately from row states, and older journals can still resume with their original conditions.
+
 Autonomous refinement retains the newest 50 completed runs and keeps runs in progress or with a pending child.
 
 ### Targets for history, screens, and export

@@ -57,18 +57,142 @@ private struct BatchJournal: Codable, Sendable {
     var observedRowID: String?
 }
 
+private struct BatchRowProgress: Codable, Equatable, Sendable {
+    var state: BatchRow.State
+    var attempts: Int
+    var workID: String?
+    var executionID: String?
+    var error: String?
+    init(_ row: BatchRow) {
+        state = row.state; attempts = row.attempts; workID = row.workID
+        executionID = row.executionID; error = row.error
+    }
+    func apply(to row: inout BatchRow) {
+        row.state = state; row.attempts = attempts; row.workID = workID
+        row.executionID = executionID; row.error = error
+    }
+}
+
+private struct BatchJournalV2: Codable, Sendable {
+    struct Row: Codable, Sendable {
+        let id: String
+        let line: Int
+        let input: String
+        let requestChanges: [String: Data]
+        let removedRequestKeys: [String]
+    }
+    let version: Int
+    let id: String
+    let created: Date
+    let retries: Int
+    let originalText: String?
+    let conditions: BatchDrawingConditions?
+    let baseRequest: GenerationRequest
+    let rows: [Row]
+}
+
+private struct BatchJournalProgress: Codable, Equatable, Sendable {
+    let round: Int
+    let observedRowID: String?
+}
+
 private actor BatchJournalStore {
     let url: URL
+    private var previous: BatchJournal?
+    private var version2 = false
     init(url: URL) { self.url = url }
+    private func folder(_ id: String) throws -> URL {
+        guard UUID(uuidString: id) != nil else { throw HostError("batch_journal_invalid") }
+        return url.deletingLastPathComponent().appendingPathComponent("batch-journal-v2-" + id, isDirectory: true)
+    }
+    private func rowURL(_ folder: URL, _ index: Int) -> URL { folder.appendingPathComponent("row-\(index).json") }
+    private func object(_ request: GenerationRequest) throws -> [String: Any] {
+        guard let value = try JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any] else {
+            throw HostError("batch_journal_invalid")
+        }
+        return value
+    }
+    private func bytes(_ value: Any) throws -> Data {
+        try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .sortedKeys, .withoutEscapingSlashes])
+    }
+    private func write<T: Encodable>(_ value: T, to destination: URL) throws {
+        try JSONEncoder().encode(value).write(to: destination, options: .atomic)
+    }
     func load() throws -> BatchJournal? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        return try JSONDecoder().decode(BatchJournal.self, from: Data(contentsOf: url))
+        let data = try Data(contentsOf: url)
+        struct Marker: Decodable { let version: Int? }
+        let marker = try JSONDecoder().decode(Marker.self, from: data)
+        guard let version = marker.version else {
+            let journal = try JSONDecoder().decode(BatchJournal.self, from: data)
+            previous = journal; version2 = false
+            return journal
+        }
+        guard version == 2 else { throw HostError("batch_journal_invalid") }
+        let header = try JSONDecoder().decode(BatchJournalV2.self, from: data)
+        let directory = try folder(header.id)
+        let state = try JSONDecoder().decode(BatchJournalProgress.self, from: Data(contentsOf: directory.appendingPathComponent("state.json")))
+        let base = try object(header.baseRequest)
+        var rows: [BatchRow] = []
+        for (index, item) in header.rows.enumerated() {
+            var request = base
+            for key in item.removedRequestKeys { request.removeValue(forKey: key) }
+            for (key, value) in item.requestChanges {
+                request[key] = try JSONSerialization.jsonObject(with: value, options: [.fragmentsAllowed])
+            }
+            let decoded = try JSONDecoder().decode(GenerationRequest.self, from: JSONSerialization.data(withJSONObject: request, options: [.sortedKeys]))
+            var row = BatchRow(id: item.id, line: item.line, input: item.input, request: decoded)
+            try JSONDecoder().decode(BatchRowProgress.self, from: Data(contentsOf: rowURL(directory, index))).apply(to: &row)
+            rows.append(row)
+        }
+        let journal = BatchJournal(id: header.id, created: header.created, rows: rows, retries: header.retries,
+                                   round: state.round, originalText: header.originalText, conditions: header.conditions,
+                                   observedRowID: state.observedRowID)
+        previous = journal; version2 = true
+        return journal
     }
     func save(_ journal: BatchJournal) throws {
-        try JSONEncoder().encode(journal).write(to: url, options: .atomic)
+        let directory = try folder(journal.id)
+        if !version2 || previous?.id != journal.id {
+            guard let first = journal.rows.first else { throw HostError("batch_journal_invalid") }
+            let obsolete = version2 && previous?.id != journal.id ? previous?.id : nil
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let base = try object(first.request)
+            let baseBytes = try base.mapValues(bytes)
+            var rows: [BatchJournalV2.Row] = []
+            for (index, row) in journal.rows.enumerated() {
+                let values = try object(row.request)
+                let valueBytes = try values.mapValues(bytes)
+                let changes = valueBytes.filter { baseBytes[$0.key] != $0.value }
+                rows.append(.init(id: row.id, line: row.line, input: row.input, requestChanges: changes,
+                                  removedRequestKeys: base.keys.filter { values[$0] == nil }.sorted()))
+                try write(BatchRowProgress(row), to: rowURL(directory, index))
+            }
+            try write(BatchJournalProgress(round: journal.round, observedRowID: journal.observedRowID), to: directory.appendingPathComponent("state.json"))
+            let header = BatchJournalV2(version: 2, id: journal.id, created: journal.created, retries: journal.retries,
+                                        originalText: journal.originalText, conditions: journal.conditions,
+                                        baseRequest: first.request, rows: rows)
+            try write(header, to: url)
+            version2 = true
+            if let obsolete { try? FileManager.default.removeItem(at: folder(obsolete)) }
+        } else if let previous {
+            guard previous.rows.count == journal.rows.count else { throw HostError("batch_journal_invalid") }
+            for index in journal.rows.indices {
+                guard previous.rows[index].id == journal.rows[index].id else { throw HostError("batch_journal_invalid") }
+                let progress = BatchRowProgress(journal.rows[index])
+                if progress != BatchRowProgress(previous.rows[index]) { try write(progress, to: rowURL(directory, index)) }
+            }
+            let state = BatchJournalProgress(round: journal.round, observedRowID: journal.observedRowID)
+            if state != BatchJournalProgress(round: previous.round, observedRowID: previous.observedRowID) {
+                try write(state, to: directory.appendingPathComponent("state.json"))
+            }
+        }
+        previous = journal
     }
     func clear() throws {
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        if version2, let previous { try? FileManager.default.removeItem(at: folder(previous.id)) }
+        previous = nil; version2 = false
     }
     func loadHistory() throws -> [String] {
         let historyURL = url.deletingLastPathComponent().appendingPathComponent("batch-prompt-history.json")

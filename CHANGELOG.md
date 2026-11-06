@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: store shared text-batch conditions separately from row states while retaining legacy resume.
+
 - macOS: retain the newest 50 completed autonomous-refinement records and keep unfinished runs.
 
 - macOS: skip reading execution records for the file log while result-log saving is disabled.

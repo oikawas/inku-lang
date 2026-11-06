@@ -104,7 +104,7 @@ ChatGPTプラン設定では接続状態を再確認でき、接続解除とは�
 - 手数は1〜10（既定5）、使う手は法則・取り合わせの1つ以上、方向性は前後を除いて1,000 UTF-16単位以内。モデルは既存の取り合わせと同じVision用途のpickerで1つ選び、一文の選択・指示書を書く送信・補完・法則の段をそのモデルに固定する。言語は画面の言語。「筆致制限を外す」は指定しなければ親のまま。手数・使う手・方向性を`interface.json`の`autonomousRefine`に覚える。
 - 法則の手は親の指示書・記述・completion_ranges・laws_layers・laws_basisを共有pipelineの`saved_laws`へ渡す。親の保存条件・種・palette・キャンバス・限りを使い、子は記述固定で`laws_change`（札は「法則」／Laws）になる。取り合わせの手は既存の`juxtaposition`を使い、coreの`rank`・`reuse`・除外文と系譜ですでに足した文を尊重して`joined`から描く。子は`description_edit`で、辺に`edited_from_history_id`・`juxtaposition`とcoreの`ai_move`を残す。
 - 法則の手は指示書を書く送信と構図の読みを再送しない。親の保存設定に`colors`があれば`choose_laws`の後に`choose_colors`も送り、無ければ`choose_laws`だけを送る。段を選ぶのは共有coreで、端末は保存設定を保つ。
-- 子はすべて`lineage_only`で保存する。`kept`だけを次の親にし、差が小さい子も系譜に残す。終端は`moves_done`・`nothing_available`・`stalled`・`stopped`・`interrupted`・`failed`。停止時は進行中の送信・描画を取り消す。終端では最後の`kept`だけを通常履歴に出す。可視差は品質・順位・採否の判定ではなく、スター等は作者が決める。
+- 子はすべて通常の履歴に保存する。`kept`だけを次の親にし、差が小さい子も系譜に残す。終端は`moves_done`・`nothing_available`・`stalled`・`stopped`・`interrupted`・`failed`。停止時は進行中の送信・描画を取り消す。終端では最後の`kept`だけを通常履歴に出す。可視差は品質・順位・採否の判定ではなく、スター等は作者が決める。
 - runはAppModelが1つずつ回し、画面を閉じても続く。進み具合は作品DBと別の、DB名に対応する`.autonomous-runs.json`へatomic writeで残す。作品の正本は作品と辺の記録。次の起動で走行中のrunを`interrupted`にし、最後の`kept`を履歴へ出す。自動でLLM送信を再開しない。
 - 画面はWebと同じ順に、題・説明・固定注記・モデル・使う手・手数と「筆致制限を外す」・方向性・開始を出す。実行中は試みごとの小さな画・手番・手・結果・見える差・一文か主の法則・理由、終端後は終わり方と最後の子を開くボタンを出す。Webの`aiRefine*`を同梱し直し、常駐先の文だけ「サーバー」から「アプリ」へ適応する。
 - 旧Vision方式の自動実行と`aiRefine`の設定は廃止する。前の作品の`autonomous_refine_mode`（vision／random）や`vision_*`はそのまま読める。10-18節の自動推敲の方式・確認は、その時点の履歴である。
@@ -890,7 +890,7 @@ Swift物理schemaはv4で、10table構成を保ち、local annotationの廃止�
 
 catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。model比較は使用中の登録LLMを最大4件選び、catalog比較は元を除くcatalog候補を使う。Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
 
-model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。補助のテキスト要求も描画と同じrate予算を使い、GeminiのcountTokens、精算と429後の待ちを行う。同時数の待ち合わせには通さず、ChatGPTプランは予算の対象外とする。推敲は色カタログ・配置の2種類で、親の保存DDLを使い、記述を上書きしない。方向性はVisionの観察にだけ渡し、助言を描画の記述に追加しない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文を成功時にimmutable recordとして追記し、既存本文を上書きしない。旧採用本文は互換読取を保持し、DB backupへ含める。
+model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。補助のテキスト要求も描画と同じrate予算を使い、GeminiのcountTokens、精算と429後の待ちを行う。同時数の待ち合わせには通さず、ChatGPTプランは予算の対象外とする。推敲は色カタログ・配置の2種類で、親の保存DDLを使い、記述を上書きしない。方向性はVisionの観察にだけ渡し、助言を描画の記述に追加しない。中間の推敲作品も通常の履歴に保存する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文を成功時にimmutable recordとして追記し、既存本文を上書きしない。旧採用本文は互換読取を保持し、DB backupへ含める。
 
 batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。履歴保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒。間隔はiteration開始から測り、満了は次の開始を止める。停止は実行と保存結果の終了を待つ。
 

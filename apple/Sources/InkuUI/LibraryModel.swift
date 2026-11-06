@@ -323,8 +323,6 @@ public final class LibraryModel {
     /// A pending read that replaces another keeps its lineage reload, even if the newer request does not need one.
     private func scheduleRefresh(refreshLineage: Bool = true) {
         expandedGroups.removeAll()
-        groupMembers.removeAll()
-        groupMemberTotals.removeAll()
         refreshToken = UUID()
         refreshTask?.cancel()
         pendingLineageRefresh = pendingLineageRefresh || refreshLineage
@@ -480,6 +478,50 @@ public final class LibraryModel {
                                                                offset: requestedOffset, minimumItemCount: requestedMinimum, includeSVG: includeListSVG,
                                                                includeWorkID: lineageIncludeID, anchorWorkID: anchor?.workID)
                 guard refreshToken == token, !Task.isCancelled else { return }
+                var opened = expandedGroups
+                if layout != .grid, focusRequest != nil, let root = result.anchorRootNodeID ?? focusLineageRootID,
+                   result.groups.contains(where: { $0.id == root }) { opened.insert(root) }
+                let roots = layout == .grid ? result.groups.map(\.id) : result.groups.map(\.id).filter { opened.contains($0) }
+                let includeSVG = includeListSVG
+                let grouped = try await withThrowingTaskGroup(of: (String, LibraryPage, [String: Int]).self) { tasks in
+                    var iterator = roots.makeIterator()
+                    func submit(_ root: String) {
+                        tasks.addTask {
+                            let page = try await database.libraryPage(query: requestedFilter, limit: 100, offset: 0,
+                                                                       rootNodeID: root, includeSVG: includeSVG)
+                            let generations = try await database.lineageGenerations(nodeIDs: page.items.compactMap { $0.work.lineageNodeID })
+                            return (root, page, generations)
+                        }
+                    }
+                    for _ in 0..<min(8, roots.count) { if let root = iterator.next() { submit(root) } }
+                    var results: [(String, LibraryPage, [String: Int])] = []
+                    while let item = try await tasks.next() {
+                        results.append(item)
+                        if let root = iterator.next() { submit(root) }
+                    }
+                    return results
+                }
+                guard refreshToken == token, !Task.isCancelled else { return }
+                var members: [String: [InkuPersistence.LibraryItem]] = [:]
+                var totals: [String: Int] = [:]
+                var listed: [String: Int] = [:]
+                var annotations = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.annotation) })
+                var sizes = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.svgBytes) })
+                for (root, page, generations) in grouped {
+                    members[root] = page.items.sorted {
+                        if $0.work.lineageNodeID == root { return $1.work.lineageNodeID != root }
+                        if $1.work.lineageNodeID == root { return false }
+                        let lhs = $0.work.lineageNodeID.flatMap { generations[$0] } ?? 0
+                        let rhs = $1.work.lineageNodeID.flatMap { generations[$0] } ?? 0
+                        return (lhs, $0.work.at, $0.id) < (rhs, $1.work.at, $1.id)
+                    }
+                    totals[root] = page.total
+                    listed.merge(generations) { $1 }
+                    for item in page.items { annotations[item.id] = item.annotation; sizes[item.id] = item.svgBytes }
+                }
+                let ids = result.groups.flatMap { members[$0.id]?.map(\.id) ?? [$0.representative.id] }
+                await pageCompanions?(ids)
+                guard refreshToken == token, !Task.isCancelled else { return }
                 if let anchor {
                     groupAnchorVisit = anchor.visit
                     lineageIncludeID = anchor.workID
@@ -489,14 +531,12 @@ public final class LibraryModel {
                     }
                 }
                 // Web: the list view opens the opened work's lineage while that focus stands.
-                if layout != .grid, focusRequest != nil, let root = focusLineageRootID,
-                   result.groups.contains(where: { $0.id == root }) {
-                    expandedGroups.insert(root)
-                }
+                expandedGroups = opened
                 groups = result.groups; total = result.total
                 works = result.groups.map(\.representative.work)
-                annotations = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.annotation) })
-                svgSizes = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.svgBytes) })
+                groupMembers = members; groupMemberTotals = totals
+                self.annotations = annotations; svgSizes = sizes
+                generations.merge(listed) { $1 }
             } else {
                 let result = try await database.libraryPage(query: requestedFilter, limit: requestedSize,
                                                              offset: requestedOffset, includeSVG: includeListSVG)
@@ -506,6 +546,7 @@ public final class LibraryModel {
                 await pageCompanions?(result.items.map(\.id))
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = []; total = result.total
+                groupMembers = [:]; groupMemberTotals = [:]
                 works = result.items.map(\.work)
                 annotations = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.annotation) })
                 svgSizes = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.svgBytes) })
@@ -518,11 +559,6 @@ public final class LibraryModel {
             if startOffset > 0, startOffset >= total { startOffset = 0; page = 0; await refresh(refreshLineage: refreshLineage); return }
             if page >= pageCount { page = pageCount - 1; await refresh(refreshLineage: refreshLineage); return }
             if !requestedGrouping { prefetchNextPage(token: token) }
-            let visibleRoots = requestedGrouping && layout == .grid ? groups.map(\.id) : Array(expandedGroups)
-            for root in visibleRoots {
-                guard refreshToken == token, !Task.isCancelled else { return }
-                await loadGroup(root: root, append: false)
-            }
             if refreshLineage, lineageFocusID != nil { await reloadLineage() }
         } catch {
             guard refreshToken == token, !Task.isCancelled else { return }

@@ -102,6 +102,7 @@ class CredentialStore:
         fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
         try:
             _check_file(os.fstat(fd))
+            delay = 0.02
             while True:
                 if check:
                     check()
@@ -111,7 +112,9 @@ class CredentialStore:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
                 except BlockingIOError:
-                    time.sleep(0.02)
+                    remaining = delay if deadline is None else min(delay, max(0, deadline - time.monotonic()))
+                    time.sleep(remaining)
+                    delay = min(0.5, delay * 2)
             yield
         finally:
             os.close(fd)

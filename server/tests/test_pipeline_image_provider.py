@@ -128,6 +128,8 @@ def test_image_rejection_never_logs_or_captures_echoed_image_or_svg(monkeypatch,
 
 
 def _chatgpt(monkeypatch, purposes):
+    from inku_server import chatgpt_runtime
+    monkeypatch.setattr(chatgpt_runtime, "_stopping", __import__("threading").Event())
     class Store:
         def lock(self, *args):
             return nullcontext()

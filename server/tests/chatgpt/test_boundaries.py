@@ -604,6 +604,27 @@ def test_runtime_cancel_closes_blocked_stream_and_releases_slot(isolated, monkey
     runtime.retire_execution("owner", "execution")
 
 
+def test_session_checker_caches_validation_but_not_cancellation(monkeypatch):
+    calls = []
+    now = [10.0]
+    cancel = threading.Event()
+    monkeypatch.setattr(runtime, "_stopping", threading.Event())
+    monkeypatch.setattr(runtime.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(runtime, "check_session", lambda *args: calls.append(args) or {"generation": 1})
+    check = runtime.session_checker("owner", "profile", 1, cancel)
+    assert check() == {"generation": 1}
+    now[0] += 0.5
+    assert check() == {"generation": 1}
+    assert len(calls) == 1
+    now[0] += 0.6
+    check()
+    assert len(calls) == 2
+    cancel.set()
+    with pytest.raises(ChatGPTError, match="cancelled"):
+        check()
+    assert len(calls) == 2
+
+
 def test_failed_initial_exchange_retains_issued_client_for_explicit_retry(isolated, monkeypatch):
     real_client = httpx.AsyncClient
     calls = []

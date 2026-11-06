@@ -2726,6 +2726,32 @@ fn resolve_impl(
             })
             .collect(),
     };
+    let count = request.score.instructions.len();
+    let groups = &request.score.transform_groups;
+    let in_transform = if groups.len() < 2 {
+        (0..count)
+            .map(|index| in_any_transform_group(groups, index))
+            .collect::<Vec<_>>()
+    } else {
+        let mut starts = vec![0usize; count + 1];
+        let mut ends = vec![0usize; count + 1];
+        for group in groups {
+            let start = group.start.min(count);
+            let end = group.end.min(count);
+            if start < end {
+                starts[start] += 1;
+                ends[end] += 1;
+            }
+        }
+        let mut depth = 0usize;
+        (0..count)
+            .map(|index| {
+                depth += starts[index];
+                depth -= ends[index];
+                depth > 0
+            })
+            .collect()
+    };
     for node in execution.schedule.order.clone() {
         if let ScheduleNode::Group(index) = node {
             execution.perform_mirrors_before_group(index);
@@ -2755,14 +2781,12 @@ fn resolve_impl(
                         .as_ref()
                         .and_then(|typed| typed.instructions[index].seed_override)
                         .or_else(|| {
-                            in_any_transform_group(&request.score.transform_groups, index).then(
-                                || {
-                                    crate::determinism::instruction_seed(
-                                        &instruction,
-                                        request.performance_seed,
-                                    )
-                                },
-                            )
+                            in_transform[index].then(|| {
+                                crate::determinism::instruction_seed(
+                                    &instruction,
+                                    request.performance_seed,
+                                )
+                            })
                         });
                     let line_centerline =
                         execution.connected_path_centerline(index, &instruction, seed_override);

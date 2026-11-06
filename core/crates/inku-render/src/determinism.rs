@@ -132,6 +132,12 @@ impl SaltedStream {
         hasher.update(DecimalText::new(index).as_bytes());
         hasher.finalize().into()
     }
+
+    pub(crate) fn unit(&self, index: i64) -> f64 {
+        let digest = self.digest(i128::from(index));
+        let value = u32::from_le_bytes(digest[..4].try_into().expect("four digest bytes"));
+        f64::from(value) / f64::from(u32::MAX)
+    }
 }
 
 /// Map an integer and seed to the same signed unit interval used by Engine 40.

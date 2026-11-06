@@ -1590,3 +1590,4 @@
 "作品が復元されたため、書き出し画面を開き直してください。" = "The library was restored. Reopen the export window.";
 "画面比" = "Aspect ratio";
 "提示したプラグイン" = "Offered plugins";
+"出力上限を保存しました。" = "Output limits saved.";

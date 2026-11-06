@@ -678,7 +678,11 @@ fn scan_segments(contour: &[Point], angle: f64, spacing: f64, phase: f64) -> Vec
                 ));
             }
         }
-        offset += spacing;
+        let next = offset + spacing;
+        if next == offset {
+            break;
+        }
+        offset = next;
     }
     result
 }

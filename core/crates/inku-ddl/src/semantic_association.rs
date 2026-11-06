@@ -2841,16 +2841,12 @@ fn build_semantic_entities(
             .iter()
             .map(|issue| 1 + issue.items.len() + usize::from(issue.quantity.is_some()))
             .sum::<usize>();
-    assert_eq!(
+    debug_assert_eq!(
         delivered_occurrence_count, owned_occurrence_count,
         "semantic association must deliver every owned occurrence exactly once"
     );
     let owned_compound_reference_count = explicit_previous_references.len();
     let delivered_compound_reference_count = explicit_previous_references.len();
-    assert_eq!(
-        delivered_compound_reference_count, owned_compound_reference_count,
-        "semantic association must retain every full-literal compound exactly once"
-    );
 
     let ast = SemanticEntityAssociationAst {
         entities,
@@ -3203,7 +3199,7 @@ fn append_macro_ownership(
             .resolved
             .get(complete.invocation_index)
             .expect("accepted I-581 binding references one resolved invocation");
-        assert_eq!(
+        debug_assert_eq!(
             complete.definition_identity, resolved.definition_identity,
             "accepted I-581 binding retains the resolved definition identity"
         );
@@ -3311,7 +3307,7 @@ fn semantic_macro_parameter(
     clause_stream: &ClauseStream,
     parameter: &MacroParameterBinding,
 ) -> SemanticMacroParameterBinding {
-    assert_eq!(
+    debug_assert_eq!(
         parameter.source_span,
         parameter.value.source_span(),
         "accepted I-581 parameter value retains its owned source span"

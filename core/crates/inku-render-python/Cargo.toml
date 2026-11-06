@@ -16,6 +16,7 @@ path = "src/lib.rs"
 inku-pipeline-uniffi = { path = "../inku-pipeline-uniffi" }
 inku-score.workspace = true
 inku-render.workspace = true
+inku-svg-raster.workspace = true
 pyo3.workspace = true
 # The Server's and the CLI's PNG (`svg_to_png`): the vendored resvg, with text for
 # the card's headnote from the font files the host passes (no system fonts).

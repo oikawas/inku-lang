@@ -6,10 +6,18 @@
 //! the one serving HTTP, for the whole render. The core keeps no mutable
 //! global state, so concurrent calls are safe.
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use serde::Deserialize;
+
+fn catch_python_panic<T>(action: impl FnOnce() -> PyResult<T>) -> PyResult<T> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)).unwrap_or_else(|_| {
+        Err(PyRuntimeError::new_err(
+            "native Rust panic at Python boundary",
+        ))
+    })
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -51,60 +59,71 @@ impl ClipPolicy {
 }
 
 #[pyfunction]
-fn core_api_version() -> &'static str {
-    inku_render::core_api_version()
+fn core_api_version() -> PyResult<&'static str> {
+    catch_python_panic(|| Ok(inku_render::core_api_version()))
 }
 
 #[pyfunction]
-fn score_version() -> &'static str {
-    inku_score::ScoreEdition::LATEST.as_str()
+fn score_version() -> PyResult<&'static str> {
+    catch_python_panic(|| Ok(inku_score::ScoreEdition::LATEST.as_str()))
 }
 
 #[pyfunction]
-fn render_engine_id() -> &'static str {
-    inku_render::render_engine_identity().0
+fn render_engine_id() -> PyResult<&'static str> {
+    catch_python_panic(|| Ok(inku_render::render_engine_identity().0))
 }
 
 #[pyfunction]
-fn render_engine_version() -> &'static str {
-    inku_render::render_engine_identity().1
+fn render_engine_version() -> PyResult<&'static str> {
+    catch_python_panic(|| Ok(inku_render::render_engine_identity().1))
 }
 
 #[pyfunction]
 fn default_color_map_json() -> PyResult<String> {
-    serde_json::to_string(&inku_render::palette::default_color_map()).map_err(|error| {
-        PyValueError::new_err(format!("default color map serialization failed: {error}"))
+    catch_python_panic(|| {
+        serde_json::to_string(&inku_render::palette::default_color_map()).map_err(|error| {
+            PyValueError::new_err(format!("default color map serialization failed: {error}"))
+        })
     })
 }
 
 #[pyfunction]
 fn renderer_reference_json() -> PyResult<String> {
-    serde_json::to_string(&inku_render::reference::renderer_reference()).map_err(|error| {
-        PyValueError::new_err(format!("renderer reference serialization failed: {error}"))
+    catch_python_panic(|| {
+        serde_json::to_string(&inku_render::reference::renderer_reference()).map_err(|error| {
+            PyValueError::new_err(format!("renderer reference serialization failed: {error}"))
+        })
     })
 }
 
 /// Derive word-touch seed text through the same portable boundary as Apple.
 #[pyfunction]
-fn render_seed_from_text(py: Python<'_>, seed_text: String) -> Option<(String, String)> {
-    py.detach(|| {
-        inku_pipeline_uniffi::render_seed_from_text(seed_text)
-            .map(|derived| (derived.render_seed, derived.seed_text))
+fn render_seed_from_text(py: Python<'_>, seed_text: String) -> PyResult<Option<(String, String)>> {
+    catch_python_panic(|| {
+        Ok({
+            py.detach(|| {
+                inku_pipeline_uniffi::render_seed_from_text(seed_text)
+                    .map(|derived| (derived.render_seed, derived.seed_text))
+            })
+        })
     })
 }
 
 /// Render one canonical coarse request and return SVG plus JSON metadata.
 #[pyfunction]
 fn render(py: Python<'_>, request_json: &str) -> PyResult<(String, String)> {
-    py.detach(|| {
-        let request = serde_json::from_str(request_json)
-            .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
-        let output = inku_render::render::render(request)
-            .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
-        let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
-            PyValueError::new_err(format!("metadata serialization failed: {error}"))
-        })?;
-        Ok((output.svg, metadata))
+    catch_python_panic(|| {
+        py.detach(|| {
+            let request = serde_json::from_str(request_json).map_err(|error| {
+                PyValueError::new_err(format!("invalid render request: {error}"))
+            })?;
+            let output = inku_render::render::render(request)
+                .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
+            let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
+                PyValueError::new_err(format!("metadata serialization failed: {error}"))
+            })?;
+            Ok((output.svg, metadata))
+        })
     })
 }
 
@@ -115,15 +134,18 @@ fn render_with_svg_limit(
     request_json: &str,
     max_svg_bytes: usize,
 ) -> PyResult<(String, String)> {
-    py.detach(|| {
-        let request = serde_json::from_str(request_json)
-            .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
-        let output = inku_render::render::render_with_svg_limit(request, max_svg_bytes)
-            .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
-        let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
-            PyValueError::new_err(format!("metadata serialization failed: {error}"))
-        })?;
-        Ok((output.svg, metadata))
+    catch_python_panic(|| {
+        py.detach(|| {
+            let request = serde_json::from_str(request_json).map_err(|error| {
+                PyValueError::new_err(format!("invalid render request: {error}"))
+            })?;
+            let output = inku_render::render::render_with_svg_limit(request, max_svg_bytes)
+                .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
+            let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
+                PyValueError::new_err(format!("metadata serialization failed: {error}"))
+            })?;
+            Ok((output.svg, metadata))
+        })
     })
 }
 
@@ -134,30 +156,35 @@ fn render_with_resources(
     request_json: &str,
     resources_json: &str,
 ) -> PyResult<(String, String)> {
-    py.detach(|| {
-        let request = serde_json::from_str(request_json)
-            .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
-        let resources: RenderResources = serde_json::from_str(resources_json)
-            .map_err(|error| PyValueError::new_err(format!("invalid render resources: {error}")))?;
-        let clip_policy = resources.clip_policy.resolve()?;
-        let output = inku_render::render::render_with_resources(
-            request,
-            &resources.hard_policy,
-            resources.operational_budget,
-            clip_policy,
-        )
-        .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
-        let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
-            PyValueError::new_err(format!("metadata serialization failed: {error}"))
-        })?;
-        Ok((output.svg, metadata))
+    catch_python_panic(|| {
+        py.detach(|| {
+            let request = serde_json::from_str(request_json).map_err(|error| {
+                PyValueError::new_err(format!("invalid render request: {error}"))
+            })?;
+            let resources: RenderResources =
+                serde_json::from_str(resources_json).map_err(|error| {
+                    PyValueError::new_err(format!("invalid render resources: {error}"))
+                })?;
+            let clip_policy = resources.clip_policy.resolve()?;
+            let output = inku_render::render::render_with_resources(
+                request,
+                &resources.hard_policy,
+                resources.operational_budget,
+                clip_policy,
+            )
+            .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
+            let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
+                PyValueError::new_err(format!("metadata serialization failed: {error}"))
+            })?;
+            Ok((output.svg, metadata))
+        })
     })
 }
 
 /// Report the shared pipeline binding and byte-protocol versions.
 #[pyfunction]
-fn pipeline_version_report() -> String {
-    inku_pipeline_uniffi::version_report()
+fn pipeline_version_report() -> PyResult<String> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::version_report()))
 }
 
 /// Produce line animation frames through the same byte boundary as UniFFI.
@@ -165,22 +192,30 @@ fn pipeline_version_report() -> String {
 fn pipeline_line_animation<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::line_animation(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::line_animation(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// Share the canonical canvas registry with the Python host.
 #[pyfunction]
-fn pipeline_canvas_registry() -> String {
-    inku_pipeline_uniffi::canvas_registry()
+fn pipeline_canvas_registry() -> PyResult<String> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::canvas_registry()))
 }
 
 /// Project the shared Stage 1 grammar for host input and prompt displays.
 #[pyfunction]
-fn pipeline_stage1_system_projection(language_code: String) -> String {
-    inku_pipeline_uniffi::stage1_system_projection(language_code)
+fn pipeline_stage1_system_projection(language_code: String) -> PyResult<String> {
+    catch_python_panic(|| {
+        Ok(inku_pipeline_uniffi::stage1_system_projection(
+            language_code,
+        ))
+    })
 }
 
 /// Advance one pipeline execution through the same owned byte boundary as Android.
@@ -189,11 +224,15 @@ fn pipeline_step<'py>(
     py: Python<'py>,
     snapshot_bytes: &Bound<'py, PyBytes>,
     input_envelope_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let snapshot = snapshot_bytes.as_bytes().to_vec();
-    let input_envelope = input_envelope_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::step(snapshot, input_envelope));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let snapshot = snapshot_bytes.as_bytes().to_vec();
+            let input_envelope = input_envelope_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::step(snapshot, input_envelope));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// Return bounded envelope JSON and any newly rendered SVG as separate values.
@@ -203,12 +242,17 @@ fn pipeline_step_with_svg_limit<'py>(
     snapshot_bytes: &Bound<'py, PyBytes>,
     input_bytes: &Bound<'py, PyBytes>,
     max_svg_bytes: usize,
-) -> (Bound<'py, PyBytes>, Option<String>) {
-    let snapshot = snapshot_bytes.as_bytes().to_vec();
-    let input = input_bytes.as_bytes().to_vec();
-    let (output, svg) =
-        py.detach(|| inku_pipeline_uniffi::step_with_svg_limit(snapshot, input, max_svg_bytes));
-    (PyBytes::new(py, &output), svg)
+) -> PyResult<(Bound<'py, PyBytes>, Option<String>)> {
+    catch_python_panic(|| {
+        Ok({
+            let snapshot = snapshot_bytes.as_bytes().to_vec();
+            let input = input_bytes.as_bytes().to_vec();
+            let (output, svg) = py.detach(|| {
+                inku_pipeline_uniffi::step_with_svg_limit(snapshot, input, max_svg_bytes)
+            });
+            (PyBytes::new(py, &output), svg)
+        })
+    })
 }
 
 /// Report the provider attempt in flight for a stored pipeline snapshot.
@@ -216,10 +260,14 @@ fn pipeline_step_with_svg_limit<'py>(
 fn pipeline_provider_attempt<'py>(
     py: Python<'py>,
     snapshot_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let snapshot = snapshot_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::provider_attempt(snapshot));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let snapshot = snapshot_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::provider_attempt(snapshot));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// Read structured progress for a saved pipeline snapshot.
@@ -227,70 +275,98 @@ fn pipeline_provider_attempt<'py>(
 fn pipeline_run_progress<'py>(
     py: Python<'py>,
     snapshot_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let snapshot = snapshot_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::run_progress(snapshot));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let snapshot = snapshot_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::run_progress(snapshot));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_resolve_palette<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::resolve_palette(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::resolve_palette(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_resolve_macro_catalog<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::resolve_macro_catalog(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::resolve_macro_catalog(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_migrate_plugin_names<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::migrate_plugin_names(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::migrate_plugin_names(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_explain_plugin_diagnostics<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::explain_plugin_diagnostics(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::explain_plugin_diagnostics(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_plugin_calls<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::plugin_calls(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::plugin_calls(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_render_saved<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::render_saved(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::render_saved(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
@@ -298,11 +374,15 @@ fn pipeline_render_saved_with_svg_limit<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
     max_svg_bytes: usize,
-) -> (Bound<'py, PyBytes>, Option<String>) {
-    let input = input_bytes.as_bytes().to_vec();
-    let (output, svg) =
-        py.detach(|| inku_pipeline_uniffi::render_saved_with_svg_limit(input, max_svg_bytes));
-    (PyBytes::new(py, &output), svg)
+) -> PyResult<(Bound<'py, PyBytes>, Option<String>)> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let (output, svg) = py
+                .detach(|| inku_pipeline_uniffi::render_saved_with_svg_limit(input, max_svg_bytes));
+            (PyBytes::new(py, &output), svg)
+        })
+    })
 }
 
 /// Migrate one saved Saijiki v1 unit (a document and its definitions) for a one-time host migration.
@@ -310,10 +390,14 @@ fn pipeline_render_saved_with_svg_limit<'py>(
 fn pipeline_migrate_saijiki_v1<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::migrate_saijiki_v1(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::migrate_saijiki_v1(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// Migrate one saved Saijiki v2 unit (a document and its definitions) for a one-time host
@@ -322,10 +406,14 @@ fn pipeline_migrate_saijiki_v1<'py>(
 fn pipeline_migrate_saijiki_v2<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::migrate_saijiki_v2(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::migrate_saijiki_v2(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// Another composition read from a work's visible instructions (draw-system05).
@@ -333,10 +421,14 @@ fn pipeline_migrate_saijiki_v2<'py>(
 fn pipeline_recompose<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::recompose(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::recompose(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// Another touch written into a work's visible instructions (the author, 2026-10-14).
@@ -344,16 +436,20 @@ fn pipeline_recompose<'py>(
 fn pipeline_retouch<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::retouch(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::retouch(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// The ranges the composition writes by name, for the host's display (draw-system05).
 #[pyfunction]
-fn pipeline_composition_ranges() -> String {
-    inku_pipeline_uniffi::composition_ranges()
+fn pipeline_composition_ranges() -> PyResult<String> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::composition_ranges()))
 }
 
 /// The states of a work's completion ranges, for the instruction editor (A3).
@@ -361,10 +457,14 @@ fn pipeline_composition_ranges() -> String {
 fn pipeline_completion_range_states<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::completion_range_states(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::completion_range_states(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// The saved-Score refinements (touches, support, color arrangement) from the shared core.
@@ -372,10 +472,14 @@ fn pipeline_completion_range_states<'py>(
 fn pipeline_saved_variants<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::saved_variants(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::saved_variants(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// The juxtaposition (取り合わせ) from the shared core: gather, prompt, check, join, same.
@@ -383,10 +487,14 @@ fn pipeline_saved_variants<'py>(
 fn pipeline_juxtaposition<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::juxtaposition(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::juxtaposition(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// The chunk moves (まとまりの手) from the shared core: start, answer, drawn.
@@ -394,18 +502,26 @@ fn pipeline_juxtaposition<'py>(
 fn pipeline_chunk_moves<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::chunk_moves(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::chunk_moves(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// Inspect plugin packages through the shared host-neutral JSON boundary.
 #[pyfunction]
-fn pipeline_plugin_package(py: Python<'_>, input_bytes: &Bound<'_, PyBytes>) -> String {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::plugin_package(input));
-    String::from_utf8(output).expect("plugin package output is UTF-8 JSON")
+fn pipeline_plugin_package(py: Python<'_>, input_bytes: &Bound<'_, PyBytes>) -> PyResult<String> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::plugin_package(input));
+            String::from_utf8(output).expect("plugin package output is UTF-8 JSON")
+        })
+    })
 }
 
 /// The autonomous refinement (AI自動推敲) from the shared core: next, record, measure.
@@ -413,10 +529,14 @@ fn pipeline_plugin_package(py: Python<'_>, input_bytes: &Bound<'_, PyBytes>) -> 
 fn pipeline_autonomous_refine<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::autonomous_refine(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::autonomous_refine(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// A provider request's bytes and what its answer says, from the shared core.
@@ -424,36 +544,48 @@ fn pipeline_autonomous_refine<'py>(
 fn pipeline_provider_wire<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::provider_wire(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::provider_wire(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_model_catalog<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::model_catalog(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::model_catalog(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 #[pyfunction]
 fn pipeline_provider_admission<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::provider_admission(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::provider_admission(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// How a host prepares the image a work is written from (`inku.image-input-policy.v1`).
 #[pyfunction]
-fn pipeline_image_input_policy() -> String {
-    inku_pipeline_uniffi::image_input_policy()
+fn pipeline_image_input_policy() -> PyResult<String> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::image_input_policy()))
 }
 
 /// The size to send an image at, the ratio its DDL declares and the nearest paper.
@@ -461,10 +593,14 @@ fn pipeline_image_input_policy() -> String {
 fn pipeline_image_canvas<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let input = input_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::image_canvas(input));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::image_canvas(input));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// The SVG of the written DDL a host shows beside the image (`draw_image_review`).
@@ -473,29 +609,33 @@ fn pipeline_image_review_svg<'py>(
     py: Python<'py>,
     snapshot_bytes: &Bound<'py, PyBytes>,
     request_bytes: &Bound<'py, PyBytes>,
-) -> Bound<'py, PyBytes> {
-    let snapshot = snapshot_bytes.as_bytes().to_vec();
-    let request = request_bytes.as_bytes().to_vec();
-    let output = py.detach(|| inku_pipeline_uniffi::image_review_svg(snapshot, request));
-    PyBytes::new(py, &output)
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let snapshot = snapshot_bytes.as_bytes().to_vec();
+            let request = request_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::image_review_svg(snapshot, request));
+            PyBytes::new(py, &output)
+        })
+    })
 }
 
 /// A description's identity `dh1` (`identity.description_hash`), from the shared core.
 #[pyfunction]
-fn pipeline_description_hash(text: &str) -> String {
-    inku_pipeline_uniffi::description_hash(text.to_owned())
+fn pipeline_description_hash(text: &str) -> PyResult<String> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::description_hash(text.to_owned())))
 }
 
 /// A history item's render identity `rh3`, or `None` when the item JSON is not an object.
 #[pyfunction]
-fn pipeline_render_hash(item_json: &str) -> Option<String> {
-    inku_pipeline_uniffi::render_hash(item_json.to_owned())
+fn pipeline_render_hash(item_json: &str) -> PyResult<Option<String>> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::render_hash(item_json.to_owned())))
 }
 
 /// The canonical JSON Server hashes, or `None` when the text is not JSON.
 #[pyfunction]
-fn pipeline_canonical_json(value_json: &str) -> Option<String> {
-    inku_pipeline_uniffi::canonical_json(value_json.to_owned())
+fn pipeline_canonical_json(value_json: &str) -> PyResult<Option<String>> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::canonical_json(value_json.to_owned())))
 }
 
 /// The instruction language for `text`, or `None` for an unsupported request or fallback.
@@ -505,36 +645,55 @@ fn pipeline_resolve_instruction_language(
     text: &str,
     requested: Option<&str>,
     fallback: &str,
-) -> Option<String> {
-    inku_pipeline_uniffi::resolve_instruction_language(
-        text.to_owned(),
-        requested.map(str::to_owned),
-        fallback.to_owned(),
-    )
+) -> PyResult<Option<String>> {
+    catch_python_panic(|| {
+        Ok({
+            inku_pipeline_uniffi::resolve_instruction_language(
+                text.to_owned(),
+                requested.map(str::to_owned),
+                fallback.to_owned(),
+            )
+        })
+    })
 }
 
 /// A requested language code normalized as Python's `(value or default).strip().lower()`.
 #[pyfunction]
 #[pyo3(signature = (value, default))]
-fn pipeline_normalize_instruction_language(value: Option<&str>, default: &str) -> Option<String> {
-    inku_pipeline_uniffi::normalize_instruction_language(
-        value.map(str::to_owned),
-        default.to_owned(),
-    )
+fn pipeline_normalize_instruction_language(
+    value: Option<&str>,
+    default: &str,
+) -> PyResult<Option<String>> {
+    catch_python_panic(|| {
+        Ok({
+            inku_pipeline_uniffi::normalize_instruction_language(
+                value.map(str::to_owned),
+                default.to_owned(),
+            )
+        })
+    })
 }
 
 /// The description with its labels removed, as every layer reads it.
 #[pyfunction]
-fn pipeline_description_without_labels(text: &str) -> String {
-    inku_pipeline_uniffi::description_without_labels(text.to_owned())
+fn pipeline_description_without_labels(text: &str) -> PyResult<String> {
+    catch_python_panic(|| {
+        Ok(inku_pipeline_uniffi::description_without_labels(
+            text.to_owned(),
+        ))
+    })
 }
 
 /// The labels' ranges as `[[start, end, kind], ...]` JSON, in Unicode scalar
 /// offsets (Python's string indices): a host takes a read-and-draw run's
 /// source labels from the `comment` ranges.
 #[pyfunction]
-fn pipeline_description_label_spans(text: &str) -> String {
-    inku_pipeline_uniffi::description_label_spans(text.to_owned())
+fn pipeline_description_label_spans(text: &str) -> PyResult<String> {
+    catch_python_panic(|| {
+        Ok(inku_pipeline_uniffi::description_label_spans(
+            text.to_owned(),
+        ))
+    })
 }
 
 /// How the PNG's size follows the request (resvg's command line, as resvg_py
@@ -582,6 +741,9 @@ fn png_of(
     font_files: &[String],
 ) -> Result<Vec<u8>, String> {
     use resvg::{tiny_skia, usvg};
+    if svg.len() > inku_svg_raster::MAX_SVG_BYTES {
+        return Err("SVG exceeds the byte limit".to_owned());
+    }
     let positive = |value: u32, name: &str| {
         if value == 0 {
             Err(format!("{name} must be positive"))
@@ -631,6 +793,9 @@ fn png_of(
     let size = fit
         .fit_to_size(tree.size().to_int_size())
         .ok_or_else(|| "target size is zero".to_owned())?;
+    if u64::from(size.width()) * u64::from(size.height()) > 600_000_000 {
+        return Err("raster exceeds the pixel limit".to_owned());
+    }
     let mut pixmap = tiny_skia::Pixmap::new(size.width(), size.height())
         .ok_or_else(|| "cannot create pixmap".to_owned())?;
     resvg::render(
@@ -657,11 +822,13 @@ fn svg_to_png<'py>(
     height: Option<u32>,
     font_files: Vec<String>,
 ) -> PyResult<Bound<'py, PyBytes>> {
-    let svg = svg.to_owned();
-    let png = py
-        .detach(|| png_of(&svg, width, height, &font_files))
-        .map_err(PyValueError::new_err)?;
-    Ok(PyBytes::new(py, &png))
+    catch_python_panic(|| {
+        let svg = svg.to_owned();
+        let png = py
+            .detach(|| png_of(&svg, width, height, &font_files))
+            .map_err(PyValueError::new_err)?;
+        Ok(PyBytes::new(py, &png))
+    })
 }
 
 /// The resvg `svg_to_png` draws with: the vendored crate's version and the
@@ -672,8 +839,13 @@ const RASTER_IDENTITY: (&str, &str) = ("resvg", "0.48.1+inku.2");
 
 /// `{"backend": "resvg", "version": "<vendored version>+inku.<patches>"}`.
 #[pyfunction]
-fn raster_identity_json() -> String {
-    serde_json::json!({"backend": RASTER_IDENTITY.0, "version": RASTER_IDENTITY.1}).to_string()
+fn raster_identity_json() -> PyResult<String> {
+    catch_python_panic(|| {
+        Ok({
+            serde_json::json!({"backend": RASTER_IDENTITY.0, "version": RASTER_IDENTITY.1})
+                .to_string()
+        })
+    })
 }
 
 #[pymodule]
@@ -750,10 +922,19 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn p0_oversized_svg_is_rejected_before_rasterization() {
+        let svg = format!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\"></svg>{}",
+            " ".repeat(64 * 1024 * 1024)
+        );
+        let error = super::png_of(&svg, None, None, &[]).unwrap_err();
+        assert!(error.contains("SVG"), "{error}");
+    }
+    #[test]
     fn score_version_names_the_latest_supported_edition() {
-        assert_eq!(super::score_version(), "0.24.0");
+        assert_eq!(super::score_version().unwrap(), "0.24.0");
         assert_eq!(
-            super::score_version(),
+            super::score_version().unwrap(),
             inku_score::ScoreEdition::LATEST.as_str()
         );
     }
@@ -772,7 +953,7 @@ mod tests {
         let patches = include_str!("../../../vendor/resvg/INKU_PATCHES.md");
         assert!(patches.contains("There are two local patches."));
         let identity: serde_json::Value =
-            serde_json::from_str(&super::raster_identity_json()).unwrap();
+            serde_json::from_str(&super::raster_identity_json().unwrap()).unwrap();
         assert_eq!(
             identity,
             serde_json::json!({"backend": "resvg", "version": "0.48.1+inku.2"})

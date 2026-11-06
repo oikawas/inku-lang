@@ -5257,9 +5257,13 @@ impl Compiler<'_> {
             let axis = usize::from(spread(0) * units.x < spread(1) * units.y);
             let mut order: Vec<usize> = (0..centers.len()).collect();
             order.sort_by(|a, b| {
-                centers[*a][axis]
-                    .partial_cmp(&centers[*b][axis])
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                let a = centers[*a][axis];
+                let b = centers[*b][axis];
+                if a == b {
+                    std::cmp::Ordering::Equal
+                } else {
+                    a.total_cmp(&b)
+                }
             });
             order
         } else {

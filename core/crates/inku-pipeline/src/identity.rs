@@ -235,11 +235,14 @@ pub(crate) fn python_loads(json_text: &str) -> Result<Value, IdentityError> {
             Value::Array(items) => Value::Array(items.into_iter().map(collapse).collect()),
             Value::Object(members) => {
                 let mut kept: Vec<(String, Value)> = Vec::with_capacity(members.len());
+                let mut positions: std::collections::HashMap<String, usize> =
+                    std::collections::HashMap::with_capacity(members.len());
                 for (name, item) in members {
                     let item = collapse(item);
-                    if let Some(slot) = kept.iter_mut().find(|existing| existing.0 == name) {
-                        slot.1 = item;
+                    if let Some(&position) = positions.get(&name) {
+                        kept[position].1 = item;
                     } else {
+                        positions.insert(name.clone(), kept.len());
                         kept.push((name, item));
                     }
                 }
@@ -303,10 +306,13 @@ fn write_value(value: &Value, out: &mut String) {
             // `json.loads` keeps the last of duplicate names; `sort_keys` orders by
             // code point, which is the byte order of UTF-8.
             let mut kept: Vec<&(String, Value)> = Vec::with_capacity(members.len());
+            let mut positions: std::collections::HashMap<&str, usize> =
+                std::collections::HashMap::with_capacity(members.len());
             for member in members {
-                if let Some(slot) = kept.iter_mut().find(|existing| existing.0 == member.0) {
-                    *slot = member;
+                if let Some(&position) = positions.get(member.0.as_str()) {
+                    kept[position] = member;
                 } else {
+                    positions.insert(member.0.as_str(), kept.len());
                     kept.push(member);
                 }
             }
@@ -399,11 +405,16 @@ pub(crate) fn python_float_repr(number: f64) -> String {
 struct Parser<'a> {
     text: &'a str,
     at: usize,
+    depth: usize,
 }
 
 impl<'a> Parser<'a> {
     fn new(text: &'a str) -> Self {
-        Self { text, at: 0 }
+        Self {
+            text,
+            at: 0,
+            depth: 0,
+        }
     }
 
     fn error(&self, reason: &'static str) -> IdentityError {
@@ -444,8 +455,19 @@ impl<'a> Parser<'a> {
 
     fn parse_value(&mut self) -> Result<Value, IdentityError> {
         match self.rest().chars().next() {
-            Some('{') => self.parse_object(),
-            Some('[') => self.parse_array(),
+            Some(open @ ('{' | '[')) => {
+                if self.depth >= 128 {
+                    return Err(self.error("recursion limit exceeded"));
+                }
+                self.depth += 1;
+                let result = if open == '{' {
+                    self.parse_object()
+                } else {
+                    self.parse_array()
+                };
+                self.depth -= 1;
+                result
+            }
             Some('"') => self.parse_string().map(Value::String),
             Some('-' | '0'..='9') => {
                 if self.eat("-Infinity") {
@@ -643,6 +665,28 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn p0_deep_provider_json_returns_error_without_aborting() {
+        if std::env::var_os("INKU_P0_DEEP_CHILD").is_some() {
+            let input = format!("{}0{}", "[".repeat(100_000), "]".repeat(100_000));
+            assert!(python_loads(&input).is_err());
+            return;
+        }
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "identity::tests::p0_deep_provider_json_returns_error_without_aborting",
+            ])
+            .env("INKU_P0_DEEP_CHILD", "1")
+            .output()
+            .unwrap();
+        assert!(
+            child.status.success(),
+            "child failed: {}",
+            String::from_utf8_lossy(&child.stderr)
+        );
+    }
 
     fn cases() -> serde_json::Value {
         serde_json::from_str(include_str!(

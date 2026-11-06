@@ -247,7 +247,7 @@ fn build_semantic_document(
             .iter()
             .map(|issue| issue.occurrences.len())
             .sum::<usize>();
-    assert_eq!(
+    debug_assert_eq!(
         delivered_ground_occurrence_count, owned_ground_occurrence_count,
         "semantic document must deliver every Ground occurrence exactly once"
     );
@@ -334,7 +334,7 @@ fn build_semantic_document(
         .sum::<usize>();
     let delivered_continuation_occurrence_count = 2 * delivered_continuation_owners.len()
         + delivered_coordination_continuation_occurrence_count;
-    assert_eq!(
+    debug_assert_eq!(
         delivered_continuation_occurrence_count, owned_continuation_occurrence_count,
         "semantic document must deliver every continuation head and marker exactly once"
     );

@@ -8,7 +8,7 @@ import UIKit
 #endif
 
 public enum LibraryLayout: String, CaseIterable, Sendable {
-    case grid, list, lineage
+    case grid, list
 }
 
 private struct LineageGraphRequest {
@@ -95,10 +95,10 @@ public final class LibraryModel {
     public var isTrash = false { didSet { if isTrash != oldValue { changedFilter() } } }
     public var order: LibraryOrder = .newest { didSet { if order != oldValue { changedFilter() } } }
     public var layout: LibraryLayout = .grid {
-        didSet { if layout != oldValue { changedPresentation(wasGrouped: grouped || oldValue == .lineage) } }
+        didSet { if layout != oldValue { changedPresentation(wasGrouped: grouped) } }
     }
     public var grouped = false {
-        didSet { if grouped != oldValue { changedPresentation(wasGrouped: oldValue || layout == .lineage) } }
+        didSet { if grouped != oldValue { changedPresentation(wasGrouped: oldValue) } }
     }
     /// Web `HistoryManagerState.pageSize`, initially 24. Set directly by the history strip, by tests and for the lineage
     /// view's eight groups; a new size here starts on the page boundary that holds the first work, which the strip's own
@@ -270,7 +270,7 @@ public final class LibraryModel {
     public var shownTo: Int { min(total, startOffset + (page + 1) * pageSize) }
     /// ← newer and Latest: an earlier page, or newer works before the kept first work.
     public var hasNewer: Bool { page > 0 || startOffset > 0 }
-    public var isGrouped: Bool { grouped || layout == .lineage }
+    public var isGrouped: Bool { grouped }
     public var filter: LibraryQuery {
         LibraryQuery(text: query, trashed: isTrash, starred: starredOnly,
                      forRevision: revisionOnly, order: order, canvasSearch: canvasSearch)

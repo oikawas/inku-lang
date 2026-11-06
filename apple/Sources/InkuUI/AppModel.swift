@@ -500,7 +500,7 @@ public final class AppModel {
             catch { startupCatalogError = error }
             library.onMutation = { [weak self] in await self?.refreshWorks() }
             // Web `inku-history-display-mode` and the thumbnail/list tab come back with the library.
-            if let layout = display.libraryLayout.flatMap(LibraryLayout.init(rawValue:)), layout != .lineage {
+            if let layout = display.libraryLayout.flatMap(LibraryLayout.init(rawValue:)) {
                 library.layout = layout
             }
             if let grouped = display.libraryGrouped { library.grouped = grouped }

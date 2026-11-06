@@ -8,19 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Core: remove unused functions and duplicate calculations without changing drawing or request output.
-
 - macOS: avoid repeating unchanged calculations and image loads in input, generation details, and model settings.
-
-- Core: reduce repeated calculations and quadratic work without changing drawing or request output.
-
-- Server: route animation and card exports through render capacity, waiting or refusing when busy just like drawing. In a test database, peak RSS for an animation of 100 works fell from about 361 MB to 254 MB.
-
-- Server: add ETag and Cache-Control to display SVGs with a render hash and return 304 for a matching condition. Gzip compression of bodies over 1 MB runs in a thread.
-
-- Server: queue output-file rebuilds on the save executor and return upon acceptance. The count is accepted works, not completed works; a full queue returns 503 with Retry-After.
-
-- Server: add listing indexes to new databases, explicit database compaction, and execution-record retention that defaults to indefinite.
 
 - macOS: retrying a library preview also reloads the work's image.
 
@@ -638,6 +626,20 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.328 (2026-11-06 / Build 1404)
+
+- Core: remove unused functions and duplicate calculations without changing drawing or request output.
+
+- Core: reduce repeated calculations and quadratic work without changing drawing or request output.
+
+- Server: route animation and card exports through render capacity, waiting or refusing when busy just like drawing. In a test database, peak RSS for an animation of 100 works fell from about 361 MB to 254 MB.
+
+- Server: add ETag and Cache-Control to display SVGs with a render hash and return 304 for a matching condition. Gzip compression of bodies over 1 MB runs in a thread.
+
+- Server: queue output-file rebuilds on the save executor and return upon acceptance. The count is accepted works, not completed works; a full queue returns 503 with Retry-After.
+
+- Server: add listing indexes to new databases, explicit database compaction, and execution-record retention that defaults to indefinite.
 
 ## v2.15.327 (2026-11-06 / Build 1403)
 

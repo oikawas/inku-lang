@@ -1987,6 +1987,34 @@ fn collect_japanese_instruction_ownership(
     positions: &[SemanticTerm],
     ownership: &mut InstructionOwnership,
 ) {
+    let mut actions_by_clause = BTreeMap::<usize, Vec<&SemanticTerm>>::new();
+    for action in actions {
+        actions_by_clause
+            .entry(action.provenance.source.clause_index)
+            .or_default()
+            .push(action);
+    }
+    let mut positions_by_clause = BTreeMap::<usize, Vec<&SemanticTerm>>::new();
+    for position in positions {
+        positions_by_clause
+            .entry(position.provenance.source.clause_index)
+            .or_default()
+            .push(position);
+    }
+    let mut entities_by_clause = BTreeMap::<usize, Vec<_>>::new();
+    for entity in &association.ast.entities {
+        entities_by_clause
+            .entry(entity.head.source().clause_index)
+            .or_default()
+            .push(entity);
+    }
+    let mut markers_by_clause = BTreeMap::<usize, Vec<_>>::new();
+    for marker in &association.clause_topology.attachment_markers {
+        markers_by_clause
+            .entry(marker.clause_index)
+            .or_default()
+            .push(marker);
+    }
     for marker in association
         .clause_topology
         .attachment_markers
@@ -1996,8 +2024,10 @@ fn collect_japanese_instruction_ownership(
         })
     {
         let clause = &association.clause_stream.clauses[marker.clause_index];
-        let previous_action_end = actions
-            .iter()
+        let previous_action_end = actions_by_clause
+            .get(&marker.clause_index)
+            .into_iter()
+            .flatten()
             .filter(|action| {
                 action.provenance.source.clause_index == marker.clause_index
                     && action.provenance.source.span.end_byte <= marker.span.start_byte
@@ -2005,10 +2035,10 @@ fn collect_japanese_instruction_ownership(
             .map(|action| action.provenance.source.span.end_byte)
             .max()
             .unwrap_or(clause.span.start_byte);
-        let candidate_entities = association
-            .ast
-            .entities
-            .iter()
+        let candidate_entities = entities_by_clause
+            .get(&marker.clause_index)
+            .into_iter()
+            .flatten()
             .filter(|entity| {
                 let source = entity.head.source();
                 source.clause_index == marker.clause_index
@@ -2028,10 +2058,10 @@ fn collect_japanese_instruction_ownership(
         }
         let entity = candidate_entities[0];
         let head_start = entity.head.source().span.start_byte;
-        let next_head_start = association
-            .ast
-            .entities
-            .iter()
+        let next_head_start = entities_by_clause
+            .get(&marker.clause_index)
+            .into_iter()
+            .flatten()
             .filter(|candidate| {
                 let source = candidate.head.source();
                 source.clause_index == marker.clause_index
@@ -2048,8 +2078,10 @@ fn collect_japanese_instruction_ownership(
         ) {
             continue;
         }
-        let candidate_actions = actions
-            .iter()
+        let candidate_actions = actions_by_clause
+            .get(&marker.clause_index)
+            .into_iter()
+            .flatten()
             .filter(|action| {
                 action.provenance.source.clause_index == marker.clause_index
                     && marker.span.end_byte <= action.provenance.source.span.start_byte
@@ -2067,15 +2099,20 @@ fn collect_japanese_instruction_ownership(
             .map(|action| action.provenance.source.span.start_byte)
             .min()
             .expect("non-empty action candidates");
-        for position in positions.iter().filter(|position| {
-            position.provenance.source.clause_index == marker.clause_index
-                && previous_action_end <= position.provenance.source.span.start_byte
-                && position.provenance.source.span.end_byte <= predicate_start
-        }) {
-            let has_direct_marker = association
-                .clause_topology
-                .attachment_markers
-                .iter()
+        for position in positions_by_clause
+            .get(&marker.clause_index)
+            .into_iter()
+            .flatten()
+            .filter(|position| {
+                position.provenance.source.clause_index == marker.clause_index
+                    && previous_action_end <= position.provenance.source.span.start_byte
+                    && position.provenance.source.span.end_byte <= predicate_start
+            })
+        {
+            let has_direct_marker = markers_by_clause
+                .get(&marker.clause_index)
+                .into_iter()
+                .flatten()
                 .filter(|candidate| candidate.clause_index == marker.clause_index)
                 .filter(|candidate| {
                     matches!(

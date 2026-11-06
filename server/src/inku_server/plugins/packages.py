@@ -26,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -207,6 +208,8 @@ class PluginPackageManager:
         self._packages: tuple[PluginPackage, ...] = ()
         self._rejected: tuple[tuple[str, tuple[str, ...]], ...] = ()
         self._bundled: tuple[PluginPackage, dict[str, bytes]] | None = None
+        self._last_disabled: set[str] = set()
+        self._last_disabled_path = self._state_path()
 
     def bundled(self) -> tuple[PluginPackage, dict[str, bytes]]:
         if self._bundled is None:
@@ -253,16 +256,32 @@ class PluginPackageManager:
             self._packages, self._rejected, self._signature = tuple(packages), tuple(rejected), signature
 
     def _disabled(self) -> set[str]:
-        try:
-            raw = json.loads(self._state_path().read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return set()
-        disabled = raw.get("disabled") if isinstance(raw, dict) else None
-        return {item for item in disabled if isinstance(item, str)} if isinstance(disabled, list) else set()
+        with self._lock:
+            if self._last_disabled_path != self._state_path():
+                self._last_disabled_path = self._state_path()
+                self._last_disabled = set()
+            try:
+                raw = json.loads(self._state_path().read_text(encoding="utf-8"))
+                disabled = raw.get("disabled") if isinstance(raw, dict) else None
+                if not isinstance(disabled, list):
+                    return set(self._last_disabled)
+                self._last_disabled = {item for item in disabled if isinstance(item, str)}
+            except (OSError, ValueError, UnicodeError):
+                pass
+            return set(self._last_disabled)
 
     def _save_disabled(self, disabled: set[str]) -> None:
-        self.directory.mkdir(parents=True, exist_ok=True)
-        self._state_path().write_text(json.dumps({"disabled": sorted(disabled)}, indent=2) + "\n", encoding="utf-8")
+        with self._lock:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            fd, temporary = tempfile.mkstemp(prefix=".package-state-", dir=self.directory)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as out:
+                    out.write(json.dumps({"disabled": sorted(disabled)}, indent=2) + "\n")
+                os.replace(temporary, self._state_path())
+                self._last_disabled = set(disabled)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
 
     def packages(self) -> tuple[PluginPackage, ...]:
         self._reload()

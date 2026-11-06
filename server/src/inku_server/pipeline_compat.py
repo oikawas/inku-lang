@@ -95,6 +95,9 @@ def _interaction(view: dict) -> HTTPException:
 
 def _settled(owner: str, view: dict, *, perform: bool, reader_left: Callable[[], bool] | None = None) -> dict:
     view = _wait(owner, view, reader_left)
+    failure = view.get("provider_failure") or {}
+    if failure.get("stage") == "host" and failure.get("failure"):
+        raise HTTPException(503, {"code": failure["failure"], "message": "The authoring operation could not finish."})
     if (view.get("phase") or {}).get("tag") == "awaiting_patch_approval":
         raise _interaction(view)
     if not perform:

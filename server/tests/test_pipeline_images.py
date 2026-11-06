@@ -19,10 +19,39 @@ from inku_server import db
 from inku_server.persistence.schema import Base, UserAccountRow
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_api import PipelineService, pipeline_router, register_pipeline_errors
-from inku_server.pipeline_candidate import CandidateHostError, PipelineBinding
+from inku_server.pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
 from inku_server.pipeline_defaults import default_manifest
 from inku_server.pipeline_images import PendingImages, prepare_image
 from inku_server.pipeline_product import ProductPipelineEffects, record_system_prompt
+
+
+def test_image_review_waits_for_capacity_and_records_timeout(monkeypatch):
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from inku_server import pipeline_images
+    from inku_server.api_core import state
+
+    run = SimpleNamespace(owner_id="owner", context={}, image_data={}, snapshot=lambda: {}, view=lambda: {"execution_id": "run"})
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1,
+                              image_review_options=lambda *_: {})
+    calls = []
+    def review(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise HTTPException(503, "render capacity is full")
+        return ({"sha256": "image"}, "data")
+    monkeypatch.setattr(pipeline_images, "review_drawing", review)
+    action = {"identity": {"action_id": "a"}}
+    try:
+        assert service._image_review(run, action)["tag"] == "image_review_drawn"
+        assert len(calls) == 2
+        monkeypatch.setattr(state, "_RENDER_TURN_WAIT_SECONDS", 0)
+        monkeypatch.setattr(pipeline_images, "review_drawing", lambda *a, **k: (_ for _ in ()).throw(HTTPException(503, "render capacity is full")))
+        assert service._image_review(run, action)["tag"] == "image_review_undrawn"
+        assert run.context["image_review_skipped"] == "render_capacity"
+    finally:
+        service.close()
 
 
 def _file(format="PNG", size=(80, 40), *, exif=None):
@@ -90,7 +119,12 @@ def test_waiting_uploads_are_owner_scoped_bounded_and_expire():
 @pytest.fixture
 def image_host(tmp_path, monkeypatch):
     from inku_server import model_settings
+    from inku_server import pipeline_api
     from inku_server.api_core import rendering, thumbnails
+    class CapturedExecution(CandidateExecution):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs, transcript=[])
+    monkeypatch.setattr(pipeline_api, "CandidateExecution", CapturedExecution)
     binding = PipelineBinding()
     engine = create_engine(f"sqlite:///{tmp_path / 'image.db'}")
     Base.metadata.create_all(engine)

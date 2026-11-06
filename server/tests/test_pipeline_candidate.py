@@ -157,7 +157,9 @@ def test_real_binding_commits_source_and_authority_before_automatic_hole_request
 
     run = CandidateExecution(binding, store, owner_id="acceptance", config=_fixture_config(), provider=provider)
     run.start_new({"tag": "description", "description": "One quiet black circle", "auto_catalog": False})
+    assert run.transcript is None and run.last_output is None
     run.run_effect()  # Recorded provider result -> atomic commit request, no Score yet.
+    assert run.transcript is None and run.last_output is None
     assert run.view()["delivery"] is None
     assert store.inventory().candidate_variations == 0
     run.run_effect()  # Actual SQL transaction -> Rust compile/finalize.

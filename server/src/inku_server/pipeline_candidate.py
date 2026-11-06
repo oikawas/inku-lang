@@ -284,6 +284,7 @@ class CandidateExecution:
         context: dict | None = None,
         save_snapshot: Callable[[dict | None, dict, dict, dict | None], None] | None = None,
         on_render_refusal: Callable[[dict, dict], None] | None = None,
+        transcript: list[dict] | None = None,
     ):
         self.binding, self.store, self.owner_id = binding, store, owner_id
         self.config = json.loads(_bytes(config))
@@ -302,7 +303,7 @@ class CandidateExecution:
         self._attempt_began: tuple[dict, int] | None = None
         # Pixel bytes never enter context, snapshots, transcripts or history.
         self.image_data: dict[str, str] = {}
-        self.transcript: list[dict] = []
+        self.transcript = transcript
         self.last_output: dict | None = None
 
     def start_new(self, authoring: dict) -> dict:
@@ -360,6 +361,11 @@ class CandidateExecution:
             self._rendered = rendered
             self._fresh = snapshot["authority"]["revision"] == "0"
 
+    def cancel_if_busy(self) -> None:
+        with self._lock:
+            if self._snapshot is not None and self._snapshot.get("action") is not None:
+                self.command({"tag": "cancel"})
+
     def run_effect(self) -> dict | None:
         """Execute the current effect once. No effect means author input is next."""
         with self._lock:
@@ -396,7 +402,10 @@ class CandidateExecution:
             self._attempt_began = (action, int(time.time() * 1000))
         try:
             # Cancellation can invalidate the action during bounded provider I/O.
-            time.sleep(int(action["delay_ms"]) / 1000)
+            from .chatgpt_runtime import execution_cancel
+            cancel = execution_cancel(self.owner_id, self._snapshot["execution_id"])
+            if cancel.wait(int(action["delay_ms"]) / 1000):
+                return None
             with self._lock:
                 if self._snapshot["action"] != action:
                     return None
@@ -443,6 +452,10 @@ class CandidateExecution:
                               busy=False, rendered=None, result=None)
             if self.context.get("provider_failure") is not None:
                 result["provider_failure"] = self.context["provider_failure"]
+            if self.context.get("host_failure") is not None:
+                code = self.context["host_failure"]
+                result["phase"] = {"tag": "failed", "reason": code}
+                result["provider_failure"] = {"failure": code, "stage": "host", "attempt": 0}
             if self.context.get("image_failure") is not None:
                 result["image_failure"] = self.context["image_failure"]
             attempt = self._provider_attempt(state)
@@ -544,7 +557,8 @@ class CandidateExecution:
         if state and (next_snapshot["document"] != state["document"]
                       or next_snapshot["delivery"] != state["delivery"]):
             self.context.pop("svg_refusal", None)
-        self.transcript.append({"input": envelope, "output": output})
+        if self.transcript is not None:
+            self.transcript.append({"input": envelope, "output": output})
         # A committed edit invalidates the previous performance. Keep it only
         # when the same acknowledged source and Score remain active.
         if rendered is None and state and next_snapshot["document"] == state["document"] and next_snapshot["delivery"] is not None:
@@ -611,5 +625,6 @@ class CandidateExecution:
             self.save_snapshot(state, next_snapshot, self.context, rendered)
         self._snapshot = next_snapshot
         self._rendered = rendered
-        self.last_output = output
+        if self.transcript is not None:
+            self.last_output = output
         return output

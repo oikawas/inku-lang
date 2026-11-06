@@ -6,7 +6,9 @@ import hashlib
 import json
 import logging
 import threading
-from concurrent.futures import Future, ThreadPoolExecutor
+import time
+from collections import OrderedDict
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from copy import deepcopy
 from dataclasses import asdict
 from typing import Callable, Literal
@@ -39,6 +41,22 @@ _UNSAVED_PARENT_STEPS = 8
 
 
 _logger = logging.getLogger(__name__)
+
+
+def _wait_for_render_capacity(render: Callable[[], object]):
+    from .api_core.state import _RENDER_TURN_WAIT_SECONDS
+
+    deadline = time.monotonic() + _RENDER_TURN_WAIT_SECONDS
+    while True:
+        try:
+            return render()
+        except HTTPException as error:
+            if error.status_code != 503 or error.detail != "render capacity is full":
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(0.1, remaining))
 
 
 def _drawn_description(text: str) -> str:
@@ -256,7 +274,7 @@ class PipelineService:
         self.image_review_options = image_review_options
         from .pipeline_images import PendingImages
         self._images = PendingImages(max_retained_runs)
-        self._runs: dict[tuple[str, str], CandidateExecution] = {}
+        self._runs: OrderedDict[tuple[str, str], CandidateExecution] = OrderedDict()
         self._jobs: dict[tuple[str, str], Future] = {}
         self._lock = threading.RLock()
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="inku-pipeline")
@@ -265,12 +283,24 @@ class PipelineService:
         from .chatgpt_runtime import stop
         stop()
         with self._lock:
-            for run in self._runs.values():
+            runs = list(self._runs.values())
+            jobs = list(self._jobs.values())
+        def cancel_run(run):
+            try:
                 if run.view()["busy"]:
                     run.command({"tag": "cancel"})
-        self._pool.shutdown(wait=True, cancel_futures=True)
+            except Exception:
+                _logger.exception("pipeline_shutdown_cancel_failed")
+        deadline = time.monotonic() + 5.0
+        cancel_threads = [threading.Thread(target=cancel_run, args=(run,), daemon=True) for run in runs]
+        for thread in cancel_threads:
+            thread.start()
+        self._pool.shutdown(wait=False, cancel_futures=True)
+        wait(jobs, timeout=max(0, deadline - time.monotonic()))
+        for thread in cancel_threads:
+            thread.join(timeout=max(0, deadline - time.monotonic()))
         self._images.clear()
-        for run in self._runs.values():
+        for run in runs:
             run.image_data.clear()
 
     def activity(self, owner: str | None) -> list[dict]:
@@ -362,15 +392,20 @@ class PipelineService:
     def _image_review(self, run: CandidateExecution, action: dict) -> dict:
         from .pipeline_images import review_drawing
         result = {"tag": "image_review_undrawn", "identity": action["identity"]}
+        run.context.pop("image_review_skipped", None)
         if self.image_review_options is None:
             return result
         try:
             snapshot = run.snapshot()
-            drawing = review_drawing(self.binding, snapshot, self.image_review_options(snapshot, run.context), owner=run.owner_id)
+            drawing = _wait_for_render_capacity(lambda: review_drawing(self.binding, snapshot, self.image_review_options(snapshot, run.context), owner=run.owner_id))
             if drawing is not None:
                 reference, data_url = drawing
                 run.image_data[reference["sha256"]] = data_url
                 return {"tag": "image_review_drawn", "identity": action["identity"], "drawing": reference}
+        except HTTPException as error:
+            if error.status_code == 503 and error.detail == "render capacity is full":
+                run.context["image_review_skipped"] = "render_capacity"
+            _logger.warning("pipeline_image_review_undrawn execution_id=%s", run.view()["execution_id"])
         except Exception:
             # Neither an SVG nor an input image can enter this diagnostic.
             _logger.warning("pipeline_image_review_undrawn execution_id=%s", run.view()["execution_id"])
@@ -542,9 +577,8 @@ class PipelineService:
         if current is not None and not current.done():
             return
         if run.view()["busy"]:
-            if run.context.get("host_options", {}).get("chatgpt_profile"):
-                from .chatgpt_runtime import begin_execution
-                begin_execution(*key)
+            from .chatgpt_runtime import begin_execution
+            begin_execution(*key, chatgpt=bool(run.context.get("host_options", {}).get("chatgpt_profile")))
             job = self._pool.submit(self._drain, run)
             job.add_done_callback(lambda done, key=key: self._log_job_failure(key, done))
             self._jobs[key] = job
@@ -574,6 +608,13 @@ class PipelineService:
     def _drain(self, run: CandidateExecution) -> None:
         try:
             self._drain_steps(run)
+        except Exception as error:
+            _logger.exception("pipeline_job_failed execution_id=%s", run.view()["execution_id"])
+            detail = error.detail if isinstance(error, HTTPException) else None
+            code = detail.get("code") if isinstance(detail, dict) else getattr(error, "code", None)
+            if not isinstance(code, str) or not code:
+                code = str(error) if isinstance(error, CandidateHostError) else "pipeline_effect_failed"
+            run.command({"tag": "cancel"}, context_updates={"host_failure": code})
         finally:
             # An unsuccessful host job is not allowed to retain source pixels.
             if not run.view()["busy"] or run.context.get("image_provenance") is not None:
@@ -598,8 +639,12 @@ class PipelineService:
                 if payload is not None:
                     # Persist the acknowledged source's safe performance before
                     # bounded provider I/O can fail or produce a declined patch.
-                    run.command(payload)
+                    _wait_for_render_capacity(lambda: run.command(payload))
             run.run_effect()
+            from .chatgpt_runtime import execution_cancel
+            if execution_cancel(run.owner_id, view["execution_id"]).is_set():
+                run.cancel_if_busy()
+                return
         if run.view()["busy"]:
             raise CandidateHostError("pipeline_effect_limit")
         run.image_data.clear()
@@ -624,6 +669,8 @@ class PipelineService:
                         }):
                     self._stop_missing_image(run)
                 self._schedule(key, run)
+            else:
+                self._runs.move_to_end(key)
             return run
 
     def completion_range_states(self, owner: str, body: CompletionRangeStatesBody) -> dict:
@@ -787,7 +834,18 @@ class PipelineService:
         if record is None:
             raise HTTPException(404, "variation_not_found")
         execution_id = record.execution_id
-        run = self.execution(owner, execution_id)
+        key = (owner, execution_id)
+        with self._lock:
+            run = self._runs.get(key)
+            if run is not None:
+                self._runs.move_to_end(key)
+            else:
+                saved = json.loads(record.state_bytes)
+                if saved["snapshot"].get("action") is not None:
+                    run = self.execution(owner, execution_id)
+                else:
+                    run = self._host(owner, saved["snapshot"]["config"], saved["context"])
+                    run.restore(saved["snapshot"], rendered=saved["rendered"])
         if run.context.get("svg_refusal") is not None:
             raise HTTPException(422, run.context["svg_refusal"])
         job = self._jobs.get((owner, execution_id))

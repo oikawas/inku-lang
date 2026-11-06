@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import threading
+import time
 
 import httpx
 import pytest
@@ -27,6 +29,36 @@ def _action() -> dict:
             }
         },
     }
+
+
+def test_api_send_is_cancelled_without_waiting_for_provider(monkeypatch):
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: ("fixture", "fixture-model"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    started = threading.Event()
+    cancelled = threading.Event()
+    async def request(_):
+        started.set()
+        await asyncio.sleep(10)
+        return httpx.Response(200)
+    provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192, execution_cancel=cancelled),
+                                     transport=httpx.MockTransport(request))
+    result = []
+    thread = threading.Thread(target=lambda: result.append(provider({**_action(), "timeout_ms": "10000"})))
+    thread.start()
+    try:
+        assert started.wait(2)
+        before = time.monotonic()
+        cancelled.set()
+        thread.join(1)
+        assert not thread.is_alive()
+        assert time.monotonic() - before < 1
+        assert result[0]["tag"] == "provider_failed"
+    finally:
+        cancelled.set()
+        thread.join(2)
 
 
 def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadline(monkeypatch):

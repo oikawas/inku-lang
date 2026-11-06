@@ -21,6 +21,7 @@ class Startup:
 _startup: Startup | None = None
 _stopping = threading.Event()
 _cancels: dict[tuple[str, str], threading.Event] = {}
+_chatgpt_cancels: set[tuple[str, str]] = set()
 _cancel_lock = threading.Lock()
 
 
@@ -84,27 +85,33 @@ def cancel_execution(owner: str, execution: str) -> None:
             event.set()
 
 
-def execution_cancel(owner: str, execution: str) -> threading.Event:
+def execution_cancel(owner: str, execution: str, *, chatgpt: bool = False) -> threading.Event:
     with _cancel_lock:
+        if chatgpt:
+            _chatgpt_cancels.add((owner, execution))
         return _cancels.setdefault((owner, execution), threading.Event())
 
 
-def begin_execution(owner: str, execution: str) -> None:
+def begin_execution(owner: str, execution: str, *, chatgpt: bool = False) -> None:
     # Called only when the prior worker has finished. Old requests retain the
     # old event, so a subsequent author action cannot revive cancelled I/O.
     with _cancel_lock:
         _cancels[(owner, execution)] = threading.Event()
+        _chatgpt_cancels.discard((owner, execution))
+        if chatgpt:
+            _chatgpt_cancels.add((owner, execution))
 
 
 def retire_execution(owner: str, execution: str) -> None:
     with _cancel_lock:
         _cancels.pop((owner, execution), None)
+        _chatgpt_cancels.discard((owner, execution))
 
 
 def cancel_owner(owner: str) -> None:
     with _cancel_lock:
         for (actor, _execution), event in _cancels.items():
-            if actor == owner:
+            if actor == owner and (actor, _execution) in _chatgpt_cancels:
                 event.set()
 
 

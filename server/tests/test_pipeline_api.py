@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
+import pytest
 from sqlalchemy import create_engine, select
 
 from inku_server.persistence.schema import Base, HistoryRow
@@ -508,3 +510,189 @@ def test_a_job_that_stops_on_an_exception_leaves_it_in_the_log(caplog):
     caplog.clear()
     PipelineService._log_job_failure(("owner", "execution-2"), finished)
     assert caplog.records == []
+
+
+@pytest.mark.parametrize("error, code", [
+    (RuntimeError("unexpected"), "pipeline_effect_failed"),
+    (HTTPException(503, {"code": "render_busy"}), "render_busy"),
+])
+def test_failed_drain_records_failure_and_releases_capacity(error, code):
+    class Run:
+        owner_id = "owner"
+        image_data = {}
+        context = {}
+        busy = True
+
+        def view(self):
+            return {"execution_id": "run", "busy": self.busy}
+
+        def command(self, payload, *, context_updates):
+            assert payload == {"tag": "cancel"}
+            self.context.update(context_updates)
+            self.busy = False
+
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1)
+    run = Run()
+    service._runs[("owner", "run")] = run
+    service._drain_steps = lambda _: (_ for _ in ()).throw(error)
+    try:
+        service._drain(run)
+        assert run.context["host_failure"] == code
+        assert not run.view()["busy"]
+        service._reserve_run()
+        assert not service._runs
+    finally:
+        service.close()
+
+
+def test_read_only_get_does_not_reserve_a_busy_slot():
+    from types import SimpleNamespace
+
+    class Run:
+        context = {}
+        image_data = {}
+        def view(self):
+            return {"busy": False, "execution_id": "saved"}
+        def restore(self, snapshot, *, rendered):
+            assert snapshot == {"config": {}, "action": None}
+
+    record = SimpleNamespace(execution_id="saved", state_bytes=json.dumps({"snapshot": {"config": {}, "action": None}, "context": {}, "rendered": None}))
+    store = SimpleNamespace(read_latest_execution_for_variation=lambda *_: record)
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=8)
+    service._host = lambda *_: Run()
+    class BusyRun(Run):
+        def view(self):
+            return {"busy": True, "execution_id": "busy"}
+    service._runs.update({("owner", str(i)): BusyRun() for i in range(8)})
+    try:
+        assert service.get("owner", "variation")["execution_id"] == "saved"
+        assert len(service._runs) == 8
+    finally:
+        service._runs.clear()
+        service.close()
+
+
+def test_get_resumes_an_unresident_busy_execution():
+    from types import SimpleNamespace
+
+    class Run:
+        context = {}
+        image_data = {}
+        def restore(self, snapshot, *, rendered):
+            self.saved = snapshot
+        def snapshot(self):
+            return self.saved
+        def view(self):
+            return {"busy": True, "execution_id": "saved"}
+
+    record = SimpleNamespace(execution_id="saved", state_bytes=json.dumps({"snapshot": {"config": {}, "action": {"tag": "generate_normalized_ddl"}}, "context": {}, "rendered": None}))
+    store = SimpleNamespace(read_latest_execution_for_variation=lambda *_: record, read_execution=lambda *_: record)
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=8)
+    service._host = lambda *_: Run()
+    scheduled = []
+    service._schedule = lambda key, run: scheduled.append((key, run))
+    try:
+        assert service.get("owner", "variation")["busy"] is True
+        assert scheduled == [(('owner', 'saved'), service._runs[('owner', 'saved')])]
+    finally:
+        service._runs.clear()
+        service.close()
+
+
+def test_reserve_evicts_least_recently_used_idle_run():
+    class Run:
+        context = {}
+        image_data = {}
+        def view(self):
+            return {"busy": False}
+
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=2)
+    service._runs.update({("owner", "first"): Run(), ("owner", "second"): Run()})
+    try:
+        service.execution("owner", "first")
+        service._reserve_run()
+        assert list(service._runs) == [("owner", "first")]
+    finally:
+        service.close()
+
+
+def test_drain_stops_after_an_effect_is_cancelled():
+    from inku_server.chatgpt_runtime import begin_execution, cancel_execution, retire_execution
+
+    class Run:
+        owner_id = "cancel-owner"
+        image_data = {}
+        context = {}
+        calls = 0
+        busy = True
+        def view(self):
+            return {"busy": self.busy, "execution_id": "cancel-run", "rendered": None}
+        def snapshot(self):
+            return {"action": {"tag": "generate_normalized_ddl"}}
+        def run_effect(self):
+            self.calls += 1
+            cancel_execution(self.owner_id, "cancel-run")
+        def cancel_if_busy(self):
+            self.busy = False
+
+    run = Run()
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=2, max_retained_runs=1)
+    begin_execution(run.owner_id, "cancel-run")
+    try:
+        service._drain_steps(run)
+        assert run.calls == 1
+        assert not run.view()["busy"]
+    finally:
+        retire_execution(run.owner_id, "cancel-run")
+        service.close()
+
+
+def test_logout_only_cancels_chatgpt_runs():
+    from inku_server.chatgpt_runtime import begin_execution, cancel_owner, execution_cancel, retire_execution
+
+    begin_execution("owner", "api", chatgpt=False)
+    begin_execution("owner", "chatgpt", chatgpt=True)
+    try:
+        cancel_owner("owner")
+        assert not execution_cancel("owner", "api").is_set()
+        assert execution_cancel("owner", "chatgpt").is_set()
+    finally:
+        retire_execution("owner", "api")
+        retire_execution("owner", "chatgpt")
+
+
+def test_logout_does_not_stop_api_drain():
+    from inku_server.chatgpt_runtime import begin_execution, cancel_owner, retire_execution
+
+    class Run:
+        owner_id = "logout-owner"
+        context = {}
+        image_data = {}
+        busy = True
+        calls = 0
+        def view(self):
+            return {"busy": self.busy, "execution_id": "api-run", "rendered": None}
+        def snapshot(self):
+            return {"action": {"tag": "generate_normalized_ddl"}}
+        def run_effect(self):
+            cancel_owner(self.owner_id)
+            self.calls += 1
+            self.busy = False
+        def cancel_if_busy(self):
+            pytest.fail("logout cancelled a non-ChatGPT run")
+
+    run = Run()
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=2, max_retained_runs=1)
+    begin_execution(run.owner_id, "api-run", chatgpt=False)
+    try:
+        service._drain_steps(run)
+        assert run.calls == 1 and not run.busy
+    finally:
+        retire_execution(run.owner_id, "api-run")
+        service.close()

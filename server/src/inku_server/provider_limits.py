@@ -17,6 +17,7 @@ rather than serialising end to end.
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -39,7 +40,7 @@ def _semaphore_for(provider_id: str, limit: int) -> threading.BoundedSemaphore:
 
 
 @contextmanager
-def provider_slot(provider_id: str | None, *, timeout: float | None = None) -> Iterator[None]:
+def provider_slot(provider_id: str | None, *, timeout: float | None = None, cancel: threading.Event | None = None) -> Iterator[None]:
     """Wait for a free slot on this provider, or pass straight through."""
     limit = provider_concurrency_limit(str(provider_id or ""))
     if limit <= 0:
@@ -48,7 +49,18 @@ def provider_slot(provider_id: str | None, *, timeout: float | None = None) -> I
     # Released on the same object it was taken from, so a definition changing
     # mid-flight cannot push a BoundedSemaphore past its ceiling.
     semaphore = _semaphore_for(str(provider_id), limit)
-    acquired = semaphore.acquire() if timeout is None else semaphore.acquire(timeout=timeout)
+    if cancel is None:
+        acquired = semaphore.acquire() if timeout is None else semaphore.acquire(timeout=timeout)
+    else:
+        deadline = None if timeout is None else time.monotonic() + timeout
+        acquired = False
+        while not cancel.is_set():
+            remaining = 0.1 if deadline is None else min(0.1, max(0, deadline - time.monotonic()))
+            if semaphore.acquire(timeout=remaining):
+                acquired = True
+                break
+            if deadline is not None and time.monotonic() >= deadline:
+                break
     if not acquired:
         raise TimeoutError("provider slot deadline expired")
     try:

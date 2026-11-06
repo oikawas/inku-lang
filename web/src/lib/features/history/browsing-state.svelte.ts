@@ -308,11 +308,7 @@ export class HistoryBrowsingState {
 			return;
 		}
 		let found = await this.fetchOffset(0, { anchorId: item.id });
-		if (requestId !== this.selectionRequest) {
-			const current = this.deps.currentItem();
-			if (current) void this.syncToItem(current);
-			return;
-		}
+		if (requestId !== this.selectionRequest) return;
 		if (found === 'missing' && this.filtered) {
 			// All strip filters come off together because the missing response
 			// does not say which independent mark hid the current work.
@@ -324,11 +320,7 @@ export class HistoryBrowsingState {
 			else this.deps.onOtherFilterCleared();
 			found = await this.fetchOffset(0, { anchorId: item.id });
 		}
-		if (requestId !== this.selectionRequest) {
-			const current = this.deps.currentItem();
-			if (current) void this.syncToItem(current);
-			return;
-		}
+		if (requestId !== this.selectionRequest) return;
 		if (found === 'missing') this.cursor = -1;
 	}
 

@@ -182,6 +182,21 @@ test('a superseded anchor lookup does not clear filters or selection', async () 
 	await newer;
 });
 
+test('an older selection does not restart or abort the newer selection', async () => {
+	const { apiFetch, requests } = deferredTransport();
+	const { state, controls } = makeState(apiFetch);
+	controls.currentItem = work('new');
+	const first = state.syncToItem(work('old'));
+	const second = state.syncToItem(work('new'));
+	requests[0].resolve(jsonResponse({ items: [work('old')], total: 1, offset: 0 }));
+	await first;
+	assert.equal(requests.length, 2);
+	assert.equal(requests[1].init?.signal?.aborted, false);
+	requests[1].resolve(jsonResponse({ items: [work('new')], total: 1, offset: 0 }));
+	await second;
+	assert.equal(state.items[state.cursor]?.id, 'new');
+});
+
 test('T-276/T-278: anchored selection clears strip filters and seeds the one manager', async () => {
 	const calls: string[] = [];
 	const { state, controls } = makeState(async (path) => {

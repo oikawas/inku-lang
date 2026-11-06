@@ -69,8 +69,10 @@ struct CreationView: View {
     @State private var showImageModelPicker = false
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
+    #if os(macOS)
     @State private var imagePreview: NSImage?
     @State private var savedImageRecord: ExactJSON?
+    #endif
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
     @State private var batchKind = "description"
     @State private var pendingImageBatchRestart: Bool?
@@ -200,8 +202,10 @@ struct CreationView: View {
             }
         }
         .onDisappear { batchWorkspace.invalidateReads() }
+        #if os(macOS)
         .onChange(of: model.imageInput?.jpeg, initial: true) { _, data in imagePreview = data.flatMap(NSImage.init(data:)) }
         .onChange(of: model.savedImageDDL, initial: true) { _, data in savedImageRecord = data.flatMap { try? ExactJSON(data: $0) } }
+        #endif
         .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
         .task(id: workspaceWork?.lineageNodeID) {
             workspaceGeneration = nil

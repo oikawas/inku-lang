@@ -306,8 +306,10 @@ test('reopening after search does not mistake its results for the strip seed', a
 	const { manager } = makeManager(works(MANAGER_PAGE_SIZE, 'search'), TOTAL);
 	const strip = works(STRIP_SIZE, 'strip');
 	manager.seedFromStrip(strip, TOTAL, 0, MANAGER_PAGE_SIZE);
+	manager.search = 'mountain';
 	await manager.fetch({ search: 'mountain' });
 	refreshDerived(manager);
+	manager.search = '';
 	manager.openWith(strip, TOTAL, 0);
 	assert.equal(manager.activeItems[0]?.id, 'strip-0');
 });
@@ -341,6 +343,8 @@ test('a retained library query survives a late strip seed, and a cached search s
 	// Stage a cached filtered search, then change to it from the retained query.
 	// The cache avoids a fetch, but it is still a real query change and therefore
 	// must return to page one and clear the checked works.
+	manager.page = 0;
+	manager.search = 'coast';
 	await manager.fetch({ page: 0, search: 'coast', starredOnly: true });
 	refreshDerived(manager);
 	manager.page = 2;

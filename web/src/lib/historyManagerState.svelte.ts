@@ -125,6 +125,7 @@ type TrashPageSync = (items: HistoryItem[], total: number) => void;
 
 /** What a request asks the server for. */
 type Request = {
+	id: number;
 	view: HistoryManagerView;
 	page: number;
 	pageSize: number;
@@ -371,14 +372,17 @@ export class HistoryManagerState {
 		// user nothing extra, so the later caller rides on the request already
 		// out. Answers still arrive; only the duplicate question is dropped.
 		//
-		// This has to be decided before taking a request number. A number marks
-		// every earlier request as superseded, so a question dropped after taking
-		// one would throw away the answer it was riding on: the works arrive, all
-		// of them, and are discarded on the doorstep.
 		const offset = this.startOffset + page * pageSize;
-		const request: Request = { view, page, pageSize, offset, search, starredOnly, forRevisionOnly, forShareOnly };
-		if (this.requestInFlight(request, pageSize)) return;
-		const requestId = ++this.requestId;
+		const request: Request = { id: ++this.requestId, view, page, pageSize, offset, search, starredOnly, forRevisionOnly, forShareOnly };
+		const existing = this.requestInFlight(request, pageSize);
+		if (existing) {
+			existing.id = request.id;
+			if (!silent) this.loading = true;
+			return;
+		}
+		const isCurrent = () => request.id === this.requestId && offset === this.startOffset + this.page * this.pageSize
+			&& view === this.view && search === this.search.trim() && starredOnly === this.starredOnly
+			&& forRevisionOnly === this.forRevisionOnly && forShareOnly === this.forShareOnly;
 		this.inFlight.push(request);
 		this.pendingRequests += 1;
 		if (!silent) this.loading = true;
@@ -400,13 +404,13 @@ export class HistoryManagerState {
 			// The third mark is independent of the other two in the same way.
 			if (forShareOnly) params.set('for_share', 'true');
 			const r = await this.apiFetch(`/api/history?${params.toString()}`);
-			if (requestId !== this.requestId) return;
+			if (!isCurrent()) return;
 			if (!r.ok) {
 				this.markLoadFailed(view);
 				return;
 			}
 			const data = await r.json() as { items: HistoryItem[]; total: number };
-			if (requestId !== this.requestId) return;
+			if (!isCurrent()) return;
 			if (trashed) {
 				this.trashItems = data.items;
 				this.trashTotal = data.total;
@@ -433,12 +437,12 @@ export class HistoryManagerState {
 				}
 			}
 		} catch {
-			if (requestId === this.requestId) this.markLoadFailed(view);
+			if (isCurrent()) this.markLoadFailed(view);
 		}
 		finally {
 			this.inFlight = this.inFlight.filter((sent) => sent !== request);
 			this.pendingRequests = Math.max(0, this.pendingRequests - 1);
-			if (!silent && (requestId === this.requestId || this.pendingRequests === 0)) this.loading = false;
+			if (request.id === this.requestId || this.pendingRequests === 0) this.loading = false;
 		}
 	};
 
@@ -688,8 +692,8 @@ export class HistoryManagerState {
 	 * somewhere else, so the works that arrived were 36 short of the ones the
 	 * modal then said it was showing.
 	 */
-	private requestInFlight(request: Request, atLeast: number): boolean {
-		return this.inFlight.some((sent) =>
+	private requestInFlight(request: Request, atLeast: number): Request | undefined {
+		return this.inFlight.find((sent) =>
 			sent.view === request.view &&
 			sent.offset === request.offset &&
 			sent.search === request.search &&

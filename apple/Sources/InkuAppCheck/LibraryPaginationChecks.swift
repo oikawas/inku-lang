@@ -308,6 +308,9 @@ private actor PaginationLineageReader: LineageReading {
 /// Use a disposable Backup API copy, never the author's live canonical database.
 @MainActor
 func runLibraryPaginationBenchmark(url: URL) async throws {
+    guard url.lastPathComponent == "identity-check.sqlite", FileManager.default.fileExists(atPath: url.path) else {
+        throw CheckFailure.message("Use an existing disposable identity-check.sqlite copy")
+    }
     let database = try InkuDatabase(url: url)
     let store = try ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url))
     let host = PipelineHost(database: database)

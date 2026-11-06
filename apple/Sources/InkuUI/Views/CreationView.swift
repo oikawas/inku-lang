@@ -85,6 +85,7 @@ struct CreationView: View {
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
     @State private var ddl3d = Ddl3DController()
     @Environment(\.inkuWindowSize) private var windowSize
+    @Environment(\.inkuTooltipsCovered) private var covered
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var isImage: Bool { automation.workspaceInputMode == "image" }
     private var workspaceCovered: Bool { ui.settingsOpen || ui.libraryOpen }
@@ -917,6 +918,7 @@ struct CreationView: View {
             } else {
                 let showsLineage = ui.workspaceTab == "lineage" && workspaceWork != nil
                 artwork
+                    .environment(\.inkuTooltipsCovered, covered || showsLineage)
                     .opacity(showsLineage ? 0 : 1)
                     .allowsHitTesting(!showsLineage)
                     .accessibilityHidden(showsLineage)
@@ -938,6 +940,7 @@ struct CreationView: View {
                         .opacity(showsLineage ? 1 : 0)
                         .allowsHitTesting(showsLineage)
                         .accessibilityHidden(!showsLineage)
+                        .environment(\.inkuTooltipsCovered, covered || ui.generationInfoOpen || ui.saijikiOpen)
                 }
             }
         }
@@ -991,7 +994,7 @@ struct CreationView: View {
     /// Its first front view matches the picture where it stands (Web `initialView`).
     private var threeDimensionalReplacement: ArtworkReplacement? {
         #if os(macOS)
-        guard ui.canvasThreeDimensional, let work = workspaceWork, let registration = Ddl3DInstallation.registered else { return nil }
+        guard !covered, ui.workspaceTab != "lineage", ui.canvasThreeDimensional, let work = workspaceWork, let registration = Ddl3DInstallation.registered else { return nil }
         let controller = ddl3d, ui = ui
         return ArtworkReplacement(zoom: controller.displayZoom, available: controller.ready && controller.failure == nil,
                                   setZoom: { controller.zoom(to: $0) }, fit: { controller.reset() }) { _, box, scale, offset in

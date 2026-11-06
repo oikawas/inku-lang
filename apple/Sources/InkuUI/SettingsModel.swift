@@ -170,7 +170,7 @@ public final class SettingsModel {
 
     public func load(model: AppModel) async {
         host = await model.hostSettings()
-        if providerIndex == nil { selectedProviderID = orderedProviders.first?.id }
+        if !host.providers.contains(where: { $0.id == selectedProviderID }) { selectedProviderID = orderedProviders.first?.id }
         await inspectAllCredentials()
     }
     public func inspectAllCredentials() async {
@@ -309,13 +309,12 @@ public final class SettingsModel {
         status = "APIキーを削除しました。"
     }
 
-    public func saveDrawingDefaults(models: ModelSelection, model: AppModel) async throws {
-        let latest = await model.hostSettings()
-        guard Self.isBatchModelAvailable(models.stage1Model, settings: latest), models.stage2Model == models.stage1Model else {
-            throw HostError("drawing_model_unavailable")
+    public func saveTokenLimits(stage1: Int, hole: Int, model: AppModel) async throws {
+        try await saveSettings(model: model) {
+            $0.models.stage1MaxTokens = stage1
+            $0.models.holeMaxTokens = hole
         }
-        try await saveSettings(model: model) { $0.models = models }
-        status = "通常の描画モデルを保存しました。"
+        status = "出力上限を保存しました。"
     }
 
     @discardableResult

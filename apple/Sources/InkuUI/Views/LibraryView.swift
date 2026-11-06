@@ -1030,6 +1030,7 @@ private struct LibraryPageNumberInput: NSViewRepresentable {
         context.coordinator.parent = self
         if field.font?.pointSize != fontSize { field.font = .monospacedDigitSystemFont(ofSize: fontSize, weight: .regular) }
         field.isEnabled = context.environment.isEnabled
+        field.isEditable = context.environment.isEnabled && !context.environment.inkuTooltipsCovered
         field.setAccessibilityLabel(label)
         // Web `shown`: the page shown, except while the reader is typing.
         if field.currentEditor() == nil, field.stringValue != String(current) { field.stringValue = String(current) }

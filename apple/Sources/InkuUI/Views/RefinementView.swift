@@ -21,7 +21,6 @@ public struct RefinementView: View {
 
     private func finish() { if let onClose { onClose() } else { dismiss() } }
     private var controlsDisabled: Bool { refinement.running || model.isBusy || closing || refinement.closed }
-    private var effectiveWild: Bool { refinement.inheritWild ? refinement.work.renderWild ?? false : refinement.wildOverride }
 
     public var body: some View {
         @Bindable var refinement = refinement
@@ -38,13 +37,6 @@ public struct RefinementView: View {
                 HStack(spacing: 8) { generateButton(count: 1); generateButton(count: 4) }
                 Label(model.display.localized("高速（補完の穴があるときだけLLM）"), systemImage: "clock")
                     .inkuFont(11).foregroundStyle(.secondary)
-                RefinementDrawingModelPicker(model: model, reference: $refinement.modelReference, disabled: controlsDisabled)
-                HStack {
-                    Button(model.display.localized("筆致制限を外す")) {
-                        refinement.wildOverride = !effectiveWild; refinement.inheritWild = false
-                    }.buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
-                        .accessibilityValue(model.display.localized(effectiveWild ? "入" : "切"))
-                }.disabled(controlsDisabled)
                 if refinement.running {
                     RunStatusView(display: model.display, label: refinement.saving ? "選択した候補を保存中" : "候補の準備中",
                         stopping: refinement.stopping || closing, onStop: { Task { await refinement.stop(app: model) } }) { ProviderProgressView(model: model, embedded: true) }
@@ -92,34 +84,5 @@ public struct RefinementView: View {
         guard !closing else { return }
         closing = true
         if await refinement.close(app: model) { finish() } else { closing = false }
-    }
-}
-
-/// The selected card uses the same model-selection owner as the DDL dialog.
-@MainActor
-private struct RefinementDrawingModelPicker: View {
-    @Bindable var model: AppModel
-    @Binding var reference: String
-    let disabled: Bool
-    @State private var showModels = false
-    @State private var providers: [ProviderSettings] = []
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(model.display.localized("描画モデル")).inkuFont(11).foregroundStyle(.secondary)
-            Button { showModels = true } label: {
-                HStack(spacing: 10) {
-                    Text(reference.isEmpty ? model.display.localized("選択してください") : ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID).displayName(reference))
-                        .inkuFont(12).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    Text(model.display.webCopy("modelSelectButton", "モデル選択")).inkuFont(10).foregroundStyle(Color.accentColor)
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }.buttonStyle(.bordered).disabled(disabled)
-        }
-        .task(id: model.providerSettingsRevision) { providers = (await model.hostSettings()).providers }
-        .sheet(isPresented: $showModels) {
-            BatchModelPickerView(model: model, initialReference: reference, immediateSelection: true, title: "描画モデル") { value in
-                try await model.selectDdlDrawingModel(value); reference = value
-            }.disabled(disabled)
-        }
     }
 }

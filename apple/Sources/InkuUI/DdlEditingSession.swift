@@ -49,13 +49,13 @@ public final class DdlEditingSession: Identifiable {
     /// Web DdlEditorDialog: discard returns to the work's saved instructions; a new DDL has none.
     public var discardTarget: String? { sourceWork == nil ? nil : initialText }
 
-    public func commit(to model: AppModel, wildOverride: Bool? = nil) async -> Bool {
+    public func commit(to model: AppModel) async -> Bool {
         guard canSubmit(to: model) else { return false }
-        if let sourceWork { return await model.drawEditedDDL(work: sourceWork, source: draft, wildOverride: wildOverride, presentation: .editor) }
+        if let sourceWork { return await model.drawEditedDDL(work: sourceWork, source: draft, presentation: .editor) }
         let previousInput = model.ddlText
         model.ddlText = draft
         guard model.canCommitDDL else { model.ddlText = previousInput; return false }
-        await model.commitDDL(wildOverride: wildOverride, presentation: .editor)
+        await model.commitDDL(wildOverride: model.wild, presentation: .editor)
         let committed = model.errorText == nil && model.visibleDDL == draft
         if !committed, model.displayedWork?.id == sourceWorkID, model.authoringRevision == sourceRevision {
             model.ddlText = previousInput

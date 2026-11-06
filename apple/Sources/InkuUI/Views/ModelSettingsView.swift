@@ -372,8 +372,7 @@ struct ModelSettingsView: View {
 
     private var drawingChanged: Bool {
         let saved = settings.host.models
-        return drawingDraft != nil && (drawingModels.stage1Model != saved.stage1Model
-            || drawingModels.stage1MaxTokens != saved.stage1MaxTokens || drawingModels.holeMaxTokens != saved.holeMaxTokens)
+        return drawingDraft != nil && (drawingModels.stage1MaxTokens != saved.stage1MaxTokens || drawingModels.holeMaxTokens != saved.holeMaxTokens)
     }
 
     private var confirmationTitle: String {
@@ -449,12 +448,10 @@ struct ModelSettingsView: View {
     }
 
     private func saveDrawingDefaults() {
-        var next = drawingModels
-        next.stage2Model = next.stage1Model
-        let models = next
+        let models = drawingModels
         perform {
-            try await settings.saveDrawingDefaults(models: models, model: model)
-            drawingDraft = models
+            try await settings.saveTokenLimits(stage1: models.stage1MaxTokens, hole: models.holeMaxTokens, model: model)
+            drawingDraft = settings.host.models
         }
     }
 

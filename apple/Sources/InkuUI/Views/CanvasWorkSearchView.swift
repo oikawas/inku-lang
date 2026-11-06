@@ -82,6 +82,7 @@ struct InkuSearchField: NSViewRepresentable {
         field.placeholderString = placeholder
         field.setAccessibilityLabel(label)
         field.isEnabled = context.environment.isEnabled
+        field.isEditable = context.environment.isEnabled && !context.environment.inkuTooltipsCovered
         field.isBezeled = !borderless
         if field.currentEditor() == nil, field.stringValue != value { field.stringValue = value }
     }

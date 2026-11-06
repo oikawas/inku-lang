@@ -52,11 +52,7 @@ public enum LibraryPerformanceProbe {
         var body: some View {
             ZStack {
                 LineageView(model: model, onWorkAction: { _, _ in }, onExport: { _ in })
-                    .opacity(0)
-                    .accessibilityHidden(true)
-                    .allowsHitTesting(false)
-                    .disabled(true)
-                    .environment(\.inkuTooltipsCovered, true)
+                    .modifier(InkuCoveredView(covered: true, hidden: true))
                 LibraryView(model: model, preview: preview, onEditWork: { _, _ in }, onAdjustWork: { _ in },
                             onReplayWork: { _ in }, onWorkAction: { _, _ in }, onClose: {})
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

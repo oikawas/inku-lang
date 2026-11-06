@@ -91,13 +91,19 @@ public enum IncuMascotFrames {
         (0, [0, 1, 0], .bezier(0.7, 0, 1, 0.5)), (0.1, [0, 1, 0], .bezier(0.7, 0, 1, 0.5)),
         (0.4, [180, 0.33, 0.5], .linear), (0.6, [180, 0.33, 0.5], .bezier(0, 0.5, 0.3, 1)),
         (0.9, [360, 1, 0], .linear), (1, [360, 1, 0], .linear)])
-    static func incubation(_ tone: Tone) -> MascotTrack {
+    private static func makeIncubation(_ tone: Tone) -> MascotTrack {
         let (base, other, period): ([Double], [Double], Double) = switch tone {
         case .left: (MascotPalette.black, MascotPalette.red, 5)
         case .right: (MascotPalette.blue, MascotPalette.green, 7)
         case .top: (MascotPalette.gray, MascotPalette.inkShade, 6)
         }
         return MascotTrack(duration: period, stops: [(0, base, .stepEnd), (0.5, other, .stepEnd), (1, base, .stepEnd)])
+    }
+    static let leftIncubation = makeIncubation(.left)
+    static let rightIncubation = makeIncubation(.right)
+    static let topIncubation = makeIncubation(.top)
+    static func incubation(_ tone: Tone) -> MascotTrack {
+        switch tone { case .left: leftIncubation; case .right: rightIncubation; case .top: topIncubation }
     }
     static func base(_ tone: Tone) -> [Double] {
         switch tone { case .top: MascotPalette.gray; case .left: MascotPalette.black; case .right: MascotPalette.blue }
@@ -169,6 +175,7 @@ public enum YuragiMascotFrames {
             (0.92, [tx * 0.7, -30, scale, 0.5, 0.6], .easeIn), (0.98, [tx, -90, scale * 1.5, 0.5, 0], .easeIn),
             (1, hidden, .easeIn)])
     }
+    static let bubbleTracks = bubbleSpecs.map { bubble($0.tx, $0.scale) }
     /// Lower-leg and side-leg pixels as (column, row, delay).
     static let legs: [(column: Int, row: Int, delay: Double)] = [(0, 2, 0), (4, 2, 0.3), (0, 3, 0.1), (2, 3, 0.2), (4, 3, 0.4)]
     /// Red pixels that do not move.
@@ -185,7 +192,7 @@ public enum YuragiMascotFrames {
     /// One of the eight bubbles: offset, scale, corner radius fraction and opacity.
     public static func bubble(index: Int, at time: Double) -> (x: Double, y: Double, scale: Double, radius: Double, opacity: Double) {
         let spec = bubbleSpecs[index]
-        let value = bubble(spec.tx, spec.scale).sample(time, delay: spec.delay)
+        let value = bubbleTracks[index].sample(time, delay: spec.delay)
         return (value[0], value[1], value[2], value[3], value[4])
     }
     /// An eye's colour as 0-1 sRGB.
@@ -246,6 +253,7 @@ struct MascotView: View {
     /// Web hides the mascot from assistive technology; the run status names it ("Incu is drawing").
     var accessibilityText: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.inkuTooltipsCovered) private var covered
     @State private var start = Date()
 
     var body: some View {
@@ -253,8 +261,8 @@ struct MascotView: View {
             .frame(width: 32, height: 32)
             .overlay {
                 Group {
-                    if reduceMotion { canvas(at: 0, still: true) }
-                    else { TimelineView(.animation) { timeline in canvas(at: timeline.date.timeIntervalSince(start), still: false) } }
+                    if reduceMotion || covered { canvas(at: 0, still: true) }
+                    else { TimelineView(.periodic(from: start, by: 1.0 / 30.0)) { timeline in canvas(at: timeline.date.timeIntervalSince(start), still: false) } }
                 }
                 .frame(width: 112, height: 112)
                 .allowsHitTesting(false)

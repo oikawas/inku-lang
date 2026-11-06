@@ -99,34 +99,6 @@ struct DdlEditorDialogLayout<Footer: View>: View {
 }
 
 @MainActor
-struct DdlDrawingModelCard: View {
-    @Bindable var model: AppModel
-    let reference: String
-    let providers: [ProviderSettings]
-    let onSelect: () -> Void
-
-    var body: some View {
-        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID)
-        VStack(alignment: .leading, spacing: 5) {
-            Text(model.display.webCopy("ddlDialogDrawingModel", "描画モデル")).inkuFont(12).foregroundStyle(.secondary)
-            Button(action: onSelect) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(reference.isEmpty ? model.display.localized("描画モデルを選択") : naming.modelShortName(reference)).inkuFont(13)
-                        if !reference.isEmpty {
-                            Text(naming.providerLabel(naming.resolve(reference).provider)).inkuFont(11).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer(minLength: 8)
-                    Text(model.display.webCopy("modelSelectButton", "モデル選択")).inkuFont(11).foregroundStyle(.secondary)
-                }.padding(9).frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
-                    .background(InkuColor.bg2).overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
-            }.buttonStyle(.plain).accessibilityLabel(model.display.webCopy("ddlDialogDrawingModel", "描画モデル") + ": " + reference)
-        }.frame(maxWidth: 520, alignment: .leading)
-    }
-}
-
-@MainActor
 struct DdlDialogFooter<Conditions: View, Actions: View>: View {
     @ViewBuilder let conditions: () -> Conditions
     @ViewBuilder let actions: () -> Actions

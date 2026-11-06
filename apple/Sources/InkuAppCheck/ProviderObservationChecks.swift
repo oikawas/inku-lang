@@ -19,8 +19,11 @@ func runProviderObservationChecks() async throws {
     let provider = ObservationCheckProvider()
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false)
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+                                   models: ["pinned", "holes"].map { ProviderModelSettings(id: $0, purposes: ["llm"]) })
     try await app.updateHostSettings(HostSettings(providers: [service], models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:holes")))
+    app.selectNextDrawingModel("check:pinned")
     app.inputMode = "description"; app.descriptionText = "A red circle above black dots scattered at the bottom"
     app.language = "en"; app.seedText = "42"
     guard app.display.preferences.captureProviderIO != true else { throw CheckFailure.message("Provider raw capture did not default off") }
@@ -30,13 +33,14 @@ func runProviderObservationChecks() async throws {
     // Failure: native composition was mixed into Stage 1, usage stayed nil, and no durable IO could be reopened.
     await app.generate()
     guard app.errorText == nil, let work = app.selectedWork, let progress = app.providerProgress,
-          progress.stage == .composition, progress.tokensIn == 13, progress.tokensOut == 0,
+          progress.stage == .colors, progress.tokensIn == 11, progress.tokensOut == 7,
           progress.providerElapsedMS != nil, progress.outcome == .succeeded, !progress.clockRunning else {
-        throw CheckFailure.message("Observed composition did not reach native actual usage/time: \(app.errorText ?? app.status)")
+        throw CheckFailure.message("Observed composition did not reach native actual usage/time: \(app.errorText ?? app.status); actions=\(await provider.actionTags)")
     }
     let metrics = app.providerMetrics
-    guard metrics.count == 2, metrics.map(\.stage) == [.stage1, .composition],
-          metrics.map(\.requestedModelReference) == ["check:pinned", "check:pinned"],
+    guard metrics.count >= 4, metrics.prefix(2).map(\.stage) == [.stage1, .composition],
+          metrics.contains(where: { $0.stage == .laws }), metrics.contains(where: { $0.stage == .colors }),
+          metrics.allSatisfy({ $0.requestedModelReference == "check:pinned" }),
           metrics[0].usage == ProviderUsage(inputTokens: 11, outputTokens: 7, totalTokens: 18),
           metrics[1].usage == ProviderUsage(inputTokens: 13, outputTokens: 0, totalTokens: 13),
           metrics.allSatisfy({ ($0.elapsedMS ?? 0) > 0 && $0.sent && $0.outcome == .completed && $0.responseModel == "check-response" }),
@@ -52,9 +56,9 @@ func runProviderObservationChecks() async throws {
     let reopened = try await restoredHost.savedProviderMetrics(workID: work.id)
     let raw = try await restoredHost.savedProviderObservations(workID: work.id)
     let httpStarts = await provider.httpStarts
-    guard reopened == metrics, raw.count == 2, raw.map(\.metric) == metrics,
+    guard reopened == metrics, raw.count == metrics.count, raw.map(\.metric) == metrics,
           raw[1].raw?.responseBody?.contains("data:") == true,
-          raw.allSatisfy({ $0.raw?.requestBody != nil && $0.raw?.captureComplete == true }), httpStarts == 2 else {
+          raw.allSatisfy({ $0.raw?.requestBody != nil && $0.raw?.captureComplete == true }), httpStarts == metrics.count else {
         throw CheckFailure.message("SQLite/Host recreation lost save-frozen metric/raw records or reopened a provider call")
     }
     let reopenedApp = AppModel(databaseURL: databaseURL, transport: provider)
@@ -134,6 +138,7 @@ private final class ObservationExecutionCapture: @unchecked Sendable {
 private actor ObservationCheckProvider: ObservedProviderTransport {
     private(set) var httpStarts = 0
     private(set) var calls = 0
+    private(set) var actionTags: [String] = []
     let conflictDatabase: InkuDatabase?
     let execution: ObservationExecutionCapture?
     init(conflictDatabase: InkuDatabase? = nil, execution: ObservationExecutionCapture? = nil) {
@@ -149,6 +154,7 @@ private actor ObservationCheckProvider: ObservedProviderTransport {
         calls += 1
         let input = try ExactJSON(data: action)
         let tag = try input.requiredString("tag")
+        actionTags.append(tag)
         guard let stage = ProviderObservationStage(action: tag), let timeout = input["timeout_ms"].string.flatMap(UInt64.init) else {
             throw HostError("invalid_observation_check_action")
         }
@@ -163,8 +169,14 @@ private actor ObservationCheckProvider: ObservedProviderTransport {
         httpStarts += 1
         let began = Date()
         try await Task.sleep(for: .milliseconds(stage == .composition ? 35 : 20))
-        let response = stage == .composition ? observationComposition() : observationPlan()
-        let resultTag = stage == .composition ? "composition_read" : "normalized_ddl_generated"
+        let response: ExactJSON
+        let resultTag: String
+        switch stage {
+        case .composition: response = observationComposition(); resultTag = "composition_read"
+        case .laws: response = observationLaws(); resultTag = "laws_chosen"
+        case .colors: response = observationColors(); resultTag = "colors_chosen"
+        default: response = observationPlan(); resultTag = "normalized_ddl_generated"
+        }
         metric.elapsedMS = UInt64(max(0, Date().timeIntervalSince(began) * 1_000))
         metric.usage = stage == .composition ? ProviderUsage(inputTokens: 13, outputTokens: 0, totalTokens: 13)
             : ProviderUsage(inputTokens: 11, outputTokens: 7, totalTokens: 18)
@@ -206,4 +218,16 @@ private func observationComposition() -> ExactJSON {
         "tension": .object(["motion": .string("still"), "focus": .string("unspecified"), "vertical": .string("unspecified"),
             "balance": .string("unspecified"), "symmetry": .string("unspecified"), "void": .string("unspecified")]),
         "stated_places": .array([.object(["layer": .integer(2), "words": .string("at the bottom"), "place": .string("bottom")])])])
+}
+
+private func observationLaws() -> ExactJSON {
+    .object(["main_law": .string("B1"), "description_counts": .array([.object(["layer": .integer(1), "words": .string("one circle")])]),
+             "laws": .object(["B1": .object(["targets": .array([.object(["layer": .integer(1), "at": .string("point_ul")])])]),
+                              "B21": .object(["targets": .array([.object(["layer": .integer(2), "hand": .string("still")])])])]),
+             "reason": .string("Place the circle above the dots.")])
+}
+
+private func observationColors() -> ExactJSON {
+    .object(["main_law": .string("D5"), "laws": .object(["D5": .object(["hue": .string("blue"), "layer": .integer(1)])]),
+             "reason": .string("Use blue as the main color.")])
 }

@@ -764,6 +764,10 @@ public final class AppModel {
         activeOperation = nil
         activeExecutionID = nil
         generationToken = nil
+        progressJournals.removeAll()
+        providerModelsByExecution.removeAll()
+        chatGPTFailureCodes.removeAll()
+        journalExecutionID = nil
         activeSingleInputMode = nil
         stopping = false
         isBusy = false
@@ -827,12 +831,6 @@ public final class AppModel {
     }
 
     public func selectSharedDrawingModel(_ reference: String) async throws {
-        guard !isBusy, SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
-        nextDrawingModelReference = reference
-    }
-
-    /// The DDL and adjustment pickers save Stage 2 immediately; the shared next-work picker is a draft.
-    public func selectDdlDrawingModel(_ reference: String) async throws {
         guard !isBusy, SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
         nextDrawingModelReference = reference
     }
@@ -1154,7 +1152,7 @@ public final class AppModel {
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
             description: description ?? descriptionText,
             language: instructionLanguage(for: mode == "ddl" ? source ?? ddlText : description ?? descriptionText), catalogID: catalogID,
-            canvasID: canvasID, seed: seedText, wild: wildOverride ?? wild, settings: mode == "ddl" ? settings : nextGenerationHostSettings,
+            canvasID: canvasID, seed: seedText, wild: wildOverride ?? wild, settings: nextGenerationHostSettings,
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
@@ -1236,7 +1234,7 @@ public final class AppModel {
             guard fit != .cancel, !isBusy, canvasID == paperID else { return false }
             var request = try bootstrap.request(inputMode: "ddl", source: source, description: "",
                 language: imported?.language ?? instructionLanguage(for: source), catalogID: catalogID, canvasID: paperID,
-                seed: seedText, wild: wild, settings: settings, parentWorkID: nil, derivationKind: "new",
+                seed: seedText, wild: wild, settings: nextGenerationHostSettings, parentWorkID: nil, derivationKind: "new",
                 importedPlugins: imported?.plugins ?? [])
             request.configuration = try configuration(request.configuration, canvasFit: fit, paperID: paperID)
             request = try await pinPersonalPlanRequests([request])[0]
@@ -1244,7 +1242,7 @@ public final class AppModel {
         } catch { report(error); return false }
     }
 
-    public func drawEditedDDL(work: SavedWork, source: String, wildOverride: Bool? = nil,
+    public func drawEditedDDL(work: SavedWork, source: String,
                               paperID: String? = nil, presentation: CanvasFitPresentation = .workspace,
                               forceEdit: Bool = false) async -> Bool {
         guard !isBusy, canvasFitQuestion == nil, !work.trashed,
@@ -1254,7 +1252,8 @@ public final class AppModel {
             let saved = try await savedConfiguration(workID: work.id)
             var options = try ExactJSON(data: saved.renderOptions)
             let target = paperID ?? options["canvas_aspect_id"].string ?? work.renderCanvasAspectID ?? canvasID
-            let unchanged = !forceEdit && source == work.ddl && wildOverride == nil
+            let unchanged = !forceEdit && source == work.ddl && options["wild"].bool == wild
+                && work.stage1Model == nextDrawingModelReference && work.stage2Model == nextDrawingModelReference
             let fit = await chooseCanvasFit(source: source, recordedWork: unchanged ? work : nil,
                                              paperID: target, presentation: presentation)
             guard fit != .cancel, !isBusy else { return false }
@@ -1264,13 +1263,11 @@ public final class AppModel {
                 options["canvas_aspect_id"] = .string(paper.canvasID)
                 options["canvas"] = .object(["width": .number(String(Int(paper.canvasWidth))), "height": .number(String(Int(paper.canvasHeight)))])
             }
-            if let wildOverride { options["wild"] = .bool(wildOverride) }
+            options["wild"] = .bool(wild)
             guard let catalog = options["catalog_id"].string, options["resolved_color_map"].object != nil else {
                 throw HostError("saved_refinement_options_unavailable")
             }
-            var models = settings.models
-            models.stage1Model = work.stage1Model ?? ""
-            if models.stage2Model.isEmpty { models.stage2Model = work.stage2Model ?? "" }
+            let models = nextGenerationHostSettings.models
             var request = GenerationRequest(authoring: .directDDL(source),
                 configuration: try configuration(saved.configuration, canvasFit: fit, paperID: target),
                 renderOptions: options.data, clipPolicy: saved.clipPolicy, models: models, providers: settings.providers,
@@ -2132,7 +2129,7 @@ public final class AppModel {
     public func commitDDL(wildOverride: Bool? = nil, presentation: CanvasFitPresentation = .workspace) async {
         guard canCommitDDL else { return }
         if let work = displayedWork, !work.trashed {
-            _ = await drawEditedDDL(work: work, source: ddlText, wildOverride: wildOverride, presentation: presentation)
+            _ = await drawEditedDDL(work: work, source: ddlText, presentation: presentation)
         } else if let id = currentExecutionID, wildOverride == nil {
             await performCommand(executionID: id, command: .commitUserDDL(expectedRevision: authoringRevision, source: ddlText), kind: "ddl_edit")
         } else if selectedContext != nil {
@@ -2364,6 +2361,10 @@ public final class AppModel {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do {
             try await host.cancelAll()
+            progressJournals.removeAll()
+            providerModelsByExecution.removeAll()
+            chatGPTFailureCodes.removeAll()
+            journalExecutionID = nil
             try await database.restore(from: url)
             displayToken = UUID()
             activeExecutionID = nil

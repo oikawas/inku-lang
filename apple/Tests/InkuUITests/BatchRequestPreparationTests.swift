@@ -23,21 +23,7 @@ import XCTest
             if mode != "random" {
                 expected = try entries.map { try app.requestForBatchDescription($0.1, sketchMode: "off") }
             }
-            var finished = false
-            let start = ContinuousClock.now
-            let task = Task { @MainActor in
-                defer { finished = true }
-                return try await app.makeBatchRows(entries, sketchMode: "off", batchRunID: "fixture")
-            }
-            var last = ContinuousClock.now
-            var maximumGap: Duration = .zero
-            while !finished {
-                await Task.yield()
-                let now = ContinuousClock.now
-                maximumGap = max(maximumGap, last.duration(to: now)); last = now
-            }
-            let rows = try await task.value
-            let elapsed = start.duration(to: .now)
+            let rows = try await app.makeBatchRows(entries, sketchMode: "off", batchRunID: "fixture")
             XCTAssertEqual(rows.count, entries.count)
             if mode == "random" {
                 let allowed = Set(app.catalogs.map(\.id).filter { $0 != initialCatalog })
@@ -59,7 +45,6 @@ import XCTest
                 provenance.displayLabel = "#\(entries[index].0)"; reference.provenance = provenance
                 XCTAssertEqual(try encoder.encode(row.request), try encoder.encode(reference), "\(mode) row \(index)")
             }
-            print("FOLLOWUP_M7_CANDIDATE mode=\(mode) total=\(elapsed) main_gap=\(maximumGap)")
         }
         for mode in ["fixed", "auto", "random"] {
             app.catalogMode = mode; app.seedText = ""

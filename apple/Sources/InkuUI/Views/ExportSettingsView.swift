@@ -160,9 +160,11 @@ struct ExportSettingsView: View {
         }
         .onChange(of: configuration) { _, _ in
             let defaults = configuration.normalized()
-            model.display.preferences.exportConfiguration = defaults
-            model.display.preferences.exportHeight = defaults.options.pixelHeight
-            model.display.preferences.exportProfile = defaults.options.svgProfile
+            var preferences = model.display.preferences
+            preferences.exportConfiguration = defaults
+            preferences.exportHeight = defaults.options.pixelHeight
+            preferences.exportProfile = defaults.options.svgProfile
+            model.display.preferences = preferences
         }
         .onChange(of: animationConfiguration) { _, _ in
             model.display.preferences.animationExportConfiguration = animationConfiguration.normalized()

@@ -71,11 +71,9 @@ struct LibraryView: View {
             }
         }
         .background(LibraryChrome.panel2)
-        .task(id: PreviewReadKey(workID: preview.work?.id, shows: preview.shows, mutating: library.mutating)) {
-            guard !library.mutating else { return }
-            await preview.loadAnnotation(using: { id in
-                try await model.auxiliaryDatabase().libraryAnnotation(id: id)
-            }, readWork: { id in try await model.auxiliaryDatabase().work(id: id) })
+        .task(id: PreviewReadKey(workID: preview.work?.id, shows: preview.shows,
+                                 revision: library.mutationRevision(for: preview.work?.id))) {
+            await loadPreview()
         }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
         .task(id: visibleIDs) { await model.loadWorkActionStates(workIDs: visibleIDs) }
@@ -421,6 +419,8 @@ struct LibraryView: View {
             mutating: library.mutating,
             hashCopied: library.copiedHash == work.id,
             modelLines: modelLines.lines(for: work, providers: providers, stageProvider: model.stageDefaultProviderID),
+            strings: LibraryGridCardStrings(title: model.workPresentationTitle(work), display: display,
+                                             selected: library.selectedIDs.contains(work.id), copied: library.copiedHash == work.id),
             focus: $focusedSlot,
             actions: LibraryGridCardActions(open: openWork, openThumbnail: openThumbnail, openLineage: openLineage, move: moveGridFocus,
                                             recordHeight: recordCardHeight, menu: menuActions))
@@ -870,13 +870,19 @@ struct LibraryView: View {
                     if let error = preview.errorText {
                         Text(error).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
                         Button(display.localized("再試行")) {
-                            Task { await preview.loadAnnotation(using: { id in try await model.auxiliaryDatabase().libraryAnnotation(id: id) }) }
+                            Task { await loadPreview() }
                         }.buttonStyle(LibraryGhostButtonStyle())
                     }
                 }.padding(12)
             }
             .background(LibraryChrome.panel2)
         }
+    }
+
+    private func loadPreview() async {
+        await preview.loadAnnotation(using: { id in
+            try await model.auxiliaryDatabase().libraryAnnotation(id: id)
+        }, readWork: { id in try await model.auxiliaryDatabase().work(id: id) })
     }
 
     private func tip(_ key: String) -> String { display.tooltip(key) }
@@ -905,7 +911,7 @@ struct LibraryView: View {
     private struct PreviewReadKey: Equatable {
         let workID: String?
         let shows: Int
-        let mutating: Bool
+        let revision: Int
     }
 }
 
@@ -1283,6 +1289,31 @@ private struct LibraryGridCardActions {
     let menu: LibraryWorkMenuActions
 }
 
+@MainActor
+private struct LibraryGridCardStrings: Equatable {
+    let title, open, preview, comment, copy, lineage, lineageTip, operations, operationsTip, select, selectionValue, selectionTip, generation: String
+    let textScale: Double
+    let language: String
+
+    init(title: String, display: DisplaySettings, selected: Bool, copied: Bool) {
+        self.title = title
+        open = display.localizedFormat("%@ を開く", title)
+        preview = display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle")
+        comment = display.webCopy("historyPreviewCommentLabel", fallback: "作品へのコメント")
+        copy = copied ? display.tooltip("コピーしました", serverKey: "historyHashCopied") : display.tooltip("作品UUIDをコピー", serverKey: "historyIdCopyTitle")
+        lineage = display.localized("系譜")
+        lineageTip = display.tooltip("この作品の系譜を開きます。")
+        operations = display.localized("作品の操作")
+        operationsTip = display.tooltip("作品の操作")
+        select = display.localizedFormat("%@ を選択", title)
+        selectionValue = display.localized(selected ? "選択済み" : "未選択")
+        selectionTip = display.tooltip(selected ? "作品の選択を解除" : "作品を選択")
+        generation = display.tooltip("世代番号", serverKey: "historyGenerationTitle")
+        textScale = display.preferences.textScale
+        language = display.preferences.language
+    }
+}
+
 /// One card of the thumbnail grid (Web `.manager-thumb-wrap`). It is given values rather than reading the models, and
 /// compares them, so a page turn rebuilds each slot once and a change that leaves a card as it was (the page loading,
 /// labels of other works) rebuilds none. Its menus and marks read the models in views of their own.
@@ -1304,6 +1335,7 @@ private struct LibraryGridCard: View, Equatable {
     let mutating: Bool
     let hashCopied: Bool
     let modelLines: [ModelNaming.Line]
+    let strings: LibraryGridCardStrings
     let focus: FocusState<Int?>.Binding
     let actions: LibraryGridCardActions
     private var display: DisplaySettings { model.display }
@@ -1314,12 +1346,11 @@ private struct LibraryGridCard: View, Equatable {
             && lhs.generation == rhs.generation && lhs.selected == rhs.selected && lhs.previewed == rhs.previewed
             && lhs.shown == rhs.shown && lhs.focused == rhs.focused && lhs.browsingLocked == rhs.browsingLocked
             && lhs.writingDisabled == rhs.writingDisabled && lhs.mutating == rhs.mutating && lhs.hashCopied == rhs.hashCopied
-            && lhs.modelLines == rhs.modelLines
+            && lhs.modelLines == rhs.modelLines && lhs.strings == rhs.strings
     }
 
     var body: some View {
         LibraryPerformanceProbe.cardBody()
-        let title = model.workPresentationTitle(work)
         return VStack(alignment: .leading, spacing: 5) {
             // HistoryManager.svelte:1202: the click previews, a double click opens the work.
             LibraryClickButton(preview: {
@@ -1333,9 +1364,9 @@ private struct LibraryGridCard: View, Equatable {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain).disabled(browsingLocked)
-            .accessibilityLabel(display.localizedFormat("%@ を開く", title))
-            .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
-            .overlay(alignment: .topLeading) { selectionCheck(title: title).padding(1) }
+            .accessibilityLabel(strings.open)
+            .inkuTooltip(strings.preview)
+            .overlay(alignment: .topLeading) { selectionCheck.padding(1) }
             // HistoryManager.svelte:1100-1102 `.manager-generation`: under the check, 30pt from the top.
             .overlay(alignment: .topLeading) { generationBadge.padding(.top, 30).padding(.leading, 6) }
             .overlay(alignment: .bottomTrailing) { if shown { LibraryCurrentBadge(display: display).padding(3) } }
@@ -1347,7 +1378,7 @@ private struct LibraryGridCard: View, Equatable {
                     .id(work.id)
                     .foregroundStyle(.secondary)
                 if let note, !note.isEmpty {
-                    (Text(display.webCopy("historyPreviewCommentLabel", fallback: "作品へのコメント") + " ").fontWeight(.semibold) + Text(note))
+                    (Text(strings.comment + " ").fontWeight(.semibold) + Text(note))
                         .inkuFont(10).foregroundStyle(.tertiary).lineLimit(1)
                 }
                 LibraryModelLinesView(lines: modelLines, display: display)
@@ -1389,44 +1420,43 @@ private struct LibraryGridCard: View, Equatable {
             LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
             Button("#") { library.copyHash(work.id) }
                 .inkuFont(10, design: .monospaced)
-                .inkuTooltip(hashCopied ? display.tooltip("コピーしました", serverKey: "historyHashCopied")
-                             : display.tooltip("作品UUIDをコピー", serverKey: "historyIdCopyTitle"))
+                .inkuTooltip(strings.copy)
             if work.lineageNodeID != nil {
                 Button { actions.openLineage(work) } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }
-                    .accessibilityLabel(display.localized("系譜")).disabled(browsingLocked)
-                    .inkuTooltip(display.tooltip("この作品の系譜を開きます。"))
+                    .accessibilityLabel(strings.lineage).disabled(browsingLocked)
+                    .inkuTooltip(strings.lineageTip)
             }
             Spacer(minLength: 0)
             Menu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: actions.menu) } label: { Image(systemName: "ellipsis") }
                 #if os(macOS)
                 .menuStyle(.borderlessButton).menuIndicator(.hidden)
                 #endif
-                .fixedSize().accessibilityLabel(display.localized("作品の操作"))
-                .inkuTooltip(display.tooltip("作品の操作"))
+                .fixedSize().accessibilityLabel(strings.operations)
+                .inkuTooltip(strings.operationsTip)
         }
         .inkuFont(12).buttonStyle(.borderless)
     }
 
-    private func selectionCheck(title: String) -> some View {
+    private var selectionCheck: some View {
         Button { library.toggleSelection(work.id) } label: { LibrarySelectionBox(selected: selected) }
             .buttonStyle(.plain)
-            .accessibilityLabel(display.localizedFormat("%@ を選択", title))
-            .accessibilityValue(display.localized(selected ? "選択済み" : "未選択"))
+            .accessibilityLabel(strings.select)
+            .accessibilityValue(strings.selectionValue)
             .disabled(mutating || browsingLocked)
-            .inkuTooltip(display.tooltip(selected ? "作品の選択を解除" : "作品を選択"))
+            .inkuTooltip(strings.selectionTip)
     }
 
     @ViewBuilder private var generationBadge: some View {
         if let generation {
             Text("\(generation)")
-                .font(.system(size: 10 * display.preferences.textScale, weight: .semibold))
+                .font(.system(size: 10 * strings.textScale, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(Color.secondary)
                 .padding(.horizontal, 3).padding(.vertical, 0)
                 .frame(minWidth: 16, minHeight: 16)
                 .background(AnyShapeStyle(.background.opacity(0.9)), in: RoundedRectangle(cornerRadius: 3))
                 .overlay(RoundedRectangle(cornerRadius: 3).stroke(LibraryChrome.border))
-                .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"), focus: .none)
+                .inkuTooltip(strings.generation, focus: .none)
         }
     }
 }

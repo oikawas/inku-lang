@@ -82,6 +82,11 @@ private struct LibraryTimelinePlace {
 @MainActor
 @Observable
 public final class LibraryModel {
+    private var workMutationRevisions: [String: Int] = [:]
+    private var allWorksMutationRevision = 0
+    public func mutationRevision(for id: String?) -> Int {
+        allWorksMutationRevision &+ (id.flatMap { workMutationRevisions[$0] } ?? 0)
+    }
     public var query = "" { didSet { if query != oldValue { changedFilter() } } }
     /// Canvas history uses its own search contract and never changes the library's query.
     public var canvasSearch = false
@@ -106,7 +111,7 @@ public final class LibraryModel {
                 page = (startOffset + page * oldValue) / pageSize
                 startOffset = 0
                 // While the opening reads the work's place, its own read follows with this size.
-                if positioning == nil { scheduleRefresh() }
+                if positioning == nil { scheduleRefresh(refreshLineage: false) }
             }
         }
     }
@@ -282,7 +287,7 @@ public final class LibraryModel {
         lineageIncludeID = nil
         if timelinePlace != nil { timelinePlace?.page = 0; timelinePlace?.startOffset = 0 }
         selectedIDs.removeAll()
-        scheduleRefresh()
+        scheduleRefresh(refreshLineage: false)
     }
 
     /// Display changes retain checked works. Web `setHistoryDisplayMode` / `selectHistoryManagerTab`: a lineage view
@@ -315,12 +320,9 @@ public final class LibraryModel {
         if readScheduled { readScheduled = false }
     }
 
-    /// A pending read that replaces another keeps its lineage reload: a new page size right after a filter change
-    /// still reloads the lineage.
+    /// A pending read that replaces another keeps its lineage reload, even if the newer request does not need one.
     private func scheduleRefresh(refreshLineage: Bool = true) {
         expandedGroups.removeAll()
-        groupMembers.removeAll()
-        groupMemberTotals.removeAll()
         refreshToken = UUID()
         refreshTask?.cancel()
         pendingLineageRefresh = pendingLineageRefresh || refreshLineage
@@ -476,6 +478,50 @@ public final class LibraryModel {
                                                                offset: requestedOffset, minimumItemCount: requestedMinimum, includeSVG: includeListSVG,
                                                                includeWorkID: lineageIncludeID, anchorWorkID: anchor?.workID)
                 guard refreshToken == token, !Task.isCancelled else { return }
+                var opened = expandedGroups
+                if layout != .grid, focusRequest != nil, let root = result.anchorRootNodeID ?? focusLineageRootID,
+                   result.groups.contains(where: { $0.id == root }) { opened.insert(root) }
+                let roots = layout == .grid ? result.groups.map(\.id) : result.groups.map(\.id).filter { opened.contains($0) }
+                let includeSVG = includeListSVG
+                let grouped = try await withThrowingTaskGroup(of: (String, LibraryPage, [String: Int]).self) { tasks in
+                    var iterator = roots.makeIterator()
+                    func submit(_ root: String) {
+                        tasks.addTask {
+                            let page = try await database.libraryPage(query: requestedFilter, limit: 100, offset: 0,
+                                                                       rootNodeID: root, includeSVG: includeSVG)
+                            let generations = try await database.lineageGenerations(nodeIDs: page.items.compactMap { $0.work.lineageNodeID })
+                            return (root, page, generations)
+                        }
+                    }
+                    for _ in 0..<min(8, roots.count) { if let root = iterator.next() { submit(root) } }
+                    var results: [(String, LibraryPage, [String: Int])] = []
+                    while let item = try await tasks.next() {
+                        results.append(item)
+                        if let root = iterator.next() { submit(root) }
+                    }
+                    return results
+                }
+                guard refreshToken == token, !Task.isCancelled else { return }
+                var members: [String: [InkuPersistence.LibraryItem]] = [:]
+                var totals: [String: Int] = [:]
+                var listed: [String: Int] = [:]
+                var annotations = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.annotation) })
+                var sizes = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.svgBytes) })
+                for (root, page, generations) in grouped {
+                    members[root] = page.items.sorted {
+                        if $0.work.lineageNodeID == root { return $1.work.lineageNodeID != root }
+                        if $1.work.lineageNodeID == root { return false }
+                        let lhs = $0.work.lineageNodeID.flatMap { generations[$0] } ?? 0
+                        let rhs = $1.work.lineageNodeID.flatMap { generations[$0] } ?? 0
+                        return (lhs, $0.work.at, $0.id) < (rhs, $1.work.at, $1.id)
+                    }
+                    totals[root] = page.total
+                    listed.merge(generations) { $1 }
+                    for item in page.items { annotations[item.id] = item.annotation; sizes[item.id] = item.svgBytes }
+                }
+                let ids = result.groups.flatMap { members[$0.id]?.map(\.id) ?? [$0.representative.id] }
+                await pageCompanions?(ids)
+                guard refreshToken == token, !Task.isCancelled else { return }
                 if let anchor {
                     groupAnchorVisit = anchor.visit
                     lineageIncludeID = anchor.workID
@@ -485,14 +531,12 @@ public final class LibraryModel {
                     }
                 }
                 // Web: the list view opens the opened work's lineage while that focus stands.
-                if layout != .grid, focusRequest != nil, let root = focusLineageRootID,
-                   result.groups.contains(where: { $0.id == root }) {
-                    expandedGroups.insert(root)
-                }
+                expandedGroups = opened
                 groups = result.groups; total = result.total
                 works = result.groups.map(\.representative.work)
-                annotations = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.annotation) })
-                svgSizes = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.svgBytes) })
+                groupMembers = members; groupMemberTotals = totals
+                self.annotations = annotations; svgSizes = sizes
+                generations.merge(listed) { $1 }
             } else {
                 let result = try await database.libraryPage(query: requestedFilter, limit: requestedSize,
                                                              offset: requestedOffset, includeSVG: includeListSVG)
@@ -502,6 +546,7 @@ public final class LibraryModel {
                 await pageCompanions?(result.items.map(\.id))
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = []; total = result.total
+                groupMembers = [:]; groupMemberTotals = [:]
                 works = result.items.map(\.work)
                 annotations = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.annotation) })
                 svgSizes = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.svgBytes) })
@@ -514,11 +559,6 @@ public final class LibraryModel {
             if startOffset > 0, startOffset >= total { startOffset = 0; page = 0; await refresh(refreshLineage: refreshLineage); return }
             if page >= pageCount { page = pageCount - 1; await refresh(refreshLineage: refreshLineage); return }
             if !requestedGrouping { prefetchNextPage(token: token) }
-            let visibleRoots = requestedGrouping && layout == .grid ? groups.map(\.id) : Array(expandedGroups)
-            for root in visibleRoots {
-                guard refreshToken == token, !Task.isCancelled else { return }
-                await loadGroup(root: root, append: false)
-            }
             if refreshLineage, lineageFocusID != nil { await reloadLineage() }
         } catch {
             guard refreshToken == token, !Task.isCancelled else { return }
@@ -611,7 +651,7 @@ public final class LibraryModel {
     }
 
     public func toggleStar(_ work: SavedWork) async {
-        await mutate { try await $0.setStarred(ids: [work.id], starred: !work.starred); return "お気に入りを更新しました" }
+        await mutate(ids: [work.id]) { try await $0.setStarred(ids: [work.id], starred: !work.starred); return "お気に入りを更新しました" }
     }
 
     public func toggleRevision(_ work: SavedWork) async {
@@ -619,7 +659,7 @@ public final class LibraryModel {
     }
 
     private func toggleAnnotation(_ work: SavedWork, mark: LibraryAnnotationMark, status: String) async {
-        await mutate { database in
+        await mutate(ids: [work.id]) { database in
             let value = try await database.toggleAnnotation(id: work.id, mark: mark)
             self.rememberAnnotation(value, id: work.id)
             return status
@@ -627,7 +667,7 @@ public final class LibraryModel {
     }
 
     public func saveNote(id: String, note: String) async {
-        await mutate { database in
+        await mutate(ids: [id]) { database in
             try await database.setAnnotation(id: id, note: note)
             let value = try await database.libraryAnnotation(id: id)
             self.rememberAnnotation(value, id: id)
@@ -637,21 +677,21 @@ public final class LibraryModel {
 
     public func trash(ids: [String]? = nil) async {
         let ids = ids ?? selectedIDs.sorted()
-        if await mutate({ let count = try await $0.setTrashed(ids: ids, trashed: true); return "\(count) 件をごみ箱へ移しました" }) {
+        if await mutate(ids: ids, { let count = try await $0.setTrashed(ids: ids, trashed: true); return "\(count) 件をごみ箱へ移しました" }) {
             selectedIDs.subtract(ids)
         }
     }
 
     public func restore(ids: [String]? = nil) async {
         let ids = ids ?? selectedIDs.sorted()
-        if await mutate({ let count = try await $0.setTrashed(ids: ids, trashed: false); return "\(count) 件を戻しました" }) {
+        if await mutate(ids: ids, { let count = try await $0.setTrashed(ids: ids, trashed: false); return "\(count) 件を戻しました" }) {
             selectedIDs.subtract(ids)
         }
     }
 
     public func permanentlyDelete(ids: [String]? = nil) async {
         let ids = ids ?? selectedIDs.sorted()
-        if await mutate({ let count = try await $0.permanentlyDelete(ids: ids); return "\(count) 件を完全に削除しました" }) {
+        if await mutate(ids: ids, { let count = try await $0.permanentlyDelete(ids: ids); return "\(count) 件を完全に削除しました" }) {
             selectedIDs.subtract(ids)
             await thumbnails?.pruneOrphans()
         }
@@ -665,11 +705,17 @@ public final class LibraryModel {
     }
 
     @discardableResult
-    private func mutate(_ operation: (InkuDatabase) async throws -> String) async -> Bool {
+    private func mutate(ids: [String]? = nil, _ operation: (InkuDatabase) async throws -> String) async -> Bool {
         guard let database, !mutating else { return false }
         mutating = true; errorText = nil
         defer { mutating = false }
-        do { status = try await operation(database); await refresh(); await onMutation?(); return true }
+        do {
+            status = try await operation(database)
+            await refresh(); await onMutation?()
+            if let ids { for id in ids { workMutationRevisions[id, default: 0] &+= 1 } }
+            else { allWorksMutationRevision &+= 1 }
+            return true
+        }
         catch { errorText = error.localizedDescription; return false }
     }
 
@@ -713,7 +759,7 @@ public final class LibraryModel {
             var offset = 0
             var ids: Set<String> = []
             repeat {
-                let result = try await database.libraryPage(query: requestedFilter, limit: 1000, offset: offset, rootNodeID: root)
+                let result = try await database.libraryPage(query: requestedFilter, limit: 1000, offset: offset, rootNodeID: root, includeSVG: false)
                 guard token == refreshToken, !Task.isCancelled else { return }
                 ids.formUnion(result.items.map(\.id))
                 offset += result.items.count

@@ -245,6 +245,8 @@ public final class AppModel {
     public private(set) var imageWorkProvenance: [String: String] = [:]
     public private(set) var savedDisplayLabels: [String: String] = [:]
     @ObservationIgnored private var displayLabelReads: Set<String> = []
+    @ObservationIgnored private var workActionReadsInFlight: Set<String> = []
+    @ObservationIgnored private var workActionReadWaiters: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private var workActionReadToken = UUID()
     public let library = LibraryModel(includeListSVG: false)
     public let display = DisplaySettings()
@@ -494,10 +496,10 @@ public final class AppModel {
             catch { startupCatalogError = error }
             library.onMutation = { [weak self] in await self?.refreshWorks() }
             // Web `inku-history-display-mode` and the thumbnail/list tab come back with the library.
-            if let layout = display.preferences.libraryLayout.flatMap(LibraryLayout.init(rawValue:)), layout != .lineage {
+            if let layout = display.libraryLayout.flatMap(LibraryLayout.init(rawValue:)), layout != .lineage {
                 library.layout = layout
             }
-            if let grouped = display.preferences.libraryGrouped { library.grouped = grouped }
+            if let grouped = display.libraryGrouped { library.grouped = grouped }
             await library.connect(database: database)
             if let provider = settings.providers.first {
                 providerURL = provider.baseURL.absoluteString
@@ -1040,11 +1042,27 @@ public final class AppModel {
     }
 
     public func loadWorkActionStates(workIDs: [String]) async {
-        let missing = Set(workIDs).filter { workActionStates[$0] == nil }
-        let labelIDs = Set(workIDs).subtracting(displayLabelReads)
+        if !Set(workIDs).isDisjoint(with: workActionReadsInFlight) {
+            await withCheckedContinuation { workActionReadWaiters.append($0) }
+            guard !Task.isCancelled else { return }
+            await loadWorkActionStates(workIDs: workIDs)
+            return
+        }
+        let eligible = Set(workIDs).subtracting(workActionReadsInFlight)
+        let missing = eligible.filter { workActionStates[$0] == nil }
+        let labelIDs = eligible.subtracting(displayLabelReads)
         guard !missing.isEmpty || !labelIDs.isEmpty, let host else { return }
         let token = workActionReadToken
+        let reading = Set(missing).union(labelIDs)
+        workActionReadsInFlight.formUnion(reading)
+        defer {
+            if token == workActionReadToken { workActionReadsInFlight.subtract(reading) }
+            let waiters = workActionReadWaiters
+            workActionReadWaiters.removeAll()
+            for waiter in waiters { waiter.resume() }
+        }
         do {
+            LibraryPerformanceProbe.actionSummaryRead()
             let summaries = try await host.savedAuthoringSummaries(workIDs: Array(missing))
             let labels = try await host.savedDisplayLabels(workIDs: Array(labelIDs))
             guard token == workActionReadToken, !Task.isCancelled else { return }
@@ -2394,6 +2412,7 @@ public final class AppModel {
             imageWorkProvenance = [:]
             savedDisplayLabels = [:]
             displayLabelReads = []
+            workActionReadsInFlight = []
             workActionReadToken = UUID()
             await library.resetAfterRestore()
             await thumbnails.synchronize()

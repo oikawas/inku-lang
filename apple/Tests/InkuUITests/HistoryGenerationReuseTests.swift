@@ -4,6 +4,21 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class HistoryGenerationReuseTests: XCTestCase {
+    func testStripListsWithoutSVGAndLoadsCompleteWorkOnNavigation() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-history-svg-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"))
+        await app.initialize()
+        let database = try app.auxiliaryDatabase()
+        let work = SavedWork(id: "svg-work", at: 1, input: "test", score: "{}", svg: "<svg>fixture</svg>", lineageNodeID: "svg-node")
+        try await database.save(work, node: LineageNode(id: "svg-node", historyID: work.id, at: work.at))
+        let history = HistoryModel()
+        await history.connect(app: app)
+        XCTAssertEqual(history.library.works.map(\.svg).joined().utf8.count, 0)
+        XCTAssertEqual(history.library.svgSizes[work.id], Int64(work.svg.utf8.count))
+        let selected = await history.navigate(app: app, boundary: "latest", selectWork: false)
+        XCTAssertEqual(selected?.svg, work.svg)
+    }
     func testPageGenerationSnapshotIsRefreshedWhenHistoryChanges() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-history-generation-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }

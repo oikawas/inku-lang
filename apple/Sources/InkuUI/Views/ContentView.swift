@@ -90,6 +90,7 @@ public struct ContentView: View {
     @State private var ui = WorkspaceUIState()
     @State private var automation = AutomationModel()
     @State private var history = HistoryModel()
+    @State private var historyRefreshTask: Task<Void, Never>?
     @State private var libraryPreview = LibraryPreviewModel()
     @State private var workspaceWork: SavedWork?
     @State private var batchWorkspace = BatchWorkspaceSelection()
@@ -184,10 +185,14 @@ public struct ContentView: View {
         }
         #endif
         .onChange(of: dialog?.id) { _, _ in batchWorkspace.invalidateReads() }
-        .onChange(of: model.works) { _, _ in Task {
-            await history.library.refresh()
-            await history.locate(app: model, workID: workspaceWork?.id)
-        } }
+        .onChange(of: model.works) { _, _ in
+            historyRefreshTask?.cancel()
+            historyRefreshTask = Task {
+                await history.library.refresh()
+                guard !Task.isCancelled else { return }
+                await history.locate(app: model, workID: workspaceWork?.id)
+            }
+        }
         .onChange(of: model.restorationRevision) { _, revision in
             libraryPreview.close()
             automation.invalidateWorkObservationsAfterRestore()
@@ -202,12 +207,12 @@ public struct ContentView: View {
                 await history.locate(app: model)
             }
         }
-        .onChange(of: ui.workspaceTab) { _, tab in remember { $0.workspaceTab = tab } }
+        .onChange(of: ui.workspaceTab) { _, tab in model.display.rememberWorkspaceTab(tab) }
         .onChange(of: automation.workspaceInputMode) { _, mode in model.display.rememberInputTab(mode) }
         .onChange(of: model.library.layout) { _, layout in
-            if layout != .lineage { remember { $0.libraryLayout = layout.rawValue } }
+            if layout != .lineage { model.display.rememberLibraryLayout(layout.rawValue) }
         }
-        .onChange(of: model.library.grouped) { _, grouped in remember { $0.libraryGrouped = grouped } }
+        .onChange(of: model.library.grouped) { _, grouped in model.display.rememberLibraryGrouped(grouped) }
         .onChange(of: ui.settingsOpen) { _, open in if !open { Task { await refreshDrawingKeyState() } } }
         .onChange(of: model.providerSettingsRevision) { _, _ in Task { await refreshDrawingKeyState() } }
         .onChange(of: model.errorText) { _, error in if error != nil { Task { await refreshDrawingKeyState() } } }
@@ -471,8 +476,7 @@ public struct ContentView: View {
 
     /// Screen choices saved in `interface.json` come back on launch; a choice the screen cannot show is skipped.
     private func restoreScreenChoices() {
-        let saved = model.display.preferences
-        if let tab = saved.workspaceTab, ["artwork", "lineage"].contains(tab) { ui.workspaceTab = tab }
+        if let tab = model.display.workspaceTab, ["artwork", "lineage"].contains(tab) { ui.workspaceTab = tab }
         // Web returns to the description tab when the input switch is hidden.
         if model.display.inputTab == "batch", model.display.visible("input_modes"), !automation.isOccupied {
             automation.workspaceInputMode = "batch"

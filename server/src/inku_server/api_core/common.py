@@ -46,16 +46,22 @@ _APP_VERSION = _app_version()
 _RELEASE_VERSION = _release_version()
 
 
-def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:
+def _unexpected_http_error(operation: str, status_code: int, *, redact: bool = False) -> HTTPException:
     _logger.exception("%s failed", operation)
     detail = f"{operation} failed"
-    if os.getenv("INKU_ENV") == "development":
+    if not redact and os.getenv("INKU_ENV") == "development":
         import sys
         import traceback
         exc_type, exc_value, _ = sys.exc_info()
         if exc_value:
             detail = f"{operation} failed: {exc_type.__name__}: {exc_value}\n{traceback.format_exc()}"
     return HTTPException(status_code=status_code, detail=detail)
+
+
+def _unique_conflict(error: Exception) -> bool:
+    original = getattr(error, "orig", error)
+    code = getattr(original, "sqlite_errorcode", None)
+    return code in (1555, 2067) or getattr(original, "sqlstate", None) == "23505" or getattr(original, "pgcode", None) == "23505"
 
 
 def _normalize_instruction_lang(value: str | None, *, default: str = "ja") -> str:

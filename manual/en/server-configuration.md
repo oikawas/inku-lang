@@ -12,6 +12,8 @@ Settings belong to three boundaries.
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
+Rendering, history redraws, and account administration return 4xx for invalid input or conflicts and 500 for unexpected internal failures. Internal exception details are logged and omitted from the response.
+
 **Some settings are only seeded by the environment.** Painting concurrency and the limits take their initial values from environment variables at first start; after that the DB settings are canonical. Changing an environment variable does not change a setting already stored. For limits, use the admin UI or `inku-cli config update`; for concurrency, use the admin UI or the API in §2.3.
 
 ## 2. Backend Environment Variables

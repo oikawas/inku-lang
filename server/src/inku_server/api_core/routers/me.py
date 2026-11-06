@@ -6,8 +6,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from ... import db as _db
-from ..common import _unexpected_http_error
+from ..common import _unexpected_http_error, _unique_conflict
 from ..deps import _admin_user, _current_user, _session_token
 from ..models import UserAccountItem
 
@@ -263,7 +264,7 @@ def api_auth_me_draw_options_for_tab(body: DrawOptionsForTabBody,
     return DrawOptionsForTabResponse(options=answer["options"])
 
 
-@router.patch("/api/auth/me/profile", response_model=UserAccountItem, summary="Update own email or password")
+@router.patch("/api/auth/me/profile", response_model=UserAccountItem, summary="Update own email or password", responses={500: {"description": "Unexpected server failure"}})
 def api_auth_me_profile(
     body: UserProfileUpdateBody,
     actor: dict = Depends(_current_user),
@@ -273,7 +274,7 @@ def api_auth_me_profile(
 
     A password change signs out the account's other sessions and keeps the session that made the
     request. Returns the updated account. An invalid value or a wrong current password is rejected
-    with 400, and an unexpected failure returns 409.
+    with 400, a duplicate email returns 409, and an unexpected failure returns 500.
     """
     try:
         user = _db.update_current_user_profile(
@@ -285,8 +286,11 @@ def api_auth_me_profile(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except IntegrityError as e:
+        if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
+        raise _unexpected_http_error("profile update", 500, redact=True) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("profile update", 409) from e
+        raise _unexpected_http_error("profile update", 500, redact=True) from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)

@@ -2305,6 +2305,8 @@ Description-batch resumption checks the registered original plan and settings ag
 
 With `batch_run_id`, `GET /api/history` returns only the caller's own works from that batch. Without it, the readable scope is unchanged.
 
+Rendering, history redraws, and account administration retain their 4xx responses for invalid input or conflicts. Unexpected internal failures are logged and return 500 without the internal exception text.
+
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
 model-call attempt begins and once the last one has ended; its

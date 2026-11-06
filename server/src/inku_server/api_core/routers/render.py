@@ -729,9 +729,9 @@ class JuxtapositionResponse(BaseModel):
     candidates: int = Field(description="Number of candidate sentences the choices were picked from.")
     model: str = Field(description="Name of the Vision model that chose the sentences.")
 
-@router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True, summary="Render a score")
+@router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True, summary="Render a score", responses={500: {"description": "Unexpected server failure"}})
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
-    """Draw a score and return it with its SVG and render metadata. With replay_saved_work, the referenced saved work's score and recorded conditions are used instead of the request's. Requires a signed-in user. Raises 422 when replay is requested without a work_id or the render fails."""
+    """Draw a score with SVG and metadata; a saved-work replay uses the saved conditions. Invalid input returns 422, and unexpected failures return 500."""
     # Authorization stays outside the render handler: an unknown work is 404.
     if req.replay_saved_work and not req.work_id:
         raise HTTPException(status_code=422, detail="saved-work replay requires a work id")
@@ -807,8 +807,10 @@ def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | 
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("score render", 422) from e
+        raise _unexpected_http_error("score render", 500, redact=True) from e
     return RenderScoreResponse(
         score=score,
         svg=svg,
@@ -820,9 +822,9 @@ def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | 
     )
 
 
-@router.post("/api/render-svg", summary="Render a score as SVG")
+@router.post("/api/render-svg", summary="Render a score as SVG", responses={500: {"description": "Unexpected server failure"}})
 def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) -> Response:
-    """Draw a score and return only the SVG as the response body. The color source, catalog id and limits source are returned in response headers. Requires a signed-in user. Raises 422 when the render fails."""
+    """Draw a score as SVG. Invalid input returns 422; unexpected failures return 500."""
     if req.score.get("version") in _COMPACT_SCORE_VERSIONS:
         from ...pipeline_runtime import get_service
         work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
@@ -849,8 +851,10 @@ def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) 
         )
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("svg render", 422) from e
+        raise _unexpected_http_error("svg render", 500, redact=True) from e
     # The body of this endpoint is the SVG itself, so the things a caller cannot
     # read off it -- whether it got the work's own colors, and whether it got the
     # work's own limits -- ride here.

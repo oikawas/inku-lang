@@ -13,14 +13,17 @@ func runProviderProgressChecks() async throws {
     let databaseURL = folder.appendingPathComponent("works.sqlite")
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                   models: ["pinned", "changed"].map { ProviderModelSettings(id: $0, purposes: ["llm"]) })
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:pinned")))
+    app.selectNextDrawingModel("check:pinned")
     app.inputMode = "description"; app.descriptionText = "a red circle"; app.seedText = "0"
 
     // Failure: AppModel discarded the real core attempt and host clock, hiding a retry as one slow answer.
     let generation = Task { @MainActor in await app.generate() }
-    await first.waitUntilEntered()
+    try await first.waitUntilEntered()
     let initial = try await waitForProviderProgress(app, attempt: 1, comparison: false)
     let initialFacts = initial.action == "generate_normalized_ddl" && initial.maxAttempts >= 2
         && initial.modelReference == "check:pinned" && initial.deadline > initial.attemptBeganAt
@@ -29,7 +32,7 @@ func runProviderProgressChecks() async throws {
     app.selectNextDrawingModel("check:changed")
     await first.release()
     let second = try await waitForProviderProgress(app, attempt: 2, comparison: false)
-    await retry.waitUntilEntered()
+    try await retry.waitUntilEntered()
     let retryFacts = second.executionID == initial.executionID && second.action == initial.action
         && second.maxAttempts == initial.maxAttempts && second.modelReference == "check:pinned"
         && second.stageBeganAt == initial.stageBeganAt && second.attemptBeganAt > initial.attemptBeganAt
@@ -66,7 +69,7 @@ func runProviderProgressChecks() async throws {
             _ = try await app.generateCandidate(request: request, token: token)
         }
     }
-    await comparison.waitUntilEntered()
+    try await comparison.waitUntilEntered()
     let comparing = try await waitForProviderProgress(app, attempt: 1, comparison: true)
     guard comparing.executionID != completed.executionID, comparing.action == "generate_normalized_ddl",
           comparing.modelReference == request.models.stage1Model, comparing.awaitingReply,
@@ -76,7 +79,7 @@ func runProviderProgressChecks() async throws {
         throw CheckFailure.message("Comparison progress borrowed the old run or changed the displayed work")
     }
     let stopping = Task { @MainActor in await app.cancel() }
-    await comparison.waitUntilCancelled()
+    try await comparison.waitUntilCancelled()
     let cancelled = app.providerProgress
     await provider.sendLateBytes(call: 3)
     await Task.yield()
@@ -139,26 +142,16 @@ private actor ProviderProgressProvider: ProviderTransport {
 }
 
 private actor ProviderProgressPause {
-    private var entered = false
-    private var cancelled = false
+    private let entered = BoundedSignal("Provider progress wait for entry timed out")
+    private let cancelled = BoundedSignal("Provider progress wait for cancellation timed out")
     private var released = false
     private var continuation: CheckedContinuation<Void, Never>?
-    private var enteredWaiters: [CheckedContinuation<Void, Never>] = []
-    private var cancelledWaiters: [CheckedContinuation<Void, Never>] = []
     func wait() async {
-        entered = true
-        let waiters = enteredWaiters; enteredWaiters = []; waiters.forEach { $0.resume() }
+        await entered.fire()
         if !released { await withCheckedContinuation { continuation = $0 } }
     }
-    func waitUntilEntered() async {
-        if !entered { await withCheckedContinuation { enteredWaiters.append($0) } }
-    }
-    func markCancelled() {
-        cancelled = true
-        let waiters = cancelledWaiters; cancelledWaiters = []; waiters.forEach { $0.resume() }
-    }
-    func waitUntilCancelled() async {
-        if !cancelled { await withCheckedContinuation { cancelledWaiters.append($0) } }
-    }
+    func waitUntilEntered() async throws { try await entered.wait() }
+    func markCancelled() async { await cancelled.fire() }
+    func waitUntilCancelled() async throws { try await cancelled.wait() }
     func release() { released = true; continuation?.resume(); continuation = nil }
 }

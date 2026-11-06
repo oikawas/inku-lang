@@ -127,8 +127,8 @@ struct AppCheck {
         if CommandLine.arguments.contains("--library-paging-perf-only") {
             try await runLibraryPagingPerformance(arguments: CommandLine.arguments); return
         }
-        if let index = CommandLine.arguments.firstIndex(of: "--library-pagination-benchmark"),
-           CommandLine.arguments.indices.contains(index + 1) {
+        if let index = CommandLine.arguments.firstIndex(of: "--library-pagination-benchmark") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected a disposable identity-check.sqlite copy") }
             try await runLibraryPaginationBenchmark(url: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
         }
         if let index = CommandLine.arguments.firstIndex(of: "--model-catalog-only") {
@@ -453,7 +453,9 @@ enum CheckFailure: Error {
 }
 
 /// The deadline releases the waiter rather than waiting for an uncooperative provider task.
-private actor BoundedSignal {
+actor BoundedSignal {
+    private let failure: String
+    init(_ failure: String = "Controller cancellation check timed out") { self.failure = failure }
     private var fired = false
     private var waiter: CheckedContinuation<Void, Error>?
     private var deadline: Task<Void, Never>?
@@ -474,7 +476,7 @@ private actor BoundedSignal {
         }
     }
     private func timeout() {
-        waiter?.resume(throwing: CheckFailure.message("Controller cancellation check timed out"))
+        waiter?.resume(throwing: CheckFailure.message(failure))
         waiter = nil; deadline = nil
     }
 }

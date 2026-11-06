@@ -19,8 +19,11 @@ func runProviderObservationChecks() async throws {
     let provider = ObservationCheckProvider()
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false)
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+                                   models: ["pinned", "holes"].map { ProviderModelSettings(id: $0, purposes: ["llm"]) })
     try await app.updateHostSettings(HostSettings(providers: [service], models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:holes")))
+    app.selectNextDrawingModel("check:pinned")
     app.inputMode = "description"; app.descriptionText = "A red circle above black dots scattered at the bottom"
     app.language = "en"; app.seedText = "42"
     guard app.display.preferences.captureProviderIO != true else { throw CheckFailure.message("Provider raw capture did not default off") }

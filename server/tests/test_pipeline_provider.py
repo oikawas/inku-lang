@@ -189,12 +189,20 @@ def test_openai_gpt_6_1_sol_reasons_low_with_room_and_a_cut_answer_is_not_used(m
     }
 
 
-def test_mlx_profile_survives_settings_and_requests_core_schema_without_tools(monkeypatch):
+def test_mlx_profile_survives_settings_and_requests_core_schema_without_tools(monkeypatch, tmp_path):
     """Forced tools made Gemma 4 repeat thought markers up to max_tokens.
     A stored MLX profile must reach constrained JSON decoding, even under a
     custom provider ID, without changing the prompt or losing its credentials.
     """
     from inku_server.model_settings import connection_for, update_model_settings
+    from inku_server import db
+    from inku_server.persistence.schema import AppSettingRow
+    from sqlalchemy import create_engine
+
+    # This transport test runs without the API startup that initializes the DB.
+    engine = create_engine(f"sqlite:///{tmp_path / 'provider-usage.db'}")
+    AppSettingRow.__table__.create(engine)
+    monkeypatch.setattr(db, "engine", engine)
 
     settings = update_model_settings({}, {"providers": {"mac-models": {
         "kind": "openai_compatible", "base_url": "http://mlx.invalid/v1",

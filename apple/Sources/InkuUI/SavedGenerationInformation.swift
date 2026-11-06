@@ -13,8 +13,13 @@ struct SavedGenerationInformation: Sendable {
     let edge: LineageEdge?
     let annotation: LibraryAnnotation
 
-    var prompts: [ExactJSON]? {
-        presentation?.promptJSON.flatMap { try? ExactJSON(data: $0).array }
+    let prompts: [ExactJSON]?
+
+    init(presentation: SavedWorkPresentation?, context: SavedAuthoringContext?, metrics: [ProviderAttemptMetric],
+         generation: Int?, edge: LineageEdge?, annotation: LibraryAnnotation) {
+        self.presentation = presentation; self.context = context; self.metrics = metrics
+        self.generation = generation; self.edge = edge; self.annotation = annotation
+        self.prompts = presentation?.promptJSON.flatMap { try? ExactJSON(data: $0).array }
     }
 
     func prompt(_ action: String) -> ExactJSON? {

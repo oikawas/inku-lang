@@ -146,7 +146,7 @@ fn retry(request: &Value) -> f64 {
             }
         }
     }
-    wait.min(3600.0)
+    wait.min(86400.0)
 }
 fn process(r: &Value) -> Result<Value, &'static str> {
     let action = r["action"].as_str().ok_or("invalid_request")?;
@@ -408,12 +408,12 @@ mod tests {
     use super::*;
     #[test]
     fn p0_retry_delay_is_bounded() {
-        assert_eq!(retry(&json!({"retry_after":"1e300"})), 3600.0);
+        assert_eq!(retry(&json!({"retry_after":"1e300"})), 86400.0);
         assert_eq!(
             retry(
                 &json!({"raw":r#"{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"1e300s"}]}}"#})
             ),
-            3600.0
+            86400.0
         );
     }
     #[test]

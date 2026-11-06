@@ -652,8 +652,8 @@ struct Candidate {
 
 #[derive(Default)]
 struct ParseMemo {
-    candidates: HashMap<usize, Vec<Candidate>>,
-    relative_heads: HashMap<usize, bool>,
+    candidates: HashMap<(usize, &'static str), Vec<Candidate>>,
+    relative_heads: HashMap<(usize, &'static str), bool>,
 }
 
 thread_local! {
@@ -845,10 +845,12 @@ fn candidates_at(
     } else {
         PARSE_MEMO.with(|slot| slot.borrow().clone())
     };
-    if let Some(cached) = memo
-        .as_ref()
-        .and_then(|memo| memo.borrow().candidates.get(&start_byte).cloned())
-    {
+    if let Some(cached) = memo.as_ref().and_then(|memo| {
+        memo.borrow()
+            .candidates
+            .get(&(start_byte, language.as_str()))
+            .cloned()
+    }) {
         return cached;
     }
     let candidates =
@@ -856,7 +858,7 @@ fn candidates_at(
     if let Some(memo) = memo {
         memo.borrow_mut()
             .candidates
-            .insert(start_byte, candidates.clone());
+            .insert((start_byte, language.as_str()), candidates.clone());
     }
     candidates
 }
@@ -1644,15 +1646,19 @@ fn has_relative_scale_head_context(
     language: ResolvedInstructionLanguage,
 ) -> bool {
     let memo = PARSE_MEMO.with(|slot| slot.borrow().clone());
-    if let Some(cached) = memo
-        .as_ref()
-        .and_then(|memo| memo.borrow().relative_heads.get(&start_byte).copied())
-    {
+    if let Some(cached) = memo.as_ref().and_then(|memo| {
+        memo.borrow()
+            .relative_heads
+            .get(&(start_byte, language.as_str()))
+            .copied()
+    }) {
         return cached;
     }
     let result = has_relative_scale_head_context_uncached(edition, source, start_byte, language);
     if let Some(memo) = memo {
-        memo.borrow_mut().relative_heads.insert(start_byte, result);
+        memo.borrow_mut()
+            .relative_heads
+            .insert((start_byte, language.as_str()), result);
     }
     result
 }

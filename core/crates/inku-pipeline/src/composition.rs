@@ -1826,13 +1826,12 @@ fn other_of_with_totals<'a>(
         });
     }
     let mut digits = vec![0_usize; sizes.len()];
+    let mut choice = vec![0_usize; sizes.len()];
     let mut combination_index = 0usize;
     loop {
-        let choice: Vec<usize> = digits
-            .iter()
-            .enumerate()
-            .map(|(layer, digit)| work.options[layer][*digit])
-            .collect();
+        for (layer, digit) in digits.iter().enumerate() {
+            choice[layer] = work.options[layer][*digit];
+        }
         if choice != current {
             let total = totals.map_or_else(
                 || work.score(&choice, &mut terms).total,
@@ -1846,7 +1845,7 @@ fn other_of_with_totals<'a>(
                 }
             };
             if better {
-                best = Some((total, choice));
+                best = Some((total, choice.clone()));
             }
         }
         if !advance(&mut digits, &sizes) {
@@ -3420,8 +3419,12 @@ fn search_work_with_totals(work: &Work<'_>) -> Result<(Searched, Option<Vec<f64>
     let mut totals = Vec::with_capacity(usize::try_from(combinations).unwrap_or_default());
     let mut terms = Terms::default();
     let mut digits = vec![0_usize; sizes.len()];
+    let mut choice = vec![0_usize; sizes.len()];
     loop {
-        totals.push(work.score(&choice_of(&digits), &mut terms).total);
+        for (layer, digit) in digits.iter().enumerate() {
+            choice[layer] = work.options[layer][*digit];
+        }
+        totals.push(work.score(&choice, &mut terms).total);
         if !advance(&mut digits, &sizes) {
             break;
         }

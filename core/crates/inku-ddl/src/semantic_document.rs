@@ -645,7 +645,7 @@ fn arbitrate_coordination_continuation_claims(
             let mut claimant = association.ast.instructions[member_index].clone();
             claimant.action = edge.action.clone();
             claimant.position = edge.position.clone();
-            let Some(admission) = continuation_marker(document, association, &claimant, true)
+            let Some(admission) = continuation_marker(document, association, &claimant, true, None)
             else {
                 continue;
             };
@@ -761,6 +761,7 @@ fn associate_continuations(
     let mut pending = Vec::new();
     let mut owned = 0;
     let mut instruction_index_map = vec![None; association.ast.instructions.len()];
+    let lookup = ContinuationLookup::new(association);
     let coordinated_members = association
         .ast
         .coordinated_head_groups
@@ -774,14 +775,28 @@ fn associate_continuations(
             instructions.push(original_instruction.clone());
             continue;
         }
-        let (instruction, consumed_upstream_spans) =
-            continuation_predicate(association, original_instruction);
-        let Some(admission) = continuation_marker(document, association, &instruction, false)
-        else {
+        let Some(mut admission) = continuation_marker(
+            document,
+            association,
+            original_instruction,
+            false,
+            Some(&lookup),
+        ) else {
             instruction_index_map[original_index] = Some(instructions.len());
             instructions.push(original_instruction.clone());
             continue;
         };
+        let (instruction, consumed_upstream_spans) =
+            continuation_predicate(association, original_instruction);
+        if document.language() == ResolvedInstructionLanguage::En {
+            admission.role = if instruction.action.as_ref().is_some_and(|action| {
+                action.provenance.source.span.end_byte <= admission.marker.span.start_byte
+            }) {
+                ContinuationPhraseRole::UnsupportedDefiniteObject
+            } else {
+                ContinuationPhraseRole::SupportedMarkedSubject
+            };
+        }
         if !has_continuation_predicate(&instruction) {
             instruction_index_map[original_index] = Some(instructions.len());
             instructions.push(original_instruction.clone());
@@ -1189,16 +1204,79 @@ struct ContinuationAdmission {
     role: ContinuationPhraseRole,
 }
 
+struct ContinuationLookup {
+    fill_heads: BTreeSet<(usize, usize)>,
+    japanese_markers: BTreeMap<(usize, usize, usize), SourceSpan>,
+}
+
+impl ContinuationLookup {
+    fn new(result: &SemanticInstructionAssociationResult) -> Self {
+        let mut fill_heads = BTreeSet::new();
+        let mut add_head = |index: usize| {
+            let span = result.ast.instructions[index].entity.head.source().span;
+            fill_heads.insert((span.start_byte, span.end_byte));
+        };
+        for edge in &result.ast.group_predicates {
+            if edge
+                .action
+                .as_ref()
+                .is_some_and(|action| action.identity.id == "fill")
+            {
+                for &index in
+                    &result.ast.coordinated_head_groups[edge.group_index].member_instruction_indices
+                {
+                    add_head(index);
+                }
+            }
+            if let Some(crate::SemanticFillTarget::InlineShape {
+                target_instruction_index,
+                ..
+            }) = &edge.fill_target
+            {
+                add_head(*target_instruction_index);
+            }
+        }
+        for candidate in &result.ast.instructions {
+            if let Some(crate::SemanticFillTarget::InlineShape {
+                target_instruction_index,
+                ..
+            }) = &candidate.fill_target
+            {
+                add_head(*target_instruction_index);
+            }
+        }
+        let mut japanese_markers = BTreeMap::new();
+        for marker in &result.association.clause_topology.attachment_markers {
+            if matches!(
+                marker.marker,
+                AttachmentMarkerKind::Japanese(
+                    JapaneseAttachmentMarkerKind::Wa | JapaneseAttachmentMarkerKind::Ga
+                )
+            ) && let Some(head) = marker.left_atom_spans.last()
+            {
+                japanese_markers
+                    .entry((marker.clause_index, head.start_byte, head.end_byte))
+                    .or_insert(marker.span);
+            }
+        }
+        Self {
+            fill_heads,
+            japanese_markers,
+        }
+    }
+}
+
 fn continuation_marker(
     document: &NormalizedDdlDocument,
     result: &SemanticInstructionAssociationResult,
     instruction: &SemanticInstruction,
     allow_shared_determiner_candidate: bool,
+    lookup: Option<&ContinuationLookup>,
 ) -> Option<ContinuationAdmission> {
     let head = instruction.entity.head.source();
     // Explicit imperative fill grammar owns both its motif and inline operand.
     // Its article must not be reused as a marked-subject continuation claim.
-    if instruction.fill_target.is_some() || result.ast.group_predicates.iter().any(|edge| {
+    let fill_owns_head = lookup.map_or_else(|| result.ast.group_predicates.iter().any(|edge| {
         (edge.action.as_ref().is_some_and(|action| action.identity.id == "fill")
             && result.ast.coordinated_head_groups[edge.group_index].member_instruction_indices.iter()
                 .any(|index| result.ast.instructions[*index].entity.head.source().span == head.span))
@@ -1207,7 +1285,8 @@ fn continuation_marker(
     }) || result.ast.instructions.iter().any(|candidate| {
         matches!(&candidate.fill_target, Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
             if result.ast.instructions[*target_instruction_index].entity.head.source().span == head.span)
-    }) {
+    }), |lookup| lookup.fill_heads.contains(&(head.span.start_byte, head.span.end_byte)));
+    if instruction.fill_target.is_some() || fill_owns_head {
         return None;
     }
     let clause = result
@@ -1217,23 +1296,32 @@ fn continuation_marker(
         .get(head.clause_index)?;
     let (marker_span, role) = match document.language() {
         ResolvedInstructionLanguage::Ja => (
-            result
-                .association
-                .clause_topology
-                .attachment_markers
-                .iter()
-                .filter(|marker| {
-                    marker.clause_index == head.clause_index
-                        && matches!(
-                            marker.marker,
-                            AttachmentMarkerKind::Japanese(
-                                JapaneseAttachmentMarkerKind::Wa | JapaneseAttachmentMarkerKind::Ga
+            if let Some(lookup) = lookup {
+                *lookup.japanese_markers.get(&(
+                    head.clause_index,
+                    head.span.start_byte,
+                    head.span.end_byte,
+                ))?
+            } else {
+                result
+                    .association
+                    .clause_topology
+                    .attachment_markers
+                    .iter()
+                    .filter(|marker| {
+                        marker.clause_index == head.clause_index
+                            && matches!(
+                                marker.marker,
+                                AttachmentMarkerKind::Japanese(
+                                    JapaneseAttachmentMarkerKind::Wa
+                                        | JapaneseAttachmentMarkerKind::Ga
+                                )
                             )
-                        )
-                        && marker.left_atom_spans.last() == Some(&head.span)
-                })
-                .map(|marker| marker.span)
-                .next()?,
+                            && marker.left_atom_spans.last() == Some(&head.span)
+                    })
+                    .map(|marker| marker.span)
+                    .next()?
+            },
             ContinuationPhraseRole::SupportedMarkedSubject,
         ),
         ResolvedInstructionLanguage::En => {

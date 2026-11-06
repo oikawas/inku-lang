@@ -782,14 +782,9 @@ public struct ContentView: View {
         guard canReadWork, let work = target ?? workTarget, !work.svg.isEmpty else { return }
         let token = UUID(); presentationLoadID = token
         let fromLibrary = ui.libraryOpen
-        let viewer: HistoryModel
-        if !history.filtered, history.library.works.contains(where: { $0.id == work.id }) {
-            viewer = history
-        } else {
-            viewer = HistoryModel()
-            await viewer.connect(app: model)
-            await viewer.locate(app: model, workID: work.id)
-        }
+        let viewer = HistoryModel()
+        await viewer.connect(app: model)
+        await viewer.locate(app: model, workID: work.id)
         guard canReadWork, ui.libraryOpen == fromLibrary, presentationLoadID == token else { return }
         presentationWork = work; presentationHistory = viewer
         enterPresentation()

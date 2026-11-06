@@ -31,10 +31,6 @@ public enum DescriptionFeedback {
         return FeedbackVocabulary(japanese + english)
     }
 
-    public static func parts(description: String, ddl: String) throws -> [FeedbackPart] {
-        InterpretationFeedback.parts(description: description, ddl: ddl, vocabulary: try vocabulary.get())
-    }
-
     public static func record(description: String, ddl: String, database: InkuDatabase) async throws {
         let vocabulary = try vocabulary.get()
         let words = await Task.detached {

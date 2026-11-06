@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: the instruction dialog (new and edit) and Another composition no longer offer the drawing model or Lift the stroke limit. Both draw with the conditions of the input panel's current tab, and an instruction edit no longer carries over the parent's stroke limit.
+
+- Server: `/api/compose` with `work_id` took the saved work's model before the request's `model`, and drew and recorded the candidate with it. It now draws with the requested model.
+
 - macOS: while the library is open, the lineage view beneath it no longer takes presses for dragging, so a card above the lineage canvas is selected at once.
 
 - macOS: decide a single or double click on a library or lineage picture from the mouse-down on that picture, so quick clicks on different cards never open a work by mistake.

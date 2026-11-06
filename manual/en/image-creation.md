@@ -222,7 +222,7 @@ The instructions box on the Describe tab also lets you edit the whole text direc
 
 `Discard edits` in the box and `Instruction editor` asks for confirmation. Press `Discard` to return to the saved instructions the target work was drawn from. Opening the editor from the box still returns to that work's instructions, rather than the box's draft. The box returns its draft; the editor returns only its own text and leaves the box's draft unchanged. Returning never draws. The button is disabled when the text matches, while read-only or while drawing, and is absent from `New instructions`. Cancel leaves the text unchanged. After discarding, ⌘Z (Ctrl+Z) in that editor restores the text from before the discard.
 
-There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Lift the stroke limit` outside the text. The painting model chosen here also becomes the input tab's current choice (it is not saved as a setting). While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
+There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts. The dialog does not offer the painting model or `Lift the stroke limit`: new and edited instructions are painted with the values in the next work's conditions on the left (the current input tab). To change them, choose them there before opening the dialog. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
 
 | Action | Contents |
 |---|---|
@@ -292,7 +292,7 @@ The color catalog list includes `From the description`. Choose it and the server
 
 A work records the colors it was drawn in on its own row. **Redrawing an older work therefore draws it in those colors, not in today's definition of its catalog.** It still draws if the catalog has since been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries a note in those cases: `Retired` when the catalog is gone, and `No record of its colors` for an older work that has no recorded colors — that one is drawn from the current definition.
 
-`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). Set its default per input tab under `Settings` → `Drawing defaults`; it starts off. The input chip chooses for the current drawing and does not change the saved default. AI refinement, redrawing from the lineage and instruction edits start from the value recorded on the original work (off for an older work without the record), and you can choose again in the dialog. The choice applies to the whole work, is recorded on it, and is used when replaying the saved work as it stands. The Image tab and the picture folder do not use it.
+`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). Set its default per input tab under `Settings` → `Drawing defaults`; it starts off. The input chip chooses for the current drawing and does not change the saved default. AI refinement and redrawing from the lineage start from the value recorded on the original work (off for an older work without the record), and you can choose again in the dialog. Instruction edits and `Another composition` use the value in the next work's conditions (they do not offer a choice). The choice applies to the whole work, is recorded on it, and is used when replaying the saved work as it stands. The Image tab and the picture folder do not use it.
 
 There are eleven canvases.
 
@@ -330,7 +330,7 @@ A refinement changes exactly one element at a time, chosen from the work-editing
 |---|---|---|
 | Another composition | Chooses numeric ranges again, except corners. The option's seed also reselects explicit tilt angles and corners | Fast (choosing ranges calls no LLM; existing completion only runs when the instructions still have gaps) |
 
-In `Another composition` you may choose `Make one option` or `Make four options`.
+In `Another composition` you may choose `Make one option` or `Make four options`. The options are painted with the painting model and `Lift the stroke limit` in the next work's conditions on the left (the current input tab; from 2026-11-06, this screen does not offer them).
 
 In `Change the composition form`, choose one of seven forms and draw one or four options. The options share the parent's reading if it has one; otherwise a new reading is made. Drawing switches to `In words` with composition enabled, and the chosen option is saved as a child. This is unavailable when the description is held. Save or discard unsaved options before making new ones.
 

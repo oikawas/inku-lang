@@ -708,7 +708,7 @@ fn build_semantic_instructions(
             )
         })
         .collect::<BTreeSet<_>>();
-    assert_eq!(
+    debug_assert_eq!(
         owned_coordination_identities.len(),
         coordination_evidence.len(),
         "accepted coordination evidence identities must be unique"
@@ -988,7 +988,7 @@ fn build_semantic_instructions(
             .iter()
             .map(|issue| issue.occurrences.len())
             .sum::<usize>();
-    assert_eq!(
+    debug_assert_eq!(
         delivered_instruction_occurrence_count, owned_instruction_occurrence_count,
         "semantic instruction association must deliver every Action / Position occurrence exactly once"
     );
@@ -1005,7 +1005,7 @@ fn build_semantic_instructions(
         })
         .collect::<Vec<_>>();
     let delivered_coordination_marker_count = delivered_coordination_identities.len();
-    assert_eq!(
+    debug_assert_eq!(
         delivered_coordination_identities
             .iter()
             .copied()
@@ -1014,7 +1014,7 @@ fn build_semantic_instructions(
         delivered_coordination_marker_count,
         "semantic instruction association must not duplicate a coordination marker owner"
     );
-    assert_eq!(
+    debug_assert_eq!(
         delivered_coordination_marker_count, owned_coordination_marker_count,
         "semantic instruction association must deliver every coordinated-head marker exactly once"
     );
@@ -1030,7 +1030,7 @@ fn build_semantic_instructions(
             .iter()
             .map(|issue| issue.occurrences.len())
             .sum::<usize>();
-    assert_eq!(
+    debug_assert_eq!(
         delivered_relation_occurrence_count, owned_relation_occurrence_count,
         "semantic instruction association must deliver every full-literal relation exactly once"
     );

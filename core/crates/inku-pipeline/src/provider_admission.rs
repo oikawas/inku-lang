@@ -146,7 +146,7 @@ fn retry(request: &Value) -> f64 {
             }
         }
     }
-    wait
+    wait.min(86400.0)
 }
 fn process(r: &Value) -> Result<Value, &'static str> {
     let action = r["action"].as_str().ok_or("invalid_request")?;
@@ -406,6 +406,16 @@ pub fn provider_admission_json(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn p0_retry_delay_is_bounded() {
+        assert_eq!(retry(&json!({"retry_after":"1e300"})), 86400.0);
+        assert_eq!(
+            retry(
+                &json!({"raw":r#"{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"1e300s"}]}}"#})
+            ),
+            86400.0
+        );
+    }
     #[test]
     fn estimate_keeps_large_integer_exact_without_wrapping() {
         let request = br#"{"action":"estimate","kind":"gemini","tpm":1,"body_bytes":1,"count_response":{"totalTokens":18446744073709551615}}"#;

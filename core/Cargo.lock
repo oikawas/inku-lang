@@ -877,6 +877,7 @@ dependencies = [
  "inku-pipeline-uniffi",
  "inku-render",
  "inku-score",
+ "inku-svg-raster",
  "pyo3",
  "resvg 0.48.1",
  "serde",

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: fix paths where input could crash or stall processing, without changing output for works that already draw.
+
 - macOS: skip reading execution records for the file log while result-log saving is disabled.
 
 - macOS: use arrow keys to preview works in the chronological library thumbnail grid.

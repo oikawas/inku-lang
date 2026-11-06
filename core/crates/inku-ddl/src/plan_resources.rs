@@ -245,12 +245,18 @@ fn register_member(
         }
         claim(&mut claims.transforms[index], value, &owner)?;
     }
+    let logical_objects = match repetitions_override {
+        Some(repetitions) => repetitions
+            .checked_mul(member.source_instruction_indices().len() as u64)
+            .ok_or_else(|| PlanResourceError {
+                owner: Box::new(owner.clone()),
+                reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::LogicalObjects),
+            })?,
+        None => u64::from(member.logical_count()),
+    };
     accounting.add(
         ResourceDemand {
-            logical_objects: repetitions_override.map_or_else(
-                || u64::from(member.logical_count()),
-                |repetitions| repetitions * member.source_instruction_indices().len() as u64,
-            ),
+            logical_objects,
             maximum_resolved_count: repetitions_override
                 .unwrap_or_else(|| u64::from(member.logical_count())),
             ..ResourceDemand::default()

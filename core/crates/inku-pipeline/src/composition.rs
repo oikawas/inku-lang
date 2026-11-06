@@ -1792,6 +1792,28 @@ fn other_of<'a>(
     let keys = |choice: &[usize]| -> Vec<&str> { choice.iter().map(|i| region_key(*i)).collect() };
     let mut best: Option<(f64, Vec<usize>)> = None;
     let mut terms = Terms::default();
+    if work.combinations() > MAX_COMBINATIONS {
+        for (layer, options) in work.options.iter().enumerate() {
+            for &option in options {
+                if option == current[layer] {
+                    continue;
+                }
+                let mut choice = current.to_vec();
+                choice[layer] = option;
+                let total = work.score(&choice, &mut terms).total;
+                if best.as_ref().is_none_or(|(best_total, best_choice)| {
+                    total < *best_total
+                        || (total == *best_total && keys(&choice) < keys(best_choice))
+                }) {
+                    best = Some((total, choice));
+                }
+            }
+        }
+        return Ok(match best {
+            Some((_, choice)) => (choice, OtherAnswer::Next),
+            None => (current.to_vec(), OtherAnswer::None),
+        });
+    }
     let mut digits = vec![0_usize; sizes.len()];
     loop {
         let choice: Vec<usize> = digits
@@ -3580,6 +3602,9 @@ fn solve_work(
     seed: u64,
     work_id: &str,
 ) -> Result<Solution, Unsolved> {
+    if searched.near.is_empty() {
+        return Err(Unsolved::NoRanges);
+    }
     let regions = searched.near[pick_index(seed, work_id, searched.near.len())].clone();
     let mut terms = Terms::default();
     let score = work.score(&regions, &mut terms);
@@ -3874,6 +3899,64 @@ pub fn composed_plan_with_joints(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn p0_empty_near_returns_unsolved() {
+        let layers = vec![plan_layer("place", "circle", None)];
+        let reading = default_reading(&layers);
+        let work = Work::new(&layers, &reading, "white").unwrap();
+        let searched = Searched {
+            best: 0.0,
+            near: vec![],
+            combinations: 1,
+        };
+        assert!(matches!(
+            solve_work(&work, &searched, 1, "work"),
+            Err(Unsolved::NoRanges)
+        ));
+    }
+
+    #[test]
+    fn p0_large_other_answer_finishes() {
+        if std::env::var_os("INKU_P0_OTHER_CHILD").is_some() {
+            let layers: Vec<_> = (0..9)
+                .map(|_| plan_layer("place", "circle", None))
+                .collect();
+            let reading = default_reading(&layers);
+            let work = Work::new(&layers, &reading, "white").unwrap();
+            assert!(work.combinations() > MAX_COMBINATIONS);
+            let current: Vec<_> = work.options.iter().map(|options| options[0]).collect();
+            let searched = Searched {
+                best: 0.0,
+                near: vec![current.clone()],
+                combinations: work.combinations(),
+            };
+            let result = other_of(&searched, Some(&current), 1, "work", || Ok(work)).unwrap();
+            assert_ne!(result.0, current);
+            return;
+        }
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "composition::tests::p0_large_other_answer_finishes",
+            ])
+            .env("INKU_P0_OTHER_CHILD", "1")
+            .spawn()
+            .unwrap();
+        let start = std::time::Instant::now();
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(status.success());
+                break;
+            }
+            if start.elapsed() > std::time::Duration::from_secs(5) {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                panic!("large composition search timed out");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
 
     #[test]
     fn fractions_compare_exactly_and_round_once() {

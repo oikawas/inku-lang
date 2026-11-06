@@ -332,6 +332,7 @@ pub(crate) fn parse_neutral_lexemes_in(
     edition: SaijikiEdition,
     document: &NormalizedDdlDocument,
 ) -> NeutralParseResult {
+    let _memo = ParseMemoGuard::new();
     let source = document.source();
     let language = document.language();
     let mut tokens = Vec::new();
@@ -649,6 +650,34 @@ struct Candidate {
     delivery: CandidateDelivery,
 }
 
+#[derive(Default)]
+struct ParseMemo {
+    candidates: HashMap<(usize, &'static str), Vec<Candidate>>,
+    relative_heads: HashMap<(usize, &'static str), bool>,
+}
+
+thread_local! {
+    static PARSE_MEMO: RefCell<Option<Rc<RefCell<ParseMemo>>>> = const { RefCell::new(None) };
+}
+
+struct ParseMemoGuard(Option<Rc<RefCell<ParseMemo>>>);
+
+impl ParseMemoGuard {
+    fn new() -> Self {
+        Self(
+            PARSE_MEMO.with(|slot| slot.replace(Some(Rc::new(RefCell::new(ParseMemo::default()))))),
+        )
+    }
+}
+
+impl Drop for ParseMemoGuard {
+    fn drop(&mut self) {
+        PARSE_MEMO.with(|slot| {
+            slot.replace(self.0.take());
+        });
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Selection {
     Token {
@@ -805,6 +834,36 @@ pub fn bracketed_plugin_at(source: &str, start: usize) -> Option<(usize, &str)> 
 }
 
 fn candidates_at(
+    edition: SaijikiEdition,
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+    require_boundary: bool,
+) -> Vec<Candidate> {
+    let memo = if require_boundary {
+        None
+    } else {
+        PARSE_MEMO.with(|slot| slot.borrow().clone())
+    };
+    if let Some(cached) = memo.as_ref().and_then(|memo| {
+        memo.borrow()
+            .candidates
+            .get(&(start_byte, language.as_str()))
+            .cloned()
+    }) {
+        return cached;
+    }
+    let candidates =
+        candidates_at_uncached(edition, source, start_byte, language, require_boundary);
+    if let Some(memo) = memo {
+        memo.borrow_mut()
+            .candidates
+            .insert((start_byte, language.as_str()), candidates.clone());
+    }
+    candidates
+}
+
+fn candidates_at_uncached(
     edition: SaijikiEdition,
     source: &str,
     start_byte: usize,
@@ -1586,6 +1645,30 @@ fn has_relative_scale_head_context(
     start_byte: usize,
     language: ResolvedInstructionLanguage,
 ) -> bool {
+    let memo = PARSE_MEMO.with(|slot| slot.borrow().clone());
+    if let Some(cached) = memo.as_ref().and_then(|memo| {
+        memo.borrow()
+            .relative_heads
+            .get(&(start_byte, language.as_str()))
+            .copied()
+    }) {
+        return cached;
+    }
+    let result = has_relative_scale_head_context_uncached(edition, source, start_byte, language);
+    if let Some(memo) = memo {
+        memo.borrow_mut()
+            .relative_heads
+            .insert((start_byte, language.as_str()), result);
+    }
+    result
+}
+
+fn has_relative_scale_head_context_uncached(
+    edition: SaijikiEdition,
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> bool {
     let mut cursor = start_byte;
     loop {
         while let Some(character) = source[cursor..].chars().next() {
@@ -2354,6 +2437,60 @@ fn is_separator(character: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn p0_repeated_size_words_compile_in_both_languages() {
+        use crate::{
+            MacroExpansionLimits, NormalizedDdlDocument, ResolvedInstructionLanguage,
+            compile_typed_ddl,
+        };
+        if let Some(count) = std::env::var_os("INKU_P0_SCALE_COUNT") {
+            let count: usize = count.to_string_lossy().parse().unwrap();
+            for (source, language) in [
+                (
+                    format!("{}円を置く。", "小さい".repeat(count)),
+                    ResolvedInstructionLanguage::Ja,
+                ),
+                (
+                    format!("place one {}circle.", "small ".repeat(count)),
+                    ResolvedInstructionLanguage::En,
+                ),
+            ] {
+                let start = std::time::Instant::now();
+                let doc = NormalizedDdlDocument::new(source, language, vec![]).unwrap();
+                let limits = MacroExpansionLimits {
+                    max_invocations: 16,
+                    max_depth: 16,
+                    max_evaluation_steps: 1000,
+                    max_nodes_per_invocation: 100,
+                    max_total_nodes: 500,
+                };
+                let _ = compile_typed_ddl(doc, &[], None, limits);
+                eprintln!("p0 size words {language:?} {count}: {:?}", start.elapsed());
+            }
+            return;
+        }
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "parser::tests::p0_repeated_size_words_compile_in_both_languages",
+            ])
+            .env("INKU_P0_SCALE_COUNT", "20")
+            .spawn()
+            .unwrap();
+        let start = std::time::Instant::now();
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(status.success());
+                break;
+            }
+            if start.elapsed() > std::time::Duration::from_secs(10) {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                panic!("repeated size words timed out");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
     #[test]
     fn only_braced_words_supply_a_japanese_coordination_boundary() {
         use super::*;

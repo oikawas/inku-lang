@@ -52,14 +52,18 @@ fn jni_boundary<T>(
     match catch_unwind(AssertUnwindSafe(|| action(&mut env))) {
         Ok(Ok(value)) => value,
         Ok(Err(error)) => {
-            let _ = env.throw_new(error.exception_class, error.message);
+            if matches!(env.exception_check(), Ok(false)) {
+                let _ = env.throw_new(error.exception_class, error.message);
+            }
             failure_value
         }
         Err(_) => {
-            let _ = env.throw_new(
-                "java/lang/IllegalStateException",
-                "native Rust panic at JNI boundary",
-            );
+            if matches!(env.exception_check(), Ok(false)) {
+                let _ = env.throw_new(
+                    "java/lang/IllegalStateException",
+                    "native Rust panic at JNI boundary",
+                );
+            }
             failure_value
         }
     }

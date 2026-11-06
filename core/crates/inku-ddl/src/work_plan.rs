@@ -792,7 +792,10 @@ pub fn normalize_work_plan_with_plugins(
                 note(Some(index), slot.field(), value, "unsupported_for_form");
             } else if vocabulary.term(slot, &value).is_none() {
                 note(Some(index), slot.field(), value, "unknown_value");
-            } else if capabilities.forms[&form].contains_key(&slot)
+            } else if capabilities
+                .forms
+                .get(&form)
+                .is_none_or(|slots| slots.contains_key(&slot))
                 && !capabilities.accepts(&form, slot, &value)
             {
                 note(Some(index), slot.field(), value, "unsupported_for_form");

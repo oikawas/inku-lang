@@ -612,7 +612,11 @@ fn washi(seed: Seed, shade: Shade, broad: &mut Broad, canvas: CanvasSize) -> Vec
     let mut y = random.uniform(0.0, mm(28.0));
     while y < canvas.height {
         chains.push_str(&format!("M0 {}h{}", n2(y), n0(canvas.width)));
-        y += mm(random.uniform(26.0, 32.0));
+        let next = y + mm(random.uniform(26.0, 32.0));
+        if next == y {
+            break;
+        }
+        y = next;
     }
     broad.lines(chains, 1.1, -2.6);
     let mut layers = Vec::new();

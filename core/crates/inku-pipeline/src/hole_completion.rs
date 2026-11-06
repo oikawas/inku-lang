@@ -74,7 +74,7 @@ pub(crate) fn confirmed_bindings(
         return vec![];
     };
     let source = compilation.document.source();
-    let text = |span: SourceSpan| &source[span.start_byte..span.end_byte];
+    let text = |span: SourceSpan| source.get(span.start_byte..span.end_byte);
     semantic.ast.instructions.iter().enumerate().filter(|(_, instruction)| contains(span, instruction.entity.head.source().span)).map(|(index, instruction)| {
         let entity = &instruction.entity;
         let mut facts = Vec::new();

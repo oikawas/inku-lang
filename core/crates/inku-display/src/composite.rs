@@ -69,7 +69,7 @@ impl CompositePixels {
         let mut joined = self
             .pixels
             .lock()
-            .expect("display composite pixel lock poisoned");
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let joined = joined.as_mut().ok_or(DisplayError::CompositeFinished)?;
         for row in 0..tile.height as usize {
             let at = (tile.y as usize - self.window.y as usize + row) * joined.stride as usize
@@ -89,7 +89,7 @@ impl CompositePixels {
         let joined = self
             .pixels
             .lock()
-            .expect("display composite pixel lock poisoned");
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let joined = joined.as_ref().ok_or(DisplayError::CompositeFinished)?;
         pixels.extend_from_slice(&joined.pixels);
         Ok(RasterOutput {
@@ -104,7 +104,7 @@ impl CompositePixels {
     fn finish(&self) -> Result<RasterOutput, DisplayError> {
         self.pixels
             .lock()
-            .expect("display composite pixel lock poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .take()
             .ok_or(DisplayError::CompositeFinished)
     }

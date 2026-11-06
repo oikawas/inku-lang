@@ -10,15 +10,20 @@ const TITLE_BRACKETS: ReadonlyArray<readonly [string, string]> = [
 	['“', '”']
 ];
 
+// Rust's str::trim uses Unicode White_Space; JavaScript trim also removes BOM.
+function trimTitleWhitespace(value: string): string {
+	return value.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, '');
+}
+
 /** The name a line gives when the whole line, without the spaces around it,
     is a title (empty for a title that ends a chunk); null for any other line.
     A name leaves out its own pair's characters only. */
 export function ddlTitleName(line: string): string | null {
-	const trimmed = line.trim();
+	const trimmed = trimTitleWhitespace(line);
 	for (const [open, close] of TITLE_BRACKETS) {
 		if (trimmed.length < open.length + close.length || !trimmed.startsWith(open) || !trimmed.endsWith(close)) continue;
 		const inner = trimmed.slice(open.length, trimmed.length - close.length);
-		if (!inner.includes(open) && !inner.includes(close) && !inner.includes('\n')) return inner.trim();
+		if (!inner.includes(open) && !inner.includes(close) && !inner.includes('\n')) return trimTitleWhitespace(inner);
 	}
 	return null;
 }

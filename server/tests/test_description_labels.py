@@ -12,16 +12,28 @@ import pathlib
 
 import pytest
 
-from inku_server.description_labels import pipeline_description
+from inku_server.description_labels import pipeline_description, source_labels
+from inku_server.pipeline_api import _rewords
 
-CASES = json.loads(
+CORPUS = json.loads(
     (pathlib.Path(__file__).parent / "data" / "description-label-cases.json").read_text(encoding="utf-8")
-)["cases"]
+)
+CASES = CORPUS["cases"]
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["why"] for c in CASES])
 def test_the_pipeline_reads_the_description_without_its_labels(case):
     assert pipeline_description(case["text"]) == case["pipeline"]
+
+
+@pytest.mark.parametrize("case", CASES, ids=[c["why"] for c in CASES])
+def test_source_labels_match_the_shared_cases(case):
+    assert source_labels(case["text"]) == case["source_labels"]
+
+
+@pytest.mark.parametrize("case", CORPUS["rewords_cases"])
+def test_rewording_matches_the_shared_cases(case):
+    assert _rewords(case["text"], case["description"]) is case["rewords"]
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["why"] for c in CASES])

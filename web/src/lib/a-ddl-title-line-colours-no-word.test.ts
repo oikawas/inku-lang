@@ -1,11 +1,26 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { annotate, highlightDDL, interpretationFeedback } from './highlight.ts';
 import { resolveInstructionLang } from './instructionLang.ts';
-import { ddlTitleName, withoutDdlTitleLines } from './ddl-titles.ts';
+import { ddlTitleName, ddlTitleLineSpans, withoutDdlTitleLines } from './ddl-titles.ts';
 
 // A title line (DDL 27) names the chunk below it and draws nothing.
 const DDL = '画面比1:1。\n\n「黒い水面」\n画面の横0.5、縦0.5の位置に、青の塗りの円を1個置く。';
+
+test('title names, UTF-16 spans and body match the shared core cases', () => {
+	const fixture = JSON.parse(readFileSync(new URL('../../../server/tests/data/ddl-title-cases.json', import.meta.url), 'utf8')) as {
+		cases: Array<{ why: string; text: string; lines: Array<[number, number, string]>; without: string }>;
+	};
+	for (const { why, text, lines, without } of fixture.cases) {
+		const scalars = Array.from(text);
+		const utf16 = (offset: number) => scalars.slice(0, offset).join('').length;
+		const expected = lines.map(([start, end, name]) => ({ start: utf16(start), end: utf16(end), name }));
+		const actual = ddlTitleLineSpans(text).map(({ start, end }) => ({ start, end, name: ddlTitleName(text.slice(start, end)) }));
+		assert.deepEqual(actual, expected, why);
+		assert.equal(withoutDdlTitleLines(text), without, why);
+	}
+});
 
 test('a title line is the core\'s: one bracketed name on a whole line', () => {
 	assert.equal(ddlTitleName('「灯台」'), '灯台');

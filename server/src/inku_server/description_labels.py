@@ -43,5 +43,4 @@ def source_labels(text: str | None) -> list[str]:
     """
     if not text:
         return []
-    spans = json.loads(importlib.import_module("inku_render").pipeline_description_label_spans(text))
-    return [label for start, end, kind in spans if kind == "comment" and (label := text[start + 1:end - 1].strip())]
+    return json.loads(importlib.import_module("inku_render").pipeline_description_source_labels(text))

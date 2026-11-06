@@ -261,7 +261,7 @@ struct ExportView: View {
         var capturedOptions = options
         capturedOptions.pixelHeight = resolution == 0 ? customHeight : resolution
         if capturedOptions.format == .png, capturedWorks.count == 1 {
-            capturedOptions.pngAlphaWhite = !singleWorkPNGTransparent
+            capturedOptions.setSingleWorkPNGTransparent(singleWorkPNGTransparent)
         }
         let capturedDestination = model.display.preferences.exportDefaults
         isBusy = true; error = nil; status = "保存作品の書き出し条件を確認しています…"
@@ -272,21 +272,22 @@ struct ExportView: View {
                 let sources = try await model.prepareExportSources(works: capturedWorks, profile: profile, requiresPluginDefinitions: capturedOptions.format == .ddl,
                                                                    lineAnimation: capturedWorks.count == 1 && (capturedOptions.format == .apng || capturedOptions.format == .gif))
                 try Task.checkCancellation()
-                status = "\(capturedWorks.count)作品を描画・エンコードしています…"
-                let artifacts = try await ExportService.prepare(sources: sources, options: capturedOptions)
+                try ExportService.validate(sources: sources, options: capturedOptions)
+                let names = ExportService.artifactNames(sources: sources, options: capturedOptions)
                 try Task.checkCancellation()
-                guard let destination = try destination(artifacts: artifacts, format: capturedOptions.format, configuration: capturedDestination) else {
+                guard let destination = try destination(names: names, format: capturedOptions.format, configuration: capturedDestination) else {
                     status = "保存を取り消しました。"
-                    // Preparing artifacts only used memory; cancellation reaches no file-writing operation.
                     if directFormat { model.reportExportStatus(status); dismiss() }
                     return
                 }
-                let urls = try await save(artifacts: artifacts, destination: destination)
+                status = "\(capturedWorks.count)作品を描画・エンコードしています…"
+                let saved = try await save(sources: sources, options: capturedOptions, names: names, destination: destination)
+                let urls = saved.urls
                 exportedURLs = urls; status = "\(urls.count)ファイルを書き出しました。"
-                if capturedWorks.count == 1, let artifact = artifacts.first, let matches = artifact.matchesSavedSVG {
+                if capturedWorks.count == 1, let matches = saved.matches {
                     var warnings: [String] = []
                     if !matches { warnings.append(copy("animationSavedMismatch", "現在の描画結果は保存された絵と異なります。")) }
-                    if artifact.compileOutcome != "complete" { warnings.append(copy("animationCompileIncomplete", "指示書の一部を描けませんでした。")) }
+                    if saved.outcome != "complete" { warnings.append(copy("animationCompileIncomplete", "指示書の一部を描けませんでした。")) }
                     if warnings.isEmpty { dismiss() } else { status = warnings.joined(separator: " ") }
                 }
                 if directFormat { model.reportExportStatus(status); dismiss() }
@@ -298,7 +299,7 @@ struct ExportView: View {
         }
     }
 
-    private func destination(artifacts: [ExportArtifact], format: SavedExportFormat, configuration: ExportConfiguration) throws -> URL? {
+    private func destination(names: [String], format: SavedExportFormat, configuration: ExportConfiguration) throws -> URL? {
         if lineAnimation, let animationDestination { return animationDestination }
         if !directFormat, let bookmark = configuration.destinationBookmark {
             var stale = false
@@ -307,10 +308,10 @@ struct ExportView: View {
             // A fresh child folder avoids silently replacing earlier exports.
             return folder
         }
-        if artifacts.count == 1 {
+        if names.count == 1 {
             let panel = NSSavePanel(); panel.title = model.display.localized("作品を書き出す")
             panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .data]
-            panel.nameFieldStringValue = artifacts[0].name
+            panel.nameFieldStringValue = names[0]
             return panel.runModal() == .OK ? panel.url : nil
         }
         let panel = NSOpenPanel(); panel.title = model.display.localized("書き出しフォルダーを選択")
@@ -319,29 +320,28 @@ struct ExportView: View {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    private func save(artifacts: [ExportArtifact], destination: URL) async throws -> [URL] {
+    private func save(sources: [ExportSource], options: ExportOptions, names: [String], destination: URL) async throws -> (urls: [URL], matches: Bool?, outcome: String?) {
         let worker = Task.detached(priority: .userInitiated) {
             let scoped = destination.startAccessingSecurityScopedResource()
             defer { if scoped { destination.stopAccessingSecurityScopedResource() } }
             try Task.checkCancellation()
             var isDirectory: ObjCBool = false
             let destinationIsDirectory = FileManager.default.fileExists(atPath: destination.path, isDirectory: &isDirectory) && isDirectory.boolValue
-            if artifacts.count == 1, !destinationIsDirectory {
-                try artifacts[0].data.write(to: destination, options: .atomic)
-                return [destination]
-            }
-            let bundle = destination.appendingPathComponent("inku-export-" + UUID().uuidString, isDirectory: true)
-            try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: false)
+            let singleFile = names.count == 1 && !destinationIsDirectory
+            let bundle = singleFile ? destination : destination.appendingPathComponent("inku-export-" + UUID().uuidString, isDirectory: true)
+            if !singleFile { try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: false) }
             do {
                 var urls: [URL] = []
-                for artifact in artifacts {
+                var matches: Bool?; var outcome: String?
+                try ExportService.emit(sources: sources, options: options) { artifact in
                     try Task.checkCancellation()
-                    let url = bundle.appendingPathComponent(artifact.name)
-                    try artifact.data.write(to: url, options: .withoutOverwriting); urls.append(url)
+                    let url = singleFile ? destination : bundle.appendingPathComponent(artifact.name)
+                    try artifact.data.write(to: url, options: singleFile ? .atomic : .withoutOverwriting)
+                    urls.append(url); matches = artifact.matchesSavedSVG; outcome = artifact.compileOutcome
                 }
-                return urls
+                return (urls, matches, outcome)
             } catch {
-                try? FileManager.default.removeItem(at: bundle)
+                if !singleFile { try? FileManager.default.removeItem(at: bundle) }
                 throw error
             }
         }

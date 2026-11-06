@@ -8,6 +8,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: remove files already created if a multi-work export fails partway through.
+
+- macOS: align sketch notes with Web and display each frozen batch model correctly.
+
+- macOS: align instruction title line breaks and BOM handling with the shared core.
+
+- macOS: preserve the original spelling of numbers when displaying and copying Scores and diagnostics.
+
+- macOS: remove the obsolete frame count from animation settings errors.
+
 - Android: use the shared core for DDL title detection and description comment contents, aligning with Server for unusual whitespace including U+001C–U+001F.
 
 - macOS: guide users to add a connection, choose a default drawing model, or select demo models in the demo panel.

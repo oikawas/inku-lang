@@ -18,21 +18,25 @@ enum ExportRaster {
         return (Int(widthValue), height)
     }
 
-    static func image(svg: String, height: Int, forcedTileSide: Int? = nil) throws -> CGImage {
+    static func image(svg: String, height: Int, forcedTileSide: Int? = nil, white: Bool = false) throws -> CGImage {
         try Task.checkCancellation()
         let scene = try InkuCore.prepareSVG(svg: svg)
-        return try image(scene: scene, height: height, forcedTileSide: forcedTileSide)
+        return try image(scene: scene, height: height, forcedTileSide: forcedTileSide, white: white)
     }
 
-    static func image(scene: PreparedSVG, height: Int, forcedTileSide: Int? = nil, maximumPixels: Int = ExportService.maximumImagePixels) throws -> CGImage {
+    static func image(scene: PreparedSVG, height: Int, forcedTileSide: Int? = nil, maximumPixels: Int = ExportService.maximumImagePixels, white: Bool = false) throws -> CGImage {
         let (width, height) = try dimensions(scene: scene, height: height, maximumPixels: maximumPixels)
-        if forcedTileSide == nil, max(width, height) <= 8192, width * height <= 16_777_216 {
+        if !white, forcedTileSide == nil, max(width, height) <= 8192, width * height <= 16_777_216 {
             let raster = try scene.rasterize(targetHeight: UInt32(height))
             try Task.checkCancellation()
             guard let image = raster.makeCGImage() else { throw ExportFailure("描画画像を作れませんでした。") }
             return image
         }
         let context = try bitmap(width: width, height: height, maximumPixels: maximumPixels)
+        if white {
+            context.setFillColor(CGColor(gray: 1, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
         let side = forcedTileSide ?? tileSide
         for y in stride(from: 0, to: height, by: side) {
             for x in stride(from: 0, to: width, by: side) {

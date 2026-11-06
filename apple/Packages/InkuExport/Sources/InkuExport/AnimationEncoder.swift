@@ -35,9 +35,12 @@ enum AnimationEncoder {
             fonts = try InkuCore.prepareRasterFonts([font.path])
         }
         let layerOrder = order(frameCount: states.count, replay: options.layerReplay)
+        let prepared: [PreparedSVG]
+        if let fonts { prepared = try states.map { try fonts.prepareSVG($0) } }
+        else { prepared = [] }
         let (width, height): (Int, Int)
-        if let fonts, let last = states.last {
-            (width, height) = try ExportRaster.dimensions(scene: fonts.prepareSVG(last), height: options.pixelHeight, maximumPixels: ExportService.maximumAnimationPixels)
+        if let last = prepared.last {
+            (width, height) = try ExportRaster.dimensions(scene: last, height: options.pixelHeight, maximumPixels: ExportService.maximumAnimationPixels)
         } else { (width, height) = try ExportRaster.dimensions(svg: sources[0].work.svg, height: options.pixelHeight) }
         let steps = options.pixelHeight <= 1080 ? 6 : options.pixelHeight <= 2160 ? 4 : 2
         let transitions = options.transition == "cut" ? 0 : steps
@@ -46,9 +49,6 @@ enum AnimationEncoder {
             throw ExportFailure("この解像度とフレーム数はアニメーションの上限（6億画素）を超えます。")
         }
         let holdMS = max(100, Int((1000 * (single ? options.layerIntervalSeconds : options.holdSeconds)).rounded(.toNearestOrEven)))
-        if options.format == .gif, holdMS > 655_350 {
-            throw ExportFailure("GIFでこのフレーム数と間隔を保持できません。間隔を短くするかAPNGを選択してください。")
-        }
         let data = NSMutableData()
         let gif = options.format == .gif
         guard let destination = CGImageDestinationCreateWithData(data, (gif ? UTType.gif.identifier : UTType.png.identifier) as CFString, count, nil) else { throw ExportFailure("アニメーションエンコーダーを準備できませんでした。") }
@@ -64,9 +64,9 @@ enum AnimationEncoder {
             CGImageDestinationAddImage(destination, image, [(gif ? kCGImagePropertyGIFDictionary : kCGImagePropertyPNGDictionary): timing] as CFDictionary)
         }
         if single {
-            guard let fonts else { throw ExportFailure("字体を準備できませんでした。") }
+            guard fonts != nil else { throw ExportFailure("字体を準備できませんでした。") }
             for index in layerOrder {
-                try autoreleasepool { try add(ExportRaster.image(scene: fonts.prepareSVG(states[index]), height: height, maximumPixels: ExportService.maximumAnimationPixels), durationMS: holdMS) }
+                try autoreleasepool { try add(ExportRaster.image(scene: prepared[index], height: height, maximumPixels: ExportService.maximumAnimationPixels), durationMS: holdMS) }
             }
         } else {
             var current = try ExportRaster.fitted(svg: sources[0].work.svg, width: width, height: height)

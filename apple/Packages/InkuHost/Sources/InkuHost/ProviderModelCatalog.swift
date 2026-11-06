@@ -25,17 +25,9 @@ public enum ProviderModelCatalog {
     public static func fetch(provider: ProviderSettings, firstURL: URL, key: String?, send: Send) async throws -> [FetchedProviderModel] {
         guard provider.kind != .chatGPTPlan else { throw HostError("personal_plan_model_catalog_requires_runtime") }
         let kind = provider.apiProfile == "mlx" ? "mlx" : provider.kind.rawValue
-        let plan = try ProviderCoreSettings.call("model_list_start", ["kind": kind, "base_url": provider.baseURL.absoluteString, "api_key": ""])
+        let plan = try ProviderCoreSettings.call("model_list_start", ["kind": kind, "base_url": provider.baseURL.absoluteString, "api_key": key ?? ""])
         guard let urlText = plan["url"] as? String, let url = URL(string: urlText) else { throw HostError("provider_base_url_invalid") }
-        var headers = plan["headers"] as? [String: String] ?? [:]
-        if let key, !key.isEmpty {
-            switch provider.kind {
-            case .anthropic: headers["x-api-key"] = key
-            case .gemini: headers["x-goog-api-key"] = key
-            case .openAICompatible: headers["Authorization"] = "Bearer " + key
-            case .chatGPTPlan: throw HostError("personal_plan_model_catalog_requires_runtime")
-            }
-        }
+        let headers = plan["headers"] as? [String: String] ?? [:]
         let itemsKey = plan["items_key"] as? String ?? ""
         let firstQuery = plan["query"] as? [String: String] ?? [:]
         var rows: [ExactJSON] = []
@@ -156,7 +148,7 @@ public enum ProviderModelCatalog {
         var answers: [String: ProviderModelAccess] = [:]
         var pending = targets.compactMap { $0["id"] as? String }[...]
         await withTaskGroup(of: (String, ProviderModelAccess?).self) { group in
-            let limit = (try? ProviderCoreSettings.call("provider_concurrency", ["provider": provider.id])["limit"] as? Int) ?? 2
+            let limit = (try? ProviderCoreSettings.call("provider_concurrency", ["provider": provider.id])["limit"] as? Int) ?? 0
             for _ in 0..<max(1, limit) { if let id = pending.popFirst() { group.addTask { (id, await probe(id)) } } }
             while let (id, answer) = await group.next() {
                 if let answer { answers[id] = answer }

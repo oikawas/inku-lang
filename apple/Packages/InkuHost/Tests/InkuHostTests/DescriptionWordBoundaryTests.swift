@@ -16,12 +16,12 @@ struct DescriptionWordBoundaryTests {
 
     // Concrete failure: matching "line" inside "outline" loses the unread word;
     // the same feedback must exclude emotion and recognized vocabulary segments.
-    @Test func feedbackRespectsAsciiWordBoundaryAndWeakPartExtraction() {
+    @Test func feedbackRespectsAsciiWordBoundaryAndWeakPartExtraction() throws {
         let vocabulary = [FeedbackLexeme(surface: "red", category: "colors"), FeedbackLexeme(surface: "line", category: "forms")]
         let text = "red outline 美しい quuxword"
-        let parts = InterpretationFeedback.parts(description: text, ddl: "colors circle", vocabulary: vocabulary)
+        let parts = try InterpretationFeedback.parts(description: text, ddl: "colors circle", vocabulary: vocabulary)
         #expect(parts.first?.text == "red" && parts.first?.tone == .strong)
         #expect(parts.contains { $0.text == "美しい" && $0.tone == .medium })
-        #expect(InterpretationFeedback.unreadWords(description: text, ddl: "colors circle", vocabulary: vocabulary) == ["outline", "quuxword"])
+        #expect(try InterpretationFeedback.unreadWords(description: text, ddl: "colors circle", vocabulary: vocabulary) == ["outline", "quuxword"])
     }
 }

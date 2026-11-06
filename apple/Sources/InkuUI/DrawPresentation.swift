@@ -43,7 +43,7 @@ enum DrawPresentation {
     static func sketchNote(_ state: String?, japanese: Bool) -> String {
         let pair: (String, String)
         switch state {
-        case "fine", "coarse": return sketchShort(state, japanese: japanese)
+        case "fine", "coarse": return ""
         case "supplemented": pair = ("記述に足りない場所の広がりや季節・時刻の光を補って描いた", "The layer supplemented the extent of place or the seasonal or time-of-day light the description left out")
         case "not_needed": pair = ("写生を通したが、補うものがなかった", "The layer ran and found nothing to add")
         case "fallback": pair = ("写生を試みたが届かず、記述のまま解釈した", "The layer was tried, did not answer, and the description was read as it stood")
@@ -52,5 +52,21 @@ enum DrawPresentation {
         default: pair = ("写生が記録される前に描かれた（切って描いたのではない）", "Drawn before the layer was recorded, which is not the same as off")
         }
         return japanese ? pair.0 : pair.1
+    }
+
+    static func modelReference(_ reference: String, empty: String) -> String {
+        guard !reference.isEmpty else { return empty }
+        return reference.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).joined(separator: " / ")
+    }
+
+    static func catalogSummary(mode: String, id: String?, catalogs: [ColorCatalogOption], auto: String, random: String, missing: String) -> String {
+        if mode == "auto" { return auto }
+        if mode == "random" { return random }
+        guard let id else { return missing }
+        return catalogs.first { $0.id == id }?.name ?? id
+    }
+
+    static func batchRow(activeID: String?, rows: [BatchRow], completed: Int, failed: Int) -> Int {
+        activeID.flatMap { id in rows.firstIndex { $0.id == id } }.map { $0 + 1 } ?? (completed + failed)
     }
 }

@@ -62,24 +62,20 @@ struct BatchConditionsView: View {
     }
 
     private var catalogSummary: String {
-        if let frozen {
-            if frozen.catalogMode == "auto" { return model.display.webCopy("colorCatalogAuto", "記述から自動選択") }
-            if frozen.catalogMode == "random" { return model.display.localized("ランダム") }
-            guard let id = frozen.catalogID else { return model.display.localized("未記録") }
-            return model.catalogs.first { $0.id == id }?.name ?? id
-        }
-        return model.catalogMode == "auto"
-            ? model.display.webCopy("colorCatalogAuto", "記述から自動選択")
-            : model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
+        DrawPresentation.catalogSummary(mode: frozen?.catalogMode ?? model.catalogMode,
+            id: frozen == nil ? model.catalogID : frozen?.catalogID, catalogs: model.catalogs,
+            auto: model.display.webCopy("colorCatalogAuto", "記述から自動選択"),
+            random: model.display.localized("ランダム"), missing: model.display.localized("未記録"))
     }
 
     private var modelSummary: String {
-        let reference = frozen.map { $0.stage1Model == $0.stage2Model ? $0.stage1Model : $0.stage1Model + " / " + $0.stage2Model }
-            ?? model.nextBatchDrawingModelReference
-        guard let separator = reference.firstIndex(of: ":") else {
-            return reference.isEmpty ? model.display.localized("選択してください") : reference
+        let empty = model.display.localized("選択してください")
+        if let frozen {
+            let first = DrawPresentation.modelReference(frozen.stage1Model, empty: empty)
+            return frozen.stage1Model == frozen.stage2Model ? first
+                : first + " / " + DrawPresentation.modelReference(frozen.stage2Model, empty: empty)
         }
-        return String(reference[..<separator]) + " / " + String(reference[reference.index(after: separator)...])
+        return DrawPresentation.modelReference(model.nextBatchDrawingModelReference, empty: empty)
     }
 
     private var details: some View {

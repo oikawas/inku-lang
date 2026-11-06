@@ -113,7 +113,7 @@ struct Bootstrap: @unchecked Sendable {
         registry = try Self.object(InkuCore.canvasRegistry)
         macroSources = try Self.object(resource("macro-sources"))
         let vocabulary = try Self.object(resource("saijiki"))
-        guard vocabulary["asset_id"] as? String == "inku.saijiki.v3",
+        guard vocabulary["asset_id"] as? String == SaijikiEdition.current,
               let categories = vocabulary["categories"] as? [[String: Any]] else {
             throw HostError("bundled_vocabulary_invalid")
         }

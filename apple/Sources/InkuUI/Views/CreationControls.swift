@@ -456,14 +456,6 @@ struct CreationDisplayedProcess: View {
         if let data = readRecord, let record = try? ExactJSON(data: data) {
             return DrawPresentation.readingNote(record["reading_state"].string, japanese: model.display.preferences.language != "en")
         }
-        return switch work.sketchState {
-        case "fine", "coarse": ""
-        case "supplemented": "記述に足りない場所の広がりや季節・時刻の光を補って描いた"
-        case "not_needed": "写生を通したが、補うものがなかった"
-        case "fallback": "写生を試みたが届かず、記述のまま解釈した"
-        case "off": "写生を通さずに描いた"
-        case "not_applicable": "この経路は写生を通らない"
-        default: "写生が記録される前に描かれた（切って描いたのではない）"
-        }
+        return DrawPresentation.sketchNote(work.sketchState, japanese: model.display.preferences.language != "en")
     }
 }

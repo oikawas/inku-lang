@@ -7,6 +7,7 @@ import InkuHost
 @MainActor
 struct DdlEditorPane: View {
     @Bindable var model: AppModel
+    let pluginWorkID: String?
     @Binding var text: String
     var disabled = false
     @Binding var insertion: InkuEditorInsertion?
@@ -27,11 +28,12 @@ struct DdlEditorPane: View {
     private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
     private var highlighter: DdlHighlighter { model.ddlHighlighter.withCalls(pluginSource == text ? pluginCalls : []) }
 
-    init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
+    init(model: AppModel, pluginWorkID: String? = nil, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
          onRangeBlocked: ((Bool) -> Void)? = nil, onRangePreview: ((CompositionRanges.Preview?) -> Void)? = nil) {
         self.onRangeBlocked = onRangeBlocked
         self.onRangePreview = onRangePreview
         self.model = model
+        self.pluginWorkID = pluginWorkID
         _text = text
         self.disabled = disabled
         _insertion = insertion
@@ -122,11 +124,11 @@ struct DdlEditorPane: View {
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor.opacity(0.7)))
         // Web DdlEditor: the states are asked 180 ms after the text settles.
-        .task(id: [text, model.completionRecordKey]) {
+        .task(id: [text, model.completionRecordKey, pluginWorkID ?? ""]) {
             try? await Task.sleep(for: .milliseconds(180))
             guard !Task.isCancelled else { return }
             let source = text
-            let calls = await model.pluginCalls(source: source)
+            let calls = await model.pluginCalls(source: source, workID: pluginWorkID)
             guard !Task.isCancelled, text == source else { return }
             pluginCalls = calls; pluginCallsRevision &+= 1; pluginSource = source
             completionStates = model.completionRangeStates(source: source)

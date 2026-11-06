@@ -74,21 +74,27 @@ enum ExportSheets {
     }
 
     static func build(sources: [ExportSource], options: ExportOptions) throws -> [ExportArtifact] {
+        var artifacts: [ExportArtifact] = []
+        try emit(sources: sources, options: options) { artifacts.append($0) }
+        return artifacts
+    }
+
+    static func emit(sources: [ExportSource], options: ExportOptions, receive: (ExportArtifact) throws -> Void) throws {
         let ai = options.format == .aiSheet
         let capacity = ai ? 12 : 28
-        var artifacts: [ExportArtifact] = []
         var sheetReferences: [(String, Int, Int)] = []
         let pages = (sources.count + capacity - 1) / capacity
         for page in 0..<pages {
             try Task.checkCancellation()
             let start = page * capacity, end = min(sources.count, start + capacity)
             let name = "inku-\(ai ? "ai" : "review")-sheet-\(page + 1).png"
-            let image = try contact(sources: Array(sources[start..<end]), options: options, startIndex: start)
-            artifacts.append(ExportArtifact(name: name, data: try ExportService.png(image)))
+            try autoreleasepool {
+                let image = try contact(sources: Array(sources[start..<end]), options: options, startIndex: start)
+                try receive(ExportArtifact(name: name, data: try ExportService.png(image)))
+            }
             sheetReferences.append((name, start + 1, end))
         }
-        if ai { artifacts.append(ExportArtifact(name: "inku-contact-sheet-notes.md", data: Data(notes(sources: sources, options: options, sheets: sheetReferences).utf8))) }
-        return artifacts
+        if ai { try receive(ExportArtifact(name: "inku-contact-sheet-notes.md", data: Data(notes(sources: sources, options: options, sheets: sheetReferences).utf8))) }
     }
 
     private static func contact(sources: [ExportSource], options: ExportOptions, startIndex: Int) throws -> CGImage {

@@ -4,16 +4,31 @@ import XCTest
 
 private actor Pages {
     private(set) var urls: [URL] = []
+    private(set) var headers: [[String: String]] = []
     private var replies: [String]
     init(_ replies: [String]) { self.replies = replies }
     func send(_ request: URLRequest) -> (status: Int, data: Data) {
         urls.append(request.url!)
+        headers.append(request.allHTTPHeaderFields ?? [:])
         // The last reply repeats, so one reply models a list that never ends.
         return (200, Data((replies.count > 1 ? replies.removeFirst() : replies.first ?? "{}").utf8))
     }
 }
 
 final class ProviderModelCatalogChecks: XCTestCase, @unchecked Sendable {
+    func testModelListUsesCoreKeyHeaders() async throws {
+        let fixtureKey = "fixture-key"
+        let p = provider("custom", .openAICompatible, "https://example.invalid/v1")
+        let expected = try ProviderCoreSettings.call("model_list_start", ["kind": p.kind.rawValue,
+            "base_url": p.baseURL.absoluteString, "api_key": fixtureKey])["headers"] as? [String: String] ?? [:]
+        let pages = Pages([#"{"data":[{"id":"one"}]}"#])
+        _ = try await ProviderModelCatalog.fetch(provider: p, firstURL: p.baseURL, key: fixtureKey) { await pages.send($0) }
+        let received = await pages.headers.first ?? [:]
+        for (key, value) in expected {
+            XCTAssertEqual(received.first { $0.key.lowercased() == key.lowercased() }?.value, value)
+        }
+        XCTAssertFalse(expected.isEmpty)
+    }
     private func provider(_ id: String, _ kind: ProviderKind, _ base: String) -> ProviderSettings {
         .init(id: id, kind: kind, baseURL: URL(string: base)!, requiresAPIKey: true)
     }

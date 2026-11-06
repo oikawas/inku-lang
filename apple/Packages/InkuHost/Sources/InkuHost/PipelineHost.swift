@@ -220,7 +220,7 @@ public actor PipelineHost {
         let document = try context.document.map { try ExactJSON(data: $0) } ?? .object([
             "source": .string(work.ddl ?? ""),
             "language": .string(work.instructionLangResolved ?? configuration["language"].string ?? "ja"),
-            "macro_locks": .array(locks), "saijiki": .string("inku.saijiki.v3")
+            "macro_locks": .array(locks), "saijiki": .string(SaijikiEdition.current)
         ])
         return .object(["document": document, "definitions": configuration["definitions"], "compiler": compiler,
                         "options": try ExactJSON(data: context.renderOptions), "clip": try ExactJSON(data: context.clipPolicy),
@@ -788,15 +788,8 @@ private actor ExecutionDriver {
             authoring["route"] = .string("read_and_draw")
             authoring["description"] = .string(try InkuCore.descriptionWithoutLabels(text))
             if request.descriptionComposition == true { authoring["composition"] = .object(["mode": .string("on")]) }
-            let spans = try ExactJSON(data: InkuCore.descriptionLabelSpans(text)).array ?? []
-            let scalars = Array(text.unicodeScalars)
-            let labels = spans.compactMap { span -> ExactJSON? in
-                guard let values = span.array, values.count == 3, values[2].string == "comment",
-                      let start = values[0].number.flatMap(Int.init), let end = values[1].number.flatMap(Int.init),
-                      start >= 0, end <= scalars.count, end >= start + 2 else { return nil }
-                let label = String(String.UnicodeScalarView(scalars[(start + 1)..<(end - 1)])).trimmingCharacters(in: .whitespacesAndNewlines)
-                return label.isEmpty ? nil : .string(label)
-            }
+            let result = try ExactJSON(data: Data(InkuCore.descriptionSourceLabels(text).utf8))
+            guard let labels = result.array, labels.allSatisfy({ $0.string != nil }) else { throw HostError("provider_core_invalid") }
             if !labels.isEmpty { authoring["source_labels"] = .array(labels) }
         }
         if request.authoring.isDirect, request.parentWorkID == nil, request.declareCanvas == true {

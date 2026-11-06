@@ -430,9 +430,8 @@ struct CreationWorkInfoView: View {
         return Color(red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255)
     }
     private func prettyScore(_ raw: String) -> String {
-        guard let data = raw.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data),
-              let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else { return raw }
-        return String(decoding: pretty, as: UTF8.self)
+        guard let data = raw.data(using: .utf8), let json = try? ExactJSON(data: data) else { return raw }
+        return json.prettyText
     }
     private func load() async {
         guard let work else { loading = false; return }

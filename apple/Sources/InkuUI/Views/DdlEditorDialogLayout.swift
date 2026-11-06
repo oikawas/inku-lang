@@ -9,6 +9,7 @@ struct DdlEditorDialogLayout<Footer: View>: View {
     let title: String
     let subtitle: String
     let work: SavedWork?
+    var pluginWorkID: String? = nil
     @Binding var text: String
     @Binding var insertion: InkuEditorInsertion?
     let disabled: Bool
@@ -54,7 +55,7 @@ struct DdlEditorDialogLayout<Footer: View>: View {
     }
 
     private var editor: some View {
-        DdlEditorPane(model: model, text: $text, disabled: disabled, insertion: $insertion,
+        DdlEditorPane(model: model, pluginWorkID: pluginWorkID, text: $text, disabled: disabled, insertion: $insertion,
             onRangeBlocked: onRangeBlocked, onRangePreview: { preview = $0 })
     }
 

@@ -141,32 +141,53 @@ public enum ExportService {
     }
 
     public static func render(sources: [ExportSource], options: ExportOptions) throws -> [ExportArtifact] {
+        var artifacts: [ExportArtifact] = []
+        try emit(sources: sources, options: options) { artifacts.append($0) }
+        return artifacts
+    }
+
+    public static func artifactNames(sources: [ExportSource], options: ExportOptions) -> [String] {
+        switch options.format {
+        case .apng, .gif: return ["inku-animation.\(options.format.fileExtension)"]
+        case .reviewSheet, .aiSheet:
+            let ai = options.format == .aiSheet
+            let capacity = ai ? 12 : 28
+            let pages = (sources.count + capacity - 1) / capacity
+            return (0..<pages).map { "inku-\(ai ? "ai" : "review")-sheet-\($0 + 1).png" }
+                + (ai ? ["inku-contact-sheet-notes.md"] : [])
+        default: return sources.map { "inku-" + safeName($0.work.id) + "." + options.format.fileExtension }
+        }
+    }
+
+    public static func emit(sources: [ExportSource], options: ExportOptions, receive: (ExportArtifact) throws -> Void) throws {
         try Task.checkCancellation()
         try validate(sources: sources, options: options)
         switch options.format {
         case .apng, .gif:
             let result = try AnimationEncoder.encode(sources: sources, options: options)
-            return [ExportArtifact(name: "inku-animation.\(options.format.fileExtension)", data: result.data,
-                                   matchesSavedSVG: result.matches, compileOutcome: result.outcome)]
+            try receive(ExportArtifact(name: "inku-animation.\(options.format.fileExtension)", data: result.data,
+                                       matchesSavedSVG: result.matches, compileOutcome: result.outcome))
         case .reviewSheet, .aiSheet:
-            return try ExportSheets.build(sources: sources, options: options)
+            try ExportSheets.emit(sources: sources, options: options, receive: receive)
         default:
-            return try sources.map { source in
+            for source in sources {
+              try autoreleasepool {
                 try Task.checkCancellation()
                 let prefix = "inku-" + safeName(source.work.id)
                 let data: Data
                 switch options.format {
                 case .svg: data = Data(try source.svg(profile: options.svgProfile).utf8)
                 case .png:
-                    let image = try ExportRaster.image(svg: source.work.svg, height: options.pixelHeight)
+                    let image = try ExportRaster.image(svg: source.work.svg, height: options.pixelHeight, white: options.pngAlphaWhite)
                     // The work's own generation time, not the export time, as Web's downloadPNG stamps it.
-                    data = PNGCaptureDate.stamp(try png(options.pngAlphaWhite ? ExportRaster.onWhite(image) : image),
+                    data = PNGCaptureDate.stamp(try png(image),
                                                 date: Date(timeIntervalSince1970: Double(source.work.at) / 1000))
                 case .ddl: data = try ddl(source)
                 case .shareCard: data = try png(ExportSheets.card(source: source, options: options))
                 default: throw ExportFailure("この形式を単独の作品として書き出せません。")
                 }
-                return ExportArtifact(name: prefix + "." + options.format.fileExtension, data: data)
+                try receive(ExportArtifact(name: prefix + "." + options.format.fileExtension, data: data))
+              }
             }
         }
     }
@@ -190,7 +211,7 @@ public enum ExportService {
                   ["restart", "reverse", "once"].contains(options.layerReplay),
                   options.holdSeconds.isFinite, (0.1...30).contains(options.holdSeconds),
                   options.layerIntervalSeconds.isFinite, (0.1...30).contains(options.layerIntervalSeconds) else {
-                throw ExportFailure("アニメーションのフレーム数・間隔・再生方式を確認してください。")
+                throw ExportFailure("アニメーションの間隔・再生方式を確認してください。")
             }
         }
     }
@@ -219,7 +240,7 @@ public enum ExportService {
             plugins.append(.object(["definition": source.pluginDefinitions[index], "note": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")]))
         }
         return ExactJSON.object([
-            "schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"), "language": .string(source.language),
+            "schema": .string("inku.ddl-export.v2"), "saijiki": .string(SaijikiEdition.current), "language": .string(source.language),
             "ddl": .string(text), "plugins": .array(plugins),
             "exported_from": .object(["build_number": .optional(buildNumber), "render_engine_version": .optional(source.work.renderEngineVersion)])
         ]).data

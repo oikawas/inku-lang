@@ -33,6 +33,25 @@ public indirect enum ExactJSON: Sendable, Equatable {
     }
 
     public var data: Data { Data(text.utf8) }
+    /// Indent without changing numeric lexemes, using Foundation's sorted-key order.
+    public var prettyText: String { prettyText(depth: 0) }
+
+    private func prettyText(depth: Int) -> String {
+        let current = String(repeating: "  ", count: depth)
+        let next = String(repeating: "  ", count: depth + 1)
+        switch self {
+        case .object(let fields) where !fields.isEmpty:
+            let keys = fields.keys.sorted {
+                $0.compare($1, options: [.numeric, .caseInsensitive, .forcedOrdering], range: nil,
+                           locale: NSLocale.system as Locale) == .orderedAscending
+            }
+            let rows = keys.map { next + Self.quote($0) + " : " + fields[$0]!.prettyText(depth: depth + 1) }
+            return "{\n" + rows.joined(separator: ",\n") + "\n" + current + "}"
+        case .array(let values) where !values.isEmpty:
+            return "[\n" + values.map { next + $0.prettyText(depth: depth + 1) }.joined(separator: ",\n") + "\n" + current + "]"
+        default: return text
+        }
+    }
     /// Select transport bytes without changing object member order or number spelling.
     public static func rawMember(_ key: String, in data: Data) throws -> Data {
         _ = try Self(data: data)

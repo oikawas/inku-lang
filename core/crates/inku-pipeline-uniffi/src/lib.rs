@@ -49,6 +49,24 @@ const PROTOCOL_VERSION: &str = "1.0.0";
 
 uniffi::setup_scaffolding!();
 
+/// An internal panic at the shared core boundary.
+#[derive(Debug, uniffi::Error)]
+pub enum CoreCallFailure {
+    InternalInvariant,
+}
+
+impl std::fmt::Display for CoreCallFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("the core call panicked")
+    }
+}
+
+impl std::error::Error for CoreCallFailure {}
+
+fn guarded_core_call<T>(operation: impl FnOnce() -> T) -> Result<T, CoreCallFailure> {
+    catch_unwind(AssertUnwindSafe(operation)).map_err(|_| CoreCallFailure::InternalInvariant)
+}
+
 /// Advance one pipeline execution using only owned byte envelopes.
 #[uniffi::export]
 pub fn step(snapshot_bytes: Vec<u8>, input_envelope_bytes: Vec<u8>) -> Vec<u8> {
@@ -320,23 +338,31 @@ pub fn ddl3d_snapshot(input_bytes: Vec<u8>) -> Vec<u8> {
 
 /// A description's identity `dh1`, as Server's `identity.description_hash`
 /// computes it. Every host asks this one copy so stored identities agree.
-#[uniffi::export]
 pub fn description_hash(text: String) -> String {
     inku_pipeline::identity::description_hash(&text)
+}
+
+#[uniffi::export(name = "description_hash")]
+pub fn description_hash_export(text: String) -> Result<String, CoreCallFailure> {
+    guarded_core_call(|| description_hash(text))
 }
 
 /// A history item's render identity `rh3`, or `None` when the item is not a
 /// JSON object Python's `json.loads` would read.
 #[uniffi::export]
 pub fn render_hash(item_json: String) -> Option<String> {
-    inku_pipeline::identity::render_hash(&item_json).ok()
+    guarded_core_call(|| inku_pipeline::identity::render_hash(&item_json).ok())
+        .ok()
+        .flatten()
 }
 
 /// The canonical JSON Server hashes (`json.dumps(sort_keys=True,
 /// separators=(",", ":"), ensure_ascii=False)`), or `None` for invalid JSON.
 #[uniffi::export]
 pub fn canonical_json(value_json: String) -> Option<String> {
-    inku_pipeline::identity::canonical_json(&value_json).ok()
+    guarded_core_call(|| inku_pipeline::identity::canonical_json(&value_json).ok())
+        .ok()
+        .flatten()
 }
 
 /// The instruction language (`"ja"` or `"en"`) for `text`, or `None` when the
@@ -347,9 +373,13 @@ pub fn resolve_instruction_language(
     requested: Option<String>,
     fallback: String,
 ) -> Option<String> {
-    inku_ddl::resolve_instruction_language(&text, requested.as_deref(), &fallback)
-        .ok()
-        .map(|language| language.as_str().to_owned())
+    guarded_core_call(|| {
+        inku_ddl::resolve_instruction_language(&text, requested.as_deref(), &fallback)
+            .ok()
+            .map(|language| language.as_str().to_owned())
+    })
+    .ok()
+    .flatten()
 }
 
 /// A requested language code (`"auto"`, `"ja"` or `"en"`) normalized as
@@ -359,21 +389,33 @@ pub fn normalize_instruction_language(
     value: Option<String>,
     default_language: String,
 ) -> Option<String> {
-    inku_ddl::normalize_instruction_language(value.as_deref(), &default_language)
-        .ok()
-        .map(|language| language.as_str().to_owned())
+    guarded_core_call(|| {
+        inku_ddl::normalize_instruction_language(value.as_deref(), &default_language)
+            .ok()
+            .map(|language| language.as_str().to_owned())
+    })
+    .ok()
+    .flatten()
 }
 
 /// The description with its labels removed, as every layer reads it.
-#[uniffi::export]
 pub fn description_without_labels(text: String) -> String {
     description_labels::pipeline_description(&text)
 }
 
+#[uniffi::export(name = "description_without_labels")]
+pub fn description_without_labels_export(text: String) -> Result<String, CoreCallFailure> {
+    guarded_core_call(|| description_without_labels(text))
+}
+
 /// The labels' ranges as `[[start, end, kind], ...]` JSON, in Unicode scalar offsets.
-#[uniffi::export]
 pub fn description_label_spans(text: String) -> String {
     description_labels::description_label_spans(&text)
+}
+
+#[uniffi::export(name = "description_label_spans")]
+pub fn description_label_spans_export(text: String) -> Result<String, CoreCallFailure> {
+    guarded_core_call(|| description_label_spans(text))
 }
 
 /// Report the fixed binding and byte-protocol versions as stable JSON.
@@ -392,12 +434,16 @@ pub struct TextRenderSeed {
 /// Derive a saved-Score performance seed without interpreting the words as DDL.
 #[uniffi::export]
 pub fn render_seed_from_text(seed_text: String) -> Option<TextRenderSeed> {
-    inku_render::determinism::render_seed_from_text(&seed_text).map(|(seed, normalized)| {
-        TextRenderSeed {
-            render_seed: seed.to_string(),
-            seed_text: normalized.to_owned(),
-        }
+    guarded_core_call(|| {
+        inku_render::determinism::render_seed_from_text(&seed_text).map(|(seed, normalized)| {
+            TextRenderSeed {
+                render_seed: seed.to_string(),
+                seed_text: normalized.to_owned(),
+            }
+        })
     })
+    .ok()
+    .flatten()
 }
 
 /// Share the canonical registry with host settings and compatibility adapters.

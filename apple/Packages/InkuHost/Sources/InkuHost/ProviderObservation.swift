@@ -16,7 +16,10 @@ public struct ProviderActionIdentity: Codable, Sendable, Hashable {
         self.actionID = actionID; self.attempt = attempt; self.requestDigest = requestDigest
     }
     public init(action: Data) throws {
-        let identity = try ExactJSON(data: action).requiredObject("identity")
+        try self.init(effect: ExactJSON(data: action))
+    }
+    init(effect: ExactJSON) throws {
+        let identity = try effect.requiredObject("identity")
         guard let attempt = identity["attempt"].number.flatMap(UInt32.init), attempt > 0 else {
             throw HostError("pipeline_schema_violation")
         }
@@ -174,14 +177,17 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
     private var endpoint: URL?
     private var operation: ProviderAttemptDiagnosticOperation?
 
-    init(action: Data, reference: String, options: ProviderObservationOptions) throws {
-        let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
+    convenience init(action: Data, reference: String, options: ProviderObservationOptions) throws {
+        try self.init(effect: ExactJSON(data: action), reference: reference, options: options)
+    }
+    init(effect: ExactJSON, reference: String, options: ProviderObservationOptions) throws {
+        let tag = try effect.requiredString("tag")
         guard let stage = ProviderObservationStage(action: tag),
               let timeout = UInt64(try effect.requiredString("timeout_ms")) else {
             throw HostError("pipeline_schema_violation")
         }
         self.options = options
-        value = ProviderAttemptObservation(metric: ProviderAttemptMetric(identity: try ProviderActionIdentity(action: action),
+        value = ProviderAttemptObservation(metric: ProviderAttemptMetric(identity: try ProviderActionIdentity(effect: effect),
             action: tag, stage: stage, requestedModelReference: reference, timeoutMS: timeout),
             raw: options.captureRaw ? ProviderRawObservation() : nil)
     }

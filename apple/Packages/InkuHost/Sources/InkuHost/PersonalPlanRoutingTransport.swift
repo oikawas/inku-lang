@@ -27,19 +27,28 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
     }
     public func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
-        let effect = try ExactJSON(data: action)
+        let parsed = try ParsedProviderAction(action)
+        let effect = parsed.effect
         let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
         guard try Self.personalModel(reference, providers: providers, defaultProvider: ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) == nil else {
             throw HostError("chatgpt_session_pin_required")
+        }
+        if let fast = ordinary as? any ParsedProviderTransport {
+            return try await fast.perform(parsed: parsed, models: models, providers: providers, credentials: credentials, onBytes: onBytes)
         }
         return try await ordinary.perform(action: action, models: models, providers: providers, credentials: credentials, onBytes: onBytes)
     }
     public func performObserved(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                                 observation: ProviderObservationOptions, willSend: @escaping ProviderObservationHandler,
                                 didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
-        let effect = try ExactJSON(data: action)
+        let parsed = try ParsedProviderAction(action)
+        let effect = parsed.effect
         let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
         guard try Self.personalModel(reference, providers: providers, defaultProvider: ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) == nil else { throw HostError("chatgpt_session_pin_required") }
+        if let fast = ordinary as? any ParsedProviderTransport {
+            return try await fast.performObserved(parsed: parsed, models: models, providers: providers, credentials: credentials,
+                observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
+        }
         if let observed = ordinary as? any ObservedProviderTransport {
             return try await observed.performObserved(action: action, models: models, providers: providers, credentials: credentials,
                 observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
@@ -69,14 +78,25 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
                                         willSend: @escaping ProviderObservationHandler, didFinish: @escaping ProviderObservationHandler,
                                         onBytes: @escaping @Sendable (Int) -> Void,
                                         onDiagnostic: @escaping @Sendable (ChatGPTPlanDiagnostic) -> Void) async throws -> Data {
-        let effect = try ExactJSON(data: action)
+        let parsed = try ParsedProviderAction(action)
+        let effect = parsed.effect
         let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
         guard let model = try Self.personalModel(reference, providers: providers, defaultProvider: ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) else {
             if let observation {
-                return try await performObserved(action: action, models: models, providers: providers, credentials: credentials,
-                    observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
+                if let fast = ordinary as? any ParsedProviderTransport {
+                    return try await fast.performObserved(parsed: parsed, models: models, providers: providers, credentials: credentials,
+                        observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
+                }
+                if let observed = ordinary as? any ObservedProviderTransport {
+                    return try await observed.performObserved(action: action, models: models, providers: providers, credentials: credentials,
+                        observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
+                }
+                guard !observation.captureRaw else { throw ProviderObservationFailure.unsupportedTransport }
             }
-            return try await perform(action: action, models: models, providers: providers, credentials: credentials, onBytes: onBytes)
+            if let fast = ordinary as? any ParsedProviderTransport {
+                return try await fast.perform(parsed: parsed, models: models, providers: providers, credentials: credentials, onBytes: onBytes)
+            }
+            return try await ordinary.perform(action: action, models: models, providers: providers, credentials: credentials, onBytes: onBytes)
         }
         guard let session else {
             throw HostError("chatgpt_session_pin_required")
@@ -91,15 +111,15 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
                        "read_description": "description_read", "compose_description": "description_composed",
                        "write_description_ddl": "description_ddl_written", "review_description_ddl": "description_ddl_reviewed"]
         guard let resultTag = results[try effect.requiredString("tag")] else { throw HostError("chatgpt_operation_not_supported") }
-        let recorder = try observation.map { try ProviderAttemptRecorder(action: action, reference: reference, options: $0) }
+        let recorder = try observation.map { try ProviderAttemptRecorder(effect: effect, reference: reference, options: $0) }
         var failure: String?
         do {
             let answer: String
             if let recorder {
                 let providerID = ProviderModelReference.resolve(reference, providers: providers).providerID
-                answer = try await runtime.performObserved(action: action, session: session, model: model, providerID: providerID,
+                answer = try await runtime.performObserved(parsed: parsed, session: session, model: model, providerID: providerID,
                     argumentLimit: argumentLimit, recorder: recorder, willSend: willSend, onBytes: onBytes)
-            } else { answer = try await runtime.perform(action: action, session: session, model: model, argumentLimit: argumentLimit, onBytes: onBytes) }
+            } else { answer = try await runtime.perform(parsed: parsed, session: session, model: model, argumentLimit: argumentLimit, onBytes: onBytes) }
             result["tag"] = .string(resultTag); result["response"] = .string(answer)
         } catch let error as ProviderObservationFailure { throw error }
         catch is CancellationError {

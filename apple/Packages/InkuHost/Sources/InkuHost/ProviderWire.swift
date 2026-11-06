@@ -24,15 +24,20 @@ public enum ProviderWire {
     }
 
     static func prepare(action: Data, provider: ProviderSettings, model: String, maxTokens: Int, key: String?) throws -> PreparedProviderRequest {
+        try prepare(parsed: ParsedProviderAction(action), provider: provider, model: model, maxTokens: maxTokens, key: key)
+    }
+
+    static func prepare(parsed: ParsedProviderAction, provider: ProviderSettings, model: String, maxTokens: Int, key: String?) throws -> PreparedProviderRequest {
+        let action = parsed.bytes
         try provider.validate()
         guard provider.kind != .chatGPTPlan else { throw HostError("chatgpt_session_pin_required") }
         guard !model.isEmpty, maxTokens > 0 else { throw HostError("provider_selection_required") }
-        let payload = try ExactJSON.rawMember("payload", in: action)
-        let prompt = try ExactJSON.rawMember("prompt", in: payload)
+        let payload = try ExactJSON.rawMemberValidated("payload", in: action)
+        let prompt = try ExactJSON.rawMemberValidated("prompt", in: payload)
         let envelope: ExactJSON = .object(["action": .string("pipeline_request"), "connection": connection(provider),
             "model": .string(model), "max_tokens": .integer(maxTokens)])
         // Passing the original prompt preserves variant member order as well as propertyOrdering.
-        let transient = try ExactJSON(data: action)["_transient_images"]
+        let transient = parsed.effect["_transient_images"]
         let images = transient.array == nil ? "" : ",\"images\":" + transient.text
         let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + images + "}").utf8)
         return try prepared(evaluate(input), provider: provider, key: key)

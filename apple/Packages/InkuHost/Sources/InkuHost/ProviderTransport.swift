@@ -7,7 +7,21 @@ public protocol ProviderTransport: Sendable {
                  credentials: any CredentialStore, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data
 }
 
-public final class URLSessionProviderTransport: ObservedProviderTransport, Sendable {
+struct ParsedProviderAction: Sendable {
+    let bytes: Data
+    let effect: ExactJSON
+    init(_ bytes: Data) throws { self.bytes = bytes; self.effect = try ExactJSON(data: bytes) }
+}
+
+protocol ParsedProviderTransport: ProviderTransport {
+    func perform(parsed: ParsedProviderAction, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data
+    func performObserved(parsed: ParsedProviderAction, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                         observation: ProviderObservationOptions, willSend: @escaping ProviderObservationHandler,
+                         didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data
+}
+
+public final class URLSessionProviderTransport: ObservedProviderTransport, ParsedProviderTransport, Sendable {
     private let budget: ProviderRateBudget
     private let http: (any ProviderHTTPClient)?
     private let legacyUsageURL: URL
@@ -42,22 +56,32 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
 
     public func perform(action: Data, models: ModelSelection, providers: [ProviderSettings],
                         credentials: any CredentialStore, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
-        try await performAttempt(action: action, models: models, providers: providers, credentials: credentials,
+        try await perform(parsed: ParsedProviderAction(action), models: models, providers: providers, credentials: credentials, onBytes: onBytes)
+    }
+    func perform(parsed: ParsedProviderAction, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        try await performAttempt(parsed: parsed, models: models, providers: providers, credentials: credentials,
                                  recorder: nil, willSend: { _ in }, didFinish: { _ in }, onBytes: onBytes)
     }
     public func performObserved(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                                 observation: ProviderObservationOptions, willSend: @escaping ProviderObservationHandler,
                                 didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
-        let effect = try ExactJSON(data: action)
+        try await performObserved(parsed: ParsedProviderAction(action), models: models, providers: providers, credentials: credentials,
+                                  observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
+    }
+    func performObserved(parsed: ParsedProviderAction, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                         observation: ProviderObservationOptions, willSend: @escaping ProviderObservationHandler,
+                         didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        let effect = parsed.effect
         let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-        let recorder = try ProviderAttemptRecorder(action: action, reference: reference, options: observation)
-        return try await performAttempt(action: action, models: models, providers: providers, credentials: credentials,
+        let recorder = try ProviderAttemptRecorder(effect: effect, reference: reference, options: observation)
+        return try await performAttempt(parsed: parsed, models: models, providers: providers, credentials: credentials,
                                         recorder: recorder, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
     }
-    private func performAttempt(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+    private func performAttempt(parsed: ParsedProviderAction, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                                 recorder: ProviderAttemptRecorder?, willSend: @escaping ProviderObservationHandler,
                                 didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
-        let effect = try ExactJSON(data: action)
+        let effect = parsed.effect
         let identity = try effect.requiredObject("identity")
         let tag = try effect.requiredString("tag")
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
@@ -86,7 +110,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             recorder?.setEndpoint(provider.baseURL)
             let key = try await credentials.key(for: provider.credentialID)
             recorder?.addSecrets(key.map { [$0] } ?? [])
-            let wire = try ProviderWire.prepare(action: action, provider: provider, model: model, maxTokens: maxTokens, key: key)
+            let wire = try ProviderWire.prepare(parsed: parsed, provider: provider, model: model, maxTokens: maxTokens, key: key)
             var request = wire.request
             request.timeoutInterval = Double(timeoutMS) / 1000
             let boundedRequest = request
@@ -104,7 +128,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             // Structured concurrency drains the cancelled task group before this session closes.
             let attemptSession = http == nil ? Self.makeSession() : nil
             defer { attemptSession?.invalidateAndCancel() }
-            let raw = try await withThrowingTaskGroup(of: Data.self) { group in
+            let read = try await withThrowingTaskGroup(of: ExactJSON.self) { group in
                 // The provider slot is held for the whole attempt, inside its deadline (provider_limits.py).
                 group.addTask { [self] in try await ProviderConcurrencySlots.shared.holding(provider.id) {
                     let limits = provider.effectiveRateLimits
@@ -136,7 +160,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                     rateWait.set(true)
                     let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens, deadline: deadline)
                     rateWait.set(false)
-                    var bytes: Data?, used: Int?, attemptError: (any Error)?
+                    var bytes: Data?, parsedResponse: ExactJSON?, used: Int?, attemptError: (any Error)?
                     recorder?.setOperation(.generation)
                     do {
                         try Task.checkCancellation()
@@ -146,6 +170,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                             onResponse: { recorder?.receive($0) })
                         if let value = try? ExactJSON(data: bytes!) { recorder?.report(value) }
                         let read = try ProviderWire.readResponse(bytes!, format: wire.format)
+                        parsedResponse = read
                         used = read["input_tokens"].number.flatMap(Int.init)
                     } catch { attemptError = error }
                     recorder?.setOperation(.admission)
@@ -157,7 +182,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                                                 used: used ?? (limits.tokensPerMinute == 0 ? 0 : nil))
                     recorder?.setOperation(.generation)
                     if let attemptError { throw attemptError }
-                    return bytes!
+                    return parsedResponse!
                 } }
                 group.addTask {
                     try await Task.sleep(for: .seconds(remaining))
@@ -168,7 +193,6 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 return result
             }
             // Server pipeline_provider logs what a cut-off answer spent before refusing it.
-            let read = try ProviderWire.readResponse(raw, format: wire.format)
             ProviderOutputLimit.log(read, outputBudget: wire.outputBudget, provider: provider.id, model: model, action: tag)
             response = try ProviderWire.answer(read)
         } catch let error as ProviderObservationFailure { throw error }

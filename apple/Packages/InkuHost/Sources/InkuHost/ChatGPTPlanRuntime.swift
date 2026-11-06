@@ -320,19 +320,23 @@ public actor ChatGPTPlanRuntime {
     }
     public func perform(action: Data, session: ChatGPTPlanSession, model: String, argumentLimit: Int,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        try await performAttempt(action: action, session: session, model: model, argumentLimit: argumentLimit,
+        try await perform(parsed: ParsedProviderAction(action), session: session, model: model, argumentLimit: argumentLimit, onBytes: onBytes)
+    }
+    func perform(parsed: ParsedProviderAction, session: ChatGPTPlanSession, model: String, argumentLimit: Int,
+                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        try await performAttempt(parsed: parsed, session: session, model: model, argumentLimit: argumentLimit,
                                  recorder: nil, willSend: { _ in }, onBytes: onBytes)
     }
-    func performObserved(action: Data, session: ChatGPTPlanSession, model: String, providerID: String, argumentLimit: Int,
+    func performObserved(parsed: ParsedProviderAction, session: ChatGPTPlanSession, model: String, providerID: String, argumentLimit: Int,
                          recorder: ProviderAttemptRecorder, willSend: @escaping ProviderObservationHandler,
                          onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        try await performAttempt(action: action, session: session, model: model, providerID: providerID,
+        try await performAttempt(parsed: parsed, session: session, model: model, providerID: providerID,
                                  argumentLimit: argumentLimit, recorder: recorder, willSend: willSend, onBytes: onBytes)
     }
-    private func performAttempt(action: Data, session: ChatGPTPlanSession, model: String, providerID: String = "chatgpt",
+    private func performAttempt(parsed: ParsedProviderAction, session: ChatGPTPlanSession, model: String, providerID: String = "chatgpt",
                                 argumentLimit: Int, recorder: ProviderAttemptRecorder?, willSend: @escaping ProviderObservationHandler,
                                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
+        let effect = parsed.effect, tag = try effect.requiredString("tag")
         let imageEffects = try ChatGPTPolicy.call("chatgpt_auth_constants")["image_effects"].array?.compactMap(\.string) ?? []
         let purpose = imageEffects.contains(tag) ? "vision" : "llm"
         _ = try ChatGPTPolicy.call("chatgpt_auth_operation", ["purpose": .string(purpose), "tag": .string(tag)])
@@ -349,10 +353,10 @@ public actor ChatGPTPlanRuntime {
             // The body does not depend on authentication. Durably save it before any
             // model-discovery or token-refresh HTTP, as well as before the paid request.
             let body: ChatGPTWire.Request?
-            let imageBody = purpose == "vision" ? try Self.request(action: action, model: model, argumentLimit: argumentLimit) : nil
+            let imageBody = purpose == "vision" ? try Self.request(parsed: parsed, model: model, argumentLimit: argumentLimit) : nil
             if let recorder {
                 let profile = try checkedProfile(session)
-                let prepared = try imageBody ?? Self.request(action: action, model: model, argumentLimit: argumentLimit)
+                let prepared = try imageBody ?? Self.request(parsed: parsed, model: model, argumentLimit: argumentLimit)
                 recorder.prepare(body: prepared.body, providerID: providerID, model: model,
                     secrets: [profile.accessToken, profile.refreshToken, profile.idToken].compactMap { $0 })
                 try await recorder.saveRequest(willSend)
@@ -364,7 +368,7 @@ public actor ChatGPTPlanRuntime {
                 let profile = try checkedProfile(session)
                 recorder.addSecrets([token, profile.refreshToken, profile.idToken].compactMap { $0 })
             }
-            let sent = try body ?? Self.request(action: action, model: model, argumentLimit: argumentLimit)
+            let sent = try body ?? Self.request(parsed: parsed, model: model, argumentLimit: argumentLimit)
             var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = sent.body
             request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -434,8 +438,11 @@ public actor ChatGPTPlanRuntime {
 
     /// The bytes recorded and sent: the effect's prompt as written, so the schema keeps its member order.
     static func request(action: Data, model: String, argumentLimit: Int) throws -> ChatGPTWire.Request {
-        let images = try ExactJSON(data: action)["_transient_images"].array?.compactMap(\.string) ?? []
-        return try ChatGPTWire.request(model: model, prompt: ExactJSON.rawMember("prompt", in: ExactJSON.rawMember("payload", in: action)), answerLimit: argumentLimit, images: images)
+        try request(parsed: ParsedProviderAction(action), model: model, argumentLimit: argumentLimit)
+    }
+    static func request(parsed: ParsedProviderAction, model: String, argumentLimit: Int) throws -> ChatGPTWire.Request {
+        let images = parsed.effect["_transient_images"].array?.compactMap(\.string) ?? []
+        return try ChatGPTWire.request(model: model, prompt: ExactJSON.rawMemberValidated("prompt", in: ExactJSON.rawMemberValidated("payload", in: parsed.bytes)), answerLimit: argumentLimit, images: images)
     }
 
     private func offeredModels(session: ChatGPTPlanSession, force: Bool, deadline: Date, operationEpoch: UInt64) async throws -> [ChatGPTPlanModel] {

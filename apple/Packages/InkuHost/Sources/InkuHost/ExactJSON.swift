@@ -54,6 +54,26 @@ public indirect enum ExactJSON: Sendable, Equatable {
         throw HostError("pipeline_schema_violation")
     }
 
+    /// The caller has already parsed the whole document. Scan without decoding large skipped values.
+    static func rawMemberValidated(_ key: String, in data: Data) throws -> Data {
+        var parser = JSONParser(bytes: Array(data)); parser.whitespace()
+        guard parser.take(123) else { throw HostError("pipeline_schema_violation") }
+        parser.whitespace()
+        if !parser.take(125) {
+            while true {
+                parser.whitespace(); let name = try parser.string()
+                parser.whitespace(); guard parser.take(58) else { throw HostError("invalid_json") }
+                parser.whitespace(); let start = parser.index
+                try parser.skipValidatedValue()
+                if name == key { return Data(parser.bytes[start..<parser.index]) }
+                parser.whitespace()
+                if parser.take(125) { break }
+                guard parser.take(44) else { throw HostError("invalid_json") }
+            }
+        }
+        throw HostError("pipeline_schema_violation")
+    }
+
     /// Split a validated JSON array into its unchanged element bytes.
     public static func rawElements(in data: Data) throws -> [Data] {
         _ = try Self(data: data)
@@ -218,6 +238,33 @@ private struct JSONParser {
             }
             return .number(String(decoding: bytes[start..<index], as: UTF8.self))
         }
+    }
+    mutating func skipValidatedValue() throws {
+        guard index < bytes.count else { throw HostError("invalid_json") }
+        var nesting = 0
+        var inString = false
+        var escaped = false
+        while index < bytes.count {
+            let byte = bytes[index]
+            if inString {
+                index += 1
+                if escaped { escaped = false }
+                else if byte == 92 { escaped = true }
+                else if byte == 34 { inString = false; if nesting == 0 { return } }
+                continue
+            }
+            if byte == 34 { inString = true; index += 1; continue }
+            if byte == 123 || byte == 91 { nesting += 1; index += 1; continue }
+            if byte == 125 || byte == 93 {
+                if nesting == 0 { return }
+                nesting -= 1; index += 1
+                if nesting == 0 { return }
+                continue
+            }
+            if nesting == 0 && (byte == 44 || byte == 32 || byte == 9 || byte == 10 || byte == 13) { return }
+            index += 1
+        }
+        guard !inString, nesting == 0 else { throw HostError("invalid_json") }
     }
     mutating func digits() { while index < bytes.count && (48...57).contains(bytes[index]) { index += 1 } }
     mutating func take(_ byte: UInt8) -> Bool {

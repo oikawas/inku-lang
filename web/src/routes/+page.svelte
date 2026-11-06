@@ -106,8 +106,6 @@
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
 	import { batchFailureReportStore } from '$lib/features/batch/failure-report.svelte';
 	import {
-		CANVAS_ASPECT_PLUGIN_ID,
-		DEFAULT_CANVAS_ASPECT_ID,
 		canvasAspectOptions as readCanvasAspectOptions,
 		getCanvasAspectOption,
 		installCanvasFormatRegistry,
@@ -226,7 +224,6 @@
 	let userMenuOpen = $state(false);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
-	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let canvasAspectOptions = $state<CanvasAspectOption[]>(readCanvasAspectOptions());
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let instructionCaptionVisible = $state(true);
@@ -797,34 +794,13 @@
 		}
 	}
 
-	async function loadPluginStorage() {
-		if (!session.currentUser) {
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			return;
-		}
-		try {
-			const r = await apiFetch('/api/auth/me/plugin-storage', { cache: 'no-store' });
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { storage?: Record<string, unknown> };
-			const canvasValue = data.storage?.[CANVAS_ASPECT_PLUGIN_ID] as { selected?: unknown; enabled?: unknown } | undefined;
-			canvasAspectId = canvasValue?.enabled === false
-				? DEFAULT_CANVAS_ASPECT_ID
-				: normalizeCanvasAspectId(canvasValue?.selected);
-		} catch (e) {
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			console.warn('failed to load plugin storage', e);
-		}
-	}
-
 	async function loadCanvasFormats(): Promise<void> {
 		try {
 			const response = await apiFetch('/api/pipeline/canvas-formats', { cache: 'no-store' });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			canvasAspectOptions = installCanvasFormatRegistry(await response.json() as CanvasFormatRegistryResponse);
-			canvasAspectId = normalizeCanvasAspectId(canvasAspectId);
 		} catch (error) {
 			canvasAspectOptions = readCanvasAspectOptions();
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			console.warn('failed to load canvas formats', error);
 		}
 	}
@@ -845,7 +821,6 @@
 		work.pendingCanvasAspectDerivation = parentNodeId
 			? { parentNodeId, fromAspectId: existingPending?.fromAspectId ?? currentAspectId, toAspectId: nextAspectId }
 			: null;
-		canvasAspectId = nextAspectId;
 		work.drawOptions.canvas_aspect = nextAspectId;
 		outputTab = 'canvas';
 		canvasViewport.fit();
@@ -1319,7 +1294,6 @@
 			settings.loadStatus(),
 			batch.loadPromptHistory(),
 			demo.loadSettings(),
-			loadPluginStorage(),
 			loadPluginVocabulary(),
 			loadCompositionRanges(),
 			loadExportTemplates(),
@@ -1342,7 +1316,6 @@
 		demoPromptModelCatalog = [];
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 		exportTemplateStatus = null;
-		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		settings.resetForLoggedOut();
 		chatgptPlanAvailable = false;
 		modelCatalogRequest++;
@@ -3405,7 +3378,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				</label>
 				<div class="demo-compact-conditions">
 					<SketchSelect value={work.sketchMode} isJapanese={getLang() === 'ja'} showValue onSelect={(mode) => (work.sketchMode = mode)} />
-					<CanvasAspectPlugin selected={canvasAspectId} options={canvasAspectOptions} open={canvasAspectMenuOpen} showValue
+					<CanvasAspectPlugin selected={work.drawOptions.canvas_aspect} options={canvasAspectOptions} open={canvasAspectMenuOpen} showValue
 						onToggle={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)} onSelect={selectCanvasAspect} />
 				</div>
 			</div>

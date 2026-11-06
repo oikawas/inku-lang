@@ -1,6 +1,7 @@
 from io import BytesIO
 
 from PIL import Image
+import pytest
 
 from inku_server import animation_export
 
@@ -23,6 +24,25 @@ def _png(color: str, width: int = 40, height: int = 24) -> bytes:
     output = BytesIO()
     Image.new("RGBA", (width, height), color).save(output, format="PNG")
     return output.getvalue()
+
+
+@pytest.mark.parametrize("format", ["apng", "gif"])
+def test_sequence_bytes_match_the_previous_copied_frame_encoding(monkeypatch, format):
+    monkeypatch.setattr(animation_export, "svg_to_png", lambda svg, height: _png(svg, height=height))
+    monkeypatch.setitem(animation_export.RESOLUTION_HEIGHTS, "1k", 24)
+    first = animation_export._fit_frame("red", 40, 24)
+    second = animation_export._fit_frame("blue", 40, 24)
+    copies = [first.copy(), *animation_export._transition_frames(first, second, "crossfade", 6), second.copy()]
+    try:
+        expected = animation_export._encode_frames(copies, [1000, *([120] * 6), 1000], format)
+        actual = animation_export.build_animation(["red", "blue"], output_format=format,
+            pattern="crossfade", hold_seconds=1, resolution="1k")
+        assert actual == expected
+    finally:
+        first.close()
+        second.close()
+        for frame in copies:
+            frame.close()
 
 
 def test_fade_white_passes_through_white_between_frames():

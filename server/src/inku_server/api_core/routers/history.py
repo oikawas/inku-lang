@@ -21,6 +21,7 @@ from ...persistence.description_lock import DESCRIPTION_READING_KINDS
 from ...persistence.schema import LineageNodeRow
 from ...persistence.variation_authority import LAWS_RECORD_KEYS
 from ..deps import _current_user
+from ..state import _render_capacity
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
 from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
 
@@ -331,24 +332,25 @@ def api_history_export_animation(
     if any(not svg for svg in svgs):
         raise HTTPException(status_code=409, detail="one or more works have no saved SVG")
     try:
-        if len(ids) == 1:
-            payload, matches, outcome = build_layer_animation(
-                _line_animation_request(actor["id"], items[0], body.show_ddl),
-                output_format=body.format,
-                replay=body.replay,
-                hold_seconds=body.hold_seconds,
-                resolution=body.resolution,
-                height_px=body.height_px,
-            )
-        else:
-            payload = build_animation(
-                svgs,
-                output_format=body.format,
-                pattern=body.pattern,
-                hold_seconds=body.hold_seconds,
-                resolution=body.resolution,
-                height_px=body.height_px,
-            )
+        with _render_capacity(actor["id"]):
+            if len(ids) == 1:
+                payload, matches, outcome = build_layer_animation(
+                    _line_animation_request(actor["id"], items[0], body.show_ddl),
+                    output_format=body.format,
+                    replay=body.replay,
+                    hold_seconds=body.hold_seconds,
+                    resolution=body.resolution,
+                    height_px=body.height_px,
+                )
+            else:
+                payload = build_animation(
+                    svgs,
+                    output_format=body.format,
+                    pattern=body.pattern,
+                    hold_seconds=body.hold_seconds,
+                    resolution=body.resolution,
+                    height_px=body.height_px,
+                )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -386,18 +388,19 @@ def api_history_export_card(
     if not svg:
         raise HTTPException(status_code=409, detail="this work has no saved SVG")
     try:
-        payload = build_card(
-            svg,
-            # The headnote is the description the author typed; ja.ts calls the
-            # canvas overlay of this same text 詞書.
-            headnote=str(item.get("input") or ""),
-            # The seed that fixes the performance, so the tail identifies this
-            # picture rather than the variation it was drawn under.
-            seed=item.get("render_seed"),
-            layout=body.layout,
-            seal=body.seal,
-            pixel_height=body.height,
-        )
+        with _render_capacity(actor["id"]):
+            payload = build_card(
+                svg,
+                # The headnote is the description the author typed; ja.ts calls the
+                # canvas overlay of this same text 詞書.
+                headnote=str(item.get("input") or ""),
+                # The seed that fixes the performance, so the tail identifies this
+                # picture rather than the variation it was drawn under.
+                seed=item.get("render_seed"),
+                layout=body.layout,
+                seal=body.seal,
+                pixel_height=body.height,
+            )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")

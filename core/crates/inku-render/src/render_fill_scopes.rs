@@ -116,7 +116,7 @@ impl FillPaintForest {
                 .any(|index| failures.contains_key(index))
             {
                 collect_paints(
-                    &paint.element,
+                    paint.element,
                     &mut Vec::new(),
                     &self.paint_order,
                     &mut paints,
@@ -230,13 +230,13 @@ impl FillPaintForest {
 }
 
 fn collect_paints(
-    element: &Element,
+    element: Element,
     clips: &mut Vec<String>,
     order: &BTreeMap<String, (usize, usize)>,
     output: &mut Vec<(usize, Element)>,
 ) {
     if let Some(&(paint_order, _)) = element.attribute("id").and_then(|id| order.get(id)) {
-        let mut paint = element.clone();
+        let mut paint = element;
         for clip in clips.iter().rev() {
             let mut wrapper = Element::new("g").attr("clip-path", clip);
             wrapper.push(paint);
@@ -245,11 +245,11 @@ fn collect_paints(
         output.push((paint_order, paint));
         return;
     }
-    let clip = element.attribute("clip-path");
-    if let Some(clip) = clip {
-        clips.push(clip.to_owned());
+    let clip = element.attribute("clip-path").map(str::to_owned);
+    if let Some(clip) = &clip {
+        clips.push(clip.clone());
     }
-    for child in element.children() {
+    for child in element.into_children() {
         if let Node::Element(child) = child {
             collect_paints(child, clips, order, output);
         }

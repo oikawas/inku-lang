@@ -680,13 +680,18 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
         score: &finalized.score,
         ..request
     };
-    let mut performance = match crate::typed_performance::resolve(finalized_request, policy) {
-        Ok(performance) => performance,
-        Err(mut error) => {
-            remap_finalized_diagnostics(&mut error.diagnostics, &new_to_old, &new_anchor_to_old);
-            return Err(error.into());
-        }
-    };
+    let mut performance =
+        match crate::typed_performance::resolve(finalized_request, policy, &input_digest) {
+            Ok(performance) => performance,
+            Err(mut error) => {
+                remap_finalized_diagnostics(
+                    &mut error.diagnostics,
+                    &new_to_old,
+                    &new_anchor_to_old,
+                );
+                return Err(error.into());
+            }
+        };
     for entry in &mut performance.performed {
         entry.original_instruction_index = new_to_old[entry.original_instruction_index];
     }

@@ -616,6 +616,9 @@ fn paint_object_body(
                     .checked_add(body_mark_index)
                     .ok_or(RenderError::InvalidScore("object mark index overflow"))?,
                 effects: copy.effects,
+                instruction_seed_override: Some(context.instruction_seed_override.unwrap_or_else(
+                    || crate::determinism::instruction_seed(instruction, context.render_seed),
+                )),
                 ..context
             };
             check_mark_extent(geometry, instruction, context)?;
@@ -1199,7 +1202,9 @@ fn render_impl(
                 color_map: &request.options.resolved_color_map,
                 work_assignment: &assignment,
                 render_seed: request.options.render_seed,
-                instruction_seed_override,
+                instruction_seed_override: Some(instruction_seed_override.unwrap_or_else(|| {
+                    crate::determinism::instruction_seed(single, request.options.render_seed)
+                })),
                 instruction_index,
                 mark_index,
                 wild: request.options.wild,

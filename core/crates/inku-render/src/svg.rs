@@ -44,6 +44,10 @@ impl Element {
         &self.children
     }
 
+    pub(crate) fn into_children(self) -> Vec<Node> {
+        self.children
+    }
+
     pub(crate) fn with_children(mut self, children: Vec<Node>) -> Self {
         self.children = children;
         self

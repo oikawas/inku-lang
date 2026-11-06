@@ -552,6 +552,46 @@ fn box_distance(point: Point, obstacle: &Obstacle) -> f64 {
 fn room(points: &[Point], sheet: Sheet, obstacles: &[Obstacle]) -> (f64, f64) {
     let short = sheet.width.min(sheet.height);
     let samples = resample(points, 63);
+    // A deliberately generous margin keeps boundary and rounding cases on the
+    // original distance path. A box farther than twice the cap on either axis
+    // cannot affect either the capped room or the crowding threshold.
+    let bounds = samples.iter().fold(
+        [
+            f64::INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+        ],
+        |[left, top, right, bottom], point| {
+            [
+                left.min(point.x),
+                top.min(point.y),
+                right.max(point.x),
+                bottom.max(point.y),
+            ]
+        },
+    );
+    let margin = 2.0 * (0.2 * short);
+    let finite_samples = samples
+        .iter()
+        .all(|point| point.x.is_finite() && point.y.is_finite());
+    let nearby = obstacles
+        .iter()
+        .filter(|obstacle| {
+            if !finite_samples
+                || !margin.is_finite()
+                || margin < 0.0
+                || !bounds.iter().all(|x| x.is_finite())
+                || !obstacle.iter().all(|x| x.is_finite())
+            {
+                return true;
+            }
+            !(obstacle[0] - bounds[2] > margin
+                || bounds[0] - obstacle[2] > margin
+                || obstacle[1] - bounds[3] > margin
+                || bounds[1] - obstacle[3] > margin)
+        })
+        .collect::<Vec<_>>();
     let (mut total, mut weights, mut crowded) = (0.0, 0.0, 0usize);
     for (index, point) in samples.iter().enumerate() {
         let edge = point
@@ -560,7 +600,7 @@ fn room(points: &[Point], sheet: Sheet, obstacles: &[Obstacle]) -> (f64, f64) {
             .min(point.y)
             .min(sheet.height - point.y);
         let mut space = edge;
-        for obstacle in obstacles {
+        for obstacle in &nearby {
             space = space.min(box_distance(*point, obstacle));
         }
         if space < 0.05 * short {

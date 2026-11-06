@@ -911,7 +911,7 @@ fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal
     }
     for (url, image) in sent.iter().zip(named) {
         let (media, data) = image_parts(url)?;
-        let bytes = chatgpt::base64_decode(&data)
+        let bytes = chatgpt::base64_decode(data)
             .ok_or_else(|| Refusal::invalid("images must be base64"))?;
         let length = match get(image, "byte_len") {
             Some(Value::Integer(digits)) => digits.parse::<usize>().ok(),
@@ -922,7 +922,7 @@ fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        if as_str(get(image, "media_type")) != Some(media.as_str())
+        if as_str(get(image, "media_type")) != Some(media)
             || length != Some(bytes.len())
             || as_str(get(image, "sha256")) != Some(digest.as_str())
         {
@@ -973,8 +973,8 @@ fn anthropic_blocks(text: &str, images: &[String]) -> Result<Value, Refusal> {
                 "source",
                 object(vec![
                     ("type", string("base64")),
-                    ("media_type", string(&media)),
-                    ("data", string(&data)),
+                    ("media_type", string(media)),
+                    ("data", string(data)),
                 ]),
             ),
         ]));
@@ -993,7 +993,7 @@ fn gemini_parts(text: &str, images: &[String]) -> Result<Value, Refusal> {
         let (media, data) = image_parts(image)?;
         parts.push(object(vec![(
             "inlineData",
-            object(vec![("mimeType", string(&media)), ("data", string(&data))]),
+            object(vec![("mimeType", string(media)), ("data", string(data))]),
         )]));
     }
     Ok(Value::Array(parts))
@@ -1246,16 +1246,13 @@ fn pipeline_request(
 }
 
 /// `vision_client._image_parts`: (media type, base64 data) of a `data:` URL.
-fn image_parts(image: &str) -> Result<(String, String), Refusal> {
+fn image_parts(image: &str) -> Result<(&str, &str), Refusal> {
     let (head, data) = image.split_once(',').unwrap_or((image, ""));
     if !head.starts_with("data:") || !head.contains(";base64") || data.is_empty() {
         return Err(Refusal::rejected("Vision images must be base64 data URLs"));
     }
     let media = head["data:".len()..].split(';').next().unwrap_or("");
-    Ok((
-        if media.is_empty() { "image/png" } else { media }.to_owned(),
-        data.to_owned(),
-    ))
+    Ok((if media.is_empty() { "image/png" } else { media }, data))
 }
 
 /// One text answer, with images when there are any: the colophon and the

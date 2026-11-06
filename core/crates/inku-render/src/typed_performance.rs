@@ -1174,7 +1174,15 @@ impl<'a> Builder<'a> {
             .collect()
     }
 
-    fn finish(mut self) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
+    #[cfg(test)]
+    fn finish(self) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
+        self.finish_with_digest(None)
+    }
+
+    fn finish_with_digest(
+        mut self,
+        input_digest: Option<&str>,
+    ) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
         self.expand_range(0, 0, self.request.score.instructions.len(), &[], None);
         self.clone_top_level_state();
         self.remap_relations();
@@ -1195,8 +1203,10 @@ impl<'a> Builder<'a> {
         (
             self.output,
             TypedExecutionPlan {
-                input_score_digest: inku_score::canonical_score_digest(self.request.score)
-                    .expect("finalized compact Score is canonical"),
+                input_score_digest: input_digest.map(str::to_owned).unwrap_or_else(|| {
+                    inku_score::canonical_score_digest(self.request.score)
+                        .expect("finalized compact Score is canonical")
+                }),
                 placement_scopes,
                 placement_fill_scope_indices,
                 transform_fill_scope_indices: self.transform_fill_scope_indices,
@@ -1597,12 +1607,13 @@ fn remap_dense_diagnostics(
 pub(crate) fn resolve(
     request: PerformanceRequest<'_>,
     policy: inku_score::ScoreErrorPolicy,
+    input_digest: &str,
 ) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
     let performance_seed = request.performance_seed;
     let composition_seed = request.composition_seed;
     let canvas = request.canvas;
     let (dense, typed, dense_to_original, dense_anchor_to_original) =
-        Builder::new(request).finish();
+        Builder::new(request).finish_with_digest(Some(input_digest));
     let source_diagnostics = typed.diagnostics.clone();
     let dense_request = PerformanceRequest {
         score: &dense,

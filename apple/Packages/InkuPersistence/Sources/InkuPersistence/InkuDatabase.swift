@@ -468,18 +468,6 @@ public actor InkuDatabase {
         }
     }
 
-    /// Zero-based place of a work's lineage in the grouped listing under the library predicate and ordering, counting
-    /// that lineage even when the minimum would drop it (Server `lineage_group_position`). nil when the filter leaves
-    /// the work out or it has no lineage node.
-    public func libraryGroupIndex(id: String, query: LibraryQuery = LibraryQuery(),
-                                  minimumItemCount: Int = 1) throws -> LibraryGroupPosition? {
-        guard minimumItemCount >= 1 else { throw PersistenceError.invalidRecord("invalid group size") }
-        return try queue.read { db in
-            try Self.groupPosition(of: id, filter: Self.libraryFilter(query), order: query.order,
-                                   minimumItemCount: minimumItemCount, in: db)
-        }
-    }
-
     private static func groupRoot(of id: String, filter: (sql: String, arguments: StatementArguments),
                                   in db: Database) throws -> String? {
         try String.fetchOne(db, sql: """

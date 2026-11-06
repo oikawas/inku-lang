@@ -315,11 +315,16 @@ func runLibraryPaginationBenchmark(url: URL) async throws {
     let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
         .standardizedFileURL.resolvingSymlinksInPath().path
     let inApplicationSupport = applicationSupport.map { path == $0 || path.hasPrefix($0 + "/") } ?? true
+    let fixedAppURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Inku.app")
+    let fixedAppDatabase = Bundle(url: fixedAppURL)?.object(forInfoDictionaryKey: "InkuDatabasePath") as? String
+    let isFixedAppDatabase = fixedAppDatabase.map {
+        URL(fileURLWithPath: $0).standardizedFileURL.resolvingSymlinksInPath().path == path
+    } ?? false
     let markedCopy = resolved.deletingLastPathComponent().pathComponents.contains { component in
         let name = component.lowercased()
         return ["disposable", "rehearsal", "scratch", "test-copy"].contains { name.contains($0) }
     }
-    guard url.isFileURL, !inApplicationSupport, resolved.lastPathComponent == "identity-check.sqlite",
+    guard url.isFileURL, !inApplicationSupport, !isFixedAppDatabase, resolved.lastPathComponent == "identity-check.sqlite",
           temporaryRoots.contains(where: { path.hasPrefix($0) }) || markedCopy,
           FileManager.default.fileExists(atPath: path) else {
         throw CheckFailure.message("Use an existing disposable identity-check.sqlite copy")

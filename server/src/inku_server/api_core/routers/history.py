@@ -22,8 +22,9 @@ from ...persistence.schema import LineageNodeRow
 from ...persistence.variation_authority import LAWS_RECORD_KEYS
 from ..deps import _current_user
 from ..state import _render_capacity
+from ..rendering import _submit_history_artifact_rebuild
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
+from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -1063,20 +1064,18 @@ def api_history_acl_put(
     return [HistoryAclEntryOut(**entry) for entry in entries]
 
 
-# The files are written inside the request, each work's PNG rasterized there
-# too, so a request holds a worker for as long as its works take. The 1,000 the
-# other bulk actions share made that minutes for anyone who asked; a client
-# with more works asks again.
+# Bound each background job; a client with more works asks again.
 _REBUILD_OUTPUT_FILES_MAX = 50
 
 
 @router.post("/api/history/rebuild-output-files", summary="Rebuild output files for works")
 def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
-    """Write the output files again for the works named in the body.
+    """Queue writing the output files again for the works named in the body.
 
     Accepts at most 50 ids per request. Returns {"ok": true, "count": n}, where n
-    is the number of works found. Returns 409 when output file saving is switched
-    off and 422 when more than 50 ids are sent.
+    is the number of works queued, not a completion count. Returns 409 when output
+    file saving is switched off, 422 for more than 50 ids, and 503 when the
+    output save queue cannot accept the request.
     """
     # Saving files is the administrator's switch; this route used to write them
     # with the switch off.
@@ -1085,8 +1084,8 @@ def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends
     if len(body.ids) > _REBUILD_OUTPUT_FILES_MAX:
         raise HTTPException(status_code=422, detail=f"at most {_REBUILD_OUTPUT_FILES_MAX} works per request")
     items = _db.get_items(actor["id"], body.ids)
-    for item in items:
-        _save_history_artifacts(item)
+    if items and not _submit_history_artifact_rebuild(items):
+        raise HTTPException(status_code=503, detail="output save queue is full", headers={"Retry-After": "1"})
     return {"ok": True, "count": len(items)}
 
 

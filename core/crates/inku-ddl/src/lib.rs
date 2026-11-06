@@ -297,3 +297,8 @@ pub(crate) fn lowercase_hex(bytes: &[u8]) -> String {
     }
     result
 }
+
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    lowercase_hex(&Sha256::digest(bytes))
+}

@@ -2,9 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::sha256_hex;
 use serde::Serialize;
 use serde_json::{Number, Value};
-use sha2::{Digest, Sha256};
 
 #[cfg(test)]
 use crate::bind_macro_parameters;
@@ -4760,10 +4760,6 @@ fn optional_f64(value: Option<f64>) -> Value {
 
 fn compact_json(value: &Value) -> String {
     serde_json::to_string(value).expect("closed value serializes")
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    crate::lowercase_hex(&Sha256::digest(bytes))
 }
 
 fn identity(domain: &str, payload: &[u8]) -> String {

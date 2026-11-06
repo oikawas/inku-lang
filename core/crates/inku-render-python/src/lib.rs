@@ -59,11 +59,6 @@ impl ClipPolicy {
 }
 
 #[pyfunction]
-fn core_api_version() -> PyResult<&'static str> {
-    catch_python_panic(|| Ok(inku_render::core_api_version()))
-}
-
-#[pyfunction]
 fn score_version() -> PyResult<&'static str> {
     catch_python_panic(|| Ok(inku_score::ScoreEdition::LATEST.as_str()))
 }
@@ -206,16 +201,6 @@ fn pipeline_line_animation<'py>(
 #[pyfunction]
 fn pipeline_canvas_registry() -> PyResult<String> {
     catch_python_panic(|| Ok(inku_pipeline_uniffi::canvas_registry()))
-}
-
-/// Project the shared Stage 1 grammar for host input and prompt displays.
-#[pyfunction]
-fn pipeline_stage1_system_projection(language_code: String) -> PyResult<String> {
-    catch_python_panic(|| {
-        Ok(inku_pipeline_uniffi::stage1_system_projection(
-            language_code,
-        ))
-    })
 }
 
 /// Advance one pipeline execution through the same owned byte boundary as Android.
@@ -912,7 +897,6 @@ fn raster_identity_json() -> PyResult<String> {
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(svg_to_png, module)?)?;
     module.add_function(wrap_pyfunction!(raster_identity_json, module)?)?;
-    module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
     module.add_function(wrap_pyfunction!(score_version, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_id, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_version, module)?)?;
@@ -925,7 +909,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_version_report, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_line_animation, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_canvas_registry, module)?)?;
-    module.add_function(wrap_pyfunction!(pipeline_stage1_system_projection, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_step, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_step_with_svg_limit, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_attempt, module)?)?;

@@ -1,7 +1,6 @@
 """Python host surface for the shared inku render core."""
 
 from ._native import (
-    core_api_version,
     default_color_map_json,
     pipeline_autonomous_refine,
     pipeline_canonical_json,
@@ -37,7 +36,6 @@ from ._native import (
     pipeline_resolve_palette,
     pipeline_retouch,
     pipeline_saved_variants,
-    pipeline_stage1_system_projection,
     pipeline_step,
     pipeline_step_with_svg_limit,
     pipeline_version_report,
@@ -54,7 +52,6 @@ from ._native import (
 )
 
 __all__ = (
-    "core_api_version",
     "default_color_map_json",
     "pipeline_autonomous_refine",
     "pipeline_canonical_json",
@@ -90,7 +87,6 @@ __all__ = (
     "pipeline_resolve_palette",
     "pipeline_retouch",
     "pipeline_saved_variants",
-    "pipeline_stage1_system_projection",
     "pipeline_step",
     "pipeline_step_with_svg_limit",
     "pipeline_version_report",

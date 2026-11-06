@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::determinism::{SaltedStream, seed_salt_index_digest};
 use crate::geometry::{IRREGULARITY_REFERENCE_SAMPLES, centerline_normals};
-use crate::support::{DEFAULT_SUPPORT, Support, support_response};
+use crate::support::{Support, support_response};
 use crate::types::{Point, Seed, Weight};
 
 const HAND_GROUP_SIZE: f64 = 0.35;
@@ -1023,27 +1023,6 @@ pub fn synthesize_contour_by(
         closed,
         grid_step,
     }
-}
-
-#[must_use]
-pub fn synthesize_default_stroke(
-    start: Point,
-    end: Point,
-    base_width: f64,
-    weight: Weight,
-    seed: Seed,
-) -> StrokeResult {
-    synthesize_stroke(StrokeRequest {
-        start,
-        end,
-        base_width,
-        weight,
-        seed,
-        sample_count: 49,
-        wild: false,
-        grid_step: 0.0,
-        support: DEFAULT_SUPPORT,
-    })
 }
 
 #[cfg(test)]

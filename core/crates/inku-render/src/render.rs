@@ -483,7 +483,6 @@ fn paint_object_body(
             let (finalized, digest) = &finalized_templates[&template.instruction_index];
             crate::checked_performance::resolve_finalized_performance(
                 body_request,
-                request.options.error_policy,
                 finalized,
                 digest,
             )

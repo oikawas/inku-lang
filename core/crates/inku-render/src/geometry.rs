@@ -400,109 +400,6 @@ pub fn arc_points_with_variation(
 }
 
 #[must_use]
-pub fn line_direction(start: Point, end: Point) -> Point {
-    let dx = end.x - start.x;
-    let dy = end.y - start.y;
-    let length = dx.hypot(dy);
-    if length < 1.0e-6 {
-        Point::new(1.0, 0.0)
-    } else {
-        Point::new(dx / length, dy / length)
-    }
-}
-
-#[must_use]
-pub fn offset_polyline(
-    points: &[Point],
-    amount: f64,
-    wander: f64,
-    wander_period: f64,
-    seed: Seed,
-) -> Vec<Point> {
-    if points.len() < 2 {
-        return points.to_vec();
-    }
-    let mut result = Vec::with_capacity(points.len());
-    let mut arc = 0.0;
-    for index in 0..points.len() {
-        let tangent = if index == 0 {
-            Point::new(points[1].x - points[0].x, points[1].y - points[0].y)
-        } else if index == points.len() - 1 {
-            Point::new(
-                points[index].x - points[index - 1].x,
-                points[index].y - points[index - 1].y,
-            )
-        } else {
-            Point::new(
-                points[index + 1].x - points[index - 1].x,
-                points[index + 1].y - points[index - 1].y,
-            )
-        };
-        let length = tangent.x.hypot(tangent.y);
-        let length = if length == 0.0 { 1.0 } else { length };
-        let normal = Point::new(-tangent.y / length, tangent.x / length);
-        let offset = amount
-            + if wander == 0.0 {
-                0.0
-            } else {
-                wander * (value_noise_1d(arc / wander_period.max(1.0e-6), seed) * 2.0 - 1.0)
-            };
-        result.push(Point::new(
-            points[index].x + normal.x * offset,
-            points[index].y + normal.y * offset,
-        ));
-        if index + 1 < points.len() {
-            arc += distance(points[index], points[index + 1]);
-        }
-    }
-    result
-}
-
-#[must_use]
-pub fn polyline_sample(points: &[Point], t: f64) -> (Point, Point) {
-    if points.len() < 2 {
-        return (
-            points.first().copied().unwrap_or(Point::new(0.0, 0.0)),
-            Point::new(1.0, 0.0),
-        );
-    }
-    let lengths: Vec<f64> = points
-        .windows(2)
-        .map(|pair| distance(pair[0], pair[1]))
-        .collect();
-    let total: f64 = lengths.iter().sum();
-    if total < 1.0e-9 {
-        return (points[0], Point::new(1.0, 0.0));
-    }
-    let target = t * total;
-    let mut accumulated = 0.0;
-    for (index, length) in lengths.iter().copied().enumerate() {
-        if accumulated + length >= target || index == lengths.len() - 1 {
-            let fraction = if length > 1.0e-9 {
-                (target - accumulated) / length
-            } else {
-                0.0
-            };
-            let start = points[index];
-            let end = points[index + 1];
-            let divisor = if length > 0.0 { length } else { 1.0 };
-            return (
-                Point::new(
-                    start.x + (end.x - start.x) * fraction,
-                    start.y + (end.y - start.y) * fraction,
-                ),
-                Point::new((end.x - start.x) / divisor, (end.y - start.y) / divisor),
-            );
-        }
-        accumulated += length;
-    }
-    (
-        *points.last().expect("nonempty polyline"),
-        Point::new(1.0, 0.0),
-    )
-}
-
-#[must_use]
 pub fn circle_points(center: Point, rx: f64, ry: f64, count: usize) -> Vec<Point> {
     (0..count)
         .map(|index| {
@@ -538,31 +435,6 @@ pub fn crescent_contour_points(center: Point, size: Point, samples_per_cubic: us
         }
     }
     points
-}
-
-#[must_use]
-pub fn rect_points(origin: Point, width: f64, height: f64, count: usize) -> Vec<Point> {
-    let perimeter = (2.0 * (width + height)).max(1.0);
-    (0..count)
-        .map(|index| {
-            let distance = (index as f64 + 0.5) / count as f64 * perimeter;
-            if distance <= width {
-                Point::new(origin.x + distance, origin.y)
-            } else if distance <= width + height {
-                Point::new(origin.x + width, origin.y + distance - width)
-            } else if distance <= 2.0 * width + height {
-                Point::new(
-                    origin.x + width - (distance - width - height),
-                    origin.y + height,
-                )
-            } else {
-                Point::new(
-                    origin.x,
-                    origin.y + height - (distance - 2.0 * width - height),
-                )
-            }
-        })
-        .collect()
 }
 
 #[must_use]
@@ -608,16 +480,6 @@ pub fn polygon_points(
 }
 
 #[must_use]
-pub fn resample_points(path: &[Point], count: usize) -> Vec<Point> {
-    if count == 0 || path.is_empty() {
-        return Vec::new();
-    }
-    (0..count)
-        .map(|index| path[(index * path.len() / count).min(path.len() - 1)])
-        .collect()
-}
-
-#[must_use]
 pub fn centerline_normals(points: &[Point], closed: bool) -> Vec<Point> {
     if points.is_empty() {
         return Vec::new();
@@ -641,62 +503,6 @@ pub fn centerline_normals(points: &[Point], closed: bool) -> Vec<Point> {
             Point::new(-dy / length, dx / length)
         })
         .collect()
-}
-
-#[must_use]
-pub fn offset_performed_path(
-    path: &[Point],
-    amount: f64,
-    closed: bool,
-    center: Point,
-    wander: f64,
-    wander_period: f64,
-    seed: Seed,
-) -> Vec<Point> {
-    let normals = centerline_normals(path, closed);
-    let votes: i64 = path
-        .iter()
-        .zip(&normals)
-        .map(|(point, normal)| {
-            if normal.x * (point.x - center.x) + normal.y * (point.y - center.y) >= 0.0 {
-                1
-            } else {
-                -1
-            }
-        })
-        .sum();
-    let sign = if votes >= 0 { 1.0 } else { -1.0 };
-    let mut arc = 0.0;
-    let mut result = Vec::with_capacity(path.len());
-    for (index, (point, normal)) in path.iter().zip(normals).enumerate() {
-        let offset = amount
-            + if wander == 0.0 {
-                0.0
-            } else {
-                wander * (value_noise_1d(arc / wander_period.max(1.0e-6), seed) * 2.0 - 1.0)
-            };
-        result.push(Point::new(
-            point.x + normal.x * offset * sign,
-            point.y + normal.y * offset * sign,
-        ));
-        if index + 1 < path.len() {
-            arc += distance(*point, path[index + 1]);
-        }
-    }
-    result
-}
-
-#[must_use]
-pub fn closed_path_length(path: &[Point]) -> f64 {
-    if path.len() < 2 {
-        return 0.0;
-    }
-    path.iter()
-        .copied()
-        .zip(path.iter().copied().cycle().skip(1))
-        .take(path.len())
-        .map(|(a, b)| distance(a, b))
-        .sum()
 }
 
 #[must_use]

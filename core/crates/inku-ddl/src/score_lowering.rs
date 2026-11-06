@@ -1160,10 +1160,9 @@ fn lower_macro_instruction(
                 binding: binding.clone(),
                 provenance: provenance.clone(),
             };
-            let attempt =
-                resolve_projected_instruction(input, context, error_policy, |input, context| {
-                    resolve_object_plan(input, context, origin.clone())
-                });
+            let attempt = resolve_projected_instruction(input, context, |input, context| {
+                resolve_object_plan(input, context, origin.clone())
+            });
             let object_index = append_plan_attempt(
                 attempt,
                 |reason| {
@@ -1235,7 +1234,7 @@ fn lower_macro_instruction(
             }
             continue;
         }
-        let attempt = lower_projected_instruction(input, context, error_policy);
+        let attempt = lower_projected_instruction(input, context);
         for omission in attempt.appearance_omissions {
             diagnostics.push(ScoreLoweringDiagnostic {
                 owner: generated_owner(
@@ -3253,18 +3252,14 @@ fn lower_verified_stage15_shared<'a>(
                 // The cycle's region already came from the source's range.
                 input.numeric_range = None;
                 if let Some(objects) = objects.as_deref_mut() {
-                    let attempt = resolve_projected_instruction(
-                        input,
-                        context,
-                        error_policy,
-                        |input, context| {
+                    let attempt =
+                        resolve_projected_instruction(input, context, |input, context| {
                             resolve_object_plan(
                                 input,
                                 context,
                                 ScoreInstructionOrigin::SourceInstruction { instruction_index },
                             )
-                        },
-                    );
+                        });
                     let object_index = append_plan_attempt(
                         attempt,
                         |reason| {
@@ -3430,18 +3425,14 @@ fn lower_verified_stage15_shared<'a>(
                                 }
                             }
                         });
-                    let attempt = resolve_projected_instruction(
-                        input,
-                        context,
-                        error_policy,
-                        |input, context| {
+                    let attempt =
+                        resolve_projected_instruction(input, context, |input, context| {
                             resolve_object_plan(
                                 input,
                                 context,
                                 ScoreInstructionOrigin::SourceInstruction { instruction_index },
                             )
-                        },
-                    );
+                        });
                     let object_index = append_plan_attempt(
                         attempt,
                         |reason| source_owner_for_gap(instruction_index, instruction, reason),
@@ -4588,15 +4579,13 @@ struct InstructionLoweringAttempt<T = Instruction> {
 fn lower_projected_instruction(
     input: ScoreLoweringInput<'_>,
     context: ScoreLoweringContext,
-    _error_policy: ScoreErrorPolicy,
 ) -> InstructionLoweringAttempt {
-    resolve_projected_instruction(input, context, _error_policy, lower_complete_instruction)
+    resolve_projected_instruction(input, context, lower_complete_instruction)
 }
 
 fn resolve_projected_instruction<'a, T>(
     input: ScoreLoweringInput<'a>,
     context: ScoreLoweringContext,
-    _error_policy: ScoreErrorPolicy,
     mut resolve: impl FnMut(
         ScoreLoweringInput<'a>,
         ScoreLoweringContext,
@@ -4678,7 +4667,7 @@ fn lower_source_instruction_with_policy(
     instruction_origins: &mut Vec<ScoreInstructionOrigin>,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
 ) {
-    let attempt = lower_projected_instruction(input, context, error_policy);
+    let attempt = lower_projected_instruction(input, context);
     for omission in attempt.appearance_omissions {
         diagnostics.push(ScoreLoweringDiagnostic {
             owner: source_owner_for_gap(instruction_index, instruction, &omission.reason),
@@ -4737,7 +4726,7 @@ fn lower_source_relation_instruction_with_policy(
     instruction_origins: &mut Vec<ScoreInstructionOrigin>,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
 ) {
-    let attempt = lower_projected_instruction(input, context, error_policy);
+    let attempt = lower_projected_instruction(input, context);
     for omission in attempt.appearance_omissions {
         diagnostics.push(ScoreLoweringDiagnostic {
             owner: source_owner_for_gap(instruction_index, instruction, &omission.reason),

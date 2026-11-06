@@ -2507,7 +2507,6 @@ fn mark_closed_arc_pairs(
 
 fn resolve_impl(
     request: PerformanceRequest<'_>,
-    _policy: ScoreErrorPolicy,
     typed: Option<TypedExecutionPlan>,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
     let policy = ScoreErrorPolicy::OmitAndContinue;
@@ -2976,15 +2975,13 @@ fn resolve_impl(
 
 pub(super) fn resolve(
     request: PerformanceRequest<'_>,
-    policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
-    resolve_impl(request, policy, None)
+    resolve_impl(request, None)
 }
 
 pub(crate) fn resolve_typed(
     request: PerformanceRequest<'_>,
-    policy: ScoreErrorPolicy,
     typed: TypedExecutionPlan,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
-    resolve_impl(request, policy, Some(typed))
+    resolve_impl(request, Some(typed))
 }

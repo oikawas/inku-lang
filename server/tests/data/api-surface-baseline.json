@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 152,
-  "operation_count": 152,
-  "schema_count": 218,
+  "endpoint_count": 155,
+  "operation_count": 155,
+  "schema_count": 220,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -1753,6 +1753,20 @@
       }
     },
     {
+      "path": "/api/settings/database/vacuum",
+      "method": "POST",
+      "operationId": "api_database_vacuum_api_settings_database_vacuum_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DatabaseVacuumResult\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/settings/db-backup",
       "method": "PUT",
       "operationId": "api_settings_update_db_backup_api_settings_db_backup_put",
@@ -1837,6 +1851,34 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMeterBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMeterStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/settings/execution-retention",
+      "method": "GET",
+      "operationId": "api_execution_retention_api_settings_execution_retention_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExecutionRetentionBody\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/settings/execution-retention",
+      "method": "PUT",
+      "operationId": "api_update_execution_retention_api_settings_execution_retention_put",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExecutionRetentionBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExecutionRetentionBody\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -2265,6 +2307,7 @@
     "CoordinatedPlacementGroupOwner": "{\"additionalProperties\":false,\"properties\":{\"group_index\":{\"description\":\"Index of the coordinated group that owns this placement. Zero or greater.\",\"minimum\":0.0,\"title\":\"Group Index\",\"type\":\"integer\"},\"kind\":{\"const\":\"coordinated_group\",\"description\":\"Always \\\"coordinated_group\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"group_index\"],\"title\":\"CoordinatedPlacementGroupOwner\",\"type\":\"object\"}",
     "CycleMembersV1": "{\"additionalProperties\":false,\"properties\":{\"occurrence_count\":{\"description\":\"Number of occurrences in the cycle. Must equal the resolved logical count of the group it belongs to.\",\"exclusiveMinimum\":0.0,\"title\":\"Occurrence Count\",\"type\":\"integer\"}},\"required\":[\"occurrence_count\"],\"title\":\"CycleMembersV1\",\"type\":\"object\"}",
     "DatabaseSettingsStatus": "{\"properties\":{\"backend\":{\"description\":\"Database backend name from the connection URL, such as sqlite or postgresql\",\"title\":\"Backend\",\"type\":\"string\"},\"database\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Database name from the connection URL; for SQLite, the file path given there\",\"title\":\"Database\"},\"driver\":{\"description\":\"SQLAlchemy driver name from the connection URL\",\"title\":\"Driver\",\"type\":\"string\"},\"file_path\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Path of the SQLite file; None when the database is not a file\",\"title\":\"File Path\"},\"file_size_bytes\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Size in bytes of the SQLite file plus its write-ahead log; None when the database is not a file\",\"title\":\"File Size Bytes\"},\"is_default\":{\"description\":\"Whether the store is the default one rather than a configured URL\",\"title\":\"Is Default\",\"type\":\"boolean\"},\"note\":{\"description\":\"Explanation of how the database connection is chosen\",\"title\":\"Note\",\"type\":\"string\"},\"runtime_editable\":{\"default\":false,\"description\":\"Whether the connection can be changed while the server runs; always false, because it is chosen at startup\",\"title\":\"Runtime Editable\",\"type\":\"boolean\"},\"url\":{\"description\":\"Connection URL with any password hidden\",\"title\":\"Url\",\"type\":\"string\"}},\"required\":[\"backend\",\"driver\",\"url\",\"is_default\",\"note\"],\"title\":\"DatabaseSettingsStatus\",\"type\":\"object\"}",
+    "DatabaseVacuumResult": "{\"properties\":{\"after_bytes\":{\"description\":\"Database and WAL size in bytes after compaction\",\"title\":\"After Bytes\",\"type\":\"integer\"},\"before_bytes\":{\"description\":\"Database and WAL size in bytes before compaction\",\"title\":\"Before Bytes\",\"type\":\"integer\"}},\"required\":[\"before_bytes\",\"after_bytes\"],\"title\":\"DatabaseVacuumResult\",\"type\":\"object\"}",
     "DbBackupEntry": "{\"properties\":{\"at\":{\"description\":\"When the copy was written, in milliseconds since the Unix epoch, from the file's modification time\",\"title\":\"At\",\"type\":\"integer\"},\"generation\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Position among automatic copies, where 1 is the newest; None for manual copies, which are not numbered\",\"title\":\"Generation\"},\"kind\":{\"description\":\"auto for a scheduled copy, which is pruned by generation; manual for a copy requested by an administrator, which is never pruned\",\"enum\":[\"auto\",\"manual\"],\"title\":\"Kind\",\"type\":\"string\"},\"name\":{\"description\":\"File name of the copy inside its auto or manual folder\",\"title\":\"Name\",\"type\":\"string\"},\"size_bytes\":{\"description\":\"Size of the copy in bytes\",\"title\":\"Size Bytes\",\"type\":\"integer\"}},\"required\":[\"kind\",\"name\",\"at\",\"size_bytes\"],\"title\":\"DbBackupEntry\",\"type\":\"object\"}",
     "DbBackupRestoreResult": "{\"properties\":{\"kind\":{\"description\":\"Folder of the restored copy, auto or manual\",\"enum\":[\"auto\",\"manual\"],\"title\":\"Kind\",\"type\":\"string\"},\"restored\":{\"description\":\"File name of the copy written into the database\",\"title\":\"Restored\",\"type\":\"string\"},\"safety_backup\":{\"description\":\"File name of the manual backup of the contents the restore replaced, made just before it\",\"title\":\"Safety Backup\",\"type\":\"string\"}},\"required\":[\"restored\",\"kind\",\"safety_backup\"],\"title\":\"DbBackupRestoreResult\",\"type\":\"object\"}",
     "DbBackupResult": "{\"properties\":{\"at\":{\"description\":\"When the copy was made, in milliseconds since the Unix epoch\",\"title\":\"At\",\"type\":\"integer\"},\"manual\":{\"description\":\"Whether the copy was requested by an administrator; true for this endpoint\",\"title\":\"Manual\",\"type\":\"boolean\"},\"path\":{\"description\":\"Path of the new copy\",\"title\":\"Path\",\"type\":\"string\"},\"size_bytes\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Size of the copy in bytes; None when the file is not present after it was written\",\"title\":\"Size Bytes\"}},\"required\":[\"path\",\"at\",\"manual\"],\"title\":\"DbBackupResult\",\"type\":\"object\"}",
@@ -2286,6 +2329,7 @@
     "DrawOptionsForTabBody": "{\"properties\":{\"options\":{\"additionalProperties\":true,\"description\":\"A saved work's recorded drawing choices, as the history returns them in `draw_options`. Unknown choices are null.\",\"title\":\"Options\",\"type\":\"object\"},\"tab\":{\"description\":\"The input tab the choices go to: `describe`, `image`, `batch_text` or `batch_image`.\",\"title\":\"Tab\",\"type\":\"string\"}},\"required\":[\"options\",\"tab\"],\"title\":\"DrawOptionsForTabBody\",\"type\":\"object\"}",
     "DrawOptionsForTabResponse": "{\"properties\":{\"options\":{\"additionalProperties\":true,\"description\":\"The tab's choices: recorded values, off for an unrecorded on/off choice, and the signed-in user's tab default for any other unrecorded choice.\",\"title\":\"Options\",\"type\":\"object\"}},\"required\":[\"options\"],\"title\":\"DrawOptionsForTabResponse\",\"type\":\"object\"}",
     "EnclosingGroupPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"enclosing_group\",\"description\":\"Always \\\"enclosing_group\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"EnclosingGroupPlacementAnchor\",\"type\":\"object\"}",
+    "ExecutionRetentionBody": "{\"properties\":{\"retention_days\":{\"anyOf\":[{\"maximum\":36500.0,\"minimum\":1.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Days to keep finished execution records, or null to keep them indefinitely\",\"title\":\"Retention Days\"}},\"title\":\"ExecutionRetentionBody\",\"type\":\"object\"}",
     "ExplicitCanvasTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"explicit_canvas\",\"description\":\"Always \\\"explicit_canvas\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"source\":{\"$ref\":\"#/components/schemas/ScoreSourceSite\",\"description\":\"Location of the canvas target in the DDL source text.\"}},\"required\":[\"kind\",\"source\"],\"title\":\"ExplicitCanvasTargetOwner\",\"type\":\"object\"}",
     "ExplicitCountOrigin": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"explicit\",\"description\":\"Always \\\"explicit\\\": the count was written in the DDL.\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"ExplicitCountOrigin\",\"type\":\"object\"}",
     "ExportTemplateItem": "{\"properties\":{\"description\":{\"default\":\"\",\"description\":\"Optional note about the template, up to 240 characters. Defaults to an empty string.\",\"maxLength\":240,\"title\":\"Description\",\"type\":\"string\"},\"id\":{\"description\":\"Template identifier, 1 to 80 characters. A repeated id in the same list is dropped.\",\"maxLength\":80,\"minLength\":1,\"title\":\"Id\",\"type\":\"string\"},\"name\":{\"description\":\"Display name, 1 to 80 characters.\",\"maxLength\":80,\"minLength\":1,\"title\":\"Name\",\"type\":\"string\"},\"y_px\":{\"description\":\"Height of the exported image in pixels, from 64 to 12000.\",\"maximum\":12000.0,\"minimum\":64.0,\"title\":\"Y Px\",\"type\":\"integer\"}},\"required\":[\"id\",\"name\",\"y_px\"],\"title\":\"ExportTemplateItem\",\"type\":\"object\"}",
@@ -2441,5 +2485,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "18bd66147a2dde5786760ed6308d1580b79b221a314f67e6127e7b6fe7d6d3f3"
+  "digest": "23cd908a74cf4a3071d946aff6bf539b642cc5aa6fa4ca8b4ef3c2e260b4791f"
 }

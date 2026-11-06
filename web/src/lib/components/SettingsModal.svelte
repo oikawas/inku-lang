@@ -362,6 +362,9 @@
 				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} personalOnly={!isAdmin} />
 		{:else if settingsTab === 'db'}
 			<DatabaseAdministrationSettings
+				onLoadRetention={settings.loadDatabaseRetention}
+				onSaveRetention={settings.saveDatabaseRetention}
+				onVacuum={settings.vacuumDatabase}
 				status={settingsStatus ? { database: settingsStatus.database, db_backup: settingsStatus.db_backup } : null}
 				statusError={settingsStatusError}
 				loading={settingsStatusLoading}

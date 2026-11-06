@@ -38,6 +38,37 @@ from ..state import _SAVE_QUEUE_LIMIT, _SAVE_WORKERS, _artifact_save_stats, _ren
 router = APIRouter(dependencies=[Depends(_admin_user)])
 
 
+class ExecutionRetentionBody(BaseModel):
+    retention_days: StrictInt | None = Field(default=None, ge=1, le=36500,
+        description="Days to keep finished execution records, or null to keep them indefinitely")
+
+
+class DatabaseVacuumResult(BaseModel):
+    before_bytes: int = Field(description="Database and WAL size in bytes before compaction")
+    after_bytes: int = Field(description="Database and WAL size in bytes after compaction")
+
+
+@router.get("/api/settings/execution-retention", response_model=ExecutionRetentionBody,
+            summary="Read execution record retention")
+def api_execution_retention() -> ExecutionRetentionBody:
+    return ExecutionRetentionBody(**_db.database_maintenance_settings())
+
+
+@router.put("/api/settings/execution-retention", response_model=ExecutionRetentionBody,
+            summary="Set execution record retention")
+def api_update_execution_retention(body: ExecutionRetentionBody) -> ExecutionRetentionBody:
+    return ExecutionRetentionBody(**_db.update_execution_retention(body.retention_days))
+
+
+@router.post("/api/settings/database/vacuum", response_model=DatabaseVacuumResult,
+             summary="Compact the database")
+def api_database_vacuum() -> DatabaseVacuumResult:
+    try:
+        return DatabaseVacuumResult(**_db.vacuum_database())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 def _log_retention_settings() -> dict:
     return _db.get_log_retention_settings()
 

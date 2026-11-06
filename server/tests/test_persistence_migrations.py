@@ -85,6 +85,46 @@ def _registry_row(engine) -> tuple[int, str, str]:
     return int(row[0]), str(row[1]), str(row[2])
 
 
+@pytest.mark.parametrize("with_indexes", [True, False])
+def test_v7_startup_preserves_existing_schema_with_or_without_listing_indexes(tmp_path, with_indexes):
+    from inku_server.persistence.schema import Base
+
+    path = tmp_path / "v7.db"
+    engine = _engine(path)
+    indexes = {
+        "ix_history_user_trashed_at",
+        "ix_history_user_starred_trashed_at",
+        "ix_history_user_for_revision_trashed_at",
+        "ix_history_for_share_group",
+        "ix_history_user_description_hash",
+    }
+
+    def start():
+        return ensure_current_schema(engine=engine, database_path=path,
+                                     create_schema=Base.metadata.create_all,
+                                     seed_fresh=_no_op, apply_legacy=_no_op)
+
+    assert start().mode == "fresh"
+    with engine.begin() as connection:
+        present = {row[1] for row in connection.exec_driver_sql("PRAGMA index_list(history)")}
+        assert indexes <= present
+        if not with_indexes:
+            for name in indexes:
+                connection.exec_driver_sql(f'DROP INDEX "{name}"')
+        before = connection.exec_driver_sql(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name"
+        ).all()
+        registry = connection.exec_driver_sql("SELECT * FROM schema_migrations").all()
+    assert _registry_row(engine)[0] == 7
+    assert start().mode == "current"
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name"
+        ).all() == before
+        assert connection.exec_driver_sql("SELECT * FROM schema_migrations").all() == registry
+    engine.dispose()
+
+
 def _v5_with_intermediate_works(path: Path):
     engine = _engine(path)
     with engine.begin() as connection:

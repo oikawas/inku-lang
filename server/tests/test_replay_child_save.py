@@ -175,6 +175,28 @@ def test_managed_replay_child_replays_its_inherited_saved_policy(monkeypatch):
                     "upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions",
                 )}, "render_diagnostics": None, "resource_execution": None,
             })
+        from inku_server.persistence.schema import PipelineCandidateExecutionRow
+        from inku_server.persistence.config import PersistenceConfig
+        import time
+        execution_id = "retention-" + uuid.uuid4().hex
+        old = int(time.time() * 1000) - 2 * 86400000
+        saved_state = json.dumps({"snapshot": {"action": None}}).encode()
+        with db.SessionLocal.begin() as session:
+            session.add(PipelineCandidateExecutionRow(owner_id=user["id"], execution_id=execution_id,
+                variation_id=snapshot["variation_id"], sequence="0", state_bytes=saved_state,
+                state_digest=sha256(saved_state).hexdigest(), created_at=old, updated_at=old))
+        canonical_url = str(db.engine.url)
+        monkeypatch.setattr(db, "PERSISTENCE_CONFIG", PersistenceConfig(canonical_url=canonical_url,
+                            thumbnail_url="sqlite://"))
+        monkeypatch.delenv("INKU_AUTONOMOUS_RUNS_DB_URL", raising=False)
+        assert db.prune_execution_records(1)["executions"] >= 1
+        assert store.read_execution(user["id"], execution_id) is None
+        assert store.read_linked_history(user["id"], parent["id"]) is not None
+        with monkeypatch.context() as admission:
+            admission.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+            fork = client.post(f"/api/pipeline/history/{parent['id']}/fork",
+                               json={"kind": "direct_ddl", "text": source}, headers=headers)
+        assert fork.status_code == 200, fork.text
         parent = db.get_items(user["id"], [parent["id"]])[0]
         request = {"work_id": parent["id"], "score": parent["score"], "render_seed": 0,
                    "composition_seed": 17, "wild": True}

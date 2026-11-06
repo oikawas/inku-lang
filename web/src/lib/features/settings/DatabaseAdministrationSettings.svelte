@@ -3,10 +3,14 @@
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import type { SettingsStatus } from './state.svelte';
 	import type { DbBackupEntry } from './server-administration.svelte';
+	import { onMount } from 'svelte';
 
 	type DatabaseStatus = Pick<SettingsStatus, 'database' | 'db_backup'>;
 
 	type Props = {
+		onLoadRetention: () => Promise<number | null>;
+		onSaveRetention: (days: number | null) => Promise<void>;
+		onVacuum: () => Promise<{ before_bytes: number; after_bytes: number }>;
 		status: DatabaseStatus | null;
 		statusError: string | null;
 		loading: boolean;
@@ -20,6 +24,9 @@
 	};
 
 	let {
+		onLoadRetention,
+		onSaveRetention,
+		onVacuum,
 		status,
 		statusError,
 		loading,
@@ -31,6 +38,39 @@
 		onDeleteBackup,
 		onRestoreBackup
 	}: Props = $props();
+
+	let retention = $state('');
+	let maintenanceStatus = $state('');
+	let maintenanceBusy = $state(false);
+	onMount(() => {
+		if (!isAdmin) return;
+		void onLoadRetention().then((days) => {
+			retention = days == null ? '' : String(days);
+		}).catch(() => { maintenanceStatus = t().settingsDbMaintenanceError; });
+	});
+	async function saveRetention() {
+		const days = retention === '' ? null : Number(retention);
+		if (days !== null && (!Number.isInteger(days) || days < 1 || days > 36500)) {
+			maintenanceStatus = t().settingsDbRetentionInvalid;
+			return;
+		}
+		if (days !== null && !window.confirm(t().settingsDbRetentionConfirm)) return;
+		maintenanceBusy = true;
+		try {
+			await onSaveRetention(days);
+			maintenanceStatus = t().settingsDbRetentionSaved;
+		} catch { maintenanceStatus = t().settingsDbMaintenanceError; }
+		finally { maintenanceBusy = false; }
+	}
+	async function vacuum() {
+		if (!window.confirm(t().settingsDbVacuumConfirm)) return;
+		maintenanceBusy = true;
+		try {
+			const result = await onVacuum();
+			maintenanceStatus = t().settingsDbVacuumResult(formatBytes(result.before_bytes), formatBytes(result.after_bytes));
+		} catch { maintenanceStatus = t().settingsDbMaintenanceError; }
+		finally { maintenanceBusy = false; }
+	}
 
 	function formatBytes(bytes: number | null | undefined): string {
 		if (bytes == null) return '-';
@@ -69,6 +109,17 @@
 </script>
 
 <div class="database-administration-settings">
+	<div class="popover-group">
+		<div class="popover-group-label">{t().settingsDbMaintenance}</div>
+		<label for="execution-retention">{t().settingsDbRetention}</label>
+		<input id="execution-retention" type="text" inputmode="numeric" bind:value={retention} disabled={!isAdmin || maintenanceBusy} />
+		<div class="db-backup-hint">{t().settingsDbRetentionHint}</div>
+		<div class="settings-inline-actions">
+			<button class="ghost-btn" onclick={saveRetention} disabled={!isAdmin || maintenanceBusy}>{t().settingsDbRetentionSave}</button>
+			<button class="ghost-btn" onclick={vacuum} disabled={!isAdmin || maintenanceBusy}>{t().settingsDbVacuum}</button>
+		</div>
+		{#if maintenanceStatus}<div class="inline-message" role="status">{maintenanceStatus}</div>{/if}
+	</div>
 	<div class="popover-group">
 		<div class="popover-group-label">{t().settingsCurrentDb}</div>
 		{#if loading}

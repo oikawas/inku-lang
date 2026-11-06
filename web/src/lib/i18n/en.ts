@@ -2,6 +2,17 @@ import type { LangPack } from './types';
 import { groupDigits } from '../formatNumber';
 
 export const en: LangPack = {
+	settingsDbMaintenance: 'Database maintenance',
+	settingsDbRetention: 'Execution record retention (days)',
+	settingsDbRetentionHint: 'Leave blank to keep records indefinitely. Saving a number deletes older finished execution records; works and lineage remain.',
+	settingsDbRetentionInvalid: 'Enter 1–36500 days or leave the field blank.',
+	settingsDbRetentionConfirm: 'Delete finished execution records older than this period?',
+	settingsDbRetentionSave: 'Save retention',
+	settingsDbRetentionSaved: 'Retention saved.',
+	settingsDbVacuum: 'Compact database',
+	settingsDbVacuumConfirm: 'Compact the database? Writes are stopped while this runs.',
+	settingsDbVacuumResult: (before, after) => `Before ${before}, after ${after}`,
+	settingsDbMaintenanceError: 'The database maintenance operation failed.',
 	imageTab: 'Image',
 	imageTabHint: 'Read an image and paint from instructions written in Japanese.',
 	imageProvenanceLabel: 'Source note',

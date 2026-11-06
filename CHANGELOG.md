@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server: add listing indexes to new databases, explicit database compaction, and execution-record retention that defaults to indefinite.
+
 - macOS: retrying a library preview also reloads the work's image.
 
 - macOS: align the instruction editor's footer buttons to the right and match the Draw button color to other drawing buttons.

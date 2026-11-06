@@ -96,6 +96,7 @@ def create_sqlite_engine(
                 cursor.execute(f"PRAGMA busy_timeout={pragmas.busy_timeout_ms}")
             if pragmas.wal:
                 cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA journal_size_limit=67108864")
         finally:
             cursor.close()
 

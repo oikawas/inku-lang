@@ -275,10 +275,21 @@ impl PipelineSnapshot {
                 .collect::<Vec<_>>()
                 .join("\n")
         };
-        let problems_of = |source: String| -> Option<(bool, usize)> {
-            let candidate = self.new_document(source).ok()?;
-            let check = self.check_written(&candidate).ok()?;
-            Some((check.drawable, check.problems.len()))
+        let mut problem_checks = std::collections::BTreeMap::new();
+        let mut problems_of = |source: String| -> Option<(bool, usize)> {
+            if let Some(result) = problem_checks.get(&source) {
+                return *result;
+            }
+            let result = self
+                .new_document(source.clone())
+                .ok()
+                .and_then(|candidate| {
+                    self.check_written(&candidate)
+                        .ok()
+                        .map(|check| (check.drawable, check.problems.len()))
+                });
+            problem_checks.insert(source, result);
+            result
         };
         let doc = ThingDocument::new_with_definitions(
             &sentences,

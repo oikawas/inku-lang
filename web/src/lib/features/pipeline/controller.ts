@@ -10,6 +10,10 @@ type ViewObserver = (view: PipelineView | null) => void;
 type Pause = (milliseconds: number) => Promise<void>;
 type RunningView = { view: PipelineView | null; stopped: boolean };
 
+export function nextPollDelay(delay: number, previous: string | undefined, current: string | undefined): number {
+	return current === previous ? Math.min(2000, delay * 2) : 250;
+}
+
 // A persisted refusal must not become another automatic perform request.
 function throwRefusal(view: PipelineView): void {
 	if (view.current_render_refusal) {
@@ -308,10 +312,13 @@ export class PipelineController {
 				this.linkedHistoryId = null;
 			}
 			show(next);
+			let pollDelay = 250;
 			while (next.busy) {
-				await this.pause(250);
+				await this.pause(pollDelay);
 				if (running.stopped) return next;
+				const sequence = next.sequence;
 				next = await load(next);
+				pollDelay = nextPollDelay(pollDelay, sequence, next.sequence);
 				if (running.stopped) return next;
 				show(next);
 			}
@@ -330,10 +337,13 @@ export class PipelineController {
 				next = await this.api.command(next, { tag: 'perform' });
 				if (running.stopped) return next;
 				show(next);
+				pollDelay = 250;
 				while (next.busy) {
-					await this.pause(250);
+					await this.pause(pollDelay);
 					if (running.stopped) return next;
+					const sequence = next.sequence;
 					next = await load(next);
+					pollDelay = nextPollDelay(pollDelay, sequence, next.sequence);
 					if (running.stopped) return next;
 					show(next);
 				}

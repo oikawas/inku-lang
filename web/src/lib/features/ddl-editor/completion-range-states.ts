@@ -8,6 +8,14 @@ export type CompletionRangeState = {
 };
 export type CompletionRangeWork = { history_id: string } | { execution_id: string };
 
+export function stableCompletionWork() {
+	let previous: CompletionRangeWork | null = null;
+	return (next: CompletionRangeWork | null): CompletionRangeWork | null => {
+		if (JSON.stringify(previous) === JSON.stringify(next)) return previous;
+		return previous = next;
+	};
+}
+
 export function completionWordsHint(ranges: readonly CompletionRangeState[], strings: LangPack): string | null {
 	const count = ranges.filter((range) => range.state === 'words_changed').length;
 	return count ? strings.ddlCompletionWordsHint(count) : null;

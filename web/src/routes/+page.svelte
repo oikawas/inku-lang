@@ -12,6 +12,7 @@
 	import { highlightDDL } from '$lib/highlight';
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
+	import { stableCompletionWork } from '$lib/features/ddl-editor/completion-range-states';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -1950,11 +1951,12 @@ function detachLineage(): void {
 }
 
 const currentLineageNodeId = $derived(work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null);
+const retainCompletionWork = stableCompletionWork();
 const currentCompletionWork: CompletionRangeWork | null = $derived.by(() => {
 	const historyId = work.displayedHistoryItem?.id ?? work.result?.history_id;
 	const view = work.pipelineView;
-	if (view && (!historyId || view.result?.history_id === historyId)) return { execution_id: view.execution_id };
-	return historyId ? { history_id: historyId } : null;
+	if (view && (!historyId || view.result?.history_id === historyId)) return retainCompletionWork({ execution_id: view.execution_id });
+	return retainCompletionWork(historyId ? { history_id: historyId } : null);
 });
 const dialogCompletionWork: CompletionRangeWork | null = $derived.by(() => {
 	const historyId = ddlDialogMode === 'edit' ? ddlDialogNode?.history?.id : null;

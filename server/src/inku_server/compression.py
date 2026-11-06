@@ -19,6 +19,8 @@ unchanged; the last chunk closes the file as before.
 
 from __future__ import annotations
 
+from functools import partial
+import anyio
 from starlette.datastructures import Headers
 from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -26,6 +28,23 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 class _FlushingGZipResponder(GZipResponder):
     """Starlette's responder, flushing what it has after every chunk."""
+
+    async def send_with_compression(self, message) -> None:
+        # Keep Starlette's header and streaming behavior, but do a large complete
+        # body's CPU work off the event loop.
+        if (message["type"] == "http.response.body" and not self.started
+                and not self.content_encoding_set and not self.content_type_is_excluded
+                and not message.get("more_body", False)
+                and len(message.get("body", b"")) > 1_000_000):
+            original = self.apply_compression
+            compressed = await anyio.to_thread.run_sync(partial(original, message["body"], more_body=False))
+            self.apply_compression = lambda body, *, more_body: compressed
+            try:
+                await super().send_with_compression(message)
+            finally:
+                self.apply_compression = original
+            return
+        await super().send_with_compression(message)
 
     def apply_compression(self, body: bytes, *, more_body: bool) -> bytes:
         self.gzip_file.write(body)

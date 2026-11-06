@@ -474,6 +474,7 @@ def api_history_svg(
     item_id: Annotated[str, Path(description="Id of the work.")],
     profile: str = Query(default="display", description="SVG output profile: display / editable / compat / live"),
     actor: dict = Depends(_current_user),
+    request: Request = None,
 ) -> Response:
     """Return the SVG of one work in the requested profile.
 
@@ -482,6 +483,12 @@ def api_history_svg(
     found for the caller and 422 when the redraw fails.
     """
     svg_profile = _validated_svg_profile(profile)
+    if svg_profile == "display" and request is not None and request.headers.get("if-none-match"):
+        render_hash = _db.readable_history_render_hash(actor["id"], item_id)
+        if render_hash:
+            etag = f'"{render_hash}-display"'
+            if request.headers["if-none-match"] == etag:
+                return Response(status_code=304, headers={"ETag": etag, "Cache-Control": _THUMB_CACHE_CONTROL})
     items = _db.get_items(actor["id"], [item_id])
     if not items:
         raise HTTPException(status_code=404, detail="history item not found")
@@ -534,7 +541,10 @@ def api_history_svg(
             raise
         except Exception as e:  # noqa: BLE001
             raise _unexpected_http_error("history svg render", 422) from e
-    return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
+    headers = {}
+    if svg_profile == "display" and item.get("render_hash"):
+        headers = {"ETag": f'"{item["render_hash"]}-display"', "Cache-Control": _THUMB_CACHE_CONTROL}
+    return Response(content=svg, media_type="image/svg+xml; charset=utf-8", headers=headers)
 
 
 def _derived_sketch_state(body: HistoryPostBody) -> str:

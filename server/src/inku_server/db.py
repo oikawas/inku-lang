@@ -1837,6 +1837,12 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
     ).get_items(user_id, ids)
 
 
+def readable_history_render_hash(user_id: str, item_id: str) -> str | None:
+    return _history.HistoryItemReader(
+        SessionLocal, _actor_of, _rows_to_dicts_with_lineage,
+    ).readable_render_hash(user_id, item_id)
+
+
 def can_read_history_item(user_id: str, item_id: str, *, actor: dict | None = None) -> bool:
     """Decide access to one active history work without loading its payload."""
     return _history.HistoryItemReader(

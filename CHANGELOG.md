@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: use arrow keys to move between works and preview them across pages in the Library timeline.
-
 - macOS: the DDL editor and layout adjustments use the current input tab's drawing model and wild setting.
 
 - macOS: while the library is open, the lineage view beneath it no longer takes presses for dragging, so a card above the lineage canvas is selected at once.
@@ -610,6 +608,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.326 (2026-11-06 / Build 1402)
+
+- Web: use arrow keys to move between works and preview them across pages in the Library timeline.
 
 ## v2.15.325 (2026-11-06 / Build 1401)
 

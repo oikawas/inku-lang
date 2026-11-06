@@ -54,6 +54,7 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
     history.library.pageSize = 12
     await history.library.setPage(8)
     let historyWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1108, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+    historyWindow.isReleasedWhenClosed = false
     let historyHost = LibraryPerformanceProbe.historyHostingView(model: app, history: history, width: 1108)
     historyHost.frame = historyWindow.contentRect(forFrameRect: historyWindow.frame)
     LibraryPerformanceProbe.reset()
@@ -70,6 +71,7 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
     }
 
     let lineageWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1108, height: 800), styleMask: [.titled], backing: .buffered, defer: false)
+    lineageWindow.isReleasedWhenClosed = false
     let lineageHost = LibraryPerformanceProbe.lineageHostingView(model: app)
     lineageHost.frame = lineageWindow.contentRect(forFrameRect: lineageWindow.frame)
     LibraryPerformanceProbe.reset()

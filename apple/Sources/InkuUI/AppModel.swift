@@ -245,6 +245,7 @@ public final class AppModel {
     public private(set) var imageWorkProvenance: [String: String] = [:]
     public private(set) var savedDisplayLabels: [String: String] = [:]
     @ObservationIgnored private var displayLabelReads: Set<String> = []
+    @ObservationIgnored private var workActionReadsInFlight: Set<String> = []
     @ObservationIgnored private var workActionReadToken = UUID()
     public let library = LibraryModel(includeListSVG: false)
     public let display = DisplaySettings()
@@ -1040,10 +1041,14 @@ public final class AppModel {
     }
 
     public func loadWorkActionStates(workIDs: [String]) async {
-        let missing = Set(workIDs).filter { workActionStates[$0] == nil }
-        let labelIDs = Set(workIDs).subtracting(displayLabelReads)
+        let eligible = Set(workIDs).subtracting(workActionReadsInFlight)
+        let missing = eligible.filter { workActionStates[$0] == nil }
+        let labelIDs = eligible.subtracting(displayLabelReads)
         guard !missing.isEmpty || !labelIDs.isEmpty, let host else { return }
         let token = workActionReadToken
+        let reading = Set(missing).union(labelIDs)
+        workActionReadsInFlight.formUnion(reading)
+        defer { if token == workActionReadToken { workActionReadsInFlight.subtract(reading) } }
         do {
             let summaries = try await host.savedAuthoringSummaries(workIDs: Array(missing))
             let labels = try await host.savedDisplayLabels(workIDs: Array(labelIDs))
@@ -2394,6 +2399,7 @@ public final class AppModel {
             imageWorkProvenance = [:]
             savedDisplayLabels = [:]
             displayLabelReads = []
+            workActionReadsInFlight = []
             workActionReadToken = UUID()
             await library.resetAfterRestore()
             await thumbnails.synchronize()

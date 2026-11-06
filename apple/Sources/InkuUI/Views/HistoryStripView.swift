@@ -201,6 +201,9 @@ import SwiftUI
             }
             .fixedSize(horizontal: false, vertical: true)
             .onChange(of: focusedWorkID) { _, id in if let id { proxy.scrollTo(id) } }
+            .task(id: library.works.map(\.id)) {
+                await model.loadWorkActionStates(workIDs: library.works.map(\.id))
+            }
         }
     }
 
@@ -282,7 +285,6 @@ import SwiftUI
         .onKeyPress(.leftArrow) { moveFocus(from: work.id, delta: -1) }
         .onKeyPress(.rightArrow) { moveFocus(from: work.id, delta: 1) }
         .overlay(alignment: .topTrailing) { starButton(work).padding(3) }
-        .task(id: work.id) { await model.loadWorkActionState(work) }
         .inkuTooltip(display.tooltipValue(detailsTip(work)))
         .accessibilityLabel(display.localizedFormat("作品を開く: %@", title(work)))
     }

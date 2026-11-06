@@ -475,7 +475,6 @@ struct LineageView: View {
         .modifier(LibraryCardSurface(current: item.id == graph.focusNodeID, focused: focusedNodeID == item.id, tombstone: item.node.state == "tombstone", cornerRadius: 10))
         .opacity(item.work?.trashed == true ? 0.62 : 1)
         .contextMenu { nodeMenu(item, graph: graph) }
-        .task(id: item.work?.id) { if let work = item.work { await model.loadWorkActionState(work) } }
         .focusable().focused($focusedNodeID, equals: item.id)
         .onKeyPress(.return) {
             guard focusedNodeID == item.id, !model.isBrowsingLocked, !library.lineageLoading else { return .ignored }

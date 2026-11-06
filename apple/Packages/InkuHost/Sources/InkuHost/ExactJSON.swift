@@ -1,6 +1,21 @@
 import Foundation
 import InkuCore
 
+private final class ExactJSONStringCodec: @unchecked Sendable {
+    static let shared = ExactJSONStringCodec()
+    private let lock = NSLock()
+    private let encoder: JSONEncoder = {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.withoutEscapingSlashes]; return encoder
+    }()
+    private let decoder = JSONDecoder()
+    func encode(_ value: String) -> String {
+        lock.withLock { String(decoding: try! encoder.encode(value), as: UTF8.self) }
+    }
+    func decode(_ bytes: Data) throws -> String {
+        try lock.withLock { try decoder.decode(String.self, from: bytes) }
+    }
+}
+
 /// JSON transport values retain number lexemes instead of rounding through Double.
 public indirect enum ExactJSON: Sendable, Equatable {
     case object([String: ExactJSON])
@@ -140,9 +155,11 @@ public indirect enum ExactJSON: Sendable, Equatable {
     public static func optional(_ value: String?) -> ExactJSON { value.map(Self.string) ?? .null }
     public static func integer(_ value: some BinaryInteger) -> ExactJSON { .number(String(value)) }
     private static func quote(_ value: String) -> String {
-        // Encoding one string also handles control characters and surrogate pairs.
-        let encoder = JSONEncoder(); encoder.outputFormatting = [.withoutEscapingSlashes]
-        return String(decoding: try! encoder.encode(value), as: UTF8.self)
+        // Restrict the fast path to unambiguous ASCII; the encoder handles all other cases.
+        if value.utf8.allSatisfy({ $0 >= 0x20 && $0 < 0x7f && $0 != 34 && $0 != 92 }) {
+            return "\"" + value + "\""
+        }
+        return ExactJSONStringCodec.shared.encode(value)
     }
 }
 
@@ -216,12 +233,15 @@ private struct JSONParser {
     mutating func string() throws -> String {
         let start = index
         guard take(34) else { throw HostError("invalid_json") }
+        var plainASCII = true
         while index < bytes.count {
             if take(34) {
-                do { return try JSONDecoder().decode(String.self, from: Data(bytes[start..<index])) }
+                if plainASCII { return String(decoding: bytes[(start + 1)..<(index - 1)], as: UTF8.self) }
+                do { return try ExactJSONStringCodec.shared.decode(Data(bytes[start..<index])) }
                 catch { throw HostError("invalid_json") }
             }
-            if take(92) { guard index < bytes.count else { throw HostError("invalid_json") }; index += 1 }
+            if bytes[index] < 0x20 || bytes[index] >= 0x7f { plainASCII = false }
+            if take(92) { plainASCII = false; guard index < bytes.count else { throw HostError("invalid_json") }; index += 1 }
             else { index += 1 }
         }
         throw HostError("invalid_json")

@@ -5,6 +5,21 @@ import InkuPersistence
 @testable import InkuHost
 
 final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
+    func testExactJSONStringAndNumberRoundTripTable() throws {
+        let samples = ["plain / ASCII", "quote \" slash \\", "絵と😀", "\u{0000}\n\t", "\u{2028}"]
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.withoutEscapingSlashes]
+        for sample in samples {
+            let expected = try encoder.encode(sample)
+            XCTAssertEqual(ExactJSON.string(sample).data, expected)
+            XCTAssertEqual(try ExactJSON(data: expected), .string(sample))
+        }
+        let escaped = Data(#"["\uD83D\uDE00",1.2300,-0,6.02e+23]"#.utf8)
+        let value = try ExactJSON(data: escaped)
+        XCTAssertEqual(value.array?[0], .string("😀"))
+        XCTAssertEqual(value.array?.dropFirst().compactMap(\.number), ["1.2300", "-0", "6.02e+23"])
+        XCTAssertEqual(try ExactJSON(data: value.data), value)
+    }
+
     func testCompletedDriversAreReleasedAndCandidateCanBeReopened() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-driver-release-\(UUID())")
         defer { try? FileManager.default.removeItem(at: folder) }

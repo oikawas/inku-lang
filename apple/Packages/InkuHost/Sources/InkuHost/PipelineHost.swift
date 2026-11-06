@@ -724,6 +724,8 @@ private actor ExecutionDriver {
     let svgLimitBytes: @Sendable () async throws -> UInt64
     let gate = AsyncGate()
     var state: StoredExecution
+    private var viewRenderedBytes: Data?
+    private var viewSVG: String?
     var databaseRevision: Int64?
     var snapshot: ExactJSON
     var initialRequest: GenerationRequest?
@@ -1201,9 +1203,10 @@ private actor ExecutionDriver {
         }
         let nextSnapshot = try result.requiredObject("snapshot")
         if let current { guard nextSnapshot["execution_id"] == current["execution_id"] else { throw HostError("pipeline_execution_identity_changed") } }
-        try within(nextSnapshot.data.count, limit: limits["max_snapshot_bytes"])
+        let nextSnapshotData = nextSnapshot.data
+        try within(nextSnapshotData.count, limit: limits["max_snapshot_bytes"])
         guard result["events"].array != nil else { throw HostError("pipeline_schema_violation") }
-        var next = state; next.snapshot = nextSnapshot.data; next.svgFailure = nil; next.svgFailureLimitMiB = nil
+        var next = state; next.snapshot = nextSnapshotData; next.svgFailure = nil; next.svgFailureLimitMiB = nil
         let priorEvents = try ExactJSON(data: state.events).array ?? []
         next.events = ExactJSON.array(priorEvents + (result["events"].array ?? [])).data
         if result["rendered"].object != nil { next.rendered = result["rendered"].data; next.savedWorkID = nil; next.candidate = nil }
@@ -1411,14 +1414,17 @@ private actor ExecutionDriver {
     }
 
     private func makeView() throws -> PipelineView {
-        let rendered = try state.rendered.map { try ExactJSON(data: $0) }
+        if state.rendered != viewRenderedBytes {
+            let svg = try state.rendered.map { try ExactJSON(data: $0)["svg"].string } ?? nil
+            viewRenderedBytes = state.rendered; viewSVG = svg
+        }
         let phase = state.svgFailure == nil ? try snapshot.requiredObject("phase").requiredString("tag") : "failed"
         return PipelineView(executionID: try executionID(), variationID: try snapshot.requiredString("variation_id"),
                             sequence: try snapshot.requiredString("sequence"), revision: try snapshot["authority"].requiredString("revision"), phase: phase,
                             authority: try snapshot["authority"].requiredString("authority"), origin: try snapshot["authority"].requiredString("origin"),
                             visibleDDL: snapshot["document"]["source"].string,
                             scoreJSON: snapshot["delivery"]["score"].object == nil ? nil : snapshot["delivery"]["score"].data,
-                            renderedJSON: state.rendered, svg: rendered?["svg"].string, savedWorkID: state.savedWorkID,
+                            renderedJSON: state.rendered, svg: viewSVG, savedWorkID: state.savedWorkID,
                             patchProposalJSON: phase == "awaiting_patch_approval" ? snapshot["phase"].data : nil,
                             eventsJSON: state.events, busy: snapshot["action"].object != nil || providerTask != nil,
                             interruptedProvider: restored && snapshot["action"].object != nil,

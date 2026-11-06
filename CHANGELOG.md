@@ -16,14 +16,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - macOS: DB v9 replaces duplicate saved data with digests and compacts the database. Drawing logs for failed or stopped executions without a saved effect are removed during migration.
 
-- Demo instruction and Vision requests now have an overall deadline including admission and limit response bodies to 32 MB.
-
-- Server: return 500 for unexpected internal failures in rendering, history redraws, and account administration, logging exception details instead of putting them in responses.
-
-- Web: reduce requests during execution and cancel the previous work's requests when switching works. Show lineage thumbnails in groups of 200, with Show more for the rest. Pause periodic history refreshes while the page is hidden or filters are active.
-
-- Server: add a batch-run ID filter to the history API for reconciling the caller's own works.
-
 - macOS: avoid repeating unchanged calculations and image loads in input, generation details, and model settings.
 
 - macOS: retrying a library preview also reloads the work's image.
@@ -642,6 +634,18 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.329 (2026-11-06 / Build 1405)
+
+- Server and Web: align DDL titles and description comments with the shared core.
+
+- Demo instruction and Vision requests now have an overall deadline including admission and limit response bodies to 32 MB.
+
+- Server: return 500 for unexpected internal failures in rendering, history redraws, and account administration, logging exception details instead of putting them in responses.
+
+- Web: reduce requests during execution and cancel the previous work's requests when switching works. Show lineage thumbnails in groups of 200, with Show more for the rest. Pause periodic history refreshes while the page is hidden or filters are active.
+
+- Server: add a batch-run ID filter to the history API for reconciling the caller's own works.
 
 ## v2.15.328 (2026-11-06 / Build 1404)
 

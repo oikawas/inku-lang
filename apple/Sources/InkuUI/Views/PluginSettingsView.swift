@@ -12,6 +12,10 @@ struct PluginSettingsView: View {
     @Bindable var model: AppModel
     @State private var settings = PluginSettingsModel()
     @State private var confirmingDelete: String?
+    #if os(macOS)
+    @State private var checkPreviewData: [Int: Data] = [:]
+    @State private var checkPreviewImages: [Int: NSImage] = [:]
+    #endif
 
     var body: some View {
         Group {
@@ -78,8 +82,9 @@ struct PluginSettingsView: View {
                             ForEach(package.words) { word in
                                 HStack(alignment: .top, spacing: 10) {
                                     Group {
-                                        if let data = word.previewData { previewData(data) }
-                                        else if let url = word.previewURL { preview(url) }
+                                        if word.previewData != nil || word.previewURL != nil {
+                                            PluginCachedImage(data: word.previewData, url: word.previewURL)
+                                        }
                                         else { Color.clear }
                                     }
                                     .frame(width: 96, height: 44)
@@ -140,7 +145,7 @@ struct PluginSettingsView: View {
             ForEach(Array((check.report["problems"].array ?? []).enumerated()), id: \.offset) { _, problem in problemView(problem) }
             ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                 HStack(alignment: .top, spacing: 8) {
-                    if let data = check.preview(at: index), let image = NSImage(data: data) {
+                    if let image = checkPreviewImages[index] {
                         Image(nsImage: image).resizable().scaledToFit().frame(width: 108, height: 46)
                     }
                     VStack(alignment: .leading, spacing: 3) {
@@ -153,7 +158,7 @@ struct PluginSettingsView: View {
                         let note = word[japanese ? "note_ja" : "note_en"].string ?? ""
                         if !note.isEmpty { Text(note).inkuFont(12) }
                         Text(word[japanese ? "example_ja" : "example_en"].string ?? "").inkuFont(12)
-                        if check.preview(at: index) != nil {
+                        if checkPreviewData[index] != nil {
                             Text(model.display.webCopy(word["preview_source"].string == "file" ? "settingsPluginPictureFromFile" : "settingsPluginPictureDrawn", "絵"))
                                 .inkuFont(11).foregroundStyle(.secondary)
                         }
@@ -171,28 +176,48 @@ struct PluginSettingsView: View {
                 Button(model.display.webCopy("confirmCancel", "キャンセル")) { settings.clearCheck() }
             }
         }.padding(10).background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 6))
+            .task(id: check.pictures.text) {
+                var data: [Int: Data] = [:]
+                var images: [Int: NSImage] = [:]
+                for index in words.indices {
+                    if let value = check.preview(at: index) {
+                        data[index] = value
+                        images[index] = NSImage(data: value)
+                    }
+                }
+                checkPreviewData = data; checkPreviewImages = images
+            }
     }
     #endif
 
-    @ViewBuilder private func preview(_ url: URL) -> some View {
-        #if os(macOS)
-        if let image = NSImage(contentsOf: url) {
-            Image(nsImage: image).resizable().scaledToFit()
-        } else { Image(systemName: "leaf").foregroundStyle(.secondary) }
-        #else
-        if let image = UIImage(contentsOfFile: url.path) {
-            Image(uiImage: image).resizable().scaledToFit()
-        } else { Image(systemName: "leaf").foregroundStyle(.secondary) }
-        #endif
-    }
+}
 
-    @ViewBuilder private func previewData(_ data: Data) -> some View {
-        #if os(macOS)
-        if let image = NSImage(data: data) { Image(nsImage: image).resizable().scaledToFit() }
-        else { Image(systemName: "leaf").foregroundStyle(.secondary) }
-        #else
-        if let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit() }
-        else { Image(systemName: "leaf").foregroundStyle(.secondary) }
-        #endif
+private struct PluginCachedImage: View {
+    let data: Data?
+    let url: URL?
+    private struct Key: Equatable { let data: Data?; let url: URL? }
+    #if os(macOS)
+    @State private var image: NSImage?
+    #else
+    @State private var image: UIImage?
+    #endif
+
+    var body: some View {
+        Group {
+            if let image {
+                #if os(macOS)
+                Image(nsImage: image).resizable().scaledToFit()
+                #else
+                Image(uiImage: image).resizable().scaledToFit()
+                #endif
+            } else { Image(systemName: "leaf").foregroundStyle(.secondary) }
+        }.task(id: Key(data: data, url: url)) {
+            let bytes = data ?? url.flatMap { try? Data(contentsOf: $0) }
+            #if os(macOS)
+            image = bytes.flatMap(NSImage.init(data:))
+            #else
+            image = bytes.flatMap(UIImage.init(data:))
+            #endif
+        }
     }
 }

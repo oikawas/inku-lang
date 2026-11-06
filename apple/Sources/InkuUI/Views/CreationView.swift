@@ -69,6 +69,8 @@ struct CreationView: View {
     @State private var showImageModelPicker = false
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
+    @State private var imagePreview: NSImage?
+    @State private var savedImageRecord: ExactJSON?
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
     @State private var batchKind = "description"
     @State private var pendingImageBatchRestart: Bool?
@@ -198,6 +200,8 @@ struct CreationView: View {
             }
         }
         .onDisappear { batchWorkspace.invalidateReads() }
+        .onChange(of: model.imageInput?.jpeg, initial: true) { _, data in imagePreview = data.flatMap(NSImage.init(data:)) }
+        .onChange(of: model.savedImageDDL, initial: true) { _, data in savedImageRecord = data.flatMap { try? ExactJSON(data: $0) } }
         .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
         .task(id: workspaceWork?.lineageNodeID) {
             workspaceGeneration = nil
@@ -405,11 +409,11 @@ struct CreationView: View {
                 Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }
-            if let image = model.imageInput, let preview = NSImage(data: image.jpeg) {
+            if model.imageInput != nil, let preview = imagePreview {
                 Image(nsImage: preview).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 220)
                 Text(model.imageFileName).inkuFont(12).foregroundStyle(.secondary)
             }
-            if let data = model.savedImageDDL, let record = try? ExactJSON(data: data) {
+            if let record = savedImageRecord {
                 if let ddl = model.selectedWork?.ddl {
                     Text(display.localized("指示書")).inkuFont(14, weight: .semibold)
                     Text(ddl).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)

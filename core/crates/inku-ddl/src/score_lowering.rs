@@ -849,6 +849,12 @@ fn lower_macro_instruction(
             _ => None,
         })
         .collect::<Vec<_>>();
+    let mut emit_positions = BTreeMap::new();
+    for (index, (binding, _, _)) in emit_nodes.iter().enumerate() {
+        if let Some(binding) = binding {
+            emit_positions.entry(*binding).or_insert(index);
+        }
+    }
     let mut successful_anchors: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
     let mut unavailable_anchor_targets = BTreeSet::new();
     for delivery in &delivery_nodes {
@@ -938,9 +944,7 @@ fn lower_macro_instruction(
             continue;
         }
         if let Some(anchor_index) = successful_anchors.get(from) {
-            let to_position = emit_nodes
-                .iter()
-                .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
+            let to_position = emit_positions.get(to).copied();
             if to_position.is_some()
                 && kind == "connected"
                 && target_path_position.is_none()
@@ -952,12 +956,8 @@ fn lower_macro_instruction(
                 continue;
             }
         }
-        let from_position = emit_nodes
-            .iter()
-            .position(|(binding, _, _)| binding.is_some_and(|binding| binding == from));
-        let to_position = emit_nodes
-            .iter()
-            .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
+        let from_position = emit_positions.get(from).copied();
+        let to_position = emit_positions.get(to).copied();
         let secondary = (kind == "between")
             .then(|| {
                 from_position
@@ -3080,17 +3080,32 @@ fn lower_verified_stage15_shared<'a>(
     let mut anchors = Vec::new();
     let mut anchor_origins = Vec::new();
     let mut instruction_origins = Vec::new();
+    let inline_region_operands: BTreeSet<usize> = document
+        .instructions
+        .iter()
+        .filter_map(|owner| match &owner.fill_target {
+            Some(crate::SemanticFillTarget::InlineShape {
+                target_instruction_index,
+                ..
+            }) => Some(*target_instruction_index),
+            _ => None,
+        })
+        .chain(
+            document
+                .group_predicates
+                .iter()
+                .filter_map(|owner| match &owner.fill_target {
+                    Some(crate::SemanticFillTarget::InlineShape {
+                        target_instruction_index,
+                        ..
+                    }) => Some(*target_instruction_index),
+                    _ => None,
+                }),
+        )
+        .collect();
     for (projected_index, instruction) in document.instructions.iter().enumerate() {
         // An inline region operand supplies geometry; it is not an extra drawing.
-        if document.instructions.iter().any(|owner| {
-            matches!(owner.fill_target,
-            Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
-                if target_instruction_index == projected_index)
-        }) || document.group_predicates.iter().any(|owner| {
-            matches!(owner.fill_target,
-            Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
-                if target_instruction_index == projected_index)
-        }) {
+        if inline_region_operands.contains(&projected_index) {
             let source_index = view
                 .source_instruction_index(projected_index)
                 .expect("verified view maps each region operand");

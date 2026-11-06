@@ -447,6 +447,30 @@ struct BatchPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var runProgress: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                if let row = automation.activeRow {
+                    Text(model.display.localizedFormat("処理中: %ld行", row.line))
+                        .inkuFont(12, weight: .semibold).monospacedDigit()
+                }
+                Spacer(minLength: 0)
+                if automation.currentRetryRound > 0 {
+                    Text(model.display.localizedFormat("再試行 %ld巡目", automation.currentRetryRound))
+                        .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            if let startedAt = automation.batchRowStartedAt {
+                TimelineView(.periodic(from: startedAt, by: 0.5)) { context in
+                    Text(model.display.localizedFormat("この行の経過 %.1f秒", max(0, context.date.timeIntervalSince(startedAt))))
+                        .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
+                        .inkuTooltip(tip("この行を描き始めてからの時間です。写生・色カタログ・指示書生成と各応答待ちを含みます。"))
+                }
+            }
+            if automation.batchRowStartedAt != nil { ProviderProgressView(model: model) }
+        }
+    }
+
     private func stateLabel(_ state: BatchRow.State) -> String {
         switch state {
         case .waiting: "待機"; case .running: "生成中"; case .succeeded: "成功"

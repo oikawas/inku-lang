@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: remove files already created if a multi-work export fails partway through.
+
 - macOS: align sketch notes with Web and display each frozen batch model correctly.
 
 - macOS: align instruction title line breaks and BOM handling with the shared core.

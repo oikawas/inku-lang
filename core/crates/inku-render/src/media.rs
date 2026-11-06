@@ -202,14 +202,8 @@ fn mix(a: &str, b: &str, t: f64) -> String {
 
 /// An open path through `points`, for strokes laid on top of a mark.
 fn polyline_path(points: &[Point]) -> Element {
-    let mut d = String::new();
-    for (index, point) in points.iter().enumerate() {
-        d.push_str(if index == 0 { "M " } else { " L " });
-        d.push_str(&n(point.x));
-        d.push(' ');
-        d.push_str(&n(point.y));
-    }
-    path(&d)
+    Element::new("path")
+        .attr("d", crate::svg::open_polyline_path(points))
         .attr("fill", "none")
         .attr("stroke-linecap", "round")
         .attr("stroke-linejoin", "round")
@@ -238,17 +232,7 @@ fn n(value: f64) -> String {
 }
 
 fn closed_d(points: &[Point]) -> String {
-    let mut d = String::new();
-    for (index, point) in points.iter().enumerate() {
-        d.push_str(if index == 0 { "M " } else { " L " });
-        d.push_str(&n(point.x));
-        d.push(' ');
-        d.push_str(&n(point.y));
-    }
-    if !points.is_empty() {
-        d.push_str(" Z");
-    }
-    d
+    crate::svg::closed_polyline_path(points)
 }
 
 fn bounds(points: &[Point]) -> (f64, f64, f64, f64) {

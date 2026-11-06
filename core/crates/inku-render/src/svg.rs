@@ -184,7 +184,7 @@ impl Document {
 
     #[must_use]
     pub fn serialize(&self) -> String {
-        let mut output = String::with_capacity(4096);
+        let mut output = String::with_capacity(self.root.unescaped_len().max(4096));
         self.root.write(&mut output);
         output
     }

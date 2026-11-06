@@ -149,8 +149,6 @@ public final class AppModel {
         request.descriptionReview = SettingsModel.isRegisteredModelAvailable(request.models.stage1Model, purpose: "vision", settings: settings)
     }
     public var sketchText = ""
-    public var variationAmplitude = "small"
-    public var variationSeedText = ""
     public var selectedHoleIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
     public private(set) var restorationRevision: UInt64 = 0
@@ -1350,11 +1348,11 @@ public final class AppModel {
 
     /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.
     public func makeDrawingAdjustmentPlans(work: SavedWork, kind: String, count: Int,
-                                           amplitude: String = "medium", wildOverride: Bool? = nil,
+                                           wildOverride: Bool? = nil,
                                            modelReference: String? = nil,
                                            recomposeMode: Recomposition.Mode = .principled) async throws -> [DrawingAdjustmentPlan] {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
-        guard ["layout_change", "variation"].contains(kind) else { throw HostError("unknown_refinement_kind") }
+        guard kind == "layout_change" else { throw HostError("unknown_refinement_kind") }
         guard [1, 4].contains(count) else { throw HostError("invalid_adjustment_count") }
         let drawing = nextGenerationHostSettings
         let selected = currentDrawOptions
@@ -1366,24 +1364,6 @@ public final class AppModel {
         let baseOptions = try ExactJSON(data: saved.renderOptions)
         guard baseOptions["catalog_id"].string != nil, baseOptions["resolved_color_map"].object != nil else {
             throw HostError("saved_refinement_options_unavailable")
-        }
-        if kind == "variation" {
-            guard ["small", "medium", "large"].contains(amplitude) else { throw HostError("invalid_variation") }
-            var seeds: Set<UInt64> = []
-            var plans: [DrawingAdjustmentPlan] = []
-            for _ in 0..<count {
-                var seed: UInt64
-                repeat { seed = UInt64.random(in: 1...((UInt64(1) << 31) - 1)) } while seeds.contains(seed)
-                seeds.insert(seed)
-                let metadata: ExactJSON = .object(["variation_amplitude": .string(amplitude), "variation_seed": .number(String(seed))])
-                // The current shared core's Stage 1.5 variation is a no-op; preserve the Score and actual model facts.
-                let replay = try await host.makeSavedScoreReplayPlan(workID: source.id, wild: wildOverride,
-                    derivationKind: kind, derivationMetadata: metadata.data, variationAmplitude: amplitude, variationSeed: String(seed))
-                try Task.checkCancellation()
-                plans.append(DrawingAdjustmentPlan(stage1Model: source.stage1Model, stage2Model: source.stage2Model,
-                    parent: source, operation: .replay(replay)))
-            }
-            return plans
         }
         guard let document = saved.document, let ddl = source.ddl, !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw HostError("saved_document_unavailable")
@@ -1517,11 +1497,11 @@ public final class AppModel {
         throw HostError("provider_selection_required")
     }
 
-    public func makeRefinementRequest(work: SavedWork, kind: String, amplitude: String = "medium",
+    public func makeRefinementRequest(work: SavedWork, kind: String,
                                       modelReference: String? = nil, catalogIDOverride: String? = nil,
                                       wildOverride: Bool? = nil) async throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
-        guard ["layout_change", "catalog_change", "variation", "model_comparison"].contains(kind) else {
+        guard ["layout_change", "catalog_change", "model_comparison"].contains(kind) else {
             throw HostError("unknown_refinement_kind")
         }
         let saved = try await savedConfiguration(workID: work.id)
@@ -1544,7 +1524,6 @@ public final class AppModel {
             language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: renderSeed, wild: wildOverride ?? work.renderWild ?? false,
             settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind,
             catalogMode: reading ? self.catalogMode : "fixed", sketch: sketch,
-            variationAmplitude: kind == "variation" ? amplitude : nil, variationSeed: kind == "variation" ? fresh : nil,
             savedConfiguration: saved.configuration)
         var nextConfig = try ExactJSON(data: request.configuration)
         var nextOptions = try ExactJSON(data: request.renderOptions)
@@ -2237,20 +2216,6 @@ public final class AppModel {
                 self.selectedContext = try await host.savedAuthoringContext(workID: id)
             }
         }
-    }
-
-    public func varySelectedWork() async {
-        guard !isBusy, !isPreview, let selectedWork else { return }
-        do {
-            var request = try await makeRefinementRequest(work: selectedWork, kind: "variation", amplitude: variationAmplitude)
-            if !variationSeedText.isEmpty {
-                guard let seed = UInt64(variationSeedText), String(seed) == variationSeedText else { throw HostError("invalid_variation") }
-                var configuration = try ExactJSON(data: request.configuration)
-                configuration["compiler"]["stage15_variation"]["seed"] = .string(variationSeedText)
-                request.configuration = configuration.data
-            }
-            _ = await runAutomation(request: try await pinPersonalPlanRequests([request])[0])
-        } catch { report(error) }
     }
 
     public func replayWithCurrentOptions() async {

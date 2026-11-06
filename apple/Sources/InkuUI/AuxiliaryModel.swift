@@ -207,7 +207,7 @@ public final class AuxiliaryModel {
             let kind = orderedKinds.contains(suggestedKind) ? suggestedKind : (orderedKinds.first ?? AuxiliaryProvider.allowedKinds[0])
             let catalog = kind == "catalog_change" ? randomCatalog(app: app, parent: work) : nil
             var request = try await app.makeRefinementRequest(work: work, kind: kind,
-                amplitude: amplitude, modelReference: modelReference.isEmpty ? nil : modelReference,
+                modelReference: modelReference.isEmpty ? nil : modelReference,
                 catalogIDOverride: catalog,
                 wildOverride: inheritWild ? nil : wildOverride)
             request = try await app.pinPersonalPlanRequests([request])[0]

@@ -287,8 +287,6 @@ public struct SavedScoreReplayPlan: Sendable {
     let renderRequest: Data
     let derivationKind: String
     let derivationMetadata: Data?
-    let variationAmplitude: String?
-    let variationSeed: String?
     var retouchedSource: String? = nil
 }
 

@@ -251,7 +251,26 @@ public final class AutomationModel {
         if mode == "image" { return app.activeSingleInputMode == "image" }
         return mode == "description" && app.activeSingleInputMode != "image"
     }
-    public var batchText = ""
+    public var batchText = "" { didSet { if !batchText.utf8.elementsEqual(oldValue.utf8) { updateBatchLines() } } }
+    public private(set) var nonEmptyBatchCount = 0
+    public private(set) var paintableBatchCount = 0
+    @ObservationIgnored private var batchLineCache: [Data: Bool] = [:]
+    @ObservationIgnored private var paintableBatchEntries: [(line: Int, text: String)] = []
+
+    private func updateBatchLines() {
+        let entries = BatchInputLines.entries(in: batchText)
+        nonEmptyBatchCount = entries.count
+        var next: [Data: Bool] = [:]
+        let paintable = BatchInputLines.paintableEntries(entries) { text in
+            let key = Data(text.utf8)
+            let result = next[key] ?? batchLineCache[key] ?? DescriptionLabels.hasDrawableText(text)
+            next[key] = result
+            return result
+        }
+        batchLineCache = next
+        paintableBatchEntries = paintable
+        paintableBatchCount = paintable.count
+    }
     public var batchSketchMode = "off"
     public var demoSeedPhrase = "日本の四季を感じさせる文章を40語以内で生成" { didSet { persistDemoPreferences() } }
     /// The saved choice survives while its provider is temporarily unusable; only the shown value falls back.
@@ -308,7 +327,6 @@ public final class AutomationModel {
 
     public init() {}
     public var isOccupied: Bool { running || preparing || imageFolderBatch.running }
-    public var nonEmptyBatchCount: Int { BatchInputLines.entries(in: batchText).count }
     public var completedCount: Int { rows.filter { $0.state == .succeeded || $0.state == .skipped }.count }
     public var successfulCount: Int { rows.filter { $0.state == .succeeded }.count }
     public var failedCount: Int { rows.filter { $0.state == .failed }.count }
@@ -456,7 +474,7 @@ public final class AutomationModel {
             let originalText = batchText
             let catalogMode = app.catalogMode
             let sketchMode = app.sketchMode
-            let entries = BatchInputLines.paintableEntries(in: originalText)
+            let entries = paintableBatchEntries
             guard !entries.isEmpty else { throw HostError("empty_batch") }
             guard entries.count <= 1000 else { throw HostError("batch_exceeds_1000_rows") }
             let retries = min(5, max(0, app.display.preferences.batchRetries))

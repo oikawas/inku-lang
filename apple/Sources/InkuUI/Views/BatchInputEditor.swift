@@ -69,6 +69,7 @@ struct InkuEditorMark: Equatable {
 enum InkuEditorMarksKey: Equatable {
     case description, none
     case ddl(DdlHighlighter, [CompletionRangeState], String)
+    case ddlRevision(Int, Int, Bool, [CompletionRangeState], String)
 }
 
 struct InkuEditorMarksCache {
@@ -146,15 +147,25 @@ struct InkuTextEditor: View {
 
 /// Offsets address the original UTF-16 storage; the batch parser owns the line count.
 private struct BatchEditorLineIndex {
+    let source: String
     let starts: [Int]
     let count: Int
 
-    init(_ text: String) {
-        count = BatchInputLines.physicalLines(in: text).count
-        var offsets = [0]
-        var offset = 0
+    init(_ text: String, reusing previous: BatchEditorLineIndex? = nil) {
+        if let previous, previous.source.utf8.elementsEqual(text.utf8) { self = previous; return }
+        source = text
+        let old = previous.map { Array($0.source.utf16) } ?? []
+        let new = Array(text.utf16)
+        var common = 0
+        while common < min(old.count, new.count), old[common] == new[common] { common += 1 }
+        let firstChangedLine = previous.map { max(0, $0.line(containing: common) - 1) } ?? 0
+        let start = previous?.starts[firstChangedLine] ?? 0
+        var offsets = previous.map { Array($0.starts.prefix(firstChangedLine)) } ?? []
+        offsets.append(start)
+        var offset = start
         var previousWasCR = false
-        for scalar in text.unicodeScalars {
+        let startIndex = String.Index(utf16Offset: start, in: text)
+        for scalar in text[startIndex...].unicodeScalars {
             offset += scalar.value > 0xffff ? 2 : 1
             if previousWasCR && scalar.value == 0x0a {
                 offsets[offsets.count - 1] = offset
@@ -168,6 +179,7 @@ private struct BatchEditorLineIndex {
             previousWasCR = scalar.value == 0x0d
         }
         starts = offsets
+        count = offsets.count
     }
 
     func line(containing offset: Int) -> Int {
@@ -311,7 +323,9 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var typedInsertion = false
         private var programmaticEdit = false
         private var completionValues: [String: String] = [:]
+        private var completionLanguage: (source: Data, key: String, value: String)?
         private var marksCache = InkuEditorMarksCache()
+        private var descriptionLineMarks: [Data: [InkuEditorMark]] = [:]
         private var paintedNames: [NSRange]?
 
         init(text: Binding<String>) { self.text = text }
@@ -349,6 +363,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             ruler = nil
             settings = nil
             marksCache = InkuEditorMarksCache()
+            descriptionLineMarks.removeAll()
             paintedNames = nil
         }
 
@@ -406,7 +421,21 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         /// Temporary attributes paint without touching the text, its undo or the IME's marked range.
         private func applyMarks() {
             guard let editor, let settings, let layout = editor.layoutManager, !editor.hasMarkedText() else { return }
-            let changed = marksCache.update(source: editor.string, key: settings.marksKey, make: settings.marks)
+            let changed = marksCache.update(source: editor.string, key: settings.marksKey) { source in
+                guard settings.marksKey == .description else { return settings.marks(source) }
+                var next: [Data: [InkuEditorMark]] = [:]
+                var offset = 0
+                var result: [InkuEditorMark] = []
+                for line in source.components(separatedBy: "\n") {
+                    let key = Data(line.utf8)
+                    let local = next[key] ?? descriptionLineMarks[key] ?? InkuEditorMark.descriptionLabels(line)
+                    next[key] = local
+                    result += local.map { InkuEditorMark(range: NSRange(location: $0.range.location + offset, length: $0.range.length), style: $0.style) }
+                    offset += line.utf16.count + 1
+                }
+                descriptionLineMarks = next
+                return result
+            }
             let names = settings.rangeTable == nil ? [] : rangeState.names
             guard changed || paintedNames != names else { return }
             paintedNames = names
@@ -528,12 +557,21 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         }
 
         /// Web `ddlCompletions`: nothing while read-only, composing, or with the caret in an open range's numbers.
-        private func completionMatch() -> DdlCompletions.Match? {
+        private func completionMatch(resolvedLanguage: String? = nil) -> DdlCompletions.Match? {
             guard let editor, let completions = settings?.completions, editor.isEditable, !editor.hasMarkedText() else { return nil }
             let selection = editor.selectedRange()
             guard selection.length == 0 else { return nil }
             let body = rangeState.active.map { NSRange(location: $0.bodyStart, length: $0.bodyEnd - $0.bodyStart) }
-            return completions.match(text: editor.string, caret: selection.location, excluded: body)
+            let language = resolvedLanguage ?? completionLanguage(for: editor.string, completions: completions)
+            return completions.match(text: editor.string, caret: selection.location, excluded: body, resolvedLanguage: language)
+        }
+
+        private func completionLanguage(for text: String, completions: DdlCompletions) -> String {
+            let source = Data(text.utf8)
+            if let cached = completionLanguage, cached.source == source, cached.key == completions.languageKey { return cached.value }
+            let value = completions.language(text)
+            completionLanguage = (source, completions.languageKey, value)
+            return value
         }
 
         /// Web `activateOnTyping`: the list opens as the author types a word some candidate starts with. No item is
@@ -550,13 +588,13 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
         func textView(_ textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
                       indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String] {
-            guard settings?.completions != nil else { return words }
-            guard let match = completionMatch(), match.range == charRange else { return [] }
+            guard let editor, let completions = settings?.completions else { return words }
+            let language = completionLanguage(for: editor.string, completions: completions)
+            guard let match = completionMatch(resolvedLanguage: language), match.range == charRange else { return [] }
             index?.pointee = -1
-            guard let editor, let completions = settings?.completions else { return match.items }
             completionValues.removeAll()
             return match.items.map { item in
-                let label = completions.presentation(for: item, text: editor.string)
+                let label = completions.presentation(for: item, text: editor.string, resolvedLanguage: language)
                 completionValues[label] = item
                 return label
             }
@@ -623,7 +661,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
         private func refreshLayout() {
             guard let editor else { return }
-            ruler?.lineIndex = BatchEditorLineIndex(editor.string)
+            if let ruler { ruler.lineIndex = BatchEditorLineIndex(editor.string, reusing: ruler.lineIndex) }
             scroll?.resizeDocument()
             ruler?.needsDisplay = true
         }
@@ -650,6 +688,7 @@ private final class BatchEditorTextView: NSTextView {
     var onHover: ((Int?) -> Void)?
     var hoverEnabled = true { didSet { if oldValue != hoverEnabled { updateTrackingAreas() } } }
     private var hoverArea: NSTrackingArea?
+    private var lastHoverIndex: Int?
     /// The word the completion list replaces; nil leaves completion off (the system's word range is not used).
     var completionRange: (() -> NSRange?)?
     var normalizeCompletion: ((String) -> String)?
@@ -686,10 +725,15 @@ private final class BatchEditorTextView: NSTextView {
         super.mouseMoved(with: event)
         guard onHover != nil else { return }
         let point = convert(event.locationInWindow, from: nil)
-        onHover?(characterIndexForInsertion(at: point))
+        let index = characterIndexForInsertion(at: point)
+        guard lastHoverIndex != index else { return }
+        lastHoverIndex = index
+        onHover?(index)
     }
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
+        guard lastHoverIndex != nil else { return }
+        lastHoverIndex = nil
         onHover?(nil)
     }
     override func unmarkText() {
@@ -972,7 +1016,7 @@ private final class BatchIOSTextView: UITextView {
     }
 
     func refreshGutter() {
-        lineIndex = BatchEditorLineIndex(text ?? "")
+        lineIndex = BatchEditorLineIndex(text ?? "", reusing: lineIndex)
         if let font { numberFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil) }
         let number = batchNumberLine(max(1, lineIndex.count), font: numberFont, color: UIColor.secondaryLabel.cgColor)
         let width = max(34, ceil(CGFloat(CTLineGetTypographicBounds(number, nil, nil, nil)) + 18))

@@ -258,6 +258,7 @@ struct ProviderModelsSheet: View {
     @Bindable var settings: SettingsModel
     @Environment(\.dismiss) private var dismiss
     @State private var draft: ProviderModelsDraft
+    @State private var draftLoaded = false
     @State private var search = ""
     @State private var filter: ProviderModelFilter = .all
     @State private var isSaving = false
@@ -269,17 +270,15 @@ struct ProviderModelsSheet: View {
         self.providerID = providerID
         self.model = model
         self.settings = settings
-        let provider = settings.host.providers.first { $0.id == providerID }
-        _draft = State(initialValue: ProviderModelsDraft(
-            models: provider.map { settings.catalogModels(for: $0) } ?? [],
-            enabled: provider?.enabledModels ?? [:]))
+        _draft = State(initialValue: .empty)
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        let visibleModels = self.visibleModels
+        return VStack(spacing: 0) {
             header
             Divider()
-            toolbar
+            toolbar(visibleModels)
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
@@ -296,6 +295,13 @@ struct ProviderModelsSheet: View {
         }
         .frame(minWidth: 690, idealWidth: 840, minHeight: 500, idealHeight: 680)
         .interactiveDismissDisabled(isWorking)
+        .task {
+            guard !draftLoaded else { return }
+            let provider = settings.host.providers.first { $0.id == providerID }
+            draft = ProviderModelsDraft(models: provider.map { settings.catalogModels(for: $0) } ?? [],
+                                        enabled: provider?.enabledModels ?? [:])
+            draftLoaded = true
+        }
     }
 
     private var provider: ProviderSettings? { settings.host.providers.first { $0.id == providerID } }
@@ -316,7 +322,7 @@ struct ProviderModelsSheet: View {
         }.padding(20)
     }
 
-    private var toolbar: some View {
+    private func toolbar(_ visibleModels: [ProviderModelSettings]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 HStack(spacing: 6) {

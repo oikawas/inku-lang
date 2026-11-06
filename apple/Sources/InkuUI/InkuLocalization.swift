@@ -23,9 +23,8 @@ public enum InkuLocalization {
         guard language == "en" else { return value }
         let direct = string(value, language: language)
         if direct != value { return direct }
-        for entry in statusFormats {
-            guard let regex = try? NSRegularExpression(pattern: entry.pattern),
-                  let match = regex.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) else { continue }
+        for (entry, regex) in compiledStatusFormats {
+            guard let match = regex.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) else { continue }
             var arguments: [CVarArg] = []
             for index in 1..<match.numberOfRanges {
                 guard let range = Range(match.range(at: index), in: value) else { continue }
@@ -41,6 +40,9 @@ public enum InkuLocalization {
         let pattern: String
         let key: String
         var localizedArguments: Set<Int> = []
+    }
+    private static let compiledStatusFormats: [(StatusFormat, NSRegularExpression)] = statusFormats.compactMap { entry in
+        (try? NSRegularExpression(pattern: entry.pattern)).map { (entry, $0) }
     }
     private static let statusFormats: [StatusFormat] = [
         .init(pattern: #"^画像をコピーしました（Y軸 ([0-9]+)px）$"#, key: "画像をコピーしました（Y軸 %@px）"),

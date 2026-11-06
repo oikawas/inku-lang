@@ -21,16 +21,20 @@ public enum ProviderModelOrdering {
 
 /// A sheet-local draft never changes persisted settings until its owner saves it.
 public struct ProviderModelsDraft: Sendable, Equatable {
-    public var models: [ProviderModelSettings]
-    public var enabled: [String: Bool]
+    public var models: [ProviderModelSettings] { didSet { if !updating { refreshOffered() } } }
+    public var enabled: [String: Bool] { didSet { if !updating { refreshOffered() } } }
     private let initialModels: [ProviderModelSettings]
     private let initialEnabled: [String: Bool]
+    private var offered: Set<String> = []
+    private var updating = false
+    public static let empty = ProviderModelsDraft(models: [], enabled: [:])
 
     public init(models: [ProviderModelSettings], enabled: [String: Bool]) {
         self.models = models
         self.enabled = enabled
         initialModels = models
         initialEnabled = enabled
+        refreshOffered()
     }
 
     public var isDirty: Bool { models != initialModels || enabled != initialEnabled }
@@ -42,10 +46,17 @@ public struct ProviderModelsDraft: Sendable, Equatable {
 
     public func isEnabled(modelID: String) -> Bool {
         guard let model = model(modelID: modelID), model.isPublishable else { return false }
-        let row: [String: Any] = ["id": "draft", "active": true, "models": [model.coreCatalogRecord], "enabled_models": enabled]
-        let answer = try? ProviderCoreSettings.call("model_offered", ["settings": ["providers": ["draft": row]], "order": ["draft"],
-            "provider": "draft", "model": modelID])
-        return answer?["offered"] as? Bool ?? false
+        return offered.contains(modelID)
+    }
+
+    private mutating func refreshOffered() {
+        let row: [String: Any] = ["id": "draft", "active": true, "models": models.map(\.coreCatalogRecord), "enabled_models": enabled]
+        // `model_offered` uses this same core provider_catalog operation with these options.
+        let answer = try? ProviderCoreSettings.call("provider_catalog", ["settings": ["providers": ["draft": row]], "order": ["draft"],
+            "include_disabled": false, "include_developer": true, "purpose": ""])
+        let groups = answer?["providers"] as? [[String: Any]] ?? []
+        let rows = groups.first?["models"] as? [[String: Any]] ?? []
+        offered = Set(rows.compactMap { $0["id"] as? String })
     }
 
     public func filteredModels(search: String, filter: ProviderModelFilter) -> [ProviderModelSettings] {
@@ -78,6 +89,8 @@ public struct ProviderModelsDraft: Sendable, Equatable {
         guard ["llm", "vision"].contains(purpose),
               let index = models.firstIndex(where: { $0.id == modelID }),
               Self.canEditPurposes(models[index]) else { return }
+        updating = true
+        defer { updating = false; refreshOffered() }
         if models[index].purposes.contains(purpose) {
             models[index].purposes.removeAll { $0 == purpose }
         } else {
@@ -94,7 +107,12 @@ public struct ProviderModelsDraft: Sendable, Equatable {
     }
 
     public mutating func setVisible(models visible: [ProviderModelSettings], enabled value: Bool) {
-        for model in visible { setEnabled(modelID: model.id, enabled: value) }
+        var next = enabled
+        for item in visible {
+            guard let model = model(modelID: item.id), !value || model.isPublishable else { continue }
+            next[model.id] = value
+        }
+        enabled = next
     }
 
     public mutating func updateModel(_ model: ProviderModelSettings) {

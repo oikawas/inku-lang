@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: avoid repeating unchanged calculations and image loads in input, generation details, and model settings.
+
 - Core: reduce repeated calculations and quadratic work without changing drawing or request output.
 
 - Server: route animation and card exports through render capacity, waiting or refusing when busy just like drawing. In a test database, peak RSS for an animation of 100 works fell from about 361 MB to 254 MB.

@@ -197,8 +197,13 @@ public final class AppModel {
     public private(set) var providerSettingsRevision = 0
     public private(set) var catalogs: [ColorCatalogOption] = []
     public private(set) var canvases: [CanvasOption] = []
-    public private(set) var saijiki: [SaijikiCategory] = []
-    public private(set) var pluginWords: [PluginWord] = []
+    public private(set) var saijiki: [SaijikiCategory] = [] {
+        didSet { saijikiRevision &+= 1; ddlHighlighter = DdlHighlighter(saijiki: saijiki); completionCache = nil }
+    }
+    public private(set) var pluginWords: [PluginWord] = [] { didSet { completionCache = nil } }
+    private(set) var saijikiRevision = 0
+    @ObservationIgnored private(set) var ddlHighlighter = DdlHighlighter(saijiki: [])
+    @ObservationIgnored private var completionCache: (disabled: [String], uiLanguage: String, language: String, value: DdlCompletions)?
     public private(set) var productReference: ProductReference?
     public private(set) var drawingLimitDefinition: DrawingLimitDefinition?
     public private(set) var importedMacroNames: [String] = []
@@ -248,6 +253,7 @@ public final class AppModel {
     @ObservationIgnored private var workActionReadsInFlight: Set<String> = []
     @ObservationIgnored private var workActionReadWaiters: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private var workActionReadToken = UUID()
+    @ObservationIgnored private var pluginWorkContexts: [String: SavedAuthoringContext] = [:]
     public let library = LibraryModel(includeListSVG: false)
     public let display = DisplaySettings()
     public let descriptionMeter = DescriptionMeterModel()
@@ -339,8 +345,17 @@ public final class AppModel {
         let config: ExactJSON
         let locks: ExactJSON
         let workContext: SavedAuthoringContext?
-        if let workID, let host { workContext = try? await host.savedAuthoringContext(workID: workID) }
-        else { workContext = selectedContext }
+        if let workID, let host {
+            if let cached = pluginWorkContexts[workID] {
+                workContext = cached
+            } else {
+                let token = workActionReadToken
+                let loaded = try? await host.savedAuthoringContext(workID: workID)
+                guard token == workActionReadToken, !Task.isCancelled else { return [] }
+                if let loaded { pluginWorkContexts[workID] = loaded }
+                workContext = loaded
+            }
+        } else { workContext = selectedContext }
         let current = workID == nil ? currentView : nil
         if let configData = current?.configurationJSON ?? workContext?.configuration,
            let documentData = current?.documentJSON ?? workContext?.document,
@@ -2414,6 +2429,7 @@ public final class AppModel {
             displayLabelReads = []
             workActionReadsInFlight = []
             workActionReadToken = UUID()
+            pluginWorkContexts.removeAll()
             await library.resetAfterRestore()
             await thumbnails.synchronize()
             restorationRevision &+= 1
@@ -2799,8 +2815,12 @@ extension AppModel {
 
     /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.
     public var ddlCompletions: DdlCompletions {
-        let disabled = settings.plugins?.disabledPackageIDs ?? []
-        return DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: display.preferences.language) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+        let disabled = (settings.plugins?.disabledPackageIDs ?? []).sorted()
+        let uiLanguage = display.preferences.language
+        if let cached = completionCache, cached.disabled == disabled, cached.uiLanguage == uiLanguage, cached.language == language { return cached.value }
+        let value = DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: uiLanguage, languageKey: language + "|" + uiLanguage) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+        completionCache = (disabled, uiLanguage, language, value)
+        return value
     }
 
     private func chooseCanvasFit(source: String, recordedWork: SavedWork? = nil, paperID: String,

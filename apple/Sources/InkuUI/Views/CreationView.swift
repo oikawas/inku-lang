@@ -69,6 +69,10 @@ struct CreationView: View {
     @State private var showImageModelPicker = false
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
+    #if os(macOS)
+    @State private var imagePreview: NSImage?
+    @State private var savedImageRecord: ExactJSON?
+    #endif
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
     @State private var batchKind = "description"
     @State private var pendingImageBatchRestart: Bool?
@@ -78,8 +82,6 @@ struct CreationView: View {
     @State private var rightPanelWidth: CGFloat = 0
     @State private var rightPanelHeight: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
-    @State private var workspaceContext: SavedAuthoringContext?
-    @State private var workspaceContextWorkID: String?
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
     @State private var lineageMounted = false
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
@@ -200,6 +202,10 @@ struct CreationView: View {
             }
         }
         .onDisappear { batchWorkspace.invalidateReads() }
+        #if os(macOS)
+        .onChange(of: model.imageInput?.jpeg, initial: true) { _, data in imagePreview = data.flatMap(NSImage.init(data:)) }
+        .onChange(of: model.savedImageDDL, initial: true) { _, data in savedImageRecord = data.flatMap { try? ExactJSON(data: $0) } }
+        #endif
         .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
         .task(id: workspaceWork?.lineageNodeID) {
             workspaceGeneration = nil
@@ -210,11 +216,8 @@ struct CreationView: View {
             workspaceGeneration = (nodeID, generation)
         }
         .task(id: workspaceWork?.id) {
-            workspaceContext = nil; workspaceContextWorkID = nil
             guard let work = workspaceWork else { return }
-            let context = try? await model.savedConfiguration(workID: work.id)
-            guard !Task.isCancelled, workspaceWork?.id == work.id else { return }
-            workspaceContext = context; workspaceContextWorkID = work.id
+            _ = try? await model.savedConfiguration(workID: work.id)
         }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
@@ -410,11 +413,11 @@ struct CreationView: View {
                 Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }
-            if let image = model.imageInput, let preview = NSImage(data: image.jpeg) {
+            if model.imageInput != nil, let preview = imagePreview {
                 Image(nsImage: preview).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 220)
                 Text(model.imageFileName).inkuFont(12).foregroundStyle(.secondary)
             }
-            if let data = model.savedImageDDL, let record = try? ExactJSON(data: data) {
+            if let record = savedImageRecord {
                 if let ddl = model.selectedWork?.ddl {
                     Text(display.localized("指示書")).inkuFont(14, weight: .semibold)
                     Text(ddl).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)

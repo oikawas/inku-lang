@@ -6,6 +6,7 @@ import SwiftUI
 struct SavedScoreVariantView: View {
     @Bindable var model: AppModel
     @State private var change: SavedScoreVariantModel
+    @State private var groundMaterial = "plain"
     @Environment(\.dismiss) private var dismiss
     private let onCommitted: (SavedWork) -> Void
     init(model: AppModel, work: SavedWork, kind: SavedScoreVariantKind, onCommitted: @escaping (SavedWork) -> Void = { _ in }) {
@@ -59,6 +60,9 @@ struct SavedScoreVariantView: View {
                 } })
         }
         .task { await change.initialize(app: model) }
+        .onChange(of: change.work.score, initial: true) { _, score in
+            groundMaterial = (try? ExactJSON(data: Data(score.utf8)))?["canvas"]["ground"]["material"].string ?? "plain"
+        }
         .interactiveDismissDisabled(change.running || change.hasUnsaved || model.isBusy)
         .onDisappear { Task { await change.stop(app: model); change.discardCandidates() } }
     }
@@ -67,9 +71,7 @@ struct SavedScoreVariantView: View {
         return model.catalogs.first { $0.id == id }?.name ?? id
     }
     private var currentGround: String {
-        let score = try? ExactJSON(data: Data(change.work.score.utf8))
-        let current = score?["canvas"]["ground"]["material"].string ?? "plain"
-        return (try? RefinementResources.grounds())?.first { $0.value == current }?.name(language: model.display.preferences.language)
+        return (try? RefinementResources.grounds())?.first { $0.value == groundMaterial }?.name(language: model.display.preferences.language)
             ?? model.display.localized("無地（指定なし）")
     }
 }

@@ -26,7 +26,15 @@ public enum BatchInputLines {
     /// numbered over every physical line. A line left with nothing to draw once the author's numbers and comments are
     /// cut is not sent, and its number is skipped, so a work still carries the line it was written on.
     public static func paintableEntries(in text: String) -> [(line: Int, text: String)] {
-        entries(in: text).filter { DescriptionLabels.hasDrawableText($0.text) }
+        paintableEntries(in: text, isPaintable: DescriptionLabels.hasDrawableText)
+    }
+
+    static func paintableEntries(in text: String, isPaintable: (String) -> Bool) -> [(line: Int, text: String)] {
+        paintableEntries(entries(in: text), isPaintable: isPaintable)
+    }
+
+    static func paintableEntries(_ entries: [(line: Int, text: String)], isPaintable: (String) -> Bool) -> [(line: Int, text: String)] {
+        entries.filter { isPaintable($0.text) }
     }
 
     /// Web `batch.nonEmpty`: the count shown under the box, the same lines the run sends.

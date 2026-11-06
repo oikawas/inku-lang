@@ -21,7 +21,17 @@ public struct DDLPackageImport: Sendable, Equatable {
     public let language: String?
     public let plugins: [ImportedMacroDefinition]
     public let migratedEdits: Int?
-    public var names: [String] {
+    public private(set) var names: [String] = []
+
+    private init(source: String, language: String?, plugins: [ImportedMacroDefinition], migratedEdits: Int?) {
+        self.source = source
+        self.language = language
+        self.plugins = plugins
+        self.migratedEdits = migratedEdits
+        names = resolveNames()
+    }
+
+    private func resolveNames() -> [String] {
         let resolvedLanguage = language ?? InkuCore.resolveInstructionLanguage(text: source, requested: "auto", fallback: "ja") ?? "ja"
         guard let catalog = try? resolveCatalog(language: resolvedLanguage) else { return [] }
         let locks = (catalog["locks"].array ?? []).map { value -> ExactJSON in

@@ -51,6 +51,8 @@ struct ArtworkCanvas: View {
     @State private var dragOrigin = CGSize.zero
     @State private var imageAspect: CGFloat = 1
     @State private var fitZoom: CGFloat = 1
+    @State private var svgKey = 0
+    @State private var verticalCaption = false
 
     private var scale: CGFloat {
         get { viewport?.wrappedValue.scale ?? localViewport.scale }
@@ -62,16 +64,17 @@ struct ArtworkCanvas: View {
     }
 
     var body: some View {
-        switch style {
+        Group { switch style {
         case .embedded: embeddedBody
         case .workspace: workspaceBody
-        }
+        } }
+        .onChange(of: caption, initial: true) { _, value in verticalCaption = CanvasInteraction.supportsVerticalCaption(value) }
     }
 
     /// A kept viewport belongs to one picture; the gesture origins resume from it.
     private func adoptViewport() {
         guard let viewport else { return }
-        let key = svg.hashValue
+        let key = svgKey
         if viewport.wrappedValue.svgKey != key { viewport.wrappedValue = CanvasViewport(svgKey: key) }
         gestureScale = scale; dragOrigin = offset
     }
@@ -83,7 +86,7 @@ struct ArtworkCanvas: View {
                 if let replacement {
                     // The replacement takes the pointer and the wheel; the caption stays over it, as on the Web.
                     // A kept zoom of the previous picture, not yet reset for this one, counts as the fit.
-                    let current = viewport.map { $0.wrappedValue.svgKey == svg.hashValue } ?? true
+                    let current = viewport.map { $0.wrappedValue.svgKey == svgKey } ?? true
                     ZStack {
                         replacement.content(geometry.size, fit.box, current ? scale : 1, current ? offset : .zero)
                         if display.preferences.captionVisible, !caption.isEmpty { workspaceCaption(size: geometry.size) }
@@ -100,8 +103,8 @@ struct ArtworkCanvas: View {
         .overlay(alignment: zoomControlsAtTop ? .top : .bottom) {
             if showsZoomControls { zoomCapsule.padding(zoomControlsAtTop ? .top : .bottom, 14) }
         }
-        .onAppear { adoptViewport() }
-        .onChange(of: svg) { _, _ in picture.clear(); reset() }
+        .onAppear { svgKey = svg.hashValue; adoptViewport() }
+        .onChange(of: svg) { _, value in svgKey = value.hashValue; picture.clear(); reset() }
     }
 
     /// The Web fit for this canvas: the saved proportion, or the picture's own until a saved one is known.
@@ -314,7 +317,7 @@ struct ArtworkCanvas: View {
         HStack(alignment: .bottom) {
             if display.preferences.captionPosition == "right" { Spacer(minLength: 0) }
             Group {
-                if display.preferences.captionVertical && CanvasInteraction.supportsVerticalCaption(caption) {
+                if display.preferences.captionVertical && verticalCaption {
                     VerticalCaption(text: caption)
                         .frame(width: min(170, size.width * 0.28), height: min(320, size.height * 0.8))
                 } else {
@@ -333,7 +336,7 @@ struct ArtworkCanvas: View {
     private func workspaceCaption(size: CGSize) -> some View {
         let right = display.preferences.captionPosition == "right"
         return Group {
-            if display.preferences.captionVertical && CanvasInteraction.supportsVerticalCaption(caption) {
+            if display.preferences.captionVertical && verticalCaption {
                 VerticalCaption(text: caption, color: Color(white: 0.99))
                     .frame(width: min(size.width * 0.4, 13 * 14 * 1.55), height: max(80, size.height - 116))
                     .padding(.vertical, 9).padding(.horizontal, 14)
@@ -372,7 +375,7 @@ struct ArtworkCanvas: View {
     }
     private func reset() {
         scale = 1; gestureScale = 1; offset = .zero; dragOrigin = .zero
-        viewport?.wrappedValue.svgKey = svg.hashValue
+        viewport?.wrappedValue.svgKey = svgKey
     }
 }
 

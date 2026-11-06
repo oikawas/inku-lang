@@ -15,15 +15,17 @@ struct DdlEditorPane: View {
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
     @State private var pluginCalls: [PluginCall] = []
+    @State private var pluginCallsRevision = 0
     @State private var pluginSource = ""
     @State private var hoverIndex: Int?
+    @State private var instructionLanguage = "ja"
     @Environment(\.inkuTooltipsCovered) private var tooltipsCovered
     @State private var rangeStatus = RangeEditorStatus()
     /// Web DdlEditorDialog: an invalid range or an IME composition holds the draw back.
     var onRangeBlocked: ((Bool) -> Void)?
     var onRangePreview: ((CompositionRanges.Preview?) -> Void)?
     private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
-    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, calls: pluginSource == text ? pluginCalls : []) }
+    private var highlighter: DdlHighlighter { model.ddlHighlighter.withCalls(pluginSource == text ? pluginCalls : []) }
 
     init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
          onRangeBlocked: ((Bool) -> Void)? = nil, onRangePreview: ((CompositionRanges.Preview?) -> Void)? = nil) {
@@ -55,7 +57,7 @@ struct DdlEditorPane: View {
                     }.frame(height: showVocabulary ? max(160, geometry.size.height * (showGuide || !unknownNames.isEmpty ? 0.46 : 0.50)) : nil)
                     if showVocabulary {
                         SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
-                            wordLanguage: model.instructionLanguage(for: text), inline: true)
+                            wordLanguage: instructionLanguage, inline: true)
                             .disabled(disabled)
                     }
                 }
@@ -63,6 +65,9 @@ struct DdlEditorPane: View {
         }
         .onChange(of: invalidSource || rangeStatus.composing, initial: true) { _, blocked in onRangeBlocked?(blocked) }
         .onDisappear { onRangePreview?(nil) }
+        .onChange(of: text, initial: true) { _, value in instructionLanguage = model.instructionLanguage(for: value) }
+        .onChange(of: model.language) { _, _ in instructionLanguage = model.instructionLanguage(for: text) }
+        .onChange(of: display.preferences.language) { _, _ in instructionLanguage = model.instructionLanguage(for: text) }
     }
 
     /// `.ddl-editor-toolbar`: the language label with its tooltip, the switches, and the status at the right.
@@ -70,7 +75,7 @@ struct DdlEditorPane: View {
         let lines = text.components(separatedBy: "\n").count
         let characters = text.utf16.count
         return HStack(spacing: 8) {
-            Text(display.localized(model.instructionLanguage(for: text) == "ja" ? "指示書（日本語DDL）" : "指示書（英語DDL）"))
+            Text(display.localized(instructionLanguage == "ja" ? "指示書（日本語DDL）" : "指示書（英語DDL）"))
                 .inkuFont(12, weight: .medium).foregroundStyle(.secondary).lineLimit(1)
                 .inkuTooltip(display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
             Button(display.webCopy("ddlEditorVocabulary", "歳時記の語彙")) { showVocabulary.toggle() }
@@ -92,7 +97,7 @@ struct DdlEditorPane: View {
                            style: .ddl, marks: { [highlighter, completionStates, completionSource] source in
                                // Tags describe the text they were read for and vanish once it changes (Web).
                                highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
-                           }, marksKey: .ddl(highlighter, completionStates, completionSource), insertion: $insertion,
+                           }, marksKey: .ddlRevision(model.saijikiRevision, pluginCallsRevision, pluginSource == text, completionStates, completionSource), insertion: $insertion,
                            rangeTable: CompositionRanges.table,
                            onRangeStatus: { status in
                                rangeStatus = status
@@ -123,7 +128,7 @@ struct DdlEditorPane: View {
             let source = text
             let calls = await model.pluginCalls(source: source)
             guard !Task.isCancelled, text == source else { return }
-            pluginCalls = calls; pluginSource = source
+            pluginCalls = calls; pluginCallsRevision &+= 1; pluginSource = source
             completionStates = model.completionRangeStates(source: source)
             completionSource = source
         }

@@ -15,7 +15,9 @@ public struct ProviderModelInfo: Identifiable, Sendable {
 /// Editable service settings contain no readable credential value.
 @MainActor @Observable
 public final class SettingsModel {
-    public var host = HostSettings()
+    public var host = HostSettings() {
+        didSet { if host != oldValue { publishedCache.removeAll() } }
+    }
     public var selectedProviderID: String? {
         didSet {
             guard oldValue != selectedProviderID else { return }
@@ -42,6 +44,7 @@ public final class SettingsModel {
     @ObservationIgnored private var discovery: Task<[FetchedProviderModel], Error>?
     @ObservationIgnored private var discoveryID: UUID?
     @ObservationIgnored private var isSaving = false
+    @ObservationIgnored private var publishedCache: [(provider: ProviderSettings, purpose: String?, models: [ProviderModelSettings])] = []
     public init(credentials: any ProviderCredentialStore = KeychainCredentialStore()) { self.credentials = credentials }
 
     public var providerIndex: Int? { host.providers.firstIndex { $0.id == selectedProviderID && $0.kind != .chatGPTPlan } }
@@ -61,8 +64,11 @@ public final class SettingsModel {
     }
 
     public func publishedModels(for provider: ProviderSettings, purpose: String? = nil) -> [ProviderModelSettings] {
-        if provider.kind == .chatGPTPlan { return catalogModels(for: provider).filter { $0.isPublishable && (purpose.map($0.offers) ?? true) } }
-        return ProviderCoreSettings.catalogModels(provider, purpose: purpose).filter { $0.isPublishable && (purpose.map($0.offers) ?? true) }
+        if let cached = publishedCache.first(where: { $0.provider == provider && $0.purpose == purpose }) { return cached.models }
+        let models = provider.kind == .chatGPTPlan ? catalogModels(for: provider) : ProviderCoreSettings.catalogModels(provider, purpose: purpose)
+        let published = models.filter { $0.isPublishable && (purpose.map($0.offers) ?? true) }
+        publishedCache.append((provider, purpose, published))
+        return published
     }
 
     public func isModelAvailable(_ reference: String) -> Bool {

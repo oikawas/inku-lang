@@ -10,10 +10,11 @@ struct DdlBoxEditor: View {
     let work: SavedWork
     let editable: Bool
     @State private var pluginCalls: [PluginCall] = []
+    @State private var pluginCallsRevision = 0
     @State private var pluginSource = ""
     @State private var hoverIndex: Int?
     @Environment(\.inkuTooltipsCovered) private var tooltipsCovered
-    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, calls: pluginSource == text ? pluginCalls : []) }
+    private var highlighter: DdlHighlighter { model.ddlHighlighter.withCalls(pluginSource == text ? pluginCalls : []) }
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
     @State private var rangeStatus = RangeEditorStatus()
@@ -36,7 +37,7 @@ struct DdlBoxEditor: View {
                            marks: { [highlighter, completionStates, completionSource] source in
                                highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
                            },
-                           marksKey: .ddl(highlighter, completionStates, completionSource),
+                           marksKey: .ddlRevision(model.saijikiRevision, pluginCallsRevision, pluginSource == text, completionStates, completionSource),
                            insertion: Binding(get: { model.ddlBoxInsertion }, set: { model.ddlBoxInsertion = $0 }),
                            rangeTable: CompositionRanges.table,
                            onRangeStatus: { status in
@@ -69,7 +70,7 @@ struct DdlBoxEditor: View {
             let source = text
             let calls = await model.pluginCalls(source: source, workID: work.id)
             guard !Task.isCancelled, text == source else { return }
-            pluginCalls = calls; pluginSource = source
+            pluginCalls = calls; pluginCallsRevision &+= 1; pluginSource = source
             completionStates = model.completionRangeStates(source: source)
             completionSource = source
         }

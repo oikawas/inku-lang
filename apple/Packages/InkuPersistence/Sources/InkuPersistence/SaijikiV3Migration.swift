@@ -6,11 +6,12 @@ import InkuCore
 enum SaijikiV3Migration {
     static func run(_ db: Database) throws -> Data {
         let started = Date()
-        var records: [String: [(String, String, Data, Data)]] = [:]
-        for row in try Row.fetchAll(db, sql: "SELECT execution_id, effect_id, acknowledgement, save_payload FROM effect_acknowledgements") {
-            let ack: Data = row["acknowledgement"], payload: Data = row["save_payload"]
+        var records: [String: [(String, String)]] = [:]
+        let acknowledgementRows = try Row.fetchCursor(db, sql: "SELECT execution_id, effect_id, acknowledgement FROM effect_acknowledgements")
+        while let row = try acknowledgementRows.next() {
+            let ack: Data = row["acknowledgement"]
             if let id = try value(db, ack, "$.work_id") {
-                records[id, default: []].append((row["execution_id"], row["effect_id"], ack, payload))
+                records[id, default: []].append((row["execution_id"], row["effect_id"]))
             }
         }
         var changed = 0, already = 0, ddlChanged = 0
@@ -18,14 +19,20 @@ enum SaijikiV3Migration {
         var replacements: [String: Int] = [:]
         var unassociatedTools: [[String: Any]] = [], unassociatedSweeps: [[String: Any]] = []
         var unadjusted: [[String: Any]] = []
-        let works = try Row.fetchAll(db, sql: "SELECT id, ddl FROM history")
-        for row in works {
+        var workCount = 0
+        let works = try Row.fetchCursor(db, sql: "SELECT id, ddl FROM history")
+        while let row = try works.next() {
+            workCount += 1
             let id: String = row["id"]
             func refuse(_ reason: String) { refusals.append(["id": id, "reason": reason]) }
             guard let source: String = row["ddl"], let matches = records[id], matches.count == 1 else {
                 refuse("missing_or_ambiguous_context"); continue
             }
-            let (execution, effect, ack, payload) = matches[0]
+            let (execution, effect) = matches[0]
+            guard let saved = try Row.fetchOne(db, sql: "SELECT acknowledgement, save_payload FROM effect_acknowledgements WHERE execution_id = ? AND effect_id = ?", arguments: [execution, effect]) else {
+                throw PersistenceError.corruptDatabase
+            }
+            let ack: Data = saved["acknowledgement"], payload: Data = saved["save_payload"]
             guard try value(db, ack, "$.performance.document.source") == source,
                   try value(db, payload, "$.work.ddl") == source else {
                 refuse("inconsistent_source"); continue
@@ -97,7 +104,7 @@ enum SaijikiV3Migration {
                 }
             }
         }
-        let report: [String: Any] = ["schema": "inku.saijiki-v3-v7-report.v1", "works": works.count,
+        let report: [String: Any] = ["schema": "inku.saijiki-v3-v7-report.v1", "works": workCount,
             "changed": changed, "ddl_changed": ddlChanged, "already": already, "refused": refusals,
             "replacements": replacements, "unassociated_tools": unassociatedTools,
             "unassociated_sweeps": unassociatedSweeps, "unadjusted_thinness": unadjusted,

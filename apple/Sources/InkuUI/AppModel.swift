@@ -764,6 +764,10 @@ public final class AppModel {
         activeOperation = nil
         activeExecutionID = nil
         generationToken = nil
+        progressJournals.removeAll()
+        providerModelsByExecution.removeAll()
+        chatGPTFailureCodes.removeAll()
+        journalExecutionID = nil
         activeSingleInputMode = nil
         stopping = false
         isBusy = false
@@ -2356,6 +2360,10 @@ public final class AppModel {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do {
             try await host.cancelAll()
+            progressJournals.removeAll()
+            providerModelsByExecution.removeAll()
+            chatGPTFailureCodes.removeAll()
+            journalExecutionID = nil
             try await database.restore(from: url)
             displayToken = UUID()
             activeExecutionID = nil

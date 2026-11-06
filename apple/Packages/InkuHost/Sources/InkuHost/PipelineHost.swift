@@ -12,6 +12,8 @@ public actor PipelineHost {
     private let credentials: any CredentialStore
     private let svgLimitBytes: @Sendable () async throws -> UInt64
     private var executions: [String: ExecutionDriver] = [:]
+    private var executionUsers: [String: Int] = [:]
+    var activeExecutionCount: Int { executions.count }
     public init(database: InkuDatabase, transport: (any ProviderTransport)? = nil,
                 credentials: any CredentialStore = KeychainCredentialStore(),
                 svgLimitBytes: @escaping @Sendable () async throws -> UInt64 = { try SVGGenerationLimit.bytes(nil) }) {
@@ -57,6 +59,8 @@ public actor PipelineHost {
         let driver = try ExecutionDriver(request: request, image: image, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
         let started = try await driver.start(progress: progress)
         executions[started.executionID] = driver
+        executionUsers[started.executionID, default: 0] += 1
+        defer { releaseExecution(started.executionID) }
         defer { Task { await driver.clearImages() } }
         try await onStarted?(started.executionID)
         try Task.checkCancellation()
@@ -71,7 +75,8 @@ public actor PipelineHost {
                         derivationMetadata: Data? = nil,
                         progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
         guard derivationKind != "variation" else { throw HostError("variation_retired") }
-        let driver = try await execution(executionID)
+        let driver = try await acquireExecution(executionID)
+        defer { releaseExecution(executionID) }
         return try await withTaskCancellationHandler {
             try await driver.perform(command, parentWorkID: parentWorkID, derivationKind: derivationKind,
                                      derivationMetadata: derivationMetadata, progress: progress)
@@ -95,19 +100,29 @@ public actor PipelineHost {
                 documentJSON: context["document"].data, deliveryJSON: nil, promptJSON: nil, holeIDs: [], candidateWork: stored.candidate.work,
                 providerMetrics: try metrics(in: context), phaseReason: nil)
         }
-        return try await execution(executionID).cancel(progress: { _ in })
+        let driver = try await acquireExecution(executionID)
+        defer { releaseExecution(executionID) }
+        return try await driver.cancel(progress: { _ in })
     }
 
     /// An explicit editor action can bind a previously unbound execution; an old pin is never replaced.
     public func bindPersonalPlanSession(executionID: String, session: ChatGPTPlanSession) async throws {
-        try await execution(executionID).bindPersonalPlanSession(session)
+        let driver = try await acquireExecution(executionID)
+        defer { releaseExecution(executionID) }
+        try await driver.bindPersonalPlanSession(session)
     }
     public func personalPlanContext(executionID: String, stage2: Bool) async throws -> (required: Bool, session: ChatGPTPlanSession?) {
-        try await execution(executionID).personalPlanContext(stage2: stage2)
+        let driver = try await acquireExecution(executionID)
+        defer { releaseExecution(executionID) }
+        return try await driver.personalPlanContext(stage2: stage2)
     }
 
     /// Restore is read-only: an unfinished paid call is never automatically repeated.
-    public func restore(executionID: String) async throws -> PipelineView { try await execution(executionID).view() }
+    public func restore(executionID: String) async throws -> PipelineView {
+        let driver = try await acquireExecution(executionID)
+        defer { releaseExecution(executionID) }
+        return try await driver.view()
+    }
 
     /// A committed work and its execution snapshot are saved together; never infer completion from a request alone.
     public func savedWorkForExecution(_ id: String) async throws -> SavedWork? {
@@ -120,7 +135,9 @@ public actor PipelineHost {
 
     /// An explicit resume finishes durable local effects only; provider work stays stopped.
     public func resume(executionID: String, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
-        try await execution(executionID).resume(progress: progress)
+        let driver = try await acquireExecution(executionID)
+        defer { releaseExecution(executionID) }
+        return try await driver.resume(progress: progress)
     }
 
     /// Restores stored Score and SVG without starting a new performance.
@@ -462,7 +479,9 @@ public actor PipelineHost {
                 node: stored.candidate.node, edge: stored.candidate.edge)
             return stored.candidate.work
         }
-        return try await execution(executionID).saveCandidate(expectedWorkID: expectedWorkID)
+        let driver = try await acquireExecution(executionID)
+        defer { releaseExecution(executionID) }
+        return try await driver.saveCandidate(expectedWorkID: expectedWorkID)
     }
 
     private func prepareCandidate(executionID: String, candidate: StoredCandidate) async throws -> PreparedCandidate {
@@ -565,6 +584,8 @@ public actor PipelineHost {
 
     public func cancelAll() async throws {
         for driver in executions.values { _ = try await driver.cancel(progress: { _ in }) }
+        executions.removeAll()
+        executionUsers.removeAll()
     }
 
     private func renderSavedLimited(_ input: Data, description: String) async throws -> ExactJSON {
@@ -589,13 +610,19 @@ public actor PipelineHost {
         return rendered
     }
 
-    private func execution(_ id: String) async throws -> ExecutionDriver {
-        if let current = executions[id] { return current }
+    private func acquireExecution(_ id: String) async throws -> ExecutionDriver {
+        if let current = executions[id] { executionUsers[id, default: 0] += 1; return current }
         guard let record = try await database.loadExecution(id: id) else { throw HostError("execution_not_found") }
         // Another reentrant load may already have installed the current actor.
-        if let current = executions[id] { return current }
+        if let current = executions[id] { executionUsers[id, default: 0] += 1; return current }
         let driver = try ExecutionDriver(record: record, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
-        executions[id] = driver; return driver
+        executions[id] = driver; executionUsers[id, default: 0] += 1; return driver
+    }
+
+    private func releaseExecution(_ id: String) {
+        guard let count = executionUsers[id] else { return }
+        if count > 1 { executionUsers[id] = count - 1 }
+        else { executionUsers.removeValue(forKey: id); executions.removeValue(forKey: id) }
     }
 }
 

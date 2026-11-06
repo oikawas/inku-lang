@@ -5,6 +5,25 @@ import InkuPersistence
 @testable import InkuHost
 
 final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
+    func testCompletedDriversAreReleasedAndCandidateCanBeReopened() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-driver-release-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let database = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let host = PipelineHost(database: database, transport: ImmediateProvider(), credentials: EmptyCredentials())
+        var request = try fixture(.description("a red circle", autoCatalog: false))
+        request.saveHistory = false
+        var views: [PipelineView] = []
+        for _ in 0..<3 { views.append(try await host.generate(request)) }
+        let afterGenerate = await host.activeExecutionCount
+        XCTAssertEqual(afterGenerate, 0)
+        let last = try XCTUnwrap(views.last)
+        let restored = try await host.restore(executionID: last.executionID)
+        XCTAssertEqual(restored.executionID, last.executionID)
+        let saved = try await host.saveCandidate(executionID: last.executionID)
+        XCTAssertEqual(saved.id, last.candidateWork?.id)
+        let afterRestore = await host.activeExecutionCount
+        XCTAssertEqual(afterRestore, 0)
+    }
     func testCancelledProviderPersistsFinalObservation() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-cancelled-observation-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }

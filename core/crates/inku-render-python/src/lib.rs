@@ -686,6 +686,25 @@ fn pipeline_description_label_spans(text: &str) -> PyResult<String> {
     })
 }
 
+#[pyfunction]
+fn pipeline_description_source_labels(text: &str) -> PyResult<String> {
+    catch_python_panic(|| {
+        Ok(inku_pipeline_uniffi::description_source_labels(
+            text.to_owned(),
+        ))
+    })
+}
+
+#[pyfunction]
+fn pipeline_description_rewords(text: &str, description: &str) -> PyResult<bool> {
+    catch_python_panic(|| {
+        Ok(inku_pipeline_uniffi::description_rewords(
+            text.to_owned(),
+            description.to_owned(),
+        ))
+    })
+}
+
 /// How the PNG's size follows the request (resvg's command line, as resvg_py
 /// does): no width or height keeps the SVG's size, one of them scales the
 /// other with the aspect, both fit the picture inside them.
@@ -956,6 +975,11 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(pipeline_description_label_spans, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pipeline_description_source_labels,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(pipeline_description_rewords, module)?)?;
     module.add_function(wrap_pyfunction!(
         pipeline_normalize_instruction_language,
         module

@@ -5,133 +5,342 @@
       "why": "a plain description is untouched",
       "text": "花の色はうつりにけりないたづらに",
       "pipeline": "花の色はうつりにけりないたづらに",
-      "spans": []
+      "spans": [],
+      "source_labels": []
     },
     {
       "why": "half-width number and full stop",
       "text": "1. 花の色はうつりにけりな",
       "pipeline": "花の色はうつりにけりな",
-      "spans": [[0, 3, "number"]]
+      "spans": [
+        [
+          0,
+          3,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "a leading zero is still a number",
       "text": "01. 花の色",
       "pipeline": "花の色",
-      "spans": [[0, 4, "number"]]
+      "spans": [
+        [
+          0,
+          4,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "full-width digits and a full-width stop",
       "text": "０１．花の色",
       "pipeline": "花の色",
-      "spans": [[0, 3, "number"]]
+      "spans": [
+        [
+          0,
+          3,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "an ideographic space is how a numbered line is written in Japanese",
       "text": "１　花の色",
       "pipeline": "花の色",
-      "spans": [[0, 2, "number"]]
+      "spans": [
+        [
+          0,
+          2,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "a closing parenthesis is a numbering too",
       "text": "12） 花の色",
       "pipeline": "花の色",
-      "spans": [[0, 4, "number"]]
+      "spans": [
+        [
+          0,
+          4,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "a colon as well",
       "text": "3: 花の色",
       "pipeline": "花の色",
-      "spans": [[0, 3, "number"]]
+      "spans": [
+        [
+          0,
+          3,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "a year is description, not a number label",
       "text": "2026年の春の雪",
       "pipeline": "2026年の春の雪",
-      "spans": []
+      "spans": [],
+      "source_labels": []
     },
     {
       "why": "a count is description: no separator follows the digit",
       "text": "3本の線を引く",
       "pipeline": "3本の線を引く",
-      "spans": []
+      "spans": [],
+      "source_labels": []
     },
     {
       "why": "a half-width space alone does not make a digit a label",
       "text": "3 本の線を引く",
       "pipeline": "3 本の線を引く",
-      "spans": []
+      "spans": [],
+      "source_labels": []
     },
     {
       "why": "a bracketed source is a comment",
       "text": "花の色はうつりにけりな [疎  紀友則 / 古今和歌集（春下）]",
       "pipeline": "花の色はうつりにけりな",
-      "spans": [[12, 32, "comment"]]
+      "spans": [
+        [
+          12,
+          32,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "疎  紀友則 / 古今和歌集（春下）"
+      ]
     },
     {
       "why": "full-width brackets are comments too",
       "text": "花の色［出典］",
       "pipeline": "花の色",
-      "spans": [[3, 7, "comment"]]
+      "spans": [
+        [
+          3,
+          7,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "出典"
+      ]
     },
     {
       "why": "a comment in the middle does not leave a double space",
       "text": "春の雪 [出典] が降る",
       "pipeline": "春の雪 が降る",
-      "spans": [[4, 8, "comment"]]
+      "spans": [
+        [
+          4,
+          8,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "出典"
+      ]
     },
     {
       "why": "both rules at once",
       "text": "01. 花の色はうつりにけりな [紀友則]",
       "pipeline": "花の色はうつりにけりな",
-      "spans": [[0, 4, "number"], [16, 21, "comment"]]
+      "spans": [
+        [
+          0,
+          4,
+          "number"
+        ],
+        [
+          16,
+          21,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "紀友則"
+      ]
     },
     {
       "why": "an unclosed bracket is description: it must not swallow the rest",
       "text": "花の色 [出典 が降る",
       "pipeline": "花の色 [出典 が降る",
-      "spans": []
+      "spans": [],
+      "source_labels": []
     },
     {
       "why": "every line of a batch carries its own number",
       "text": "1. 春の雪\n2. 夏の川\n3. 秋の月",
       "pipeline": "春の雪\n夏の川\n秋の月",
-      "spans": [[0, 3, "number"], [7, 10, "number"], [14, 17, "number"]]
+      "spans": [
+        [
+          0,
+          3,
+          "number"
+        ],
+        [
+          7,
+          10,
+          "number"
+        ],
+        [
+          14,
+          17,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "a comment may sit on a line of its own",
       "text": "春の雪\n[古今和歌集]\n降る",
       "pipeline": "春の雪\n\n降る",
-      "spans": [[4, 11, "comment"]]
+      "spans": [
+        [
+          4,
+          11,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "古今和歌集"
+      ]
     },
     {
       "why": "two comments on one line",
       "text": "[a]春の雪[b]",
       "pipeline": "春の雪",
-      "spans": [[0, 3, "comment"], [6, 9, "comment"]]
+      "spans": [
+        [
+          0,
+          3,
+          "comment"
+        ],
+        [
+          6,
+          9,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "a",
+        "b"
+      ]
     },
     {
       "why": "an empty description stays empty",
       "text": "",
       "pipeline": "",
-      "spans": []
+      "spans": [],
+      "source_labels": []
     },
     {
       "why": "a line that is only a label becomes empty, and the break is kept",
       "text": "1.\n春の雪",
       "pipeline": "\n春の雪",
-      "spans": [[0, 2, "number"]]
+      "spans": [
+        [
+          0,
+          2,
+          "number"
+        ]
+      ],
+      "source_labels": []
     },
     {
       "why": "only a newline starts a line: a number after U+2028 is description",
-      "text": "花\u20281. 月",
-      "pipeline": "花\u20281. 月",
-      "spans": []
+      "text": "花 1. 月",
+      "pipeline": "花 1. 月",
+      "spans": [],
+      "source_labels": []
     },
     {
       "why": "a lone carriage return does not close a comment's line",
       "text": "[a\rb]",
       "pipeline": "",
-      "spans": [[0, 5, "comment"]]
+      "spans": [
+        [
+          0,
+          5,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "a\rb"
+      ]
+    },
+    {
+      "why": "Python control whitespace at comment edges",
+      "text": "花 [\u001c出典\u001c]",
+      "pipeline": "花",
+      "spans": [
+        [
+          2,
+          8,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "出典"
+      ]
+    },
+    {
+      "why": "ideographic whitespace at comment edges",
+      "text": "花［　出典　］",
+      "pipeline": "花",
+      "spans": [
+        [
+          1,
+          7,
+          "comment"
+        ]
+      ],
+      "source_labels": [
+        "出典"
+      ]
+    }
+  ],
+  "rewords_cases": [
+    {
+      "text": "1. 春 [出典]",
+      "description": "春",
+      "rewords": false
+    },
+    {
+      "text": "a  b",
+      "description": "a\tb",
+      "rewords": false
+    },
+    {
+      "text": "青い円",
+      "description": "赤い円",
+      "rewords": true
+    },
+    {
+      "text": "花 [一]",
+      "description": "花 [二]",
+      "rewords": false
+    },
+    {
+      "text": "a\u001cb",
+      "description": "a b",
+      "rewords": false
+    },
+    {
+      "text": "［　］",
+      "description": "",
+      "rewords": false
     }
   ]
 }

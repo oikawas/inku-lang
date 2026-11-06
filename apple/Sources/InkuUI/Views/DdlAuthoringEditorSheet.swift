@@ -15,7 +15,7 @@ struct DdlAuthoringEditorSheet: View {
     var body: some View {
         DdlEditorDialogLayout(model: model, title: model.display.localized("指示書エディタ"),
             subtitle: model.display.webCopy("ddlEditDialogSubtitle", "描画すると、選択した作品の子として系譜へ保存します。"),
-            work: session.work ?? model.displayedWork, text: $session.draft, insertion: $insertion,
+            work: session.work ?? model.displayedWork, pluginWorkID: session.work?.id, text: $session.draft, insertion: $insertion,
             disabled: model.isBusy, onClose: { session.cancel(); dismiss() }, onRangeBlocked: { rangeBlocked = $0 }) {
             DdlDialogFooter {
                 EmptyView()

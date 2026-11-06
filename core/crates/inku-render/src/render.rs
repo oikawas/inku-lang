@@ -684,12 +684,15 @@ fn paint_object_body(
                 max_output_vertices: 200_000,
             },
         });
-        let mut definitions = material_definitions.clone();
-        definitions.extend(surface_definitions.iter().cloned());
-        let before = definitions.len();
+        let existing_definitions = material_definitions
+            .iter()
+            .chain(surface_definitions.iter())
+            .collect::<Vec<_>>();
+        let mut definitions = Vec::new();
         let (paint, diagnostics, _) = forest.finish(
             &scopes,
             profile,
+            &existing_definitions,
             &mut definitions,
             clip_policy,
             &performed.performed,
@@ -700,8 +703,8 @@ fn paint_object_body(
                 "object body fill clipping failed",
             ));
         }
-        allowance.spend(definitions[before..].iter())?;
-        material_definitions.extend(definitions.into_iter().skip(before));
+        allowance.spend(definitions.iter())?;
+        material_definitions.extend(definitions);
         for element in paint {
             group.push(element);
         }
@@ -1291,18 +1294,21 @@ fn render_impl(
     if has_fill_scopes {
         let (_, _, clip_policy) =
             resources.expect("typed fill requires explicit resource authority");
-        let mut definitions = material_definitions.clone();
-        definitions.extend(surface_definitions.iter().cloned());
-        let before = definitions.len();
+        let existing_definitions = material_definitions
+            .iter()
+            .chain(surface_definitions.iter())
+            .collect::<Vec<_>>();
+        let mut definitions = Vec::new();
         let (paint, diagnostics, omitted) = fill_forest.finish(
             &performance.fill_scopes,
             profile,
+            &existing_definitions,
             &mut definitions,
             clip_policy,
             &performance.performed,
             instruction_limit,
         );
-        material_definitions.extend(definitions.into_iter().skip(before));
+        material_definitions.extend(definitions);
         for element in paint {
             content.push(element);
         }

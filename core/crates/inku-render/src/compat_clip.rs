@@ -157,7 +157,7 @@ impl Style {
 
 struct Context<'a> {
     region: &'a PreparedRegion,
-    definitions: BTreeMap<String, Element>,
+    definitions: BTreeMap<String, &'a Element>,
     options: ClipOptions<'a>,
     remaining: ClipLimits,
     serial: usize,
@@ -171,6 +171,15 @@ pub fn clip_element(
     region: &PreparedRegion,
     definitions: &[Element],
     options: ClipOptions<'_>,
+) -> Result<Element, ClipError> {
+    clip_element_refs(element, region, definitions.iter(), options)
+}
+
+pub(crate) fn clip_element_refs<'a>(
+    element: &'a Element,
+    region: &'a PreparedRegion,
+    definitions: impl Iterator<Item = &'a Element>,
+    options: ClipOptions<'a>,
 ) -> Result<Element, ClipError> {
     if !options.tolerance.is_finite() || options.tolerance <= 0.0 || options.id_prefix.is_empty() {
         return Err(invalid("clip options"));
@@ -199,9 +208,9 @@ pub fn clip_element(
     context.visit(element, &Style::default(), Affine::IDENTITY, 0)
 }
 
-fn collect_definitions(
-    element: &Element,
-    result: &mut BTreeMap<String, Element>,
+fn collect_definitions<'a>(
+    element: &'a Element,
+    result: &mut BTreeMap<String, &'a Element>,
     work: &mut usize,
     depth: usize,
 ) -> Result<(), ClipError> {
@@ -212,7 +221,7 @@ fn collect_definitions(
     if matches!(element.name(), "linearGradient" | "pattern")
         && let Some(id) = element.attribute("id")
     {
-        result.insert(id.to_owned(), element.clone());
+        result.insert(id.to_owned(), element);
     }
     for node in element.children() {
         if let Node::Element(child) = node {
@@ -444,7 +453,7 @@ impl Context<'_> {
                 if bounds.width() <= 0.0 || bounds.height() <= 0.0 {
                     return Err(invalid("paint server bounds"));
                 }
-                let mut definition = definition.clone();
+                let mut definition = (*definition).clone();
                 let matrix = Affine::new([
                     bounds.width(),
                     0.0,

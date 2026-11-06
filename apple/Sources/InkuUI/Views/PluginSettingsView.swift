@@ -176,7 +176,7 @@ struct PluginSettingsView: View {
                 Button(model.display.webCopy("confirmCancel", "キャンセル")) { settings.clearCheck() }
             }
         }.padding(10).background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 6))
-            .task(id: check.pictures.text) {
+            .task(id: check.previewKeys + [check.pictures.text]) {
                 var data: [Int: Data] = [:]
                 var images: [Int: NSImage] = [:]
                 for index in words.indices {

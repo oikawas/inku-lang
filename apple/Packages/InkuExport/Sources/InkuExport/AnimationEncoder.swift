@@ -35,7 +35,9 @@ enum AnimationEncoder {
             fonts = try InkuCore.prepareRasterFonts([font.path])
         }
         let layerOrder = order(frameCount: states.count, replay: options.layerReplay)
-        let prepared = try fonts.map { fonts in try states.map { try fonts.prepareSVG($0) } } ?? []
+        let prepared: [PreparedSVG]
+        if let fonts { prepared = try states.map { try fonts.prepareSVG($0) } }
+        else { prepared = [] }
         let (width, height): (Int, Int)
         if let last = prepared.last {
             (width, height) = try ExportRaster.dimensions(scene: last, height: options.pixelHeight, maximumPixels: ExportService.maximumAnimationPixels)

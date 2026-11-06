@@ -46,9 +46,6 @@ enum AnimationEncoder {
             throw ExportFailure("この解像度とフレーム数はアニメーションの上限（6億画素）を超えます。")
         }
         let holdMS = max(100, Int((1000 * (single ? options.layerIntervalSeconds : options.holdSeconds)).rounded(.toNearestOrEven)))
-        if options.format == .gif, holdMS > 655_350 {
-            throw ExportFailure("GIFでこのフレーム数と間隔を保持できません。間隔を短くするかAPNGを選択してください。")
-        }
         let data = NSMutableData()
         let gif = options.format == .gif
         guard let destination = CGImageDestinationCreateWithData(data, (gif ? UTType.gif.identifier : UTType.png.identifier) as CFString, count, nil) else { throw ExportFailure("アニメーションエンコーダーを準備できませんでした。") }

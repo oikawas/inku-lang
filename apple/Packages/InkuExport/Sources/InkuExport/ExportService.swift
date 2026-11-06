@@ -190,7 +190,7 @@ public enum ExportService {
                   ["restart", "reverse", "once"].contains(options.layerReplay),
                   options.holdSeconds.isFinite, (0.1...30).contains(options.holdSeconds),
                   options.layerIntervalSeconds.isFinite, (0.1...30).contains(options.layerIntervalSeconds) else {
-                throw ExportFailure("アニメーションのフレーム数・間隔・再生方式を確認してください。")
+                throw ExportFailure("アニメーションの間隔・再生方式を確認してください。")
             }
         }
     }

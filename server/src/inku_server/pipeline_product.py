@@ -469,7 +469,12 @@ class ProductPipelineEffects:
         # still names two keeps the Stage 1 one; one that names only Stage 2
         # (hand-written DDL, the old compose URL) is the one model; none takes
         # the account's model. The work still records both keys, now equal.
-        model_ref = selected.get("stage1_model") or selected.get("stage2_model")
+        # The request's model comes before a saved work's record: a fork that
+        # names only Stage 2 (the layout options) was otherwise drawn with the
+        # parent's Stage 1 (2026-11-06, the author: those draw with the input
+        # panel's conditions). A fork that names none keeps the parent's.
+        model_ref = (options.get("stage1_model") or options.get("stage2_model")
+                     or selected.get("stage1_model") or selected.get("stage2_model"))
         if kind == "image" and not model_ref:
             actor_models = (actor or {}).get("model_settings") or {}
             vision_model = actor_models.get("vision_model")

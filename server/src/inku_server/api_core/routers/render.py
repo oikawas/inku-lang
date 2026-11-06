@@ -94,7 +94,9 @@ class ComposeRequest(BaseModel):
     batch_line_number: int | None = Field(default=None, ge=1, description="Line number in the client batch.")
     batch_lease: str | None = Field(default=None, max_length=200, description="Lease for the client batch.")
     model: str | None = Field(
-        default=None, description="Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)"
+        default=None,
+        description="The drawing model, used for every send of this drawing, also when work_id is given. "
+        "Omitted means the saved work's model when work_id is given, else the user's drawing model.",
     )
     description: str | None = Field(default=None, max_length=100_000, description="作者が書いた記述 (省略可)")
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")

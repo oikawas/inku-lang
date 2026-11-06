@@ -158,6 +158,7 @@ struct Builder<'a> {
     diagnostics: Vec<ScoreExecutionDiagnostic>,
     /// Top-level transform groups already cloned into `output`.
     cloned_top_transforms: HashSet<usize>,
+    instance_prefixes: BTreeMap<(usize, usize), Sha256>,
 }
 
 impl<'a> Builder<'a> {
@@ -187,6 +188,7 @@ impl<'a> Builder<'a> {
             scope_sources: Vec::new(),
             diagnostics: Vec::new(),
             cloned_top_transforms: HashSet::new(),
+            instance_prefixes: BTreeMap::new(),
         }
     }
 
@@ -263,14 +265,32 @@ impl<'a> Builder<'a> {
             anchor_target: relation.and_then(|value| value.target_anchor_index),
         });
         self.output.instructions.push(instruction);
+        let prefix = self
+            .instance_prefixes
+            .entry((context, old))
+            .or_insert_with(|| {
+                let mut bytes =
+                    serde_json::to_vec(&(&resolved.owner, &self.contexts[context].path))
+                        .expect("typed instance seed prefix is serializable");
+                bytes.pop();
+                bytes.push(b',');
+                let mut hash = Sha256::new();
+                hash.update(bytes);
+                hash
+            });
+        let mut hash = prefix.clone();
+        hash.update(instance_ordinal.to_string().as_bytes());
+        hash.update(b"]");
+        if let Some(seed) = self.request.performance_seed {
+            hash.update(format!(":render:{seed}").as_bytes());
+        }
+        let digest = hash.finalize();
+        let seed_override = i128::from(u64::from_le_bytes(
+            digest[..8].try_into().expect("eight digest bytes"),
+        ));
         self.dense.push(DenseInstruction {
             original_index: old,
-            seed_override: Some(instance_seed(
-                &resolved.owner,
-                &self.contexts[context].path,
-                instance_ordinal,
-                self.request.performance_seed,
-            )),
+            seed_override: Some(seed_override),
             fill_scope_index: innermost_fill,
             context_path: self.contexts[context].path.clone(),
             semantic_anchor: Some(target.unwrap_or_else(|| {
@@ -1402,6 +1422,7 @@ fn translate_instruction_to(
     result
 }
 
+#[allow(dead_code)]
 fn instance_seed(
     owner: &inku_score::ScoreSourceOwner,
     context: &[u64],

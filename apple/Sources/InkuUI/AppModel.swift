@@ -88,7 +88,7 @@ public final class AppModel {
         })
     }
     private var currentDrawOptions: DrawOptions {
-        get { drawSelections[activeDrawTab] ?? DrawOptionsCore.release[activeDrawTab]! }
+        get { drawSelections[activeDrawTab] ?? DrawOptionsCore.release[activeDrawTab] ?? .empty }
         set { drawSelections[activeDrawTab] = newValue }
     }
     public var imageCanvasID: String {
@@ -149,8 +149,6 @@ public final class AppModel {
         request.descriptionReview = SettingsModel.isRegisteredModelAvailable(request.models.stage1Model, purpose: "vision", settings: settings)
     }
     public var sketchText = ""
-    public var variationAmplitude = "small"
-    public var variationSeedText = ""
     public var selectedHoleIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
     public private(set) var restorationRevision: UInt64 = 0
@@ -186,10 +184,6 @@ public final class AppModel {
     @ObservationIgnored private var chatGPTFailureCodes: [String: String] = [:]
     /// Web CanvasPanel `clipboardMessage`: the copy button names the result, 2.5 s after success and 8 s after a failure.
     public private(set) var clipboardMessageKey: String?
-    public var providerURL = "http://localhost:8080/v1"
-    public var providerModel = ""
-    public var providerKind = "openai_compatible"
-    public var providerKey = ""
     public private(set) var nextDrawingModelReference: String {
         get { currentDrawOptions.models.stage1 ?? "" }
         set { currentDrawOptions.models.stage1 = newValue; currentDrawOptions.models.stage2 = newValue }
@@ -265,10 +259,6 @@ public final class AppModel {
     public let thumbnails = ArtworkThumbnails()
     @ObservationIgnored public var onSavedWork: (@MainActor (SavedWork) async -> Void)?
     @ObservationIgnored public var onDrawingLog: (@MainActor (DrawingLogRecord) async -> Void)?
-    public let versionSummary: String = {
-        let report = try? JSONSerialization.jsonObject(with: Data(InkuCore.versionReport.utf8)) as? [String: String]
-        return "共通コア接続 \(report?["binding_version"] ?? "不明") · 描画接続 \(InkuCore.rasterAPIVersion)"
-    }()
 
     @ObservationIgnored private let databaseURL: URL?
     @ObservationIgnored private let openDatabase: @Sendable (URL) throws -> InkuDatabase
@@ -387,14 +377,13 @@ public final class AppModel {
     }
     public var displayedWork: SavedWork? { previewWork ?? selectedWork }
     public var isPreview: Bool { previewWork != nil }
-    public var hasConfiguredProviders: Bool { !settings.providers.isEmpty }
     public var hasNextDrawingModel: Bool {
         settings.providers.contains { nextDrawingModelReference.hasPrefix($0.id + ":") && nextDrawingModelReference.count > $0.id.count + 1 }
     }
     public var canCommitDDL: Bool { !isBusy && !isPreview && !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (currentExecutionID != nil || selectedContext != nil) }
     public var canEditCurrentDDL: Bool { !isBusy && !isPreview && (currentExecutionID != nil || selectedContext != nil) }
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
-    public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
+    var hasDrawingConnection: Bool { !settings.providers.isEmpty }
     public var hasAvailableNextDrawingModel: Bool {
         hasNextDrawingModel && (drawingAvailability[nextDrawingModelReference]?.drawing ?? false)
     }
@@ -511,17 +500,11 @@ public final class AppModel {
             catch { startupCatalogError = error }
             library.onMutation = { [weak self] in await self?.refreshWorks() }
             // Web `inku-history-display-mode` and the thumbnail/list tab come back with the library.
-            if let layout = display.libraryLayout.flatMap(LibraryLayout.init(rawValue:)), layout != .lineage {
+            if let layout = display.libraryLayout.flatMap(LibraryLayout.init(rawValue:)) {
                 library.layout = layout
             }
             if let grouped = display.libraryGrouped { library.grouped = grouped }
             await library.connect(database: database)
-            if let provider = settings.providers.first {
-                providerURL = provider.baseURL.absoluteString
-                providerKind = provider.apiProfile == "mlx" ? "mlx" : provider.kind.rawValue
-                providerModel = settings.models.stage1Model.hasPrefix("\(provider.id):")
-                    ? String(settings.models.stage1Model.dropFirst(provider.id.count + 1)) : settings.models.stage1Model
-            }
             try await reloadWorks()
             // Web completeAuthentication opens the first normal history item once at startup.
             if let latest = try await database.libraryPage(limit: 1).items.first?.work, selectedWorkID == nil {
@@ -878,10 +861,6 @@ public final class AppModel {
     public func operationalLimitDefaults() throws -> [String: UInt32] {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         return try bootstrap.operationalLimitDefaults()
-    }
-
-    public func operationalLimits() throws -> [String: UInt32] {
-        try operationalLimitDefaults().merging(settings.operationalLimits ?? [:]) { _, selected in selected }
     }
 
     public func updateOperationalLimits(_ limits: [String: UInt32]?) async throws {
@@ -1369,11 +1348,11 @@ public final class AppModel {
 
     /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.
     public func makeDrawingAdjustmentPlans(work: SavedWork, kind: String, count: Int,
-                                           amplitude: String = "medium", wildOverride: Bool? = nil,
+                                           wildOverride: Bool? = nil,
                                            modelReference: String? = nil,
                                            recomposeMode: Recomposition.Mode = .principled) async throws -> [DrawingAdjustmentPlan] {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
-        guard ["layout_change", "variation"].contains(kind) else { throw HostError("unknown_refinement_kind") }
+        guard kind == "layout_change" else { throw HostError("unknown_refinement_kind") }
         guard [1, 4].contains(count) else { throw HostError("invalid_adjustment_count") }
         let drawing = nextGenerationHostSettings
         let selected = currentDrawOptions
@@ -1385,24 +1364,6 @@ public final class AppModel {
         let baseOptions = try ExactJSON(data: saved.renderOptions)
         guard baseOptions["catalog_id"].string != nil, baseOptions["resolved_color_map"].object != nil else {
             throw HostError("saved_refinement_options_unavailable")
-        }
-        if kind == "variation" {
-            guard ["small", "medium", "large"].contains(amplitude) else { throw HostError("invalid_variation") }
-            var seeds: Set<UInt64> = []
-            var plans: [DrawingAdjustmentPlan] = []
-            for _ in 0..<count {
-                var seed: UInt64
-                repeat { seed = UInt64.random(in: 1...((UInt64(1) << 31) - 1)) } while seeds.contains(seed)
-                seeds.insert(seed)
-                let metadata: ExactJSON = .object(["variation_amplitude": .string(amplitude), "variation_seed": .number(String(seed))])
-                // The current shared core's Stage 1.5 variation is a no-op; preserve the Score and actual model facts.
-                let replay = try await host.makeSavedScoreReplayPlan(workID: source.id, wild: wildOverride,
-                    derivationKind: kind, derivationMetadata: metadata.data, variationAmplitude: amplitude, variationSeed: String(seed))
-                try Task.checkCancellation()
-                plans.append(DrawingAdjustmentPlan(stage1Model: source.stage1Model, stage2Model: source.stage2Model,
-                    parent: source, operation: .replay(replay)))
-            }
-            return plans
         }
         guard let document = saved.document, let ddl = source.ddl, !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw HostError("saved_document_unavailable")
@@ -1536,11 +1497,11 @@ public final class AppModel {
         throw HostError("provider_selection_required")
     }
 
-    public func makeRefinementRequest(work: SavedWork, kind: String, amplitude: String = "medium",
+    public func makeRefinementRequest(work: SavedWork, kind: String,
                                       modelReference: String? = nil, catalogIDOverride: String? = nil,
                                       wildOverride: Bool? = nil) async throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
-        guard ["layout_change", "catalog_change", "variation", "model_comparison"].contains(kind) else {
+        guard ["layout_change", "catalog_change", "model_comparison"].contains(kind) else {
             throw HostError("unknown_refinement_kind")
         }
         let saved = try await savedConfiguration(workID: work.id)
@@ -1563,7 +1524,6 @@ public final class AppModel {
             language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: renderSeed, wild: wildOverride ?? work.renderWild ?? false,
             settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind,
             catalogMode: reading ? self.catalogMode : "fixed", sketch: sketch,
-            variationAmplitude: kind == "variation" ? amplitude : nil, variationSeed: kind == "variation" ? fresh : nil,
             savedConfiguration: saved.configuration)
         var nextConfig = try ExactJSON(data: request.configuration)
         var nextOptions = try ExactJSON(data: request.renderOptions)
@@ -2190,13 +2150,6 @@ public final class AppModel {
         }
     }
 
-    public func regenerateDescription() async {
-        guard canRegenerateDescription, let id = currentExecutionID else { return }
-        let sketch: SketchRequest = sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off
-        await performCommand(executionID: id, command: .generateFromDescription(expectedRevision: authoringRevision,
-            description: descriptionText, autoCatalog: catalogMode == "auto", sketch: sketch), kind: "description_edit")
-    }
-
     public func completeHoles() async {
         guard canCompleteHoles, let id = currentExecutionID else { return }
         let selected = selectedHoleIDs.isEmpty ? holeIDs : holeIDs.filter { selectedHoleIDs.contains($0) }
@@ -2263,20 +2216,6 @@ public final class AppModel {
                 self.selectedContext = try await host.savedAuthoringContext(workID: id)
             }
         }
-    }
-
-    public func varySelectedWork() async {
-        guard !isBusy, !isPreview, let selectedWork else { return }
-        do {
-            var request = try await makeRefinementRequest(work: selectedWork, kind: "variation", amplitude: variationAmplitude)
-            if !variationSeedText.isEmpty {
-                guard let seed = UInt64(variationSeedText), String(seed) == variationSeedText else { throw HostError("invalid_variation") }
-                var configuration = try ExactJSON(data: request.configuration)
-                configuration["compiler"]["stage15_variation"]["seed"] = .string(variationSeedText)
-                request.configuration = configuration.data
-            }
-            _ = await runAutomation(request: try await pinPersonalPlanRequests([request])[0])
-        } catch { report(error) }
     }
 
     public func replayWithCurrentOptions() async {
@@ -2360,33 +2299,6 @@ public final class AppModel {
         return sources
     }
 
-    public func saveProvider() async {
-        guard settingsStore != nil, let url = URL(string: providerURL),
-              !providerModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            report(HostError("provider_settings_incomplete"))
-            return
-        }
-        do {
-            let kind: ProviderKind = providerKind == "mlx" ? .openAICompatible
-                : ProviderKind(rawValue: providerKind) ?? .openAICompatible
-            let provider = ProviderSettings(id: "local", kind: kind, baseURL: url,
-                apiProfile: providerKind == "mlx" ? "mlx" : nil,
-                requiresAPIKey: url.scheme == "https")
-            try provider.validate()
-            if !providerKey.isEmpty { try await credentials.setKey(providerKey, for: provider.credentialID) }
-            let modelID = "local:\(providerModel)"
-            var changed = settings
-            if let index = changed.providers.firstIndex(where: { $0.id == provider.id }) { changed.providers[index] = provider }
-            else { changed.providers.append(provider) }
-            changed.models.stage1Model = modelID
-            changed.models.stage2Model = modelID
-            try await updateHostSettings(changed)
-            providerKey = ""
-            errorText = nil
-            status = "接続設定を保存しました"
-        } catch { report(error) }
-    }
-
     @discardableResult
     public func backup(to url: URL) async -> Bool {
         guard let database else { return false }
@@ -2447,20 +2359,6 @@ public final class AppModel {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do { try Data(work.svg.utf8).write(to: url, options: .atomic); status = "SVGを書き出しました" }
         catch { report(error) }
-    }
-
-    public func exportPNG(to url: URL, height: UInt32) async {
-        guard let work = selectedWork else { return }
-        let options = display.preferences.singleWorkPNGOptions(height: Int(height))
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
-            try Task.checkCancellation()
-            guard let artifact = artifacts.first else { throw HostError("png_encode_failed") }
-            try artifact.data.write(to: url, options: .atomic)
-            status = "PNGを書き出しました"
-        } catch { report(error) }
     }
 
     public func copyImage(work target: SavedWork? = nil) async {

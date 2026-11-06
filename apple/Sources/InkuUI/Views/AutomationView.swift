@@ -16,22 +16,12 @@ private enum DemoModelPicker: String, Identifiable {
 @MainActor struct AutomationView: View {
     @Bindable var model: AppModel
     @Bindable var automation: AutomationModel
-    var demoOnly = false
-    @State private var tab = "batch"
     @State private var modelPicker: DemoModelPicker?
     @State private var showCatalogs = false
     @State private var showPaper = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !demoOnly {
-              InkuSegmentedButtons(options: [("batch", model.display.localized("バッチ")), ("demo", model.display.localized("デモ"))], selection: $tab)
-                .accessibilityLabel(model.display.localized("自動制作"))
-                .disabled(model.isBrowsingLocked)
-            }
-            if !demoOnly && tab == "batch" {
-                BatchPanelView(model: model, automation: automation)
-            } else {
                 ScrollView { demo }
                 if automation.running {
                     // DemoPanel.svelte:196: the running demo shows the drawing indicator.
@@ -48,7 +38,6 @@ private enum DemoModelPicker: String, Identifiable {
                     }
                 } else { Text(model.display.message(automation.status)).inkuFont(13).foregroundStyle(.secondary) }
                 if let error = automation.errorText { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-            }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -69,7 +58,7 @@ private enum DemoModelPicker: String, Identifiable {
                 }
             }
         }
-        .sheet(isPresented: $showCatalogs) { ColorCatalogView(model: model, descriptionOnly: true) }
+        .sheet(isPresented: $showCatalogs) { ColorCatalogView(model: model) }
     }
     private var demo: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -120,9 +109,14 @@ private enum DemoModelPicker: String, Identifiable {
             Button(model.display.localized("デモを開始"), systemImage: "play.fill") { Task { await automation.startDemo(app: model) } }
                 .disabled(!automation.canStartDemo(app: model))
             if automation.demoModel.isEmpty || automation.demoStage1Model.isEmpty || automation.demoStage2Model.isEmpty {
-                Button(model.display.localized("使用中のLLMモデルを設定してください。"), systemImage: "gearshape") {
-                    NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": "models"])
-                }.inkuFont(12).disabled(model.isBrowsingLocked)
+                if let section = SettingsSection.demoGuidance(hasConnection: model.hasDrawingConnection) {
+                    Button(model.display.localized("モデル設定で接続先を追加してください。"), systemImage: "gearshape") {
+                        NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": section.rawValue])
+                    }.inkuFont(12).disabled(model.isBrowsingLocked)
+                } else {
+                    Text(model.display.localized("上のボタンでデモのモデルを選んでください。"))
+                        .inkuFont(12).foregroundStyle(.secondary)
+                }
             }
             demoStatistics
             if let work = automation.demoWork {

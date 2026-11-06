@@ -50,8 +50,7 @@ extension PipelineHost {
         ])
         let plan = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: base.context,
             renderRequest: render.data, derivationKind: "canvas_fit",
-            derivationMetadata: try result.requiredObject("derivation_metadata").data,
-            variationAmplitude: nil, variationSeed: nil)
+            derivationMetadata: try result.requiredObject("derivation_metadata").data)
         let candidate = try await previewSavedScoreReplay(plan)
         try Task.checkCancellation()
         return try await saveCandidate(executionID: candidate.executionID)
@@ -77,8 +76,7 @@ extension PipelineHost {
             render["request"]["options"]["resolved_color_map"] = try result.requiredObject("color_map")
             let replay = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: base.context,
                 renderRequest: render.data, derivationKind: "color_arrangement_change",
-                derivationMetadata: try result.requiredObject("derivation_metadata").data,
-                variationAmplitude: nil, variationSeed: nil)
+                derivationMetadata: try result.requiredObject("derivation_metadata").data)
             plans.append(SavedScoreVariantPlan(index: index, ground: nil, replay: replay))
         }
         return ColorArrangementPage(plans: plans,
@@ -101,8 +99,7 @@ extension PipelineHost {
             render["request"]["score"] = try result.requiredObject("score")
             var replay = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: base.context,
                 renderRequest: render.data, derivationKind: "ground_change",
-                derivationMetadata: try result.requiredObject("derivation_metadata").data,
-                variationAmplitude: nil, variationSeed: nil)
+                derivationMetadata: try result.requiredObject("derivation_metadata").data)
             replay.retouchedSource = try result.requiredString("ddl")
             return SavedScoreVariantPlan(index: nil, ground: material, replay: replay)
         }

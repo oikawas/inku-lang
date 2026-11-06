@@ -23,7 +23,6 @@ public enum CoreFailure: Error, Sendable {
     /// Skia display does not take this work; show it with `PreparedSVG` and count the code.
     case displayUnsupported(code: String, message: String)
     case displayRefused(code: String, message: String)
-    case emptySeedText
     case internalInvariant
 }
 
@@ -204,17 +203,6 @@ public enum InkuCore {
         catch InkuCoreBindings.CoreCallFailure.InternalInvariant { throw CoreFailure.internalInvariant }
     }
 
-    public static func renderSeedWords(fromText text: String) throws -> (seed: String, text: String) {
-        guard let derived = InkuCoreBindings.renderSeedFromText(seedText: text) else {
-            throw CoreFailure.emptySeedText
-        }
-        return (derived.renderSeed, derived.seedText)
-    }
-
-    public static func renderSeed(fromText text: String) throws -> String {
-        try renderSeedWords(fromText: text).seed
-    }
-
     public static func countDescriptionMeter(text: String, languageCode: String, dictionaryDirectory: String) -> Data {
         InkuCoreBindings.countDescriptionMeter(text: text, languageCode: languageCode, dictionaryDirectory: dictionaryDirectory)
     }
@@ -246,10 +234,6 @@ public enum InkuCore {
     /// The tiles covering a window, nearest to its centre first.
     public static func displayTiles(window: DisplayRegion, side: UInt32) -> [DisplayRegion] {
         InkuCoreBindings.displayTiles(window: window.binding, side: side).map(DisplayRegion.init)
-    }
-
-    public static func step(snapshot: Data, input: Data) -> Data {
-        InkuCoreBindings.step(snapshotBytes: snapshot, inputEnvelopeBytes: input)
     }
 
     public static func stepSvgLimited(snapshot: Data, input: Data, maxSvgBytes: UInt64) -> (json: Data, svg: String?) {
@@ -363,20 +347,12 @@ public enum InkuCore {
         InkuCoreBindings.resolvePalette(inputBytes: input)
     }
 
-    public static func stage1SystemProjection(languageCode: String) -> String {
-        InkuCoreBindings.stage1SystemProjection(languageCode: languageCode)
-    }
-
     public static func resolveMacroCatalog(_ input: Data) -> Data {
         InkuCoreBindings.resolveMacroCatalog(inputBytes: input)
     }
 
     public static func explainPluginDiagnostics(_ input: Data) -> Data {
         InkuCoreBindings.explainPluginDiagnostics(inputBytes: input)
-    }
-
-    public static func migrateSaijikiV1(_ input: Data) -> Data {
-        InkuCoreBindings.migrateSaijikiV1(inputBytes: input)
     }
 
     public static func migrateSaijikiV2(_ input: Data) -> Data {
@@ -399,13 +375,4 @@ public enum InkuCore {
         }
     }
 
-    public static func rasterizeRegion(svg: String, fullWidth: UInt32, fullHeight: UInt32, x: UInt32, y: UInt32, width: UInt32, height: UInt32) throws -> RasterImage {
-        do {
-            return RasterImage(try InkuCoreBindings.rasterizeSvgRegion(svg: svg, fullWidth: fullWidth, fullHeight: fullHeight, x: x, y: y, width: width, height: height))
-        } catch InkuCoreBindings.RasterFailure.Refused(let code, let message) {
-            throw CoreFailure.rasterRefused(code: code, message: message)
-        } catch InkuCoreBindings.RasterFailure.InternalInvariant {
-            throw CoreFailure.internalInvariant
-        }
-    }
 }

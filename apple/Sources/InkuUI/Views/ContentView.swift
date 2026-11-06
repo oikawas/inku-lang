@@ -128,6 +128,7 @@ public struct ContentView: View {
         .onDisappear { importer.cancel(); automation.flushDemoPreferences() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             automation.flushDemoPreferences()
+            Task { await model.shutdownPersonalPlan() }
         }
         #endif
         .environment(model.display)
@@ -210,7 +211,7 @@ public struct ContentView: View {
         .onChange(of: ui.workspaceTab) { _, tab in model.display.rememberWorkspaceTab(tab) }
         .onChange(of: automation.workspaceInputMode) { _, mode in model.display.rememberInputTab(mode) }
         .onChange(of: model.library.layout) { _, layout in
-            if layout != .lineage { model.display.rememberLibraryLayout(layout.rawValue) }
+            model.display.rememberLibraryLayout(layout.rawValue)
         }
         .onChange(of: model.library.grouped) { _, grouped in model.display.rememberLibraryGrouped(grouped) }
         .onChange(of: ui.settingsOpen) { _, open in if !open { Task { await refreshDrawingKeyState() } } }

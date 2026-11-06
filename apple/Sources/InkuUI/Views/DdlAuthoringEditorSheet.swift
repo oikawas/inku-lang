@@ -173,7 +173,7 @@ struct NewDdlAuthoringSheet: View {
                 importedDocument = document
                 draft = document.source
             } catch is CancellationError { }
-            catch { importError = error.localizedDescription }
+            catch { importError = DDLImportErrorText.message(error, display: model.display) }
         }
     }
 }

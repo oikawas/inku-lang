@@ -81,61 +81,6 @@ struct SaijikiV3MigrationTests {
         #expect((report["refused"] as? [[String: String]])?.first?["reason"] == "definition_not_supplied")
     }
 
-    /// Only an explicitly named disposable SQLite backup may be passed here.
-    @Test func migrateExplicitRehearsalCopy() async throws {
-        guard let path = ProcessInfo.processInfo.environment["INKU_V7_REHEARSAL_DB"], !path.isEmpty else { return }
-        let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
-        let temporaryRoots = [FileManager.default.temporaryDirectory, URL(fileURLWithPath: "/private/tmp", isDirectory: true)]
-            .map { $0.resolvingSymlinksInPath().path + "/" }
-        guard temporaryRoots.contains(where: { url.path.hasPrefix($0) }) else {
-            throw PersistenceError.invalidRecord("rehearsal_requires_temporary_copy")
-        }
-        _ = try InkuDatabase(url: url)
-    }
-
-    @Test func compileExplicitRehearsalSamples() async throws {
-        guard let path = ProcessInfo.processInfo.environment["INKU_V7_REHEARSAL_DB"],
-              let oldPath = ProcessInfo.processInfo.environment["INKU_V7_REHEARSAL_BEFORE"] else { return }
-        let dbURL = URL(fileURLWithPath: path).resolvingSymlinksInPath()
-        let oldURL = URL(fileURLWithPath: oldPath).resolvingSymlinksInPath()
-        let root = URL(fileURLWithPath: "/private/tmp", isDirectory: true).resolvingSymlinksInPath().path + "/"
-        guard dbURL.path.hasPrefix(root), oldURL.path.hasPrefix(root) else { throw PersistenceError.invalidRecord("rehearsal_requires_temporary_copy") }
-        var config = Configuration(); config.readonly = true
-        let old = try DatabaseQueue(path: oldURL.path, configuration: config)
-        let ids = try await old.read { db -> [String] in
-            let many = try String.fetchAll(db, sql: """
-                SELECT id FROM history WHERE ddl IS NOT NULL
-                ORDER BY (length(ddl)-length(replace(ddl,'細筆',''))) +
-                         (length(ddl)-length(replace(ddl,'太筆',''))) +
-                         (length(ddl)-length(replace(ddl,'クレヨン',''))) DESC LIMIT 2
-                """)
-            let rare = try String.fetchOne(db, sql: """
-                SELECT json_extract(CAST(acknowledgement AS TEXT), '$.work_id') AS work_id
-                FROM effect_acknowledgements
-                GROUP BY json_extract(CAST(acknowledgement AS TEXT), '$.performance.document.macro_locks')
-                ORDER BY count(*) ASC LIMIT 1
-                """)
-            return many + (rare.map { [$0] } ?? [])
-        }
-        try old.close()
-        #expect(ids.count == 3)
-        let current = try DatabaseQueue(path: dbURL.path, configuration: config)
-        for id in ids {
-            let request = try #require(try await current.read { db in
-                try String.fetchOne(db, sql: """
-                    SELECT json_object('document', json(json_extract(CAST(acknowledgement AS TEXT), '$.performance.document')),
-                        'definitions', json(json_extract(CAST(acknowledgement AS TEXT), '$.performance.configuration.definitions')),
-                        'compiler', json(json_extract(CAST(acknowledgement AS TEXT), '$.performance.configuration.compiler')))
-                    FROM effect_acknowledgements WHERE json_extract(CAST(acknowledgement AS TEXT), '$.work_id') = ?
-                    """, arguments: [id])
-            })
-            let result = try #require(JSONSerialization.jsonObject(with: InkuCore.compile(Data(request.utf8))) as? [String: Any])
-            #expect(result["error"] == nil || result["error"] is NSNull)
-            #expect(result["score"] is [String: Any])
-        }
-        try current.close()
-    }
-
     @Test func migratesOneUnitAndLeavesRefusalsAndLogsIntact() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-v7-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

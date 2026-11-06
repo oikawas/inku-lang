@@ -5,7 +5,6 @@ import SwiftUI
 struct BatchPanelView: View {
     @Bindable var model: AppModel
     @Bindable var automation: AutomationModel
-    var inputOnly = false
     var onObserveWork: ((SavedWork, String) -> Void)? = nil
     var followsLatestWork = true
     var selectedRowID: String? = nil
@@ -18,8 +17,6 @@ struct BatchPanelView: View {
     var ui: WorkspaceUIState? = nil
     @State private var localResultsExpanded = false
     @State private var localIssuesExpanded = false
-    @State private var localConditionsExpanded = false
-    @State private var localWorkspaceTab = "work"
     @State private var selectedHistoryPrompt = ""
     @State private var historyOpen = false
     @State private var editorHeight: CGFloat?
@@ -28,8 +25,6 @@ struct BatchPanelView: View {
 
     private var resultsExpanded: Binding<Bool> { kept(\.batchResultsExpanded, $localResultsExpanded) }
     private var issuesExpanded: Binding<Bool> { kept(\.batchIssuesExpanded, $localIssuesExpanded) }
-    private var conditionsExpanded: Binding<Bool> { kept(\.batchConditionsExpanded, $localConditionsExpanded) }
-    private var workspaceTab: Binding<String> { kept(\.batchWorkspaceTab, $localWorkspaceTab) }
     private func kept<Value>(_ path: ReferenceWritableKeyPath<WorkspaceUIState, Value>, _ local: Binding<Value>) -> Binding<Value> {
         guard let ui else { return local }
         return Binding(get: { ui[keyPath: path] }, set: { ui[keyPath: path] = $0 })
@@ -45,41 +40,8 @@ struct BatchPanelView: View {
     private var paintableCount: Int { automation.paintableBatchCount }
     private var inputHeight: CGFloat { editorHeight ?? min(220, max(140, (windowSize?.height ?? 880) * 0.22)) }
     private var issueRows: [BatchRow] { automation.rows.filter { $0.state == .uncertain } }
-    private var displayedWork: SavedWork? {
-        automation.observedWork ?? model.selectedWork
-    }
-    private var workspaceMinimumHeight: CGFloat {
-        automation.running && conditionsExpanded.wrappedValue ? 620 : 500
-    }
-
     var body: some View {
-        Group {
-          if inputOnly {
-            inputContent
-          } else {
-        GeometryReader { geometry in
-            if geometry.size.width >= 840 {
-                HStack(alignment: .top, spacing: 16) {
-                    inputPane.frame(width: 410)
-                    Divider()
-                    workspacePane(height: geometry.size.height)
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        inputContent
-                        Divider()
-                        workspace.frame(height: max(workspaceMinimumHeight, geometry.size.height * 0.85))
-                    }
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 12)
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
-            }
-        }
-          }
-        }
+        inputContent
         .clipped()
         .confirmationDialog(model.display.webCopy("batchClearResumeConfirm", "中断したバッチを再開できなくなります。"),
                             isPresented: $clearResume, titleVisibility: .visible) {
@@ -106,14 +68,6 @@ struct BatchPanelView: View {
         }
     }
 
-    private var inputPane: some View {
-        ScrollView {
-            inputContent.padding(.trailing, 2).padding(.bottom, 12)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .clipped()
-    }
-
     private var inputContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             input
@@ -123,7 +77,7 @@ struct BatchPanelView: View {
                 BatchConditionsView(model: model, automation: automation)
             }
             actions
-            if inputOnly && automation.running { BatchObservationCards(model: model, automation: automation) }
+            if automation.running { BatchObservationCards(model: model, automation: automation) }
             if !automation.running, automation.failedCount > 0 { failureReport }
             if automation.uncertainCount > 0 { issueResults }
             if !automation.rows.isEmpty { allResults }
@@ -493,31 +447,6 @@ struct BatchPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var workspace: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if automation.running {
-                runProgress
-                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: conditionsExpanded) {
-                    frozenConditions.padding(.top, 4)
-                }
-                .inkuFont(12)
-            }
-            observation
-        }
-        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    @ViewBuilder private func workspacePane(height: CGFloat) -> some View {
-        if height < workspaceMinimumHeight {
-            ScrollView {
-                workspace.frame(height: workspaceMinimumHeight)
-            }
-            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        } else {
-            workspace
-        }
-    }
-
     private var runProgress: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -540,101 +469,6 @@ struct BatchPanelView: View {
             }
             if automation.batchRowStartedAt != nil { ProviderProgressView(model: model) }
         }
-    }
-
-    private var frozenConditions: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(model.display.localized("開始時の描画条件")).inkuFont(12, weight: .semibold)
-            if let conditions = automation.batchConditions {
-                Text(conditionsSummary(conditions)).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
-            } else {
-                Text(model.display.localized("未記録")).inkuFont(12).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func conditionsSummary(_ conditions: BatchDrawingConditions) -> String {
-        let catalog: String
-        if conditions.catalogMode == "fixed" {
-            catalog = conditions.catalogID.map { id in model.catalogs.first { $0.id == id }?.name ?? id }
-                ?? model.display.localized("未記録")
-        } else {
-            catalog = model.display.localized(conditions.catalogMode == "random" ? "ランダム" : "記述から選択")
-        }
-        let paper = conditions.canvasID.map { id in model.canvases.first { $0.id == id }?.label ?? id }
-            ?? model.display.localized("未記録")
-        let reference = conditions.inputMode == "ddl" ? "DDL" : conditions.stage1Model == conditions.stage2Model
-            ? conditions.stage1Model : [conditions.stage1Model, conditions.stage2Model].joined(separator: " / ")
-        let sketch = model.display.localized(conditions.sketchMode == "on" ? "あり" : conditions.sketchMode == "supplied" ? "指定" : "なし")
-        let wild = conditions.wild.map { model.display.localized($0 ? "入" : "切") } ?? model.display.localized("未記録")
-        return [model.display.localized("入力") + ": " + model.display.localized(conditions.inputMode == "ddl" ? "DDL" : "記述"),
-                model.display.localized("モデル") + ": " + reference,
-                model.display.localized("色カタログ") + ": " + catalog,
-                model.display.localized("用紙") + ": " + paper,
-                model.display.localized("写生") + ": " + sketch,
-                model.display.localized("筆致制限を外す") + ": " + wild].joined(separator: " · ")
-    }
-
-    private var observation: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Text(model.display.localized(observationTitle)).inkuFont(12, weight: .semibold)
-                if automation.observedWork != nil, let row = automation.observedRow {
-                    Text(model.display.localizedFormat("%ld行", row.line)).inkuFont(12).monospacedDigit()
-                }
-                Spacer(minLength: 0)
-                if displayedWork != nil {
-                    Label(model.display.localized("保存済み"), systemImage: "checkmark.circle").inkuFont(12).foregroundStyle(.secondary)
-                }
-            }
-            InkuSegmentedButtons(options: [("work", model.display.localized("作品")), ("ddl", "DDL"), ("sketch", model.display.localized("写生"))],
-                                 selection: workspaceTab)
-            .accessibilityLabel(model.display.localized("表示する内容"))
-            if let work = displayedWork {
-                if automation.observedWork == nil {
-                    Text(model.display.localized("このバッチの成功作品はまだありません。前に表示した保存作品を表示しています。"))
-                        .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Text(savedSummary(work)).inkuFont(12).foregroundStyle(.secondary)
-                    .lineLimit(2).textSelection(.enabled)
-                if workspaceTab.wrappedValue == "work" {
-                    ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if workspaceTab.wrappedValue == "ddl" {
-                    observedText(work.ddl, empty: "この作品には保存されたDDLがありません。", monospaced: true)
-                } else {
-                    observedText(work.sketchText, empty: "この作品には保存された写生がありません。", monospaced: false)
-                }
-            } else {
-                ContentUnavailableView(model.display.localized("バッチの作品"), systemImage: "paintpalette",
-                    description: Text(model.display.localized("このバッチで保存できた作品と、その行のDDL・写生を表示します。")))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var observationTitle: String {
-        workspaceTab.wrappedValue == "ddl" ? "表示中のDDL" : workspaceTab.wrappedValue == "sketch" ? "表示中の写生" : "表示中の作品"
-    }
-
-    private func observedText(_ text: String?, empty: String, monospaced: Bool) -> some View {
-        ScrollView(monospaced ? [.horizontal, .vertical] : [.vertical]) {
-            Text(text.flatMap { $0.isEmpty ? nil : $0 } ?? model.display.localized(empty))
-                .font(monospaced ? .system(.callout, design: .monospaced) : .callout)
-                .fixedSize(horizontal: monospaced, vertical: true)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .padding(12)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
-    }
-
-    private func savedSummary(_ work: SavedWork) -> String {
-        [work.stage1Model ?? model.display.localized("未記録"), work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID ?? model.display.localized("未記録"),
-         work.renderCanvasAspectID ?? model.display.localized("未記録")].joined(separator: " · ")
     }
 
     private func stateLabel(_ state: BatchRow.State) -> String {

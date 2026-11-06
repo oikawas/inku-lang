@@ -76,28 +76,6 @@ struct LibraryExpandableTitle: View {
     }
 }
 
-@MainActor
-struct LibraryModelFactsView: View {
-    let work: SavedWork
-    let display: DisplaySettings
-    var compact = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            ForEach(SavedWorkFacts.models(work)) { fact in
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(display.localized(fact.label)).foregroundStyle(.secondary)
-                    Text(fact.reference ?? display.localized("未記録"))
-                        .foregroundStyle(fact.reference == nil ? Color.secondary : Color.primary)
-                        .lineLimit(compact ? 1 : nil)
-                        .textSelection(.enabled)
-                }
-                .inkuTooltip(display.tooltipValue(display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録"))), focus: .none)
-            }
-        }.inkuFont(compact ? 10 : 12)
-    }
-}
-
 /// Web `modelLines` on a library card: "解釈:" / "描画:" only when the two stages differ (HistoryManager.svelte:364-374).
 @MainActor
 struct LibraryModelLinesView: View {

@@ -207,7 +207,7 @@ public final class AuxiliaryModel {
             let kind = orderedKinds.contains(suggestedKind) ? suggestedKind : (orderedKinds.first ?? AuxiliaryProvider.allowedKinds[0])
             let catalog = kind == "catalog_change" ? randomCatalog(app: app, parent: work) : nil
             var request = try await app.makeRefinementRequest(work: work, kind: kind,
-                amplitude: amplitude, modelReference: modelReference.isEmpty ? nil : modelReference,
+                modelReference: modelReference.isEmpty ? nil : modelReference,
                 catalogIDOverride: catalog,
                 wildOverride: inheritWild ? nil : wildOverride)
             request = try await app.pinPersonalPlanRequests([request])[0]
@@ -280,10 +280,6 @@ public final class AuxiliaryModel {
     private func randomCatalog(app: AppModel, parent: SavedWork) -> String? {
         let current = parent.renderColorCatalogID ?? parent.catalogID
         return app.catalogs.filter { $0.id != current }.randomElement()?.id ?? current ?? app.catalogs.first?.id
-    }
-
-    public static func kindLabel(_ kind: String) -> String {
-        ["reinterpretation": "読み取り", "catalog_change": "色", "layout_change": "配置", "touch_change": "タッチ", "variation": "変奏"][kind] ?? kind
     }
 
     /// The thumbnail is an observation input; the saved SVG is never rewritten.

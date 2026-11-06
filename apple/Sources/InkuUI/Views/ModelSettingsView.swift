@@ -26,15 +26,6 @@ struct ModelSettingsView: View {
     private var chatGPTProvider: ProviderSettings {
         settings.host.providers.first { $0.kind == .chatGPTPlan } ?? .personalPlan
     }
-    private var drawingChoices: [DrawingChoice] {
-        (settings.orderedProviders + settings.host.providers.filter { $0.kind == .chatGPTPlan }).flatMap { provider in
-            SettingsModel.batchModels(for: provider).map {
-                DrawingChoice(provider: provider, model: ProviderModelInfo(id: provider.id + ":" + $0.id,
-                    name: $0.label, contextLimit: nil, capabilities: []))
-            }
-        }
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -543,12 +534,6 @@ struct ModelSettingsView: View {
                   let parsed = Int(trimmed), (0...1_000_000_000).contains(parsed) else { return nil }
             return parsed
         }
-    }
-
-    private struct DrawingChoice: Identifiable {
-        let provider: ProviderSettings
-        let model: ProviderModelInfo
-        var id: String { model.id }
     }
 
     private enum SheetRoute: Identifiable {

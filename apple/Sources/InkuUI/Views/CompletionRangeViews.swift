@@ -16,18 +16,6 @@ enum CompletionRangeStyle {
         states.map { InkuEditorMark(range: NSRange(location: $0.utf16Start, length: $0.utf16End - $0.utf16Start), style: .completion($0.state)) }
     }
 
-    /// The read-only DDL box: the same underlines, without touching what is copied.
-    static func attributed(_ source: String, _ states: [CompletionRangeState]) -> AttributedString {
-        var text = AttributedString(source)
-        for state in states {
-            let utf16 = source.utf16
-            guard let lower = utf16.index(utf16.startIndex, offsetBy: state.utf16Start, limitedBy: utf16.endIndex),
-                  let upper = utf16.index(utf16.startIndex, offsetBy: state.utf16End, limitedBy: utf16.endIndex),
-                  let start = AttributedString.Index(lower, within: text), let end = AttributedString.Index(upper, within: text) else { continue }
-            text[start..<end].underlineStyle = Text.LineStyle(pattern: .dot, color: color(state.state))
-        }
-        return text
-    }
 }
 
 @MainActor

@@ -87,28 +87,3 @@ struct ModelPurposeBadgesView: View {
         }
     }
 }
-
-/// Units and purpose IDs remain identical in both interface languages.
-struct ModelMeasurementView: View {
-    let llmSeconds: Double?
-    let visionSeconds: Double?
-    let llmCost: Double?
-    let visionCost: Double?
-    var language = "ja"
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if llmCost != nil || visionCost != nil {
-                Text(ModelMetadataPresentation.cost(entry, language: language))
-            }
-            if llmSeconds != nil || visionSeconds != nil {
-                Text(ModelMetadataPresentation.speed(entry, language: language))
-            }
-        }.font(.caption).textSelection(.enabled)
-    }
-
-    private var entry: ProviderModelSettings {
-        ProviderModelSettings(id: "measurement", speedLLMSeconds: llmSeconds, speedVisionSeconds: visionSeconds,
-                              costUSDLLM: llmCost, costUSDVision: visionCost)
-    }
-}

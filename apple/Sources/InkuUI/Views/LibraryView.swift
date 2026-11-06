@@ -460,14 +460,6 @@ struct LibraryView: View {
         return .handled
     }
 
-    /// Native facts the Web card does not print: saved time and SVG size, with the colour catalog on hover.
-    private func savedFacts(_ work: SavedWork) -> some View {
-        (Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
-            + Text(" · " + ByteCountFormatter.string(fromByteCount: svgBytes(work), countStyle: .file)))
-            .inkuFont(10).monospacedDigit().foregroundStyle(.tertiary).lineLimit(1)
-            .inkuTooltip(display.tooltipValue(display.localized("色") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? display.localized("未記録"))), focus: .none)
-    }
-
     private var currentBadge: some View { LibraryCurrentBadge(display: display) }
 
     private func selectionCheck(_ work: SavedWork) -> some View {
@@ -717,7 +709,7 @@ struct LibraryView: View {
             .overlay(alignment: .topTrailing) {
                 // HistoryManager.svelte:1054 `.lineage-generation-badge`, in the thumbnail lane only.
                 if model.selectedWorkID == work.id { currentBadge.padding(3) }
-                else if library.layout != .list { generationBadge(work, plate: false).padding(8) }
+                else if library.layout != .list { generationBadge(work).padding(8) }
             }
             HStack(spacing: 4) {
                 LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
@@ -893,17 +885,14 @@ struct LibraryView: View {
             : display.tooltip("作品UUIDをコピー", serverKey: "historyIdCopyTitle")
     }
 
-    @ViewBuilder private func generationBadge(_ work: SavedWork, plate: Bool) -> some View {
+    @ViewBuilder private func generationBadge(_ work: SavedWork) -> some View {
         if let generation = work.lineageNodeID.flatMap({ library.generations[$0] }) {
             Text("\(generation)")
-                .font(.system(size: (plate ? 10 : 9) * display.preferences.textScale, weight: plate ? .semibold : .regular))
-                .monospacedDigit()
-                .foregroundStyle(plate ? Color.secondary : Color.accentColor)
-                .padding(.horizontal, plate ? 3 : 5).padding(.vertical, plate ? 0 : 1)
-                .frame(minWidth: 16, minHeight: plate ? 16 : nil)
-                .background(plate ? AnyShapeStyle(.background.opacity(0.9)) : AnyShapeStyle(Color.accentColor.opacity(0.14)),
-                            in: RoundedRectangle(cornerRadius: plate ? 3 : 8))
-                .overlay(RoundedRectangle(cornerRadius: plate ? 3 : 8).stroke(plate ? LibraryChrome.border : Color.clear))
+                .font(.system(size: 9 * display.preferences.textScale, weight: .regular))
+                .monospacedDigit().foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 5).padding(.vertical, 1).frame(minWidth: 16)
+                .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.clear))
                 .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"), focus: .none)
         }
     }
@@ -1457,175 +1446,6 @@ private struct LibraryGridCard: View, Equatable {
                 .background(AnyShapeStyle(.background.opacity(0.9)), in: RoundedRectangle(cornerRadius: 3))
                 .overlay(RoundedRectangle(cornerRadius: 3).stroke(LibraryChrome.border))
                 .inkuTooltip(strings.generation, focus: .none)
-        }
-    }
-}
-
-@MainActor
-struct LibraryWorkDetails: View {
-    @Bindable var model: AppModel
-    let work: SavedWork
-    let onReplayWork: (SavedWork) -> Void
-    var annotationSource: LibraryAnnotationState? = nil
-    var onAnnotationSaved: ((String, LibraryAnnotation) -> Void)? = nil
-    var onOpenInCreate: ((SavedWork) -> Void)? = nil
-    var onAdjustWork: ((SavedWork) -> Void)? = nil
-    var onWorkAction: ((SavedWork, String) -> Void)? = nil
-    var onOpenLineage: ((SavedWork) -> Void)? = nil
-    var writingLocked = false
-    @State private var comment = LibraryNoteEditorModel()
-    private var library: LibraryModel { model.library }
-    private var writingDisabled: Bool { model.isBusy || writingLocked }
-    private var annotationState: LibraryAnnotationState {
-        if let annotationSource { return annotationSource }
-        if library.isAnnotationLoading(for: work.id) { return .loading }
-        if let value = library.loadedAnnotation(for: work.id) { return .available(value) }
-        return .unavailable
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 14) { heading; Spacer(minLength: 12); workActions }
-                VStack(alignment: .leading, spacing: 10) { heading; workActions }
-            }
-            ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer,
-                          caption: model.imageWorkProvenance[work.id] == nil ? work.effectiveSourceText : model.workPresentationTitle(work))
-                .frame(height: 280)
-                // HistoryManager.svelte:915-921: a double click on the preview opens the work.
-                .simultaneousGesture(TapGesture(count: 2).onEnded {
-                    guard let onOpenInCreate, !model.isBrowsingLocked, !work.trashed else { return }
-                    onOpenInCreate(work)
-                })
-                .inkuTooltip(onOpenInCreate == nil || work.trashed ? ""
-                             : model.display.tooltip("ダブルクリックで作品を開く", serverKey: "historyPreviewOpenHint"))
-            LibraryModelFactsView(work: work, display: model.display)
-            if let onWorkAction {
-                ViewThatFits(in: .horizontal) {
-                    HStack { previewActions(onWorkAction) }
-                    VStack(alignment: .leading, spacing: 8) { previewActions(onWorkAction) }
-                }.controlSize(.small).disabled(model.isBrowsingLocked || work.trashed)
-            }
-            LabeledContent(model.display.localized("SVG容量"), value: ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(work), countStyle: .file))
-                .inkuFont(12).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label(model.display.localized("コメント"), systemImage: "text.bubble").inkuFont(12, weight: .medium)
-                    Spacer()
-                    Text("\(comment.text.utf16.count) / \(LibraryNoteEditorModel.limit)").inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
-                    Button(model.display.localized("保存")) { saveNote() }
-                        .disabled(writingDisabled || library.mutating || !comment.canSave)
-                        .inkuTooltip(model.display.tooltip("この作品のコメントを保存します。"))
-                }
-                // Typing stops at the limit, as the Web textarea's maxlength does.
-                TextField(model.display.localized("コメント（240文字まで）"), text: Binding(
-                    get: { comment.text }, set: { comment.text = LibraryNoteEditorModel.limited($0) }), axis: .vertical)
-                    .lineLimit(2...4).textFieldStyle(.roundedBorder)
-                    .disabled(writingDisabled || annotationState.annotation == nil || comment.saving)
-                if annotationState == .loading {
-                    HStack(spacing: 6) { ProgressView().controlSize(.small); Text(model.display.localized("コメントを読み込み中")) }
-                        .inkuFont(12).foregroundStyle(.secondary)
-                } else if annotationState == .unavailable {
-                    Text(model.display.localized("コメントを取得できません")).inkuFont(12).foregroundStyle(.secondary)
-                }
-                if let error = comment.errorText { Text(error).inkuFont(12).foregroundStyle(.red).textSelection(.enabled) }
-            }
-            DisclosureGroup(model.display.localized("DDL・Score・保存情報")) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        OutputView(ddl: work.ddl ?? "", score: work.score).frame(height: 160)
-                        if model.imageWorkProvenance[work.id] != nil {
-                            Text(model.workPresentationTitle(work)).textSelection(.enabled)
-                        } else if !work.effectiveSourceText.isEmpty {
-                            Text(model.display.localizedFormat("記述: %@", work.effectiveSourceText)).textSelection(.enabled)
-                        }
-                        Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime.year().month().day().hour().minute().second())
-                            .inkuFont(12).foregroundStyle(.secondary)
-                        Text(model.display.localizedFormat("作品 ID: %@", work.id)).inkuFont(12, design: .monospaced).textSelection(.enabled)
-                        Text(model.display.localizedFormat("用紙: %@ · シード: %@", work.renderCanvasAspectID ?? "—", work.renderSeed ?? "—"))
-                            .inkuFont(12).textSelection(.enabled)
-                        Text(model.display.localizedFormat("色: %@ · 描画: %@ %@", work.renderColorCatalogName ?? work.catalogID ?? "—", work.renderEngineID ?? "—", work.renderEngineVersion ?? ""))
-                            .inkuFont(12).textSelection(.enabled)
-                        Text(model.display.localizedFormat("SVG: %ld bytes · 生成: %@", work.svg.utf8.count, work.elapsedMS.map { model.display.localizedFormat("%.3f 秒", Double($0) / 1000) } ?? "—"))
-                            .inkuFont(12).textSelection(.enabled)
-                        hashRow("描画", hash: work.renderHash)
-                        hashRow("記述", hash: work.descriptionHash)
-                    }
-                }.frame(maxHeight: 260).padding(.top, 8)
-            }
-        }.task(id: work.id) {
-            comment.receive(workID: work.id, state: annotationState)
-            await model.loadWorkActionState(work)
-        }
-        .onChange(of: annotationState) { _, value in
-            comment.receive(workID: work.id, state: value)
-        }
-    }
-
-    private var heading: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(model.display.localized(work.trashed ? "ごみ箱の作品" : annotationSource == nil ? "表示中の作品" : "作品プレビュー"), systemImage: work.trashed ? "trash" : "eye")
-                .inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-            LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), size: 14)
-        }
-    }
-
-    @ViewBuilder private func previewActions(_ action: @escaping (SavedWork, String) -> Void) -> some View {
-        Button(model.display.localized("生成情報"), systemImage: "info.circle") { action(work, "info") }
-        if let onOpenLineage {
-            Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { onOpenLineage(work) }
-                .disabled(work.lineageNodeID == nil)
-        }
-        if let onAdjustWork {
-            Button(model.display.localized("推敲する"), systemImage: "slider.horizontal.3") { onAdjustWork(work) }
-                .disabled(writingDisabled)
-        }
-        Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
-            SavedWorkRefinementActions(model: model, work: work, onAction: action, writingLocked: writingDisabled)
-        }.disabled(writingDisabled)
-        Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.up") { action(work, "export") }.disabled(writingDisabled)
-    }
-
-    private var workActions: some View {
-        HStack(spacing: 10) {
-            Button(model.display.localized(onOpenInCreate == nil ? "制作で編集" : "制作で開く"), systemImage: "pencil") {
-                if let onOpenInCreate { onOpenInCreate(work) }
-                else { Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create", userInfo: ["workID": work.id]) } }
-            }.disabled(model.isBrowsingLocked || work.trashed)
-                .inkuTooltip(model.display.tooltip("保存作品を制作に開きます。制作中の内容が置き換わります。"))
-            Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }.disabled(writingDisabled || work.trashed)
-                .inkuTooltip(model.display.tooltip("保存時と現行の描画を比較します。"))
-        }.controlSize(.small).fixedSize()
-    }
-
-    private func saveNote() {
-        guard !writingDisabled, !library.mutating else { return }
-        Task {
-            let id = work.id
-            let value = await comment.save { id, submitted in
-                await library.saveNote(id: id, note: submitted)
-                if let error = library.errorText {
-                    throw NSError(domain: "InkuLibraryNote", code: 1, userInfo: [NSLocalizedDescriptionKey: error])
-                }
-                return try await model.auxiliaryDatabase().libraryAnnotation(id: id)
-            }
-            if let value { onAnnotationSaved?(id, value) }
-        }
-    }
-
-    private func hashRow(_ label: String, hash: String?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(model.display.localizedFormat("%@ハッシュ: %@", model.display.localized(label), "")).inkuFont(12).foregroundStyle(.secondary)
-                Spacer()
-                if let hash {
-                    // HistoryManager.svelte:975: the copy button names what it copies, then that it did.
-                    Button(model.display.localized("コピー")) { library.copyHash(hash) }.inkuFont(12).buttonStyle(.borderless)
-                        .inkuTooltip(library.copiedHash == hash ? model.display.tooltip("コピーしました", serverKey: "historyHashCopied")
-                                     : model.display.tooltip("描画ハッシュ全体をコピー", serverKey: "historyHashCopyTitle"))
-                }
-            }
-            Text(hash ?? "—").inkuFont(12, design: .monospaced).textSelection(.enabled)
         }
     }
 }

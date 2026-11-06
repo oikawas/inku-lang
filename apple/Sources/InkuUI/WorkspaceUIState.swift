@@ -46,8 +46,6 @@ final class WorkspaceUIState {
     var canvasViewport = CanvasViewport()
     var batchResultsExpanded = false
     var batchIssuesExpanded = false
-    var batchConditionsExpanded = false
-    var batchWorkspaceTab = "work"
     var generationInfoTab = "details"
     /// The next drawing model's service needs an API key that is not stored (first launch guidance).
     var drawingKeyMissing = false

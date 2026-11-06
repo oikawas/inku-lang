@@ -10,6 +10,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Android: use the shared core for DDL title detection and description comment contents, aligning with Server for unusual whitespace including U+001C–U+001F.
 
+- macOS: guide users to add a connection, choose a default drawing model, or select demo models in the demo panel.
+
+- macOS: show a readable reason when importing instructions in the new instruction editor fails.
+
 - macOS: DB v9 replaces duplicate saved data with digests and compacts the database. Drawing logs for failed or stopped executions without a saved effect are removed during migration.
 
 - Demo instruction and Vision requests now have an overall deadline including admission and limit response bodies to 32 MB.

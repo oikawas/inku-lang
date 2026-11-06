@@ -36,7 +36,7 @@ public actor PipelineHost {
         if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
             throw HostError("developer_provider_observations_not_available")
         }
-        guard ["normal", "lineage_only"].contains(request.historyVisibility) else { throw HostError("invalid_history_visibility") }
+        guard request.historyVisibility == "normal" else { throw HostError("invalid_history_visibility") }
         if request.authoring.isDirect, let parentID = request.parentWorkID,
            let parent = try? await savedAuthoringContext(workID: parentID), let imageDDL = parent.imageDDL {
             request.inheritedImageDDL = imageDDL
@@ -317,10 +317,8 @@ public actor PipelineHost {
     /// Freeze all saved rendering facts before any candidate starts, without resolving today's colors.
     public func makeSavedScoreReplayPlan(workID: String, renderSeed: String? = nil, wild: Bool? = nil,
                                         options replayOptions: ReplayOptions? = nil, compositionSeed: String? = nil,
-                                        derivationKind: String = "replay", derivationMetadata: Data? = nil,
-                                        variationAmplitude: String? = nil,
-                                        variationSeed: String? = nil) async throws -> SavedScoreReplayPlan {
-        guard derivationKind != "variation", variationAmplitude == nil, variationSeed == nil else {
+                                        derivationKind: String = "replay", derivationMetadata: Data? = nil) async throws -> SavedScoreReplayPlan {
+        guard derivationKind != "variation" else {
             throw HostError("variation_retired")
         }
         guard derivationKind != "touch_change" else { throw HostError("touch_refinement_retired") }
@@ -336,8 +334,7 @@ public actor PipelineHost {
         _ = try metadataText(derivationMetadata)
         try Task.checkCancellation()
         return SavedScoreReplayPlan(work: source, parentNode: parentNode, context: context.data, renderRequest: request.data,
-            derivationKind: derivationKind, derivationMetadata: derivationMetadata,
-            variationAmplitude: variationAmplitude, variationSeed: variationSeed)
+            derivationKind: derivationKind, derivationMetadata: derivationMetadata)
     }
 
     /// Four validated touch assignments, built entirely from the saved parent's Score and core reading.
@@ -370,8 +367,7 @@ public actor PipelineHost {
             child.removeValue(forKey: "laws_layers")
             if written["laws_layers"].object != nil { child["laws_layers"] = written["laws_layers"] }
             var replay = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: ExactJSON.object(child).data,
-                renderRequest: request.data, derivationKind: "tool_change", derivationMetadata: metadata.data,
-                variationAmplitude: nil, variationSeed: nil)
+                renderRequest: request.data, derivationKind: "tool_change", derivationMetadata: metadata.data)
             replay.retouchedSource = ddl
             plans.append(ToolVariantPlan(mode: mode, tools: tools, changes: changes, source: ddl, labels: labels, replay: replay))
         }
@@ -383,9 +379,6 @@ public actor PipelineHost {
     }
 
     public func previewSavedScoreReplay(_ plan: SavedScoreReplayPlan) async throws -> PreparedCandidate {
-        guard plan.derivationKind != "variation", plan.variationAmplitude == nil, plan.variationSeed == nil else {
-            throw HostError("variation_retired")
-        }
         let began = Date()
         let source = plan.work
         guard let stored = try await database.work(id: source.id), !stored.trashed,
@@ -550,7 +543,7 @@ public actor PipelineHost {
         work.variationAmplitude = compiler["stage15_variation"]["amplitude"].string
         work.variationSeed = compiler["stage15_variation"]["seed"].string
         work.renderHash = try WorkIdentity.render(score: score, options: options, metadata: rendered["metadata"])
-        let node = LineageNode(id: nodeID, historyID: id, state: request.historyVisibility == "lineage_only" ? "lineage_only" : "active",
+        let node = LineageNode(id: nodeID, historyID: id, state: "active",
             at: now, descriptionHash: work.descriptionHash, renderHash: work.renderHash, rootNodeID: parentNode.rootNodeID ?? parentNode.id)
         let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID,
             derivationKind: request.derivationKind, metadataJSON: try metadataText(request.derivationMetadata), at: now)
@@ -1321,7 +1314,7 @@ private actor ExecutionDriver {
             edge = LineageEdge(id: newID(), parentNodeID: parentNodeID, childNodeID: nodeID,
                                derivationKind: state.derivationKind, metadataJSON: metadata, at: now)
         }
-        let node = LineageNode(id: nodeID, historyID: id, state: state.historyVisibility == "lineage_only" ? "lineage_only" : "active",
+        let node = LineageNode(id: nodeID, historyID: id, state: "active",
             at: now, descriptionHash: descriptionHash, renderHash: renderHash, rootNodeID: rootNodeID)
         var savedState = state; savedState.savedWorkID = id
         let effectID = "save-render:" + (try snapshot.requiredString("sequence"))

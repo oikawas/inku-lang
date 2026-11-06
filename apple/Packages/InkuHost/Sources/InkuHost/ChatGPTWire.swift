@@ -32,12 +32,6 @@ enum ChatGPTWire {
             "answer_limit": .integer(answerLimit)]).data))
     }
 
-    static func wireLimit(answerLimit: Int) throws -> Int {
-        let result = try ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_limits"), "answer_limit": .integer(answerLimit)]).data)
-        guard let limit = int(result["wire_limit"]) else { throw HostError("chatgpt_response_invalid") }
-        return limit
-    }
-
     static func read(text: Bool, answerLimit: Int, wire: Data) throws -> Stream {
         let result = try ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_stream"), "mode": .string(text ? "text" : "pipeline"),
             "answer_limit": .integer(answerLimit), "wire_base64": .string(wire.base64EncodedString())]).data)

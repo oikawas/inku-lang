@@ -68,14 +68,6 @@ func runComparisonChecks() async throws {
     model.selectNextDrawingModel("check:model")
     await model.generate()
     guard model.errorText == nil, let described = model.selectedWork, !model.sourceLocked else { throw CheckFailure.message("Description source failed") }
-    // Failure: the retired variation (8ca63a39, Server 1162) still drew a work from the selected one.
-    let beforeVariation = try await database.list().count
-    model.variationSeedText = "17"
-    await model.varySelectedWork()
-    guard model.selectedWork == described, try await database.list().count == beforeVariation, !model.sourceLocked else {
-        throw CheckFailure.message("Retired variation drew a work: \(model.errorText ?? model.status)")
-    }
-    model.errorText = nil
     let variation = described
 
     // Failure: model comparison drew its candidates one after another; Web draws them at once within the fan-out limit.
@@ -119,7 +111,7 @@ func runComparisonChecks() async throws {
           try await database.list().count == rowCount + 1 else {
         throw CheckFailure.message("Editing a retained variation failed to create a source-authoritative child: \(model.errorText ?? model.status)")
     }
-    print("Comparison passed: two previews add no history; four model candidates drawn at once (peak \(fanoutPeak) in flight); one explicit selection creates one immutable-parent child; save retry is idempotent; retired variation draws nothing and the description source stays editable; blocked model cancellation drains with no late candidate. No external provider calls.")
+    print("Comparison passed: two previews add no history; four model candidates drawn at once (peak \(fanoutPeak) in flight); one explicit selection creates one immutable-parent child; save retry is idempotent; the description source stays editable; blocked model cancellation drains with no late candidate. No external provider calls.")
 }
 
 private actor ComparisonProvider: ProviderTransport {

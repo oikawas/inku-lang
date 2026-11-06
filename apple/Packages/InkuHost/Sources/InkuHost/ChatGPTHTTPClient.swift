@@ -66,12 +66,9 @@ enum ChatGPTEndpoints {
     static let issuer = try! constants.requiredString("issuer")
     static let resource = try! constants.requiredString("resource")
     static let token = URL(string: try! constants.requiredString("token"))!
-    static let authorize = URL(string: try! constants.requiredString("authorize"))!
     static let discovery = URL(string: issuer + "/.well-known/openid-configuration")!
     static let models = URL(string: resource + "/models")!
     static let responses = URL(string: resource + "/responses")!
-    static let usage = URL(string: "https://chatgpt.com/settings/usage")!
-    static let scope = try! constants.requiredString("scopes")
     static func validate(_ url: URL, authenticationOnly: Bool = false) throws {
         if authenticationOnly || url.host == "auth.openai.com" {
             _ = try ChatGPTPolicy.call("chatgpt_auth_endpoint", ["url": .string(url.absoluteString)])

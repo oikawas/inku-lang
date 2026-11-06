@@ -141,7 +141,7 @@ struct CreationView: View {
         }
         .animation(.easeOut(duration: 0.2), value: ui.saijikiOpen)
         .sheet(isPresented: $showColorCatalogs) {
-            ColorCatalogView(model: model, descriptionOnly: true)
+            ColorCatalogView(model: model)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.colorCatalog)
         }
         .sheet(isPresented: $showModelPicker) {
@@ -322,14 +322,14 @@ struct CreationView: View {
                 }.pickerStyle(.segmented).disabled(controlsDisabled)
                 if batchKind == "image" { imageFolderPanel }
                 else {
-                    BatchPanelView(model: model, automation: automation, inputOnly: true,
+                    BatchPanelView(model: model, automation: automation,
                                    onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                                    followsLatestWork: batchWorkspace.followsLatest,
                                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
                                    onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
                 }
                 #else
-                BatchPanelView(model: model, automation: automation, inputOnly: true,
+                BatchPanelView(model: model, automation: automation,
                     onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                     followsLatestWork: batchWorkspace.followsLatest,
                     selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
@@ -594,11 +594,13 @@ struct CreationView: View {
     /// InputPanel.svelte:308-337: the paint button, or the run status while drawing.
     private var generationAction: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if model.inputMode == "description" && !model.hasNextDrawingModel {
+            if model.inputMode == "description" && !model.hasAvailableNextDrawingModel {
                 Button {
-                    ui.settingsSection = .models; ui.settingsOpen = true
+                    ui.settingsSection = .drawingGuidance(hasConnection: model.hasDrawingConnection); ui.settingsOpen = true
                 } label: {
-                    Label(display.localized("記述から生成するには、設定で接続先とモデルを指定してください。"), systemImage: "gearshape")
+                    Label(display.localized(model.hasDrawingConnection
+                        ? "描くときのデフォルトで、使える描画モデルを選んでください。"
+                        : "モデル設定で接続先を追加してください。"), systemImage: "gearshape")
                         .inkuFont(13).multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
@@ -1163,27 +1165,5 @@ struct WrappingHStack: Layout {
         }
         if !current.indices.isEmpty { rows.append(current) }
         return rows
-    }
-}
-
-struct OutputView: View {
-    @Environment(\.locale) private var locale
-    let ddl: String
-    let score: String
-    @State private var tab = "ddl"
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            InkuSegmentedButtons(options: [("ddl", "DDL"), ("score", "Score")], selection: $tab)
-                .accessibilityLabel(InkuLocalization.string("出力", locale: locale))
-            ScrollView {
-                Text(tab == "ddl" ? ddl : score)
-                    .inkuFont(12, design: .monospaced)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-            }
-            .background(.background, in: RoundedRectangle(cornerRadius: 6))
-        }
     }
 }

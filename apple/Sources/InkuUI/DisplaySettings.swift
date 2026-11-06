@@ -23,7 +23,6 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     /// Local equivalent of Server client_limit; validated before a refinement starts.
     public var refinementFanoutLimit = 4
     public var clipboardHeight = 1080
-    public var clipboardBackground = "original"
     public var clipboardFormat: String?
     public var visionModelReference: String?
     public var auxiliaryVisionModelReference: String?

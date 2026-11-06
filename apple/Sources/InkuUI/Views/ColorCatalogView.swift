@@ -9,23 +9,21 @@ struct ColorCatalogView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draftCatalogID: String
     @State private var draftMode: String
-    private let descriptionOnly: Bool
     #if os(macOS)
     private let sheetSize: CGSize
     #endif
 
-    init(model: AppModel, descriptionOnly: Bool = false) {
+    init(model: AppModel) {
         self.model = model
-        self.descriptionOnly = descriptionOnly
         _draftCatalogID = State(initialValue: model.catalogID)
-        _draftMode = State(initialValue: model.catalogMode == "auto" && (descriptionOnly || model.inputMode == "description") ? "auto" : "fixed")
+        _draftMode = State(initialValue: model.catalogMode == "auto" ? "auto" : "fixed")
         #if os(macOS)
         let available = NSApp.keyWindow?.contentView?.bounds.size ?? CGSize(width: 1212, height: 868)
         sheetSize = CGSize(width: min(1180, max(640, available.width - 32)), height: min(820, max(440, available.height - 48)))
         #endif
     }
 
-    private var allowsDescriptionAuto: Bool { descriptionOnly || model.inputMode == "description" }
+    private var allowsDescriptionAuto: Bool { true }
     private var selectedCatalog: ColorCatalogOption? { model.catalogs.first { $0.id == draftCatalogID } }
     private var canConfirm: Bool {
         !model.isBusy && selectedCatalog != nil && ["fixed", "auto"].contains(draftMode)
@@ -64,9 +62,6 @@ struct ColorCatalogView: View {
         #if os(macOS)
         .frame(width: sheetSize.width, height: sheetSize.height)
         #endif
-        .onChange(of: model.inputMode) { _, mode in
-            if !descriptionOnly, mode == "ddl", draftMode == "auto" { draftMode = "fixed" }
-        }
     }
 
     private func confirm() {
@@ -181,44 +176,6 @@ struct ColorCatalogView: View {
                 .accessibilityLabel([swatch.name, model.display.preferences.language == "ja" ? swatch.japaneseName : nil, swatch.code].compactMap { $0 }.joined(separator: ", "))
             }
         }
-    }
-}
-
-@MainActor
-struct ColorCatalogPreview: View {
-    let catalog: ColorCatalogOption?
-    let mode: String
-    let display: DisplaySettings
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(display.localized("色カタログ"), systemImage: "paintpalette").inkuFont(12, weight: .semibold)
-                Spacer()
-                Image(systemName: "chevron.right").inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
-            }
-            if mode == "fixed" {
-                if let catalog {
-                    Text(catalog.name).inkuFont(13, weight: .medium)
-                    HStack(spacing: 3) {
-                        ForEach(Array(catalog.palette.enumerated()), id: \.offset) { _, swatch in
-                            CatalogSwatchShape(swatch: swatch)
-                        }
-                    }
-                    .frame(height: 18).accessibilityHidden(true)
-                    Text(catalog.localizedDetail(language: display.preferences.language)).inkuFont(12).foregroundStyle(.secondary)
-                } else {
-                    Text(display.localized("選択してください")).inkuFont(12).foregroundStyle(.secondary)
-                }
-            } else {
-                Text(display.localized(mode == "random" ? "生成ごとに配色をランダムに選びます。" : "次の生成で、記述から配色を選びます。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
     }
 }
 

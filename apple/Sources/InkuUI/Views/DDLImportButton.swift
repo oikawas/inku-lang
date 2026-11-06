@@ -1,6 +1,26 @@
 import InkuHost
 import Observation
 import SwiftUI
+
+@MainActor
+enum DDLImportErrorText {
+    static func message(_ error: Error, display: DisplaySettings) -> String {
+        guard let failure = error as? HostError else {
+            return display.localizedFormat("DDLファイルを読み込めませんでした: %@", error.localizedDescription)
+        }
+        switch failure.code {
+        case "ddl_import_too_large": return display.localized("DDLファイルは4MiB以下で読み込んでください。")
+        case "ddl_import_invalid_utf8": return display.localized("UTF-8のテキストファイルを選択してください。")
+        case "ddl_export_without_ddl": return display.localized("このDDL packageには指示書がありません。")
+        case "ddl_export_requires_v2": return display.label("元の作品から v2 で書き出し直してください。", "Export the original work again in v2 format.")
+        case "ddl_export_too_many_plugins": return display.localized("持ち込めるプラグイン定義は64件までです。")
+        case "ddl_export_invalid", "ddl_export_invalid_plugin", "imported_macro_catalog_incomplete": return display.localized("プラグイン定義を確認できませんでした。元の作品からもう一度書き出してください。")
+        case "authoring_busy", "ddl_import_busy_or_unavailable": return display.localized("描画の準備が完了してから読み込んでください。")
+        case "ddl_import_context_changed": return display.localized("読み込み中に制作内容が変わったため、取り込みを中止しました。もう一度ファイルを選択してください。")
+        default: return display.localizedFormat("DDLファイルを読み込めませんでした: %@", failure.localizedDescription)
+        }
+    }
+}
 #if os(macOS)
 import AppKit
 import UniformTypeIdentifiers
@@ -73,19 +93,7 @@ final class DDLImportController {
             } catch is CancellationError { self.message = "読み込みを中止しました。" }
             catch {
                 guard !Task.isCancelled else { self.message = "読み込みを中止しました。"; return }
-                if let failure = error as? HostError {
-                    switch failure.code {
-                    case "ddl_import_too_large": model.errorText = model.display.localized("DDLファイルは4MiB以下で読み込んでください。")
-                    case "ddl_import_invalid_utf8": model.errorText = model.display.localized("UTF-8のテキストファイルを選択してください。")
-                    case "ddl_export_without_ddl": model.errorText = model.display.localized("このDDL packageには指示書がありません。")
-                    case "ddl_export_requires_v2": model.errorText = model.display.label("元の作品から v2 で書き出し直してください。", "Export the original work again in v2 format.")
-                    case "ddl_export_too_many_plugins": model.errorText = model.display.localized("持ち込めるプラグイン定義は64件までです。")
-                    case "ddl_export_invalid", "ddl_export_invalid_plugin", "imported_macro_catalog_incomplete": model.errorText = model.display.localized("プラグイン定義を確認できませんでした。元の作品からもう一度書き出してください。")
-                    case "authoring_busy", "ddl_import_busy_or_unavailable": model.errorText = model.display.localized("描画の準備が完了してから読み込んでください。")
-                    case "ddl_import_context_changed": model.errorText = model.display.localized("読み込み中に制作内容が変わったため、取り込みを中止しました。もう一度ファイルを選択してください。")
-                    default: model.errorText = model.display.localizedFormat("DDLファイルを読み込めませんでした: %@", failure.localizedDescription)
-                    }
-                } else { model.errorText = model.display.localizedFormat("DDLファイルを読み込めませんでした: %@", error.localizedDescription) }
+                model.errorText = DDLImportErrorText.message(error, display: model.display)
             }
         }
         return true
@@ -139,18 +147,4 @@ final class DDLImportController {
     }
 }
 
-@MainActor
-struct DDLImportButton: View {
-    @Bindable var model: AppModel
-    @Environment(DDLImportController.self) private var importer
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button(model.display.localized(importer.isReading ? "読み込んでいます…" : "DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { importer.read(app: model) }
-                .disabled(importer.isReading || model.isBusy)
-            if !importer.visibleMessage(app: model).isEmpty {
-                Text(model.display.message(importer.visibleMessage(app: model))).inkuFont(12).foregroundStyle(.secondary)
-            }
-        }
-    }
-}
 #endif

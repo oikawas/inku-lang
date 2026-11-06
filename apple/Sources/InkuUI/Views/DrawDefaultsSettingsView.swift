@@ -16,10 +16,13 @@ import InkuHost
     private func imageTab(_ tab: String) -> Bool { tab == "image" || tab == "batch_image" }
     private func copy(_ key: String, _ fallback: String) -> String { model.display.webCopy(key, fallback) }
     private func binding<T>(_ tab: String, _ path: WritableKeyPath<DrawOptions, T>) -> Binding<T> {
-        Binding(get: { (draft[tab] ?? model.drawDefaults[tab]!)[keyPath: path] }, set: { value in
-            if draft[tab] == nil { draft[tab] = model.drawDefaults[tab] }
+        Binding(get: { options(tab)[keyPath: path] }, set: { value in
+            if draft[tab] == nil { draft[tab] = options(tab) }
             draft[tab]?[keyPath: path] = value; saved = false
         })
+    }
+    private func options(_ tab: String) -> DrawOptions {
+        draft[tab] ?? model.drawDefaults[tab] ?? DrawOptionsCore.release[tab] ?? .empty
     }
     private func tabTitle(_ tab: String) -> String {
         switch tab {
@@ -53,10 +56,10 @@ import InkuHost
                         togglePicker(copy("wildButton", "筆致制限を外す"), tab: tab, path: \.wild)
                     }
                     Picker(copy("colorCatalogButton", "色カタログ"), selection: Binding(get: {
-                        let catalog = (draft[tab] ?? model.drawDefaults[tab]!).catalog
+                        let catalog = options(tab).catalog
                         return catalog.mode == "auto" ? "auto" : catalog.id
                     }, set: { value in
-                        if draft[tab] == nil { draft[tab] = model.drawDefaults[tab] }
+                        if draft[tab] == nil { draft[tab] = options(tab) }
                         draft[tab]?.catalog.mode = value == "auto" ? "auto" : "fixed"
                         if value != "auto" { draft[tab]?.catalog.id = value }
                         saved = false

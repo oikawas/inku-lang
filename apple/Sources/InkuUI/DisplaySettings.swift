@@ -161,6 +161,9 @@ public final class DisplaySettings {
     @ObservationIgnored private var previewingTextSize = false
     @ObservationIgnored private var rememberedSettingsTab: String?
     @ObservationIgnored private var rememberedInputTab: String?
+    @ObservationIgnored private var rememberedWorkspaceTab: String?
+    @ObservationIgnored private var rememberedLibraryLayout: String?
+    @ObservationIgnored private var rememberedLibraryGrouped: Bool?
     @ObservationIgnored private let fileWriter = DisplayPreferencesFileWriter()
     @ObservationIgnored private var saveRevision = 0
     public init() {}
@@ -180,6 +183,9 @@ public final class DisplaySettings {
         fileURL = url
         rememberedSettingsTab = nil
         rememberedInputTab = nil
+        rememberedWorkspaceTab = nil
+        rememberedLibraryLayout = nil
+        rememberedLibraryGrouped = nil
     }
 
     public var colorScheme: ColorScheme? {
@@ -211,6 +217,21 @@ public final class DisplaySettings {
         rememberedInputTab = tab
         persist()
     }
+    public var workspaceTab: String? { rememberedWorkspaceTab ?? preferences.workspaceTab }
+    public var libraryLayout: String? { rememberedLibraryLayout ?? preferences.libraryLayout }
+    public var libraryGrouped: Bool? { rememberedLibraryGrouped ?? preferences.libraryGrouped }
+    public func rememberWorkspaceTab(_ tab: String) {
+        guard workspaceTab != tab else { return }
+        rememberedWorkspaceTab = tab; persist()
+    }
+    public func rememberLibraryLayout(_ layout: String) {
+        guard libraryLayout != layout else { return }
+        rememberedLibraryLayout = layout; persist()
+    }
+    public func rememberLibraryGrouped(_ grouped: Bool) {
+        guard libraryGrouped != grouped else { return }
+        rememberedLibraryGrouped = grouped; persist()
+    }
     public func previewTextSize(_ step: Int) {
         previewingTextSize = true
         preferences.textSizeStep = min(4, max(0, step))
@@ -225,6 +246,9 @@ public final class DisplaySettings {
             var snapshot = preferences.forPersistence()
             if let rememberedSettingsTab { snapshot.settingsTab = rememberedSettingsTab }
             if let rememberedInputTab { snapshot.inputTab = rememberedInputTab }
+            if let rememberedWorkspaceTab { snapshot.workspaceTab = rememberedWorkspaceTab }
+            if let rememberedLibraryLayout { snapshot.libraryLayout = rememberedLibraryLayout }
+            if let rememberedLibraryGrouped { snapshot.libraryGrouped = rememberedLibraryGrouped }
             let data = try JSONEncoder().encode(snapshot)
             saveRevision += 1
             let revision = saveRevision

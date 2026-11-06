@@ -36,10 +36,10 @@ use inku_ddl::work_plan::{
     composition_layer,
 };
 use inku_ddl::{
-    CompilerLockState, ExactFraction, MacroDefinition, MacroExpansionLimits, MacroLock,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, SemanticExplicitGeometry,
-    SemanticGeometryValue, SemanticHead, SemanticInstruction, SemanticPreviousReference,
-    SemanticRelation, SemanticRelationKind, SemanticSequenceKind, compile_typed_ddl,
+    CompilerLockState, ExactFraction, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
+    ResolvedInstructionLanguage, SemanticExplicitGeometry, SemanticGeometryValue, SemanticHead,
+    SemanticInstruction, SemanticPreviousReference, SemanticRelation, SemanticRelationKind,
+    SemanticSequenceKind, compile_typed_ddl,
 };
 use serde::{Deserialize, Serialize};
 
@@ -236,20 +236,7 @@ pub(crate) fn document(
     language: ResolvedInstructionLanguage,
     definitions: &[MacroDefinition],
 ) -> Option<NormalizedDdlDocument> {
-    let mut locks = Vec::new();
-    for definition in definitions {
-        let identity = definition.identity().ok()?;
-        locks.push(
-            MacroLock::new(
-                identity.qualified_name(),
-                identity.version(),
-                format!("sha256:{}", identity.full_digest_hex()),
-            )
-            .and_then(|lock| lock.with_aliases(definition.alias_qualified_names()))
-            .ok()?,
-        );
-    }
-    NormalizedDdlDocument::new(source, language, locks).ok()
+    crate::description_laws::locked_document(source, language, definitions)
 }
 
 pub(crate) fn canonical(

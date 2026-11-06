@@ -109,12 +109,25 @@ impl NormalizedDdlDocument {
         self.legacy_names_for_migration
     }
     /// Attach visible names only from definitions matching the complete lock identity.
-    pub fn with_definition_names(mut self, definitions: &[crate::MacroDefinition]) -> Self {
+    pub fn with_definition_names(self, definitions: &[crate::MacroDefinition]) -> Self {
+        let identities: Vec<_> = definitions
+            .iter()
+            .map(|definition| definition.identity())
+            .collect();
+        self.with_definition_names_and_identities(definitions, &identities)
+    }
+
+    pub(crate) fn with_definition_names_and_identities(
+        mut self,
+        definitions: &[crate::MacroDefinition],
+        identities: &[Result<crate::MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
+    ) -> Self {
         for lock in &mut self.macro_locks {
             let matches: Vec<_> = definitions
                 .iter()
-                .filter_map(|definition| {
-                    let identity = definition.identity().ok()?;
+                .zip(identities)
+                .filter_map(|(definition, identity)| {
+                    let identity = identity.as_ref().ok()?;
                     (identity.qualified_name() == lock.qualified_name
                         && identity.version() == lock.version
                         && format!("sha256:{}", identity.full_digest_hex()) == lock.digest)

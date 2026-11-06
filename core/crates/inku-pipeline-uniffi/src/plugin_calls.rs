@@ -36,15 +36,26 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         return Err(());
     }
     let input: Input = serde_json::from_slice(bytes).map_err(|_| ())?;
+    let identities: Vec<_> = input
+        .definitions
+        .iter()
+        .map(|definition| definition.identity())
+        .collect();
     let mut locks = input.locks;
     for lock in &mut locks {
-        if let Some(definition) = input.definitions.iter().find(|definition| {
-            definition.identity().is_ok_and(|identity| {
-                identity.qualified_name() == lock.qualified_name
-                    && identity.version() == lock.version
-                    && format!("sha256:{}", identity.full_digest_hex()) == lock.digest
-            })
-        }) {
+        if let Some((definition, _)) =
+            input
+                .definitions
+                .iter()
+                .zip(&identities)
+                .find(|(_, identity)| {
+                    identity.as_ref().is_ok_and(|identity| {
+                        identity.qualified_name() == lock.qualified_name
+                            && identity.version() == lock.version
+                            && format!("sha256:{}", identity.full_digest_hex()) == lock.digest
+                    })
+                })
+        {
             for alias in definition.alias_qualified_names() {
                 if !lock.aliases.contains(&alias) {
                     lock.aliases.push(alias);
@@ -58,8 +69,8 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         macro_locks: locks,
         saijiki: SAIJIKI_ASSET_ID.into(),
     };
-    let entries: Vec<Value> = input.definitions.iter().enumerate().filter_map(|(index, definition)| {
-        let identity = definition.identity().ok()?;
+    let entries: Vec<Value> = input.definitions.iter().zip(&identities).enumerate().filter_map(|(index, (definition, identity))| {
+        let identity = identity.as_ref().ok()?;
         if !visible.macro_locks.iter().any(|lock| lock.qualified_name == identity.qualified_name()) { return None; }
         let (ja, en) = inku_pipeline::plugin_offer::visible_names(definition);
         let note = input.summaries.get(index).cloned().unwrap_or_default();
@@ -81,10 +92,9 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
     // identifies another version. Then ask it to classify that original lock.
     let mut shadow = visible.clone();
     for lock in &mut shadow.macro_locks {
-        if let Some(identity) = input
-            .definitions
+        if let Some(identity) = identities
             .iter()
-            .filter_map(|definition| definition.identity().ok())
+            .filter_map(|identity| identity.as_ref().ok())
             .find(|identity| identity.qualified_name() == lock.qualified_name)
         {
             lock.version = identity.version().to_owned();
@@ -102,7 +112,7 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         if kind == Kind::MissingLock && item.surface.starts_with(['{', '｛'])
             && let Some(found) = shadow_resolution.resolved.iter().find(|found| found.span == item.span)
             && let Some(lock) = visible.macro_locks.iter().find(|lock| lock.qualified_name == found.lock.qualified_name)
-            && let Some(identity) = input.definitions.iter().filter_map(|definition| definition.identity().ok()).find(|identity| identity.qualified_name() == lock.qualified_name)
+            && let Some(identity) = identities.iter().filter_map(|identity| identity.as_ref().ok()).find(|identity| identity.qualified_name() == lock.qualified_name)
         {
             if identity.version() != lock.version { kind = Kind::VersionMismatch; }
             else if format!("sha256:{}", identity.full_digest_hex()) != lock.digest { kind = Kind::DigestMismatch; }

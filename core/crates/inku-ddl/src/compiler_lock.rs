@@ -6,6 +6,8 @@ use serde::Serialize;
 use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
+#[cfg(test)]
+use crate::bind_macro_parameters;
 use crate::{
     ClauseAtom, CoreRoleKind, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
     ExpansionPathSegment, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance, MacroDefinition,
@@ -18,7 +20,7 @@ use crate::{
     SemanticInstruction, SemanticInstructionIssueKind, SemanticInstructionOccurrenceRole,
     SemanticIssueCausalProvenance, SemanticMacroInvocationHead, SemanticMacroParameterValue,
     SemanticRelationIssueKind, SemanticTerm, SourceOccurrence, SourceSpan,
-    associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
+    associate_semantic_document_with_macro_binding, derive_macro_seed,
     geometry_resolution_policy_digest,
     macro_expansion::{
         MacroExpansionExecutionOwner, MacroExpansionSelection, expand_selected_macros,
@@ -543,15 +545,24 @@ pub fn compile_typed_ddl(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
 ) -> TypedDdlCompilation {
-    let document = document.with_definition_names(definitions);
+    let identities: Vec<_> = definitions
+        .iter()
+        .map(|definition| definition.identity())
+        .collect();
+    let document = document.with_definition_names_and_identities(definitions, &identities);
     if !valid_limits(limits) {
         return integrity_failure(document, "invalid_expansion_limits");
     }
 
-    let parameter_binding = match bind_macro_parameters(&document, definitions) {
-        Ok(binding) => binding,
-        Err(_) => return integrity_failure(document, "clause_stream_integrity"),
-    };
+    let parameter_binding =
+        match crate::macro_parameter_binding::bind_macro_parameters_with_identities(
+            &document,
+            definitions,
+            &identities,
+        ) {
+            Ok(binding) => binding,
+            Err(_) => return integrity_failure(document, "clause_stream_integrity"),
+        };
     let clause_stream = &parameter_binding
         .macro_resolution
         .relation_reference_evidence
@@ -674,7 +685,7 @@ pub fn compile_typed_ddl(
     };
     let lock = build_lock(
         &document,
-        definitions,
+        &identities,
         composition_seed,
         &projection,
         structured_semantic_occurrence_digest,
@@ -2699,7 +2710,7 @@ fn compiler_state(projection: &Projection) -> CompilerLockState {
 #[allow(clippy::too_many_arguments)]
 fn build_lock(
     document: &NormalizedDdlDocument,
-    definitions: &[MacroDefinition],
+    identities: &[Result<crate::MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
     composition_seed: Option<u64>,
     projection: &Projection,
     structured_semantic_occurrence_digest: String,
@@ -2713,7 +2724,7 @@ fn build_lock(
     let canonical_pre_expansion_digest = canonical_bytes.map(sha256_hex);
     let has_structured_meaning = canonical_pre_expansion_digest.is_some();
     let definition_identities = if has_structured_meaning {
-        definition_identities(document, definitions)
+        definition_identities(document, identities)
     } else {
         Vec::new()
     };
@@ -2812,7 +2823,7 @@ pub fn compiler_lock_hash_input(lock: &TypedDdlCompilerLock) -> Vec<u8> {
 
 fn definition_identities(
     document: &NormalizedDdlDocument,
-    definitions: &[MacroDefinition],
+    identities: &[Result<crate::MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
 ) -> Vec<CompilerDefinitionIdentity> {
     document
         .macro_locks()
@@ -2821,9 +2832,9 @@ fn definition_identities(
             qualified_name: sidecar.qualified_name().to_owned(),
             version: sidecar.version().to_owned(),
             sidecar_digest: sidecar.digest().to_owned(),
-            resolved_definition_digest: definitions
+            resolved_definition_digest: identities
                 .iter()
-                .filter_map(|definition| definition.identity().ok())
+                .filter_map(|identity| identity.as_ref().ok())
                 .find(|identity| {
                     identity.qualified_name() == sidecar.qualified_name()
                         && identity.version() == sidecar.version()

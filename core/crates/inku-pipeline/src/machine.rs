@@ -1185,9 +1185,21 @@ impl PipelineSnapshot {
         if self.protocol != PROTOCOL_NAME || self.version != PROTOCOL_VERSION {
             return Err(ProtocolError::ProtocolMismatch);
         }
-        let mut copy = self.clone();
-        copy.seal()?;
-        if copy.snapshot_digest != self.snapshot_digest {
+        // `snapshot_digest` is the final, always-present field of the derived
+        // serializer. Replace only its serialized value, preserving field order
+        // and every other byte produced by that serializer.
+        let mut bytes = serde_json::to_vec(self).map_err(|_| ProtocolError::SchemaViolation)?;
+        let encoded_digest = serde_json::to_vec(&self.snapshot_digest)
+            .map_err(|_| ProtocolError::SchemaViolation)?;
+        let mut suffix = b",\"snapshot_digest\":".to_vec();
+        suffix.extend_from_slice(&encoded_digest);
+        suffix.push(b'}');
+        if !bytes.ends_with(&suffix) {
+            return Err(ProtocolError::SchemaViolation);
+        }
+        bytes.truncate(bytes.len() - encoded_digest.len() - 1);
+        bytes.extend_from_slice(b"\"\"}");
+        if digest("inku.pipeline-snapshot.v1", &[&bytes]) != self.snapshot_digest {
             return Err(ProtocolError::StaleResult);
         }
         // A saved document of a retired edition is migrated by its host before anything else.
@@ -3557,6 +3569,7 @@ impl PipelineSnapshot {
         let Some(next) = policy.next_budgeted_attempt(attempt, total) else {
             return Ok(false);
         };
+        let mut base = None;
         let feedback = results
             .iter()
             .zip(proposals)
@@ -3573,7 +3586,11 @@ impl PipelineSnapshot {
                 if result["status"] == "rejected"
                     && let Some(proposal) = proposal
                 {
-                    let unread = self.unread_in_proposal(index, proposal);
+                    let unread = base
+                        .get_or_insert_with(|| self.compilation())
+                        .as_ref()
+                        .map(|base| self.unread_in_proposal(base, index, proposal))
+                        .unwrap_or_default();
                     if !unread.is_empty() {
                         entry["unread"] = json!(unread);
                     }
@@ -3629,10 +3646,12 @@ impl PipelineSnapshot {
     /// The words the compiler cannot read once a refused proposal replaces its
     /// hole alone (A1 stage 3), named in the second request. The holes are in
     /// the source order the short ids use.
-    fn unread_in_proposal(&self, index: usize, proposal: &str) -> Vec<String> {
-        let Ok(base) = self.compilation() else {
-            return vec![];
-        };
+    fn unread_in_proposal(
+        &self,
+        base: &inku_ddl::TypedDdlCompilation,
+        index: usize,
+        proposal: &str,
+    ) -> Vec<String> {
         let PipelinePhase::AwaitingLlm { hole_ids, .. } = &self.phase else {
             return vec![];
         };

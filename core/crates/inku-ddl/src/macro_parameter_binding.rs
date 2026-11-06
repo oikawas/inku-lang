@@ -2,10 +2,12 @@
 
 use std::collections::BTreeMap;
 
+#[cfg(test)]
+use crate::resolve_macro_invocations;
 use crate::{
     ClauseAtom, ClauseStreamError, MacroDefinition, MacroDefinitionIdentity,
     MacroInvocationLockResolutionResult, NormalizedDdlDocument, ParameterSchema,
-    ResolvedMacroInvocation, SourceSpan, project_macro_semantic_ref, resolve_macro_invocations,
+    ResolvedMacroInvocation, SourceSpan, project_macro_semantic_ref,
 };
 
 /// Stable identity for the typed macro parameter binding overlay.
@@ -137,11 +139,28 @@ pub fn bind_macro_parameters(
     document: &NormalizedDdlDocument,
     definitions: &[MacroDefinition],
 ) -> Result<MacroParameterBindingResult, ClauseStreamError> {
-    let macro_resolution = resolve_macro_invocations(document, definitions)?;
-    Ok(build_parameter_bindings(
+    let identities: Vec<_> = definitions
+        .iter()
+        .map(|definition| definition.identity())
+        .collect();
+    bind_macro_parameters_with_identities(document, definitions, &identities)
+}
+
+pub(crate) fn bind_macro_parameters_with_identities(
+    document: &NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    identities: &[Result<MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
+) -> Result<MacroParameterBindingResult, ClauseStreamError> {
+    let macro_resolution = crate::macro_resolution::resolve_macro_invocations_with_identities(
+        document,
+        definitions,
+        identities,
+    )?;
+    Ok(build_parameter_bindings_with_identities(
         document,
         definitions,
         macro_resolution,
+        identities,
     ))
 }
 
@@ -186,10 +205,24 @@ enum FactKind {
     },
 }
 
+#[cfg(test)]
 fn build_parameter_bindings(
     document: &NormalizedDdlDocument,
     definitions: &[MacroDefinition],
     macro_resolution: MacroInvocationLockResolutionResult,
+) -> MacroParameterBindingResult {
+    let identities: Vec<_> = definitions
+        .iter()
+        .map(|definition| definition.identity())
+        .collect();
+    build_parameter_bindings_with_identities(document, definitions, macro_resolution, &identities)
+}
+
+fn build_parameter_bindings_with_identities(
+    document: &NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    macro_resolution: MacroInvocationLockResolutionResult,
+    identities: &[Result<MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
 ) -> MacroParameterBindingResult {
     let mut complete = Vec::new();
     let mut diagnostics = Vec::new();
@@ -200,11 +233,13 @@ fn build_parameter_bindings(
     for (invocation_index, resolved) in macro_resolution.resolved.iter().enumerate() {
         let matching_definitions = definitions
             .iter()
-            .filter(|definition| {
-                definition
-                    .identity()
-                    .is_ok_and(|identity| identity == resolved.definition_identity)
+            .zip(identities)
+            .filter(|(_, identity)| {
+                identity
+                    .as_ref()
+                    .is_ok_and(|identity| identity == &resolved.definition_identity)
             })
+            .map(|(definition, _)| definition)
             .collect::<Vec<_>>();
         if matching_definitions.len() != 1 {
             ownership_failures.insert(

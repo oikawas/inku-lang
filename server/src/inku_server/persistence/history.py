@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from contextvars import ContextVar
+from copy import deepcopy
 from contextlib import nullcontext
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -70,6 +72,8 @@ LINEAGE_DERIVATION_KINDS = {
     # client sends it.
     "chunk_move",
 }
+
+_projection_options_cache: ContextVar[dict | None] = ContextVar("history_projection_options", default=None)
 
 
 @dataclass(frozen=True)
@@ -333,7 +337,7 @@ class HistoryLineageGroupReader:
             )
             representative_id_by_root = {root: history_id for root, history_id in representative_pairs}
             representative_ids = list(representative_id_by_root.values())
-            representatives = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids))
+            representatives = session.query(HistoryRow).options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace)).filter(HistoryRow.id.in_(representative_ids))
             if include_svg:
                 representative_items = self.rows_to_dicts_with_lineage_fn(session, representatives.all(), actor)
             else:
@@ -427,7 +431,7 @@ class HistoryLineageGroupReader:
             if search:
                 query = query.filter(self.history_search_clause_fn(search))
             total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
-            page = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit)
+            page = query.options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace)).order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit)
             if include_svg:
                 rows = page.all()
                 return self.rows_to_dicts_with_lineage_fn(session, rows, actor), total
@@ -520,6 +524,7 @@ class HistoryItemReader:
         with self.session_factory() as session:
             rows = (
                 session.query(HistoryRow)
+                .options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace))
                 .filter(
                     access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                     HistoryRow.id.in_(ids),
@@ -575,9 +580,9 @@ class HistoryMarkWriter:
             if note is not None:
                 clean_note = note.strip()[:240]
                 row.note = clean_note or None
+            result = self.row_to_dict_fn(row)
             session.commit()
-            session.refresh(row)
-            return self.row_to_dict_fn(row)
+            return result
 
     def set_item_for_revision(self, user_id: str, item_id: str, for_revision: bool) -> dict | None:
         """Raise or drop the revision mark. Independent of starred: neither reads the other."""
@@ -591,9 +596,9 @@ class HistoryMarkWriter:
             if not row:
                 return None
             row.for_revision = 1 if for_revision else 0
+            result = self.row_to_dict_fn(row)
             session.commit()
-            session.refresh(row)
-            return self.row_to_dict_fn(row)
+            return result
 
 
 @dataclass(frozen=True)
@@ -663,7 +668,7 @@ class HistoryPermanentDeleteWriter:
             return 0
         actor = self.actor_of_fn(user_id)
         with self.session_factory() as session:
-            query = session.query(HistoryRow).filter(
+            query = session.query(HistoryRow).options(defer(HistoryRow.svg)).filter(
                 access._writable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(ids),
             )
@@ -819,9 +824,9 @@ class HistoryShareWriter:
                 return None
             if not for_share:
                 row.for_share = 0
+                result = self.row_to_dict_fn(row)
                 session.commit()
-                session.refresh(row)
-                return self.row_to_dict_fn(row)
+                return result
             # Only a NAMED group is checked, not the one already on the row. `chmod
             # g+r` asks nothing of the group the file is in; re-opening a work its
             # owner had opened before is the same act, and requiring administrator
@@ -841,9 +846,9 @@ class HistoryShareWriter:
                 raise ValueError(f"no such organisation group: {target_group}")
             row.for_share = 1
             row.share_group_id = target_group
+            result = self.row_to_dict_fn(row)
             session.commit()
-            session.refresh(row)
-            return self.row_to_dict_fn(row)
+            return result
 
 
 @dataclass(frozen=True)
@@ -959,18 +964,16 @@ class HistoryListProjector:
         Set only when true, so `response_model_exclude_none` keeps it off the wire
         for the ordinary case of a person looking at their own works.
         """
-        if include_svg:
-            items = [self.row_to_dict_fn(row) for row in rows]
-        else:
-            svg_bytes_by_id = svg_bytes_by_id or {}
-            items = [
-                self.row_to_dict_fn(
-                    row,
-                    include_svg=False,
-                    svg_bytes=svg_bytes_by_id.get(row.id, 0),
-                )
-                for row in rows
-            ]
+        token = _projection_options_cache.set({})
+        try:
+            if include_svg:
+                items = [self.row_to_dict_fn(row) for row in rows]
+            else:
+                svg_bytes_by_id = svg_bytes_by_id or {}
+                items = [self.row_to_dict_fn(row, include_svg=False, svg_bytes=svg_bytes_by_id.get(row.id, 0))
+                         for row in rows]
+        finally:
+            _projection_options_cache.reset(token)
         from .ancestry import ancestors, generations
         node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         ancestry = ancestors(session, node_ids, actor)
@@ -1332,7 +1335,14 @@ def row_to_dict(
         "render_canvas_aspect", "stage1_model", "stage2_model",
     )}
     record["image_ddl"] = {} if image_ddl is not None else None
-    item["draw_options"] = core_catalog("options_of_work", record=record)["options"]
+    cache = _projection_options_cache.get()
+    key = json.dumps(record, ensure_ascii=False, sort_keys=True) if cache is not None else None
+    if cache is not None and key in cache:
+        item["draw_options"] = deepcopy(cache[key])
+    else:
+        item["draw_options"] = core_catalog("options_of_work", record=record)["options"]
+        if cache is not None:
+            cache[key] = deepcopy(item["draw_options"])
     if image_ddl is not None:
         try:
             record = json.loads(image_ddl)

@@ -116,6 +116,7 @@ class HistorySearchService:
 
     def _project_rows(self, session, query, actor: dict, *, include_svg: bool) -> list[dict]:
         """Project a list page without fetching artwork the caller declined."""
+        query = query.options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace))
         if include_svg:
             return self.rows_to_dicts_with_lineage(session, query.all(), actor)
         projected = query.options(defer(HistoryRow.svg)).add_columns(

@@ -21,6 +21,25 @@ class RecordingLogger:
         self.calls.append((message, args))
 
 
+def test_draw_options_are_reused_within_a_projection(monkeypatch):
+    from inku_server import verified_model_catalog
+    original = verified_model_catalog.core_catalog
+    calls = []
+    def count(action, **kwargs):
+        if action == "options_of_work":
+            calls.append(action)
+        return original(action, **kwargs)
+    monkeypatch.setattr(verified_model_catalog, "core_catalog", count)
+    token = history._projection_options_cache.set({})
+    try:
+        first, _ = _project(_row(id="first"))
+        second, _ = _project(_row(id="second"))
+        assert first["draw_options"] == second["draw_options"]
+        assert calls == ["options_of_work"]
+    finally:
+        history._projection_options_cache.reset(token)
+
+
 def _row(**overrides: object) -> SimpleNamespace:
     values: dict[str, object] = {
         "id": "history-1",

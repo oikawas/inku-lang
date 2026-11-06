@@ -664,6 +664,15 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
             owner: inku_score::SavedScoreResourceOwner::Score,
             reason: inku_score::SavedScoreResourceFailure::InvalidContract("non-canonical Score"),
         })?;
+    resolve_finalized_performance(request, policy, &finalized, &input_digest)
+}
+
+pub(crate) fn resolve_finalized_performance(
+    request: PerformanceRequest<'_>,
+    policy: ScoreErrorPolicy,
+    finalized: &inku_score::FinalizedScore,
+    input_digest: &str,
+) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
     let mut new_to_old = vec![0; finalized.score.instructions.len()];
     for (old, new) in finalized.index_maps.instructions.iter().enumerate() {
         if let Some(new) = new {
@@ -681,7 +690,7 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
         ..request
     };
     let mut performance =
-        match crate::typed_performance::resolve(finalized_request, policy, &input_digest) {
+        match crate::typed_performance::resolve(finalized_request, policy, input_digest) {
             Ok(performance) => performance,
             Err(mut error) => {
                 remap_finalized_diagnostics(
@@ -701,17 +710,17 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
     let execution = performance
         .execution
         .get_or_insert_with(|| ScoreExecutionSummary {
-            input_score_digest: input_digest.clone(),
+            input_score_digest: input_digest.to_owned(),
             diagnostics: Vec::new(),
             rendered_instruction_indices: Vec::new(),
         });
-    execution.input_score_digest = input_digest;
+    execution.input_score_digest = input_digest.to_owned();
     execution.rendered_instruction_indices = rendered_instruction_indices;
     execution.rendered_instruction_indices.sort_unstable();
     execution.rendered_instruction_indices.dedup();
     remap_finalized_diagnostics(&mut execution.diagnostics, &new_to_old, &new_anchor_to_old);
     performance.resource_demand = Some(finalized.demand);
-    performance.resource_diagnostics = finalized.resource_diagnostics;
-    performance.relation_diagnostics = finalized.relation_diagnostics;
+    performance.resource_diagnostics = finalized.resource_diagnostics.clone();
+    performance.relation_diagnostics = finalized.relation_diagnostics.clone();
     Ok(performance)
 }

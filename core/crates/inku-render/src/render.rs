@@ -435,6 +435,10 @@ fn paint_object_body(
     surface_definitions: &mut Vec<Element>,
     allowance: &mut OutputAllowance,
     body_diagnostics: &mut Vec<inku_score::ScoreExecutionDiagnostic>,
+    finalized_templates: &mut std::collections::BTreeMap<
+        usize,
+        (inku_score::FinalizedScore, String),
+    >,
 ) -> Result<Element, RenderError> {
     let (canvas, box_transform) =
         crate::object_template::object_box_transform(parent, request.options.canvas, containing)
@@ -455,13 +459,41 @@ fn paint_object_body(
         canvas: Some(canvas),
     };
     let performed = if let Some(policy) = &template.body.resource_policy {
-        resolve_checked_performance_with_resources(
-            body_request,
-            request.options.error_policy,
-            &policy.hard_policy,
-            policy.operational_budget,
-        )
-        .map_err(|error| match error {
+        let result = if template.body.uses_compact_resource_contract() {
+            if !finalized_templates.contains_key(&template.instruction_index) {
+                let finalized = inku_score::finalize_saved_score_with_omitted_instructions(
+                    &template.body,
+                    &policy.hard_policy,
+                    policy.operational_budget,
+                    &[],
+                )
+                .map_err(RenderError::ResourceAuthority)?;
+                let digest = inku_score::canonical_score_digest(&template.body).map_err(|_| {
+                    RenderError::ResourceAuthority(inku_score::SavedScoreResourceError {
+                        owner: inku_score::SavedScoreResourceOwner::Score,
+                        reason: inku_score::SavedScoreResourceFailure::InvalidContract(
+                            "non-canonical Score",
+                        ),
+                    })
+                })?;
+                finalized_templates.insert(template.instruction_index, (finalized, digest));
+            }
+            let (finalized, digest) = &finalized_templates[&template.instruction_index];
+            crate::checked_performance::resolve_finalized_performance(
+                body_request,
+                request.options.error_policy,
+                finalized,
+                digest,
+            )
+        } else {
+            resolve_checked_performance_with_resources(
+                body_request,
+                request.options.error_policy,
+                &policy.hard_policy,
+                policy.operational_budget,
+            )
+        };
+        result.map_err(|error| match error {
             CheckedPerformanceWithResourcesError::Resources(error) => {
                 RenderError::ResourceAuthority(error)
             }
@@ -1069,6 +1101,7 @@ fn render_impl(
     let keeps_obstacles = performance.score.uses_free_line();
     let mut obstacles = Vec::new();
     let mut object_diagnostics = Vec::new();
+    let mut finalized_templates = std::collections::BTreeMap::new();
     for (performed_index, (instruction, performed)) in ordered {
         let visible =
             instruction_limit.is_none_or(|limit| performed.original_instruction_index < limit);
@@ -1179,6 +1212,7 @@ fn render_impl(
                     &mut surface_definitions,
                     &mut allowance,
                     &mut body_diagnostics,
+                    &mut finalized_templates,
                 )?;
                 if visible {
                     for mut diagnostic in body_diagnostics {

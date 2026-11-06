@@ -5,6 +5,26 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class LibraryClickWeightTests: XCTestCase {
+    func testPreviewRetryLoadsFullWorkAfterAnnotationFailure() async {
+        enum ReadFailure: Error { case temporary }
+        let preview = LibraryPreviewModel()
+        let listed = SavedWork(id: "fixture", at: 1, input: "test", score: "{}", svg: "")
+        var complete = listed; complete.svg = "<svg/>"
+        preview.show(listed)
+        var attempts = 0
+        func read(_ id: String) async throws -> LibraryAnnotation {
+            attempts += 1
+            if attempts == 1 { throw ReadFailure.temporary }
+            return LibraryAnnotation()
+        }
+        func readWork(_ id: String) async throws -> SavedWork? { complete }
+        await preview.loadAnnotation(using: read, readWork: readWork)
+        XCTAssertEqual(preview.work?.svg, "")
+        XCTAssertEqual(preview.annotationState, .unavailable)
+        await preview.loadAnnotation(using: read, readWork: readWork)
+        XCTAssertEqual(preview.work?.svg, "<svg/>")
+        XCTAssertEqual(preview.annotationState, .available(LibraryAnnotation()))
+    }
     func testMarksAreRecomputedOnlyForTextOrRecipeChange() {
         var cache = InkuEditorMarksCache()
         var calls = 0

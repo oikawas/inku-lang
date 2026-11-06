@@ -7,7 +7,9 @@ browser. The UI receives masked status fields.
 from __future__ import annotations
 
 import os
+import json
 from copy import deepcopy
+from functools import lru_cache
 from typing import Any
 
 from .secrets import decrypt_secret, encrypt_secret
@@ -86,9 +88,16 @@ def default_user_model_settings() -> dict[str, Any]:
 
 
 def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
+    return deepcopy(_cached_model_settings(json.dumps(settings, ensure_ascii=False),
+                                           json.dumps(_settings_environment(), sort_keys=True)))
+
+
+@lru_cache(maxsize=32)
+def _cached_model_settings(serialized: str, environment: str) -> dict[str, Any]:
+    settings = json.loads(serialized)
     incoming = settings.get("providers") if isinstance(settings, dict) else None
     order = list(incoming) if isinstance(incoming, dict) else []
-    return _ordered_settings(core_catalog("normalize_settings", settings=settings, order=order, env=_settings_environment()))
+    return _ordered_settings(core_catalog("normalize_settings", settings=settings, order=order, env=json.loads(environment)))
 
 
 def _host_providers() -> dict[str, Any] | None:
@@ -127,7 +136,18 @@ def _user_catalog_context(providers: dict[str, Any] | None = None) -> dict[str, 
 
 
 def normalize_user_model_settings(settings: dict[str, Any] | None, *, providers: dict[str, Any] | None = None) -> dict[str, Any]:
-    return core_catalog("normalize_user", settings=settings, **_user_catalog_context(providers))["settings"]
+    context = _user_catalog_context(providers)
+    return deepcopy(_cached_user_settings(json.dumps(settings, ensure_ascii=False), json.dumps(context, ensure_ascii=False)))
+
+
+@lru_cache(maxsize=512)
+def _cached_user_settings(serialized: str, context: str) -> dict[str, Any]:
+    return core_catalog("normalize_user", settings=json.loads(serialized), **json.loads(context))["settings"]
+
+
+def invalidate_model_settings_cache() -> None:
+    _cached_model_settings.cache_clear()
+    _cached_user_settings.cache_clear()
 
 
 def release_draw_defaults() -> dict[str, Any]:

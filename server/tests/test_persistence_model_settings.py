@@ -134,3 +134,30 @@ def test_model_settings_store_preserves_exceptions() -> None:
     with pytest.raises(ValueError, match="projection failed"):
         store_type(dependency, lambda value: value, broken_storage).update({})
     assert dependency.calls == []
+
+
+def test_model_settings_cache_observes_updates_from_another_store(tmp_path, monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from inku_server.persistence.schema import Base
+    from inku_server.model_settings import normalize_model_settings, storage_model_settings
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'models.db'}")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    first = settings.ModelSettingsStore(settings.AppSettingsStore(factory, lambda: 10), normalize_model_settings, storage_model_settings)
+    other = settings.ModelSettingsStore(settings.AppSettingsStore(factory, lambda: 10), normalize_model_settings, storage_model_settings)
+    settings.invalidate_model_cache()
+    value = first.get()
+    provider = next(iter(value["providers"]))
+    value["providers"][provider]["base_url"] = "https://first.example.test/v1"
+    expected = other.update(value)
+    assert first.get() == expected
+    value = other.get()
+    value["providers"][provider]["base_url"] = "https://second.example.test/v1"
+    old = first.get()
+    other.app_settings.write(settings.MODEL_SETTINGS_KEY, storage_model_settings(value))
+    assert first.get() != old
+    assert first.get() == other.get()
+    settings.invalidate_model_cache()
+    engine.dispose()

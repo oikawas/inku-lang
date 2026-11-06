@@ -207,6 +207,7 @@ def api_history_get(
         position = _db.item_position(
             actor["id"], anchor_id, trashed=trashed, starred=starred,
             for_revision=for_revision, for_share=for_share,
+            actor=actor,
             **({"query_text": q} if q.strip() else {}),
         )
         if position is not None:
@@ -221,6 +222,7 @@ def api_history_get(
         for_revision=for_revision,
         for_share=for_share,
         include_svg=include_svg,
+        actor=actor,
         **({"canvas_search": True} if canvas_search else {}),
     )
     # When the picture is present, count it here. When it is withheld,
@@ -445,8 +447,15 @@ def api_history_thumb(
     # A thumbnail page asks once per image; loading every SVG and lineage just
     # to answer the permission question made those requests compete with their
     # own PNG transfer.
-    if not _db.can_read_history_item(actor["id"], item_id):
+    if not _db.can_read_history_item(actor["id"], item_id, actor=actor):
         raise HTTPException(status_code=404, detail="history item not found")
+    if request.headers.get("if-none-match"):
+        metadata = _thumbs_db.get_thumb_metadata(item_id, scale)
+        if metadata is None:
+            raise HTTPException(status_code=404, detail="thumbnail not found")
+        etag = _thumb_etag(metadata)
+        if request.headers["if-none-match"] == etag:
+            return Response(status_code=304, headers={"ETag": etag, "Cache-Control": _THUMB_CACHE_CONTROL})
     row = _thumbs_db.get_thumb(item_id, scale)
     if row is None:
         raise HTTPException(status_code=404, detail="thumbnail not found")

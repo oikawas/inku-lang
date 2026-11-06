@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -649,7 +651,8 @@ class AppSettingsStore:
             row = session.get(AppSettingRow, key)
             if row:
                 row.value = json.dumps(value, ensure_ascii=False)
-                row.at = self.now_ms()
+                now = self.now_ms()
+                row.at = max(now, (row.at or 0) + 1) if key == MODEL_SETTINGS_KEY else now
             else:
                 row = AppSettingRow(
                     key=key,
@@ -670,12 +673,38 @@ class ModelSettingsStore:
     storage: Callable[[dict], dict]
 
     def get(self) -> dict:
-        return self.normalize(self.app_settings.read(MODEL_SETTINGS_KEY))
+        if not isinstance(self.app_settings, AppSettingsStore):
+            return self.normalize(self.app_settings.read(MODEL_SETTINGS_KEY))
+        from ..model_settings import _settings_environment
+        factory = self.app_settings.session_factory
+        with factory() as session:
+            version = session.query(AppSettingRow.at).filter(AppSettingRow.key == MODEL_SETTINGS_KEY).scalar()
+        key = (factory.kw.get("bind"), version, tuple(sorted(_settings_environment().items())))
+        with _model_cache_lock:
+            if key in _model_cache:
+                return deepcopy(_model_cache[key])
+        value = self.normalize(self.app_settings.read(MODEL_SETTINGS_KEY))
+        with _model_cache_lock:
+            _model_cache.clear()
+            _model_cache[key] = deepcopy(value)
+        return value
 
     def update(self, settings: dict) -> dict:
         stored = self.storage(settings)
         self.app_settings.write(MODEL_SETTINGS_KEY, stored)
+        invalidate_model_cache()
         return self.normalize(stored)
+
+
+_model_cache_lock = threading.Lock()
+_model_cache: dict[tuple, dict] = {}
+
+
+def invalidate_model_cache() -> None:
+    from ..model_settings import invalidate_model_settings_cache
+    with _model_cache_lock:
+        _model_cache.clear()
+    invalidate_model_settings_cache()
 
 
 @dataclass(frozen=True)
@@ -993,6 +1022,9 @@ class UserSettingsUpdater:
                     ensure_ascii=False,
                 )
             session.commit()
+            if model_settings is not None:
+                from ..model_settings import invalidate_model_settings_cache
+                invalidate_model_settings_cache()
             session.refresh(row)
             group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
             return self.user_to_dict_fn(row, group_name)

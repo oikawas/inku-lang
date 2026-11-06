@@ -42,3 +42,26 @@ def test_put_thumb_uses_one_atomic_upsert_for_insert_and_replace(
         assert stored["source_render_hash"] == "rh3:second"
     finally:
         engine.dispose()
+
+
+def test_not_modified_thumb_reads_metadata_without_png(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from sqlalchemy import create_engine, event
+    from sqlalchemy.orm import sessionmaker
+    from inku_server import db, thumbs_db
+    from inku_server.api_core.routers.history import api_history_thumb
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'thumbs.db'}")
+    thumbs_db.Base.metadata.create_all(engine)
+    monkeypatch.setattr(thumbs_db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(db, "can_read_history_item", lambda *args, **kwargs: True)
+    thumbs_db.put_thumb("h", 1, b"png", "hash")
+    queries = []
+    @event.listens_for(engine, "before_cursor_execute")
+    def record(_connection, _cursor, statement, *_):
+        queries.append(statement.lower())
+    response = api_history_thumb("h", SimpleNamespace(headers={"if-none-match": '"hash-1"'}),
+                                 scale=1, v="", actor={"id": "owner"})
+    assert response.status_code == 304
+    assert len(queries) == 1 and "png" not in queries[0]
+    engine.dispose()

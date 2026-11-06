@@ -1018,6 +1018,7 @@ def restore_db_backup(kind: str, name: str) -> dict:
         return _backup_service().restore_backup(kind, name)
     finally:
         engine.dispose()
+        _settings.invalidate_model_cache()
         _db_restoring.clear()
         _db_restore_lock.release()
 
@@ -1569,6 +1570,7 @@ def list_items(
     for_share: bool = False,
     include_svg: bool = True,
     canvas_search: bool = False,
+    actor: dict | None = None,
 ) -> tuple[list[dict], int]:
     arguments = (
         user_id,
@@ -1580,6 +1582,9 @@ def list_items(
         for_revision,
         for_share,
     )
+    if actor is not None:
+        return _history_search_service().list_items(*arguments, include_svg=include_svg,
+                                                   canvas_search=canvas_search, actor=actor)
     if canvas_search:
         return _history_search_service().list_items(*arguments, include_svg=include_svg, canvas_search=True)
     if include_svg:
@@ -1672,9 +1677,11 @@ def item_position(
     for_revision: bool = False,
     for_share: bool = False,
     query_text: str = "",
+    actor: dict | None = None,
 ) -> int | None:
     return _history.HistoryItemPositionReader(SessionLocal, _actor_of, _history_search_service().position_search_clause).item_position(
-        user_id, item_id, trashed, starred, for_revision, for_share, query_text
+        user_id, item_id, trashed, starred, for_revision, for_share, query_text,
+        **({"actor": actor} if actor is not None else {})
     )
 
 
@@ -1718,13 +1725,13 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
     ).get_items(user_id, ids)
 
 
-def can_read_history_item(user_id: str, item_id: str) -> bool:
+def can_read_history_item(user_id: str, item_id: str, *, actor: dict | None = None) -> bool:
     """Decide access to one active history work without loading its payload."""
     return _history.HistoryItemReader(
         SessionLocal,
         _actor_of,
         _rows_to_dicts_with_lineage,
-    ).can_read_item(user_id, item_id)
+    ).can_read_item(user_id, item_id, **({"actor": actor} if actor is not None else {}))
 
 
 def delete_all(user_id: str) -> None:

@@ -530,14 +530,14 @@ class HistoryItemReader:
             items = self.rows_to_dicts_with_lineage_fn(session, rows, actor)
             return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
-    def can_read_item(self, user_id: str, item_id: str) -> bool:
+    def can_read_item(self, user_id: str, item_id: str, *, actor: dict | None = None) -> bool:
         """Check one active work's visibility without materializing its artwork.
 
         A thumbnail request needs the same permission decision as ``get_items()``,
         but not its SVG, Score, or lineage projection.  Those fields can be
         megabytes each, and the browser asks this question once per thumbnail.
         """
-        actor = self.actor_of_fn(user_id)
+        actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of_fn(user_id)
         with self.session_factory() as session:
             return (
                 session.query(HistoryRow.id)
@@ -903,8 +903,9 @@ class HistoryItemPositionReader:
         for_revision: bool = False,
         for_share: bool = False,
         query_text: str = "",
+        actor: dict | None = None,
     ) -> int | None:
-        actor = self.actor_of_fn(user_id)
+        actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of_fn(user_id)
         with self.session_factory() as session:
             visible = session.query(HistoryRow.id, HistoryRow.at).filter(
                 access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),

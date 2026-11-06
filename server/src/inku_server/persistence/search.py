@@ -234,8 +234,9 @@ class HistorySearchService:
         for_share: bool = False,
         include_svg: bool = True,
         canvas_search: bool = False,
+        actor: dict | None = None,
     ) -> tuple[list[dict], int]:
-        actor = self.actor_of(user_id)
+        actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of(user_id)
         with self.session_factory() as session:
             query = session.query(HistoryRow).filter(
                 self.readable_by(actor, HistoryRow.user_id, HistoryRow.id),

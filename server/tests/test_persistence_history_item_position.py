@@ -26,6 +26,7 @@ def test_history_item_position_reader_owns_the_exact_query_and_db_is_thin_facade
             inspect.Parameter("for_revision", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=False, annotation="bool"),
             inspect.Parameter("for_share", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=False, annotation="bool"),
             inspect.Parameter("query_text", inspect.Parameter.POSITIONAL_OR_KEYWORD, default="", annotation="str"),
+            inspect.Parameter("actor", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=None, annotation="dict | None"),
         ],
         return_annotation="int | None",
     )
@@ -138,7 +139,7 @@ def test_history_router_keeps_anchor_page_delegation(monkeypatch) -> None:
         canvas_search=False,
         actor={"id": "actor"},
     )
-    assert calls == [(("actor", "anchor"), {"trashed": False, "starred": False, "for_revision": False, "for_share": False})]
+    assert calls == [(("actor", "anchor"), {"trashed": False, "starred": False, "for_revision": False, "for_share": False, "actor": {"id": "actor"}})]
     assert response.offset == 10
 
 

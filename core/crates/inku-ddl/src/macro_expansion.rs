@@ -335,6 +335,24 @@ pub(crate) fn expand_selected_macros(
     expand_macros_with_selection(parameter_binding, definitions, seeds, limits, selection)
 }
 
+pub(crate) fn expand_selected_macros_with_identities(
+    parameter_binding: MacroParameterBindingResult,
+    definitions: &[MacroDefinition],
+    seeds: &[MacroSeed],
+    limits: MacroExpansionLimits,
+    selection: MacroExpansionSelection,
+    identities: &[Result<MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
+) -> MacroExpansionResult {
+    expand_macros_with_selection_and_identities(
+        parameter_binding,
+        definitions,
+        seeds,
+        limits,
+        selection,
+        identities,
+    )
+}
+
 pub(crate) fn exact_successful_expansion_subset(
     expansion: &MacroExpansionResult,
     retained_source_ordinals: &BTreeSet<u64>,
@@ -366,6 +384,28 @@ fn expand_macros_with_selection(
     seeds: &[MacroSeed],
     limits: MacroExpansionLimits,
     selection: MacroExpansionSelection,
+) -> MacroExpansionResult {
+    let identities: Vec<_> = definitions
+        .iter()
+        .map(|definition| definition.identity())
+        .collect();
+    expand_macros_with_selection_and_identities(
+        parameter_binding,
+        definitions,
+        seeds,
+        limits,
+        selection,
+        &identities,
+    )
+}
+
+fn expand_macros_with_selection_and_identities(
+    parameter_binding: MacroParameterBindingResult,
+    definitions: &[MacroDefinition],
+    seeds: &[MacroSeed],
+    limits: MacroExpansionLimits,
+    selection: MacroExpansionSelection,
+    identities: &[Result<MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
 ) -> MacroExpansionResult {
     let mut diagnostics = Vec::new();
     if !limits.is_valid() {
@@ -422,7 +462,7 @@ fn expand_macros_with_selection(
             validated_bindings.push(None);
             continue;
         }
-        match validate_binding_identity(&parameter_binding, binding_index, definitions) {
+        match validate_binding_identity(&parameter_binding, binding_index, identities) {
             Ok(validated) => {
                 if !selected_binding_indices.contains(&binding_index) {
                     let definition = &definitions[validated.definition_index];
@@ -553,7 +593,7 @@ struct ValidatedBinding {
 fn validate_binding_identity(
     parameter_binding: &MacroParameterBindingResult,
     binding_index: usize,
-    definitions: &[MacroDefinition],
+    identities: &[Result<MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
 ) -> Result<ValidatedBinding, EvalError> {
     let binding = &parameter_binding.complete[binding_index];
     let resolved = parameter_binding
@@ -587,14 +627,14 @@ fn validate_binding_identity(
         ));
     }
 
-    let matching_definitions = definitions
+    let matching_definitions = identities
         .iter()
         .enumerate()
-        .filter_map(|(index, definition)| {
-            definition
-                .identity()
+        .filter_map(|(index, identity)| {
+            identity
+                .as_ref()
                 .ok()
-                .filter(|identity| identity == &binding.definition_identity)
+                .filter(|identity| *identity == &binding.definition_identity)
                 .map(|identity| (index, identity))
         })
         .collect::<Vec<_>>();

@@ -23,7 +23,8 @@ use crate::{
     associate_semantic_document_with_macro_binding, derive_macro_seed,
     geometry_resolution_policy_digest,
     macro_expansion::{
-        MacroExpansionExecutionOwner, MacroExpansionSelection, expand_selected_macros,
+        MacroExpansionExecutionOwner, MacroExpansionSelection,
+        expand_selected_macros_with_identities,
     },
     project_macro_semantic_ref,
     semantic_association::{
@@ -648,7 +649,14 @@ pub fn compile_typed_ddl(
                 seeds.push(derive_macro_seed(canonical, &invocation, composition_seed));
             }
         }
-        let expanded = expand_selected_macros(binding, definitions, &seeds, limits, selection);
+        let expanded = expand_selected_macros_with_identities(
+            binding,
+            definitions,
+            &seeds,
+            limits,
+            selection,
+            &identities,
+        );
         project_expansion_diagnostics(&document, &expanded, &mut projection);
         if let Ok(owners) = &execution_owners {
             if expanded.diagnostics.is_empty() {

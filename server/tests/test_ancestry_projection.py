@@ -28,6 +28,7 @@ def test_cross_owner_generation_and_depth_independent_queries():
         row = session.get(HistoryRow, "h23")
         projector = history.HistoryListProjector(lambda row: {"id": row.id}, lambda edge: {"metadata": {}})
         listed = projector.rows_to_dicts_with_lineage(session, [row], actor)[0]
+        assert sum("FROM pipeline_history_links" in sql for sql in statements) == 1
         store = lineage.LineageStore(None, None, None)
         assert listed["lineage_generation"] == store._lineage_generations(session, actor, ["n23"])["n23"] == 24
         statements.clear()

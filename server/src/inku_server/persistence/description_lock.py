@@ -25,6 +25,7 @@ exactly when its parent is.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from sqlalchemy import tuple_
 
 from .ddl_source import LEGACY_EXPANDED_ORIGIN
 from .schema import HistoryRow, LineageEdgeRow, LineageNodeRow, PipelineHistoryLinkRow, VariationAuthorityRow
@@ -44,7 +45,7 @@ DESCRIPTION_READING_KINDS = frozenset({
 _MAX_DEPTH = 256
 
 
-def locked_history_ids(session, history_ids: Iterable[str], *, ancestry=None) -> set[str]:
+def locked_history_ids(session, history_ids: Iterable[str], *, ancestry=None, links=None) -> set[str]:
     """The subset of `history_ids` that is description-locked."""
     starts = [history_id for history_id in dict.fromkeys(history_ids) if history_id]
     if not starts:
@@ -61,7 +62,13 @@ def locked_history_ids(session, history_ids: Iterable[str], *, ancestry=None) ->
     history_of_node.update({node.id: node.history_id for node in nodes.values()})
     edge_of_child = {child: (edge.parent_node_id, edge.derivation_kind) for child, edge in edges.items()}
     histories = list({*starts, *(history for history in history_of_node.values() if history)})
-    ddl_authoritative = _ddl_authoritative_histories(session, histories)
+    if links is None:
+        pairs = {(node.user_id, node.history_id) for node in nodes.values() if node.user_id and node.history_id}
+        pairs.update((owner, history_id) for history_id, owner in session.query(HistoryRow.id, HistoryRow.user_id)
+                     .filter(HistoryRow.id.in_(histories)).all() if owner)
+        links = session.query(PipelineHistoryLinkRow).filter(
+            tuple_(PipelineHistoryLinkRow.owner_id, PipelineHistoryLinkRow.history_id).in_(pairs)).all() if pairs else []
+    ddl_authoritative = _ddl_authoritative_histories(session, histories, links=links)
     ddl_of_history = _ddl_of_histories(session, [
         history_of_node.get(node) for node in {
             node for child, (parent, kind) in edge_of_child.items() if kind == "replay" for node in (child, parent)
@@ -120,7 +127,7 @@ def _ddl_of_histories(session, history_ids: list[str | None]) -> dict[str, str]:
     }
 
 
-def _ddl_authoritative_histories(session, history_ids: list[str]) -> set[str]:
+def _ddl_authoritative_histories(session, history_ids: list[str], *, links) -> set[str]:
     if not history_ids:
         return set()
     # An exported image work can be imported without its pipeline sidecars.
@@ -130,13 +137,14 @@ def _ddl_authoritative_histories(session, history_ids: list[str]) -> set[str]:
             HistoryRow.id.in_(history_ids), HistoryRow.image_ddl.is_not(None),
         ).all()
     }
-    links = session.query(PipelineHistoryLinkRow).filter(PipelineHistoryLinkRow.history_id.in_(history_ids)).all()
     if not links:
         return image_histories
     variations = {
-        (row.owner_id, row.variation_id): row.authority
-        for row in session.query(VariationAuthorityRow).filter(
-            VariationAuthorityRow.variation_id.in_({link.variation_id for link in links})
+        (owner, variation): authority
+        for owner, variation, authority in session.query(VariationAuthorityRow.owner_id, VariationAuthorityRow.variation_id,
+                                                          VariationAuthorityRow.authority).filter(
+            tuple_(VariationAuthorityRow.owner_id, VariationAuthorityRow.variation_id).in_(
+                {(link.owner_id, link.variation_id) for link in links})
         ).all()
     }
     return image_histories | {

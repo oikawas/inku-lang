@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
-from sqlalchemy import LargeBinary, and_, case, func, or_, select
+from sqlalchemy import LargeBinary, and_, case, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import defer
 
@@ -970,10 +970,19 @@ class HistoryListProjector:
                 )
                 for row in rows
             ]
-        if rows:
+        from .ancestry import ancestors, generations
+        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
+        ancestry = ancestors(session, node_ids, actor)
+        ancestor_nodes, _, _ = ancestry
+        link_keys = {(row.user_id, row.id) for row in rows if row.user_id}
+        link_keys.update((node.user_id, node.history_id) for node in ancestor_nodes.values()
+                         if node.user_id and node.history_id)
+        links = []
+        if link_keys:
             links = session.query(PipelineHistoryLinkRow).filter(
-                PipelineHistoryLinkRow.history_id.in_([row.id for row in rows]),
+                tuple_(PipelineHistoryLinkRow.owner_id, PipelineHistoryLinkRow.history_id).in_(link_keys),
             ).all()
+        if rows:
             links_by_work = {(link.owner_id, link.history_id): link for link in links}
             for item, row in zip(items, rows, strict=True):
                 link = links_by_work.get((row.user_id, row.id))
@@ -1020,10 +1029,7 @@ class HistoryListProjector:
                     item["shared"] = True
         # A work its DDL holds (edited, or derived from an edited one) is not
         # drawn from its description again; the client offers the fork instead.
-        from .ancestry import ancestors, generations
-        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
-        ancestry = ancestors(session, node_ids, actor)
-        locked = locked_history_ids(session, [row.id for row in rows], ancestry=ancestry)
+        locked = locked_history_ids(session, [row.id for row in rows], ancestry=ancestry, links=links)
         for item, row in zip(items, rows, strict=True):
             item["description_locked"] = row.id in locked
         if not node_ids:

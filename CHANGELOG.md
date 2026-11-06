@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: preserve the original spelling of numbers when displaying and copying Scores and diagnostics.
+
 - macOS: remove the obsolete frame count from animation settings errors.
 
 - Android: use the shared core for DDL title detection and description comment contents, aligning with Server for unusual whitespace including U+001C–U+001F.

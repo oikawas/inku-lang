@@ -48,6 +48,8 @@ type NavigationDeps<TActor extends SettingsActor> = {
 	apiFetch: ApiFetch;
 	currentUser: () => TActor | null;
 	setCurrentUser: (actor: TActor) => void;
+	beginSettingsUpdate: () => { id: number; owner: string | undefined };
+	acceptSettingsUpdate: (token: { id: number; owner: string | undefined }, actor: TActor) => boolean;
 	loadTab: (tab: SettingsTab) => void;
 	loadAvailableModels: () => void | Promise<void>;
 	cancelModelSelection: () => void;
@@ -96,6 +98,7 @@ export function createSettingsNavigation<TActor extends SettingsActor>(
 	async function updateUserSettingsTab(tab: SettingsTab): Promise<void> {
 		const currentUser = deps.currentUser();
 		if (!currentUser || !isSettingsContentTab(tab) || BROWSER_ONLY_SETTINGS_TABS.includes(tab)) return;
+		const token = deps.beginSettingsUpdate();
 		try {
 			const response = await deps.apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -106,7 +109,7 @@ export function createSettingsNavigation<TActor extends SettingsActor>(
 				const body = await response.json().catch(() => ({})) as { detail?: unknown };
 				throw new Error(deps.describeApiError(body.detail, response.status));
 			}
-			deps.setCurrentUser(await response.json() as TActor);
+			deps.acceptSettingsUpdate(token, await response.json() as TActor);
 		} catch (error) {
 			console.warn('failed to update settings tab', error);
 		}

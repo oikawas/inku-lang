@@ -590,6 +590,8 @@
 		apiFetch,
 		currentUser: () => session.currentUser,
 		setCurrentUser: (actor) => session.setCurrentUser(actor),
+		beginSettingsUpdate: () => session.beginSettingsUpdate(),
+		acceptSettingsUpdate: (token, actor) => session.acceptSettingsUpdate(token, actor),
 		loadAvailableModels,
 		refreshCurrentUserSettings: () => session.refreshCurrentUserSettings(),
 		loadExportTemplates,
@@ -682,22 +684,23 @@
 	async function saveDrawDefaults(defaults: DrawDefaults): Promise<void> {
 		const user = session.currentUser;
 		if (!user) throw new Error('not signed in');
+		const token = session.beginSettingsUpdate();
 		const response = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ model_settings: { draw_defaults: defaults } }) });
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		const updated = await response.json() as UserItem;
 		if (session.currentUser?.id !== user.id) throw new Error('account changed');
-		session.setCurrentUser(updated);
-		if (updated.model_settings?.draw_defaults) work.setDrawDefaults(user.id, updated.model_settings.draw_defaults);
+		if (session.acceptSettingsUpdate(token, updated) && updated.model_settings?.draw_defaults) work.setDrawDefaults(user.id, updated.model_settings.draw_defaults);
 	}
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
 		instructionCaptionVisible = visible;
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { instruction_caption_visible: visible } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save instruction caption setting', e); }
 	}
 
@@ -707,6 +710,7 @@
 		const previous = okugakiModel;
 		okugakiModel = nextModel;
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -714,7 +718,7 @@
 				body: JSON.stringify({ model_settings: { okugaki_provider: provider, okugaki_model: model.trim() } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) {
 			okugakiModel = previous;
 			console.warn('failed to save okugaki model', e);
@@ -730,6 +734,7 @@
 		visionProvider = provider;
 		visionModel = model;
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -737,7 +742,7 @@
 				body: JSON.stringify({ model_settings: { vision_provider: provider, vision_model: model } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) {
 			visionProvider = prevProvider;
 			visionModel = prevModel;
@@ -916,6 +921,7 @@
 		if (!session.currentUser) return;
 		const previousUser = session.currentUser;
 		const userId = previousUser.id;
+		const token = session.beginSettingsUpdate();
 		try {
 		await loadModelReferences([{action: 'split_ref', ref: okugakiModel}]);
 		// What the page owns; the features add their own fields to the save.
@@ -948,15 +954,19 @@
 					? { ...actor.model_settings, ui_text_size: textSizeSettings.step }
 					: actor.model_settings
 			};
-			session.setCurrentUser(actorWithTextSizePreview);
-			applyUserModelSettings(actorWithTextSizePreview, { excludeUserSettingIds: ['text-size'] });
+			if (session.acceptSettingsUpdate(token, actorWithTextSizePreview)) applyUserModelSettings(actorWithTextSizePreview, { excludeUserSettingIds: ['text-size'] });
 		} catch (e) {
 			if (session.currentUser?.id === userId) {
 				session.setCurrentUser({
-					...previousUser,
-					model_settings: previousUser.model_settings
-						? { ...previousUser.model_settings, ui_text_size: textSizeSettings.step }
-						: previousUser.model_settings
+					...session.currentUser,
+					model_settings: previousUser.model_settings && session.currentUser.model_settings
+						? { ...session.currentUser.model_settings,
+							stage1_provider: previousUser.model_settings.stage1_provider, stage1_model: previousUser.model_settings.stage1_model,
+							stage2_provider: previousUser.model_settings.stage2_provider, stage2_model: previousUser.model_settings.stage2_model,
+							vision_provider: previousUser.model_settings.vision_provider, vision_model: previousUser.model_settings.vision_model,
+							okugaki_provider: previousUser.model_settings.okugaki_provider, okugaki_model: previousUser.model_settings.okugaki_model,
+							instruction_caption_visible: previousUser.model_settings.instruction_caption_visible, ui_text_size: textSizeSettings.step }
+						: session.currentUser.model_settings
 				});
 			}
 			console.warn('failed to update model selection', e);
@@ -1005,10 +1015,11 @@
 	// so a browser-wide value would only ever be the wrong user's.
 	async function persistColorCatalogSelection(selected: string) {
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { color_catalog_id: selected } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save color catalog selection', e); }
 	}
 	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
@@ -1019,10 +1030,11 @@
 	// state, and refolding it under them would be worse than forgetting it.
 	async function persistDescribePanelFolds(fields: Record<string, boolean>) {
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save describe panel folds', e); }
 	}
 	bindDescribePanelPersist((fields) => { void persistDescribePanelFolds(fields); });
@@ -1030,10 +1042,11 @@
 	// the choice as the user just made it.
 	async function persistGenerationInfoSettings(fields: Record<string, boolean>) {
 		if (!session.currentUser) return;
+		const token = session.beginSettingsUpdate();
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.setCurrentUser(await r.json() as UserItem);
+			session.acceptSettingsUpdate(token, await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save generation info settings', e); }
 	}
 	bindGenerationInfoSettingsPersist((fields) => { void persistGenerationInfoSettings(fields); });
@@ -1045,6 +1058,7 @@
 		if (!userId) return;
 		captionSettingsWrite = captionSettingsWrite.then(async () => {
 			if (session.currentUser?.id !== userId) return;
+			const token = session.beginSettingsUpdate();
 			try {
 				const response = await apiFetch('/api/auth/me/settings', {
 					method: 'PATCH',
@@ -1053,13 +1067,14 @@
 				});
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
 				const actor = await response.json() as UserItem;
-				if (session.currentUser?.id === userId) session.setCurrentUser(actor);
+				session.acceptSettingsUpdate(token, actor);
 			} catch (cause) { console.warn('failed to save headnote direction', cause); }
 		});
 	});
 	bindTextSizePersist(async (step) => {
 		const userId = session.currentUser?.id;
 		if (!userId) throw new Error('No signed-in user');
+		const token = session.beginSettingsUpdate();
 		const response = await apiFetch('/api/auth/me/settings', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
@@ -1072,7 +1087,7 @@
 		if (actor.model_settings?.ui_text_size !== step) throw new Error('Text size was not persisted');
 		// Only merge this preference; another settings request may have completed
 		// while the slider save was in flight.
-		session.setCurrentUser({
+		session.acceptSettingsUpdate(token, {
 			...currentUser,
 			model_settings: { ...actor.model_settings, ...currentUser.model_settings, ui_text_size: step }
 		});
@@ -1573,6 +1588,8 @@
 		stage2Model: () => splitModelReference(work.tabModelRef('stage2'), availableModelCatalog).model,
 		currentUser: () => session.currentUser,
 		setCurrentUser: (user) => session.setCurrentUser(user as UserItem),
+		beginSettingsUpdate: () => session.beginSettingsUpdate(),
+		acceptSettingsUpdate: (token, user) => session.acceptSettingsUpdate(token, user as UserItem),
 		apiFetch,
 	});
 
@@ -2788,6 +2805,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		showAuxiliary={session.uiVisibility.auxiliary}
 		uiMode={session.uiMode}
 		tooltipsEnabled={session.tooltipsEnabled}
+		themeSaving={session.themeSaving}
+		tooltipsSaving={session.tooltipsSaving}
 		onSetUiMode={(mode) => void session.updateUiMode(mode)}
 		onToggleTooltips={() => void session.updateTooltipsEnabled(!session.tooltipsEnabled)}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}

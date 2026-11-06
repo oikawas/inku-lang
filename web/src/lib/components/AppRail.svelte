@@ -20,6 +20,8 @@
 		showAuxiliary: boolean;
 		uiMode: UiMode;
 		tooltipsEnabled: boolean;
+		themeSaving: boolean;
+		tooltipsSaving: boolean;
 		onSetUiMode: (mode: UiMode) => void | Promise<void>;
 		onToggleTooltips: () => void | Promise<void>;
 		onToggleUserMenu: () => void;
@@ -42,6 +44,8 @@
 		showAuxiliary,
 		uiMode,
 		tooltipsEnabled,
+		themeSaving,
+		tooltipsSaving,
 		onSetUiMode,
 		onToggleTooltips,
 		onToggleUserMenu,
@@ -160,6 +164,7 @@
 				type="button"
 				aria-pressed={tooltipsEnabled}
 				aria-label={tooltipsEnabled ? t().tooltipsHide : t().tooltipsShow}
+				disabled={tooltipsSaving}
 				onclick={onToggleTooltips}
 			>
 				<span class="rail-icon tooltip-icon" aria-hidden="true">?</span>
@@ -176,7 +181,7 @@
 
 		{#if showAuxiliary}
 		<Tooltip placement="right" text={t().tooltipAppRailTheme}>
-			<button class="rail-action" onclick={onToggleTheme}>
+			<button class="rail-action" onclick={onToggleTheme} disabled={themeSaving}>
 				<span class="rail-icon theme-icon" class:dark={darkMode} aria-hidden="true"></span>
 				{#if expanded}<span class="rail-label">{darkMode ? t().themeLight : t().themeDark}</span>{/if}
 			</button>

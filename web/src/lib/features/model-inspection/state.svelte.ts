@@ -12,6 +12,8 @@ export type ModelInspectionDeps = {
 	stage2Model: () => string;
 	currentUser: () => { username: string } | null;
 	setCurrentUser: (user: unknown) => void;
+	beginSettingsUpdate: () => { id: number; owner: string | undefined };
+	acceptSettingsUpdate: (token: { id: number; owner: string | undefined }, user: unknown) => boolean;
 	apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
 };
 
@@ -84,6 +86,7 @@ function isModelInspectionChoiceBlocked(model: string) {
 
 async function persistModelInspectionSelection(models: string[]) {
 	if (!currentUser) return;
+	const token = deps.beginSettingsUpdate();
 	try {
 		const r = await apiFetch('/api/auth/me/settings', {
 			method: 'PATCH',
@@ -95,7 +98,7 @@ async function persistModelInspectionSelection(models: string[]) {
 			}),
 		});
 		if (!r.ok) throw new Error(`HTTP ${r.status}`);
-		deps.setCurrentUser(await r.json());
+		deps.acceptSettingsUpdate(token, await r.json());
 	} catch (e) {
 		console.warn('failed to save model comparison selection', e);
 	}

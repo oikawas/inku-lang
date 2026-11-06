@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- On macOS, drawing model guidance now opens the appropriate settings for adding a connection or choosing a drawing model.
+
 - macOS: show a readable reason when importing instructions in the new instruction editor fails.
 
 - macOS: DB v9 replaces duplicate saved data with digests and compacts the database. Drawing logs for failed or stopped executions without a saved effect are removed during migration.

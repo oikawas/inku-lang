@@ -9,6 +9,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     #if !os(macOS)
     case about
     #endif
+    static func drawingGuidance(hasConnection: Bool) -> SettingsSection {
+        hasConnection ? .drawDefaults : .models
+    }
     var id: String { rawValue }
     var title: String {
         switch self {

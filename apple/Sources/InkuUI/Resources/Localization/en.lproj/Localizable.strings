@@ -1591,3 +1591,6 @@
 "画面比" = "Aspect ratio";
 "提示したプラグイン" = "Offered plugins";
 "出力上限を保存しました。" = "Output limits saved.";
+
+"モデル設定で接続先を追加してください。" = "Add a connection in Model Settings.";
+"描くときのデフォルトで、使える描画モデルを選んでください。" = "Choose an available drawing model in Drawing Defaults.";

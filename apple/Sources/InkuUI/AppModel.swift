@@ -385,6 +385,7 @@ public final class AppModel {
     public var canCommitDDL: Bool { !isBusy && !isPreview && !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (currentExecutionID != nil || selectedContext != nil) }
     public var canEditCurrentDDL: Bool { !isBusy && !isPreview && (currentExecutionID != nil || selectedContext != nil) }
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
+    var hasDrawingConnection: Bool { !settings.providers.isEmpty }
     public var hasAvailableNextDrawingModel: Bool {
         hasNextDrawingModel && (drawingAvailability[nextDrawingModelReference]?.drawing ?? false)
     }

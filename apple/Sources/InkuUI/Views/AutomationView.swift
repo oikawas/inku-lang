@@ -120,8 +120,11 @@ private enum DemoModelPicker: String, Identifiable {
             Button(model.display.localized("デモを開始"), systemImage: "play.fill") { Task { await automation.startDemo(app: model) } }
                 .disabled(!automation.canStartDemo(app: model))
             if automation.demoModel.isEmpty || automation.demoStage1Model.isEmpty || automation.demoStage2Model.isEmpty {
-                Button(model.display.localized("使用中のLLMモデルを設定してください。"), systemImage: "gearshape") {
-                    NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": "models"])
+                Button(model.display.localized(model.hasDrawingConnection
+                    ? "描くときのデフォルトで、使える描画モデルを選んでください。"
+                    : "モデル設定で接続先を追加してください。"), systemImage: "gearshape") {
+                    let section = SettingsSection.drawingGuidance(hasConnection: model.hasDrawingConnection)
+                    NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": section.rawValue])
                 }.inkuFont(12).disabled(model.isBrowsingLocked)
             }
             demoStatistics

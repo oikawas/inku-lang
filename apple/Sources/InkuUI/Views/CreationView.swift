@@ -594,11 +594,13 @@ struct CreationView: View {
     /// InputPanel.svelte:308-337: the paint button, or the run status while drawing.
     private var generationAction: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if model.inputMode == "description" && !model.hasNextDrawingModel {
+            if model.inputMode == "description" && !model.hasAvailableNextDrawingModel {
                 Button {
-                    ui.settingsSection = .models; ui.settingsOpen = true
+                    ui.settingsSection = .drawingGuidance(hasConnection: model.hasDrawingConnection); ui.settingsOpen = true
                 } label: {
-                    Label(display.localized("記述から生成するには、設定で接続先とモデルを指定してください。"), systemImage: "gearshape")
+                    Label(display.localized(model.hasDrawingConnection
+                        ? "描くときのデフォルトで、使える描画モデルを選んでください。"
+                        : "モデル設定で接続先を追加してください。"), systemImage: "gearshape")
                         .inkuFont(13).multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)

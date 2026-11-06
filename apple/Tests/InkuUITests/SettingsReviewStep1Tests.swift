@@ -4,6 +4,11 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class SettingsReviewStep1Tests: XCTestCase {
+    func testDrawingGuidanceRoutesByConnection() {
+        XCTAssertEqual(SettingsSection.drawingGuidance(hasConnection: false), .models)
+        XCTAssertEqual(SettingsSection.drawingGuidance(hasConnection: true), .drawDefaults)
+    }
+
     func testSavingTokenLimitsPreservesUnavailableModels() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-token-limits-\(UUID())")
         defer { try? FileManager.default.removeItem(at: folder) }

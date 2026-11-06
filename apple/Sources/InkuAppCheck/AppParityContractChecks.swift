@@ -40,10 +40,12 @@ func runAppParityContractChecks(fixtureDirectory: URL? = nil) async throws {
     }
     let editor = DdlEditingSession(work: parent)
     model.wild = true
-    guard editor.draft == source, editor.canSubmit(to: model), await editor.commit(to: model),
-          let child = model.selectedWork, child.id != parent.id, child.ddl == source, child.renderWild == true,
+    let permitted = editor.canSubmit(to: model)
+    let committed = await editor.commit(to: model)
+    guard editor.draft == parent.ddl, permitted, committed,
+          let child = model.selectedWork, child.id != parent.id, child.ddl == parent.ddl, child.renderWild == true,
           child.stage2Model == "fixture:beta" else {
-        throw CheckFailure.message("Unchanged DDL could not be redrawn with new conditions: \(model.errorText ?? model.status)")
+        throw CheckFailure.message("Unchanged DDL redraw did not preserve its instructions or use current conditions: \(model.errorText ?? model.status)")
     }
     let database = try InkuDatabase(url: databaseURL)
     let storedParent = try await database.work(id: parent.id)

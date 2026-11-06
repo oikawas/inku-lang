@@ -708,6 +708,8 @@ macOSでは全体の処理エラーを画面下の閉じられる表示へ出す
 
 ## 2026-10-04 描画失敗の診断と実行ログ
 
+結果ログの保存が無効な間は、描画中にファイル用の描画ログを読み込まない。
+
 toolbarの「描画ログ」で直近100件のpipeline実行を新しい順に表示する。成功作品がない実行も、開始日時、記述、固定したモデル、完了・失敗・停止等の状態、失敗段階・分類、各試行の時間・HTTP状態・実測記録とcoreの経過を確認できる。読出しはSQLiteの既存snapshotだけを使い、driverの再開・provider送信・作品の変更を行わない。raw本文や凍結したprovider設定を通常logのdecode対象にも返却型にも含めない。
 
 通常APIの失敗metricへ後方互換optionalの診断を付ける。OS通信errorのdomain／codeと固定した説明、既知host error、HTTP拒否のcode／type／param／statusと240文字以内のmessageを保存する。接続先はscheme／host／portだけとし、path／query／userinfo／headersを含めない。実credentialと秘密らしい文字列を切取り前にmaskする。HTTP応答を得られない通信では、要求を送れたと推測しない。古い実行には新しい詳細を補作せず、記録されなかった理由を明示する。共通Rustの失敗分類・再試行・fallbackは変更しない。

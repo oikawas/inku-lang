@@ -708,6 +708,8 @@ On macOS, global operation errors appear in a dismissible notice at the bottom o
 
 ## 2026-10-04 Drawing failure diagnostics and execution logs
 
+While result-log saving is disabled, drawing does not read execution logs for the file log.
+
 The toolbar's Drawing log shows the latest 100 pipeline executions, newest first. Executions without saved works retain their start time, description, pinned models, completion/failure/cancellation state, failed stage and classification, each attempt's timing/HTTP facts/measurements, and core progress. Reading uses existing SQLite snapshots without resuming drivers, sending provider requests, or changing works. Ordinary log decoding and result types exclude raw provider bodies and frozen provider settings.
 
 Ordinary API failure metrics include backward-compatible optional diagnostics: OS network error domain/code and a fixed explanation, known host errors, and HTTP refusal code/type/param/status with a message bounded to 240 characters. Endpoints contain only scheme/host/port, excluding path/query/userinfo/headers. Actual credentials and secret-shaped strings are masked before shortening. A failed connection without an HTTP response is not assumed to have sent a request. Older records remain readable and are explicitly marked when detailed reasons were not recorded. Shared Rust failure classifications, retries, and fallbacks stay unchanged.

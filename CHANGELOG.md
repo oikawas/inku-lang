@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: skip reading execution records for the file log while result-log saving is disabled.
+
 - macOS: use arrow keys to preview works in the chronological library thumbnail grid.
 
 - macOS: the DDL editor and layout adjustments use the current input tab's drawing model and wild setting.

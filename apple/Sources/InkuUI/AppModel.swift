@@ -1438,6 +1438,7 @@ public final class AppModel {
     public func adoptDrawingAdjustmentCandidate(candidate: PreparedCandidate, token: UUID) async throws -> SavedWork {
         guard generationToken == token, !stopping, let host else { throw CancellationError() }
         let saved = try await host.saveCandidate(executionID: candidate.executionID, expectedWorkID: candidate.work.id)
+        recordDrawingLog(executionID: candidate.executionID)
         await notifySavedWork(saved)
         do { try await reloadWorks() } catch { report(error) }
         guard generationToken == token, !stopping, !Task.isCancelled else { return saved }
@@ -1802,6 +1803,7 @@ public final class AppModel {
             let candidate = try await self.generateCandidate(request: request, token: token, comparison: false)
             try Task.checkCancellation()
             let saved = try await self.saveComparisonCandidate(executionID: candidate.executionID, token: token)
+            self.recordDrawingLog(executionID: candidate.executionID)
             result = saved
             guard self.generationToken == token, !self.stopping, !Task.isCancelled else { return }
             let view = try await host.restore(executionID: candidate.executionID)
@@ -2588,7 +2590,7 @@ public final class AppModel {
     }
 
     private func recordDrawingLog(executionID: String) {
-        guard let host, let callback = onDrawingLog else { return }
+        guard display.preferences.saveResultLog, let host, let callback = onDrawingLog else { return }
         // Read durable public facts, independent of UI selection and the caller's cancellation.
         Task { @MainActor in
             do {
@@ -2616,7 +2618,6 @@ public final class AppModel {
     }
     private func apply(_ view: PipelineView) {
         finishProviderStage(view)
-        recordDrawingLog(executionID: view.executionID)
         currentView = view
         currentExecutionID = view.executionID
         if isBusy, view.savedWorkID == displayedWork?.id { providerMetrics = view.providerMetrics }

@@ -20,6 +20,9 @@ struct DdlTitleTests {
                         return NSRange(location: offsets[start], length: offsets[end] - offsets[start])
                     }
                     #expect(DdlTitles.lineRanges(text) == expected, "\(row["why"].string ?? "")")
+                    for (range, line) in zip(expected, try #require(row["lines"].array)) {
+                        #expect(DdlTitles.name((text as NSString).substring(with: range)) == line.array?[2].string)
+                    }
                     #expect(DdlTitles.withoutTitleLines(text) == row["without"].string)
                 }
                 return

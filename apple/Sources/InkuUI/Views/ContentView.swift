@@ -128,6 +128,7 @@ public struct ContentView: View {
         .onDisappear { importer.cancel(); automation.flushDemoPreferences() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             automation.flushDemoPreferences()
+            Task { await model.shutdownPersonalPlan() }
         }
         #endif
         .environment(model.display)

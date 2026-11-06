@@ -1613,10 +1613,7 @@ const fn overlaps(left: SourceSpan, right: SourceSpan) -> bool {
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    crate::lowercase_hex(&Sha256::digest(bytes))
 }
 
 #[cfg(test)]

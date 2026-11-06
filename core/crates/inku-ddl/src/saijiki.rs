@@ -487,12 +487,7 @@ pub fn saijiki_asset() -> &'static SaijikiAsset {
 /// Return the lowercase SHA-256 of the exact embedded asset bytes.
 pub fn saijiki_asset_sha256_hex() -> &'static str {
     SAIJIKI_ASSET_SHA256_HEX
-        .get_or_init(|| {
-            Sha256::digest(SAIJIKI_ASSET_BYTES)
-                .iter()
-                .map(|byte| format!("{byte:02x}"))
-                .collect()
-        })
+        .get_or_init(|| crate::lowercase_hex(&Sha256::digest(SAIJIKI_ASSET_BYTES)))
         .as_str()
 }
 
@@ -597,7 +592,7 @@ pub(crate) fn canonical_semantic_id(
     category_key: &str,
     lexical_id: &str,
 ) -> Result<Option<String>, SaijikiProjectionError> {
-    canonical_semantic_id_from_asset(saijiki_asset(), category_key, lexical_id)
+    canonical_semantic_id_in(SaijikiEdition::CURRENT, category_key, lexical_id)
 }
 
 /// A semantic id spelled as `edition` spelled it, for the identity a saved Macro definition
@@ -607,7 +602,41 @@ pub(crate) fn canonical_semantic_id_in(
     category_key: &str,
     lexical_id: &str,
 ) -> Result<Option<String>, SaijikiProjectionError> {
-    canonical_semantic_id_from_asset(edition.asset(), category_key, lexical_id)
+    type Ids = HashMap<String, HashMap<String, Result<Option<String>, SaijikiProjectionError>>>;
+    static V1: OnceLock<Ids> = OnceLock::new();
+    static V2: OnceLock<Ids> = OnceLock::new();
+    static V3: OnceLock<Ids> = OnceLock::new();
+    let cache = match edition {
+        SaijikiEdition::V1 => &V1,
+        SaijikiEdition::V2 => &V2,
+        SaijikiEdition::V3 => &V3,
+    };
+    let asset = edition.asset();
+    let categories = cache.get_or_init(|| {
+        asset
+            .categories
+            .iter()
+            .map(|category| {
+                let mut words = HashMap::new();
+                for word in &category.words {
+                    if let Some(id) = semantic_wire_id(word) {
+                        words.entry(id.clone()).or_insert_with(|| {
+                            canonical_semantic_id_from_asset(asset, &category.key, &id)
+                        });
+                    }
+                }
+                (category.key.clone(), words)
+            })
+            .collect()
+    });
+    categories
+        .get(category_key)
+        .ok_or_else(|| SaijikiProjectionError::MissingCategory {
+            key: category_key.to_owned(),
+        })?
+        .get(lexical_id)
+        .cloned()
+        .unwrap_or(Ok(None))
 }
 
 fn canonical_semantic_id_from_asset(

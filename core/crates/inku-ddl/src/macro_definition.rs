@@ -1187,10 +1187,7 @@ impl MacroDefinition {
         framed.extend_from_slice(&(canonical_json.len() as u64).to_be_bytes());
         framed.extend_from_slice(&canonical_json);
         let full_digest: [u8; 32] = Sha256::digest(framed).into();
-        let full_digest_hex = full_digest
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let full_digest_hex = crate::lowercase_hex(&full_digest);
         MacroDefinitionIdentity {
             qualified_name: self
                 .qualified_name()

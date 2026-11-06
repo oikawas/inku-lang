@@ -339,9 +339,13 @@ pub(crate) fn parse_neutral_lexemes_in(
     let mut diagnostics = Vec::new();
     let mut recognized_delivery_count = 0;
     let mut cursor = 0;
+    let mut pending = None;
 
     while cursor < source.len() {
-        match selection_at(edition, document, cursor, language) {
+        match pending
+            .take()
+            .or_else(|| selection_at(edition, document, cursor, language))
+        {
             Some(Selection::Token { end_byte, kind }) => {
                 tokens.push(NeutralToken {
                     span: SourceSpan {
@@ -396,7 +400,7 @@ pub(crate) fn parse_neutral_lexemes_in(
                     continue;
                 }
 
-                let end_byte = unknown_end(edition, document, cursor, language);
+                let (end_byte, next) = unknown_end(edition, document, cursor, language);
                 diagnostics.push(diagnostic(
                     source,
                     cursor,
@@ -405,6 +409,7 @@ pub(crate) fn parse_neutral_lexemes_in(
                     false,
                 ));
                 cursor = end_byte;
+                pending = next;
             }
         }
     }
@@ -653,10 +658,75 @@ struct Candidate {
     delivery: CandidateDelivery,
 }
 
+struct AssetWordCandidate {
+    surface: String,
+    suffix: Option<&'static str>,
+    identity: String,
+    delivery: CandidateDelivery,
+}
+
+fn asset_word_candidates(
+    edition: SaijikiEdition,
+    language: ResolvedInstructionLanguage,
+) -> &'static [AssetWordCandidate] {
+    use std::sync::OnceLock;
+    static V1_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V1_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V2_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V2_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V3_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V3_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    let cache = match (edition, language) {
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::Ja) => &V2_JA,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+    };
+    cache.get_or_init(|| {
+        let mut entries = Vec::new();
+        for category in &edition.asset().categories {
+            for word in &category.words {
+                let surfaces = parser_candidate_surfaces(word, language);
+                let mut add = |surface: String, suffix| {
+                    entries.push(AssetWordCandidate {
+                        surface,
+                        suffix,
+                        identity: format!("word:{}:{}", category.key, word.surface_ja),
+                        delivery: CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                            asset_id: edition.asset_id().to_owned(),
+                            category_key: category.key.clone(),
+                            canonical_surface_ja: word.surface_ja.clone(),
+                        }),
+                    })
+                };
+                for surface in &surfaces {
+                    add(surface.to_string(), None);
+                }
+                let Some(surface) = surfaces.first().map(|surface| surface.as_ref()) else {
+                    continue;
+                };
+                if language == ResolvedInstructionLanguage::En && category.key == "katachi" {
+                    add(format!("{surface}s"), None);
+                }
+                if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {
+                    if JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1.contains(&word.surface_ja.as_str()) {
+                        add(surface.to_owned(), Some("い"));
+                    }
+                    add(surface.to_owned(), Some("色"));
+                }
+            }
+        }
+        entries
+    })
+}
+
 #[derive(Default)]
 struct ParseMemo {
     candidates: HashMap<(usize, &'static str), Vec<Candidate>>,
     relative_heads: HashMap<(usize, &'static str), bool>,
+    left_ends: Option<Rc<LeftCandidateEnds>>,
 }
 
 thread_local! {
@@ -1032,86 +1102,49 @@ fn candidates_at_uncached(
         );
     }
 
-    for category in &asset.categories {
-        for word in &category.words {
-            let surfaces = parser_candidate_surfaces(word, language);
-            for surface in &surfaces {
-                push_surface_candidate(
-                    edition,
-                    &mut candidates,
-                    source,
-                    start_byte,
-                    language,
-                    require_boundary,
-                    surface.as_ref(),
-                    PRIORITY_ASSET,
-                    format!("word:{}:{}", category.key, word.surface_ja),
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                        asset_id: edition.asset_id().to_owned(),
-                        category_key: category.key.clone(),
-                        canonical_surface_ja: word.surface_ja.clone(),
-                    }),
-                );
+    for entry in asset_word_candidates(edition, language) {
+        let suffix = entry.suffix.unwrap_or("");
+        let end = start_byte + entry.surface.len() + suffix.len();
+        let Some(actual) = source.get(start_byte..end) else {
+            continue;
+        };
+        let matches = if entry.suffix.is_some() {
+            actual.starts_with(&entry.surface) && &actual[entry.surface.len()..] == suffix
+        } else {
+            match language {
+                ResolvedInstructionLanguage::Ja => actual == entry.surface,
+                ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(&entry.surface),
             }
-            let Some(surface) = surfaces.first().map(|surface| surface.as_ref()) else {
-                continue;
-            };
-            if language == ResolvedInstructionLanguage::En && category.key == "katachi" {
-                // Registered primitive heads use regular English noun plurals.
-                // Number agreement changes spelling, never quantity or identity.
-                push_surface_candidate(
-                    edition,
-                    &mut candidates,
-                    source,
-                    start_byte,
-                    language,
-                    require_boundary,
-                    &format!("{surface}s"),
-                    PRIORITY_ASSET,
-                    format!("word:{}:{}", category.key, word.surface_ja),
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                        asset_id: edition.asset_id().to_owned(),
-                        category_key: category.key.clone(),
-                        canonical_surface_ja: word.surface_ja.clone(),
-                    }),
-                );
-            }
-            if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {
-                if JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1.contains(&word.surface_ja.as_str()) {
-                    push_japanese_derived_surface_candidate(
-                        edition,
-                        &mut candidates,
-                        source,
-                        start_byte,
-                        require_boundary,
-                        surface,
-                        "い",
-                        PRIORITY_ASSET,
-                        format!("word:{}:{}", category.key, word.surface_ja),
-                        CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                            asset_id: edition.asset_id().to_owned(),
-                            category_key: category.key.clone(),
-                            canonical_surface_ja: word.surface_ja.clone(),
-                        }),
-                    );
-                }
-                push_japanese_derived_surface_candidate(
-                    edition,
-                    &mut candidates,
-                    source,
-                    start_byte,
-                    require_boundary,
-                    surface,
-                    "色",
-                    PRIORITY_ASSET,
-                    format!("word:{}:{}", category.key, word.surface_ja),
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                        asset_id: edition.asset_id().to_owned(),
-                        category_key: category.key.clone(),
-                        canonical_surface_ja: word.surface_ja.clone(),
-                    }),
-                );
-            }
+        };
+        if !matches {
+            continue;
+        }
+        if let Some(suffix) = entry.suffix {
+            push_japanese_derived_surface_candidate(
+                edition,
+                &mut candidates,
+                source,
+                start_byte,
+                require_boundary,
+                &entry.surface,
+                suffix,
+                PRIORITY_ASSET,
+                entry.identity.clone(),
+                entry.delivery.clone(),
+            );
+        } else {
+            push_surface_candidate(
+                edition,
+                &mut candidates,
+                source,
+                start_byte,
+                language,
+                require_boundary,
+                &entry.surface,
+                PRIORITY_ASSET,
+                entry.identity.clone(),
+                entry.delivery.clone(),
+            );
         }
     }
 
@@ -1530,8 +1563,19 @@ thread_local! {
 }
 
 fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidateEnds> {
+    let memo = PARSE_MEMO.with(|cell| cell.borrow().clone());
+    if let Some(ends) = memo
+        .as_ref()
+        .and_then(|memo| memo.borrow().left_ends.clone())
+        && ends.edition == edition
+    {
+        return ends;
+    }
     let cached = LEFT_CANDIDATE_ENDS.with(|cell| cell.borrow().clone());
     if let Some(ends) = cached.filter(|ends| ends.edition == edition && ends.source == source) {
+        if let Some(memo) = &memo {
+            memo.borrow_mut().left_ends = Some(Rc::clone(&ends));
+        }
         return ends;
     }
     let mut earliest_start = HashMap::new();
@@ -1580,6 +1624,9 @@ fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidat
         earliest_start,
     });
     LEFT_CANDIDATE_ENDS.with(|cell| *cell.borrow_mut() = Some(Rc::clone(&ends)));
+    if let Some(memo) = memo {
+        memo.borrow_mut().left_ends = Some(Rc::clone(&ends));
+    }
     ends
 }
 
@@ -1927,10 +1974,32 @@ fn push_japanese_native_tsu_counter_candidate(
     });
 }
 
+fn japanese_number_run_start(source: &str, end_byte: usize) -> usize {
+    let mut start = end_byte;
+    for (index, ch) in source[..end_byte].char_indices().rev() {
+        if ch.is_ascii_digit()
+            || ('０'..='９').contains(&ch)
+            || japanese_digit(ch).is_some()
+            || japanese_small_unit(ch).is_some()
+            || japanese_large_unit(ch).is_some()
+            || NATIVE_TSU_CARDINALS_JA
+                .iter()
+                .any(|(surface, _)| surface.contains(ch))
+        {
+            start = index;
+        } else {
+            break;
+        }
+    }
+    start
+}
+
 fn japanese_exact_number_before(source: &str, end_byte: usize) -> Option<u64> {
-    source[..end_byte]
+    let run_start = japanese_number_run_start(source, end_byte);
+    source[run_start..end_byte]
         .char_indices()
-        .find_map(|(start_byte, _)| {
+        .find_map(|(offset, _)| {
+            let start_byte = run_start + offset;
             NATIVE_TSU_CARDINALS_JA
                 .iter()
                 .find_map(|(surface, value)| {
@@ -1958,20 +2027,25 @@ fn japanese_exact_number_before(source: &str, end_byte: usize) -> Option<u64> {
 }
 
 fn japanese_exact_number_ends_at(source: &str, end_byte: usize) -> bool {
-    source[..end_byte].char_indices().any(|(start_byte, _)| {
-        NATIVE_TSU_CARDINALS_JA.iter().any(|(surface, _)| {
-            start_byte + surface.len() == end_byte
-                && source.get(start_byte..end_byte) == Some(*surface)
-        }) || japanese_kanji_cardinal_at(source, start_byte)
-            .is_some_and(|(candidate_end, _)| candidate_end == end_byte)
-            || japanese_fullwidth_decimal_at(source, start_byte)
-                .is_some_and(|(candidate_end, value)| candidate_end == end_byte && value.is_some())
-            || (source.as_bytes()[start_byte].is_ascii_digit()
-                && source.as_bytes()[start_byte..end_byte]
-                    .iter()
-                    .all(u8::is_ascii_digit)
-                && source[start_byte..end_byte].parse::<u64>().is_ok())
-    })
+    let run_start = japanese_number_run_start(source, end_byte);
+    source[run_start..end_byte]
+        .char_indices()
+        .any(|(offset, _)| {
+            let start_byte = run_start + offset;
+            NATIVE_TSU_CARDINALS_JA.iter().any(|(surface, _)| {
+                start_byte + surface.len() == end_byte
+                    && source.get(start_byte..end_byte) == Some(*surface)
+            }) || japanese_kanji_cardinal_at(source, start_byte)
+                .is_some_and(|(candidate_end, _)| candidate_end == end_byte)
+                || japanese_fullwidth_decimal_at(source, start_byte).is_some_and(
+                    |(candidate_end, value)| candidate_end == end_byte && value.is_some(),
+                )
+                || (source.as_bytes()[start_byte].is_ascii_digit()
+                    && source.as_bytes()[start_byte..end_byte]
+                        .iter()
+                        .all(u8::is_ascii_digit)
+                    && source[start_byte..end_byte].parse::<u64>().is_ok())
+        })
 }
 
 fn japanese_fullwidth_decimal_at(source: &str, start_byte: usize) -> Option<(usize, Option<u64>)> {
@@ -2402,7 +2476,7 @@ fn unknown_end(
     document: &NormalizedDdlDocument,
     start_byte: usize,
     language: ResolvedInstructionLanguage,
-) -> usize {
+) -> (usize, Option<Selection>) {
     let source = document.source();
     let first = source[start_byte..]
         .chars()
@@ -2414,13 +2488,15 @@ fn unknown_end(
             .chars()
             .next()
             .expect("unknown resynchronization remains inside source");
-        if is_separator(character) || selection_at(edition, document, end_byte, language).is_some()
-        {
-            break;
+        if is_separator(character) {
+            return (end_byte, None);
+        }
+        if let Some(next) = selection_at(edition, document, end_byte, language) {
+            return (end_byte, Some(next));
         }
         end_byte += character.len_utf8();
     }
-    end_byte
+    (end_byte, None)
 }
 
 fn is_separator(character: char) -> bool {

@@ -625,7 +625,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			const total = fromStart ? imageFolder.pictures.length : imageFolder.pending.length;
 			if (total === 0) return;
 			lease = await startBatchLease(apiFetch, runId, '', { draw_options: choices }, total, () => imageFolder.success,
-				() => imageFolder.stop(), 'image');
+				() => { imageFolder.stop(); void imageBatchController.cancel(); }, 'image');
 			await imageFolder.run({
 				fromStart,
 				batchRunId: lease ? runId : undefined,

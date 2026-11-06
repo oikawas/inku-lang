@@ -14,6 +14,7 @@ import InkuUI
     let service = ProviderSettings(id: "laws-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false, models: [.init(id: "pinned")])
     let models = ModelSelection(stage1Model: "laws-check:pinned", stage2Model: "laws-check:pinned")
     try await app.updateHostSettings(HostSettings(providers: [service], models: models))
+    app.selectNextDrawingModel("laws-check:pinned")
     app.inputMode = "description"; app.descriptionText = "赤い円がひとつ浮かび、下に黒い点が散らばる"
     app.language = "ja"; app.seedText = "7"; app.catalogMode = "auto"
     let database = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))

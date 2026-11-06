@@ -18,6 +18,7 @@ import InkuUI
                                    models: ["pinned", "unused-stage2"].map { ProviderModelSettings(id: $0) })
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "composition-check:pinned", stage2Model: "composition-check:pinned")))
+    app.selectNextDrawingModel("composition-check:pinned")
     app.inputMode = "description"; app.descriptionText = compositionCheckDescription
     app.language = "en"; app.seedText = "42"
     var request = try app.requestForCurrentInput()

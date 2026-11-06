@@ -19,6 +19,7 @@ import InkuUI
                                    models: [ProviderModelSettings(id: "pinned")])
     let models = ModelSelection(stage1Model: "laws-check:pinned", stage2Model: "laws-check:pinned")
     try await app.updateHostSettings(HostSettings(providers: [service], models: models))
+    app.selectNextDrawingModel("laws-check:pinned")
     app.inputMode = "description"; app.language = "ja"; app.seedText = "7"
     let database = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
     let credentials = LawsColorsEmptyCredentials()

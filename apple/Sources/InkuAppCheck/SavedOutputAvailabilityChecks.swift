@@ -12,9 +12,11 @@ func runSavedOutputAvailabilityChecks() async throws {
     let provider = SavedOutputAvailabilityProvider()
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false)
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+                                   models: [.init(id: "saved-output")])
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "check:saved-output", stage2Model: "check:saved-output")))
+    app.selectNextDrawingModel("check:saved-output")
     app.inputMode = "description"; app.descriptionText = "a red circle"; app.language = "en"; app.seedText = "42"
     await app.generate()
     let parentOutput = await app.outputSnapshot()

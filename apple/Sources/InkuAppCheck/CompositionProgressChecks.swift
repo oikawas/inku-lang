@@ -20,6 +20,7 @@ func runCompositionProgressChecks() async throws {
                                    models: ["pinned", "comparison-stage1", "holes-only", "later"].map { ProviderModelSettings(id: $0) })
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:pinned")))
+    app.selectNextDrawingModel("check:pinned")
     app.inputMode = "description"; app.descriptionText = compositionProgressDescription; app.seedText = "0"
     let defaultRequest = try app.requestForCurrentInput()
     guard try ExactJSON(data: defaultRequest.configuration)["composition"]["read"].bool == true else {

@@ -15,6 +15,7 @@ import InkuUI
         let model = ProviderModelSettings(id: "fixture", purposes: vision ? ["llm", "vision"] : ["llm"])
         let service = ProviderSettings(id: "fixture", baseURL: URL(string: "https://fixture.invalid")!, requiresAPIKey: false, models: [model])
         try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "fixture:fixture", stage2Model: "fixture:fixture")))
+        app.selectNextDrawingModel("fixture:fixture")
         app.inputMode = "description"; app.descriptionText = "🌙 紫の にほへる妹 [大海人皇子] 人妻ゆゑに"; app.language = "ja"; app.seedText = "42"
         app.descriptionComposition = composed
         guard app.drawRoute == "read_and_draw", app.sketchMode == "on" else { throw CheckFailure.message("read and draw defaults") }

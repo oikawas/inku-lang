@@ -150,7 +150,7 @@ test('T-275: only the latest strip request settles items, offset, and busy state
 	assert.equal(state.fetchInFlight, 0);
 
 	controls.signedIn = false;
-	assert.equal(await state.fetchOffset(0), false);
+	assert.equal(await state.fetchOffset(0), 'failed');
 	assert.deepEqual(state.items, []);
 	assert.equal(state.total, 0);
 	assert.equal(state.offset, 0);
@@ -163,6 +163,23 @@ test('T-275: only the latest strip request settles items, offset, and busy state
 	await invalidated;
 	assert.deepEqual(state.items, []);
 	assert.deepEqual(state.manager.activeItems, []);
+});
+
+test('a superseded anchor lookup does not clear filters or selection', async () => {
+	const { apiFetch, requests } = deferredTransport();
+	const { state, controls } = makeState(apiFetch);
+	state.items = [work('previous')];
+	state.cursor = 0;
+	state.starredOnly = true;
+	const sync = state.syncToItem(work('wanted'));
+	const newer = state.fetchOffset(0, { preserveSelection: true });
+	requests[0].resolve(jsonResponse({ items: [], total: 0 }));
+	await sync;
+	assert.equal(state.starredOnly, true);
+	assert.equal(state.cursor, 0);
+	assert.equal(controls.starredNotices, 0);
+	requests[1].resolve(jsonResponse({ items: [work('previous')], total: 1, offset: 0 }));
+	await newer;
 });
 
 test('T-276/T-278: anchored selection clears strip filters and seeds the one manager', async () => {

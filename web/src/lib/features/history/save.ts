@@ -1,6 +1,7 @@
 import type { DerivationKind } from '../../derivation.ts';
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
+import type { FetchHistoryResult } from './browsing-state.svelte.ts';
 
 export type SaveHistoryOptions = {
 	selectSaved?: boolean;
@@ -41,7 +42,7 @@ export type SaveHistoryDependencies = {
 	refreshCountedUser: () => Promise<void>;
 	activeHistoryId: () => string | null;
 	currentOffset: () => number;
-	fetchOffset: (offset: number, options?: { anchorId?: string; preserveSelection?: boolean }) => Promise<boolean>;
+	fetchOffset: (offset: number, options?: { anchorId?: string; preserveSelection?: boolean }) => Promise<FetchHistoryResult>;
 	clearSelection: () => void;
 };
 

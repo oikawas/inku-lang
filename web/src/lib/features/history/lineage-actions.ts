@@ -1,11 +1,12 @@
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import type { LineageNode } from './types.ts';
+import type { FetchHistoryResult } from './browsing-state.svelte.ts';
 
 type FetchOffset = (
 	offset: number,
 	options?: { anchorId?: string; preserveSelection?: boolean }
-) => Promise<boolean>;
+) => Promise<FetchHistoryResult>;
 
 export type FocusSavedLineageDependencies = {
 	fetchOffset: FetchOffset;
@@ -26,10 +27,12 @@ export async function focusSavedLineageChild(
 ): Promise<void> {
 	if (!historyId || !nodeId) throw deps.missingIdentityError();
 	let found = await deps.fetchOffset(0, { anchorId: historyId });
-	if (!found && deps.filtered()) {
+	if (found === 'missing' && deps.filtered()) {
 		deps.clearFilters();
 		found = await deps.fetchOffset(0, { anchorId: historyId });
 	}
+	if (found === 'superseded') return;
+	if (found !== 'found') throw deps.missingWorkError();
 	const saved = deps.items().find((item) => item.id === historyId);
 	if (!saved) throw deps.missingWorkError();
 	deps.displayCurrentItem(saved);

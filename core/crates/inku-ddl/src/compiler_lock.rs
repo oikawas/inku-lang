@@ -1490,11 +1490,12 @@ fn project_deliveries(
     let covered_spans = projection
         .deliveries
         .iter()
-        .filter_map(|delivery| delivery.span)
-        .collect::<Vec<_>>();
+        .filter_map(|delivery| delivery.span.map(|span| (span.start_byte, span.end_byte)))
+        .collect::<std::collections::HashSet<_>>();
     for clause in &association.clause_stream.clauses {
         for atom in &clause.atoms {
-            if !covered_spans.contains(&atom.span()) {
+            let span = atom.span();
+            if !covered_spans.contains(&(span.start_byte, span.end_byte)) {
                 let kind = match atom {
                     ClauseAtom::CoreRole(_) => "core_role_transport",
                     ClauseAtom::CoreModifier(_) => "core_modifier_transport",
@@ -2632,17 +2633,18 @@ fn add_blocking_with_members(
 }
 
 fn sort_projection(projection: &mut Projection) {
-    projection.deliveries.sort_by_key(|item| {
-        let span = item.span.unwrap_or(SourceSpan {
-            start_byte: usize::MAX,
-            end_byte: usize::MAX,
-        });
-        (
-            span.start_byte,
-            span.end_byte,
-            item.kind.as_str(),
-            item.id.clone(),
-        )
+    projection.deliveries.sort_by(|left, right| {
+        let key = |item: &SemanticDelivery| {
+            let span = item.span.unwrap_or(SourceSpan {
+                start_byte: usize::MAX,
+                end_byte: usize::MAX,
+            });
+            (span.start_byte, span.end_byte)
+        };
+        key(left)
+            .cmp(&key(right))
+            .then_with(|| left.kind.as_str().cmp(right.kind.as_str()))
+            .then_with(|| left.id.cmp(&right.id))
     });
     projection
         .holes

@@ -560,6 +560,9 @@ fn candidates_at_with_locked_macro_boundary(
 ) -> Vec<Candidate> {
     let source = document.source();
     let mut candidates = candidates_at(edition, source, start_byte, language, true);
+    if document.macro_locks().is_empty() {
+        return candidates;
+    }
     // A sidecar-locked Macro is also a recognized left boundary for Japanese
     // particles. The ordinary asset-only boundary scan cannot see that head.
     let left_end = source[..start_byte].trim_end_matches(is_separator).len();
@@ -567,8 +570,8 @@ fn candidates_at_with_locked_macro_boundary(
         .trim_end_matches(|ch| is_separator(ch) && !matches!(ch, '}' | '｝'))
         .len();
     let preceded_by_bracket_macro = language == ResolvedInstructionLanguage::Ja
-        && source[..bracket_end].char_indices().any(|(start, ch)| {
-            matches!(ch, '{' | '｛') && matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
+        && source[..bracket_end].rfind(['{', '｛']).is_some_and(|start| {
+            matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
         });
     let preceded_by_locked_macro = preceded_by_bracket_macro
         || document.legacy_names_for_migration()
@@ -972,6 +975,7 @@ fn candidates_at_uncached(
     for (surface, value) in modifier_forms.thinness {
         if language == ResolvedInstructionLanguage::Ja
             && require_boundary
+            && source.get(start_byte..start_byte + surface.len()) == Some(*surface)
             && !has_japanese_recognized_left_boundary(edition, source, start_byte)
         {
             continue;
@@ -2342,6 +2346,14 @@ fn unsupported_numeric_end(source: &str, start_byte: usize) -> Option<usize> {
 }
 
 fn qualified_macro_end(source: &str, start_byte: usize) -> Option<usize> {
+    if !source
+        .get(start_byte..)?
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_alphabetic())
+    {
+        return None;
+    }
     let mut end_byte = start_byte;
     for (offset, character) in source[start_byte..].char_indices() {
         if is_macro_segment_character(character) || character == '.' {

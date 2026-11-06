@@ -2145,11 +2145,41 @@ fn collect_english_instruction_ownership(
     positions: &[SemanticTerm],
     ownership: &mut InstructionOwnership,
 ) {
+    let mut actions_by_clause = BTreeMap::<usize, Vec<&SemanticTerm>>::new();
+    for action in actions {
+        actions_by_clause
+            .entry(action.provenance.source.clause_index)
+            .or_default()
+            .push(action);
+    }
+    let mut positions_by_clause = BTreeMap::<usize, Vec<&SemanticTerm>>::new();
+    for position in positions {
+        positions_by_clause
+            .entry(position.provenance.source.clause_index)
+            .or_default()
+            .push(position);
+    }
+    let mut entities_by_clause = BTreeMap::<usize, Vec<_>>::new();
+    for entity in &association.ast.entities {
+        entities_by_clause
+            .entry(entity.head.source().clause_index)
+            .or_default()
+            .push(entity);
+    }
+    let mut markers_by_clause = BTreeMap::<usize, Vec<_>>::new();
+    for marker in &association.clause_topology.attachment_markers {
+        markers_by_clause
+            .entry(marker.clause_index)
+            .or_default()
+            .push(marker);
+    }
     for action in actions {
         let clause_index = action.provenance.source.clause_index;
         let clause = &association.clause_stream.clauses[clause_index];
-        let upper_bound = actions
-            .iter()
+        let upper_bound = actions_by_clause
+            .get(&clause_index)
+            .into_iter()
+            .flatten()
             .filter(|candidate| {
                 candidate.provenance.source.clause_index == clause_index
                     && action.provenance.source.span.end_byte
@@ -2158,10 +2188,10 @@ fn collect_english_instruction_ownership(
             .map(|candidate| candidate.provenance.source.span.start_byte)
             .min()
             .unwrap_or(clause.span.end_byte);
-        let candidate_entities = association
-            .ast
-            .entities
-            .iter()
+        let candidate_entities = entities_by_clause
+            .get(&clause_index)
+            .into_iter()
+            .flatten()
             .filter(|entity| {
                 let source = entity.head.source();
                 source.clause_index == clause_index
@@ -2182,10 +2212,10 @@ fn collect_english_instruction_ownership(
         let head_start = entity.head.source().span.start_byte;
         ownership.insert_action(head_start, action.provenance.source.span.start_byte);
 
-        for marker in association
-            .clause_topology
-            .attachment_markers
-            .iter()
+        for marker in markers_by_clause
+            .get(&clause_index)
+            .into_iter()
+            .flatten()
             .filter(|marker| marker.clause_index == clause_index)
             .filter(|marker| {
                 matches!(
@@ -2211,11 +2241,16 @@ fn collect_english_instruction_ownership(
                 )
             })
         {
-            for position in positions.iter().filter(|position| {
-                position.provenance.source.clause_index == clause_index
-                    && marker.span.end_byte <= position.provenance.source.span.start_byte
-                    && position.provenance.source.span.end_byte <= upper_bound
-            }) {
+            for position in positions_by_clause
+                .get(&clause_index)
+                .into_iter()
+                .flatten()
+                .filter(|position| {
+                    position.provenance.source.clause_index == clause_index
+                        && marker.span.end_byte <= position.provenance.source.span.start_byte
+                        && position.provenance.source.span.end_byte <= upper_bound
+                })
+            {
                 if english_position_gap_is_clear(
                     association,
                     clause_index,

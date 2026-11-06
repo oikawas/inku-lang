@@ -147,15 +147,24 @@ struct InkuTextEditor: View {
 
 /// Offsets address the original UTF-16 storage; the batch parser owns the line count.
 private struct BatchEditorLineIndex {
+    let source: String
     let starts: [Int]
     let count: Int
 
-    init(_ text: String) {
-        count = BatchInputLines.physicalLines(in: text).count
-        var offsets = [0]
-        var offset = 0
+    init(_ text: String, reusing previous: BatchEditorLineIndex? = nil) {
+        source = text
+        let old = previous.map { Array($0.source.utf16) } ?? []
+        let new = Array(text.utf16)
+        var common = 0
+        while common < min(old.count, new.count), old[common] == new[common] { common += 1 }
+        let firstChangedLine = previous.map { max(0, $0.line(containing: common) - 1) } ?? 0
+        let start = previous?.starts[firstChangedLine] ?? 0
+        var offsets = previous.map { Array($0.starts.prefix(firstChangedLine)) } ?? []
+        offsets.append(start)
+        var offset = start
         var previousWasCR = false
-        for scalar in text.unicodeScalars {
+        let startIndex = String.Index(utf16Offset: start, in: text)
+        for scalar in text[startIndex...].unicodeScalars {
             offset += scalar.value > 0xffff ? 2 : 1
             if previousWasCR && scalar.value == 0x0a {
                 offsets[offsets.count - 1] = offset
@@ -169,6 +178,7 @@ private struct BatchEditorLineIndex {
             previousWasCR = scalar.value == 0x0d
         }
         starts = offsets
+        count = offsets.count
     }
 
     func line(containing offset: Int) -> Int {
@@ -639,7 +649,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
         private func refreshLayout() {
             guard let editor else { return }
-            ruler?.lineIndex = BatchEditorLineIndex(editor.string)
+            if let ruler { ruler.lineIndex = BatchEditorLineIndex(editor.string, reusing: ruler.lineIndex) }
             scroll?.resizeDocument()
             ruler?.needsDisplay = true
         }
@@ -994,7 +1004,7 @@ private final class BatchIOSTextView: UITextView {
     }
 
     func refreshGutter() {
-        lineIndex = BatchEditorLineIndex(text ?? "")
+        lineIndex = BatchEditorLineIndex(text ?? "", reusing: lineIndex)
         if let font { numberFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil) }
         let number = batchNumberLine(max(1, lineIndex.count), font: numberFont, color: UIColor.secondaryLabel.cgColor)
         let width = max(34, ceil(CGFloat(CTLineGetTypographicBounds(number, nil, nil, nil)) + 18))

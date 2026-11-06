@@ -386,7 +386,8 @@ struct AppCheck {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let databaseURL = directory.appendingPathComponent("inku.sqlite")
-        let provider = ProviderSettings(id: "local", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+        let provider = ProviderSettings(id: "local", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                        models: [.init(id: "boundary-check")])
         let settings = HostSettings(providers: [provider], models: ModelSelection(stage1Model: "local:boundary-check", stage2Model: "local:boundary-check"))
         try JSONEncoder().encode(settings).write(to: directory.appendingPathComponent("providers.json"), options: .atomic)
 
@@ -401,6 +402,7 @@ struct AppCheck {
         let model = AppModel(databaseURL: databaseURL, transport: transport)
         await model.initialize()
         model.inputMode = "description"
+        model.selectNextDrawingModel("local:boundary-check")
         model.descriptionText = "a red circle"
         model.seedText = "42"
         guard model.errorText == nil, model.canGenerate else {

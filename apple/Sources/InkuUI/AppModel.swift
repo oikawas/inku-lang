@@ -1253,6 +1253,7 @@ public final class AppModel {
             var options = try ExactJSON(data: saved.renderOptions)
             let target = paperID ?? options["canvas_aspect_id"].string ?? work.renderCanvasAspectID ?? canvasID
             let unchanged = !forceEdit && source == work.ddl && options["wild"].bool == wild
+                && work.stage1Model == nextDrawingModelReference && work.stage2Model == nextDrawingModelReference
             let fit = await chooseCanvasFit(source: source, recordedWork: unchanged ? work : nil,
                                              paperID: target, presentation: presentation)
             guard fit != .cancel, !isBusy else { return false }

@@ -78,8 +78,6 @@ struct CreationView: View {
     @State private var rightPanelWidth: CGFloat = 0
     @State private var rightPanelHeight: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
-    @State private var workspaceContext: SavedAuthoringContext?
-    @State private var workspaceContextWorkID: String?
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
     @State private var lineageMounted = false
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
@@ -210,11 +208,8 @@ struct CreationView: View {
             workspaceGeneration = (nodeID, generation)
         }
         .task(id: workspaceWork?.id) {
-            workspaceContext = nil; workspaceContextWorkID = nil
             guard let work = workspaceWork else { return }
-            let context = try? await model.savedConfiguration(workID: work.id)
-            guard !Task.isCancelled, workspaceWork?.id == work.id else { return }
-            workspaceContext = context; workspaceContextWorkID = work.id
+            _ = try? await model.savedConfiguration(workID: work.id)
         }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)

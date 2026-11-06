@@ -248,6 +248,7 @@ public final class AppModel {
     @ObservationIgnored private var workActionReadsInFlight: Set<String> = []
     @ObservationIgnored private var workActionReadWaiters: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private var workActionReadToken = UUID()
+    @ObservationIgnored private var pluginWorkContexts: [String: SavedAuthoringContext] = [:]
     public let library = LibraryModel(includeListSVG: false)
     public let display = DisplaySettings()
     public let descriptionMeter = DescriptionMeterModel()
@@ -339,8 +340,17 @@ public final class AppModel {
         let config: ExactJSON
         let locks: ExactJSON
         let workContext: SavedAuthoringContext?
-        if let workID, let host { workContext = try? await host.savedAuthoringContext(workID: workID) }
-        else { workContext = selectedContext }
+        if let workID, let host {
+            if let cached = pluginWorkContexts[workID] {
+                workContext = cached
+            } else {
+                let token = workActionReadToken
+                let loaded = try? await host.savedAuthoringContext(workID: workID)
+                guard token == workActionReadToken, !Task.isCancelled else { return [] }
+                if let loaded { pluginWorkContexts[workID] = loaded }
+                workContext = loaded
+            }
+        } else { workContext = selectedContext }
         let current = workID == nil ? currentView : nil
         if let configData = current?.configurationJSON ?? workContext?.configuration,
            let documentData = current?.documentJSON ?? workContext?.document,
@@ -2414,6 +2424,7 @@ public final class AppModel {
             displayLabelReads = []
             workActionReadsInFlight = []
             workActionReadToken = UUID()
+            pluginWorkContexts.removeAll()
             await library.resetAfterRestore()
             await thumbnails.synchronize()
             restorationRevision &+= 1

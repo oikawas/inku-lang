@@ -33,8 +33,8 @@ public enum DescriptionFeedback {
 
     public static func record(description: String, ddl: String, database: InkuDatabase) async throws {
         let vocabulary = try vocabulary.get()
-        let words = await Task.detached {
-            InterpretationFeedback.unreadWords(description: description, ddl: ddl, vocabulary: vocabulary)
+        let words = try await Task.detached {
+            try InterpretationFeedback.unreadWords(description: description, ddl: ddl, vocabulary: vocabulary)
         }.value
         try await database.recordUnreadWords(words, context: description, at: Int64(Date().timeIntervalSince1970 * 1000))
     }

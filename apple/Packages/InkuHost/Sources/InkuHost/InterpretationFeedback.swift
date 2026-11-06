@@ -39,14 +39,14 @@ public struct FeedbackPart: Sendable, Identifiable {
 public enum InterpretationFeedback {
     private static let emotions = ["美しい", "美しく", "激しい", "激しく", "静かな", "静かに", "素敵", "きれい", "やさしい", "切ない", "哀しい", "儚い", "神秘的", "幻想的", "寂しい", "爽やか"]
 
-    public static func parts(description: String, ddl: String, vocabulary: [FeedbackLexeme]) -> [FeedbackPart] {
-        parts(description: description, ddl: ddl, vocabulary: FeedbackVocabulary(vocabulary))
+    public static func parts(description: String, ddl: String, vocabulary: [FeedbackLexeme]) throws -> [FeedbackPart] {
+        try parts(description: description, ddl: ddl, vocabulary: FeedbackVocabulary(vocabulary))
     }
 
-    public static func parts(description: String, ddl: String, vocabulary: FeedbackVocabulary) -> [FeedbackPart] {
+    public static func parts(description: String, ddl: String, vocabulary: FeedbackVocabulary) throws -> [FeedbackPart] {
         // A title line quotes the description's words without drawing them, so a word is read only where
         // a drawing sentence carries it (DDL 27).
-        let ddl = DdlTitles.withoutTitleLines(ddl)
+        let ddl = try DdlTitles.withoutTitleLinesForDrawing(ddl)
         guard !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         let emotions = emotions.sorted { $0.utf16.count > $1.utf16.count }
@@ -94,13 +94,13 @@ public enum InterpretationFeedback {
         return result
     }
 
-    public static func unreadWords(description: String, ddl: String, vocabulary: [FeedbackLexeme]) -> [String] {
-        unreadWords(description: description, ddl: ddl, vocabulary: FeedbackVocabulary(vocabulary))
+    public static func unreadWords(description: String, ddl: String, vocabulary: [FeedbackLexeme]) throws -> [String] {
+        try unreadWords(description: description, ddl: ddl, vocabulary: FeedbackVocabulary(vocabulary))
     }
 
-    public static func unreadWords(description: String, ddl: String, vocabulary: FeedbackVocabulary) -> [String] {
+    public static func unreadWords(description: String, ddl: String, vocabulary: FeedbackVocabulary) throws -> [String] {
         let pattern = try! NSRegularExpression(pattern: "[一-龯々ぁ-んァ-ヶー]{2,}|[A-Za-z][A-Za-z'-]+")
-        return parts(description: description, ddl: ddl, vocabulary: vocabulary).filter { $0.tone == .weak }.flatMap { part in
+        return try parts(description: description, ddl: ddl, vocabulary: vocabulary).filter { $0.tone == .weak }.flatMap { part in
             pattern.matches(in: part.text, range: NSRange(part.text.startIndex..., in: part.text)).map { (part.text as NSString).substring(with: $0.range) }
         }
     }

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: align instruction title line breaks and BOM handling with the shared core.
+
 - macOS: preserve the original spelling of numbers when displaying and copying Scores and diagnostics.
 
 - macOS: remove the obsolete frame count from animation settings errors.

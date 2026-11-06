@@ -207,6 +207,16 @@ public enum InkuCore {
         catch InkuCoreBindings.CoreCallFailure.InternalInvariant { throw CoreFailure.internalInvariant }
     }
 
+    public static func ddlTitleLines(_ source: String) throws -> String {
+        do { return try InkuCoreBindings.ddlTitleLines(source: source) }
+        catch InkuCoreBindings.CoreCallFailure.InternalInvariant { throw CoreFailure.internalInvariant }
+    }
+
+    public static func withoutDdlTitleLines(_ source: String) throws -> String {
+        do { return try InkuCoreBindings.withoutDdlTitleLines(source: source) }
+        catch InkuCoreBindings.CoreCallFailure.InternalInvariant { throw CoreFailure.internalInvariant }
+    }
+
     /// `[[start, end, kind], ...]`, with Unicode scalar offsets owned by the shared core.
     public static func descriptionLabelSpans(_ text: String) throws -> Data {
         do { return Data(try InkuCoreBindings.descriptionLabelSpans(text: text).utf8) }

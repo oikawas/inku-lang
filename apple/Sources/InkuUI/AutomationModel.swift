@@ -461,14 +461,7 @@ public final class AutomationModel {
             guard entries.count <= 1000 else { throw HostError("batch_exceeds_1000_rows") }
             let retries = min(5, max(0, app.display.preferences.batchRetries))
             let batchRunID = UUID().uuidString
-            var captured = try entries.map { line, input in
-                var request = try app.requestForBatchDescription(input, sketchMode: sketchMode)
-                var provenance = request.provenance ?? GenerationProvenance()
-                provenance.batchRunID = batchRunID; provenance.batchLineNumber = line
-                provenance.displayLabel = "#\(line)"
-                request.provenance = provenance
-                return BatchRow(line: line, input: input, request: request)
-            }
+            var captured = try await app.makeBatchRows(entries, sketchMode: sketchMode, batchRunID: batchRunID)
             let pinned = try await app.pinPersonalPlanRequests(captured.map(\.request))
             guard pinned.count == captured.count else { throw HostError("personal_plan_batch_pin_incomplete") }
             for index in captured.indices { captured[index].request = pinned[index] }

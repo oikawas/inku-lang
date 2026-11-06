@@ -79,7 +79,8 @@ public struct PluginWord: Identifiable, Sendable {
     }
 }
 
-struct Bootstrap {
+// All stored bootstrap resources are immutable after construction.
+struct Bootstrap: @unchecked Sendable {
     private let manifest: [String: Any]
     private let catalogRecords: [[String: Any]]
     private let registry: [String: Any]
@@ -228,20 +229,40 @@ struct Bootstrap {
         return palette
     }
 
+    struct BatchInvariant: Sendable {
+        let maps: [String: [String: String]]
+        let encodedMaps: [String: Data]
+        let catalogs: [String: ExactJSON]
+    }
+
+    func batchInvariant(languages: Set<String>, settings: HostSettings) throws -> BatchInvariant {
+        var maps: [String: [String: String]] = [:]
+        var encoded: [String: Data] = [:]
+        for record in catalogRecords {
+            guard let id = record["id"] as? String else { throw HostError("color_catalogs_invalid") }
+            let map = try Self.renderColorMap(for: record)
+            maps[id] = map; encoded[id] = try Self.bytes(map)
+        }
+        var catalogs: [String: ExactJSON] = [:]
+        for language in languages { catalogs[language] = try macroCatalogValue(language: language, settings: settings) }
+        return BatchInvariant(maps: maps, encodedMaps: encoded, catalogs: catalogs)
+    }
+
     func request(inputMode: String, source: String, description: String, language: String,
                  catalogID: String, canvasID: String, seed: String, wild: Bool,
                  settings: HostSettings, parentWorkID: String? = nil, derivationKind: String = "new",
                  catalogMode: String = "fixed", sketch: SketchRequest = .off,
                  variationAmplitude: String? = nil, variationSeed: String? = nil,
                  savedConfiguration: Data? = nil, importedPlugins: [ImportedMacroDefinition] = [],
-                 compositionSeed: String? = nil) throws -> GenerationRequest {
+                 compositionSeed: String? = nil, batchInvariant: BatchInvariant? = nil,
+                 batchSelectedCatalog: String? = nil) throws -> GenerationRequest {
         guard derivationKind != "variation", variationAmplitude == nil, variationSeed == nil else {
             throw HostError("variation_retired")
         }
         let selectedID: String
         if catalogMode == "random" {
-            guard let option = catalogs.filter({ $0.id != catalogID }).randomElement() else { throw HostError("catalog_selection_unavailable") }
-            selectedID = option.id
+            guard let id = batchSelectedCatalog ?? catalogs.filter({ $0.id != catalogID }).randomElement()?.id else { throw HostError("catalog_selection_unavailable") }
+            selectedID = id
         } else { selectedID = catalogID }
         let saved = try savedConfiguration.map(Self.object)
         guard ["en", "ja"].contains(language),
@@ -259,7 +280,7 @@ struct Bootstrap {
               let registryBody = registry["registry"] as? [String: Any] else {
             throw HostError("installation_defaults_invalid")
         }
-        let colorMap = try Self.renderColorMap(for: record)
+        let colorMap = try batchInvariant?.maps[selectedID] ?? Self.renderColorMap(for: record)
         let actualSeed = seed.isEmpty ? String(UInt64.random(in: 0...((UInt64(1) << 53) - 1))) : seed
         guard let parsedSeed = UInt64(actualSeed), String(parsedSeed) == actualSeed else { throw HostError("invalid_seed") }
         if let compositionSeed {
@@ -325,7 +346,7 @@ struct Bootstrap {
             config["catalogs"] = try catalogRecords.map { record in
                 guard let id = record["id"] as? String,
                       let name = record["name"] as? String else { throw HostError("color_catalogs_invalid") }
-                let map = try Self.renderColorMap(for: record)
+                let map = try batchInvariant?.maps[id] ?? Self.renderColorMap(for: record)
                 var resolved = host
                 resolved["resolved_catalog_id"] = id
                 // Server marks the default candidate "default" only through the host it shares when default is chosen.
@@ -348,15 +369,20 @@ struct Bootstrap {
         ]
         let authoring: GenerationAuthoring = inputMode == "ddl"
             ? .directDDL(source) : .description(description, autoCatalog: catalogMode == "auto", sketch: sketch)
-        let colorMaps = try Dictionary(uniqueKeysWithValues: catalogRecords.map { item -> (String, Data) in
+        let colorMaps = try batchInvariant?.encodedMaps ?? Dictionary(uniqueKeysWithValues: catalogRecords.map { item -> (String, Data) in
             guard let id = item["id"] as? String else { throw HostError("color_catalogs_invalid") }
             let map = try Self.renderColorMap(for: item)
             return (id, try Self.bytes(map))
         })
         var exactConfiguration = try ExactJSON(data: Self.bytes(config))
         if saved == nil || inputMode == "description" {
-            try updatePluginDefinitions(in: &exactConfiguration, language: language, settings: settings,
-                                        importedPlugins: saved == nil && inputMode == "ddl" ? importedPlugins : [])
+            if let catalog = batchInvariant?.catalogs[language], let entries = catalog["entries"].array {
+                exactConfiguration["definitions"] = .array(entries.map { $0["definition"] })
+                exactConfiguration["macro_summaries"] = .array(entries.map { $0["summary"] })
+            } else {
+                try updatePluginDefinitions(in: &exactConfiguration, language: language, settings: settings,
+                                            importedPlugins: saved == nil && inputMode == "ddl" ? importedPlugins : [])
+            }
         }
         var request = GenerationRequest(authoring: authoring, configuration: exactConfiguration.data,
             renderOptions: try Self.bytes(options), clipPolicy: try Self.bytes(clip),

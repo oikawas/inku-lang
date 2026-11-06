@@ -1168,6 +1168,60 @@ public final class AppModel {
             sketchOverride: sketchMode == "on" ? .on : .off)
     }
 
+    func makeBatchRows(_ entries: [(Int, String)], sketchMode: String, batchRunID: String) async throws -> [BatchRow] {
+        guard ["off", "on"].contains(sketchMode) else { throw HostError("invalid_batch_sketch_mode") }
+        guard let bootstrap else { throw HostError("installation_unavailable") }
+        guard SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings) else {
+            throw HostError("drawing_model_not_available")
+        }
+        let capturedSettings = nextGenerationHostSettings
+        let requestedLanguage = language, uiLanguage = display.preferences.language
+        let chosenCatalog = catalogID, selectedCanvas = canvasID, mode = catalogMode, seed = seedText
+        let useWild = wild, route = drawRoute, composition = descriptionComposition
+        let review = SettingsModel.isRegisteredModelAvailable(capturedSettings.models.stage1Model, purpose: "vision", settings: capturedSettings)
+        let captureIO = developerModeEnabled && display.preferences.captureProviderIO == true
+        let catalogChoices = bootstrap.catalogs.map(\.id).filter { $0 != chosenCatalog }
+        let task = Task.detached {
+            struct Key: Hashable { let language: String; let seed: String; let catalog: String }
+            let languages = entries.map { InkuCore.resolveInstructionLanguage(text: $0.1, requested: requestedLanguage, fallback: uiLanguage) ?? "ja" }
+            let invariant = try bootstrap.batchInvariant(languages: Set(languages), settings: capturedSettings)
+            var templates: [Key: GenerationRequest] = [:]
+            var rows: [BatchRow] = []
+            for (index, entry) in entries.enumerated() {
+                try Task.checkCancellation()
+                let selected: String
+                if mode == "random" {
+                    guard let choice = catalogChoices.randomElement() else { throw HostError("catalog_selection_unavailable") }
+                    selected = choice
+                } else { selected = chosenCatalog }
+                let actualSeed = seed.isEmpty ? String(UInt64.random(in: 0...((UInt64(1) << 53) - 1))) : seed
+                let key = Key(language: languages[index], seed: actualSeed, catalog: selected)
+                var request: GenerationRequest
+                if let cached = templates[key] { request = cached }
+                else {
+                    request = try bootstrap.request(inputMode: "description", source: "", description: entry.1,
+                        language: key.language, catalogID: chosenCatalog, canvasID: selectedCanvas, seed: actualSeed,
+                        wild: useWild, settings: capturedSettings, catalogMode: mode,
+                        sketch: sketchMode == "on" ? .on : .off, batchInvariant: invariant,
+                        batchSelectedCatalog: mode == "random" ? selected : nil)
+                    if route == "read_and_draw" {
+                        request.drawRoute = route; request.descriptionComposition = composition; request.descriptionReview = review
+                    }
+                    request.recordsDrawOptions = true; request.captureProviderIO = captureIO
+                    if !seed.isEmpty { templates[key] = request }
+                }
+                request.authoring = .description(entry.1, autoCatalog: mode == "auto", sketch: sketchMode == "on" ? .on : .off)
+                request.description = entry.1
+                var provenance = request.provenance ?? GenerationProvenance()
+                provenance.batchRunID = batchRunID; provenance.batchLineNumber = entry.0
+                provenance.displayLabel = "#\(entry.0)"; request.provenance = provenance
+                rows.append(BatchRow(line: entry.0, input: entry.1, request: request))
+            }
+            return rows
+        }
+        return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+    }
+
     public func requestForDemoDescription(_ description: String, sketchMode: String) throws -> GenerationRequest {
         guard let bootstrap, ["off", "on"].contains(sketchMode),
               SettingsModel.isBatchModelAvailable(settings.models.stage1Model, settings: settings) else {

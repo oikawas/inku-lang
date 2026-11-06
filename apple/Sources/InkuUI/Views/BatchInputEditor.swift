@@ -152,6 +152,7 @@ private struct BatchEditorLineIndex {
     let count: Int
 
     init(_ text: String, reusing previous: BatchEditorLineIndex? = nil) {
+        if let previous, previous.source.utf8.elementsEqual(text.utf8) { self = previous; return }
         source = text
         let old = previous.map { Array($0.source.utf16) } ?? []
         let new = Array(text.utf16)
@@ -323,7 +324,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var programmaticEdit = false
         private var completionValues: [String: String] = [:]
         private var marksCache = InkuEditorMarksCache()
-        private var descriptionLineMarks: [String: [InkuEditorMark]] = [:]
+        private var descriptionLineMarks: [Data: [InkuEditorMark]] = [:]
         private var paintedNames: [NSRange]?
 
         init(text: Binding<String>) { self.text = text }
@@ -421,12 +422,13 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             guard let editor, let settings, let layout = editor.layoutManager, !editor.hasMarkedText() else { return }
             let changed = marksCache.update(source: editor.string, key: settings.marksKey) { source in
                 guard settings.marksKey == .description else { return settings.marks(source) }
-                var next: [String: [InkuEditorMark]] = [:]
+                var next: [Data: [InkuEditorMark]] = [:]
                 var offset = 0
                 var result: [InkuEditorMark] = []
                 for line in source.components(separatedBy: "\n") {
-                    let local = next[line] ?? descriptionLineMarks[line] ?? InkuEditorMark.descriptionLabels(line)
-                    next[line] = local
+                    let key = Data(line.utf8)
+                    let local = next[key] ?? descriptionLineMarks[key] ?? InkuEditorMark.descriptionLabels(line)
+                    next[key] = local
                     result += local.map { InkuEditorMark(range: NSRange(location: $0.range.location + offset, length: $0.range.length), style: $0.style) }
                     offset += line.utf16.count + 1
                 }

@@ -251,19 +251,20 @@ public final class AutomationModel {
         if mode == "image" { return app.activeSingleInputMode == "image" }
         return mode == "description" && app.activeSingleInputMode != "image"
     }
-    public var batchText = "" { didSet { if batchText != oldValue { updateBatchLines() } } }
+    public var batchText = "" { didSet { if !batchText.utf8.elementsEqual(oldValue.utf8) { updateBatchLines() } } }
     public private(set) var nonEmptyBatchCount = 0
     public private(set) var paintableBatchCount = 0
-    @ObservationIgnored private var batchLineCache: [String: Bool] = [:]
+    @ObservationIgnored private var batchLineCache: [Data: Bool] = [:]
     @ObservationIgnored private var paintableBatchEntries: [(line: Int, text: String)] = []
 
     private func updateBatchLines() {
         let entries = BatchInputLines.entries(in: batchText)
         nonEmptyBatchCount = entries.count
-        var next: [String: Bool] = [:]
+        var next: [Data: Bool] = [:]
         let paintable = BatchInputLines.paintableEntries(entries) { text in
-            let result = next[text] ?? batchLineCache[text] ?? DescriptionLabels.hasDrawableText(text)
-            next[text] = result
+            let key = Data(text.utf8)
+            let result = next[key] ?? batchLineCache[key] ?? DescriptionLabels.hasDrawableText(text)
+            next[key] = result
             return result
         }
         batchLineCache = next

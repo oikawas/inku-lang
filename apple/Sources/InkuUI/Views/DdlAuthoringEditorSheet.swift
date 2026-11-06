@@ -8,11 +8,6 @@ struct DdlAuthoringEditorSheet: View {
     @Bindable var session: DdlEditingSession
     var onPendingReview: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
-    @State private var showModels = false
-    @State private var drawingModel = ""
-    @State private var providers: [ProviderSettings] = []
-    @State private var inheritedWild = false
-    @State private var wildOverride: Bool?
     @State private var insertion: InkuEditorInsertion?
     @State private var rangeBlocked = false
     @State private var confirmingDiscard = false
@@ -23,14 +18,7 @@ struct DdlAuthoringEditorSheet: View {
             work: session.work ?? model.displayedWork, text: $session.draft, insertion: $insertion,
             disabled: model.isBusy, onClose: { session.cancel(); dismiss() }, onRangeBlocked: { rangeBlocked = $0 }) {
             DdlDialogFooter {
-                HStack(spacing: 18) {
-                    DdlDrawingModelCard(model: model, reference: drawingModel, providers: providers) { showModels = true }
-                    HStack(spacing: 8) {
-                        Button(model.display.localized("筆致制限を外す")) { wildOverride = !(wildOverride ?? inheritedWild) }
-                            .buttonStyle(InkuGhostButtonStyle(active: wildOverride ?? inheritedWild))
-                            .accessibilityValue(model.display.localized((wildOverride ?? inheritedWild) ? "オン" : "オフ"))
-                    }.fixedSize()
-                }.disabled(model.isBusy)
+                EmptyView()
             } actions: {
                 VStack(alignment: .trailing, spacing: 8) {
                     if let error = model.errorText {
@@ -63,7 +51,7 @@ struct DdlAuthoringEditorSheet: View {
                                     let previous = model.patchReview
                                     let previousIssues = model.completionIssues
                                     let previousExecution = model.completionNoticeExecutionID
-                                    let saved = await session.commit(to: model, wildOverride: wildOverride)
+                                    let saved = await session.commit(to: model)
                                     if model.shouldReturnToCreation(afterSaving: saved, previousReview: previous, previousIssues: previousIssues, previousNoticeExecutionID: previousExecution) {
                                         if !saved { onPendingReview() }
                                         dismiss()
@@ -80,19 +68,6 @@ struct DdlAuthoringEditorSheet: View {
             }
         }
         .interactiveDismissDisabled(model.isBusy)
-        .task {
-            let settings = await model.hostSettings()
-            providers = settings.providers
-            drawingModel = SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) ? settings.models.stage2Model : ""
-            inheritedWild = model.displayedWork?.renderWild ?? false
-            wildOverride = inheritedWild
-        }
-        .sheet(isPresented: $showModels) {
-            BatchModelPickerView(model: model, initialReference: drawingModel, immediateSelection: true, title: "描画モデル") { reference in
-                try await model.selectDdlDrawingModel(reference)
-                drawingModel = reference
-            }
-        }
     }
 
     private func tip(_ key: String) -> String {
@@ -107,11 +82,8 @@ struct NewDdlAuthoringSheet: View {
     var onPendingReview: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var draft = ""
-    @State private var drawingModel = ""
-    @State private var providers: [ProviderSettings] = []
     @State private var importedDocument: DDLPackageImport?
     @State private var showImport = false
-    @State private var showModels = false
     @State private var importTask: Task<Void, Never>?
     @State private var importing = false
     @State private var importError: String?
@@ -132,7 +104,6 @@ struct NewDdlAuthoringSheet: View {
             onClose: { dismiss() }, onRangeBlocked: { rangeBlocked = $0 }) {
             DdlDialogFooter {
                 HStack(spacing: 18) {
-                    DdlDrawingModelCard(model: model, reference: drawingModel, providers: providers) { showModels = true }
                     VStack(alignment: .leading, spacing: 5) {
                         Button(model.display.localized("DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { showImport = true }
                         if let importedDocument, !importedDocument.names.isEmpty {
@@ -178,17 +149,6 @@ struct NewDdlAuthoringSheet: View {
             }
         }
         .interactiveDismissDisabled(model.isBusy || importing)
-        .task {
-            let settings = await model.hostSettings()
-            providers = settings.providers
-            drawingModel = SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) ? settings.models.stage2Model : ""
-        }
-        .sheet(isPresented: $showModels) {
-            BatchModelPickerView(model: model, initialReference: drawingModel, immediateSelection: true, title: "描画モデル") { reference in
-                try await model.selectDdlDrawingModel(reference)
-                drawingModel = reference
-            }
-        }
         .fileImporter(isPresented: $showImport,
             allowedContentTypes: [.json, .plainText, UTType(filenameExtension: "ddl") ?? .text], allowsMultipleSelection: false) { result in
                 switch result {

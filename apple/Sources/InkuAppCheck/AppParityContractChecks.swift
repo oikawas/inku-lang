@@ -26,21 +26,23 @@ func runAppParityContractChecks(fixtureDirectory: URL? = nil) async throws {
         ])
     try await model.updateHostSettings(HostSettings(providers: [provider], models: .init(stage1Model: "fixture:alpha", stage2Model: "fixture:alpha")))
     try await model.selectSharedDrawingModel("fixture:alpha")
-    try await model.selectDdlDrawingModel("fixture:beta")
+    try await model.selectSharedDrawingModel("fixture:beta")
     let settings = await model.hostSettings()
-    guard settings.models.stage1Model == "fixture:alpha", settings.models.stage2Model == "fixture:beta",
-          model.nextDrawingModelReference == "fixture:alpha" else {
-        throw CheckFailure.message("The DDL picker changed the shared next-drawing selection")
+    guard settings.models.stage1Model == "fixture:alpha", settings.models.stage2Model == "fixture:alpha",
+          model.nextDrawingModelReference == "fixture:beta" else {
+        throw CheckFailure.message("The next drawing model was not selected independently of saved defaults")
     }
     model.seedText = "42"
     model.catalogMode = "fixed"
     let source = "place one green square at center."
-    guard await model.drawNewDDL(source), let parent = model.selectedWork else {
+    guard await model.drawNewDDL(source), let parent = model.selectedWork, parent.stage2Model == "fixture:beta" else {
         throw CheckFailure.message("Direct DDL fixture failed: \(model.errorText ?? model.status)")
     }
     let editor = DdlEditingSession(work: parent)
-    guard editor.draft == source, editor.canSubmit(to: model), await editor.commit(to: model, wildOverride: true),
-          let child = model.selectedWork, child.id != parent.id, child.ddl == source, child.renderWild == true else {
+    model.wild = true
+    guard editor.draft == source, editor.canSubmit(to: model), await editor.commit(to: model),
+          let child = model.selectedWork, child.id != parent.id, child.ddl == source, child.renderWild == true,
+          child.stage2Model == "fixture:beta" else {
         throw CheckFailure.message("Unchanged DDL could not be redrawn with new conditions: \(model.errorText ?? model.status)")
     }
     let database = try InkuDatabase(url: databaseURL)
@@ -67,7 +69,7 @@ func runAppParityContractChecks(fixtureDirectory: URL? = nil) async throws {
         try context.renderOptions.write(to: folder.appendingPathComponent("native-render-options.json"), options: .atomic)
         model.display.preferences.uiMode = "full"
     }
-    print("App parity contract passed: empty description; shared/DDL models separated; unchanged-DDL condition edit saves one immutable-parent child; layout retains checked ID; user-authored DDL availability. Two deterministic works, zero provider calls.")
+    print("App parity contract passed: empty description; DDL uses next drawing model and wild; unchanged-DDL condition edit saves one immutable-parent child; layout retains checked ID; user-authored DDL availability. Two deterministic works, zero provider calls.")
 }
 
 private struct NoParityProviderCalls: ProviderTransport {

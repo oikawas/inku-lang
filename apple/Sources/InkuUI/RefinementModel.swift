@@ -46,9 +46,6 @@ public struct RefinementSlot: Identifiable, Sendable {
 public final class RefinementModel {
     public let work: SavedWork
     public let kind = RefinementKind.layout
-    public var inheritWild = true
-    public var wildOverride: Bool
-    public var modelReference = ""
     public private(set) var initialized = false
     public private(set) var initializing = false
     public private(set) var sourceIsLocked = false
@@ -73,7 +70,6 @@ public final class RefinementModel {
 
     public init(work: SavedWork) {
         self.work = work
-        wildOverride = work.renderWild ?? false
     }
 
     public var selectedCount: Int { candidates.filter { $0.selected && $0.savedWork == nil }.count }
@@ -88,7 +84,6 @@ public final class RefinementModel {
 
     public func initialize(app: AppModel) async {
         guard !initialized, !initializing, !closed else { return }
-        inheritWild = false; wildOverride = work.renderWild ?? false
         initializing = true
         defer { initializing = false }
         do {
@@ -100,12 +95,6 @@ public final class RefinementModel {
             }
             sourceIsLocked = context.authority != "description_authoritative"
             sourceIsDDLOrigin = context.origin == "direct_ddl"
-            if modelReference.isEmpty {
-                let settings = await app.nextGenerationSettings()
-                if SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) {
-                    modelReference = settings.models.stage2Model
-                }
-            }
             initialized = true
             errorText = nil
             status = "変更条件を固定しました。候補を用意してください。"
@@ -141,13 +130,13 @@ public final class RefinementModel {
         let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let selectedKind = kind
         let selectedMode = recomposeMode
-        let selectedWild: Bool? = inheritWild ? nil : wildOverride
-        let selectedModel: String? = !modelReference.isEmpty ? modelReference : nil
+        let selectedWild: Bool? = app.wild
+        let selectedModel: String? = app.nextDrawingModelReference
         let run = UUID()
         runID = run; running = true; saving = !selection.isEmpty; stopping = false
         errorText = nil
         capturedStage1Model = work.stage1Model
-        capturedStage2Model = selectedModel ?? app.nextDrawingModelReference
+        capturedStage2Model = selectedModel
         status = "候補の準備中"
         let pending = Task { @MainActor [weak self] in
             guard let self else { return false }

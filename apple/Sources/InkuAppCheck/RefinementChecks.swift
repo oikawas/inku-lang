@@ -55,17 +55,17 @@ func runRefinementChecks() async throws {
     // Failure: removing the parameters dialog also removes layout or makes it reread a description.
     let layout = RefinementModel(work: parent)
     await layout.initialize(app: app)
-    layout.modelReference = "check:layout"
+    app.selectNextDrawingModel("check:layout")
     app.catalogID = app.catalogs.first(where: { $0.id != parent.catalogID })!.id
     app.seedText = "999"; app.wild = false
     await layout.generate(app: app, count: 4)
     guard layout.errorText == nil, layout.candidates.count == 4, layout.candidates.map(\.number) == [1, 2, 3, 4],
           layout.slots.allSatisfy({ $0.state == .ready }),
-          layout.capturedStage1Model == "check:original", layout.capturedStage2Model == "check:layout",
+          layout.capturedStage1Model == "check:layout", layout.capturedStage2Model == "check:layout",
           Set(layout.candidates.compactMap { $0.work.compositionSeed }).count == 4,
           layout.candidates.allSatisfy({ $0.work.renderSeed == "0" && $0.work.ddl == parent.ddl
-              && $0.work.renderColorCatalogID == app.catalogID && $0.work.renderWild == (parent.renderWild ?? false)
-              && $0.work.stage1Model == "check:original" && $0.work.stage2Model == "check:layout"
+              && $0.work.renderColorCatalogID == app.catalogID && $0.work.renderWild == false
+              && $0.work.stage1Model == "check:layout" && $0.work.stage2Model == "check:layout"
               && $0.work.interpretationSeed == nil }),
           await provider.calls == initialCalls, try await database.list().count == initialRows,
           app.selectedWork == parent else {

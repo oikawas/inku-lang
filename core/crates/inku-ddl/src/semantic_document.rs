@@ -192,6 +192,9 @@ fn build_semantic_document(
         .map(|source| source.span)
         .collect::<Vec<_>>();
     let mut grounds = Vec::new();
+    let sentence_ends = crate::semantic_association::sentence_end_positions(
+        &instruction_association.association.clause_stream,
+    );
 
     for (clause_index, clause) in instruction_association
         .association
@@ -213,10 +216,8 @@ fn build_semantic_document(
             {
                 continue;
             }
-            let region_index = sentence_region_index(
-                &instruction_association.association.clause_stream,
-                term.span,
-            );
+            let region_index =
+                crate::semantic_association::indexed_sentence_region(&sentence_ends, term.span);
             grounds.push(project_semantic_term(
                 document,
                 &term.asset_id,
@@ -501,6 +502,7 @@ fn associate_backgrounds(
     }
 
     let stream = &association.association.clause_stream;
+    let sentence_ends = crate::semantic_association::sentence_end_positions(stream);
     stream
         .clauses
         .iter()
@@ -520,7 +522,10 @@ fn associate_backgrounds(
                 {
                     return None;
                 }
-                let region_index = sentence_region_index(stream, atom.span());
+                let region_index = crate::semantic_association::indexed_sentence_region(
+                    &sentence_ends,
+                    atom.span(),
+                );
                 let source = || SourceOccurrence {
                     span: atom.span(),
                     surface: document.source()[atom.span().start_byte..atom.span().end_byte]
@@ -1207,6 +1212,7 @@ struct ContinuationAdmission {
 struct ContinuationLookup {
     fill_heads: BTreeSet<(usize, usize)>,
     japanese_markers: BTreeMap<(usize, usize, usize), SourceSpan>,
+    sentence_ends: Vec<usize>,
 }
 
 impl ContinuationLookup {
@@ -1262,6 +1268,9 @@ impl ContinuationLookup {
         Self {
             fill_heads,
             japanese_markers,
+            sentence_ends: crate::semantic_association::sentence_end_positions(
+                &result.association.clause_stream,
+            ),
         }
     }
 }
@@ -1361,7 +1370,15 @@ fn continuation_marker(
             span: marker_span,
             surface: document.source()[marker_span.start_byte..marker_span.end_byte].to_owned(),
             language: document.language(),
-            region_index: sentence_region_index(&result.association.clause_stream, marker_span),
+            region_index: lookup.map_or_else(
+                || sentence_region_index(&result.association.clause_stream, marker_span),
+                |lookup| {
+                    crate::semantic_association::indexed_sentence_region(
+                        &lookup.sentence_ends,
+                        marker_span,
+                    )
+                },
+            ),
             clause_index: head.clause_index,
             atom_index,
         },

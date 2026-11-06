@@ -430,6 +430,8 @@ fn associate_fill_targets(
     group_targets: &mut BTreeMap<usize, SemanticFillTarget>,
 ) -> BTreeMap<usize, SemanticFillTarget> {
     let mut targets = BTreeMap::new();
+    let sentence_ends =
+        crate::semantic_association::sentence_end_positions(&association.clause_stream);
     for (clause_index, clause) in association.clause_stream.clauses.iter().enumerate() {
         let clause_actions = actions
             .iter()
@@ -488,7 +490,10 @@ fn associate_fill_targets(
                 span,
                 surface: document.source()[span.start_byte..span.end_byte].to_owned(),
                 language: document.language(),
-                region_index: sentence_region_index(&association.clause_stream, span),
+                region_index: crate::semantic_association::indexed_sentence_region(
+                    &sentence_ends,
+                    span,
+                ),
                 clause_index,
                 atom_index,
             }
@@ -617,6 +622,8 @@ fn build_semantic_instructions(
     let mut positions = Vec::new();
     let mut directions = Vec::new();
     let mut owned_instruction_occurrence_count = 0;
+    let sentence_ends =
+        crate::semantic_association::sentence_end_positions(&association.clause_stream);
 
     for (clause_index, clause) in association.clause_stream.clauses.iter().enumerate() {
         for (atom_index, atom) in clause.atoms.iter().enumerate() {
@@ -645,7 +652,8 @@ fn build_semantic_instructions(
                 | RemainingRoleKind::Proportion
                 | RemainingRoleKind::Sequence => continue,
             };
-            let region_index = sentence_region_index(&association.clause_stream, term.span);
+            let region_index =
+                crate::semantic_association::indexed_sentence_region(&sentence_ends, term.span);
             let projected =
                 project_instruction_term(document, term, region_index, clause_index, atom_index);
             match role {

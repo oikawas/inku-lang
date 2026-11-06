@@ -225,8 +225,14 @@ import SwiftUI
         let lines = metadata(work)
         return Button {
             guard !locked else { return }
-            onSelectWork(work)
-            Task { await model.selectWork(work) }
+            Task {
+                do {
+                    let full = try await library.fullWork(id: work.id)
+                    guard !locked, !Task.isCancelled else { return }
+                    onSelectWork(full)
+                    await model.selectWork(full)
+                } catch { model.errorText = error.localizedDescription }
+            }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
@@ -296,7 +302,7 @@ import SwiftUI
             let next: SavedWork?
             if let index = library.works.firstIndex(where: { $0.id == id }),
                library.works.indices.contains(index + delta) {
-                next = library.works[index + delta]
+                next = try? await library.fullWork(id: library.works[index + delta].id)
             } else {
                 next = await history.navigate(app: model, fromWorkID: id, delta: delta, selectWork: false)
             }
@@ -336,7 +342,7 @@ import SwiftUI
             output.append((naming.stripModel(stage1), stage1.map(naming.displayName) ?? "-", true))
         }
         if fields.contains("engine") { let version = engineVersion(work); output.append((version, version, false)) }
-        if fields.contains("size") { let size = Self.fileSize(SavedWorkFacts.svgBytes(work)); output.append((size, size, false)) }
+        if fields.contains("size") { let size = Self.fileSize(library.svgSizes[work.id] ?? SavedWorkFacts.svgBytes(work)); output.append((size, size, false)) }
         return Array(output.prefix(3))
     }
 
@@ -392,7 +398,7 @@ import SwiftUI
                 display.webCopy("historyStripFieldGeneration", fallback: "世代") + ": " + generationLabel(work),
                 display.webCopy("historyTooltipColorCatalog", fallback: "色カタログ") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? unrecorded),
                 "Render: " + (work.renderEngineVersion ?? display.webCopy("historyVersionNotRecorded", fallback: "記録なし")),
-                display.localized("SVG容量") + ": " + ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(work), countStyle: .file)]
+                display.localized("SVG容量") + ": " + ByteCountFormatter.string(fromByteCount: library.svgSizes[work.id] ?? SavedWorkFacts.svgBytes(work), countStyle: .file)]
             .joined(separator: "\n")
     }
 

@@ -22,7 +22,7 @@ public enum HistoryStripPlaceholder: Equatable, Sendable {
 
 @MainActor @Observable
 public final class HistoryModel {
-    public let library = LibraryModel()
+    public let library = LibraryModel(includeListSVG: false)
     public private(set) var generations: [String: Int] = [:]
     public private(set) var generationLoading = true
     public private(set) var generationError: String?
@@ -52,7 +52,6 @@ public final class HistoryModel {
         guard library.pageSize != capacity else { return }
         library.pageSize = capacity
         await locate(app: app, workID: workID)
-        await library.setPage(library.page)
     }
     public func connect(app: AppModel) async {
         guard database == nil else { return }
@@ -98,7 +97,7 @@ public final class HistoryModel {
         guard let database, let id = workID ?? app.selectedWorkID else { selectedIndex = nil; return }
         do {
             let position = try await database.libraryIndex(id: id, query: library.filter)
-            guard locationToken == token, workID != nil || app.selectedWorkID == id else { return }
+            guard locationToken == token, !Task.isCancelled, workID != nil || app.selectedWorkID == id else { return }
             selectedIndex = position
             guard let position else { return }
             if library.page != position / library.pageSize { await library.setPage(position / library.pageSize) }
@@ -125,7 +124,10 @@ public final class HistoryModel {
             guard navigationToken == token, !app.isBrowsingLocked,
                   app.selectedWorkID == initialSelection, library.filter == query else { return nil }
             guard library.works.indices.contains(index % library.pageSize) else { return nil }
-            let work = library.works[index % library.pageSize]
+            let listed = library.works[index % library.pageSize]
+            let work = try await library.fullWork(id: listed.id)
+            guard navigationToken == token, !Task.isCancelled, !app.isBrowsingLocked,
+                  app.selectedWorkID == initialSelection, library.filter == query else { return nil }
             if selectWork {
                 await app.selectWork(work)
                 guard navigationToken == token, !app.isBrowsingLocked,

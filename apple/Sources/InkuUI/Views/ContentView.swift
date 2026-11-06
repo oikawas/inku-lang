@@ -90,6 +90,7 @@ public struct ContentView: View {
     @State private var ui = WorkspaceUIState()
     @State private var automation = AutomationModel()
     @State private var history = HistoryModel()
+    @State private var historyRefreshTask: Task<Void, Never>?
     @State private var libraryPreview = LibraryPreviewModel()
     @State private var workspaceWork: SavedWork?
     @State private var batchWorkspace = BatchWorkspaceSelection()
@@ -184,10 +185,14 @@ public struct ContentView: View {
         }
         #endif
         .onChange(of: dialog?.id) { _, _ in batchWorkspace.invalidateReads() }
-        .onChange(of: model.works) { _, _ in Task {
-            await history.library.refresh()
-            await history.locate(app: model, workID: workspaceWork?.id)
-        } }
+        .onChange(of: model.works) { _, _ in
+            historyRefreshTask?.cancel()
+            historyRefreshTask = Task {
+                await history.library.refresh()
+                guard !Task.isCancelled else { return }
+                await history.locate(app: model, workID: workspaceWork?.id)
+            }
+        }
         .onChange(of: model.restorationRevision) { _, revision in
             libraryPreview.close()
             automation.invalidateWorkObservationsAfterRestore()
@@ -778,9 +783,14 @@ public struct ContentView: View {
         guard canReadWork, let work = target ?? workTarget, !work.svg.isEmpty else { return }
         let token = UUID(); presentationLoadID = token
         let fromLibrary = ui.libraryOpen
-        let viewer = HistoryModel()
-        await viewer.connect(app: model)
-        await viewer.locate(app: model, workID: work.id)
+        let viewer: HistoryModel
+        if !history.filtered, history.library.works.contains(where: { $0.id == work.id }) {
+            viewer = history
+        } else {
+            viewer = HistoryModel()
+            await viewer.connect(app: model)
+            await viewer.locate(app: model, workID: work.id)
+        }
         guard canReadWork, ui.libraryOpen == fromLibrary, presentationLoadID == token else { return }
         presentationWork = work; presentationHistory = viewer
         enterPresentation()

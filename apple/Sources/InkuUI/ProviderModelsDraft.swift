@@ -108,7 +108,10 @@ public struct ProviderModelsDraft: Sendable, Equatable {
 
     public mutating func setVisible(models visible: [ProviderModelSettings], enabled value: Bool) {
         var next = enabled
-        for model in visible where !value || model.isPublishable { next[model.id] = value }
+        for item in visible {
+            guard let model = model(modelID: item.id), !value || model.isPublishable else { continue }
+            next[model.id] = value
+        }
         enabled = next
     }
 

@@ -680,6 +680,8 @@ New variation generation, adoption, autonomous refinement, and advice are retire
 
 AI direction uses the Web’s 160 UTF-16-code-unit limit, with the same counter and without splitting a visible character. Previewing a saved autonomous-refinement generation does not change its parent. Continue from this work explicitly rereads the saved work and conditions before changing the next parent; failed reads retain the original parent and reason. A colophon reads a fixed root-to-target path and displays its generation count. It cannot generate a new reading while that path is unavailable.
 
+Autonomous refinement retains the newest 50 completed runs and keeps runs in progress or with a pending child.
+
 ### Targets for history, screens, and export
 
 The history strip derives capacity from the work-area width without changing input or the displayed work merely to fill space. Library search/marks/pages/multiple selection, preview, and Open in Creation are separate. Changing lineage focus, expanding a branch, previewing saved information, and selecting Creation are also distinct. Export receives a snapshot of the active screen's fixed target without importing another screen's checkboxes.

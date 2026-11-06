@@ -14,7 +14,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 from typing import Any
 
@@ -24,6 +23,7 @@ from . import provider_wire
 from .chatgpt_store import ChatGPTError
 from .model_settings import connection_for
 from .text_provider import send_text
+from .request_timeout import request_timeout_seconds
 
 _logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
             return asyncio.run(request_vision(
                 connection["owner_id"], connection["profile_id"], connection["generation"], model_id,
                 system=system, text=text, images=images,
-                deadline=time.monotonic() + float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180")),
+                deadline=time.monotonic() + request_timeout_seconds(),
                 transport=transport,
             )).strip()
         except ChatGPTError:
@@ -74,7 +74,7 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
             raise ChatGPTError("chatgpt_response_invalid") from None
     if connection.get("requires_api_key") and not connection.get("api_key"):
         raise ValueError(f"{connection.get('id')} API key is not configured")
-    timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180"))
+    timeout = request_timeout_seconds()
     try:
         built, response, read = send_text(connection, model_id, system=system, text=text, images=images,
                                           temperature=temperature, max_tokens=max_tokens, timeout=timeout, transport=transport)

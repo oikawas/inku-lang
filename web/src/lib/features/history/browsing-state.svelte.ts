@@ -1,4 +1,5 @@
 import type { ApiFetch } from '../../transport/api-fetch.ts';
+import { fetchAnchorWithFilterReset } from './lineage-actions.ts';
 import {
 	HistoryManagerState,
 	type HistoryItem
@@ -24,22 +25,8 @@ import {
 export const HISTORY_EXTERNAL_REFRESH_MS = 12_000;
 export const HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS = 5_000;
 
-export type HistoryStarProjection = {
-	id?: string;
-	starred?: boolean;
-	note?: string | null;
-};
-
-export type HistoryForRevisionProjection = {
-	id?: string;
-	for_revision?: boolean;
-};
-
-export type HistoryForShareProjection = {
-	id?: string;
-	for_share?: boolean;
-	share_group_id?: string | null;
-};
+import type { HistoryStarProjection, HistoryForRevisionProjection, HistoryForShareProjection } from './projections.ts';
+export type { HistoryStarProjection, HistoryForRevisionProjection, HistoryForShareProjection } from './projections.ts';
 
 export type HistoryBrowsingDependencies = {
 	apiFetch: ApiFetch;
@@ -311,19 +298,20 @@ export class HistoryBrowsingState {
 			return;
 		}
 		this.cursor = -1;
-		let found = await this.fetchOffset(0, { anchorId: item.id, signal });
-		if (requestId !== this.selectionRequest || signal?.aborted) return;
-		if (found === 'missing' && this.filtered) {
-			// All strip filters come off together because the missing response
-			// does not say which independent mark hid the current work.
-			const clearedStarred = this.starredOnly;
-			this.starredOnly = false;
-			this.forRevisionOnly = false;
-			this.forShareOnly = false;
-			if (clearedStarred) this.deps.onStarredFilterCleared();
-			else this.deps.onOtherFilterCleared();
-			found = await this.fetchOffset(0, { anchorId: item.id, signal });
-		}
+		const found = await fetchAnchorWithFilterReset(item.id, {
+			fetchOffset: (offset, options) => this.fetchOffset(offset, options),
+			filtered: () => this.filtered,
+			isCurrent: () => requestId === this.selectionRequest && !signal?.aborted,
+			signal,
+			clearFilters: () => {
+				const clearedStarred = this.starredOnly;
+				this.starredOnly = false;
+				this.forRevisionOnly = false;
+				this.forShareOnly = false;
+				if (clearedStarred) this.deps.onStarredFilterCleared();
+				else this.deps.onOtherFilterCleared();
+			}
+		});
 		if (requestId !== this.selectionRequest || signal?.aborted) return;
 		if (found === 'missing') this.cursor = -1;
 	}

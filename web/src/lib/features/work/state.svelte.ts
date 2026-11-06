@@ -7,12 +7,11 @@ import {
 	compositionOption, sketchModeForRoute,
 	type CompositionMode, type DrawRoute
 } from '$lib/draw-route';
-import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
+import { composeFallbackReason, composeFallbackState, composeFallbackValue, interpretFallbackReason as interpretReason } from '$lib/composeFallback';
 import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
 import { modelDisplayName, qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
-import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
-import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+import { AUTO_CATALOG_ID, colorCatalogOverride, resolveCatalogId } from '$lib/features/color-catalog/render';
 import { renderSettingsPayload } from '$lib/features/render-payload';
 import { runCurrentWork, type InstructionLang, type PaintOptions, type PaintResult, type Seed } from '$lib/features/run/current-work';
 import { batchSettings } from '$lib/features/batch/settings.svelte';
@@ -308,7 +307,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	function pipelineOptions(options: PaintOptions = {}): PipelineOptions {
 		const selected = currentOptions();
-		const render = renderSettingsPayload('paint', { ...colorCatalogOverride(selected.catalog.mode === 'auto' ? AUTO_CATALOG_ID : selected.catalog.id),
+		const render = renderSettingsPayload('paint', { ...colorCatalogOverride(tabCatalogSelection()),
 			...wildOverride(selected.wild === 'on'), ...options.renderOverrides });
 		const route = options.route ?? currentOptions().route;
 		return {
@@ -316,11 +315,11 @@ export function createWorkState(deps: WorkStateDeps) {
 			...compositionOption(route, options.compositionMode ?? currentOptions().composition),
 			sketch: options.sketchMode ?? currentOptions().sketch,
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
-			stage1_model: options.stage1Model ?? selected.models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
-			stage2_model: options.stage2Model ?? selected.models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
+			stage1_model: options.stage1Model ?? tabModelRef('stage1'),
+			stage2_model: options.stage2Model ?? tabModelRef('stage2'),
 			instruction_lang: instructionLang,
 			ui_lang: getLang(),
-			catalog_id: typeof render.catalog_id === 'string' ? render.catalog_id : colorCatalogSettings.effectiveId,
+			catalog_id: typeof render.catalog_id === 'string' ? render.catalog_id : resolveCatalogId(tabCatalogSelection()),
 			catalog_mode: typeof render.catalog_mode === 'string' ? render.catalog_mode : undefined,
 			canvas_aspect: options.canvasAspectId ?? selected.canvas_aspect,
 			...(options.canvasFit ? { canvas_fit: options.canvasFit } : {}),
@@ -732,11 +731,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	const canSubmit = $derived(
 		inputMode === 'single' ? !!pipelineDescription(input).trim() : inputMode === 'batch' ? batch.nonEmpty > 0 : false
 	);
-	const interpretFallbackReason = $derived(
-		displayedHistoryItem
-			? (displayedHistoryItem.interpret_fallback ?? null)
-			: (result?.interpret_fallback_used ? (result.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
-	);
+	const interpretFallbackReason = $derived(interpretReason(displayedHistoryItem, result));
 	const composeFallbackRaw = $derived(
 		displayedHistoryItem
 			? (displayedHistoryItem.compose_fallback ?? null)
@@ -872,15 +867,15 @@ export function createWorkState(deps: WorkStateDeps) {
 				strings: t(),
 				// Resolve injected route settings before entering the stateless run
 				// operation. A caller's one-run override still wins there.
-				stage1Model: currentOptions().models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
-				stage2Model: currentOptions().models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
+				stage1Model: tabModelRef('stage1'),
+				stage2Model: tabModelRef('stage2'),
 				includeThinking: deps.models.includeThinking(),
 				instructionLang,
 				canvasAspectId: currentOptions().canvas_aspect,
 				sketchMode: currentOptions().sketch,
 				route: currentOptions().route,
 				compositionMode: currentOptions().composition,
-				renderPayload: renderSettingsPayload('paint', { ...colorCatalogOverride(currentOptions().catalog.mode === 'auto' ? AUTO_CATALOG_ID : currentOptions().catalog.id),
+				renderPayload: renderSettingsPayload('paint', { ...colorCatalogOverride(tabCatalogSelection()),
 					...wildOverride(currentOptions().wild === 'on'), ...options.renderOverrides })
 			},
 			{
@@ -915,7 +910,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			// Demo follows the catalog modal, including "from the description";
 			// it has no separate catalog or wild-mode setting of its own.
 			renderOverrides: () => ({
-				...colorCatalogOverride(colorCatalogSettings.selected),
+				...colorCatalogOverride(tabCatalogSelection()),
 				...wildOverride(false),
 			}),
 			paintInstruction: (prompt, paintOptions) => {
@@ -1427,10 +1422,10 @@ export function createWorkState(deps: WorkStateDeps) {
 		get composeFallbackRecord() { return composeFallbackState(composeFallbackRaw); },
 		get statusDdlOrigin() { return (displayedHistoryItem?.display_label ?? null) === 'DDL'; },
 		get stage1ModelLabel() {
-			return modelDisplayName(currentOptions().models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()), deps.models.available(), deps.models.stage1Provider());
+			return modelDisplayName(tabModelRef('stage1'), deps.models.available(), deps.models.stage1Provider());
 		},
 		get stage2ModelLabel() {
-			return modelDisplayName(currentOptions().models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()), deps.models.available(), deps.models.stage2Provider());
+			return modelDisplayName(tabModelRef('stage2'), deps.models.available(), deps.models.stage2Provider());
 		},
 		get inputMode() { return inputMode; },
 		set inputMode(value) { inputMode = value; },

@@ -6,6 +6,7 @@ import importlib.metadata
 import os
 from pathlib import Path
 from fastapi import HTTPException
+from ..build_info import build_number as _build_number
 from ..languages import SUPPORTED_INSTRUCTION_LANGS, normalize_instruction_lang, resolve_instruction_lang
 from ..model_settings import model_is_offered, provider_for_model
 from ..verified_model_catalog import core_catalog
@@ -81,16 +82,6 @@ def _normalize_ui_lang(value: str | None) -> str | None:
     if not lang:
         return None
     return lang[:32]
-
-
-def _build_number() -> str | None:
-    # One level deeper than api.py: api_core/common.py -> inku_server -> src ->
-    # server -> repository root.
-    path = Path(__file__).resolve().parents[4] / "web" / "BUILD_NUMBER"
-    try:
-        return path.read_text(encoding="utf-8").strip() or None
-    except OSError:
-        return None
 
 
 def _resolved_vision_model(model: str | None, actor: dict | None = None) -> str:

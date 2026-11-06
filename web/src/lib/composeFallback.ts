@@ -67,3 +67,8 @@ export function hasFallbackMark(work: {
 }): boolean {
 	return Boolean(work?.interpret_fallback) || composeFallbackReason(work?.compose_fallback) !== null;
 }
+
+/** The saved reason takes precedence; an unsaved result reports its first reason. */
+export function interpretFallbackReason(saved: { interpret_fallback?: string | null } | null | undefined, result: { interpret_fallback_used?: boolean | null; interpret_fallback_reasons?: string[] | null } | null | undefined): string | null {
+	return saved ? saved.interpret_fallback ?? null : result?.interpret_fallback_used ? result.interpret_fallback_reasons?.[0] ?? 'stage1_fallback' : null;
+}

@@ -81,7 +81,7 @@
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
-	import { AUTO_CATALOG_ID, colorCatalogOverride, resolveCatalogId } from '$lib/features/color-catalog/render';
+	import { AUTO_CATALOG_ID, bindColorCatalogRenderState, colorCatalogOverride, resolveCatalogId } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload } from '$lib/features/render-payload';
 	import {
 		runCurrentWork,
@@ -494,7 +494,6 @@
 	let defaultCatalogId = $state('default');
 	// Old catalog id -> the id it answers to today, served by /api/color-catalogs.
 	let renamedCatalogIds = $state<Record<string, string>>({});
-	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.effectiveId) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 
 	// ── Settings tabs ────────────────────────────────────────
 	let pluginEntries = $state<PluginEntry[]>([]);
@@ -581,6 +580,8 @@
 		}
 	});
 	bindWildRenderState(() => work.drawOptions.wild === 'on');
+	bindColorCatalogRenderState(() => work.tabCatalogSelection());
+	const currentCatalog = $derived(catalogById(colorCatalogs, resolveCatalogId(work.tabCatalogSelection())) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 	const settings = createSettingsController({
 		chatgptAvailable: () => chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id,
 		invalidateChatGPTModels: () => {
@@ -1004,15 +1005,14 @@
 	}
 
 	function openCatalogModal() {
-		colorCatalogSettings.selected = work.drawOptions.catalog.mode === 'auto' ? AUTO_CATALOG_ID : work.drawOptions.catalog.id;
-		catalogSelectionSnapshot = colorCatalogSettings.selected;
+		catalogSelectionSnapshot = work.tabCatalogSelection();
 		catalogOpen = true;
 	}
 
-	function persistSelectedCatalog() {
-		if (work.tabCatalogSelection() !== colorCatalogSettings.selected) work.invalidateWorkOptions();
-		work.drawOptions.catalog.mode = colorCatalogSettings.selected === AUTO_CATALOG_ID ? 'auto' : 'fixed';
-		if (colorCatalogSettings.selected !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = colorCatalogSettings.selected;
+	function setSelectedCatalog(id: string) {
+		if (work.tabCatalogSelection() !== id) work.invalidateWorkOptions();
+		work.drawOptions.catalog.mode = id === AUTO_CATALOG_ID ? 'auto' : 'fixed';
+		if (id !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = id;
 	}
 
 	// The folds ride in the user's model_settings for the same reason the
@@ -1089,14 +1089,12 @@
 
 	function confirmCatalogSelection() {
 		catalogSelectionSnapshot = null;
-		persistSelectedCatalog();
 		catalogOpen = false;
 	}
 
 	function cancelCatalogSelection() {
 		if (catalogSelectionSnapshot !== null) {
-			colorCatalogSettings.selected = catalogSelectionSnapshot;
-			persistSelectedCatalog();
+			setSelectedCatalog(catalogSelectionSnapshot);
 		}
 		catalogSelectionSnapshot = null;
 		catalogOpen = false;
@@ -1466,7 +1464,7 @@
 		await demo.saveCurrent({
 			stage1Model: qualifiedModelRef(stage1Provider, stage1Model),
 			stage2Model: qualifiedModelRef(stage2Provider, stage2Model),
-			effectiveCatalogId: colorCatalogSettings.effectiveId,
+			effectiveCatalogId: resolveCatalogId(work.tabCatalogSelection()),
 			canvasAspectId: effectiveCanvasAspectId(),
 			instructionLang: work.instructionLang,
 			uiLang: getLang(),
@@ -1674,7 +1672,7 @@ async function toggleLineageForRevision(node: LineageNode, event?: Event): Promi
 }
 
 function lineageCatalogId(node: LineageNode): string {
-	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? colorCatalogSettings.effectiveId;
+	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? resolveCatalogId(work.tabCatalogSelection());
 }
 
 function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
@@ -1685,7 +1683,12 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await focusSavedLineageChild(historyId, nodeId, {
 		fetchOffset: (offset, options) => history.fetchOffset(offset, options),
 		filtered: () => historyStripFiltered,
-		clearFilters: () => history.clearFilters(),
+		clearFilters: () => {
+			const clearedStarred = history.starredOnly;
+			history.clearFilters();
+			if (clearedStarred) showHistoryStarredFilterClearedNotice();
+			else showHistoryForRevisionFilterClearedNotice();
+		},
 		items: () => historyItems,
 		displayCurrentItem: (item) => {
 			// The saved child becomes the lineage focus without replacing an
@@ -2269,10 +2272,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	return nodeId;
 }
 
-	function setSelectedCatalog(id: string) {
-		colorCatalogSettings.selected = id;
-		persistSelectedCatalog();
-	}
 
 	// ── Download ────────────────────────────────────────────
 	const savedWorkExportActions = makeSavedWorkExportActions({
@@ -3389,7 +3388,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				<ModelCardPicker label={t().modelButton} selectedModel={qualifiedModelRef(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
 					onSelect={setDrawingModel} />
 				<label class="demo-catalog-field"><span>{t().colorCatalogButton}</span>
-					<select bind:value={colorCatalogSettings.selected}>
+					<select value={work.tabCatalogSelection()} onchange={(event) => setSelectedCatalog(event.currentTarget.value)}>
 						<option value={AUTO_CATALOG_ID}>{t().colorCatalogAuto}</option>
 						{#each colorCatalogs as catalog (catalog.id)}<option value={catalog.id}>{catalog.name}</option>{/each}
 					</select>
@@ -3569,7 +3568,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		<ColorCatalogModal
 			imageInput={work.inputMode === 'image'}
 			catalogs={colorCatalogs}
-			selectedCatalog={colorCatalogSettings.selected}
+			selectedCatalog={work.tabCatalogSelection()}
 			{currentCatalog}
 			onSelectCatalog={setSelectedCatalog}
 			onCancel={cancelCatalogSelection}

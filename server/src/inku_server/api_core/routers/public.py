@@ -21,6 +21,7 @@ from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalo
 from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model
 from ...verified_model_catalog import core_catalog
 from ...text_provider import send_text
+from ...request_timeout import request_timeout_seconds
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
@@ -389,7 +390,7 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
     provider, model_id = provider_for_model(model or None, stage="stage1", settings=settings)
     # One deadline for every provider: a request worker is not held for minutes
     # over a one-line demo prompt when a provider stops answering.
-    timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
+    timeout = request_timeout_seconds()
     connection = connection_for(provider, settings)
     if connection.get("requires_api_key") and not connection.get("api_key"):
         raise RuntimeError(f"{provider} API key is not configured")

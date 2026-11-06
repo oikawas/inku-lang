@@ -22,6 +22,7 @@ from .pipeline_candidate import CandidateExecution, CandidateHostError, Pipeline
 from .pipeline_settings import select_canvas
 from .persistence.variation_authority import (
     LAWS_RECORD_KEYS,
+    _OwnedExecutionState,
     ExecutionSnapshotConflict,
     VariationAuthorityAdapterError,
 )
@@ -345,7 +346,10 @@ class PipelineService:
             transport = self.provider_with_context(owner, run.context) if self.provider_with_context else self.provider_for(owner)
             return transport(action)
 
+        last_rendered = last_ranges = last_digest = None
+
         def save(previous, snapshot, host_context, rendered):
+            nonlocal last_rendered, last_ranges, last_digest
             if rendered is None:
                 host_context.pop("result", None)
                 host_context.pop("render_digest", None)
@@ -353,14 +357,16 @@ class PipelineService:
                 projection = rendered
                 if snapshot.get("completion_ranges") is not None:
                     projection = {"rendered": rendered, "completion_ranges": snapshot["completion_ranges"]}
-                digest = hashlib.sha256(json.dumps(projection, sort_keys=True).encode()).hexdigest()
+                ranges = snapshot.get("completion_ranges")
+                if rendered is last_rendered and ranges == last_ranges and last_digest is not None:
+                    digest = last_digest
+                else:
+                    digest = hashlib.sha256(json.dumps(projection, sort_keys=True).encode()).hexdigest()
+                    last_rendered, last_ranges, last_digest = rendered, deepcopy(ranges), digest
                 if digest != host_context.get("render_digest"):
                     host_context["result"] = self.project_result(owner, snapshot, host_context, rendered)
                     host_context["render_digest"] = digest
-            state_bytes = json.dumps(
-                {"snapshot": snapshot, "context": host_context, "rendered": rendered},
-                ensure_ascii=False, allow_nan=False, separators=(",", ":"),
-            ).encode()
+            state_bytes = _OwnedExecutionState(snapshot, host_context, rendered)
             if previous is None:
                 self.store.create_execution(owner, snapshot["execution_id"], snapshot["variation_id"], snapshot["sequence"], state_bytes)
             else:

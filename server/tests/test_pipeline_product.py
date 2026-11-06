@@ -776,11 +776,12 @@ def test_prepare_reads_model_settings_once_and_resolves_only_selected_palette(tm
         palettes.append(json.loads(value)["catalog_id"])
         return resolve(value)
     monkeypatch.setattr(db, "get_model_settings", read_settings)
-    binding.resolve_palette = resolve_palette
     effects = ProductPipelineEffects(binding, default_manifest(binding))
-    effects.prepare("author", "direct_ddl", "A line", {
+    binding.resolve_palette = resolve_palette
+    _, context = effects.prepare("author", "direct_ddl", "A line", {
         "catalog_id": "default", "catalog_mode": "fixed", "stage1_model": "fixture:one",
     }, None)
     assert reads == [1]
     assert palettes == ["default"]
+    assert set(context["color_maps"]) == {"default"}
     engine.dispose()

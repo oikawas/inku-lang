@@ -607,7 +607,20 @@ def _failed_result(commit: _Commit, actual_revision: str | None) -> dict[str, ob
     }
 
 
+class _OwnedExecutionState(bytes):
+    """A wrapper constructed by the host from its own state, not client bytes."""
+
+    def __new__(cls, snapshot: dict, context: dict, rendered: dict | None):
+        wrapper = {"snapshot": snapshot, "context": context, "rendered": rendered}
+        if set(wrapper) != {"snapshot", "context", "rendered"}:
+            raise VariationAuthorityAdapterError("invalid execution state wrapper")
+        return super().__new__(cls, json.dumps(wrapper, ensure_ascii=False, allow_nan=False,
+                                               separators=(",", ":")).encode())
+
+
 def _validated_state_bytes(value: bytes) -> tuple[bytes, str]:
+    if type(value) is _OwnedExecutionState:
+        return bytes(value), hashlib.sha256(value).hexdigest()
     if not isinstance(value, bytes):
         raise VariationAuthorityAdapterError(
             "execution state must be owned bytes"

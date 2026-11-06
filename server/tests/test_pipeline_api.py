@@ -770,3 +770,41 @@ def test_logout_does_not_stop_api_drain():
     finally:
         retire_execution(run.owner_id, "api-run")
         service.close()
+
+
+def test_snapshot_reuses_render_digest_until_render_or_ranges_change(monkeypatch):
+    from inku_server import pipeline_api
+
+    class Store:
+        def create_execution(self, *args):
+            pass
+        def compare_and_set_execution(self, *args, **kwargs):
+            pass
+
+    service = PipelineService(None, Store(), config_for=None, provider_for=None, render_for=None,
+                              project_result=lambda *args: {}, max_workers=1,
+                              max_effect_steps=1, max_retained_runs=1)
+    calls = []
+    original = pipeline_api.hashlib.sha256
+    def digest(value):
+        calls.append(1)
+        return original(value)
+    monkeypatch.setattr(pipeline_api.hashlib, "sha256", digest)
+    try:
+        run = service._host("owner", {}, {})
+        rendered = {"svg": "<svg/>"}
+        snapshot = {"execution_id": "e", "variation_id": "v", "sequence": "0"}
+        context = {}
+        run.save_snapshot(None, snapshot, context, rendered)
+        previous = snapshot
+        snapshot = {**snapshot, "sequence": "1"}
+        run.save_snapshot(previous, snapshot, context, rendered)
+        assert len(calls) == 1
+        previous = snapshot
+        snapshot = {**snapshot, "sequence": "2", "completion_ranges": {"ranges": []}}
+        run.save_snapshot(previous, snapshot, context, rendered)
+        assert len(calls) == 2
+        run.save_snapshot(snapshot, {**snapshot, "sequence": "3"}, context, {"svg": "<svg/>"})
+        assert len(calls) == 3
+    finally:
+        service.close()

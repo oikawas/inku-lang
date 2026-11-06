@@ -441,10 +441,10 @@ class ProductPipelineEffects:
             raise CandidateHostError("binding_palette_unavailable")
         for catalog in catalogs:
             identity = catalog["id"]
-            color_map = render_color_map_for_catalog(identity)
-            color_maps[identity] = color_map
             if mode != "auto" and identity != catalog_id:
                 continue
+            color_map = render_color_map_for_catalog(identity)
+            color_maps[identity] = color_map
             palette = json.loads(self.binding.resolve_palette(_bytes({
                 "color_map": color_map, "catalog_id": identity, "render_seed": str(seed),
                 "background": template_host["background"],

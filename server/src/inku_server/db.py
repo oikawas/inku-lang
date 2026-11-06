@@ -566,8 +566,9 @@ def juxtaposition_sources(user_id: str) -> list[tuple[str, str]]:
     """(id, description) of the user's own works that may lend a sentence to a juxtaposition."""
     from .persistence.juxtaposition import owned_description_sources
 
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
-        return owned_description_sources(session, _actor_of(user_id))
+        return owned_description_sources(session, actor)
 
 
 def lineage_node_description_locked(node_id: str) -> bool:
@@ -1067,7 +1068,7 @@ def _group_to_dict(row: UserGroupRow) -> dict:
     return _groups.group_to_dict(row)
 
 
-def _user_account_projector(model_settings: dict | None = None) -> _accounts.UserAccountProjector:
+def _user_account_projector(model_settings: dict | None = None, *, raw: bool = False) -> _accounts.UserAccountProjector:
     from sqlalchemy.orm import object_session
     from .model_settings import normalize_user_model_settings
 
@@ -1079,13 +1080,33 @@ def _user_account_projector(model_settings: dict | None = None) -> _accounts.Use
         _UI_CUSTOM_KEYS,
         _SETTINGS_TABS,
         normalize_history_strip_fields,
-        (normalize_user_model_settings if model_settings is None else
+        ((lambda value: value) if raw else normalize_user_model_settings if model_settings is None else
          lambda value: normalize_user_model_settings(value, providers=model_settings.get("providers", {}))),
     )
 
 
 def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
-    return _user_account_projector().project(row, group_name)
+    from sqlalchemy.orm import object_session
+    from .model_settings import normalize_model_settings
+    session = object_session(row)
+    if session is None:
+        raise RuntimeError("_user_to_dict needs an attached row to read permission groups")
+    stored = session.get(_settings.AppSettingRow, _settings.MODEL_SETTINGS_KEY)
+    try:
+        value = json.loads(stored.value) if stored else None
+    except (ValueError, TypeError):
+        value = None
+    return _user_account_projector(normalize_model_settings(value)).project(row, group_name)
+
+
+def _user_to_dict_raw(row: UserAccountRow, group_name: str | None = None) -> dict:
+    return _user_account_projector(raw=True).project(row, group_name)
+
+
+def _normalize_session_user(user: dict) -> dict:
+    from .model_settings import normalize_user_model_settings
+    user["model_settings"] = normalize_user_model_settings(user["model_settings"])
+    return user
 
 
 def add_item(item: dict, *, session=None, actor=None) -> dict:
@@ -1156,7 +1177,8 @@ def _session_store() -> _sessions.SessionStore:
         _hash_token,
         _now_ms,
         _SESSION_MAX_AGE_SECONDS,
-        _user_to_dict,
+        _user_to_dict_raw,
+        _normalize_session_user,
     )
 
 
@@ -1306,7 +1328,7 @@ def increment_user_generation_count(user_id: str, amount: int = 1, *, session=No
 
 
 def _user_settings_updater() -> _settings.UserSettingsUpdater:
-    return _settings.UserSettingsUpdater(SessionLocal, _user_to_dict)
+    return _settings.UserSettingsUpdater(SessionLocal, _user_to_dict, get_model_settings)
 
 
 def update_user_theme(user_id: str, ui_theme: str) -> dict | None:

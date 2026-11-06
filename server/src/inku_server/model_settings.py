@@ -135,8 +135,8 @@ def release_draw_defaults() -> dict[str, Any]:
     return core_catalog("release_defaults")["release"]["tabs"]
 
 
-def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:
-    return core_catalog("update_user", settings=current, patch=patch, **_user_catalog_context())["settings"]
+def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any], *, providers=None) -> dict[str, Any]:
+    return core_catalog("update_user", settings=current, patch=patch, **_user_catalog_context(providers))["settings"]
 
 
 def model_provider_catalog(

@@ -889,6 +889,7 @@ class LogRetentionSettingsStore:
 class UserSettingsUpdater:
     session_factory: Callable[[], Any]
     user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+    model_settings_fn: Callable[[], dict] | None = None
 
     def update_user_theme(self, user_id: str, ui_theme: str) -> dict | None:
         if ui_theme not in {"light", "dark"}:
@@ -946,6 +947,7 @@ class UserSettingsUpdater:
             or len(history_strip_fields) > HISTORY_STRIP_FIELD_LIMIT
         ):
             raise ValueError("invalid history strip fields")
+        providers = self.model_settings_fn().get("providers", {}) if model_settings is not None and self.model_settings_fn else None
         with self.session_factory() as session:
             row = session.get(UserAccountRow, user_id)
             if not row:
@@ -987,7 +989,7 @@ class UserSettingsUpdater:
                     plugin_storage.pop(LEGACY_CANVAS_STORAGE_KEY)
                     row.plugin_storage = json.dumps(plugin_storage, ensure_ascii=False)
                 row.model_settings = json.dumps(
-                    update_user_model_settings(current_model_settings, model_settings),
+                    update_user_model_settings(current_model_settings, model_settings, providers=providers),
                     ensure_ascii=False,
                 )
             session.commit()

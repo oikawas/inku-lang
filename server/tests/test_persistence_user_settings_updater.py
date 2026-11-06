@@ -58,10 +58,11 @@ def test_settings_owns_user_updater_and_db_delegates(monkeypatch: pytest.MonkeyP
             calls.append(("settings", self.dependencies, args, kwargs))
             return "settings-sentinel"
 
-    dependencies = (object(), object())
+    dependencies = (object(), object(), object())
     monkeypatch.setattr(db._settings, "UserSettingsUpdater", RecordingUpdater)
     monkeypatch.setattr(db, "SessionLocal", dependencies[0])
     monkeypatch.setattr(db, "_user_to_dict", dependencies[1])
+    monkeypatch.setattr(db, "get_model_settings", dependencies[2])
 
     assert db.update_user_theme("u", "light") == "theme-sentinel"
     assert db.update_user_settings("u", ui_mode="full") == "settings-sentinel"
@@ -178,7 +179,7 @@ def test_user_settings_preserves_json_merge_transaction_and_exceptions(
     monkeypatch.setattr(
         settings,
         "update_user_model_settings",
-        lambda current, patch: {"current": current, "patch": patch},
+        lambda current, patch, **kwargs: {"current": current, "patch": patch},
     )
     session = _Session(row)
     result = _build(session).update_user_settings(

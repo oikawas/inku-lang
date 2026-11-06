@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from inku_server import db
 from inku_server.persistence import history
-from inku_server.persistence.schema import Base, HistoryAclRow, HistoryRow, UserGroupRow
+from inku_server.persistence.schema import Base, HistoryAclRow, HistoryRow, UserAccountRow, UserGroupRow
 
 
 def _row(
@@ -187,6 +187,8 @@ def test_share_writer_preserves_real_sqlalchemy_access_and_destination_state() -
                 UserGroupRow(id="owner-group", name="owner", at=1),
                 UserGroupRow(id="target-group", name="target", at=1),
                 UserGroupRow(id="stored-group", name="stored", at=1),
+                UserAccountRow(id="owner", username="owner", email="owner@example.test", password_hash="unused", role="user", group_id="owner-group", at=1),
+                UserAccountRow(id="loner", username="loner", email="loner@example.test", password_hash="unused", role="user", at=1),
                 _row("fresh", "owner"),
                 _row("stored", "owner", share_group_id="stored-group"),
                 _row("write", "owner"),
@@ -322,7 +324,7 @@ def test_share_writer_preserves_lookup_timing_order_and_exceptions(
 
         def get(self, model: object, target: str) -> object:
             events.append(f"get:{target}")
-            return object()
+            return SimpleNamespace(group_id="owner-group") if model is UserAccountRow else object()
 
         def commit(self) -> None:
             events.append("commit")
@@ -354,11 +356,10 @@ def test_share_writer_preserves_lookup_timing_order_and_exceptions(
         "writable",
         "filter",
         "first",
-        "actor:owner",
+        "get:owner",
         "get:owner-group",
-        "commit",
-        "refresh",
         "project",
+        "commit",
     ]
 
     events.clear()
@@ -369,9 +370,8 @@ def test_share_writer_preserves_lookup_timing_order_and_exceptions(
         "writable",
         "filter",
         "first",
-        "commit",
-        "refresh",
         "project",
+        "commit",
     ]
 
     failing = history.HistoryShareWriter(

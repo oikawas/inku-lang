@@ -23,6 +23,7 @@ from .schema import (
     LineageNodeRow,
     OkugakiRow,
     PipelineHistoryLinkRow,
+    UserAccountRow,
     UserGroupRow,
 )
 from .description_lock import DESCRIPTION_READING_KINDS, locked_history_ids
@@ -828,7 +829,8 @@ class HistoryShareWriter:
             # who chose it.
             if share_group_id and share_group_id != actor.get("group_id") and not self.has_permission_group_fn(actor, "admins"):
                 raise PermissionError("only administrators may share a work outside their own group")
-            owner_group_id = self.actor_of_fn(row.user_id)["group_id"] if row.user_id else None
+            owner = session.get(UserAccountRow, row.user_id) if row.user_id else None
+            owner_group_id = owner.group_id if owner else None
             # The destination the work already carries wins over the owner's own: it
             # is what "the bit went down and came back up" has to mean, and a fresh
             # work has none, so the owner's group is what fills the blank.

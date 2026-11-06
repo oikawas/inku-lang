@@ -580,7 +580,7 @@ class PipelineService:
             return
         for key, run in list(self._runs.items()):
             job = self._jobs.get(key)
-            if not run.busy and (job is None or job.done()):
+            if not run.busy and not getattr(run, "pending_host_failure", False) and (job is None or job.done()):
                 from .chatgpt_runtime import retire_execution
                 retire_execution(*key)
                 run.image_data.clear()
@@ -680,7 +680,11 @@ class PipelineService:
             run = self._runs.get(key)
             if run is not None:
                 self._runs.move_to_end(key)
-                return run
+        if run is not None:
+            reconcile = getattr(run, "reconcile_host_failure", None)
+            if reconcile is not None:
+                reconcile()
+            return run
         record = self.store.read_execution(owner, execution_id)
         if record is None:
             raise HTTPException(404, "variation_not_found")
@@ -887,6 +891,9 @@ class PipelineService:
                 else:
                     run = self._host(owner, saved["snapshot"]["config"], saved["context"])
                     run.restore(saved["snapshot"], rendered=saved["rendered"])
+        reconcile = getattr(run, "reconcile_host_failure", None)
+        if reconcile is not None:
+            reconcile()
         if run.context.get("svg_refusal") is not None:
             raise HTTPException(422, run.context["svg_refusal"])
         job = self._jobs.get((owner, execution_id))

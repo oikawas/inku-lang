@@ -295,6 +295,7 @@ class CandidateExecution:
         self.on_render_refusal = on_render_refusal
         self._rendered: dict | None = None
         self._snapshot: dict | None = None
+        self._pending_host_failure: str | None = None
         self._lock = threading.RLock()
         self._changed = threading.Condition(self._lock)
         self._fresh = False
@@ -338,6 +339,8 @@ class CandidateExecution:
         with self._lock:
             if self._snapshot is None:
                 raise CandidateHostError("execution_not_started")
+            if self._pending_host_failure is not None:
+                raise CandidateHostError(self._pending_host_failure)
             previous_context = self.context
             if context_updates:
                 self.context = {**self.context, **json.loads(_bytes(context_updates))}
@@ -371,14 +374,29 @@ class CandidateExecution:
         """Stop a resident run without writing while database writes are blocked."""
         with self._changed:
             if self._snapshot is not None:
-                self._snapshot = {**self._snapshot, "action": None}
+                self._pending_host_failure = reason
                 self.context["host_failure"] = reason
                 self._changed.notify_all()
 
     @property
+    def pending_host_failure(self) -> bool:
+        return self._pending_host_failure is not None
+
+    def reconcile_host_failure(self) -> None:
+        """Persist the cancelled state once writes are allowed again."""
+        with self._lock:
+            if self._pending_host_failure is None:
+                return
+            from . import db
+            if db.database_write_block_reason() is not None:
+                return
+            self._advance({"tag": "cancel"})
+            self._pending_host_failure = None
+
+    @property
     def busy(self) -> bool:
         snapshot = self._snapshot
-        return snapshot is not None and snapshot.get("action") is not None
+        return snapshot is not None and snapshot.get("action") is not None and self._pending_host_failure is None
 
     def wait_for_change(self, sequence: str, timeout: float) -> None:
         with self._changed:
@@ -477,6 +495,8 @@ class CandidateExecution:
                 code = self.context["host_failure"]
                 result["phase"] = {"tag": "failed", "reason": code}
                 result["provider_failure"] = {"failure": code, "stage": "host", "attempt": 0}
+                if self._pending_host_failure is not None:
+                    result["busy"] = False
             if self.context.get("image_failure") is not None:
                 result["image_failure"] = self.context["image_failure"]
             attempt = self._provider_attempt(state)

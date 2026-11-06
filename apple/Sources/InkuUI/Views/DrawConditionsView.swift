@@ -42,7 +42,7 @@ import SwiftUI
         Text(text).inkuFont(11).foregroundStyle(.tertiary)
     }
     private func routeButton(_ route: String, _ title: String) -> some View {
-        Button { model.selectDrawRoute(route); if route == "read_and_draw" { onSketch("on") } } label: {
+        Button { model.selectDrawRoute(route) } label: {
             Text(title).inkuFont(12, weight: self.route == route ? .semibold : .regular)
                 .frame(maxWidth: .infinity).frame(height: 26)
                 .background(self.route == route ? InkuColor.bg2 : Color.clear, in: RoundedRectangle(cornerRadius: 5))

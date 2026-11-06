@@ -1437,7 +1437,11 @@ fn render_impl(
     // class contains either word, and host colors are hex, so a match is a number.
     // The whole text is searched because a few numbers (a hatch spacing in a
     // class name) are written without `write_number`, which counts them.
-    if svg.contains("NaN") || svg.contains("inf") {
+    if svg
+        .as_bytes()
+        .windows(3)
+        .any(|bytes| bytes == b"NaN" || bytes == b"inf")
+    {
         return Err(RenderError::NonFiniteSvg {
             instruction_index: first_non_finite,
         });

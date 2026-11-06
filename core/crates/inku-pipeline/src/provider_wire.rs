@@ -891,12 +891,12 @@ fn bearer() -> (&'static str, &'static str, &'static str) {
 /// The images a pipeline request carries: the `data:` URLs the host sends,
 /// each the image the prompt names in its place by type, length and SHA-256
 /// (the image stages, 2026-10-24). A prompt without images takes none.
-fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal> {
+fn prompt_images<'a>(request: &'a Value, prompt: &Value) -> Result<Vec<&'a str>, Refusal> {
     let sent = match get(request, "images") {
         None => Vec::new(),
         Some(Value::Array(items)) => items
             .iter()
-            .map(|item| as_str(Some(item)).map(str::to_owned))
+            .map(|item| as_str(Some(item)))
             .collect::<Option<_>>()
             .ok_or_else(|| Refusal::invalid("images must be strings"))?,
         Some(_) => return Err(Refusal::invalid("images must be a list")),
@@ -933,7 +933,7 @@ fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal
 }
 
 /// OpenAI Responses parts: the text, then each image.
-fn responses_parts(text: &str, images: &[String]) -> Value {
+fn responses_parts<T: AsRef<str>>(text: &str, images: &[T]) -> Value {
     let mut parts = vec![object(vec![
         ("type", string("input_text")),
         ("text", string(text)),
@@ -941,14 +941,14 @@ fn responses_parts(text: &str, images: &[String]) -> Value {
     parts.extend(images.iter().map(|image| {
         object(vec![
             ("type", string("input_image")),
-            ("image_url", string(image)),
+            ("image_url", string(image.as_ref())),
         ])
     }));
     Value::Array(parts)
 }
 
 /// OpenAI-compatible chat parts: the text, then each image.
-fn chat_parts(text: &str, images: &[String]) -> Value {
+fn chat_parts<T: AsRef<str>>(text: &str, images: &[T]) -> Value {
     let mut parts = vec![object(vec![
         ("type", string("text")),
         ("text", string(text)),
@@ -956,17 +956,17 @@ fn chat_parts(text: &str, images: &[String]) -> Value {
     parts.extend(images.iter().map(|image| {
         object(vec![
             ("type", string("image_url")),
-            ("image_url", object(vec![("url", string(image))])),
+            ("image_url", object(vec![("url", string(image.as_ref()))])),
         ])
     }));
     Value::Array(parts)
 }
 
 /// Anthropic blocks: each image, then the text.
-fn anthropic_blocks(text: &str, images: &[String]) -> Result<Value, Refusal> {
+fn anthropic_blocks<T: AsRef<str>>(text: &str, images: &[T]) -> Result<Value, Refusal> {
     let mut blocks = Vec::with_capacity(images.len() + 1);
     for image in images {
-        let (media, data) = image_parts(image)?;
+        let (media, data) = image_parts(image.as_ref())?;
         blocks.push(object(vec![
             ("type", string("image")),
             (
@@ -987,10 +987,10 @@ fn anthropic_blocks(text: &str, images: &[String]) -> Result<Value, Refusal> {
 }
 
 /// Gemini parts: the text, then each image inline.
-fn gemini_parts(text: &str, images: &[String]) -> Result<Value, Refusal> {
+fn gemini_parts<T: AsRef<str>>(text: &str, images: &[T]) -> Result<Value, Refusal> {
     let mut parts = vec![object(vec![("text", string(text))])];
     for image in images {
-        let (media, data) = image_parts(image)?;
+        let (media, data) = image_parts(image.as_ref())?;
         parts.push(object(vec![(
             "inlineData",
             object(vec![("mimeType", string(media)), ("data", string(data))]),
@@ -1002,12 +1002,12 @@ fn gemini_parts(text: &str, images: &[String]) -> Result<Value, Refusal> {
 /// `SingleAttemptProvider._request`'s body for one pipeline effect. The
 /// images the prompt names follow its message in each dialect's Vision parts;
 /// a request without images is written as it was.
-fn pipeline_request(
+fn pipeline_request<T: AsRef<str>>(
     connection: &Connection,
     model: &str,
     prompt: &Value,
     max_tokens: i64,
-    images: &[String],
+    images: &[T],
 ) -> Result<Built, Refusal> {
     let field = |name: &str| {
         as_str(get(prompt, name))

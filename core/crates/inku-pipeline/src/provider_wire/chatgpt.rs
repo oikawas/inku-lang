@@ -195,11 +195,11 @@ fn cache_key(system: &str, schema: &Value) -> String {
 /// required; streamed and not stored, with the cache routing hint last. The
 /// images the prompt names follow its message as the Vision request sends
 /// them; without images the body is as it was.
-pub(super) fn pipeline_request(
+pub(super) fn pipeline_request<T: AsRef<str>>(
     model: &str,
     prompt: &Value,
     answer_limit: usize,
-    images: &[String],
+    images: &[T],
 ) -> Result<Value, Refusal> {
     let field = |name: &str| {
         as_str(get(prompt, name))

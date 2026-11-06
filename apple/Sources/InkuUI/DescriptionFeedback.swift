@@ -4,7 +4,7 @@ import InkuPersistence
 
 /// The same display vocabulary and greedy interpretation feedback as Web.
 public enum DescriptionFeedback {
-    private static let vocabulary: Result<[FeedbackLexeme], Error> = Result {
+    private static let vocabulary: Result<FeedbackVocabulary, Error> = Result {
         guard let url = Bundle.module.url(forResource: "saijiki", withExtension: "json"),
               let root = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
               let categories = root["categories"] as? [[String: Any]],
@@ -28,7 +28,7 @@ public enum DescriptionFeedback {
             japanese.append(FeedbackLexeme(surface: ja, category: "あいだ"))
             english.append(FeedbackLexeme(surface: en, category: "relations"))
         }
-        return japanese + english
+        return FeedbackVocabulary(japanese + english)
     }
 
     public static func parts(description: String, ddl: String) throws -> [FeedbackPart] {
@@ -36,7 +36,10 @@ public enum DescriptionFeedback {
     }
 
     public static func record(description: String, ddl: String, database: InkuDatabase) async throws {
-        let words = InterpretationFeedback.unreadWords(description: description, ddl: ddl, vocabulary: try vocabulary.get())
+        let vocabulary = try vocabulary.get()
+        let words = await Task.detached {
+            InterpretationFeedback.unreadWords(description: description, ddl: ddl, vocabulary: vocabulary)
+        }.value
         try await database.recordUnreadWords(words, context: description, at: Int64(Date().timeIntervalSince1970 * 1000))
     }
 }

@@ -276,6 +276,7 @@ class PipelineService:
         self._images = PendingImages(max_retained_runs)
         self._runs: OrderedDict[tuple[str, str], CandidateExecution] = OrderedDict()
         self._jobs: dict[tuple[str, str], Future] = {}
+        self._starting = 0
         self._lock = threading.RLock()
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="inku-pipeline")
 
@@ -448,6 +449,9 @@ class PipelineService:
                 )
         with self._lock:
             self._reserve_run()
+            self._starting += 1
+        reserved = True
+        try:
             image = self._images.get(owner, image_id) if kind == "image" else None
             if prepared is not None:
                 config, resolved_context = prepared
@@ -495,8 +499,15 @@ class PipelineService:
                 self._images.consume(owner, image_id)
             run.context["execution_id"] = run.view()["execution_id"]
             key = (owner, run.view()["execution_id"])
-            self._runs[key] = run
-            self._schedule(key, run)
+            with self._lock:
+                self._starting -= 1
+                reserved = False
+                self._runs[key] = run
+                self._schedule(key, run)
+        finally:
+            if reserved:
+                with self._lock:
+                    self._starting -= 1
         return run.view()
 
     def author_ddl(self, owner: str, execution_id: str, body: AuthorDdlBody) -> dict:
@@ -556,11 +567,11 @@ class PipelineService:
         )
 
     def _reserve_run(self) -> None:
-        if len(self._runs) < self.max_retained_runs:
+        if len(self._runs) + self._starting < self.max_retained_runs:
             return
         for key, run in list(self._runs.items()):
             job = self._jobs.get(key)
-            if not run.view()["busy"] and (job is None or job.done()):
+            if not run.busy and (job is None or job.done()):
                 from .chatgpt_runtime import retire_execution
                 retire_execution(*key)
                 run.image_data.clear()
@@ -576,7 +587,7 @@ class PipelineService:
         current = self._jobs.get(key)
         if current is not None and not current.done():
             return
-        if run.view()["busy"]:
+        if run.busy:
             from .chatgpt_runtime import begin_execution
             begin_execution(*key, chatgpt=bool(run.context.get("host_options", {}).get("chatgpt_profile")))
             job = self._pool.submit(self._drain, run)
@@ -653,25 +664,36 @@ class PipelineService:
         key = (owner, execution_id)
         with self._lock:
             run = self._runs.get(key)
+            if run is not None:
+                self._runs.move_to_end(key)
+                return run
+        record = self.store.read_execution(owner, execution_id)
+        if record is None:
+            raise HTTPException(404, "variation_not_found")
+        saved = json.loads(record.state_bytes)
+        candidate = self._host(owner, saved["snapshot"]["config"], saved["context"])
+        candidate.restore(saved["snapshot"], rendered=saved["rendered"])
+        candidate.context["execution_id"] = execution_id
+        with self._lock:
+            run = self._runs.get(key)
             if run is None:
-                record = self.store.read_execution(owner, execution_id)
-                if record is None:
-                    raise HTTPException(404, "variation_not_found")
                 self._reserve_run()
-                saved = json.loads(record.state_bytes)
-                run = self._host(owner, saved["snapshot"]["config"], saved["context"])
-                run.restore(saved["snapshot"], rendered=saved["rendered"])
-                run.context["execution_id"] = execution_id
+                run = candidate
                 self._runs[key] = run
-                if (run.snapshot().get("image_ddl") is not None
-                        and (run.snapshot().get("action") or {}).get("tag") in {
-                            "select_image_catalog", "write_image_ddl", "draw_image_review", "review_image_ddl",
-                        }):
-                    self._stop_missing_image(run)
-                self._schedule(key, run)
+                registered = True
             else:
                 self._runs.move_to_end(key)
-            return run
+                registered = False
+        if registered:
+            snapshot = saved["snapshot"]
+            if (snapshot.get("image_ddl") is not None
+                    and (snapshot.get("action") or {}).get("tag") in {
+                        "select_image_catalog", "write_image_ddl", "draw_image_review", "review_image_ddl",
+                    }):
+                self._stop_missing_image(run)
+            with self._lock:
+                self._schedule(key, run)
+        return run
 
     def completion_range_states(self, owner: str, body: CompletionRangeStatesBody) -> dict:
         """Read this owner's trusted inputs without starting or resuming work."""

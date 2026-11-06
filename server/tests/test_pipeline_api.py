@@ -644,6 +644,7 @@ def test_reserve_evicts_least_recently_used_idle_run():
     class Run:
         context = {}
         image_data = {}
+        busy = False
         def view(self):
             return {"busy": False}
 
@@ -655,6 +656,41 @@ def test_reserve_evicts_least_recently_used_idle_run():
         service._reserve_run()
         assert list(service._runs) == [("owner", "first")]
     finally:
+        service.close()
+
+
+def test_slow_prepare_does_not_block_another_resident_get():
+    import threading
+
+    entered, release = threading.Event(), threading.Event()
+    class Run:
+        context = {}
+        image_data = {}
+        busy = False
+        _snapshot = {"execution_id": "old", "variation_id": "old-var", "action": None}
+        def view(self):
+            return {"execution_id": self._snapshot["execution_id"], "busy": False}
+        def start_new(self, _authoring):
+            self._snapshot = {"execution_id": "new", "variation_id": "new-var", "action": None}
+
+    def prepare(*_):
+        entered.set()
+        assert release.wait(2)
+        return {}, {}
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              prepare_for=prepare, max_workers=1, max_effect_steps=1, max_retained_runs=2)
+    service._runs[("owner", "old")] = Run()
+    service._host = lambda *_: Run()
+    worker = threading.Thread(target=lambda: service.start("owner", "direct_ddl", "circle"))
+    worker.start()
+    try:
+        assert entered.wait(1)
+        start = time.monotonic()
+        assert service.get("owner", "old-var")["execution_id"] == "old"
+        assert time.monotonic() - start < 0.5
+    finally:
+        release.set()
+        worker.join(2)
         service.close()
 
 

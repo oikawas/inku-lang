@@ -367,6 +367,11 @@ class CandidateExecution:
             if self._snapshot is not None and self._snapshot.get("action") is not None:
                 self.command({"tag": "cancel"})
 
+    @property
+    def busy(self) -> bool:
+        snapshot = self._snapshot
+        return snapshot is not None and snapshot.get("action") is not None
+
     def wait_for_change(self, sequence: str, timeout: float) -> None:
         with self._changed:
             self._changed.wait_for(

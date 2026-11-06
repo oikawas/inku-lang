@@ -597,7 +597,7 @@ def test_runtime_cancel_closes_blocked_stream_and_releases_slot(isolated, monkey
                                                      runtime.execution_cancel("owner", "execution")))
     with ThreadPoolExecutor(max_workers=1) as pool:
         service._pool = pool
-        run = SimpleNamespace(context={"host_options": {"chatgpt_profile": value["id"]}}, view=lambda: {"busy": True})
+        run = SimpleNamespace(context={"host_options": {"chatgpt_profile": value["id"]}}, busy=True, view=lambda: {"busy": True})
         service._schedule(("owner", "execution"), run)
         assert json.loads(service._jobs[("owner", "execution")].result())
     assert cancel.is_set() and not runtime.execution_cancel("owner", "execution").is_set()

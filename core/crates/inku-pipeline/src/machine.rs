@@ -3542,6 +3542,7 @@ impl PipelineSnapshot {
     /// spent the first answer stands.
     fn ask_holes_again(
         &mut self,
+        base: &TypedDdlCompilation,
         prompt: &LlmPrompt,
         results: &[serde_json::Value],
         proposals: &[Option<String>],
@@ -3566,7 +3567,6 @@ impl PipelineSnapshot {
         let Some(next) = policy.next_budgeted_attempt(attempt, total) else {
             return Ok(false);
         };
-        let mut base = None;
         let feedback = results
             .iter()
             .zip(proposals)
@@ -3583,11 +3583,7 @@ impl PipelineSnapshot {
                 if result["status"] == "rejected"
                     && let Some(proposal) = proposal
                 {
-                    let unread = base
-                        .get_or_insert_with(|| self.compilation())
-                        .as_ref()
-                        .map(|base| self.unread_in_proposal(base, index, proposal))
-                        .unwrap_or_default();
+                    let unread = self.unread_in_proposal(base, index, proposal);
                     if !unread.is_empty() {
                         entry["unread"] = json!(unread);
                     }
@@ -3987,7 +3983,9 @@ impl PipelineSnapshot {
         if current
             && previous.is_none()
             && results.iter().any(|result| result["status"] == "rejected")
-            && self.ask_holes_again(&prompt, &results, &proposals, hole_ids, spent_ms, events)?
+            && self.ask_holes_again(
+                &base, &prompt, &results, &proposals, hole_ids, spent_ms, events,
+            )?
         {
             return Ok(());
         }

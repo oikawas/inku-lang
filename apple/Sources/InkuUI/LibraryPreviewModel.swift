@@ -45,6 +45,7 @@ public final class LibraryPreviewModel {
     public func loadAnnotation(using read: (String) async throws -> LibraryAnnotation,
                                readWork: ((String) async throws -> SavedWork?)? = nil) async {
         guard let id = work?.id else { return }
+        LibraryPerformanceProbe.previewRead()
         let selection = selectionToken
         let token = UUID()
         readToken = token

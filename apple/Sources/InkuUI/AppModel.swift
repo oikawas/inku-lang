@@ -1050,6 +1050,7 @@ public final class AppModel {
         workActionReadsInFlight.formUnion(reading)
         defer { if token == workActionReadToken { workActionReadsInFlight.subtract(reading) } }
         do {
+            LibraryPerformanceProbe.actionSummaryRead()
             let summaries = try await host.savedAuthoringSummaries(workIDs: Array(missing))
             let labels = try await host.savedDisplayLabels(workIDs: Array(labelIDs))
             guard token == workActionReadToken, !Task.isCancelled else { return }

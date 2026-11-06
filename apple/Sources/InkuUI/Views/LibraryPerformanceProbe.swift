@@ -19,10 +19,12 @@ public enum LibraryPerformanceProbe {
     public private(set) static var hostingLayouts = 0
     /// Times a library work menu (context menu or ⋯) built its items.
     public private(set) static var menuBodies = 0
+    public private(set) static var actionSummaryReads = 0
+    public private(set) static var previewReads = 0
 
     public static func reset() {
         refreshesStarted = 0; refreshesFinished = 0; lineageReads = 0; cardBodies = 0; lineageNodeBodies = 0
-        hostingLayouts = 0; menuBodies = 0
+        hostingLayouts = 0; menuBodies = 0; actionSummaryReads = 0; previewReads = 0
     }
 
     static func refreshStarted() { if counting { refreshesStarted += 1 } }
@@ -31,11 +33,23 @@ public enum LibraryPerformanceProbe {
     static func cardBody() { if counting { cardBodies += 1 } }
     static func lineageNodeBody() { if counting { lineageNodeBodies += 1 } }
     static func menuBody() { if counting { menuBodies += 1 } }
+    static func actionSummaryRead() { if counting { actionSummaryReads += 1 } }
+    static func previewRead() { if counting { previewReads += 1 } }
 
     #if os(macOS)
     /// The library overlay over a hidden lineage view, as `ContentView` keeps the shell beneath the library.
     public static func hostingView(model: AppModel, preview: LibraryPreviewModel) -> NSView {
         CountingHostingView(rootView: ProbeRoot(model: model, preview: preview))
+    }
+
+    public static func historyHostingView(model: AppModel, history: HistoryModel, width: CGFloat) -> NSView {
+        NSHostingView(rootView: HistoryStripView(model: model, history: history, windowWidth: width)
+            .environment(model.display))
+    }
+
+    public static func lineageHostingView(model: AppModel) -> NSView {
+        NSHostingView(rootView: LineageView(model: model, onWorkAction: { _, _ in }, onExport: { _ in })
+            .environment(model.display))
     }
 
     private final class CountingHostingView: NSHostingView<ProbeRoot> {

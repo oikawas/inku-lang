@@ -46,6 +46,22 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
         throw CheckFailure.message("The launch pass baked or failed on a fixture whose PNGs are all current: \(pass)")
     }
     let library = app.library
+    _ = NSApplication.shared
+    NSApp.setActivationPolicy(.prohibited)
+    LibraryPerformanceProbe.counting = true
+    let history = HistoryModel()
+    await history.connect(app: app)
+    history.library.pageSize = 12
+    await history.library.setPage(8)
+    let historyWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1108, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+    let historyHost = LibraryPerformanceProbe.historyHostingView(model: app, history: history, width: 1108)
+    historyHost.frame = historyWindow.contentRect(forFrameRect: historyWindow.frame)
+    LibraryPerformanceProbe.reset()
+    historyWindow.contentView = historyHost
+    let historyMeter = PagingMeter(host: historyHost, app: app)
+    _ = try await historyMeter.settle()
+    print("N2 history: works \(history.library.works.count), summary reads \(LibraryPerformanceProbe.actionSummaryReads)")
+    historyWindow.contentView = nil; historyWindow.close()
     // The lineage beneath the library: the root of the fixture's tree, whose members lie on many pages.
     let root = try await app.library.fullWork(id: PagingFixture.id(PagingFixture.lineageRoot))
     await library.loadLineage(work: root)
@@ -53,8 +69,16 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
         throw CheckFailure.message("The fixture lineage did not load beneath the library")
     }
 
-    _ = NSApplication.shared
-    NSApp.setActivationPolicy(.prohibited)
+    let lineageWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1108, height: 800), styleMask: [.titled], backing: .buffered, defer: false)
+    let lineageHost = LibraryPerformanceProbe.lineageHostingView(model: app)
+    lineageHost.frame = lineageWindow.contentRect(forFrameRect: lineageWindow.frame)
+    LibraryPerformanceProbe.reset()
+    lineageWindow.contentView = lineageHost
+    let lineageMeter = PagingMeter(host: lineageHost, app: app)
+    _ = try await lineageMeter.settle()
+    print("N2 lineage: nodes \(graph.nodes.count), summary reads \(LibraryPerformanceProbe.actionSummaryReads)")
+    lineageWindow.contentView = nil; lineageWindow.close()
+
     let preview = LibraryPreviewModel()
     let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .resizable],
                           backing: .buffered, defer: false)
@@ -81,6 +105,34 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
     }
     // SwiftUI builds its accessibility tree only for a connected AX client; in-process reads see none.
     print("AX probe: hosting view children \(host.accessibilityChildren()?.count ?? 0) (no AX client, so the turns below are without AX)")
+
+    let cardsAtOpen = LibraryPerformanceProbe.cardBodies
+    let nodesAtOpen = LibraryPerformanceProbe.lineageNodeBodies
+    app.display.preferences.saveResultLog.toggle()
+    _ = try await meter.settle()
+    print("N3 preferences: works \(library.works.count), open cards \(cardsAtOpen), open nodes \(nodesAtOpen), cards \(LibraryPerformanceProbe.cardBodies - cardsAtOpen), nodes \(LibraryPerformanceProbe.lineageNodeBodies - nodesAtOpen)")
+
+    guard library.works.count >= 2 else { throw CheckFailure.message("N4 requires two works") }
+    let first = try await library.fullWork(id: library.works[0].id)
+    let other = try await library.fullWork(id: library.works[1].id)
+    preview.show(first)
+    _ = try await meter.settle()
+    var reads = LibraryPerformanceProbe.previewReads
+    let lineageBefore = LibraryPerformanceProbe.lineageReads
+    library.query = "paging-no-match"
+    _ = try await meter.settle()
+    print("N4 search: lineage reads \(LibraryPerformanceProbe.lineageReads - lineageBefore), preview reads \(LibraryPerformanceProbe.previewReads - reads)")
+    reads = LibraryPerformanceProbe.previewReads
+    await library.toggleStar(other)
+    _ = try await meter.settle()
+    print("N4 other star: preview reads \(LibraryPerformanceProbe.previewReads - reads)")
+    reads = LibraryPerformanceProbe.previewReads
+    await library.toggleStar(first)
+    _ = try await meter.settle()
+    print("N4 own star: preview reads \(LibraryPerformanceProbe.previewReads - reads)")
+    preview.close()
+    library.query = ""
+    _ = try await meter.settle()
 
     // L7, before any turn: a revision-marked lineage node that the first page does not list.
     let offPage = PagingFixture.revisionMarkedLineageMembers.map(PagingFixture.id)

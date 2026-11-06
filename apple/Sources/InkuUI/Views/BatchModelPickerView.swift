@@ -6,7 +6,6 @@ struct BatchModelPickerView: View {
     @Bindable var model: AppModel
     private let initialReference: String?
     private let singlePurposeSelection: Bool
-    private let allowVisionSelection: Bool
     private let title: String
     private let purpose: String
     private let onSelection: (@MainActor (String) async throws -> Void)?
@@ -19,27 +18,21 @@ struct BatchModelPickerView: View {
     @State private var selectionError: String?
     @State private var committing = false
     @State private var draftThinking = false
-    @State private var selectionTab = "shared"
-    @State private var draftVisionReference = ""
     @FocusState private var focusedReference: String?
 
     private var groups: [ProviderSettings] {
         (settings?.providers ?? []).filter { !SettingsModel.registeredModels(for: $0, purpose: selectedPurpose).isEmpty }
     }
-    private var hasVisionTab: Bool {
-        allowVisionSelection && !singlePurposeSelection && purpose == "llm" && onSelection == nil
-    }
-    private var selectedPurpose: String { hasVisionTab && selectionTab == "vision" ? "vision" : purpose }
-    private var selectedReference: String { selectedPurpose == "vision" && hasVisionTab ? draftVisionReference : draftReference }
+    private var selectedPurpose: String { purpose }
+    private var selectedReference: String { draftReference }
     private var inspectedReference: String? { hoveredReference ?? focusedReference }
     init(model: AppModel, initialReference: String? = nil, immediateSelection: Bool = false,
-         title: String = "モデル選択", purpose: String = "llm", allowVisionSelection: Bool = false,
+         title: String = "モデル選択", purpose: String = "llm",
          onSelection: (@MainActor (String) async throws -> Void)? = nil) {
         self.model = model
         self.initialReference = initialReference
         // Preserve existing caller syntax while every entry now confirms its local draft.
         self.singlePurposeSelection = immediateSelection
-        self.allowVisionSelection = allowVisionSelection
         self.title = title
         self.purpose = purpose
         self.onSelection = onSelection
@@ -48,10 +41,6 @@ struct BatchModelPickerView: View {
     private var cannotSelect: Bool { model.isBusy || !isEnabled || committing }
     private var canConfirm: Bool {
         guard !cannotSelect, let settings else { return false }
-        if hasVisionTab {
-            return SettingsModel.isBatchModelAvailable(draftReference, settings: settings)
-                && (draftVisionReference.isEmpty || SettingsModel.isRegisteredModelAvailable(draftVisionReference, purpose: "vision", settings: settings))
-        }
         return SettingsModel.isRegisteredModelAvailable(draftReference, purpose: selectedPurpose, settings: settings)
     }
 
@@ -71,7 +60,6 @@ struct BatchModelPickerView: View {
             Divider()
             HStack {
                 selectionTabButton("shared", title: singlePurposeSelection ? model.display.localized(title) : model.display.label("描画モデル", "Drawing model"))
-                if hasVisionTab { selectionTabButton("vision", title: "Vision") }
             }.padding(.horizontal, 24).padding(.vertical, 12)
             Divider()
             if let selectionError {
@@ -157,10 +145,8 @@ struct BatchModelPickerView: View {
             if settings == nil {
                 draftReference = initialReference ?? model.nextBatchDrawingModelReference
                 draftThinking = model.display.preferences.includeThinking ?? false
-                draftVisionReference = model.imageVisionModel
             }
             else if !SettingsModel.isRegisteredModelAvailable(draftReference, purpose: purpose, settings: current) { draftReference = "" }
-            if !SettingsModel.isRegisteredModelAvailable(draftVisionReference, purpose: "vision", settings: current) { draftVisionReference = "" }
             settings = current
             hoveredReference = nil
             focusedReference = nil
@@ -170,16 +156,10 @@ struct BatchModelPickerView: View {
     }
 
     private func selectionTabButton(_ tab: String, title: String) -> some View {
-        let selected = selectionTab == tab
-        return Button {
-            selectionTab = tab
-            hoveredReference = nil
-            focusedReference = nil
-        } label: {
-            Text(title).inkuFont(13, weight: .semibold).frame(maxWidth: .infinity).padding(10)
-                .background(selected ? Color.accentColor.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(alignment: .bottom) { Rectangle().fill(selected ? Color.accentColor : Color.clear).frame(height: 2) }
-        }.buttonStyle(.plain).disabled(cannotSelect).accessibilityAddTraits(selected ? .isSelected : [])
+        Text(title).inkuFont(13, weight: .semibold).frame(maxWidth: .infinity).padding(10)
+            .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .bottom) { Rectangle().fill(Color.accentColor).frame(height: 2) }
+            .accessibilityAddTraits(.isSelected)
     }
 
     private var selectionSummary: some View {
@@ -188,11 +168,7 @@ struct BatchModelPickerView: View {
             Text(entry(for: draftReference, purpose: purpose).map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
                  ?? model.display.localized("未設定"))
                 .inkuFont(13).fixedSize(horizontal: false, vertical: true)
-            if hasVisionTab {
-                Text("Vision").inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
-                Text(entry(for: draftVisionReference, purpose: "vision").map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
-                     ?? model.display.localized("未設定")).inkuFont(13)
-            }
+
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(10)
         .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
@@ -217,7 +193,6 @@ struct BatchModelPickerView: View {
                 try await model.selectSharedDrawingModel(draftReference)
                 guard model.nextBatchDrawingModelReference == draftReference else { throw HostError("drawing_model_not_available") }
                 model.display.preferences.includeThinking = draftThinking
-                if hasVisionTab { model.selectImageVisionModel(draftVisionReference) }
                 if model.display.saveError != nil { throw HostError("interface_settings_save_failed") }
             }
             dismiss()
@@ -231,8 +206,7 @@ struct BatchModelPickerView: View {
         return Button {
             guard !cannotSelect, let settings,
                   SettingsModel.isRegisteredModelAvailable(reference, purpose: selectedPurpose, settings: settings) else { return }
-            if hasVisionTab && selectedPurpose == "vision" { draftVisionReference = reference }
-            else { draftReference = reference }
+            draftReference = reference
             selectionError = nil
         } label: {
             VStack(alignment: .leading, spacing: 4) {

@@ -110,8 +110,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			: qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()));
 	}
 	/** The catalog choice of the tab on screen, as a catalog override reads it. */
-	function tabCatalogSelection(): string {
-		const catalog = currentOptions().catalog;
+	function tabCatalogSelection(options: DrawOptions = currentOptions()): string {
+		const catalog = options.catalog;
 		return catalog.mode === 'auto' ? AUTO_CATALOG_ID : catalog.id;
 	}
 	function setDrawDefaults(owner: string, defaults: DrawDefaults): void {
@@ -413,7 +413,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const provenance = imageProvenance;
 		const choices = copyDrawOptions(drawChoices.image);
 		const model = choices.models.vision ?? qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
-		const selectedCatalog = choices.catalog.mode === 'auto' ? AUTO_CATALOG_ID : choices.catalog.id;
+		const selectedCatalog = tabCatalogSelection(choices);
 		const catalog = renderSettingsPayload('paint', colorCatalogOverride(selectedCatalog));
 		const abortController = new AbortController();
 		submitAbortController = abortController;
@@ -517,7 +517,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	async function paintPictureFile(file: File, signal: AbortSignal, choices: DrawOptions, runId?: string, lease?: string): Promise<void> {
 		const imageCanvasAspectId = choices.canvas_aspect;
-		const selectedCatalog = choices.catalog.mode === 'auto' ? AUTO_CATALOG_ID : choices.catalog.id;
+		const selectedCatalog = tabCatalogSelection(choices);
 		const catalog = renderSettingsPayload('paint', colorCatalogOverride(selectedCatalog));
 		const api = new PipelineApi(apiFetch);
 		const provenance = await provenanceOfFile(file);
@@ -1058,7 +1058,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function submitBatch(options: { resumeLines?: NumberedLine[]; retryFailedLines?: NumberedLine[]; }): Promise<void> {
 		let savedWork: Iteration | null = null;
 		const batchCanvasAspectId = drawChoices.batch_text.canvas_aspect;
-		const batchCatalogId = drawChoices.batch_text.catalog.mode === 'auto' ? AUTO_CATALOG_ID : drawChoices.batch_text.catalog.id;
+		const batchCatalogId = tabCatalogSelection(drawChoices.batch_text);
 		const batchStage1Model = drawChoices.batch_text.models.stage1 ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
 		const batchStage2Model = drawChoices.batch_text.models.stage2 ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
 		const batchSketchMode = drawChoices.batch_text.sketch;

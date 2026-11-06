@@ -2423,8 +2423,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const statusStage2ModelOnly = $derived(work.displayedHistoryItem
 		? (work.displayedHistoryItem.stage2_model ? modelShortName(work.displayedHistoryItem.stage2_model) : '-')
 		: (work.result?.stage2_model ? modelShortName(work.result.stage2_model) : '-'));
-	const nextStage1Model = $derived(statusModelName(work.drawOptions.models.stage1 ?? qualifiedModelRef(stage1Provider, stage1Model)));
-	const nextStage2Model = $derived(statusModelName(work.drawOptions.models.stage2 ?? qualifiedModelRef(stage2Provider, stage2Model)));
+	const nextStage1Model = $derived(statusModelName(work.tabModelRef('stage1')));
+	const nextStage2Model = $derived(statusModelName(work.tabModelRef('stage2')));
 	const nextCatalogName = $derived(work.drawOptions.catalog.mode === 'auto' ? (work.inputMode === 'image' ? t().imageCatalogAuto : t().colorCatalogAuto) : (catalogById(colorCatalogs, work.drawOptions.catalog.id)?.name ?? work.drawOptions.catalog.id));
 	// The catalog a work was drawn with, named as it stands today. Two things
 	// the bare name cannot say are said here instead of being papered over: an

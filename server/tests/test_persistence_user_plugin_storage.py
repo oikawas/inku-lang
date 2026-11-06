@@ -104,6 +104,12 @@ class _Session:
         self.events.append(("get", getattr(row_type, "__tablename__", "unknown"), key))
         return self.row
 
+    def connection(self):
+        return self
+
+    def exec_driver_sql(self, sql):
+        self.events.append(sql)
+
     def commit(self) -> None:
         self.events.append("commit")
 
@@ -142,7 +148,7 @@ def test_plugin_storage_preserves_single_value_merge_and_exceptions() -> None:
     assert result == {"old": {"x": 1}, "new": {"y": 2}}
     assert json.loads(row.plugin_storage) == result
     assert session.events == [
-        ("get", "user_accounts", "u"),
+        "BEGIN IMMEDIATE",
         ("get", "user_accounts", "u"),
         "commit",
     ]
@@ -153,3 +159,35 @@ def test_plugin_storage_preserves_single_value_merge_and_exceptions() -> None:
 
     with pytest.raises(RuntimeError, match="get failed"):
         _build(BrokenSession(None)).get("u")
+
+
+def test_concurrent_plugin_value_updates_and_corrupt_storage(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from inku_server.persistence.schema import Base, UserAccountRow
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'plugins.db'}")
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine)
+    with sessions() as session:
+        session.add(UserAccountRow(id="u", username="u", email="u@example.test", password_hash="x", role="user", at=1))
+        session.commit()
+    store = settings.UserPluginStorageStore(sessions)
+    barrier = Barrier(2)
+    def update(name):
+        barrier.wait()
+        return store.update_value("u", name, {"value": name})
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(update, ["first", "second"]))
+    assert store.get("u") == {"first": {"value": "first"}, "second": {"value": "second"}}
+    with sessions() as session:
+        row = session.get(UserAccountRow, "u")
+        row.plugin_storage = "{broken"
+        session.commit()
+    with pytest.raises(ValueError, match="stored plugin storage is invalid"):
+        store.update_value("u", "third", {})
+    with sessions() as session:
+        assert session.get(UserAccountRow, "u").plugin_storage == "{broken"
+    engine.dispose()

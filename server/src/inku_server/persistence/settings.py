@@ -610,9 +610,20 @@ class UserPluginStorageStore:
             return clean
 
     def update_value(self, user_id: str, plugin_id: str, value: dict) -> dict | None:
-        current = self.get(user_id)
-        current[plugin_id] = value
-        return self.update(user_id, current)
+        with self.session_factory() as session:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            try:
+                current = normalize_plugin_storage(json.loads(row.plugin_storage or "{}"))
+            except (ValueError, TypeError) as error:
+                raise ValueError("stored plugin storage is invalid") from error
+            current[plugin_id] = value
+            clean = normalize_plugin_storage(current)
+            row.plugin_storage = json.dumps(clean, ensure_ascii=False)
+            session.commit()
+            return clean
 
 
 @dataclass(frozen=True)

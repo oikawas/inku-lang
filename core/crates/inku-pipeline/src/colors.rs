@@ -4787,18 +4787,29 @@ impl<'a> Painting<'a> {
         } else {
             None
         };
-        let valid = |chosen: &BTreeMap<usize, Color>| {
-            let mut colors = fixed.clone();
+        let mut colors = fixed.clone();
+        let valid = |chosen: &BTreeMap<usize, Color>, colors: &mut BTreeMap<usize, Vec<Color>>| {
+            let mut prior = Vec::with_capacity(chosen.len());
             for (layer, color) in chosen {
-                colors.insert(*layer, vec![*color]);
+                prior.push((*layer, colors.insert(*layer, vec![*color])));
             }
-            self.tool_predicate(&colors)
+            let result = self.tool_predicate(colors)
                 && self
-                    .aerial_broken_with_before(&colors, || before_near)
-                    .is_none()
+                    .aerial_broken_with_before(colors, || before_near)
+                    .is_none();
+            for (layer, old) in prior {
+                if let Some(old) = old {
+                    colors.insert(layer, old);
+                } else {
+                    colors.remove(&layer);
+                }
+            }
+            result
         };
-        let evaluate = |chosen: &BTreeMap<usize, Color>| -> Option<SearchKey> {
-            if !valid(chosen) {
+        let evaluate = |chosen: &BTreeMap<usize, Color>,
+                        colors: &mut BTreeMap<usize, Vec<Color>>|
+         -> Option<SearchKey> {
+            if !valid(chosen, colors) {
                 return None;
             }
             let mut all = before.clone();
@@ -4833,10 +4844,10 @@ impl<'a> Painting<'a> {
                     .map(|(k, (layer, digit))| (*layer, options[k][*digit]))
                     .collect();
                 if self.trial {
-                    if valid(&chosen) {
+                    if valid(&chosen, &mut colors) {
                         return Some(chosen);
                     }
-                } else if let Some(key) = evaluate(&chosen)
+                } else if let Some(key) = evaluate(&chosen, &mut colors)
                     && better(key, best.as_ref().map(|(key, _)| *key))
                 {
                     best = Some((key, chosen));
@@ -4877,14 +4888,14 @@ impl<'a> Painting<'a> {
                         )
                     })
                     .collect();
-                let key = evaluate(&all_free).unwrap_or((f64::MIN, 0));
+                let key = evaluate(&all_free, &mut colors).unwrap_or((f64::MIN, 0));
                 if better(key, best.map(|(key, _)| key)) {
                     best = Some((key, *color));
                 }
             }
             chosen.insert(*layer, best.map_or(options[k][0], |(_, color)| color));
         }
-        evaluate(&chosen).map(|_| chosen)
+        evaluate(&chosen, &mut colors).map(|_| chosen)
     }
 
     fn assign_by_tool(&mut self) -> Result<(), Refusal> {

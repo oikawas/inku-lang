@@ -337,6 +337,11 @@ pub struct Shares {
     discs: BTreeMap<u64, Vec<(f64, f64)>>,
 }
 
+fn shared_shares() -> &'static std::sync::Mutex<Shares> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<Shares>> = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| std::sync::Mutex::new(Shares::default()))
+}
+
 /// Coverage counts by thousandths, as shares of all touched pixels.
 fn shares_of(counts: &BTreeMap<i64, u64>) -> Vec<(f64, f64)> {
     let total: u64 = counts.values().sum();
@@ -354,7 +359,18 @@ impl Shares {
         if width >= WIDE_BAND {
             return vec![(1.0, 1.0)];
         }
-        self.bands
+        let key = width.to_bits();
+        if let Some(value) = shared_shares()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .bands
+            .get(&key)
+            .cloned()
+        {
+            return value;
+        }
+        let value = self
+            .bands
             .entry(width.to_bits())
             .or_insert_with(|| {
                 let steps = 8;
@@ -392,7 +408,12 @@ impl Shares {
                 }
                 shares_of(&counts)
             })
-            .clone()
+            .clone();
+        let mut cache = shared_shares().lock().unwrap_or_else(|e| e.into_inner());
+        if cache.bands.len() < 256 {
+            cache.bands.entry(key).or_insert_with(|| value.clone());
+        }
+        value
     }
 
     /// A stroke thinner than a pixel is drawn as a hairline whose strength its
@@ -415,7 +436,18 @@ impl Shares {
         if diameter >= WIDE_DISC {
             return vec![(1.0, 1.0)];
         }
-        self.discs
+        let key = diameter.to_bits();
+        if let Some(value) = shared_shares()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .discs
+            .get(&key)
+            .cloned()
+        {
+            return value;
+        }
+        let value = self
+            .discs
             .entry(diameter.to_bits())
             .or_insert_with(|| {
                 let steps = 8;
@@ -455,7 +487,12 @@ impl Shares {
                 }
                 shares_of(&counts)
             })
-            .clone()
+            .clone();
+        let mut cache = shared_shares().lock().unwrap_or_else(|e| e.into_inner());
+        if cache.discs.len() < 256 {
+            cache.discs.entry(key).or_insert_with(|| value.clone());
+        }
+        value
     }
 
     fn of(&mut self, cover: Cover, width: f64) -> Vec<(f64, f64)> {

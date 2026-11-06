@@ -173,6 +173,48 @@ def _writer(
     )
 
 
+def test_caller_transaction_survives_idempotency_race(tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from inku_server.persistence.schema import AppSettingRow, Base
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'race.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session, session.begin():
+        session.add(HistoryRow(id="existing", user_id="user-1", at=1, input="", idempotency_key="same"))
+
+    class MissOnceSession(Session):
+        miss = True
+        def query(self, *entities, **kwargs):
+            query = super().query(*entities, **kwargs)
+            if entities == (HistoryRow,) and self.miss:
+                self.miss = False
+                class Miss:
+                    def filter(self, *args):
+                        return self
+                    def first(self):
+                        return None
+                return Miss()
+            return query
+
+    with MissOnceSession(engine) as session, session.begin():
+        session.add(AppSettingRow(key="outer", value="{}", at=1))
+        writer = history.HistoryWriter(
+            session_factory=lambda: session, actor_of_fn=lambda user: {"id": user},
+            owned_by_fn=lambda actor, column: column == actor["id"], readable_node_fn=lambda actor: True,
+            row_to_dict_fn=lambda row: {"id": row.id}, render_hash_for_item_fn=lambda item: "hash",
+            description_hash_fn=lambda text: "description", normalize_canvas_aspect_id_fn=lambda value: value,
+            canvas_aspect_ratio_for_aspect_fn=lambda value: 1, canonical_json_fn=json.dumps,
+        )
+        replay = writer.add_item(_item(id="racing", idempotency_key="same"), session=session,
+                                 actor={"id": "user-1"})
+        assert replay == {"id": "existing", "_idempotent_replay": True}
+    with Session(engine) as session:
+        assert session.get(AppSettingRow, "outer") is not None
+        assert session.query(HistoryRow).count() == 1
+    engine.dispose()
+
+
 def test_history_writer_owns_add_item_and_db_delegates() -> None:
     assert history.HistoryWriter.__dataclass_params__.frozen is True
     assert db.LINEAGE_DERIVATION_KINDS is history.LINEAGE_DERIVATION_KINDS

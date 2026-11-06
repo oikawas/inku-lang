@@ -1202,38 +1202,35 @@ class HistoryWriter:
                         if row.image_ddl is None:
                             row.image_ddl = parent_work.image_ddl
             row.idempotency_key = idempotency_key
-            if item.get("coerce_catalog_digest") and item.get("coerce_catalog_snapshot") is not None:
-                digest = item["coerce_catalog_digest"]
-                trace_version = item.get("coerce_trace_version") or 1
-                snapshot_json = json.dumps(
-                    item["coerce_catalog_snapshot"], ensure_ascii=False, separators=(",", ":")
-                )
-                if sha256(snapshot_json.encode("utf-8")).hexdigest() != digest:
-                    raise ValueError("coerce catalog digest does not match its snapshot bytes")
-                catalog = session.get(CoerceTraceCatalogRow, digest)
-                if catalog is None:
-                    session.add(
-                        CoerceTraceCatalogRow(
-                            digest=digest,
-                            trace_version=trace_version,
-                            snapshot_json=snapshot_json,
-                        )
-                    )
-                elif (
-                    catalog.trace_version != trace_version
-                    or catalog.snapshot_json != snapshot_json
-                ):
-                    raise ValueError("coerce catalog digest does not match its immutable snapshot")
-            session.add(row)
-            session.add(node)
             # SQLite foreign-key enforcement requires the new child node to exist
             # before its edge is inserted. Both writes remain in one transaction.
             try:
-                session.flush()
-            except IntegrityError:
                 if not own_session:
-                    raise
-                session.rollback()
+                    connection = session.connection()
+                    if connection.dialect.name == "sqlite" and not connection.connection.driver_connection.in_transaction:
+                        # A released SQLite savepoint must remain inside the caller's transaction.
+                        connection.exec_driver_sql("BEGIN")
+                with (nullcontext() if own_session else session.begin_nested()):
+                    if item.get("coerce_catalog_digest") and item.get("coerce_catalog_snapshot") is not None:
+                        digest = item["coerce_catalog_digest"]
+                        trace_version = item.get("coerce_trace_version") or 1
+                        snapshot_json = json.dumps(
+                            item["coerce_catalog_snapshot"], ensure_ascii=False, separators=(",", ":")
+                        )
+                        if sha256(snapshot_json.encode("utf-8")).hexdigest() != digest:
+                            raise ValueError("coerce catalog digest does not match its snapshot bytes")
+                        catalog = session.get(CoerceTraceCatalogRow, digest)
+                        if catalog is None:
+                            session.add(CoerceTraceCatalogRow(digest=digest, trace_version=trace_version,
+                                                             snapshot_json=snapshot_json))
+                        elif catalog.trace_version != trace_version or catalog.snapshot_json != snapshot_json:
+                            raise ValueError("coerce catalog digest does not match its immutable snapshot")
+                    session.add(row)
+                    session.add(node)
+                    session.flush()
+            except IntegrityError:
+                if own_session:
+                    session.rollback()
                 if not idempotency_key:
                     raise
                 existing = session.query(HistoryRow).filter(

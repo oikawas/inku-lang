@@ -1211,6 +1211,15 @@ fn candidates_at_uncached(
                 .iter()
                 .map(|literal| (literal.as_str(), CanonicalRelationForm::FullLiteral)),
         ) {
+            let matches = source
+                .get(start_byte..start_byte + surface.len())
+                .is_some_and(|actual| match language {
+                    ResolvedInstructionLanguage::Ja => actual == surface,
+                    ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(surface),
+                });
+            if !matches {
+                continue;
+            }
             let delivery = canonical_relation_identity(&relation.relation_type, form)
                 .map(|mut canonical_identity| {
                     canonical_identity.target = relation.literal_targets.get(surface).copied();
@@ -1237,6 +1246,16 @@ fn candidates_at_uncached(
     }
 
     for definition in grammar_marker_definitions(language) {
+        let surface = definition.id.surface();
+        let matches = source
+            .get(start_byte..start_byte + surface.len())
+            .is_some_and(|actual| match language {
+                ResolvedInstructionLanguage::Ja => actual == surface,
+                ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(surface),
+            });
+        if !matches {
+            continue;
+        }
         let candidate_identity = if definition.id == MarkerId::JaBackground {
             "document:background".to_owned()
         } else {

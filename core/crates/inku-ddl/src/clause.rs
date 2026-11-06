@@ -259,9 +259,11 @@ pub fn parse_clause_stream(
     let mut separators = collect_separators(source)
         .into_iter()
         .filter(|separator| {
+            let index =
+                atoms.partition_point(|atom| atom.span().end_byte <= separator.span.start_byte);
             !atoms
-                .iter()
-                .any(|atom| contains(atom.span(), separator.span))
+                .get(index)
+                .is_some_and(|atom| contains(atom.span(), separator.span))
         })
         .collect::<Vec<_>>();
     let canvas_ratio_declaration =
@@ -273,9 +275,11 @@ pub fn parse_clause_stream(
         );
     for atom in &atoms {
         let atom_span = atom.span();
+        let index =
+            separators.partition_point(|separator| separator.span.end_byte <= atom_span.start_byte);
         if let Some(separator) = separators
-            .iter()
-            .find(|separator| spans_overlap(atom_span, separator.span))
+            .get(index)
+            .filter(|separator| spans_overlap(atom_span, separator.span))
         {
             return Err(ClauseStreamError::AtomCrossesSeparator {
                 atom_span,
@@ -298,10 +302,16 @@ pub fn parse_clause_stream(
     let fragments = clause_fragments(source.len(), &separators);
     for atom in &atoms {
         let atom_span = atom.span();
-        let membership_count = fragments
-            .iter()
-            .filter(|fragment| contains(**fragment, atom_span))
-            .count();
+        let index = fragments.partition_point(|fragment| fragment.end_byte <= atom_span.start_byte);
+        let membership_count = usize::from(
+            fragments
+                .get(index)
+                .is_some_and(|fragment| contains(*fragment, atom_span)),
+        ) + usize::from(
+            fragments
+                .get(index + 1)
+                .is_some_and(|fragment| contains(*fragment, atom_span)),
+        );
         match membership_count {
             0 => return Err(ClauseStreamError::AtomOutsideClause { atom_span }),
             1 => {}
@@ -312,21 +322,23 @@ pub fn parse_clause_stream(
     let mut clauses = fragments
         .iter()
         .copied()
-        .filter(|fragment| atoms.iter().any(|atom| contains(*fragment, atom.span())))
         .map(|span| ClauseSegment {
             span,
             atoms: Vec::new(),
         })
         .collect::<Vec<_>>();
     for atom in atoms {
+        let index =
+            clauses.partition_point(|clause| clause.span.end_byte <= atom.span().start_byte);
         let clause = clauses
-            .iter_mut()
-            .find(|clause| contains(clause.span, atom.span()))
+            .get_mut(index)
+            .filter(|clause| contains(clause.span, atom.span()))
             .ok_or(ClauseStreamError::AtomOutsideClause {
                 atom_span: atom.span(),
             })?;
         clause.atoms.push(atom);
     }
+    clauses.retain(|clause| !clause.atoms.is_empty());
 
     Ok(ClauseStream {
         clauses,

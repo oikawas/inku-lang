@@ -26,8 +26,8 @@ public struct DdlCompletions {
 
     @MainActor public func words(for text: String) -> [String] { language(text) == "ja" ? japanese : english }
 
-    @MainActor func presentation(for completion: String, text: String) -> String {
-        let lang = language(text)
+    @MainActor func presentation(for completion: String, text: String, resolvedLanguage: String? = nil) -> String {
+        let lang = resolvedLanguage ?? language(text)
         guard let word = plugins.first(where: { $0.displayName(language: lang) == completion }) else { return completion }
         let others = Array(word.japanese.dropFirst()) + Array(word.english.dropFirst())
         let kind = uiLanguage != "en" ? (word.kind == "object" ? "物の語" : "情景の語") : (word.kind == "object" ? "object" : "scene")
@@ -42,7 +42,7 @@ public struct DdlCompletions {
         public let items: [String]
     }
 
-    @MainActor public func match(text: String, caret: Int, excluded: NSRange? = nil) -> Match? {
+    @MainActor public func match(text: String, caret: Int, excluded: NSRange? = nil, resolvedLanguage: String? = nil) -> Match? {
         let source = text as NSString
         guard caret > 0, caret <= source.length else { return nil }
         if let excluded, caret >= excluded.location, caret <= NSMaxRange(excluded) { return nil }
@@ -56,7 +56,7 @@ public struct DdlCompletions {
         }
         if opening < caret, [0x7b, 0xff5b].contains(Int(source.character(at: opening))) {
             let prefix = source.substring(with: NSRange(location: opening + 1, length: caret - opening - 1))
-            let lang = language(text)
+            let lang = resolvedLanguage ?? language(text)
             var seen = Set<String>()
             let items = plugins.filter { word in
                 prefix.isEmpty || (word.japanese + word.english).contains { $0.range(of: prefix, options: [.caseInsensitive, .anchored]) != nil }
@@ -65,7 +65,8 @@ public struct DdlCompletions {
             let hasClose = caret < source.length && [0x7d, 0xff5d].contains(Int(source.character(at: caret)))
             return Match(range: NSRange(location: opening, length: caret - opening + (hasClose ? 1 : 0)), items: items)
         }
-        return Self.match(text: text, caret: caret, words: words(for: text), excluded: excluded)
+        let lang = resolvedLanguage ?? language(text)
+        return Self.match(text: text, caret: caret, words: lang == "ja" ? japanese : english, excluded: excluded)
     }
 
     /// The word being typed before the caret: the longest run that ends at the caret, holds no space or

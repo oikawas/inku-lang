@@ -528,12 +528,12 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         }
 
         /// Web `ddlCompletions`: nothing while read-only, composing, or with the caret in an open range's numbers.
-        private func completionMatch() -> DdlCompletions.Match? {
+        private func completionMatch(resolvedLanguage: String? = nil) -> DdlCompletions.Match? {
             guard let editor, let completions = settings?.completions, editor.isEditable, !editor.hasMarkedText() else { return nil }
             let selection = editor.selectedRange()
             guard selection.length == 0 else { return nil }
             let body = rangeState.active.map { NSRange(location: $0.bodyStart, length: $0.bodyEnd - $0.bodyStart) }
-            return completions.match(text: editor.string, caret: selection.location, excluded: body)
+            return completions.match(text: editor.string, caret: selection.location, excluded: body, resolvedLanguage: resolvedLanguage)
         }
 
         /// Web `activateOnTyping`: the list opens as the author types a word some candidate starts with. No item is
@@ -550,13 +550,13 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
         func textView(_ textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
                       indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String] {
-            guard settings?.completions != nil else { return words }
-            guard let match = completionMatch(), match.range == charRange else { return [] }
+            guard let editor, let completions = settings?.completions else { return words }
+            let language = completions.language(editor.string)
+            guard let match = completionMatch(resolvedLanguage: language), match.range == charRange else { return [] }
             index?.pointee = -1
-            guard let editor, let completions = settings?.completions else { return match.items }
             completionValues.removeAll()
             return match.items.map { item in
-                let label = completions.presentation(for: item, text: editor.string)
+                let label = completions.presentation(for: item, text: editor.string, resolvedLanguage: language)
                 completionValues[label] = item
                 return label
             }

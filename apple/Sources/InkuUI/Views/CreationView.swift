@@ -292,8 +292,8 @@ struct CreationView: View {
 
     private var batchProgress: String {
         guard automation.running, automation.mode == "batch", !automation.rows.isEmpty else { return "" }
-        let current = automation.activeRow.flatMap { active in automation.rows.firstIndex { $0.id == active.id } }.map { $0 + 1 }
-            ?? (automation.completedCount + automation.failedCount)
+        let current = DrawPresentation.batchRow(activeID: automation.activeRow?.id, rows: automation.rows,
+                                                completed: automation.completedCount, failed: automation.failedCount)
         guard current > 0 else { return "" }
         let retry = automation.currentRetryRound > 0 ? " ↻\(automation.currentRetryRound)" : ""
         return "(\(current)/\(automation.rows.count)\(retry))"
@@ -546,8 +546,7 @@ struct CreationView: View {
                     .popover(isPresented: $showConditionDetails) { conditionDetails }
             }.padding(.top, 8).padding(.bottom, 2)
             conditionRow(display.webCopy("modelButton", "モデル"),
-                         value: model.nextBatchDrawingModelReference.isEmpty ? display.localized("選択してください")
-                            : model.nextBatchDrawingModelReference.split(separator: ":", maxSplits: 1).joined(separator: " / "),
+                         value: DrawPresentation.modelReference(model.nextBatchDrawingModelReference, empty: display.localized("選択してください")),
                          help: display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
                          showsPlan: model.nextBatchDrawingModelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
                 .disabled(controlsDisabled)
@@ -571,8 +570,9 @@ struct CreationView: View {
     }
 
     private var catalogSummary: String {
-        model.catalogMode == "auto" ? display.webCopy("colorCatalogAuto", "記述から自動選択")
-            : model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
+        DrawPresentation.catalogSummary(mode: model.catalogMode, id: model.catalogID, catalogs: model.catalogs,
+            auto: display.webCopy("colorCatalogAuto", "記述から自動選択"),
+            random: display.localized("ランダム"), missing: display.localized("未記録"))
     }
 
     private func conditionRow(_ label: String, value: String, help: String, showsPlan: Bool = false, action: @escaping () -> Void) -> some View {

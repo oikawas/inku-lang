@@ -329,8 +329,8 @@ struct BatchPanelView: View {
     }
 
     private var currentBatchRow: Int {
-        automation.activeRow.flatMap { active in automation.rows.firstIndex { $0.id == active.id } }.map { $0 + 1 }
-            ?? (automation.completedCount + automation.failedCount)
+        DrawPresentation.batchRow(activeID: automation.activeRow?.id, rows: automation.rows,
+                                  completed: automation.completedCount, failed: automation.failedCount)
     }
 
     private var runningLabel: String {

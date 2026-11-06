@@ -261,7 +261,7 @@ struct ExportView: View {
         var capturedOptions = options
         capturedOptions.pixelHeight = resolution == 0 ? customHeight : resolution
         if capturedOptions.format == .png, capturedWorks.count == 1 {
-            capturedOptions.pngAlphaWhite = !singleWorkPNGTransparent
+            capturedOptions.setSingleWorkPNGTransparent(singleWorkPNGTransparent)
         }
         let capturedDestination = model.display.preferences.exportDefaults
         isBusy = true; error = nil; status = "保存作品の書き出し条件を確認しています…"

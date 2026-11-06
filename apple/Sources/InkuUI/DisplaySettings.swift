@@ -3,6 +3,10 @@ import InkuExport
 import Observation
 import SwiftUI
 
+extension ExportOptions {
+    mutating func setSingleWorkPNGTransparent(_ transparent: Bool) { pngAlphaWhite = !transparent }
+}
+
 public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var language = "ja"
     /// Web `theme` starts dark; a saved choice is kept.
@@ -128,7 +132,7 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
         var options = exportDefaults.options
         options.format = .png
         options.pixelHeight = height
-        options.pngAlphaWhite = !singleWorkPNGTransparent
+        options.setSingleWorkPNGTransparent(singleWorkPNGTransparent)
         return options
     }
 

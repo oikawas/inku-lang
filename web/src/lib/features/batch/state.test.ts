@@ -56,6 +56,18 @@ function makeState(
 	return { state, reports };
 }
 
+test('batch reconciliation asks for the run in one filtered page', async () => {
+	const paths: string[] = [];
+	const { state } = makeState(async (path) => {
+		paths.push(path);
+		return jsonResponse({ items: [{ batch_run_id: 'run id', batch_line_number: 1 }] });
+	});
+	const collect = state as unknown as { collectRunWorks: (run: string, need: number) => Promise<unknown[]> };
+	assert.equal((await collect.collectRunWorks('run id', 2)).length, 1);
+	assert.equal(paths.length, 1);
+	assert.equal(new URL(paths[0], 'http://example.test').searchParams.get('batch_run_id'), 'run id');
+});
+
 test('each batch work starts its own clock and a cut connection keeps that start', async () => {
 	let clock = 100_000, secondSends = 0, probes = 0;
 	const state = new BatchState({

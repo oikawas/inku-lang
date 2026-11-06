@@ -588,7 +588,8 @@ export function createWorkState(deps: WorkStateDeps) {
 				if (saved) drawChoices.batch_image = copyDrawOptions(saved);
 				const lines: number[] = [];
 				for (let offset = 0; ; offset += 100) {
-					const page = await apiFetch(`/api/history?offset=${offset}&limit=100&include_svg=false`, { cache: 'no-store' });
+					const params = new URLSearchParams({ offset: String(offset), limit: '100', include_svg: 'false', batch_run_id: record.batchRunId });
+					const page = await apiFetch(`/api/history?${params}`, { cache: 'no-store' });
 					if (!page.ok) return false;
 					const values = await page.json() as { items?: Array<{ batch_run_id?: string; batch_line_number?: number }> };
 					if (!Array.isArray(values.items)) return false;

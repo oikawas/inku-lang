@@ -10,6 +10,7 @@ from sqlalchemy import LargeBinary, func, or_, text
 from sqlalchemy.orm import defer
 
 from .schema import HistoryRow
+from .access import _owned_by
 
 
 def _fts_match_query(search: str) -> str:
@@ -163,6 +164,7 @@ class HistorySearchService:
         for_revision: bool = False,
         for_share: bool = False,
         include_svg: bool = True,
+        batch_run_id: str | None = None,
     ) -> tuple[list[dict], int]:
         visible, visible_params = self.readable_sql(actor, "h.user_id", "h.id")
         params = {
@@ -179,6 +181,9 @@ class HistorySearchService:
         # The third mark narrows the same way: AND, not OR. Asking for the bundle
         # asks for the works in it, not for the works in it plus one's own.
         for_share_clause = "AND h.for_share = 1" if for_share else ""
+        batch_clause = "AND h.user_id = :batch_owner AND h.batch_run_id = :batch_run_id" if batch_run_id is not None else ""
+        if batch_run_id is not None:
+            params.update(batch_owner=actor["id"], batch_run_id=batch_run_id)
         total = session.execute(
             text(
                 f"""
@@ -190,6 +195,7 @@ class HistorySearchService:
                   {starred_clause}
                   {for_revision_clause}
                   {for_share_clause}
+                  {batch_clause}
                   AND history_fts MATCH :match
                 """
             ),
@@ -208,6 +214,7 @@ class HistorySearchService:
                       {starred_clause}
                       {for_revision_clause}
                       {for_share_clause}
+                      {batch_clause}
                       AND history_fts MATCH :match
                     ORDER BY h.at DESC, h.id ASC
                     LIMIT :limit OFFSET :offset
@@ -236,6 +243,7 @@ class HistorySearchService:
         include_svg: bool = True,
         canvas_search: bool = False,
         actor: dict | None = None,
+        batch_run_id: str | None = None,
     ) -> tuple[list[dict], int]:
         actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of(user_id)
         with self.session_factory() as session:
@@ -249,6 +257,8 @@ class HistorySearchService:
                 query = query.filter(HistoryRow.for_revision == 1)
             if for_share:
                 query = query.filter(HistoryRow.for_share == 1)
+            if batch_run_id is not None:
+                query = query.filter(_owned_by(actor, HistoryRow.user_id), HistoryRow.batch_run_id == batch_run_id)
             search = query_text.strip()
             if search and not canvas_search and self.use_history_fts(search):
                 arguments = (
@@ -262,6 +272,8 @@ class HistorySearchService:
                     for_revision,
                     for_share,
                 )
+                if batch_run_id is not None:
+                    return self.list_items_with_fts(*arguments, include_svg=include_svg, batch_run_id=batch_run_id)
                 if include_svg:
                     return self.list_items_with_fts(*arguments)
                 return self.list_items_with_fts(*arguments, include_svg=False)

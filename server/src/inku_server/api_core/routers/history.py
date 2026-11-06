@@ -194,11 +194,13 @@ def api_history_get(
         default=True,
         description="Send each work's whole SVG. Clients that draw from thumbnails send false.",
     ),
+    batch_run_id: str | None = Query(default=None, max_length=100, description="When set, list only the caller's works from this batch run."),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
     """Return one page of the works the caller may read: their own, those shared with them, and those opened to their user group.
 
-    The filters narrow that set.
+    The filters narrow that set. batch_run_id restricts the result to the
+    caller's own works in that batch, excluding works shared by others.
 
     The works come with their total count, the offset and the limit that were
     used. When anchor_id names a work that is found, the offset is moved to the
@@ -211,6 +213,7 @@ def api_history_get(
             for_revision=for_revision, for_share=for_share,
             actor=actor,
             **({"query_text": q} if q.strip() else {}),
+            **({"batch_run_id": batch_run_id} if batch_run_id is not None else {}),
         )
         if position is not None:
             offset = (position // limit) * limit
@@ -226,6 +229,7 @@ def api_history_get(
         include_svg=include_svg,
         actor=actor,
         **({"canvas_search": True} if canvas_search else {}),
+        **({"batch_run_id": batch_run_id} if batch_run_id is not None else {}),
     )
     # When the picture is present, count it here. When it is withheld,
     # persistence already measured its UTF-8 byte length in SQLite without

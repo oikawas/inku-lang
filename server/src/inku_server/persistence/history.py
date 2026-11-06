@@ -920,6 +920,7 @@ class HistoryItemPositionReader:
         for_share: bool = False,
         query_text: str = "",
         actor: dict | None = None,
+        batch_run_id: str | None = None,
     ) -> int | None:
         actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of_fn(user_id)
         with self.session_factory() as session:
@@ -933,6 +934,8 @@ class HistoryItemPositionReader:
                 visible = visible.filter(HistoryRow.for_revision == 1)
             if for_share:
                 visible = visible.filter(HistoryRow.for_share == 1)
+            if batch_run_id is not None:
+                visible = visible.filter(access._owned_by(actor, HistoryRow.user_id), HistoryRow.batch_run_id == batch_run_id)
             if query_text.strip():
                 visible = visible.filter(self.history_search_clause_fn(query_text.strip()))
             target = visible.filter(HistoryRow.id == item_id).first()

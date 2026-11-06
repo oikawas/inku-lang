@@ -331,6 +331,8 @@ uv run inku-cli replay WORK_ID --save-child
 
     uv run inku-cli api GET /api/color-catalogs
     uv run inku-cli api GET /api/history --query limit=20 --query starred=true
+    # 自分の指定バッチの作品だけを取得する
+    uv run inku-cli api GET /api/history --query batch_run_id=RUN_ID
     uv run inku-cli api PATCH /api/auth/me/settings --data '{"ui_theme":"dark"}'
     uv run inku-cli api POST /api/history/trash --file ids.json
     uv run inku-cli api DELETE /api/history --header X-Inku-Confirm=permanent-delete-trash

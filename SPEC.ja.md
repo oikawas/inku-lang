@@ -1402,6 +1402,8 @@ pipeline の JSON view は同じ内容を `progress` に含める。Web が最�
 
 記述バッチの再開候補は、登録された元の計画・条件と同じ batch ID の保存作品を照合し、保存済みの行を再送しない。描画が続いているか不確定な間は再開を提示しない。画像フォルダは同じフォルダの選び直しを必要とし、ブラウザの localStorage に記録した送信時のファイル順と保存済み作品を照合してから続ける。localStorage を失うとその照合はできない。旧クライアントの未登録バッチには従来の履歴からの推測を用いる。
 
+`GET /api/history` に `batch_run_id` を指定すると、そのバッチに属する呼び手自身の作品だけを返す。指定しない場合の閲覧範囲は変わらない。
+
 ### 12.11 中間フィルタ（旧Stage 1.5）
 
 中間フィルタは LLM を使わない決定的な typed transformation である。入力は lock 検証済みの `CanonicalReady` typed meaning とし、自由 prose は受け取らない。出力は共有lowererが読むeffective DDL / typed meaningである。2026-09-27に`place:center`の焦点への読み替えと変奏の軸を外し、2026-10-04に明示変奏を廃止した。中間フィルタは入力の検証とeffective meaningの同一性だけを担う。

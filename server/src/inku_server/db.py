@@ -1683,6 +1683,7 @@ def list_items(
     include_svg: bool = True,
     canvas_search: bool = False,
     actor: dict | None = None,
+    batch_run_id: str | None = None,
 ) -> tuple[list[dict], int]:
     arguments = (
         user_id,
@@ -1694,6 +1695,9 @@ def list_items(
         for_revision,
         for_share,
     )
+    if batch_run_id is not None:
+        return _history_search_service().list_items(*arguments, include_svg=include_svg,
+                                                   canvas_search=canvas_search, actor=actor, batch_run_id=batch_run_id)
     if actor is not None:
         return _history_search_service().list_items(*arguments, include_svg=include_svg,
                                                    canvas_search=canvas_search, actor=actor)
@@ -1790,10 +1794,12 @@ def item_position(
     for_share: bool = False,
     query_text: str = "",
     actor: dict | None = None,
+    batch_run_id: str | None = None,
 ) -> int | None:
     return _history.HistoryItemPositionReader(SessionLocal, _actor_of, _history_search_service().position_search_clause).item_position(
         user_id, item_id, trashed, starred, for_revision, for_share, query_text,
-        **({"actor": actor} if actor is not None else {})
+        **({"actor": actor} if actor is not None else {}),
+        **({"batch_run_id": batch_run_id} if batch_run_id is not None else {})
     )
 
 

@@ -2301,6 +2301,8 @@ A batch that reaches the end with unsaved lines is `finished_with_failures`. On 
 
 Description-batch resumption checks the registered original plan and settings against saved works with the same batch ID and does not resend saved lines. Resume is not offered while a drawing is active or uncertain. An image folder must be picked again; its submitted order, kept in the browser's localStorage, is reconciled with saved works before resumption. Losing localStorage loses that reconciliation. Older unregistered batches retain the history-based fallback.
 
+With `batch_run_id`, `GET /api/history` returns only the caller's own works from that batch. Without it, the readable scope is unchanged.
+
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
 model-call attempt begins and once the last one has ended; its

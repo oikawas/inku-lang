@@ -11,7 +11,7 @@ import XCTest
         await app.initialize()
         let database = try app.auxiliaryDatabase()
         let work = SavedWork(id: "svg-work", at: 1, input: "test", score: "{}", svg: "<svg>fixture</svg>")
-        try await database.save(work)
+        try await database.save(work, node: LineageNode(id: "svg-node", historyID: work.id, at: work.at))
         let history = HistoryModel()
         await history.connect(app: app)
         XCTAssertEqual(history.library.works.map(\.svg).joined().utf8.count, 0)

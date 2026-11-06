@@ -476,7 +476,6 @@ public struct ContentView: View {
 
     /// Screen choices saved in `interface.json` come back on launch; a choice the screen cannot show is skipped.
     private func restoreScreenChoices() {
-        let saved = model.display.preferences
         if let tab = model.display.workspaceTab, ["artwork", "lineage"].contains(tab) { ui.workspaceTab = tab }
         // Web returns to the description tab when the input switch is hidden.
         if model.display.inputTab == "batch", model.display.visible("input_modes"), !automation.isOccupied {

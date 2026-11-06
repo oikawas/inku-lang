@@ -371,6 +371,8 @@ class AutonomousRunner:
         stop = self._stops.get(run_id)
         if run["state"] == "running" and stop is not None:
             stop.set()
+            from .chatgpt_runtime import cancel_execution
+            cancel_execution(owner, f"autonomous:{run_id}")
         return self.get(owner, run_id)
 
     def stopping(self, run_id: str) -> bool:
@@ -482,6 +484,8 @@ class AutonomousRunner:
             run["error"] = f"{type(error).__name__}: {error}"[:500]
             self._finish(run, "failed", "error")
         finally:
+            from .chatgpt_runtime import retire_execution
+            retire_execution(run["owner_id"], f"autonomous:{run['id']}")
             with self._lock:
                 self._stops.pop(run["id"], None)
 
@@ -711,6 +715,10 @@ class AutonomousRunner:
         # What the pipeline's record of a sent system prompt reads; the provider body leaves them out.
         prompt.update(prompt_id=f"inku.chunk-moves-{request['purpose']}.v1", prompt_digest=f"sha256:{digest}",
                       instruction_language=language)
+        from .chatgpt_runtime import execution_cancel
+        execution_id = f"autonomous:{run['id']}"
+        execution_cancel(run["owner_id"], execution_id)
+        context = {**context, "execution_id": execution_id}
         perform = get_service().provider_with_context(run["owner_id"], context,
                                                       [picture[0]] if picture is not None else None)
         failure = None
@@ -721,6 +729,8 @@ class AutonomousRunner:
                       "identity": {"action_id": f"{run['id']}-t{step['turn']}-{request['purpose']}-{sent}",
                                    "attempt": attempt, "request_digest": digest}}
             result = perform(action)
+            if stop.is_set():
+                raise _Stopped
             if result["tag"] != "provider_failed":
                 return str(result.get("response") or ""), None
             failure = str(result.get("failure") or "provider_failed")

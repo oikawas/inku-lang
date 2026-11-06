@@ -94,6 +94,30 @@ def _chunk_run(owner: str, *, moves: int = 3) -> dict:
 STEP = {"turn": 1, "attempt": 1, "kind": "chunks", "note": DIRECTION}
 
 
+def test_chunk_send_uses_a_run_key_and_owner_logout_does_not_poison_the_next_run(monkeypatch):
+    from types import SimpleNamespace
+    from inku_server import chatgpt_runtime, pipeline_runtime
+
+    seen = []
+    def provider(owner, context, _images):
+        seen.append((owner, context["execution_id"]))
+        event = chatgpt_runtime.execution_cancel(owner, context["execution_id"])
+        return lambda action: {"tag": "normalized_ddl_generated", "response": "ok"} if not event.is_set() else {"tag": "provider_failed", "failure": "chatgpt_cancelled"}
+    monkeypatch.setattr(pipeline_runtime, "get_service", lambda: SimpleNamespace(provider_with_context=provider))
+    request = {"system": "s", "text": "t", "response_schema": {}, "purpose": "choose"}
+    try:
+        first = _chunk_run("owner")
+        assert AutonomousRunner._send_chunk(None, first, STEP, {}, request, None, 1, threading.Event(), "ja") == ("ok", None)
+        chatgpt_runtime.cancel_owner("owner")
+        second = _chunk_run("owner")
+        assert AutonomousRunner._send_chunk(None, second, STEP, {}, request, None, 1, threading.Event(), "ja") == ("ok", None)
+        assert seen == [("owner", f"autonomous:{first['id']}"), ("owner", f"autonomous:{second['id']}")]
+        assert ("owner", "") not in chatgpt_runtime._cancels
+    finally:
+        for owner, key in seen:
+            chatgpt_runtime.retire_execution(owner, key)
+
+
 @pytest.mark.parametrize("wild, expected", [(None, False), (False, False), (True, True)])
 def test_a_run_uses_its_own_stroke_choice_not_its_parent(wild, expected):
     run = {"settings": {"model": MODEL, "language": "ja", "wild": wild}}

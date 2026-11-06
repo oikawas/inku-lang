@@ -1299,7 +1299,17 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert "skipped PNG output" in caplog.text
 
 
-def test_history_output_files_are_rebuildable_from_db(tmp_path):
+def test_history_output_files_are_rebuildable_from_db(tmp_path, monkeypatch):
+    from threading import Event
+
+    finished = Event()
+    original_save = api_rendering._save_history_artifacts
+    def save_and_signal(item):
+        try:
+            original_save(item)
+        finally:
+            finished.set()
+    monkeypatch.setattr(api_rendering, "_save_history_artifacts", save_and_signal)
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"artifact-{suffix}")
     user = db.add_user(
@@ -1327,6 +1337,7 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
     r = client.post("/api/history/rebuild-output-files", json={"ids": [item["id"]]}, headers=headers)
     assert r.status_code == 200
     assert r.json()["count"] == 1
+    assert finished.wait(10), "the queued rebuild did not finish"
     assert (tmp_path / "outputs" / "sample_instruction.txt").read_text(encoding="utf-8") == "artifact source"
     assert (tmp_path / "outputs" / "sample_normalized.ddl").read_text(encoding="utf-8") == "中心に円"
     saved_score = json.loads((tmp_path / "outputs" / "sample_score.json").read_text(encoding="utf-8"))
@@ -1341,8 +1352,7 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
 
 
 def test_rebuilding_output_files_follows_the_save_switch_in_bounded_batches(monkeypatch):
-    """The files are written inside the request, so the batch is small, and
-    the rebuild used to write them with the administrator's switch off."""
+    """The batch stays bounded and respects the administrator's switch."""
     suffix = uuid.uuid4().hex[:8]
     user = db.add_user(f"rebuild-{suffix}", f"rebuild-{suffix}@example.test", "password-123", ["users"], None)
     headers, token = _auth_headers(user)

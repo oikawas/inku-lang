@@ -21,8 +21,10 @@ from ...persistence.description_lock import DESCRIPTION_READING_KINDS
 from ...persistence.schema import LineageNodeRow
 from ...persistence.variation_authority import LAWS_RECORD_KEYS
 from ..deps import _current_user
+from ..state import _render_capacity
+from ..rendering import _submit_history_artifact_rebuild
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
+from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -331,24 +333,25 @@ def api_history_export_animation(
     if any(not svg for svg in svgs):
         raise HTTPException(status_code=409, detail="one or more works have no saved SVG")
     try:
-        if len(ids) == 1:
-            payload, matches, outcome = build_layer_animation(
-                _line_animation_request(actor["id"], items[0], body.show_ddl),
-                output_format=body.format,
-                replay=body.replay,
-                hold_seconds=body.hold_seconds,
-                resolution=body.resolution,
-                height_px=body.height_px,
-            )
-        else:
-            payload = build_animation(
-                svgs,
-                output_format=body.format,
-                pattern=body.pattern,
-                hold_seconds=body.hold_seconds,
-                resolution=body.resolution,
-                height_px=body.height_px,
-            )
+        with _render_capacity(actor["id"]):
+            if len(ids) == 1:
+                payload, matches, outcome = build_layer_animation(
+                    _line_animation_request(actor["id"], items[0], body.show_ddl),
+                    output_format=body.format,
+                    replay=body.replay,
+                    hold_seconds=body.hold_seconds,
+                    resolution=body.resolution,
+                    height_px=body.height_px,
+                )
+            else:
+                payload = build_animation(
+                    svgs,
+                    output_format=body.format,
+                    pattern=body.pattern,
+                    hold_seconds=body.hold_seconds,
+                    resolution=body.resolution,
+                    height_px=body.height_px,
+                )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -386,18 +389,19 @@ def api_history_export_card(
     if not svg:
         raise HTTPException(status_code=409, detail="this work has no saved SVG")
     try:
-        payload = build_card(
-            svg,
-            # The headnote is the description the author typed; ja.ts calls the
-            # canvas overlay of this same text 詞書.
-            headnote=str(item.get("input") or ""),
-            # The seed that fixes the performance, so the tail identifies this
-            # picture rather than the variation it was drawn under.
-            seed=item.get("render_seed"),
-            layout=body.layout,
-            seal=body.seal,
-            pixel_height=body.height,
-        )
+        with _render_capacity(actor["id"]):
+            payload = build_card(
+                svg,
+                # The headnote is the description the author typed; ja.ts calls the
+                # canvas overlay of this same text 詞書.
+                headnote=str(item.get("input") or ""),
+                # The seed that fixes the performance, so the tail identifies this
+                # picture rather than the variation it was drawn under.
+                seed=item.get("render_seed"),
+                layout=body.layout,
+                seal=body.seal,
+                pixel_height=body.height,
+            )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -471,6 +475,7 @@ def api_history_svg(
     item_id: Annotated[str, Path(description="Id of the work.")],
     profile: str = Query(default="display", description="SVG output profile: display / editable / compat / live"),
     actor: dict = Depends(_current_user),
+    request: Request = None,
 ) -> Response:
     """Return the SVG of one work in the requested profile.
 
@@ -479,6 +484,12 @@ def api_history_svg(
     found for the caller and 422 when the redraw fails.
     """
     svg_profile = _validated_svg_profile(profile)
+    if svg_profile == "display" and request is not None and request.headers.get("if-none-match"):
+        render_hash = _db.readable_history_render_hash(actor["id"], item_id)
+        if render_hash:
+            etag = f'"{render_hash}-display"'
+            if request.headers["if-none-match"] == etag:
+                return Response(status_code=304, headers={"ETag": etag, "Cache-Control": _THUMB_CACHE_CONTROL})
     items = _db.get_items(actor["id"], [item_id])
     if not items:
         raise HTTPException(status_code=404, detail="history item not found")
@@ -531,7 +542,10 @@ def api_history_svg(
             raise
         except Exception as e:  # noqa: BLE001
             raise _unexpected_http_error("history svg render", 422) from e
-    return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
+    headers = {}
+    if svg_profile == "display" and item.get("render_hash"):
+        headers = {"ETag": f'"{item["render_hash"]}-display"', "Cache-Control": _THUMB_CACHE_CONTROL}
+    return Response(content=svg, media_type="image/svg+xml; charset=utf-8", headers=headers)
 
 
 def _derived_sketch_state(body: HistoryPostBody) -> str:
@@ -1050,20 +1064,18 @@ def api_history_acl_put(
     return [HistoryAclEntryOut(**entry) for entry in entries]
 
 
-# The files are written inside the request, each work's PNG rasterized there
-# too, so a request holds a worker for as long as its works take. The 1,000 the
-# other bulk actions share made that minutes for anyone who asked; a client
-# with more works asks again.
+# Bound each background job; a client with more works asks again.
 _REBUILD_OUTPUT_FILES_MAX = 50
 
 
 @router.post("/api/history/rebuild-output-files", summary="Rebuild output files for works")
 def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
-    """Write the output files again for the works named in the body.
+    """Queue writing the output files again for the works named in the body.
 
     Accepts at most 50 ids per request. Returns {"ok": true, "count": n}, where n
-    is the number of works found. Returns 409 when output file saving is switched
-    off and 422 when more than 50 ids are sent.
+    is the number of works queued, not a completion count. Returns 409 when output
+    file saving is switched off, 422 for more than 50 ids, and 503 when the
+    output save queue cannot accept the request.
     """
     # Saving files is the administrator's switch; this route used to write them
     # with the switch off.
@@ -1072,8 +1084,8 @@ def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends
     if len(body.ids) > _REBUILD_OUTPUT_FILES_MAX:
         raise HTTPException(status_code=422, detail=f"at most {_REBUILD_OUTPUT_FILES_MAX} works per request")
     items = _db.get_items(actor["id"], body.ids)
-    for item in items:
-        _save_history_artifacts(item)
+    if items and not _submit_history_artifact_rebuild(items):
+        raise HTTPException(status_code=503, detail="output save queue is full", headers={"Retry-After": "1"})
     return {"ok": True, "count": len(items)}
 
 

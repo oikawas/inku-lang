@@ -555,6 +555,17 @@ class HistoryItemReader:
                 is not None
             )
 
+    def readable_render_hash(self, user_id: str, item_id: str) -> str | None:
+        """Read only the validator, using the same access rule as get_items."""
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            row = session.query(HistoryRow.render_hash).filter(
+                access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                HistoryRow.id == item_id,
+                HistoryRow.trashed == 0,
+            ).first()
+            return row[0] if row else None
+
 
 @dataclass(frozen=True)
 class HistoryMarkWriter:

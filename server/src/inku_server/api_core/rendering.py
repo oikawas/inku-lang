@@ -395,6 +395,34 @@ def _submit_history_artifact_save(item: dict) -> bool:
     return True
 
 
+def _run_history_artifact_rebuild(items: list[dict]) -> None:
+    try:
+        for item in items:
+            try:
+                _save_history_artifacts(item)
+            except Exception:
+                _logger.exception("unexpected artifact rebuild failure: history_id=%s", item.get("id"))
+                _increment_save_stat("failed")
+        _increment_save_stat("completed")
+    finally:
+        _save_slots.release()
+
+
+def _submit_history_artifact_rebuild(items: list[dict]) -> bool:
+    if not _save_slots.acquire(blocking=False):
+        _increment_save_stat("skipped")
+        return False
+    _increment_save_stat("submitted")
+    try:
+        _save_executor.submit(_run_history_artifact_rebuild, items)
+    except Exception:
+        _increment_save_stat("failed")
+        _save_slots.release()
+        _logger.exception("failed to submit artifact rebuild job")
+        return False
+    return True
+
+
 def _score_canvas_aspect_value(score: Score) -> str:
     if isinstance(score.canvas, CanvasSpec):
         return score.canvas.aspect

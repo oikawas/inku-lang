@@ -139,10 +139,11 @@ def build_animation(
     hold_ms = max(100, round(hold_seconds * 1000))
     transition_ms = max(40, min(120, hold_ms // 4))
     encoded_frames: list[Image.Image] = []
+    transition_frames: list[Image.Image] = []
     durations: list[int] = []
     try:
         for index, frame in enumerate(frames):
-            encoded_frames.append(frame.copy())
+            encoded_frames.append(frame)
             durations.append(hold_ms)
             if index >= len(frames) - 1:
                 continue
@@ -153,11 +154,12 @@ def build_animation(
                 transition_steps,
             )
             encoded_frames.extend(transitions)
+            transition_frames.extend(transitions)
             durations.extend([transition_ms] * len(transitions))
 
         return _encode_frames(encoded_frames, durations, output_format)
     finally:
-        for frame in encoded_frames:
+        for frame in transition_frames:
             frame.close()
         for frame in frames:
             frame.close()

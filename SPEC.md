@@ -4507,8 +4507,9 @@ The server stores these values in `app_settings.output_save_settings` as
 paths, and restricts PNG size to 1080 or 2160.  `POST
 /api/history/rebuild-output-files`, which writes a work's files again from the
 DB, is refused with 409 while automatic saving is off and takes at most 50 works
-per request (2026-09-26) — the files, PNG included, are made inside the request,
-and the 1,000 it used to allow held a worker for minutes.
+per request. File writing and PNG rasterization are queued on the save executor,
+and the request returns upon acceptance. `count` is the number of works accepted,
+not the number completed. A full queue returns 503 with a `Retry-After` header.
 
 Disabling automatic artifact saving does not disable DB history saving.  The
 history DB remains the source of truth, and only derived files such as SVG,

@@ -6,6 +6,7 @@
 		loginPassword: string;
 		loginPasswordVisible: boolean;
 		loginStatus: string | null;
+		loggingIn: boolean;
 		onLogin: () => void | Promise<void>;
 		appVersion: string;
 		buildNumber: string;
@@ -19,6 +20,7 @@
 		loginPassword = $bindable(''),
 		loginPasswordVisible = $bindable(false),
 		loginStatus,
+		loggingIn,
 		onLogin,
 		appVersion,
 		buildNumber,
@@ -67,7 +69,7 @@
 						type={loginPasswordVisible ? 'text' : 'password'}
 						placeholder={t().loginPasswordPlaceholder}
 						autocomplete="current-password"
-						onkeydown={(e) => { if (e.key === 'Enter') void onLogin(); }}
+						onkeydown={(e) => { if (e.key === 'Enter' && !loggingIn) void onLogin(); }}
 					/>
 					<button
 						class="password-toggle"
@@ -92,7 +94,7 @@
 						{/if}
 					</button>
 				</div>
-				<button class="ghost-btn login-submit" onclick={onLogin}>{t().loginSubmit}</button>
+				<button class="ghost-btn login-submit" onclick={onLogin} disabled={loggingIn}>{t().loginSubmit}</button>
 			</div>
 		</div>
 		{/if}

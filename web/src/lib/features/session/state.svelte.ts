@@ -91,6 +91,7 @@ export class SessionState {
 	loginPassword = $state('');
 	loginPasswordVisible = $state(false);
 	loginStatus = $state<string | null>(null);
+	loggingIn = $state(false);
 	/** Start-up could not reach the server; the page waits for it instead of asking to sign in. */
 	connectionLost = $state(false);
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -233,6 +234,8 @@ export class SessionState {
 	}
 
 	async login(): Promise<void> {
+		if (this.loggingIn) return;
+		this.loggingIn = true;
 		this.loginStatus = null;
 		try {
 			const response = await fetch('/api/auth/login', {
@@ -253,6 +256,8 @@ export class SessionState {
 			await this.deps.afterAuthenticated('login');
 		} catch (cause) {
 			this.loginStatus = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			this.loggingIn = false;
 		}
 	}
 

@@ -2776,6 +2776,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:loginPassword={session.loginPassword}
 		bind:loginPasswordVisible={session.loginPasswordVisible}
 		loginStatus={session.loginStatus}
+		loggingIn={session.loggingIn}
 		connectionLost={session.connectionLost}
 		onLogin={() => session.login()}
 		appVersion={APP_VERSION}

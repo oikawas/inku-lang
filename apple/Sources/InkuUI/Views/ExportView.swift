@@ -29,13 +29,13 @@ struct ExportView: View {
     private let lineAnimation: Bool
     @State private var restorationRevision: UInt64
 
-    init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false, directCard: Bool = false, initialFormat: SavedExportFormat? = nil,
+    init(model: AppModel, works: [SavedWork], preserveOrder: Bool = false, directCard: Bool = false, initialFormat: SavedExportFormat? = nil,
          initialSVGProfile: String? = nil, initialPixelHeight: Int? = nil, lineAnimation: Bool = false) {
         self.model = model
         _restorationRevision = State(initialValue: model.restorationRevision)
-        let candidates = works ?? model.works.filter { !$0.trashed }
+        let candidates = works
         _candidates = State(initialValue: candidates)
-        _selectedIDs = State(initialValue: works == nil ? Set(model.selectedWorkID.map { [$0] } ?? []) : Set(candidates.map(\.id)))
+        _selectedIDs = State(initialValue: Set(candidates.map(\.id)))
         let requestedFormat = lineAnimation ? model.display.preferences.animationDefaults.options.format : directCard ? SavedExportFormat.shareCard : initialFormat ?? model.display.preferences.exportDefaults.options.format
         let defaults = requestedFormat == .apng || requestedFormat == .gif
             ? model.display.preferences.animationDefaults : model.display.preferences.exportDefaults
@@ -51,7 +51,7 @@ struct ExportView: View {
         self.preserveOrder = preserveOrder
         self.directCard = directCard
         self.lineAnimation = lineAnimation
-        self.directFormat = !directCard && initialFormat != nil && works != nil
+        self.directFormat = !directCard && initialFormat != nil
     }
 
     private var selection: [SavedWork] {
@@ -116,12 +116,9 @@ struct ExportView: View {
                     }
                     if !animation && (options.format == .png || options.format == .shareCard) {
                         Picker(model.display.localized("Y軸"), selection: $resolution) {
-                            if animation {
-                                Text("150px").tag(150); Text("300px").tag(300); Text("500px").tag(500)
-                            }
-                            Text(animation ? "1K（1080px）" : "1080px").tag(1080)
-                            Text(animation ? "4K（2160px）" : "2160px").tag(2160)
-                            Text(animation ? "8K（4320px）" : "4320px").tag(4320)
+                            Text("1080px").tag(1080)
+                            Text("2160px").tag(2160)
+                            Text("4320px").tag(4320)
                             Text(model.display.localized("カスタム")).tag(0)
                             if resolution != 0, ![150, 300, 500, 1080, 2160, 4320].contains(resolution) { Text("\(resolution)px").tag(resolution) }
                         }

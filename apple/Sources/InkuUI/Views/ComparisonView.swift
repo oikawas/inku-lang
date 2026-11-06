@@ -30,8 +30,6 @@ public struct ComparisonView: View {
                             Button(model.display.webCopy("colorCatalogChangeDraw", "ほかの色カタログで描く"), systemImage: "play.fill") {
                                 Task { await comparison.generate(app: model) }
                             }.buttonStyle(.borderedProminent).disabled(!comparison.canGenerate || model.isBusy)
-                                .inkuTooltip(comparison.kind == .model
-                                    ? model.display.tooltip("選んだモデルで記述から描き直し、候補を並べます。記述、色カタログ、キャンバスは保ちます。", serverKey: "tooltipModelCompare") : "", placement: .bottom)
                         }
                         Label(model.display.localized(comparison.kind == .catalog ? "超高速（LLM不要）" : "低速（LLM・API使用）"), systemImage: "clock")
                             .inkuFont(11).foregroundStyle(.secondary)

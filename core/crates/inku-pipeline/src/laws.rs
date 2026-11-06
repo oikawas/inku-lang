@@ -3603,6 +3603,7 @@ enum Arranged {
 struct Compiler<'a> {
     context: &'a LawsContext,
     score: Score,
+    positions: BTreeMap<usize, Vec<usize>>,
     laws: &'a BTreeMap<&'static str, Value>,
     notes: Vec<Note>,
     /// The layers a law arranged, in the order the laws arranged them.
@@ -3637,7 +3638,7 @@ impl Compiler<'_> {
     }
 
     fn instructions_of(&self, layer: usize) -> Vec<usize> {
-        layers(&self.score).remove(&layer).unwrap_or_default()
+        self.positions.get(&layer).cloned().unwrap_or_default()
     }
 
     fn only(&self, layer: usize, law: &str) -> Result<usize, Refusal> {
@@ -3856,6 +3857,7 @@ impl Compiler<'_> {
                     marks[1].rotation = Some(-turn);
                 }
                 self.score.instructions.splice(position..=position, marks);
+                self.positions = layers(&self.score);
                 self.paired.insert(layer);
                 continue;
             }
@@ -4118,6 +4120,7 @@ impl Compiler<'_> {
             .map(|(point, scale)| single(&template, *point, *scale))
             .collect();
         self.score.instructions.splice(position..=position, marks);
+        self.positions = layers(&self.score);
         self.opened.insert(layer);
     }
 
@@ -4607,6 +4610,7 @@ impl Compiler<'_> {
             .rev()
             .map(|position| self.score.instructions.remove(*position))
             .collect();
+        self.positions = layers(&self.score);
         taken.reverse();
         Ok((first, taken))
     }
@@ -4692,6 +4696,7 @@ impl Compiler<'_> {
                 }
             }
             self.score.instructions.insert(position, mark);
+            self.positions = layers(&self.score);
         }
         Ok(())
     }
@@ -4877,6 +4882,7 @@ impl Compiler<'_> {
             }
         }
         self.score.instructions.splice(position..position, built);
+        self.positions = layers(&self.score);
         Ok(())
     }
 
@@ -4965,6 +4971,7 @@ impl Compiler<'_> {
             let position = self.only(*voice, "C3")?;
             let marks = built.remove(voice).unwrap_or_default();
             self.score.instructions.splice(position..=position, marks);
+            self.positions = layers(&self.score);
         }
         Ok(())
     }
@@ -5072,6 +5079,7 @@ impl Compiler<'_> {
             }
         }
         self.score.instructions.splice(position..position, built);
+        self.positions = layers(&self.score);
         Ok(())
     }
 
@@ -5215,6 +5223,7 @@ impl Compiler<'_> {
             built.push(mark);
         }
         self.score.instructions.splice(position..position, built);
+        self.positions = layers(&self.score);
         Ok(())
     }
 
@@ -5293,6 +5302,7 @@ impl Compiler<'_> {
             built.push(mark);
         }
         self.score.instructions.splice(position..position, built);
+        self.positions = layers(&self.score);
         Ok(())
     }
 
@@ -6188,6 +6198,7 @@ fn apply(
     let compiler = Compiler {
         context,
         score: context.score.clone(),
+        positions: layers(&context.score),
         laws: &answer.laws,
         notes: Vec::new(),
         arranged: Vec::new(),

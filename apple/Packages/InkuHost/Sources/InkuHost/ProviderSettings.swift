@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Security
 
@@ -180,7 +181,24 @@ public struct HostSettings: Codable, Sendable, Equatable {
 
 public actor ProviderSettingsStore {
     public nonisolated let url: URL
+    private struct FileIdentity: Equatable {
+        let device: dev_t
+        let inode: ino_t
+        let size: off_t
+        let seconds: time_t
+        let nanoseconds: Int
+    }
     private var cachedSVGLimitBytes: UInt64?
+    private var cachedFileIdentity: FileIdentity?
+    private func fileIdentity() -> FileIdentity? {
+        let descriptor = Darwin.open(url.path, O_RDONLY)
+        guard descriptor >= 0 else { return nil }
+        defer { Darwin.close(descriptor) }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0 else { return nil }
+        return FileIdentity(device: info.st_dev, inode: info.st_ino, size: info.st_size,
+                            seconds: info.st_mtimespec.tv_sec, nanoseconds: info.st_mtimespec.tv_nsec)
+    }
     public init(url: URL) { self.url = url }
     private func readRaw() throws -> HostSettings {
         guard FileManager.default.fileExists(atPath: url.path) else { return .init() }
@@ -193,6 +211,7 @@ public actor ProviderSettingsStore {
         let settings = try ProviderCoreSettings.normalize(before)
         if settings != before { try write(settings) }
         cachedSVGLimitBytes = try SVGGenerationLimit.bytes(settings.svgLimitMiB)
+        cachedFileIdentity = fileIdentity()
         return settings
     }
     public func loadNormalized() throws -> HostSettings { try load() }
@@ -204,6 +223,7 @@ public actor ProviderSettingsStore {
         let normalized = try ProviderCoreSettings.update(before, to: settings)
         try write(normalized)
         cachedSVGLimitBytes = try SVGGenerationLimit.bytes(normalized.svgLimitMiB)
+        cachedFileIdentity = fileIdentity()
         return normalized
     }
     private func write(_ settings: HostSettings) throws {
@@ -212,7 +232,7 @@ public actor ProviderSettingsStore {
     }
 
     public func svgLimitBytes() throws -> UInt64 {
-        if let cachedSVGLimitBytes { return cachedSVGLimitBytes }
+        if let cachedSVGLimitBytes, cachedFileIdentity == fileIdentity() { return cachedSVGLimitBytes }
         return try SVGGenerationLimit.bytes(load().svgLimitMiB)
     }
 }

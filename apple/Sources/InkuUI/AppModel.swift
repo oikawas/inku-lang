@@ -2603,8 +2603,7 @@ public final class AppModel {
             let presentation = try await host.savedWorkPresentation(workID: work.id)
             let prompt = try presentation.promptJSON.map(Self.pretty) ?? ""
             let events = try presentation.eventsJSON.map(Self.pretty) ?? ""
-            let availability: PromptAvailability = presentation.renderedJSON == nil ? .unavailable : (presentation.promptJSON == nil ? .notRecorded : .recorded)
-            return OutputSnapshot(prompt: prompt, promptAvailability: availability,
+            return OutputSnapshot(prompt: prompt, promptAvailability: presentation.promptJSON == nil ? .notRecorded : .recorded,
                                   events: events, score: score)
         } catch {
             return OutputSnapshot(prompt: "", promptAvailability: .unavailable, events: "", score: score)

@@ -55,11 +55,21 @@ func runSavedOutputAvailabilityChecks() async throws {
                                       "performance": legacyContext]).data
     _ = try await database.commitEffect(id: executionID, expectedRevision: originalExecution.revision, effectID: "save-render:999999",
         snapshot: originalExecution.snapshot, acknowledgement: legacyAck, work: legacy, node: node, edge: edge)
+    guard let afterLegacy = try await database.loadExecution(id: executionID) else { throw CheckFailure.message("Legacy execution missing") }
+    var unavailable = legacy
+    unavailable.id = executionID + "_999998"; unavailable.lineageNodeID = UUID().uuidString; unavailable.at -= 1
+    let unavailableNode = LineageNode(id: unavailable.lineageNodeID!, historyID: unavailable.id, at: unavailable.at,
+        descriptionHash: unavailable.descriptionHash, renderHash: unavailable.renderHash, rootNodeID: root)
+    let unavailableEdge = LineageEdge(id: UUID().uuidString, parentNodeID: root, childNodeID: unavailableNode.id,
+        derivationKind: "saved-output-unavailable-fixture", at: unavailable.at)
+    let unavailableAck = ExactJSON.object(["tag": .string("saved_work_committed"), "work_id": .string(unavailable.id)]).data
+    _ = try await database.commitEffect(id: executionID, expectedRevision: afterLegacy.revision, effectID: "save-render:999998",
+        snapshot: afterLegacy.snapshot, acknowledgement: unavailableAck, work: unavailable, node: unavailableNode, edge: unavailableEdge)
     let reopened = AppModel(databaseURL: databaseURL, transport: provider)
     await reopened.initialize()
     guard reopened.errorText == nil else { throw CheckFailure.message("Saved-output reopen failed: \(reopened.errorText ?? reopened.status)") }
     let rows = try await database.list()
-    guard rows.count == 3, let execution = try await database.loadExecution(id: executionID) else {
+    guard rows.count == 4, let execution = try await database.loadExecution(id: executionID) else {
         throw CheckFailure.message("Saved-output fixture is missing its two saved revisions or durable execution")
     }
     let calls = await provider.calls
@@ -70,12 +80,19 @@ func runSavedOutputAvailabilityChecks() async throws {
     guard reopened.errorText == nil, reopened.selectedWork == legacy,
           reopened.visibleDDL == legacy.ddl, reopenedOutput.score == legacy.score, reopened.currentSVG == legacy.svg,
           reopened.authoringAuthority == parentContext.authority, reopened.authoringRevision == parentContext.revision,
-          !reopened.sourceLocked, reopenedOutput.promptAvailability == .unavailable, reopenedOutput.prompt.isEmpty,
+          !reopened.sourceLocked, reopenedOutput.promptAvailability == .notRecorded, reopenedOutput.prompt.isEmpty,
           reopened.diagnosticsJSON.isEmpty, reopenedOutput.events.isEmpty,
           await provider.calls == calls, try await database.list() == rows,
           try await database.loadExecution(id: executionID) == execution,
           try await database.work(id: legacy.id) == legacy, try await database.work(id: child.id) == child else {
         throw CheckFailure.message("Saved parent adopted a later output, misreported prompt availability, changed authority/history or called a provider")
+    }
+    await reopened.selectWork(unavailable)
+    let missingOutput = await reopened.outputSnapshot()
+    guard missingOutput.promptAvailability == .unavailable, missingOutput.prompt.isEmpty, missingOutput.events.isEmpty,
+          await provider.calls == calls, try await database.list() == rows,
+          try await database.loadExecution(id: executionID) == execution else {
+        throw CheckFailure.message("A missing saved performance was not reported as unavailable")
     }
     print("Saved output availability passed: real core parent -> same-execution DDL child -> old parent selection; missing prompt is unavailable, saved DDL/Score/SVG/authority retained, no provider call or history/execution write. Isolated mock only.")
 }

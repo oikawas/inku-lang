@@ -13,6 +13,7 @@
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
 	import { stableCompletionWork } from '$lib/features/ddl-editor/completion-range-states';
+	import { ddlWorkKey } from '$lib/features/ddl-editor/work-key';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -3031,7 +3032,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								ranges={compositionRanges}
 								completionWork={currentCompletionWork}
 								{apiFetch}
-								workKey={work.result}
+								workKey={ddlWorkKey(work.displayedHistoryItem?.id, work.result)}
 								onDdlChange={(ddl) => { if (canEditCurrentDdl && !rangeEditingLocked) work.ddl = ddl; }}
 								onRangePreview={(preview) => { ddlRangePreview = preview; }}
 								{pluginEntries}

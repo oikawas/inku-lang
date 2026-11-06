@@ -45,9 +45,6 @@ public enum DescriptionLabels {
     /// Server `_rewords` (pipeline_api.py:59-64): whether the words read differ, labels and spacing aside.
     /// A held work refuses a description that rewords it; its own description may still start a new work.
     public static func rewords(_ text: String, _ description: String) throws -> Bool {
-        func read(_ value: String) throws -> String {
-            try pipelineDescription(value).split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
-        }
-        return try read(text) != read(description)
+        try InkuCore.descriptionRewords(text, description)
     }
 }

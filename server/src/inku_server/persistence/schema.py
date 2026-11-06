@@ -8,6 +8,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     LargeBinary,
     String,
     Text,
@@ -22,7 +23,14 @@ class Base(DeclarativeBase):
 
 class HistoryRow(Base):
     __tablename__ = "history"
-    __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_history_user_idempotency"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_history_user_idempotency"),
+        Index("ix_history_user_trashed_at", "user_id", "trashed", "at"),
+        Index("ix_history_user_starred_trashed_at", "user_id", "starred", "trashed", "at"),
+        Index("ix_history_user_for_revision_trashed_at", "user_id", "for_revision", "trashed", "at"),
+        Index("ix_history_for_share_group", "for_share", "share_group_id", "trashed", "at"),
+        Index("ix_history_user_description_hash", "user_id", "description_hash"),
+    )
 
     id           = Column(String,     primary_key=True)
     user_id      = Column(String,     ForeignKey("user_accounts.id"), nullable=True, index=True)

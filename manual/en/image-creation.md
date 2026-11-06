@@ -507,7 +507,7 @@ In the Web `Timeline`, use the arrow keys to move between works and change the p
 
 Combine `Thumbnails` with `By lineage` to show lineages with at least two works matching the current search and filters, arranged horizontally from the origin in generation order. A lineage with only one matching work is omitted, except for the work selected when opening the Library if it matches the conditions. The lineage `List` view has no such two-work minimum. Scroll vertically between lineage groups and horizontally through a long row of related works. The thumbnail of the work shown on the canvas carries the same `Current` badge as the history strip (at the picture's lower right in `Timeline`, and in place of the generation number at the upper right in `By lineage`).
 
-Each lineage initially shows 200 works. `Show more` adds 200 at a time; moving past the displayed end with an arrow key also reveals the next 200 and previews the next work.
+Each lineage initially shows 200 works. `Show more` adds 200 at a time.
 
 **What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to three** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A fourth choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 

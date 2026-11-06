@@ -40,6 +40,10 @@ export type SvgWeight = {
  * different quantity: it excludes nothing, it descends into `<defs>`, and the
  * page can be showing several copies of the same drawing side by side.
  */
+export function svgByteLength(svg: string): number {
+	return new TextEncoder().encode(svg).length;
+}
+
 export function measureSvgWeight(svg: string): SvgWeight {
 	let objects = 0;
 	for (const match of svg.matchAll(ELEMENT_RE)) {
@@ -59,5 +63,5 @@ export function measureSvgWeight(svg: string): SvgWeight {
 		points += Math.floor((match[1].match(NUMBER_RE)?.length ?? 0) / 2);
 	}
 
-	return { bytes: new TextEncoder().encode(svg).length, objects, points };
+	return { bytes: svgByteLength(svg), objects, points };
 }

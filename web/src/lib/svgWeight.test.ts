@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { measureSvgWeight } from './svgWeight.ts';
+import { measureSvgWeight, svgByteLength } from './svgWeight.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const PANEL = read('./components/CanvasPanel.svelte');
@@ -186,6 +186,8 @@ test('T-71  one known drawing, and all three numbers agree with svg_weight.py', 
 
 test('T-71  and the drawer shows that measurement, not a second one of its own', () => {
 	// The point of the pair is defeated the moment the screen counts by itself.
-	assert.match(PANEL, /import \{ measureSvgWeight \} from '\$lib\/svgWeight'/);
-	assert.match(PANEL, /const detailSvgBytes = \$derived\(result\?\.svg \? new TextEncoder\(\)\.encode\(result\.svg\)\.length : null\)/);
+	assert.match(PANEL, /import \{ measureSvgWeight, svgByteLength \} from '\$lib\/svgWeight'/);
+	assert.match(PANEL, /const detailSvgBytes = \$derived\(result\?\.svg \? svgByteLength\(result\.svg\) : null\)/);
+	assert.doesNotMatch(PANEL, /new TextEncoder\(/);
+	assert.equal(svgByteLength('<svg>絵</svg>'), measureSvgWeight('<svg>絵</svg>').bytes);
 });

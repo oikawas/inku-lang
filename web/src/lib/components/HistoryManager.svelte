@@ -18,7 +18,7 @@
 	import { getCanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
 	import { libraryArrowDestination, libraryPageTargetIndex } from '$lib/features/library/arrow-navigation';
-	import { LINEAGE_CHUNK_SIZE, lineageArrowTarget, visibleLineageCount } from '$lib/features/library/lineage-pagination';
+	import { LINEAGE_CHUNK_SIZE, visibleLineageCount } from '$lib/features/library/lineage-pagination';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -456,18 +456,6 @@
 
 	function showMoreLineage(root: string): void {
 		visibleLineageCounts = { ...visibleLineageCounts, [root]: visibleLineageCount(visibleLineageCounts[root]) + LINEAGE_CHUNK_SIZE };
-	}
-
-	function handleLineageArrow(event: KeyboardEvent, group: LineageHistoryGroup, item: HistoryItem): void {
-		if (!active || historyManagerView !== 'active' || event.isComposing || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
-		if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-		const items = lineageLaneItems(group), index = items.indexOf(item);
-		const shown = visibleLineageCount(visibleLineageCounts[group.root_node_id]);
-		const next = lineageArrowTarget(index, items.length, shown, event.key);
-		if (!next) return;
-		event.preventDefault();
-		if (next.shown !== shown) visibleLineageCounts = { ...visibleLineageCounts, [group.root_node_id]: next.shown };
-		void tick().then(() => focusAndPreview(items[next.index]));
 	}
 
 	async function fetchLineageGroups(): Promise<void> {
@@ -1263,7 +1251,7 @@
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 											{#if lineageThumbsMode && it.id && currentHistoryId === it.id}<span class="lineage-current-badge">{t().historyCurrentBadge}</span>{:else if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
 											<div class="lineage-member-content">
-												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)} onkeydown={(event) => { if (lineageThumbsMode) handleLineageArrow(event, group, it); }}>
+												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)}>
 													<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
 													<span>{thumbnailPromptText(it.image_provenance ?? it.source_text ?? it.input)}</span>
 												</button>

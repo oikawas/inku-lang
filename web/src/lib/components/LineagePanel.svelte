@@ -695,7 +695,7 @@ $effect(() => {
 });
 $effect(() => {
 	const target = graph?.focus_node_id ?? null;
-	if (okugakiOpen && target && target !== okugakiLoadedTarget) void loadOkugaki();
+	if (okugakiOpen && target) void untrack(() => loadOkugaki(true));
 });
 
 </script>

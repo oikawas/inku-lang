@@ -20,7 +20,7 @@
 	import { normalizeSketchState, sketchStateNote, sketchStateShort, type SketchMode } from '$lib/sketch';
 	import { drawOptionRows, INPUT_PANEL_ORDER } from '$lib/features/draw-options';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
-	import { measureSvgWeight } from '$lib/svgWeight';
+	import { measureSvgWeight, svgByteLength } from '$lib/svgWeight';
 	import { formatCanvasCapacity, groupDigits } from '$lib/formatNumber';
 	import { normalizeCaptionWritingMode, supportsVerticalCaption, type CaptionPosition, type CaptionWritingMode } from '$lib/captionWritingMode';
 	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
@@ -690,7 +690,7 @@
 	const composeFallbackRecord = $derived(composeFallbackState(composeFallbackRaw));
 	// The strip needs bytes alone; the drawer counts structure when opened.
 	const detailSvgWeight = $derived(generationInfoOpen && result?.svg ? measureSvgWeight(result.svg) : null);
-	const detailSvgBytes = $derived(result?.svg ? new TextEncoder().encode(result.svg).length : null);
+	const detailSvgBytes = $derived(result?.svg ? svgByteLength(result.svg) : null);
 	const canvasNavOldestTooltip = $derived(t().tooltipCanvasNavOldest);
 </script>
 

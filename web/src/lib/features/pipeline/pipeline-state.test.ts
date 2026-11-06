@@ -80,6 +80,42 @@ test('a poll returning HTTP 422 cannot return the preceding successful result', 
 	assert.equal(controller.current?.result, null);
 });
 
+test('polling retries transient failures and continues following', async () => {
+	let calls = 0;
+	const waits: number[] = [];
+	const api = { start: async () => view({ busy: true }), load: async () => {
+		calls += 1;
+		if (calls <= 2) throw new PipelineApiError(503, { code: 'unavailable' });
+		return view({ phase: { tag: 'ready' } });
+	} };
+	const controller = new PipelineController(api as never, () => ({}), () => {}, async (ms) => { waits.push(ms); });
+	assert.equal((await controller.fromDescription('circle')).phase.tag, 'ready');
+	assert.equal(calls, 3);
+	assert.deepEqual(waits, [250, 500, 1000]);
+});
+
+test('polling stops retrying after its bounded transient failures', async () => {
+	let calls = 0;
+	const api = { start: async () => view({ busy: true }), load: async () => {
+		calls += 1;
+		throw new PipelineApiError(503, { code: 'unavailable' });
+	} };
+	const controller = new PipelineController(api as never, () => ({}), () => {}, async () => {});
+	await assert.rejects(controller.fromDescription('circle'), PipelineApiError);
+	assert.equal(calls, 6);
+});
+
+test('polling retries a browser fetch network failure', async () => {
+	let calls = 0;
+	const api = { start: async () => view({ busy: true }), load: async () => {
+		if (++calls === 1) throw new TypeError('fetch failed');
+		return view({ phase: { tag: 'ready' } });
+	} };
+	const controller = new PipelineController(api as never, () => ({}), () => {}, async () => {});
+	assert.equal((await controller.fromDescription('circle')).phase.tag, 'ready');
+	assert.equal(calls, 2);
+});
+
 test('new authoring clears a failed view while retaining its parent and the newly selected model', async () => {
 	let model = 'chatgpt:luna';
 	const failed = view({ phase: { tag: 'failed', reason: 'stage1_failed' },

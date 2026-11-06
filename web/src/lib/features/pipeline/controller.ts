@@ -4,6 +4,7 @@ import {
 	type PipelineOptions,
 	type PipelineView,
 } from './api';
+import { isConnectionFailure } from '../../transport/connection-failure';
 
 type ViewObserver = (view: PipelineView | null) => void;
 type Pause = (milliseconds: number) => Promise<void>;
@@ -287,6 +288,18 @@ export class PipelineController {
 			}
 			throwRefusal(view);
 		};
+		const load = async (current: PipelineView): Promise<PipelineView> => {
+			for (let retries = 0; ; retries += 1) {
+				if (running.stopped) return current;
+				try {
+					return await this.api.load(current.variation_id);
+				} catch (cause) {
+					const transient = isConnectionFailure(cause) || cause instanceof TypeError || (cause instanceof PipelineApiError && [502, 503, 504].includes(cause.status));
+					if (!transient || retries >= 5) throw cause;
+					await this.pause(500 * 2 ** retries);
+				}
+			}
+		};
 		try {
 			let next = await start();
 			if (following()) {
@@ -298,7 +311,7 @@ export class PipelineController {
 			while (next.busy) {
 				await this.pause(250);
 				if (running.stopped) return next;
-				next = await this.api.load(next.variation_id);
+				next = await load(next);
 				if (running.stopped) return next;
 				show(next);
 			}
@@ -320,7 +333,7 @@ export class PipelineController {
 				while (next.busy) {
 					await this.pause(250);
 					if (running.stopped) return next;
-					next = await this.api.load(next.variation_id);
+					next = await load(next);
 					if (running.stopped) return next;
 					show(next);
 				}

@@ -217,14 +217,20 @@ public enum StopButtonSnapshot {
     }
 }
 
-/// Web `.paint-btn.block`: full width, 14px weight 500, padding 9, radius 4, action colors.
+/// Web `.paint-btn`, with the full-width `.block` variant used by drawing forms.
 struct InkuPaintButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    var block: Bool
+    init(block: Bool = true) { self.block = block }
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .inkuFont(14, weight: .medium)
-            .frame(maxWidth: .infinity)
-            .padding(9)
+        Group {
+            if block {
+                configuration.label.inkuFont(14, weight: .medium).frame(maxWidth: .infinity).padding(9)
+            } else {
+                configuration.label.inkuFont(14, weight: .medium)
+                    .padding(.vertical, 8).padding(.horizontal, 18).frame(minWidth: 96)
+            }
+        }
             .foregroundStyle(Color.white.opacity(isEnabled ? 1 : 0.85))
             .background(RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(isEnabled ? Color.accentColor.opacity(configuration.isPressed ? 0.8 : 1) : Color.secondary.opacity(0.55)))

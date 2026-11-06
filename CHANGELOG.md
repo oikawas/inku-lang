@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: align the instruction editor's footer buttons to the right and match the Draw button color to other drawing buttons.
+
 - macOS: stop the affected operation instead of crashing on an internal core failure.
 
 - macOS: report plugin-catalog validation failures without stopping startup.

@@ -107,6 +107,7 @@ struct DdlDialogFooter<Conditions: View, Actions: View>: View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .bottom, spacing: 18) {
                 conditions().frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
+                Spacer(minLength: 0)
                 actions().fixedSize(horizontal: true, vertical: false)
             }
             VStack(alignment: .leading, spacing: 10) {

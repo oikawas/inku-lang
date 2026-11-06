@@ -58,7 +58,7 @@ struct DdlAuthoringEditorSheet: View {
                                     }
                                 }
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(InkuPaintButtonStyle(block: false))
                             .disabled(!session.canSubmit(to: model) || rangeBlocked)
                             .keyboardShortcut(.defaultAction)
                             .inkuTooltip(tip("このDDLを確定して、新しい作品として描画します。"))
@@ -141,7 +141,7 @@ struct NewDdlAuthoringSheet: View {
                                         dismiss()
                                     }
                                 }
-                            }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                            }.buttonStyle(InkuPaintButtonStyle(block: false)).keyboardShortcut(.defaultAction)
                                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rangeBlocked)
                         }
                     }

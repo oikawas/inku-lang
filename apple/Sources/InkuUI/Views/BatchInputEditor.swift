@@ -313,6 +313,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var programmaticEdit = false
         private var completionValues: [String: String] = [:]
         private var marksCache = InkuEditorMarksCache()
+        private var descriptionLineMarks: [String: [InkuEditorMark]] = [:]
         private var paintedNames: [NSRange]?
 
         init(text: Binding<String>) { self.text = text }
@@ -350,6 +351,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             ruler = nil
             settings = nil
             marksCache = InkuEditorMarksCache()
+            descriptionLineMarks.removeAll()
             paintedNames = nil
         }
 
@@ -407,7 +409,20 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         /// Temporary attributes paint without touching the text, its undo or the IME's marked range.
         private func applyMarks() {
             guard let editor, let settings, let layout = editor.layoutManager, !editor.hasMarkedText() else { return }
-            let changed = marksCache.update(source: editor.string, key: settings.marksKey, make: settings.marks)
+            let changed = marksCache.update(source: editor.string, key: settings.marksKey) { source in
+                guard settings.marksKey == .description else { return settings.marks(source) }
+                var next: [String: [InkuEditorMark]] = [:]
+                var offset = 0
+                var result: [InkuEditorMark] = []
+                for line in source.components(separatedBy: "\n") {
+                    let local = next[line] ?? descriptionLineMarks[line] ?? InkuEditorMark.descriptionLabels(line)
+                    next[line] = local
+                    result += local.map { InkuEditorMark(range: NSRange(location: $0.range.location + offset, length: $0.range.length), style: $0.style) }
+                    offset += line.utf16.count + 1
+                }
+                descriptionLineMarks = next
+                return result
+            }
             let names = settings.rangeTable == nil ? [] : rangeState.names
             guard changed || paintedNames != names else { return }
             paintedNames = names

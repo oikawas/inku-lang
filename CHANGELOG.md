@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server: route animation and card exports through render capacity, waiting or refusing when busy just like drawing. In a test database, peak RSS for an animation of 100 works fell from about 361 MB to 254 MB.
+
+- Server: add ETag and Cache-Control to display SVGs with a render hash and return 304 for a matching condition. Gzip compression of bodies over 1 MB runs in a thread.
+
+- Server: queue output-file rebuilds on the save executor and return upon acceptance. The count is accepted works, not completed works; a full queue returns 503 with Retry-After.
+
 - Server: add listing indexes to new databases, explicit database compaction, and execution-record retention that defaults to indefinite.
 
 - macOS: retrying a library preview also reloads the work's image.

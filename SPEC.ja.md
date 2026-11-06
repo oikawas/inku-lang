@@ -2627,7 +2627,7 @@ CLI の `paint` と `batch` も、保存する SVG ファイルのために `--s
 - 出力フォルダをサーバーの絶対パスとして設定
 - 自動 PNG のサイズを 1080px か 2160px から選択
 
-サーバーはこれらを `app_settings.output_save_settings` に `enabled`・`output_dir`・`png_size` として保存する。`INKU_OUTPUT_DIR` と `INKU_OUTPUT_PNG_SIZE` が初期値を与え、未設定なら既定は `~/.local/share/inku/outputs` と 2160px。API の `PUT /api/settings/output-save` は管理者専用で、絶対パスだけを受け取り、PNG サイズを 1080 か 2160 に制限する。作品ファイルを DB から作り直す `POST /api/history/rebuild-output-files` は、自動保存が無効なら 409 で断り、1 回に 50 件までを受ける（2026-09-26）—— ファイルは要求の中で書かれ PNG 化もそこで行うので、1,000 件を許すと要求 1 つがワーカーを数分占めた。
+サーバーはこれらを `app_settings.output_save_settings` に `enabled`・`output_dir`・`png_size` として保存する。`INKU_OUTPUT_DIR` と `INKU_OUTPUT_PNG_SIZE` が初期値を与え、未設定なら既定は `~/.local/share/inku/outputs` と 2160px。API の `PUT /api/settings/output-save` は管理者専用で、絶対パスだけを受け取り、PNG サイズを 1080 か 2160 に制限する。作品ファイルを DB から作り直す `POST /api/history/rebuild-output-files` は、自動保存が無効なら 409 で断り、1 回に 50 件までを受ける。ファイルの書き込みと PNG 化は保存の executor に積み、要求には受付だけを返す。`count` は受け付けた作品の数であり、完了した数ではない。キューが満杯なら `Retry-After` ヘッダー付きの 503 を返す。
 
 **自動保存を切っても DB の履歴保存は切れない。** 履歴 DB は正本のままで、SVG・JSON・入力テキスト・正規化 DDL・PNG といった派生ファイルだけが飛ばされる。有効なとき、作品ファイルはユーザーと日付でまとめて `<output_dir>/<user_id>/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history-id>...` の下に置かれる。
 

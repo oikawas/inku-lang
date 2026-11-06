@@ -2,6 +2,21 @@
 
 from __future__ import annotations
 
+
+def test_disabled_state_keeps_last_valid_value_when_read_is_corrupt(tmp_path):
+    from inku_server.plugins.packages import PluginPackageManager
+
+    manager = PluginPackageManager(tmp_path)
+    manager._state_path().write_text("{broken", encoding="utf-8")
+    assert manager._disabled() == set()
+    manager._save_disabled({"Nature.leaves"})
+    assert manager._disabled() == {"Nature.leaves"}
+    manager._state_path().write_text('{"disabled":', encoding="utf-8")
+    assert manager._disabled() == {"Nature.leaves"}
+    manager._save_disabled({"Other.words"})
+    assert manager._disabled() == {"Other.words"}
+    assert list(tmp_path.glob(".package-state-*")) == []
+
 import uuid
 
 import pytest

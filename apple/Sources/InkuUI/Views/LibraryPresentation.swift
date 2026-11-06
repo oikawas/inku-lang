@@ -243,10 +243,40 @@ public enum LibraryGridPaging {
     public static let initialPageSize = 24
     public static let maximumPageSize = 100
 
+    public enum Direction { case left, right, up, down }
+    public enum Destination: Equatable { case slot(Int), previousPage, nextPage, stay }
+
+    public static func columns(width: Double, gap: Double = gap, minCardWidth: Double = minCardWidth) -> Int {
+        guard width.isFinite, width > 0, gap.isFinite, minCardWidth.isFinite, minCardWidth + gap > 0 else { return 1 }
+        return max(1, Int(((width + gap) / (minCardWidth + gap)).rounded(.down)))
+    }
+
+    public static func pageTargetIndex(position: Int, offset: Int, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        return max(0, min(count - 1, position - offset))
+    }
+
+    public static func destination(slot: Int, direction: Direction, columns: Int, count: Int,
+                                   hasPrevious: Bool, hasNext: Bool) -> Destination {
+        guard count > 0, slot >= 0, slot < count else { return .stay }
+        let width = max(1, columns)
+        switch direction {
+        case .left:
+            return slot > 0 ? .slot(slot - 1) : hasPrevious ? .previousPage : .stay
+        case .right:
+            return slot + 1 < count ? .slot(slot + 1) : hasNext ? .nextPage : .stay
+        case .up:
+            return slot >= width ? .slot(slot - width) : hasPrevious ? .previousPage : .stay
+        case .down:
+            if slot / width == (count - 1) / width { return hasNext ? .nextPage : .stay }
+            return .slot(min(count - 1, slot + width))
+        }
+    }
+
     public static func pageSize(width: Double, height: Double, gap: Double = gap, minCardWidth: Double = minCardWidth,
                                 cardHeights: [Double]) -> Int {
         guard width > 0, height > 0 else { return 1 }
-        let columns = max(1, Int(((width + gap) / (minCardWidth + gap)).rounded(.down)))
+        let columns = columns(width: width, gap: gap, minCardWidth: minCardWidth)
         let measured = cardHeights.reduce(0) { $1.isFinite && $1 > 0 ? max($0, $1) : $0 }
         let cardWidth = max(minCardWidth, (width - gap * Double(columns - 1)) / Double(columns))
         let cardHeight = measured > 0 ? measured : max(1, cardWidth - 12) * 58 / 82 + 75

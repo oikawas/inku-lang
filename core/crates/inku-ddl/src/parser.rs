@@ -669,6 +669,68 @@ struct AssetWordCandidate {
     delivery: CandidateDelivery,
 }
 
+struct AssetRelationCandidate {
+    surface: &'static str,
+    identity: String,
+    delivery: CandidateDelivery,
+}
+
+fn asset_relation_candidates(
+    edition: SaijikiEdition,
+    language: ResolvedInstructionLanguage,
+) -> &'static [AssetRelationCandidate] {
+    use std::sync::OnceLock;
+    static V1_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V1_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V2_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V2_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V3_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V3_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    let cache = match (edition, language) {
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::Ja) => &V2_JA,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+    };
+    cache.get_or_init(|| {
+        let mut entries = Vec::new();
+        for relation in &edition.asset().relations {
+            let (surface, literals) = match language {
+                ResolvedInstructionLanguage::Ja => {
+                    (relation.surface_ja.as_str(), &relation.literals_ja)
+                }
+                ResolvedInstructionLanguage::En => {
+                    (relation.surface_en.as_str(), &relation.literals_en)
+                }
+            };
+            for (surface, form) in std::iter::once((surface, CanonicalRelationForm::Short)).chain(
+                literals
+                    .iter()
+                    .map(|literal| (literal.as_str(), CanonicalRelationForm::FullLiteral)),
+            ) {
+                let delivery = canonical_relation_identity(&relation.relation_type, form)
+                    .map(|mut canonical_identity| {
+                        canonical_identity.target = relation.literal_targets.get(surface).copied();
+                        CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
+                            asset_id: edition.asset_id().to_owned(),
+                            relation_type: relation.relation_type.clone(),
+                            canonical_identity,
+                        })
+                    })
+                    .unwrap_or(CandidateDelivery::Hole);
+                entries.push(AssetRelationCandidate {
+                    surface,
+                    identity: format!("relation:{}:{}", relation.relation_type, form.as_str()),
+                    delivery,
+                });
+            }
+        }
+        entries
+    })
+}
+
 fn asset_word_candidates(
     edition: SaijikiEdition,
     language: ResolvedInstructionLanguage,
@@ -972,7 +1034,6 @@ fn candidates_at_uncached(
     require_boundary: bool,
 ) -> Vec<Candidate> {
     let mut candidates = Vec::new();
-    let asset = edition.asset();
 
     match language {
         ResolvedInstructionLanguage::Ja => {
@@ -1201,39 +1262,14 @@ fn candidates_at_uncached(
         );
     }
 
-    for relation in &asset.relations {
-        let (surface, full_literals) = match language {
-            ResolvedInstructionLanguage::Ja => {
-                (relation.surface_ja.as_str(), &relation.literals_ja)
-            }
-            ResolvedInstructionLanguage::En => {
-                (relation.surface_en.as_str(), &relation.literals_en)
-            }
-        };
-        for (surface, form) in std::iter::once((surface, CanonicalRelationForm::Short)).chain(
-            full_literals
-                .iter()
-                .map(|literal| (literal.as_str(), CanonicalRelationForm::FullLiteral)),
-        ) {
-            let matches = source
-                .get(start_byte..start_byte + surface.len())
-                .is_some_and(|actual| match language {
-                    ResolvedInstructionLanguage::Ja => actual == surface,
-                    ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(surface),
-                });
-            if !matches {
-                continue;
-            }
-            let delivery = canonical_relation_identity(&relation.relation_type, form)
-                .map(|mut canonical_identity| {
-                    canonical_identity.target = relation.literal_targets.get(surface).copied();
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
-                        asset_id: edition.asset_id().to_owned(),
-                        relation_type: relation.relation_type.clone(),
-                        canonical_identity,
-                    })
-                })
-                .unwrap_or(CandidateDelivery::Hole);
+    for entry in asset_relation_candidates(edition, language) {
+        let matches = source
+            .get(start_byte..start_byte + entry.surface.len())
+            .is_some_and(|actual| match language {
+                ResolvedInstructionLanguage::Ja => actual == entry.surface,
+                ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(entry.surface),
+            });
+        if matches {
             push_surface_candidate(
                 edition,
                 &mut candidates,
@@ -1241,10 +1277,10 @@ fn candidates_at_uncached(
                 start_byte,
                 language,
                 require_boundary,
-                surface,
+                entry.surface,
                 PRIORITY_ASSET,
-                format!("relation:{}:{}", relation.relation_type, form.as_str()),
-                delivery,
+                entry.identity.clone(),
+                entry.delivery.clone(),
             );
         }
     }

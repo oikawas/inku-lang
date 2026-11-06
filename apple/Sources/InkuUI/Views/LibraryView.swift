@@ -443,15 +443,16 @@ struct LibraryView: View {
             let previous = destination == .previousPage
             let targetPage = library.page + (previous ? -1 : 1)
             let pageSize = library.pageSize
-            let expectedOffset = max(0, library.startOffset + targetPage * pageSize)
+            let position = previous ? library.shownFrom - 2 : library.shownTo
             let filter = library.filter
             Task { @MainActor in
                 defer { movingGridPage = false }
                 await library.setPage(targetPage)
                 guard !model.isBrowsingLocked, !library.mutating, !library.loading, library.errorText == nil,
                       !library.isGrouped, library.layout == .grid, library.filter == filter, library.pageSize == pageSize,
-                      library.shownFrom - 1 == expectedOffset,
-                      let work = previous ? library.works.last : library.works.first else { return }
+                      let index = LibraryGridPaging.pageTargetIndex(position: position, offset: library.shownFrom - 1,
+                                                                   count: library.works.count) else { return }
+                let work = library.works[index]
                 openWork(work)
                 library.requestVisibleFocus(workID: work.id)
             }

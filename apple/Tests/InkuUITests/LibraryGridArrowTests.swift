@@ -31,5 +31,12 @@ final class LibraryGridArrowTests: XCTestCase {
         XCTAssertEqual(Paging.columns(width: 291), 1)
         XCTAssertEqual(Paging.columns(width: 292), 2)
         XCTAssertEqual(Paging.columns(width: 0), 1)
+        let targets: [(Int, Int, Int, Int?)] = [
+            (4, 0, 20, 4), (39, 20, 20, 19), (40, 40, 20, 0),
+            (99, 40, 10, 9), (0, 20, 20, 0), (0, 0, 0, nil),
+        ]
+        for (position, offset, count, expected) in targets {
+            XCTAssertEqual(Paging.pageTargetIndex(position: position, offset: offset, count: count), expected)
+        }
     }
 }

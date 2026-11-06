@@ -251,6 +251,11 @@ public enum LibraryGridPaging {
         return max(1, Int(((width + gap) / (minCardWidth + gap)).rounded(.down)))
     }
 
+    public static func pageTargetIndex(position: Int, offset: Int, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        return max(0, min(count - 1, position - offset))
+    }
+
     public static func destination(slot: Int, direction: Direction, columns: Int, count: Int,
                                    hasPrevious: Bool, hasNext: Bool) -> Destination {
         guard count > 0, slot >= 0, slot < count else { return .stay }

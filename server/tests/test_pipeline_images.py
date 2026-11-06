@@ -19,7 +19,7 @@ from inku_server import db
 from inku_server.persistence.schema import Base, UserAccountRow
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_api import PipelineService, pipeline_router, register_pipeline_errors
-from inku_server.pipeline_candidate import CandidateHostError, PipelineBinding
+from inku_server.pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
 from inku_server.pipeline_defaults import default_manifest
 from inku_server.pipeline_images import PendingImages, prepare_image
 from inku_server.pipeline_product import ProductPipelineEffects, record_system_prompt
@@ -119,7 +119,12 @@ def test_waiting_uploads_are_owner_scoped_bounded_and_expire():
 @pytest.fixture
 def image_host(tmp_path, monkeypatch):
     from inku_server import model_settings
+    from inku_server import pipeline_api
     from inku_server.api_core import rendering, thumbnails
+    class CapturedExecution(CandidateExecution):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs, transcript=[])
+    monkeypatch.setattr(pipeline_api, "CandidateExecution", CapturedExecution)
     binding = PipelineBinding()
     engine = create_engine(f"sqlite:///{tmp_path / 'image.db'}")
     Base.metadata.create_all(engine)

@@ -62,7 +62,7 @@ def _run(monkeypatch, svg, *, context=None):
         config={"envelope_limits": {
             "max_input_bytes": 4096, "max_snapshot_bytes": 4096, "max_output_bytes": 4096,
         }}, provider=lambda _: None, allow_render=True, context=context,
-        save_snapshot=lambda *args: saved.append(deepcopy(args)),
+        save_snapshot=lambda *args: saved.append(deepcopy(args)), transcript=[],
     )
     run.restore(_snapshot())
     return run, saved

@@ -284,6 +284,7 @@ class CandidateExecution:
         context: dict | None = None,
         save_snapshot: Callable[[dict | None, dict, dict, dict | None], None] | None = None,
         on_render_refusal: Callable[[dict, dict], None] | None = None,
+        transcript: list[dict] | None = None,
     ):
         self.binding, self.store, self.owner_id = binding, store, owner_id
         self.config = json.loads(_bytes(config))
@@ -302,7 +303,7 @@ class CandidateExecution:
         self._attempt_began: tuple[dict, int] | None = None
         # Pixel bytes never enter context, snapshots, transcripts or history.
         self.image_data: dict[str, str] = {}
-        self.transcript: list[dict] = []
+        self.transcript = transcript
         self.last_output: dict | None = None
 
     def start_new(self, authoring: dict) -> dict:
@@ -551,7 +552,8 @@ class CandidateExecution:
         if state and (next_snapshot["document"] != state["document"]
                       or next_snapshot["delivery"] != state["delivery"]):
             self.context.pop("svg_refusal", None)
-        self.transcript.append({"input": envelope, "output": output})
+        if self.transcript is not None:
+            self.transcript.append({"input": envelope, "output": output})
         # A committed edit invalidates the previous performance. Keep it only
         # when the same acknowledged source and Score remain active.
         if rendered is None and state and next_snapshot["document"] == state["document"] and next_snapshot["delivery"] is not None:
@@ -618,5 +620,6 @@ class CandidateExecution:
             self.save_snapshot(state, next_snapshot, self.context, rendered)
         self._snapshot = next_snapshot
         self._rendered = rendered
-        self.last_output = output
+        if self.transcript is not None:
+            self.last_output = output
         return output

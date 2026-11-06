@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import logging
 import threading
@@ -82,9 +83,7 @@ DESCRIPTION_LOCKED = {
 def _rewords(text: str, description: str) -> bool:
     """Whether the words read differ, labels and spacing aside (the stored
     description may keep the labels the page strips before showing it)."""
-    def read(value: str) -> str:
-        return " ".join(pipeline_description(str(value)).split())
-    return read(text) != read(description)
+    return importlib.import_module("inku_render").pipeline_description_rewords(str(text), str(description))
 
 
 def _route_fields(context: dict, text: str) -> dict:

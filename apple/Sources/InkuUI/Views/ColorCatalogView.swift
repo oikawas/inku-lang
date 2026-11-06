@@ -184,44 +184,6 @@ struct ColorCatalogView: View {
     }
 }
 
-@MainActor
-struct ColorCatalogPreview: View {
-    let catalog: ColorCatalogOption?
-    let mode: String
-    let display: DisplaySettings
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(display.localized("色カタログ"), systemImage: "paintpalette").inkuFont(12, weight: .semibold)
-                Spacer()
-                Image(systemName: "chevron.right").inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
-            }
-            if mode == "fixed" {
-                if let catalog {
-                    Text(catalog.name).inkuFont(13, weight: .medium)
-                    HStack(spacing: 3) {
-                        ForEach(Array(catalog.palette.enumerated()), id: \.offset) { _, swatch in
-                            CatalogSwatchShape(swatch: swatch)
-                        }
-                    }
-                    .frame(height: 18).accessibilityHidden(true)
-                    Text(catalog.localizedDetail(language: display.preferences.language)).inkuFont(12).foregroundStyle(.secondary)
-                } else {
-                    Text(display.localized("選択してください")).inkuFont(12).foregroundStyle(.secondary)
-                }
-            } else {
-                Text(display.localized(mode == "random" ? "生成ごとに配色をランダムに選びます。" : "次の生成で、記述から配色を選びます。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
-    }
-}
-
 private struct CatalogSwatchShape: View {
     let swatch: ColorCatalogSwatch
 

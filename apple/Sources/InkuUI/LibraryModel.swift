@@ -644,12 +644,6 @@ public final class LibraryModel {
         return result.sorted { ($0.at, $0.id) < ($1.at, $1.id) }
     }
 
-    public func lineagePathWorks(focusNodeID: String? = nil) async throws -> [SavedWork] {
-        guard let database, let focus = focusNodeID ?? lineageFocusID,
-              let path = try await database.lineage(focusNodeID: focus, pathOnly: true) else { return [] }
-        return try await database.exportWorks(ids: path.nodes.compactMap { $0.work?.id })
-    }
-
     public func toggleStar(_ work: SavedWork) async {
         await mutate(ids: [work.id]) { try await $0.setStarred(ids: [work.id], starred: !work.starred); return "お気に入りを更新しました" }
     }

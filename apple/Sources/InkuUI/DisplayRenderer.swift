@@ -194,12 +194,6 @@ public final class DisplayRenderer: Sendable {
         failureLog.withLock { $0 = FailureLog(folder: directory.appendingPathComponent("display-failures", isDirectory: true)) }
     }
 
-    public func purge() {
-        state.withLock { state in
-            state.scenes.removeAll(); state.coarse.removeAll(); state.wholes.removeAll()
-        }
-    }
-
     private func draw(svg: String, width: UInt32, height: UInt32, cancelled: OSAllocatedUnfairLock<Bool>,
                       yield: (Frame) -> Void) throws {
         func checkCancellation() throws { if cancelled.withLock({ $0 }) { throw CancellationError() } }

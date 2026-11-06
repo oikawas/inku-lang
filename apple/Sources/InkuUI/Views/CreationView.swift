@@ -1167,25 +1167,3 @@ struct WrappingHStack: Layout {
         return rows
     }
 }
-
-struct OutputView: View {
-    @Environment(\.locale) private var locale
-    let ddl: String
-    let score: String
-    @State private var tab = "ddl"
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            InkuSegmentedButtons(options: [("ddl", "DDL"), ("score", "Score")], selection: $tab)
-                .accessibilityLabel(InkuLocalization.string("出力", locale: locale))
-            ScrollView {
-                Text(tab == "ddl" ? ddl : score)
-                    .inkuFont(12, design: .monospaced)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-            }
-            .background(.background, in: RoundedRectangle(cornerRadius: 6))
-        }
-    }
-}

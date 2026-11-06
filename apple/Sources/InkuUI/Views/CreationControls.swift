@@ -3,21 +3,6 @@ import InkuHost
 import InkuPersistence
 import SwiftUI
 
-extension View {
-    func creationPanel() -> some View {
-        padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.quaternary))
-    }
-}
-
-@MainActor
-struct CreationModelPicker: View {
-    @Bindable var model: AppModel
-    var body: some View { BatchModelPickerView(model: model) }
-}
-
 /// Every action receives the same work that supplies the canvas image and caption.
 /// Web CanvasArtworkWorkspace.svelte:186-395: the marks sit at the work's lower left, the actions at its lower right,
 /// as 34pt floating circles 14pt above the bottom and 18pt in from the side.

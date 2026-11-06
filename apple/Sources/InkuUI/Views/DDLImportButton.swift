@@ -147,18 +147,4 @@ final class DDLImportController {
     }
 }
 
-@MainActor
-struct DDLImportButton: View {
-    @Bindable var model: AppModel
-    @Environment(DDLImportController.self) private var importer
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button(model.display.localized(importer.isReading ? "読み込んでいます…" : "DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { importer.read(app: model) }
-                .disabled(importer.isReading || model.isBusy)
-            if !importer.visibleMessage(app: model).isEmpty {
-                Text(model.display.message(importer.visibleMessage(app: model))).inkuFont(12).foregroundStyle(.secondary)
-            }
-        }
-    }
-}
 #endif

@@ -857,8 +857,12 @@ fn lower_macro_instruction(
     }
     let mut successful_anchors: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
     let mut unavailable_anchor_targets = BTreeSet::new();
-    for delivery in &delivery_nodes {
-        if is_in_invalid_transform(delivery, &invalid_transforms) {
+    let excluded: Vec<bool> = delivery_nodes
+        .iter()
+        .map(|delivery| is_in_invalid_transform(delivery, &invalid_transforms))
+        .collect();
+    for (delivery, excluded) in delivery_nodes.iter().zip(&excluded) {
+        if *excluded {
             continue;
         }
         let ExpandedMacroNode::Anchor {
@@ -921,8 +925,8 @@ fn lower_macro_instruction(
     }
     let mut relation_by_to = BTreeMap::new();
     let mut anchor_relation_by_to = BTreeMap::new();
-    for delivery in &delivery_nodes {
-        if is_in_invalid_transform(delivery, &invalid_transforms) {
+    for (delivery, excluded) in delivery_nodes.iter().zip(&excluded) {
+        if *excluded {
             continue;
         }
         let node = delivery.node;
@@ -1009,9 +1013,9 @@ fn lower_macro_instruction(
     let mut successful_bindings: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
     let mut successful_emits = BTreeMap::new();
 
-    for delivery in &delivery_nodes {
+    for (delivery, excluded) in delivery_nodes.iter().zip(&excluded) {
         let node = delivery.node;
-        if is_in_invalid_transform(delivery, &invalid_transforms) {
+        if *excluded {
             continue;
         }
         let ExpandedMacroNode::Emit {

@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Core: fix paths where input could crash or stall processing, without changing output for works that already draw.
-
 - macOS: skip reading execution records for the file log while result-log saving is disabled.
 
 - macOS: use arrow keys to preview works in the chronological library thumbnail grid.
@@ -614,6 +612,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.327 (2026-11-06 / Build 1403)
+
+- Core: fix paths where input could crash or stall processing, without changing output for works that already draw.
 
 ## v2.15.326 (2026-11-06 / Build 1402)
 

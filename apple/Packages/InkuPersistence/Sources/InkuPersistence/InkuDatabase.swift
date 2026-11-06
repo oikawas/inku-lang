@@ -20,7 +20,9 @@ public enum LibraryAnnotationMark: Sendable {
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
     public static let currentSchemaVersion = 9
+    private static let vacuumMarker = "swift-v9-vacuum-complete"
     public nonisolated let url: URL
+    public nonisolated let vacuumDeferred: Bool
     let queue: DatabaseQueue
 
     public init(url: URL) throws {
@@ -86,7 +88,10 @@ public actor InkuDatabase {
         configuration.busyMode = .timeout(5)
         self.queue = try DatabaseQueue(path: self.url.path, configuration: configuration)
         if !exists {
-            try queue.write { db in try db.execute(sql: Self.schemaSQL()) }
+            try queue.write { db in
+                try db.execute(sql: Self.schemaSQL())
+                try db.execute(sql: "INSERT INTO schema_migrations(identifier) VALUES (?)", arguments: [Self.vacuumMarker])
+            }
         } else {
             let reportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-\(UUID().uuidString).json")
             let v7ReportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v3-v7-\(UUID().uuidString).json")
@@ -99,6 +104,7 @@ public actor InkuDatabase {
             }
         }
         try queue.read { try Self.validateSchema($0) }
+        self.vacuumDeferred = try !Self.compactV9(queue, at: self.url)
     }
 
     private static func migrate(_ db: Database, reportURL: URL, v7ReportURL: URL) throws {
@@ -153,6 +159,27 @@ public actor InkuDatabase {
             }
             try db.execute(sql: Self.resourceSQL("migration-v9"))
         }
+    }
+
+    /// Runs outside a transaction. A missing marker means a prior migration still needs compaction.
+    private static func compactV9(_ queue: DatabaseQueue, at url: URL) throws -> Bool {
+        let complete = try queue.read { db in
+            try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE identifier = ?)", arguments: [vacuumMarker]) == true
+        }
+        if complete { return true }
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        let volume = try FileManager.default.attributesOfFileSystem(forPath: url.deletingLastPathComponent().path)
+        let free = (volume[.systemFreeSize] as? NSNumber)?.int64Value ?? 0
+        guard free >= size else { return false }
+        do {
+            try queue.writeWithoutTransaction { try $0.execute(sql: "VACUUM") }
+        } catch let error as DatabaseError where error.resultCode.rawValue == 13 {
+            return false
+        }
+        try queue.read { try validateRestore($0) }
+        try queue.write { try $0.execute(sql: "INSERT INTO schema_migrations(identifier) VALUES (?)", arguments: [vacuumMarker]) }
+        return true
     }
 
     public nonisolated static func applicationSupportURL(hostIdentifier: String) throws -> URL {
@@ -1033,6 +1060,7 @@ public actor InkuDatabase {
             try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL)
         }
         try isolated.read { try Self.validateRestore($0) }
+        _ = try Self.compactV9(isolated, at: temporary)
         // Artwork rollback must not reopen reservations already charged by this DB.
         try retainLiveProviderRates(in: isolated)
         try isolated.read { try Self.validateRestore($0) }
@@ -1176,9 +1204,10 @@ public actor InkuDatabase {
         if version >= 7 { identifiers.append("swift-v7-saijiki-v3") }
         if version >= 8 { identifiers.append("swift-v8-draw-options") }
         if version >= 9 { identifiers.append("swift-v9-effect-digests") }
+        let actualIdentifiers = try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
+        let completedIdentifiers = version >= 9 ? (identifiers + [vacuumMarker]).sorted() : identifiers
         guard try schemaObjects(in: db) == expectedObjects,
-              try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
-                == identifiers else {
+              actualIdentifiers == identifiers || actualIdentifiers == completedIdentifiers else {
             throw PersistenceError.unknownSchema
         }
     }

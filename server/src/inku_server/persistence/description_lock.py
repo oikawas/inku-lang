@@ -44,7 +44,7 @@ DESCRIPTION_READING_KINDS = frozenset({
 _MAX_DEPTH = 256
 
 
-def locked_history_ids(session, history_ids: Iterable[str]) -> set[str]:
+def locked_history_ids(session, history_ids: Iterable[str], *, ancestry=None) -> set[str]:
     """The subset of `history_ids` that is description-locked."""
     starts = [history_id for history_id in dict.fromkeys(history_ids) if history_id]
     if not starts:
@@ -54,22 +54,12 @@ def locked_history_ids(session, history_ids: Iterable[str]) -> set[str]:
     for node in session.query(LineageNodeRow).filter(LineageNodeRow.history_id.in_(starts)).all():
         node_of_history[node.history_id] = node.id
         history_of_node[node.id] = node.history_id
-    edge_of_child: dict[str, tuple[str, str]] = {}
-    frontier = set(node_of_history.values())
-    for _ in range(_MAX_DEPTH):
-        if not frontier:
-            break
-        edges = session.query(LineageEdgeRow).filter(LineageEdgeRow.child_node_id.in_(frontier)).all()
-        parents: set[str] = set()
-        for edge in edges:
-            edge_of_child[edge.child_node_id] = (edge.parent_node_id, edge.derivation_kind)
-            if edge.derivation_kind not in DESCRIPTION_READING_KINDS and edge.derivation_kind != "ddl_edit":
-                parents.add(edge.parent_node_id)
-        unseen = parents - history_of_node.keys()
-        if unseen:
-            for node in session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(unseen)).all():
-                history_of_node[node.id] = node.history_id
-        frontier = {parent for parent in parents if parent not in edge_of_child}
+    if ancestry is None:
+        from .ancestry import ancestors
+        ancestry = ancestors(session, list(node_of_history.values()))
+    nodes, edges, _ = ancestry
+    history_of_node.update({node.id: node.history_id for node in nodes.values()})
+    edge_of_child = {child: (edge.parent_node_id, edge.derivation_kind) for child, edge in edges.items()}
     histories = list({*starts, *(history for history in history_of_node.values() if history)})
     ddl_authoritative = _ddl_authoritative_histories(session, histories)
     ddl_of_history = _ddl_of_histories(session, [

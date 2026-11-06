@@ -362,30 +362,21 @@ def test_recursive_ctes_keep_predicate_binds_union_depth_order_and_early_limits(
 def test_generation_follows_primary_edges_and_stops_cycles(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    predicate_calls: list[dict] = []
-    monkeypatch.setattr(
-        lineage.access,
-        "_readable_edge",
-        lambda actor: predicate_calls.append(actor) or object(),
-    )
+    from inku_server.persistence import ancestry
     actor = {"id": "user"}
-    chain = SequentialSession(
-        [
-            SimpleNamespace(parent_node_id="middle"),
-            SimpleNamespace(parent_node_id="root"),
-            None,
-        ]
-    )
+    chain = SequentialSession([])
+    edges = {"leaf": SimpleNamespace(id="1", parent_node_id="middle"),
+             "middle": SimpleNamespace(id="2", parent_node_id="root")}
+    monkeypatch.setattr(ancestry, "ancestors", lambda *_: ({}, edges, {"1", "2"}))
     assert _store(chain)._lineage_generations(chain, actor, ["leaf"]) == {
         "root": 1,
         "middle": 2,
         "leaf": 3,
     }
-    cycle = SequentialSession(
-        [SimpleNamespace(parent_node_id="b"), SimpleNamespace(parent_node_id="a")]
-    )
+    cycle = SequentialSession([])
+    edges = {"a": SimpleNamespace(id="1", parent_node_id="b"),
+             "b": SimpleNamespace(id="2", parent_node_id="a")}
     assert _store(cycle)._lineage_generations(cycle, actor, ["a"]) == {"b": 1, "a": 2}
-    assert predicate_calls == [actor] * 5
 
 
 def test_graph_clamps_budget_deduplicates_and_sorts(

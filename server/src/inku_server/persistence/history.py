@@ -1020,40 +1020,22 @@ class HistoryListProjector:
                     item["shared"] = True
         # A work its DDL holds (edited, or derived from an edited one) is not
         # drawn from its description again; the client offers the fork instead.
-        locked = locked_history_ids(session, [row.id for row in rows])
+        from .ancestry import ancestors, generations
+        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
+        ancestry = ancestors(session, node_ids, actor)
+        locked = locked_history_ids(session, [row.id for row in rows], ancestry=ancestry)
         for item, row in zip(items, rows, strict=True):
             item["description_locked"] = row.id in locked
-        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         if not node_ids:
             return items
-        nodes = session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(node_ids)).all()
-        node_by_id = {node.id: node for node in nodes}
+        node_by_id, ancestor_edges, readable_edges = ancestry
         user_ids = {row.user_id for row in rows}
         edges = session.query(LineageEdgeRow).filter(
             LineageEdgeRow.user_id.in_(user_ids),
             LineageEdgeRow.child_node_id.in_(node_ids),
         ).all()
         edge_by_child = {edge.child_node_id: edge for edge in edges}
-        generation_by_node = {node_id: 1 for node_id in node_ids}
-        ancestor_by_target = {node_id: node_id for node_id in node_ids}
-        seen_by_target = {node_id: {node_id} for node_id in node_ids}
-        frontier = set(node_ids)
-        while frontier:
-            ancestor_edges = session.query(LineageEdgeRow).filter(
-                LineageEdgeRow.user_id.in_(user_ids),
-                LineageEdgeRow.child_node_id.in_(frontier),
-            ).all()
-            parent_by_child = {edge.child_node_id: edge.parent_node_id for edge in ancestor_edges}
-            next_frontier: set[str] = set()
-            for target_id, ancestor_id in ancestor_by_target.items():
-                parent_id = parent_by_child.get(ancestor_id)
-                if parent_id is None or parent_id in seen_by_target[target_id]:
-                    continue
-                seen_by_target[target_id].add(parent_id)
-                ancestor_by_target[target_id] = parent_id
-                generation_by_node[target_id] += 1
-                next_frontier.add(parent_id)
-            frontier = next_frontier
+        generation_by_node = generations(node_ids, ancestor_edges, readable_edges)
 
         for row, item in zip(rows, items, strict=True):
             node = node_by_id.get(row.lineage_node_id)

@@ -78,13 +78,13 @@ async def _send(built, connection, body, headers, timeout, client):
                     counted = await _post(client, built["count_tokens"]["url"], headers=headers,
                                           body=built["count_tokens"]["body"].encode("utf-8"), timeout=timeout, limit=16384)
                     if counted.status_code == 429:
-                        budget.cool_down(provider, retry_after_seconds(counted.headers, counted.content, now=budget.clock()))
+                        await asyncio.to_thread(budget.cool_down, provider, retry_after_seconds(counted.headers, counted.content, now=budget.clock()))
                     counted.raise_for_status()
                     input_tokens = estimate_input_tokens(kind, limits["tpm"], len(body), json.loads(counted.content))
                 reservation = await budget.reserve(provider, kind, limits, input_tokens)
             response = await _post(client, built["url"], headers=headers, body=body, timeout=timeout, limit=MAX_RESPONSE_BYTES)
             if budget is not None and response.status_code == 429:
-                budget.cool_down(provider, retry_after_seconds(response.headers, response.content[:16384], now=budget.clock()))
+                await asyncio.to_thread(budget.cool_down, provider, retry_after_seconds(response.headers, response.content[:16384], now=budget.clock()))
             read = None
             if response.is_success:
                 read = provider_wire.read_text_with_usage(built["format"], response.status_code, response.content)
@@ -92,7 +92,7 @@ async def _send(built, connection, body, headers, timeout, client):
             return built, response, read
     finally:
         if budget is not None and reservation is not None:
-            budget.settle(provider, reservation, input_used if input_used is not None else (None if limits["tpm"] else 0))
+            await asyncio.to_thread(budget.settle, provider, reservation, input_used if input_used is not None else (None if limits["tpm"] else 0))
 
 
 def send_text(connection: dict[str, Any], model_id: str, *, system: str, text: str, images: list[str],

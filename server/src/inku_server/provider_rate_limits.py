@@ -126,7 +126,19 @@ class ProviderRateBudget:
                 _replace_state(state, result)
                 return result.get("seconds", 0.0)
 
-            delay = self._change(provider, admit)
+            change = asyncio.create_task(asyncio.to_thread(self._change, provider, admit))
+            try:
+                delay = await asyncio.shield(change)
+            except asyncio.CancelledError:
+                # A thread cannot be cancelled mid-transaction. If admission
+                # committed, reconcile it before propagating cancellation.
+                try:
+                    delay = await change
+                    if not delay:
+                        await asyncio.to_thread(self.settle, provider, token, None if limits["tpm"] else 0)
+                except Exception:
+                    pass
+                raise
             if not delay:
                 return token
             await self.sleep(delay)

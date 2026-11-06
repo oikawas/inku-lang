@@ -221,7 +221,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	let thinking = $state<string | null>(null);
 
-	let result = $state<PaintResult | null>(null);
+	let result = $state.raw<PaintResult | null>(null);
 
 	/** The author's choice of route. Read and draw starts with the sketch on
 	 *  (the author's answer, 2026-10-25); the current stages leave it alone. */

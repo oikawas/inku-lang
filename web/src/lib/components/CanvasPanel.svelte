@@ -688,12 +688,9 @@
 	// Three readings for the drawer, one condition for the badge. Only Stage 2
 	// can tell 'no' from 'unrecorded', so only its row shows three.
 	const composeFallbackRecord = $derived(composeFallbackState(composeFallbackRaw));
-	// Bytes, objects, and points do not stand in for one another. Measure all
-	// three once for both the canvas strip and the generation-information view,
-	// using the same definition as the trend report (see $lib/svgWeight).
-	// HistoryItem carries no SVG, so this reads the current result directly.
-	const detailSvgWeight = $derived(result?.svg ? measureSvgWeight(result.svg) : null);
-	const detailSvgBytes = $derived(detailSvgWeight?.bytes ?? null);
+	// The strip needs bytes alone; the drawer counts structure when opened.
+	const detailSvgWeight = $derived(generationInfoOpen && result?.svg ? measureSvgWeight(result.svg) : null);
+	const detailSvgBytes = $derived(result?.svg ? new TextEncoder().encode(result.svg).length : null);
 	const canvasNavOldestTooltip = $derived(t().tooltipCanvasNavOldest);
 </script>
 

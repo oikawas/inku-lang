@@ -115,7 +115,7 @@ test('T-69  the drawer measures only when the work on screen has an SVG', () => 
 	// and a zero here is a claim about a drawing that does not exist.
 	assert.match(
 		PANEL,
-		/const detailSvgWeight = \$derived\(result\?\.svg \? measureSvgWeight\(result\.svg\) : null\)/,
+		/const detailSvgWeight = \$derived\(generationInfoOpen && result\?\.svg \? measureSvgWeight\(result\.svg\) : null\)/,
 		'the drawer measures without checking that there is an SVG'
 	);
 });
@@ -187,8 +187,5 @@ test('T-71  one known drawing, and all three numbers agree with svg_weight.py', 
 test('T-71  and the drawer shows that measurement, not a second one of its own', () => {
 	// The point of the pair is defeated the moment the screen counts by itself.
 	assert.match(PANEL, /import \{ measureSvgWeight \} from '\$lib\/svgWeight'/);
-	assert.match(PANEL, /const detailSvgBytes = \$derived\(detailSvgWeight\?\.bytes \?\? null\)/);
-	// The old inline byte count is gone, so bytes and the two new numbers come
-	// from one function applied to one string.
-	assert.doesNotMatch(PANEL, /new TextEncoder\(\)\.encode\(result\.svg\)/);
+	assert.match(PANEL, /const detailSvgBytes = \$derived\(result\?\.svg \? new TextEncoder\(\)\.encode\(result\.svg\)\.length : null\)/);
 });

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: avoid repeating unchanged calculations and image loads in input, generation details, and model settings.
+
 - macOS: retrying a library preview also reloads the work's image.
 
 - macOS: align the instruction editor's footer buttons to the right and match the Draw button color to other drawing buttons.

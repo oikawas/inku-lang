@@ -111,7 +111,7 @@ func runComparisonChecks() async throws {
           try await database.list().count == rowCount + 1 else {
         throw CheckFailure.message("Editing a retained variation failed to create a source-authoritative child: \(model.errorText ?? model.status)")
     }
-    print("Comparison passed: two previews add no history; four model candidates drawn at once (peak \(fanoutPeak) in flight); one explicit selection creates one immutable-parent child; save retry is idempotent; retired variation draws nothing and the description source stays editable; blocked model cancellation drains with no late candidate. No external provider calls.")
+    print("Comparison passed: two previews add no history; four model candidates drawn at once (peak \(fanoutPeak) in flight); one explicit selection creates one immutable-parent child; save retry is idempotent; the description source stays editable; blocked model cancellation drains with no late candidate. No external provider calls.")
 }
 
 private actor ComparisonProvider: ProviderTransport {

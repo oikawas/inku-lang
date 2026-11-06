@@ -12,6 +12,8 @@
 
 API keyの環境変数は初期値です。管理UIでDBへ保存したprovider keyがある場合は暗号化して利用します。ホスト固有情報と秘密をGit追跡文書へ書かないでください。
 
+描画・履歴の再描画とユーザー管理では、入力の誤りや重複は 4xx、予期しない内部の失敗は 500 を返します。内部の例外の詳細はログで確認し、応答には含めません。
+
 **環境変数が種を与えるだけの設定があります。**描画の並列度と制限値は、初回起動時に環境変数から初期値を取り、以後はDBの設定が正本になります。環境変数を変えても、既に保存された設定は変わりません。制限値は管理UIか `inku-cli config update`、並列度は管理UIか§2.3のAPIで変更してください。
 
 ## 2. backend環境変数
@@ -102,11 +104,13 @@ pipelineのeffect実行poolはこれとは別です。manifestの`host_limits`�
 
 | 変数 | 目的 | 実装既定値 |
 |---|---|---|
-| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | catalog選択・穴補完policyのattempt／total秒 | `120` |
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | catalog選択・穴補完policyのattempt／total秒、およびデモ指示・Vision送信の全体の期限 | `120` |
 | `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | 写生・型を埋める・構図の読み・法則・配色・書く・見比べ・画像から書く・画像との見比べの1試行の上限秒（色カタログと補完には効かない。変数の名は以前の`Stage 1`の名のまま） | `300` |
 | `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | 同じ送信の総予算秒（attempt以上へ正規化） | `540` |
 | `INKU_LLM_RETRY_ATTEMPTS` | policyの最大試行回数 | `4` |
 | `INKU_LLM_RETRY_BASE_DELAY` | policyの試行間待機秒 | `2.0` |
+
+デモ指示と Vision の応答本文は 32 MB が上限です。
 
 配布templateは運用例としてretry値を明示しています。実装既定値とtemplate値を意識して変更してください。
 

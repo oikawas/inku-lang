@@ -226,7 +226,7 @@
 					{#each tries as { turn, attempt } (`${turn}-${attempt.attempt}`)}
 						<li class="ai-refine-try" class:kept={attempt.outcome === 'kept'}>
 							<div class="ai-refine-thumb">
-								{#if attempt.history_id}<HistoryThumbnail item={child(attempt.history_id)} scope="ai-refine-progress" size="mini" />{/if}
+								{#if attempt.history_id}<HistoryThumbnail item={child(attempt.history_id)} size="mini" />{/if}
 							</div>
 							<div class="ai-refine-try-text">
 								<span class="ai-refine-try-head">{t().aiRefineTurn(turn)} · {kindLabel(attempt.kind)} · {outcomeLabel(attempt.outcome)}{#if sharePercent(attempt.share)} · {t().aiRefineShare(sharePercent(attempt.share) ?? '')}{/if}</span>

@@ -1368,7 +1368,7 @@ Transcript replayはcommandと最終effect resultの入力envelopeだけから�
 
 ### 12.8 エラー回復戦略
 
-Server の pipeline では、写生・構図・法則・色と型を埋める工程の retry 予算は既定で1回300秒・合計540秒とし、`INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` と `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` で変えられる。カタログと穴埋めの予算はそれぞれ既定で1回・合計とも120秒で、`INKU_LLM_REQUEST_TIMEOUT_SECONDS` を使う。プロバイダーの送信待ち時間も工程の期限に含まれる。
+Server の pipeline では、写生・構図・法則・色と型を埋める工程の retry 予算は既定で1回300秒・合計540秒とし、`INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` と `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` で変えられる。カタログと穴埋めの予算はそれぞれ既定で1回・合計とも120秒で、`INKU_LLM_REQUEST_TIMEOUT_SECONDS` を使う。プロバイダーの送信待ち時間も工程の期限に含まれる。デモの指示と Vision の送信は、待機と応答の受信を含む全体に同じ期限を適用し、応答本文は 32 MB を上限とする。
 
 各 LLM 段のretry判断は、callerが明示した`max_attempts`と`total_timeout_ms`の範囲内だけで行う。Transport failureと空・短すぎる・schema不適合の応答は、その有限budget内で次のattemptを消費できるが、provider rejectionとgeneric semantic failureは終端である。提供元の出力上限で切れた描画の応答は、形が揃って見えても答えとして使わず、応答を読めない失敗として扱う（§12.5）。Budgetを使い切った後は別モデルへ切り替えず、決定的フォールバックで有限に完了するか、明示的に失敗する。フォールバックは DDL の明示要素を配達するための互換経路であって、新しい内容を補う経路ではない。
 
@@ -1405,6 +1405,8 @@ pipeline の JSON view は同じ内容を `progress` に含める。Web が最�
 記述バッチの再開候補は、登録された元の計画・条件と同じ batch ID の保存作品を照合し、保存済みの行を再送しない。描画が続いているか不確定な間は再開を提示しない。画像フォルダは同じフォルダの選び直しを必要とし、ブラウザの localStorage に記録した送信時のファイル順と保存済み作品を照合してから続ける。localStorage を失うとその照合はできない。旧クライアントの未登録バッチには従来の履歴からの推測を用いる。
 
 `GET /api/history` に `batch_run_id` を指定すると、そのバッチに属する呼び手自身の作品だけを返す。指定しない場合の閲覧範囲は変わらない。
+
+描画・履歴の再描画とユーザー管理では、入力の誤りや重複は従来の 4xx で返し、予期しないサーバー内部の失敗は 500 として記録する。500 の応答には内部例外の文を含めない。
 
 ### 12.11 中間フィルタ（旧Stage 1.5）
 

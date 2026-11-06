@@ -77,7 +77,7 @@ test('a real provider failure keeps its localized stage, status, and provider me
 		message: 'upstream disconnected',
 	}, 500, ja);
 
-	assert.equal(actual, '解釈のモデル提供元がエラーを返しました（HTTP 502）。\nupstream disconnected');
+	assert.equal(actual, '指示書を書くのモデル提供元がエラーを返しました（HTTP 502）。\nupstream disconnected');
 });
 
 test('the account deletions the server refuses read in the page language', () => {

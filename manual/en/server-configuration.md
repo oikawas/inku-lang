@@ -12,6 +12,8 @@ Settings belong to three boundaries.
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
+Rendering, history redraws, and account administration return 4xx for invalid input or conflicts and 500 for unexpected internal failures. Internal exception details are logged and omitted from the response.
+
 **Some settings are only seeded by the environment.** Painting concurrency and the limits take their initial values from environment variables at first start; after that the DB settings are canonical. Changing an environment variable does not change a setting already stored. For limits, use the admin UI or `inku-cli config update`; for concurrency, use the admin UI or the API in §2.3.
 
 ## 2. Backend Environment Variables
@@ -102,11 +104,14 @@ The distributed Compose files put a memory ceiling on the `api` container (`INKU
 
 | Variable | Purpose | Implementation default |
 |---|---|---|
-| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Catalog selection / hole completion policy attempt and total seconds | `120` |
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Catalog selection / hole completion policy attempt and total seconds, and the overall demo instruction and Vision request deadline | `120` |
 | `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | Per-attempt ceiling in seconds for the sketch from life, fill the plan, composition reading, laws, colors, writing, review, writing from a picture and picture review (not the color catalog or completion; the variable keeps its earlier `Stage 1` name) | `300` |
 | `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | Total seconds for the same sends (normalized to at least the attempt ceiling) | `540` |
 | `INKU_LLM_RETRY_ATTEMPTS` | Maximum policy attempts | `4` |
 | `INKU_LLM_RETRY_BASE_DELAY` | Policy delay between attempts in seconds | `2.0` |
+
+Demo instruction and Vision response bodies are limited to 32 MB.
+
 
 The distributed environment template explicitly sets operational example values. Be aware of the difference between template values and implementation defaults.
 

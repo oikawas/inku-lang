@@ -104,7 +104,7 @@ def host(tmp_path, monkeypatch):
     monkeypatch.setattr(rendering, "_submit_history_artifact_save", lambda _: None)
     monkeypatch.setattr(thumbnails, "submit_thumbnail_build", lambda _: None)
 
-    def offered(provider, model, settings, *, purpose):
+    def offered(provider, model, settings, *, purpose, normalized_settings=None):
         return provider == "openai" and model == "fixture-vision"
 
     monkeypatch.setattr(model_settings, "model_is_offered", offered)

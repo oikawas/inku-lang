@@ -106,7 +106,8 @@ PUBLIC = {  # every entry needs a reason
 # Editor inspection and package-word preview add two authenticated routes.
 # Five authenticated routes were added: activity, batch list/start/heartbeat,
 # and saving a composition-form execution.
-EXPECTED_ROUTE_COUNT = 151
+# Drawing options and the three maintenance endpoints are guarded.
+EXPECTED_ROUTE_COUNT = 155
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

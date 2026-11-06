@@ -159,6 +159,6 @@ test('a chosen image fills the note unless the author typed one, and the setting
 	assert.match(state, /imageProvenanceTyped = false;/);
 	assert.match(read('../../components/InputPanel.svelte'), /oninput=\{\(\) => onImageProvenanceInput\?\.\(\)\}/);
 	const navigation = read('../settings/navigation-state.svelte.ts');
-	assert.match(navigation, /const BROWSER_ONLY_SETTINGS_TABS: readonly SettingsTab\[\] = \['image'\];/);
+	assert.match(navigation, /const BROWSER_ONLY_SETTINGS_TABS: readonly SettingsTab\[\] = \['image', 'draw_defaults'\];/);
 	assert.match(read('../../components/SettingsModal.svelte'), /\{:else if settingsTab === 'image'\}\s*<ImageSettings \/>/);
 });

@@ -177,5 +177,5 @@ def test_a_regrained_redraw_is_saved_and_writes_the_edge():
         assert [edge["derivation_kind"] for edge in edges] == ["sketch_grain_change"]
     finally:
         db.delete_session(token)
-        db.delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
         assert db.delete_user(user["id"])

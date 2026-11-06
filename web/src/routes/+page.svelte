@@ -75,13 +75,13 @@
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
-	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import { bindGenerationInfoSettingsPersist } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
-	import { AUTO_CATALOG_ID, colorCatalogOverride, resolveCatalogId } from '$lib/features/color-catalog/render';
+	import { AUTO_CATALOG_ID, bindColorCatalogRenderState, colorCatalogOverride, resolveCatalogId } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload } from '$lib/features/render-payload';
 	import {
 		runCurrentWork,
@@ -95,9 +95,9 @@
 	import { BatchState } from '$lib/features/batch/state.svelte';
 	import { DemoState } from '$lib/features/demo/state.svelte';
 	import { demoInstructionModelGroups } from '$lib/demo';
-	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
+	import { resumedComposition, resumedWild, type BatchRunConditions, type NumberedLine } from '$lib/features/batch/resume';
 	import { loadBatchSavedWork } from '$lib/features/batch/saved-work';
-	import { copyDrawOptions, LEGACY_WILD_DEFAULT_KEY, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
+	import { LEGACY_WILD_DEFAULT_KEY, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
 	import { bindWildRenderState, wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
 	import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
@@ -494,7 +494,6 @@
 	let defaultCatalogId = $state('default');
 	// Old catalog id -> the id it answers to today, served by /api/color-catalogs.
 	let renamedCatalogIds = $state<Record<string, string>>({});
-	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.effectiveId) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 
 	// ── Settings tabs ────────────────────────────────────────
 	let pluginEntries = $state<PluginEntry[]>([]);
@@ -581,6 +580,8 @@
 		}
 	});
 	bindWildRenderState(() => work.drawOptions.wild === 'on');
+	bindColorCatalogRenderState(() => work.tabCatalogSelection());
+	const currentCatalog = $derived(catalogById(colorCatalogs, resolveCatalogId(work.tabCatalogSelection())) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 	const settings = createSettingsController({
 		chatgptAvailable: () => chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id,
 		invalidateChatGPTModels: () => {
@@ -758,7 +759,6 @@
 	/** Put back the conditions the last work of the stopped run was drawn under. */
 	async function applyBatchRunConditions(conditions: BatchRunConditions) {
 		const choices = work.batchTextOptions;
-		Object.assign(choices, copyDrawOptions(work.drawDefaults.batch_text));
 		await loadModelReferences([conditions.stage1Model, conditions.stage2Model].filter((ref): ref is string => !!ref).map((ref) => ({action: 'split_ref', ref})));
 		// `auto` reads each description anew, so a run made under it must resume
 		// under it -- the resolved id is what the last line happened to get, not
@@ -771,11 +771,11 @@
 		// The route first: choosing read and draw turns the sketch on, and the
 		// line after puts back the sketch the run was drawn with.
 		if (conditions.route) choices.route = conditions.route;
-		choices.composition = conditions.composition ?? 'off';
+		choices.composition = resumedComposition(conditions.composition, choices.composition);
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
 		choices.sketch = sketchModeOf(conditions.sketchGrain);
-		choices.wild = conditions.wild === true ? 'on' : 'off';
+		choices.wild = resumedWild(conditions.wild, choices.wild);
 		if (conditions.canvasAspectId) choices.canvas_aspect = normalizeCanvasAspectId(conditions.canvasAspectId);
 	}
 
@@ -1004,29 +1004,15 @@
 	}
 
 	function openCatalogModal() {
-		colorCatalogSettings.selected = work.drawOptions.catalog.mode === 'auto' ? AUTO_CATALOG_ID : work.drawOptions.catalog.id;
-		catalogSelectionSnapshot = colorCatalogSettings.selected;
+		catalogSelectionSnapshot = work.tabCatalogSelection();
 		catalogOpen = true;
 	}
 
-	function persistSelectedCatalog() {
-		if (work.tabCatalogSelection() !== colorCatalogSettings.selected) work.invalidateWorkOptions();
-		work.drawOptions.catalog.mode = colorCatalogSettings.selected === AUTO_CATALOG_ID ? 'auto' : 'fixed';
-		if (colorCatalogSettings.selected !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = colorCatalogSettings.selected;
+	function setSelectedCatalog(id: string) {
+		if (work.tabCatalogSelection() !== id) work.invalidateWorkOptions();
+		work.drawOptions.catalog.mode = id === AUTO_CATALOG_ID ? 'auto' : 'fixed';
+		if (id !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = id;
 	}
-
-	// The selection rides in the user's model_settings: a drawing needs a session,
-	// so a browser-wide value would only ever be the wrong user's.
-	async function persistColorCatalogSelection(selected: string) {
-		if (!session.currentUser) return;
-		const token = session.beginSettingsUpdate();
-		try {
-			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { color_catalog_id: selected } }) });
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.acceptSettingsUpdate(token, await r.json() as UserItem);
-		} catch (e) { console.warn('failed to save color catalog selection', e); }
-	}
-	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
 
 	// The folds ride in the user's model_settings for the same reason the
 	// catalogue does: neither section has anything to show without a session.
@@ -1102,14 +1088,12 @@
 
 	function confirmCatalogSelection() {
 		catalogSelectionSnapshot = null;
-		persistSelectedCatalog();
 		catalogOpen = false;
 	}
 
 	function cancelCatalogSelection() {
 		if (catalogSelectionSnapshot !== null) {
-			colorCatalogSettings.selected = catalogSelectionSnapshot;
-			persistSelectedCatalog();
+			setSelectedCatalog(catalogSelectionSnapshot);
 		}
 		catalogSelectionSnapshot = null;
 		catalogOpen = false;
@@ -1417,7 +1401,6 @@
 	const historyForRevisionOnly = $derived(history.forRevisionOnly);
 	const historyForShareOnly = $derived(history.forShareOnly);
 	const historyStripFiltered = $derived(history.filtered);
-	const trashItems = $derived(history.trashItems);
 	const trashTotal = $derived(history.trashTotal);
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void; focusOnOpen?: boolean } | null>(null);
 	function confirmDiscardEdits(run: () => void, cancelRun: () => void): void {
@@ -1480,7 +1463,7 @@
 		await demo.saveCurrent({
 			stage1Model: qualifiedModelRef(stage1Provider, stage1Model),
 			stage2Model: qualifiedModelRef(stage2Provider, stage2Model),
-			effectiveCatalogId: colorCatalogSettings.effectiveId,
+			effectiveCatalogId: resolveCatalogId(work.tabCatalogSelection()),
 			canvasAspectId: effectiveCanvasAspectId(),
 			instructionLang: work.instructionLang,
 			uiLang: getLang(),
@@ -1688,7 +1671,7 @@ async function toggleLineageForRevision(node: LineageNode, event?: Event): Promi
 }
 
 function lineageCatalogId(node: LineageNode): string {
-	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? colorCatalogSettings.effectiveId;
+	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? resolveCatalogId(work.tabCatalogSelection());
 }
 
 function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
@@ -1699,7 +1682,12 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await focusSavedLineageChild(historyId, nodeId, {
 		fetchOffset: (offset, options) => history.fetchOffset(offset, options),
 		filtered: () => historyStripFiltered,
-		clearFilters: () => history.clearFilters(),
+		clearFilters: () => {
+			const clearedStarred = history.starredOnly;
+			history.clearFilters();
+			if (clearedStarred) showHistoryStarredFilterClearedNotice();
+			else showHistoryForRevisionFilterClearedNotice();
+		},
 		items: () => historyItems,
 		displayCurrentItem: (item) => {
 			// The saved child becomes the lineage focus without replacing an
@@ -2283,10 +2271,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	return nodeId;
 }
 
-	function setSelectedCatalog(id: string) {
-		colorCatalogSettings.selected = id;
-		persistSelectedCatalog();
-	}
 
 	// ── Download ────────────────────────────────────────────
 	const savedWorkExportActions = makeSavedWorkExportActions({
@@ -2439,8 +2423,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const statusStage2ModelOnly = $derived(work.displayedHistoryItem
 		? (work.displayedHistoryItem.stage2_model ? modelShortName(work.displayedHistoryItem.stage2_model) : '-')
 		: (work.result?.stage2_model ? modelShortName(work.result.stage2_model) : '-'));
-	const nextStage1Model = $derived(statusModelName(work.drawOptions.models.stage1 ?? qualifiedModelRef(stage1Provider, stage1Model)));
-	const nextStage2Model = $derived(statusModelName(work.drawOptions.models.stage2 ?? qualifiedModelRef(stage2Provider, stage2Model)));
+	const nextStage1Model = $derived(statusModelName(work.tabModelRef('stage1')));
+	const nextStage2Model = $derived(statusModelName(work.tabModelRef('stage2')));
 	const nextCatalogName = $derived(work.drawOptions.catalog.mode === 'auto' ? (work.inputMode === 'image' ? t().imageCatalogAuto : t().colorCatalogAuto) : (catalogById(colorCatalogs, work.drawOptions.catalog.id)?.name ?? work.drawOptions.catalog.id));
 	// The catalog a work was drawn with, named as it stands today. Two things
 	// the bare name cannot say are said here instead of being papered over: an
@@ -3403,7 +3387,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				<ModelCardPicker label={t().modelButton} selectedModel={qualifiedModelRef(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
 					onSelect={setDrawingModel} />
 				<label class="demo-catalog-field"><span>{t().colorCatalogButton}</span>
-					<select bind:value={colorCatalogSettings.selected}>
+					<select value={work.tabCatalogSelection()} onchange={(event) => setSelectedCatalog(event.currentTarget.value)}>
 						<option value={AUTO_CATALOG_ID}>{t().colorCatalogAuto}</option>
 						{#each colorCatalogs as catalog (catalog.id)}<option value={catalog.id}>{catalog.name}</option>{/each}
 					</select>
@@ -3583,7 +3567,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		<ColorCatalogModal
 			imageInput={work.inputMode === 'image'}
 			catalogs={colorCatalogs}
-			selectedCatalog={colorCatalogSettings.selected}
+			selectedCatalog={work.tabCatalogSelection()}
 			{currentCatalog}
 			onSelectCatalog={setSelectedCatalog}
 			onCancel={cancelCatalogSelection}

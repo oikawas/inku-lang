@@ -1119,7 +1119,7 @@
 					onclick={activatePreviewArtwork}
 					ondblclick={previewArtwork}
 				>
-					<HistoryThumbnail item={previewItem} scope={'library-preview-' + previewItem.id} size="manager" />
+					<HistoryThumbnail item={previewItem} size="manager" />
 				</button>
 				<p class="history-preview-open-hint">{t().historyPreviewOpenHint}</p>
 				<p class="history-preview-description">{previewItem.image_provenance ?? previewItem.source_text ?? previewItem.input}</p>
@@ -1224,7 +1224,7 @@
 						<div class="lineage-group-head">
 							{#if !lineageThumbsMode}
 								<button class="lineage-representative" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(group.representative)} ondblclick={() => openThumbnail(group.representative)}>
-									<HistoryThumbnail item={group.representative} scope={'lineage-group-' + group.root_node_id} size="mini" />
+									<HistoryThumbnail item={group.representative} size="mini" />
 								</button>
 							{/if}
 							<div class="lineage-group-summary">
@@ -1252,7 +1252,7 @@
 											{#if lineageThumbsMode && it.id && currentHistoryId === it.id}<span class="lineage-current-badge">{t().historyCurrentBadge}</span>{:else if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
 											<div class="lineage-member-content">
 												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)}>
-													<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
+													<HistoryThumbnail item={it} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
 													<span>{thumbnailPromptText(it.image_provenance ?? it.source_text ?? it.input)}</span>
 												</button>
 												{@render shareStatus(it)}
@@ -1312,7 +1312,7 @@
 							role="button"
 							tabindex={historyManagerView === 'active' ? 0 : -1}
 						>
-							<HistoryThumbnail item={it} scope="manager" size="manager" />
+							<HistoryThumbnail item={it} size="manager" />
 							{#if it.id && currentHistoryId === it.id}<span class="thumb-current-badge">{t().historyCurrentBadge}</span>{/if}
 						</div>
 						<div class="manager-thumb-actions">
@@ -1380,7 +1380,7 @@
 									title={t().historyPreviewTitle}
 									aria-label={t().historyPreviewTitle}
 								>
-									<HistoryThumbnail item={it} scope="table" size="mini" />
+									<HistoryThumbnail item={it} size="mini" />
 								</button>
 								<button
 									class="thumb-star mini-star"

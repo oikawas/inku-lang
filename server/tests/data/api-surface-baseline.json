@@ -251,7 +251,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserProfileUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -505,7 +506,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryPostBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -759,7 +761,8 @@
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -1691,7 +1694,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreResponse\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -1705,7 +1709,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderSvgRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -2161,7 +2166,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupCreateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupItem\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -2191,7 +2197,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupItem\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -2219,7 +2226,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountCreateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -2250,7 +2258,8 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
+        "500": "{\"description\":\"Unexpected server failure\"}"
       }
     },
     {
@@ -2486,5 +2495,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "75caec4c5b3fcd8d7cf7d199fa28b6c21daf0dc1d1756e97698e3ba10853c48e"
+  "digest": "bf678f5e186d8763dc2fb504aea1103ffda2249b9d0cbfe56c9f7197583948c5"
 }

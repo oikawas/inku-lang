@@ -1,4 +1,5 @@
 import type { ApiFetch } from '../../transport/api-fetch.ts';
+import { fetchAnchorWithFilterReset } from './lineage-actions.ts';
 import {
 	HistoryManagerState,
 	type HistoryItem
@@ -24,22 +25,8 @@ import {
 export const HISTORY_EXTERNAL_REFRESH_MS = 12_000;
 export const HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS = 5_000;
 
-export type HistoryStarProjection = {
-	id?: string;
-	starred?: boolean;
-	note?: string | null;
-};
-
-export type HistoryForRevisionProjection = {
-	id?: string;
-	for_revision?: boolean;
-};
-
-export type HistoryForShareProjection = {
-	id?: string;
-	for_share?: boolean;
-	share_group_id?: string | null;
-};
+import type { HistoryStarProjection, HistoryForRevisionProjection, HistoryForShareProjection } from './projections.ts';
+export type { HistoryStarProjection, HistoryForRevisionProjection, HistoryForShareProjection } from './projections.ts';
 
 export type HistoryBrowsingDependencies = {
 	apiFetch: ApiFetch;
@@ -83,7 +70,6 @@ export class HistoryBrowsingState {
 	search = $state('');
 	searchFailed = $state(false);
 	private appliedSearch = $state('');
-	trashItems = $state<HistoryItem[]>([]);
 	trashTotal = $state(0);
 
 	readonly manager: HistoryManagerState;
@@ -99,8 +85,7 @@ export class HistoryBrowsingState {
 
 	constructor(deps: HistoryBrowsingDependencies) {
 		this.deps = deps;
-		this.manager = new HistoryManagerState(deps.apiFetch, (items, total) => {
-			this.trashItems = items;
+		this.manager = new HistoryManagerState(deps.apiFetch, (_items, total) => {
 			this.trashTotal = total;
 		});
 	}
@@ -158,7 +143,6 @@ export class HistoryBrowsingState {
 		this.search = '';
 		this.appliedSearch = '';
 		this.searchFailed = false;
-		this.trashItems = [];
 		this.trashTotal = 0;
 		this.externalRefreshInFlight = false;
 		this.lastExternalRefreshAt = 0;
@@ -314,38 +298,37 @@ export class HistoryBrowsingState {
 			return;
 		}
 		this.cursor = -1;
-		let found = await this.fetchOffset(0, { anchorId: item.id, signal });
-		if (requestId !== this.selectionRequest || signal?.aborted) return;
-		if (found === 'missing' && this.filtered) {
-			// All strip filters come off together because the missing response
-			// does not say which independent mark hid the current work.
-			const clearedStarred = this.starredOnly;
-			this.starredOnly = false;
-			this.forRevisionOnly = false;
-			this.forShareOnly = false;
-			if (clearedStarred) this.deps.onStarredFilterCleared();
-			else this.deps.onOtherFilterCleared();
-			found = await this.fetchOffset(0, { anchorId: item.id, signal });
-		}
+		const found = await fetchAnchorWithFilterReset(item.id, {
+			fetchOffset: (offset, options) => this.fetchOffset(offset, options),
+			filtered: () => this.filtered,
+			isCurrent: () => requestId === this.selectionRequest && !signal?.aborted,
+			signal,
+			clearFilters: () => {
+				const clearedStarred = this.starredOnly;
+				this.starredOnly = false;
+				this.forRevisionOnly = false;
+				this.forShareOnly = false;
+				if (clearedStarred) this.deps.onStarredFilterCleared();
+				else this.deps.onOtherFilterCleared();
+			}
+		});
 		if (requestId !== this.selectionRequest || signal?.aborted) return;
 		if (found === 'missing') this.cursor = -1;
 	}
 
 	async fetchTrashPage(): Promise<void> {
 		if (!this.deps.signedIn()) {
-			this.trashItems = [];
 			this.trashTotal = 0;
 			return;
 		}
 		const requestId = ++this.trashRequest;
 		try {
 			const response = await this.deps.apiFetch(
-				'/api/history?offset=0&limit=100&trashed=true&include_svg=false'
+				'/api/history?offset=0&limit=1&trashed=true&include_svg=false'
 			);
 			if (requestId !== this.trashRequest || !response.ok) return;
-			const data = await response.json() as { items: HistoryItem[]; total: number };
+			const data = await response.json() as { total: number };
 			if (requestId !== this.trashRequest) return;
-			this.trashItems = data.items;
 			this.trashTotal = data.total;
 		} catch {
 			// The trash summary is opportunistic; the manager can fetch it later.
@@ -529,18 +512,12 @@ export class HistoryBrowsingState {
 		this.items = this.items.map((candidate) => candidate.id === item.id
 			? { ...candidate, starred: item.starred, note: hasNote ? item.note : candidate.note }
 			: candidate);
-		this.trashItems = this.trashItems.map((candidate) => candidate.id === item.id
-			? { ...candidate, starred: item.starred, note: hasNote ? item.note : candidate.note }
-			: candidate);
 		this.manager.applyStarState(item);
 	}
 
 	applyForRevisionState(item: HistoryForRevisionProjection): void {
 		if (!item.id) return;
 		this.items = this.items.map((candidate) => candidate.id === item.id
-			? { ...candidate, for_revision: item.for_revision }
-			: candidate);
-		this.trashItems = this.trashItems.map((candidate) => candidate.id === item.id
 			? { ...candidate, for_revision: item.for_revision }
 			: candidate);
 		this.manager.applyForRevisionState(item);
@@ -550,9 +527,6 @@ export class HistoryBrowsingState {
 		if (!item.id) return;
 		const next = { for_share: item.for_share, share_group_id: item.share_group_id };
 		this.items = this.items.map((candidate) => candidate.id === item.id
-			? { ...candidate, ...next }
-			: candidate);
-		this.trashItems = this.trashItems.map((candidate) => candidate.id === item.id
 			? { ...candidate, ...next }
 			: candidate);
 		this.manager.applyForShareState(item);

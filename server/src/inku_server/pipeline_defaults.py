@@ -8,6 +8,7 @@ from copy import deepcopy
 
 from .color_catalogs import render_color_map_for_catalog
 from .limits import DEFAULT_LIMITS
+from .request_timeout import request_timeout_seconds
 from .pipeline_candidate import PipelineBinding, _bytes
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
 
@@ -45,7 +46,7 @@ def default_manifest(binding: PipelineBinding) -> dict:
     # Catalog selection and hole completion retain the existing request bound.
     # Stage 1 has a separate finite budget because its verified models can need
     # longer than one legacy request deadline. Core still owns every retry.
-    timeout_ms = max(1, int(float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120")) * 1000))
+    timeout_ms = max(1, int(request_timeout_seconds() * 1000))
     max_attempts = max(1, int(os.getenv("INKU_LLM_RETRY_ATTEMPTS", "4")))
     retry_delay_ms = max(
         0, int(float(os.getenv("INKU_LLM_RETRY_BASE_DELAY", "2")) * 1000)

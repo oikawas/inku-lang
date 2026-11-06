@@ -75,21 +75,6 @@ def bake(svg: str, scale: int) -> bytes | None:
         return None
 
 
-def build_one(history_id: str, svg: str, render_hash: str | None, scale: int) -> bool:
-    """Bake and store one thumbnail here, in this process.
-
-    False when nothing was written. Neither production path calls this: it holds
-    the GIL for the length of the bake, which is what I-284 moved the save off.
-    It stays as the in-process form the gates arrange a single bake with, and as
-    what a perturbation puts back to show that the child pool is load-bearing.
-    """
-    png = bake(svg, scale)
-    if png is None:
-        return False
-    _thumbs.put_thumb(history_id, scale, png, render_hash)
-    return True
-
-
 # ── Baking in a child ───────────────────────────────────────────────────────
 # Both the save path and the rebuild bake this way: only the rasterizing crosses
 # to a child process, and the storing stays here, where SQLite has one

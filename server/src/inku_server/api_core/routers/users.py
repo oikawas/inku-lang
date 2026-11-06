@@ -6,9 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from ... import db as _db
 from ...persistence.accounts import LastAdministratorError
-from ..common import _unexpected_http_error
+from ..common import _unexpected_http_error, _unique_conflict
 from ..deps import _user_manager
 from ..models import UserAccountItem
 
@@ -76,12 +77,12 @@ def api_user_groups_list(actor: dict = Depends(_user_manager)) -> list[UserGroup
     return [UserGroupItem(**group) for group in groups]
 
 
-@router.post("/api/user-groups", response_model=UserGroupItem, summary="Create a user group")
+@router.post("/api/user-groups", response_model=UserGroupItem, summary="Create a user group", responses={500: {"description": "Unexpected server failure"}})
 def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_user_manager)) -> UserGroupItem:
     """Create a user group with the given name. Only administrators may create groups.
 
-    Returns 403 for other user managers, 400 when the name is invalid, and 409 on an unexpected
-    failure.
+    Returns 403 for other user managers, 400 when the name is invalid, 409
+    when the name already exists, and 500 on an unexpected failure.
     """
     if not _db.has_permission_group(actor, "admins"):
         raise HTTPException(status_code=403, detail="only administrators can create groups")
@@ -89,11 +90,14 @@ def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_use
         return UserGroupItem(**_db.add_user_group(body.name))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except IntegrityError as e:
+        if _unique_conflict(e): raise HTTPException(status_code=409, detail="group already exists") from e
+        raise _unexpected_http_error("group create", 500, redact=True) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("group create", 409) from e
+        raise _unexpected_http_error("group create", 500, redact=True) from e
 
 
-@router.patch("/api/user-groups/{group_id}", response_model=UserGroupItem, summary="Rename a user group")
+@router.patch("/api/user-groups/{group_id}", response_model=UserGroupItem, summary="Rename a user group", responses={500: {"description": "Unexpected server failure"}})
 def api_user_groups_update(
     group_id: Annotated[str, Path(description="Id of the user group to rename.")],
     body: UserGroupUpdateBody,
@@ -102,7 +106,7 @@ def api_user_groups_update(
     """Rename a user group. Only administrators may rename groups.
 
     Returns 403 for other user managers, 400 when the name is invalid, 404 when the group does not
-    exist, and 409 on an unexpected failure.
+    exist, 409 for a duplicate name, and 500 on an unexpected failure.
     """
     if not _db.has_permission_group(actor, "admins"):
         raise HTTPException(status_code=403, detail="only administrators can update groups")
@@ -110,8 +114,11 @@ def api_user_groups_update(
         group = _db.update_user_group(group_id, body.name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except IntegrityError as e:
+        if _unique_conflict(e): raise HTTPException(status_code=409, detail="group already exists") from e
+        raise _unexpected_http_error("group update", 500, redact=True) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("group update", 409) from e
+        raise _unexpected_http_error("group update", 500, redact=True) from e
     if not group:
         raise HTTPException(status_code=404, detail="group not found")
     return UserGroupItem(**group)
@@ -148,13 +155,13 @@ def api_users_list(actor: dict = Depends(_user_manager)) -> list[UserAccountItem
     return [UserAccountItem(**user) for user in _db.list_users_for_actor(actor)]
 
 
-@router.post("/api/users", response_model=UserAccountItem, summary="Create a user account")
+@router.post("/api/users", response_model=UserAccountItem, summary="Create a user account", responses={500: {"description": "Unexpected server failure"}})
 def api_users_create(body: UserAccountCreateBody, actor: dict = Depends(_user_manager)) -> UserAccountItem:
     """Create a user account.
 
     A leader who is not an administrator may only create members with the `users` permission group
     in their own user group; other requests return 403. Returns 400 when a value is invalid and 409
-    on an unexpected failure.
+    for a duplicate account and 500 on an unexpected failure.
     """
     if not _db.has_permission_group(actor, "admins"):
         if set(body.permission_groups) != {"users"} or body.group_id != actor.get("group_id"):
@@ -169,12 +176,15 @@ def api_users_create(body: UserAccountCreateBody, actor: dict = Depends(_user_ma
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except IntegrityError as e:
+        if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
+        raise _unexpected_http_error("user create", 500, redact=True) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("user create", 409) from e
+        raise _unexpected_http_error("user create", 500, redact=True) from e
     return UserAccountItem(**user)
 
 
-@router.patch("/api/users/{user_id}", response_model=UserAccountItem, summary="Update a user account")
+@router.patch("/api/users/{user_id}", response_model=UserAccountItem, summary="Update a user account", responses={500: {"description": "Unexpected server failure"}})
 def api_users_update(
     user_id: Annotated[str, Path(description="Id of the user account to update.")],
     body: UserAccountUpdateBody,
@@ -203,8 +213,11 @@ def api_users_update(
         raise HTTPException(status_code=409, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except IntegrityError as e:
+        if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
+        raise _unexpected_http_error("user update", 500, redact=True) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("user update", 409) from e
+        raise _unexpected_http_error("user update", 500, redact=True) from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)

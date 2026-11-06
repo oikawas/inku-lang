@@ -5,7 +5,7 @@ import type { FetchHistoryResult } from './browsing-state.svelte.ts';
 
 type FetchOffset = (
 	offset: number,
-	options?: { anchorId?: string; preserveSelection?: boolean }
+	options?: { anchorId?: string; preserveSelection?: boolean; signal?: AbortSignal }
 ) => Promise<FetchHistoryResult>;
 
 export type FocusSavedLineageDependencies = {
@@ -19,6 +19,20 @@ export type FocusSavedLineageDependencies = {
 	missingWorkError: () => Error;
 };
 
+/** Retry a missing anchor once after removing the filters that can hide it. */
+export async function fetchAnchorWithFilterReset(
+ historyId: string,
+ deps: { fetchOffset: FetchOffset; filtered: () => boolean; clearFilters: () => void; isCurrent?: () => boolean; signal?: AbortSignal },
+): Promise<FetchHistoryResult> {
+ let found = await deps.fetchOffset(0, { anchorId: historyId, ...(deps.signal ? { signal: deps.signal } : {}) });
+ if (deps.isCurrent && !deps.isCurrent()) return 'superseded';
+ if (found === 'missing' && deps.filtered()) {
+  deps.clearFilters();
+  found = await deps.fetchOffset(0, { anchorId: historyId, ...(deps.signal ? { signal: deps.signal } : {}) });
+ }
+ return deps.isCurrent && !deps.isCurrent() ? 'superseded' : found;
+}
+
 /** Focus the saved child in browsing, on the canvas, and in lineage order. */
 export async function focusSavedLineageChild(
 	historyId: string | null | undefined,
@@ -26,11 +40,7 @@ export async function focusSavedLineageChild(
 	deps: FocusSavedLineageDependencies
 ): Promise<void> {
 	if (!historyId || !nodeId) throw deps.missingIdentityError();
-	let found = await deps.fetchOffset(0, { anchorId: historyId });
-	if (found === 'missing' && deps.filtered()) {
-		deps.clearFilters();
-		found = await deps.fetchOffset(0, { anchorId: historyId });
-	}
+	const found = await fetchAnchorWithFilterReset(historyId, deps);
 	if (found === 'superseded') return;
 	if (found !== 'found') throw deps.missingWorkError();
 	const saved = deps.items().find((item) => item.id === historyId);

@@ -172,6 +172,10 @@ def test_paint_409_exposes_persisted_compiler_failure_detail(
     config["stage1_retry"]["max_attempts"] = 1
     engine = create_engine(f"sqlite:///{tmp_path / 'provider-failure.db'}")
     Base.metadata.create_all(engine)
+    # The write-lock gate must read the same initialized test database as the
+    # execution; this test does not start the API's normal DB initialization.
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     store = VariationAuthorityStore(engine)
     effects = ProductPipelineEffects(binding, manifest)
     rejected_action_ids = []

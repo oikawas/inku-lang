@@ -25,6 +25,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, get_args
 
+from .build_info import build_number
 from . import schema
 from .color_catalogs import COLOR_KEYS, DEFAULT_COLOR_CATALOG_ID, color_catalogs
 from .geometry_thresholds import (
@@ -73,14 +74,6 @@ def _app_version() -> str | None:
         return None
 
 
-def _build_number() -> str | None:
-    path = _REPO_ROOT / "web" / "BUILD_NUMBER"
-    try:
-        return path.read_text(encoding="utf-8").strip() or None
-    except OSError:
-        return None
-
-
 def _git_short_hash() -> str | None:
     try:
         result = subprocess.run(
@@ -100,7 +93,7 @@ def _git_short_hash() -> str | None:
 def _meta() -> dict[str, Any]:
     return {
         "app_version": _app_version(),
-        "build_number": _build_number(),
+        "build_number": build_number(_REPO_ROOT),
         "git_short_hash": _git_short_hash(),
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         "score_version": get_args(schema.ScoreVersion)[0],

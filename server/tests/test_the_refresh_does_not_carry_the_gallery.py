@@ -74,7 +74,7 @@ class World:
 
     def teardown(self) -> None:
         for user, token in ((self.owner, self.owner_t), (self.stranger, self.stranger_t)):
-            db.delete_all(user["id"])
+            db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
             db.delete_session(token)
             db.delete_user(user["id"], cascade=True)
 

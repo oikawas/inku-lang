@@ -19,7 +19,6 @@
 
 	type Props = {
 		item: HistoryItem;
-		scope: string;
 		size?: Size;
 	};
 

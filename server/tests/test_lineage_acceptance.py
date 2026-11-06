@@ -45,7 +45,7 @@ def _item(user_id: str, source: str, at: int, **extra) -> dict:
 
 def _cleanup(*users: dict) -> None:
     for user in users:
-        db.delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
         assert db.delete_user(user["id"])
 
 

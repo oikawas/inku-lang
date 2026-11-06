@@ -32,7 +32,7 @@
 	import WorkEditDialog from './WorkEditDialog.svelte';
 	import JuxtaposeDialog from './JuxtaposeDialog.svelte';
 	import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
-	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
+	import { composeFallbackReason, composeFallbackState, composeFallbackValue, interpretFallbackReason as interpretReason } from '$lib/composeFallback';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
 	import type { RangePreview } from '$lib/composition-ranges';
@@ -671,11 +671,7 @@
 			: ''
 	);
 	// Since v1.98, identify works drawn with fallback DDL after Stage 1 failed.
-	const interpretFallbackReason = $derived(
-		statusHistoryItem
-			? (statusHistoryItem.interpret_fallback ?? null)
-			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
-	);
+	const interpretFallbackReason = $derived(interpretReason(statusHistoryItem, result));
 	// Stage 2's counterpart. A saved work reads its column; a work still on the
 	// canvas reads the response it was drawn by, which is the only place the
 	// fact exists before it is saved.

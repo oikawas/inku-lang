@@ -148,11 +148,11 @@ test('T-236 the badge wording exists in both languages and names its layer', () 
 		// seeing one badge has to know which stage lost the description.
 		assert.notEqual(pack.composeFallbackBadge, pack.interpretFallbackBadge);
 	}
-	assert.equal(ja.composeFallbackBadge, '作曲フォールバック');
-	assert.equal(ja.interpretFallbackBadge, '解釈フォールバック');
+	assert.equal(ja.composeFallbackBadge, '旧作品の楽譜の代替');
+	assert.equal(ja.interpretFallbackBadge, '指示書の代替');
 	// GLOSSARY: `composition` is the word for placement, so the English badge
 	// says Score -- `Composition fallback` would collide with composition_seed.
-	assert.equal(en.composeFallbackBadge, 'Score fallback');
+	assert.equal(en.composeFallbackBadge, "Old work's score fallback");
 	assert.ok(!en.composeFallbackBadge.toLowerCase().includes('composition'));
 	// The hint names the stage and differs by reason.
 	assert.notEqual(

@@ -57,7 +57,8 @@ def test_history_list_state_reader_is_owned_by_history_persistence_module():
     forbidden_import_parts = {"db", "renderer", "rendering", "render_engines", "config", "engine", "search", "lineage"}
     for imported in imports:
         if isinstance(imported, ast.ImportFrom):
-            assert imported.level <= 1
+            # Drawing-option projection is owned by the shared core adapter.
+            assert imported.level <= 1 or (imported.level == 2 and imported.module == "verified_model_catalog")
             names = [imported.module or "", *(alias.name for alias in imported.names)]
         else:
             names = [alias.name for alias in imported.names]

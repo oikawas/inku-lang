@@ -474,7 +474,7 @@ def api_history_thumb(
     return Response(content=row["png"], media_type="image/png", headers=headers)
 
 
-@router.get("/api/history/{item_id}/svg", summary="Get a work's SVG")
+@router.get("/api/history/{item_id}/svg", summary="Get a work's SVG", responses={500: {"description": "Unexpected server failure"}})
 def api_history_svg(
     item_id: Annotated[str, Path(description="Id of the work.")],
     profile: str = Query(default="display", description="SVG output profile: display / editable / compat / live"),
@@ -485,7 +485,7 @@ def api_history_svg(
 
     The display profile returns the SVG saved with the work. Other profiles are
     drawn again from the work's saved score. Returns 404 when the work is not
-    found for the caller and 422 when the redraw fails.
+    found for the caller, 422 for an invalid redraw, and 500 for an unexpected failure.
     """
     svg_profile = _validated_svg_profile(profile)
     if svg_profile == "display" and request is not None and request.headers.get("if-none-match"):
@@ -544,8 +544,10 @@ def api_history_svg(
             )
         except HTTPException:
             raise
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
         except Exception as e:  # noqa: BLE001
-            raise _unexpected_http_error("history svg render", 422) from e
+            raise _unexpected_http_error("history svg render", 500, redact=True) from e
     headers = {}
     if svg_profile == "display" and item.get("render_hash"):
         headers = {"ETag": f'"{item["render_hash"]}-display"', "Cache-Control": _THUMB_CACHE_CONTROL}
@@ -593,7 +595,7 @@ def _parent_laws_records(owner_id: str, parent_node_id: str) -> dict:
     return laws_records_of(VariationAuthorityStore(_db.engine), owner_id, parent_id) if parent_id else {}
 
 
-@router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True, summary="Save a work to history")
+@router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True, summary="Save a work to history", responses={500: {"description": "Unexpected server failure"}})
 def api_history_post(
     body: HistoryPostBody,
     idempotency_key: str | None = Header(
@@ -610,7 +612,7 @@ def api_history_post(
     a replay of a saved work, or a child of a lineage node. Returns 404 when a
     named lineage node or parent is not found, 409 when the parent's description
     is locked or a replay preview has changed, and 422 when the score or the
-    replay request is invalid.
+    replay request is invalid. An unexpected rendering failure returns 500.
     """
     replay_link = None
     # A sender never names a laws record: the Server writes them only on the edges
@@ -855,8 +857,10 @@ def api_history_post(
             svg, render_metadata = _render_with_metadata(score, render_metadata, owner=actor["id"])
         except HTTPException:
             raise
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
         except Exception as e:  # noqa: BLE001
-            raise _unexpected_http_error("history score render", 422) from e
+            raise _unexpected_http_error("history score render", 500, redact=True) from e
     def persist_managed(item):
         store, linked = replay_link
         with _db.SessionLocal.begin() as session:

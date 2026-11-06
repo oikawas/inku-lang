@@ -533,12 +533,10 @@ def ensure_current_schema(
     database_path: Path | None,
     create_schema: Callable[[Connection], None],
     seed_fresh: Callable[[Connection], None],
-    apply_legacy: Callable[[Connection], None],
 ) -> MigrationOutcome:
     """Create or verify current storage; add nullable image fields to v4.
 
-    The callback signature remains stable for the DB façade. Historical
-    upgrades belong to ``legacy_v3_migrations`` and the isolated restore entry.
+    Historical upgrades belong to ``legacy_v3_migrations`` and the isolated restore entry.
     """
     with engine.connect() as connection:
         tables = _user_tables(connection)

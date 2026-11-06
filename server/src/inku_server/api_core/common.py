@@ -6,6 +6,7 @@ import importlib.metadata
 import os
 from pathlib import Path
 from fastapi import HTTPException
+from ..build_info import build_number as _build_number
 from ..languages import SUPPORTED_INSTRUCTION_LANGS, normalize_instruction_lang, resolve_instruction_lang
 from ..model_settings import model_is_offered, provider_for_model
 from ..verified_model_catalog import core_catalog
@@ -46,16 +47,22 @@ _APP_VERSION = _app_version()
 _RELEASE_VERSION = _release_version()
 
 
-def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:
+def _unexpected_http_error(operation: str, status_code: int, *, redact: bool = False) -> HTTPException:
     _logger.exception("%s failed", operation)
     detail = f"{operation} failed"
-    if os.getenv("INKU_ENV") == "development":
+    if not redact and os.getenv("INKU_ENV") == "development":
         import sys
         import traceback
         exc_type, exc_value, _ = sys.exc_info()
         if exc_value:
             detail = f"{operation} failed: {exc_type.__name__}: {exc_value}\n{traceback.format_exc()}"
     return HTTPException(status_code=status_code, detail=detail)
+
+
+def _unique_conflict(error: Exception) -> bool:
+    original = getattr(error, "orig", error)
+    code = getattr(original, "sqlite_errorcode", None)
+    return code in (1555, 2067) or getattr(original, "sqlstate", None) == "23505" or getattr(original, "pgcode", None) == "23505"
 
 
 def _normalize_instruction_lang(value: str | None, *, default: str = "ja") -> str:
@@ -75,16 +82,6 @@ def _normalize_ui_lang(value: str | None) -> str | None:
     if not lang:
         return None
     return lang[:32]
-
-
-def _build_number() -> str | None:
-    # One level deeper than api.py: api_core/common.py -> inku_server -> src ->
-    # server -> repository root.
-    path = Path(__file__).resolve().parents[4] / "web" / "BUILD_NUMBER"
-    try:
-        return path.read_text(encoding="utf-8").strip() or None
-    except OSError:
-        return None
 
 
 def _resolved_vision_model(model: str | None, actor: dict | None = None) -> str:

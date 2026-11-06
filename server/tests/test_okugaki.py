@@ -115,7 +115,7 @@ def test_branch_fact_sheet_handles_legacy_visibility_and_tombstone():
         assert sheet["generations"][0]["features"] is None
         assert sheet["generations"][1]["caption"] == "hidden"
     finally:
-        db.delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
         assert db.delete_user(user["id"])
 
 
@@ -180,8 +180,8 @@ def test_generate_signs_mechanically_and_storage_is_append_only_scoped_and_idemp
         assert before["description_hash"] == after["description_hash"]
         assert before["render_hash"] == after["render_hash"]
     finally:
-        db.delete_all(user["id"])
-        db.delete_all(other["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(other["id"])
         assert db.delete_user(user["id"])
         assert db.delete_user(other["id"])
 

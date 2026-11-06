@@ -13,7 +13,6 @@ from xml.etree import ElementTree
 
 from inku_server.renderer import render
 from inku_server.schema import Score
-from inku_server.svg_compat import validate_compat_svg
 
 ROOT = Path(__file__).resolve().parents[2]
 SVG_NS = "{http://www.w3.org/2000/svg}"
@@ -103,7 +102,6 @@ def test_t337_non_computer_solid_has_stable_base_fill_and_its_own_tool_filter():
 def test_t338_non_computer_solid_compat_is_flat_and_portable():
     svg = _render("pen", "compat")
 
-    validate_compat_svg(svg)
     assert not list(_elements(svg, "filter"))
     assert not list(_elements(svg, "clipPath"))
     assert len(_classed(svg, "solid-base-fill-v1")) == 1

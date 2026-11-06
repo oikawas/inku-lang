@@ -71,8 +71,8 @@ EXPECTED_TABLE_NAMES = {
     "app_settings",
     *AUTHORING_TABLE_NAMES,
 }
-# Registry v5 adds nullable image provenance and core metadata to the single-DDL schema.
-SINGLE_DDL_SCHEMA_SHA256 = "d3432962cad7d3117804668c355dfedf0bee3286bbecb0abb3a949c4c329ef61"
+# Registry v7 adds recorded drawing options; fresh databases also include the listing indexes.
+SINGLE_DDL_SCHEMA_SHA256 = "3867f273ceb19c18ca3da80b29d2436a7c262e7a0626435734b0046c6a721f18"
 
 
 def _compiled_schema_payload(base, *, excluded_tables: set[str] | None = None) -> bytes:

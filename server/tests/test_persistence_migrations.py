@@ -102,7 +102,7 @@ def test_v7_startup_preserves_existing_schema_with_or_without_listing_indexes(tm
     def start():
         return ensure_current_schema(engine=engine, database_path=path,
                                      create_schema=Base.metadata.create_all,
-                                     seed_fresh=_no_op, apply_legacy=_no_op)
+                                     seed_fresh=_no_op)
 
     assert start().mode == "fresh"
     with engine.begin() as connection:
@@ -153,7 +153,7 @@ def test_v5_history_normalization_is_atomic_and_preserves_the_backup(tmp_path, m
         monkeypatch.setattr(migrations, "require_integrity", lambda _connection: (_ for _ in ()).throw(RuntimeError("injected")))
     def run():
         return ensure_current_schema(engine=engine, database_path=path, create_schema=_no_op,
-                                     seed_fresh=_no_op, apply_legacy=_no_op)
+                                     seed_fresh=_no_op)
     if fail:
         with pytest.raises(migrations.MigrationExecutionError) as error:
             run()
@@ -190,7 +190,7 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
 ) -> None:
     path = tmp_path / "fresh.db"
     engine = _engine(path)
-    calls = {"create": 0, "seed": 0, "legacy": 0}
+    calls = {"create": 0, "seed": 0}
 
     def create_schema(connection) -> None:
         calls["create"] += 1
@@ -202,15 +202,11 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
             text("INSERT INTO history(id, input, score, svg) VALUES ('fresh', '', '{}', '')")
         )
 
-    def legacy(_connection) -> None:
-        calls["legacy"] += 1
-
     first = ensure_current_schema(
         engine=engine,
         database_path=path,
         create_schema=create_schema,
         seed_fresh=seed,
-        apply_legacy=legacy,
     )
     monkeypatch.setattr(
         migrations,
@@ -222,12 +218,11 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
         database_path=path,
         create_schema=create_schema,
         seed_fresh=seed,
-        apply_legacy=legacy,
     )
 
     assert first.mode == "fresh"
     assert second.mode == "current"
-    assert calls == {"create": 1, "seed": 1, "legacy": 0}
+    assert calls == {"create": 1, "seed": 1}
     assert _registry_row(engine) == (
         MIGRATION_VERSION,
         MIGRATION_NAME,
@@ -345,7 +340,6 @@ def test_registry_checksum_mismatch_fails_closed(tmp_path: Path) -> None:
         database_path=path,
         create_schema=lambda connection: _create_history_schema(connection, current=True),
         seed_fresh=_no_op,
-        apply_legacy=_no_op,
     )
     with engine.begin() as connection:
         connection.exec_driver_sql("UPDATE schema_migrations SET checksum='wrong'")
@@ -356,7 +350,6 @@ def test_registry_checksum_mismatch_fails_closed(tmp_path: Path) -> None:
             database_path=path,
             create_schema=_create_history_schema,
             seed_fresh=_no_op,
-            apply_legacy=_no_op,
         )
     engine.dispose()
 
@@ -375,7 +368,6 @@ def test_unknown_legacy_schema_fails_before_snapshot_or_mutation(tmp_path: Path)
             database_path=path,
             create_schema=_no_op,
             seed_fresh=_no_op,
-            apply_legacy=_no_op,
         )
 
     assert hashlib.sha256(path.read_bytes()).hexdigest() == before
@@ -501,7 +493,6 @@ def test_partial_fts_state_fails_without_guessing_a_repair(
             database_path=path,
             create_schema=_no_op,
             seed_fresh=_no_op,
-            apply_legacy=lambda _connection: pytest.fail("partial FTS was repaired"),
         )
     assert not (tmp_path / "migration-backups").exists()
     engine.dispose()

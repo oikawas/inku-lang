@@ -2216,7 +2216,7 @@ After selecting ordinary history, description generation and DDL drawing wait fo
 
 ### 12.8 Error Recovery
 
-In the Server pipeline, sketch from life, composition, laws, colors and fill-the-plan retries default to 300 seconds per attempt and 540 seconds in total, configurable with `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` and `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS`. Catalog and hole-filling retries default to 120 seconds both per attempt and in total, using `INKU_LLM_REQUEST_TIMEOUT_SECONDS`. Waiting to send to the provider counts against the stage deadline.
+In the Server pipeline, sketch from life, composition, laws, colors and fill-the-plan retries default to 300 seconds per attempt and 540 seconds in total, configurable with `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` and `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS`. Catalog and hole-filling retries default to 120 seconds both per attempt and in total, using `INKU_LLM_REQUEST_TIMEOUT_SECONDS`. Waiting to send to the provider counts against the stage deadline. Demo instruction and Vision requests use the same overall deadline, including admission and response receipt, and limit response bodies to 32 MB.
 
 Each LLM stage makes retry decisions only within its caller-supplied
 `max_attempts` and `total_timeout_ms`. Transport failures and empty, too-short,
@@ -2304,6 +2304,8 @@ A batch that reaches the end with unsaved lines is `finished_with_failures`. On 
 Description-batch resumption checks the registered original plan and settings against saved works with the same batch ID and does not resend saved lines. Resume is not offered while a drawing is active or uncertain. An image folder must be picked again; its submitted order, kept in the browser's localStorage, is reconciled with saved works before resumption. Losing localStorage loses that reconciliation. Older unregistered batches retain the history-based fallback.
 
 With `batch_run_id`, `GET /api/history` returns only the caller's own works from that batch. Without it, the readable scope is unchanged.
+
+Rendering, history redraws, and account administration retain their 4xx responses for invalid input or conflicts. Unexpected internal failures are logged and return 500 without the internal exception text.
 
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a

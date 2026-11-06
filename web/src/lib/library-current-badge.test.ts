@@ -24,7 +24,7 @@ function rule(source: string, selector: string): Record<string, string> {
 test('a time-ordered Library card marks the work shown on the canvas', () => {
 	assert.match(
 		MANAGER,
-		/<HistoryThumbnail item=\{it\} scope="manager" size="manager" \/>\s*\{#if it\.id && currentHistoryId === it\.id\}<span class="thumb-current-badge">\{t\(\)\.historyCurrentBadge\}<\/span>\{\/if\}/
+		/<HistoryThumbnail item=\{it\} size="manager" \/>\s*\{#if it\.id && currentHistoryId === it\.id\}<span class="thumb-current-badge">\{t\(\)\.historyCurrentBadge\}<\/span>\{\/if\}/
 	);
 });
 

@@ -47,10 +47,10 @@ test('a description is drawn in words unless the author chooses a plan', () => {
 	assert.equal(sketchModeForRoute('stages', 'on'), 'on');
 	// Neither the route nor the sketch is a stored setting.
 	const work = read('./features/work/state.svelte.ts');
-	assert.match(work, /let drawRoute = \$state<DrawRoute>\(DEFAULT_DRAW_ROUTE\)/);
+	assert.match(work, /route: 'read_and_draw', sketch: 'on'/);
 	// The page opens on read and draw with the sketch on, as choosing it would.
-	assert.match(work, /let sketchMode = \$state<SketchMode>\(sketchModeForRoute\(DEFAULT_DRAW_ROUTE, DEFAULT_SKETCH_MODE\)\)/);
-	assert.match(work, /if \(route !== drawRoute\) sketchMode = sketchModeForRoute\(route, sketchMode\)/);
+	assert.match(work, /route: 'read_and_draw', sketch: 'on'/);
+	assert.match(work, /if \(route !== currentOptions\(\)\.route\) currentOptions\(\)\.sketch = sketchModeForRoute\(route, currentOptions\(\)\.sketch\)/);
 	assert.doesNotMatch(work, /persist\(\{[^}]*drawRoute/);
 });
 
@@ -63,19 +63,19 @@ test('a work opened from the history sets the route it was drawn by', () => {
 	assert.equal(drawRouteOf({ route: 'read_and_draw' }), 'read_and_draw');
 	assert.equal(drawRouteOf({ route: 'stages', description_ddl: {} }), 'stages');
 	const page = read('../routes/+page.svelte');
-	assert.match(page, /drawRouteOf\(it\)/);
+	assert.match(page, /adoptWorkOptions\(it\.draw_options, imageWork \? 'image' : 'describe', signal\)/);
 	assert.match(page, /onSelectDrawRoute=\{work\.selectDrawRoute\}/);
 });
 
 test('every run asks for the route it was drawn with, the batch included', () => {
 	const work = read('./features/work/state.svelte.ts');
 	const currentWork = read('./features/run/current-work.ts');
-	assert.match(work, /const route = options\.route \?\? drawRoute;\s*return \{\s*route,/);
-	assert.match(work, /const batchRoute = drawRoute/);
+	assert.match(work, /const route = options\.route \?\? currentOptions\(\)\.route;\s*return \{\s*route,/);
+	assert.match(work, /const batchRoute = drawChoices\.batch_text\.route/);
 	assert.match(currentWork, /description: text,\s*route,/);
 	// The composition and laws travel with the route (2026-10-26): only read and draw sends it.
-	assert.match(work, /\.\.\.compositionOption\(route, options\.compositionMode \?\? compositionMode\)/);
-	assert.match(work, /const batchComposition = compositionMode/);
+	assert.match(work, /\.\.\.compositionOption\(route, options\.compositionMode \?\? currentOptions\(\)\.composition\)/);
+	assert.match(work, /const batchComposition = drawChoices\.batch_text\.composition/);
 	assert.match(currentWork, /description: text,\s*route,\s*\.\.\.composition,/);
 });
 
@@ -95,7 +95,7 @@ test('the composition and laws are sent only by read and draw, and a work says w
 	assert.equal(compositionPassed('read_and_draw', 'on'), true);
 	const page = read('../routes/+page.svelte');
 	assert.match(page, /onSelectCompositionMode=\{work\.selectCompositionMode\}/);
-	assert.match(page, /drawRouteOf\(it\),\s*compositionModeOf\(it\)\)/);
+	assert.match(page, /adoptWorkOptions\(it\.draw_options, imageWork \? 'image' : 'describe', signal\)/);
 });
 
 test('the last measure is counted and the pairs that did not fit are named', () => {

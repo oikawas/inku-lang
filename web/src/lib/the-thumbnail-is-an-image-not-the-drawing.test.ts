@@ -143,7 +143,7 @@ const SENDERS = [
 	{
 		file: './features/history/browsing-state.svelte.ts',
 		what: "the trash count's listing",
-		pattern: /\/api\/history\?offset=0&limit=100&trashed=true&include_svg=false/,
+		pattern: /\/api\/history\?offset=0&limit=1&trashed=true&include_svg=false/,
 		sendsFalse: true
 	}
 ];

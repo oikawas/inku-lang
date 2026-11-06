@@ -46,7 +46,7 @@ test('T-41  and the catalog name it stood under is still there', () => {
 	// Which of the fourteen catalogs translated the colours is the fact that is
 	// about this work, and it stays.
 	assert.match(INFO, /t\(\)\.provenanceHintCatalog\)/);
-	assert.match(INFO, /<dd>\{statusCatalogName\}<\/dd>/);
+	assert.match(INFO, /<dd>\{optionText\('catalog'\)\}<\/dd>/);
 });
 
 // ------------------------------------------------------------------- T-42

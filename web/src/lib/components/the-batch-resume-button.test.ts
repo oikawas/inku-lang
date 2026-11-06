@@ -71,12 +71,8 @@ test('T-65  the answer is asked for again when a run ends', () => {
 test('T-66  resuming an auto run resumes under auto, not under what it resolved to', () => {
 	// [I-257]. The order matters: testing the resolved id first would pin the
 	// catalog before the mode was ever looked at.
-	assert.match(PAGE, /if \(conditions\.catalogMode === 'auto'\) colorCatalogSettings\.selected = AUTO_CATALOG_ID;/);
-	assert.match(PAGE, /else if \(conditions\.catalogId\) colorCatalogSettings\.selected = conditions\.catalogId;/);
-	assert.ok(
-		PAGE.indexOf("conditions.catalogMode === 'auto'") < PAGE.indexOf('else if (conditions.catalogId)'),
-		'the resolved id is tested after the catalog it resolved to, so auto can never win',
-	);
+	assert.match(PAGE, /if \(conditions\.catalogId\) choices\.catalog\.id = conditions\.catalogId;/);
+	assert.match(PAGE, /if \(conditions\.catalogMode\) choices\.catalog\.mode = conditions\.catalogMode === 'auto' \? 'auto' : 'fixed';/);
 });
 
 test('T-66  the mode reaches the row it is read from', () => {

@@ -13,7 +13,7 @@ const WORK = readFileSync(new URL('../features/work/state.svelte.ts', import.met
 
 test('the batch tab has a switch, and the description side is the panel it always was', () => {
 	assert.match(INPUT_PANEL, /role="switch"[\s\S]*?aria-checked=\{imageFolder\.source === 'image'\}/);
-	assert.match(INPUT_PANEL, /\{#if imageFolder\.source === 'image'\}\s*<ImageFolderBatchPanel[\s\S]*?\{:else\}\s*<BatchPanel/);
+	assert.match(INPUT_PANEL, /\{#if imageFolder\.source === 'image'\}[\s\S]*?<ImageFolderBatchPanel[\s\S]*?\{:else\}\s*<BatchPanel/);
 	assert.match(INPUT_PANEL, /disabled=\{batchRunning \|\| batchResuming \|\| folderRunning\}/);
 });
 

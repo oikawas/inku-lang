@@ -570,16 +570,18 @@ fn candidates_at_with_locked_macro_boundary(
     }
     // A sidecar-locked Macro is also a recognized left boundary for Japanese
     // particles. The ordinary asset-only boundary scan cannot see that head.
-    let left_end = source[..start_byte].trim_end_matches(is_separator).len();
-    let bracket_end = source[..start_byte]
-        .trim_end_matches(|ch| is_separator(ch) && !matches!(ch, '}' | '｝'))
-        .len();
-    let preceded_by_bracket_macro = language == ResolvedInstructionLanguage::Ja
-        && source[..bracket_end].rfind(['{', '｛']).is_some_and(|start| {
-            matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
-        });
-    let preceded_by_locked_macro = preceded_by_bracket_macro
-        || document.legacy_names_for_migration()
+    let preceded = std::cell::OnceCell::new();
+    let preceded_by_locked_macro = || {
+        *preceded.get_or_init(|| {
+        let left_end = source[..start_byte].trim_end_matches(is_separator).len();
+        let bracket_end = source[..start_byte]
+            .trim_end_matches(|ch| is_separator(ch) && !matches!(ch, '}' | '｝'))
+            .len();
+        let preceded_by_bracket_macro = language == ResolvedInstructionLanguage::Ja
+            && source[..bracket_end].rfind(['{', '｛']).is_some_and(|start| {
+                matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
+            });
+        preceded_by_bracket_macro || document.legacy_names_for_migration()
             && language == ResolvedInstructionLanguage::Ja
             && document.macro_locks().iter().any(|macro_lock| {
                 macro_lock.visible_names().any(|name| {
@@ -592,12 +594,14 @@ fn candidates_at_with_locked_macro_boundary(
                             if end_byte == left_end)
                         })
                 })
-            });
+            })
+    })
+    };
     // The ordinary coordination right-boundary check sees built-in words
     // and qualified Macro names, but not a bracketed sidecar-locked word.
     if language == ResolvedInstructionLanguage::Ja
         && source[start_byte..].starts_with('と')
-        && (preceded_by_locked_macro
+        && (preceded_by_locked_macro()
             || has_japanese_recognized_left_candidate(edition, source, start_byte)
             || has_japanese_recognized_left_candidate_across_separators(
                 edition, source, start_byte,
@@ -637,7 +641,7 @@ fn candidates_at_with_locked_macro_boundary(
                     | Some(QualifiedMacroMatch::AmbiguousLocks { .. })
             );
         let already_present = candidates.iter().any(|existing| existing == &candidate);
-        if (followed_by_locked_macro || preceded_by_locked_macro) && !already_present {
+        if !already_present && (followed_by_locked_macro || preceded_by_locked_macro()) {
             candidates.push(candidate);
         }
     }

@@ -157,6 +157,14 @@ struct LibraryParityTests {
             childNodeID: grandchildNode.id, derivationKind: "ddl_edit", at: grandchild.at))
         #expect(try await db.lineageGenerations(nodeIDs: [siblingNode.id, grandchildNode.id, childNode.id])
                 == [siblingNode.id: 2, grandchildNode.id: 3, childNode.id: 2])
+        for (focus, depth, limit, pathOnly) in [
+            (rootNode.id, 2, 200, false), (childNode.id, 1, 200, false),
+            (grandchildNode.id, 0, 1, false), (grandchildNode.id, 0, 200, true)
+        ] {
+            let graph = try #require(await db.lineage(focusNodeID: focus, descendantDepth: depth, nodeLimit: limit, pathOnly: pathOnly))
+            let expected = try await db.lineageGenerations(nodeIDs: graph.nodes.map(\.id))
+            for node in graph.nodes { #expect(node.generation == expected[node.id]) }
+        }
         try await db.setTrashed(ids: [root.id], trashed: true)
         #expect(try await db.permanentlyDelete(ids: [root.id]) == 1)
         #expect(try await db.lineageGenerations(nodeIDs: nodeIDs) == [rootNode.id: 1, childNode.id: 2])

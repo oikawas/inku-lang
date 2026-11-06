@@ -472,7 +472,7 @@ public actor InkuDatabase {
         case .revision: column = "for_revision"
         }
         return try queue.write { db in
-            guard try SavedWork.fetchOne(db, key: id) != nil else {
+            guard try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM history WHERE id = ?)", arguments: [id]) == true else {
                 throw PersistenceError.invalidRecord("work no longer exists")
             }
             try db.execute(sql: "INSERT OR IGNORE INTO library_annotations (history_id) VALUES (?)", arguments: [id])
@@ -484,7 +484,7 @@ public actor InkuDatabase {
 
     public func setAnnotation(id: String, note: String? = nil, forRevision: Bool? = nil) throws {
         try queue.write { db in
-            guard try SavedWork.fetchOne(db, key: id) != nil else {
+            guard try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM history WHERE id = ?)", arguments: [id]) == true else {
                 throw PersistenceError.invalidRecord("work no longer exists")
             }
             try db.execute(sql: "INSERT OR IGNORE INTO library_annotations (history_id) VALUES (?)", arguments: [id])
@@ -522,8 +522,9 @@ public actor InkuDatabase {
         try queue.write { db in
             var count = 0
             for id in Set(ids) {
-                guard let work = try SavedWork.fetchOne(db, key: id), !requireTrashed || work.trashed else { continue }
-                if let nodeID = work.lineageNodeID {
+                guard let row = try Row.fetchOne(db, sql: "SELECT trashed, lineage_node_id FROM history WHERE id = ?", arguments: [id]),
+                      !requireTrashed || row["trashed"] as Bool else { continue }
+                if let nodeID: String = row["lineage_node_id"] {
                     try db.execute(sql: """
                         UPDATE lineage_nodes SET state = 'tombstone', history_id = NULL,
                             description_hash = NULL, render_hash = NULL, deleted_at = ? WHERE id = ?
@@ -653,13 +654,17 @@ public actor InkuDatabase {
             var current = focusNodeID
             var ancestorIDs = [focusNodeID]
             var truncated = false
+            var cyclic = false
             while let edge = try LineageEdge.fetchOne(db, sql: "SELECT * FROM lineage_edges WHERE child_node_id = ?",
                                                      arguments: [current]) {
-                guard !selectedIDs.contains(edge.parentNodeID) else { break }
+                guard !selectedIDs.contains(edge.parentNodeID) else { cyclic = true; break }
                 guard pathOnly || selectedIDs.count < limit else { truncated = true; break }
                 selectedEdges.append(edge); selectedIDs.insert(edge.parentNodeID)
                 ancestorIDs.append(edge.parentNodeID); current = edge.parentNodeID
             }
+            let focusGeneration = try Self.generation(id: focusNodeID, in: db)
+            var generations: [String: Int] = [:]
+            for (distance, id) in ancestorIDs.enumerated() { generations[id] = focusGeneration - distance }
             if !pathOnly {
                 var frontier = [focusNodeID]
                 for level in 0..<depth {
@@ -671,6 +676,7 @@ public actor InkuDatabase {
                     for edge in edges where !selectedIDs.contains(edge.childNodeID) {
                         guard selectedIDs.count < limit else { truncated = true; break }
                         selectedEdges.append(edge); selectedIDs.insert(edge.childNodeID); next.append(edge.childNodeID)
+                        generations[edge.childNodeID] = focusGeneration + level + 1
                     }
                     frontier = next
                     if frontier.isEmpty { break }
@@ -688,7 +694,7 @@ public actor InkuDatabase {
                 let childCount = try Int.fetchOne(db, sql: "SELECT count(*) FROM lineage_edges WHERE parent_node_id = ?",
                                                  arguments: [id]) ?? 0
                 return LineageItem(node: node, work: work, annotation: annotation,
-                                   generation: try Self.generation(id: id, in: db), childCount: childCount)
+                                   generation: cyclic ? try Self.generation(id: id, in: db) : generations[id]!, childCount: childCount)
             }
             return LineageGraph(focusNodeID: focusNodeID,
                                 nodes: pathOnly ? items : items.sorted { ($0.node.at, $0.id) < ($1.node.at, $1.id) },

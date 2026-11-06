@@ -723,7 +723,7 @@ public final class LibraryModel {
             var offset = 0
             var ids: Set<String> = []
             repeat {
-                let result = try await database.libraryPage(query: requestedFilter, limit: 1000, offset: offset, rootNodeID: root)
+                let result = try await database.libraryPage(query: requestedFilter, limit: 1000, offset: offset, rootNodeID: root, includeSVG: false)
                 guard token == refreshToken, !Task.isCancelled else { return }
                 ids.formUnion(result.items.map(\.id))
                 offset += result.items.count

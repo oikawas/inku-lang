@@ -150,6 +150,11 @@ export type BatchRunConditions = {
 	composition?: CompositionMode | null;
 };
 
+/** A missing record leaves the author's current switch alone. */
+export function resumedWild(recorded: boolean | null, current: 'on' | 'off'): 'on' | 'off' {
+	return recorded === null ? current : recorded ? 'on' : 'off';
+}
+
 /**
  * The conditions to put back before resuming, read off the last work drawn.
  *

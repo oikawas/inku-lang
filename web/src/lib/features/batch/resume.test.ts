@@ -7,6 +7,7 @@ import {
 	latestBatchWork,
 	linesToResume,
 	numberedBatchLines,
+	resumedWild,
 	type BatchWork,
 } from './resume';
 
@@ -134,6 +135,13 @@ test('T-63  a condition the work never recorded is not invented', () => {
 		composition: null,
 	});
 	assert.equal(conditionsOfWork({ render_wild: false }).wild, null);
+});
+
+test('resuming preserves the current wild switch when the work did not record it', () => {
+	assert.equal(resumedWild(null, 'on'), 'on');
+	assert.equal(resumedWild(null, 'off'), 'off');
+	assert.equal(resumedWild(true, 'off'), 'on');
+	assert.equal(resumedWild(false, 'on'), 'off');
 });
 
 test('T-66  a run made under auto says so, beside the catalog it resolved to', () => {

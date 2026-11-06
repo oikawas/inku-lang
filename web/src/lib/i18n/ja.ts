@@ -175,6 +175,8 @@ export const ja: LangPack = {
 		return Object.hasOwn(reasons, reason) ? reasons[reason] : `検査で断られた（${reason}）`;
 	},
 	pipelineAttentionReason: (reason) => `理由: ${({
+		pipeline_effect_failed: 'サーバーの処理を完了できませんでした。もう一度描いてください',
+		pipeline_effect_limit: '処理の手数が上限を超えました',
 		stage1_failed: '記述の解釈を完了できませんでした',
 		hole_completion_failed: 'DDLの補完候補を作れませんでした',
 		description_ddl_failed: '記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください',

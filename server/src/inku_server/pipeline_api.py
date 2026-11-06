@@ -578,7 +578,7 @@ class PipelineService:
             return
         if run.view()["busy"]:
             from .chatgpt_runtime import begin_execution
-            begin_execution(*key)
+            begin_execution(*key, chatgpt=bool(run.context.get("host_options", {}).get("chatgpt_profile")))
             job = self._pool.submit(self._drain, run)
             job.add_done_callback(lambda done, key=key: self._log_job_failure(key, done))
             self._jobs[key] = job
@@ -643,6 +643,7 @@ class PipelineService:
             run.run_effect()
             from .chatgpt_runtime import execution_cancel
             if execution_cancel(run.owner_id, view["execution_id"]).is_set():
+                run.cancel_if_busy()
                 return
         if run.view()["busy"]:
             raise CandidateHostError("pipeline_effect_limit")
@@ -840,8 +841,11 @@ class PipelineService:
                 self._runs.move_to_end(key)
             else:
                 saved = json.loads(record.state_bytes)
-                run = self._host(owner, saved["snapshot"]["config"], saved["context"])
-                run.restore(saved["snapshot"], rendered=saved["rendered"])
+                if saved["snapshot"].get("action") is not None:
+                    run = self.execution(owner, execution_id)
+                else:
+                    run = self._host(owner, saved["snapshot"]["config"], saved["context"])
+                    run.restore(saved["snapshot"], rendered=saved["rendered"])
         if run.context.get("svg_refusal") is not None:
             raise HTTPException(422, run.context["svg_refusal"])
         job = self._jobs.get((owner, execution_id))

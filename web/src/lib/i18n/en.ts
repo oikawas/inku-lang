@@ -177,6 +177,8 @@ export const en: LangPack = {
 		return Object.hasOwn(reasons, reason) ? reasons[reason] : `Refused by the check (${reason}).`;
 	},
 	pipelineAttentionReason: (reason) => `Reason: ${({
+		pipeline_effect_failed: 'the server could not finish processing; please draw again',
+		pipeline_effect_limit: 'the number of processing steps exceeded the limit',
 		stage1_failed: 'the description could not be interpreted',
 		hole_completion_failed: 'a DDL completion proposal could not be prepared',
 		description_ddl_failed: 'no instructions could be written from the description; change the model and draw again',

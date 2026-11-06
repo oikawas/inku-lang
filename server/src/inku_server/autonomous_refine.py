@@ -717,7 +717,7 @@ class AutonomousRunner:
                       instruction_language=language)
         from .chatgpt_runtime import execution_cancel
         execution_id = f"autonomous:{run['id']}"
-        execution_cancel(run["owner_id"], execution_id)
+        execution_cancel(run["owner_id"], execution_id, chatgpt=bool(context.get("host_options", {}).get("chatgpt_profile")))
         context = {**context, "execution_id": execution_id}
         perform = get_service().provider_with_context(run["owner_id"], context,
                                                       [picture[0]] if picture is not None else None)

@@ -572,7 +572,7 @@ class ProductPipelineEffects:
                 max_response_bytes=self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"],
                 chatgpt_owner=owner, chatgpt_profile=options.get("chatgpt_profile"),
                 chatgpt_generation=options.get("chatgpt_generation"),
-                chatgpt_cancel=execution_cancel(owner, context["execution_id"]) if options.get("chatgpt_profile") and context.get("execution_id") else None,
+                chatgpt_cancel=execution_cancel(owner, context["execution_id"], chatgpt=True) if options.get("chatgpt_profile") and context.get("execution_id") else None,
                 execution_cancel=execution_cancel(owner, context["execution_id"]) if context.get("execution_id") else None,
             ), images=images, on_bytes=received_bytes, observation=(
                 ProviderObservationStore(

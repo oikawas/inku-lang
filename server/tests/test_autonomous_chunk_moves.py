@@ -107,10 +107,12 @@ def test_chunk_send_uses_a_run_key_and_owner_logout_does_not_poison_the_next_run
     request = {"system": "s", "text": "t", "response_schema": {}, "purpose": "choose"}
     try:
         first = _chunk_run("owner")
-        assert AutonomousRunner._send_chunk(None, first, STEP, {}, request, None, 1, threading.Event(), "ja") == ("ok", None)
+        context = {"host_options": {"chatgpt_profile": "profile"}}
+        assert AutonomousRunner._send_chunk(None, first, STEP, context, request, None, 1, threading.Event(), "ja") == ("ok", None)
         chatgpt_runtime.cancel_owner("owner")
+        assert chatgpt_runtime.execution_cancel(*seen[0]).is_set()
         second = _chunk_run("owner")
-        assert AutonomousRunner._send_chunk(None, second, STEP, {}, request, None, 1, threading.Event(), "ja") == ("ok", None)
+        assert AutonomousRunner._send_chunk(None, second, STEP, context, request, None, 1, threading.Event(), "ja") == ("ok", None)
         assert seen == [("owner", f"autonomous:{first['id']}"), ("owner", f"autonomous:{second['id']}")]
         assert ("owner", "") not in chatgpt_runtime._cancels
     finally:

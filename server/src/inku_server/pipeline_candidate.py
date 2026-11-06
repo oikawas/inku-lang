@@ -361,6 +361,11 @@ class CandidateExecution:
             self._rendered = rendered
             self._fresh = snapshot["authority"]["revision"] == "0"
 
+    def cancel_if_busy(self) -> None:
+        with self._lock:
+            if self._snapshot is not None and self._snapshot.get("action") is not None:
+                self.command({"tag": "cancel"})
+
     def run_effect(self) -> dict | None:
         """Execute the current effect once. No effect means author input is next."""
         with self._lock:

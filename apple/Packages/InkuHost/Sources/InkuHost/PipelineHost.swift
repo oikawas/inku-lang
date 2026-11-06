@@ -36,7 +36,7 @@ public actor PipelineHost {
         if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
             throw HostError("developer_provider_observations_not_available")
         }
-        guard ["normal", "lineage_only"].contains(request.historyVisibility) else { throw HostError("invalid_history_visibility") }
+        guard request.historyVisibility == "normal" else { throw HostError("invalid_history_visibility") }
         if request.authoring.isDirect, let parentID = request.parentWorkID,
            let parent = try? await savedAuthoringContext(workID: parentID), let imageDDL = parent.imageDDL {
             request.inheritedImageDDL = imageDDL
@@ -543,7 +543,7 @@ public actor PipelineHost {
         work.variationAmplitude = compiler["stage15_variation"]["amplitude"].string
         work.variationSeed = compiler["stage15_variation"]["seed"].string
         work.renderHash = try WorkIdentity.render(score: score, options: options, metadata: rendered["metadata"])
-        let node = LineageNode(id: nodeID, historyID: id, state: request.historyVisibility == "lineage_only" ? "lineage_only" : "active",
+        let node = LineageNode(id: nodeID, historyID: id, state: "active",
             at: now, descriptionHash: work.descriptionHash, renderHash: work.renderHash, rootNodeID: parentNode.rootNodeID ?? parentNode.id)
         let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID,
             derivationKind: request.derivationKind, metadataJSON: try metadataText(request.derivationMetadata), at: now)
@@ -1314,7 +1314,7 @@ private actor ExecutionDriver {
             edge = LineageEdge(id: newID(), parentNodeID: parentNodeID, childNodeID: nodeID,
                                derivationKind: state.derivationKind, metadataJSON: metadata, at: now)
         }
-        let node = LineageNode(id: nodeID, historyID: id, state: state.historyVisibility == "lineage_only" ? "lineage_only" : "active",
+        let node = LineageNode(id: nodeID, historyID: id, state: "active",
             at: now, descriptionHash: descriptionHash, renderHash: renderHash, rootNodeID: rootNodeID)
         var savedState = state; savedState.savedWorkID = id
         let effectID = "save-render:" + (try snapshot.requiredString("sequence"))

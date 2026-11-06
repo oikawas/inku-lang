@@ -3372,6 +3372,31 @@ pub fn search(
     search_work(&Work::new(layers, reading, background)?)
 }
 
+pub(crate) struct PreparedWork<'a>(Work<'a>);
+
+impl<'a> PreparedWork<'a> {
+    pub(crate) fn new(
+        layers: &'a [WorkPlanLayer],
+        reading: &'a CheckedReading,
+        background: &str,
+    ) -> Result<Self, Unsolved> {
+        Ok(Self(Work::new(layers, reading, background)?))
+    }
+
+    pub(crate) fn search(&self) -> Result<Searched, Unsolved> {
+        search_work(&self.0)
+    }
+
+    pub(crate) fn solve(
+        &self,
+        searched: &Searched,
+        seed: u64,
+        work_id: &str,
+    ) -> Result<Solution, Unsolved> {
+        solve_work(&self.0, searched, seed, work_id)
+    }
+}
+
 fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
     search_work_with_totals(work).map(|(searched, _)| searched)
 }

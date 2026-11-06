@@ -2355,28 +2355,25 @@ impl PipelineSnapshot {
         reading: &CheckedReading,
     ) -> Result<(VisibleDocument, ComposedPlan), &'static str> {
         let background = plan.background.as_deref().unwrap_or("white");
-        let searched =
-            composition::search(&plan.layers, reading, background).map_err(|unsolved| {
-                match unsolved {
-                    composition::Unsolved::NoRanges => "no_ranges",
-                    composition::Unsolved::UnknownPlace(_) => "unknown_place",
-                }
-            })?;
+        let prepared = composition::PreparedWork::new(&plan.layers, reading, background).map_err(
+            |unsolved| match unsolved {
+                composition::Unsolved::NoRanges => "no_ranges",
+                composition::Unsolved::UnknownPlace(_) => "unknown_place",
+            },
+        )?;
+        let searched = prepared.search().map_err(|unsolved| match unsolved {
+            composition::Unsolved::NoRanges => "no_ranges",
+            composition::Unsolved::UnknownPlace(_) => "unknown_place",
+        })?;
         let composition_seed = self
             .config
             .compiler
             .composition_seed()
             .map_err(|_| "policy")?;
         let work_id = candidate.source_digest();
-        let solution = composition::solve(
-            &plan.layers,
-            reading,
-            background,
-            &searched,
-            composition_seed.unwrap_or(1),
-            &work_id,
-        )
-        .map_err(|_| "unsolved")?;
+        let solution = prepared
+            .solve(&searched, composition_seed.unwrap_or(1), &work_id)
+            .map_err(|_| "unsolved")?;
         let jointed = composition::join(
             &plan.layers,
             reading,

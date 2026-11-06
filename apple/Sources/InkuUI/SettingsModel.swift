@@ -24,14 +24,9 @@ public final class SettingsModel {
             cancelDiscovery()
             discoveredModelCatalog = []
             modelCatalogProvider = nil
-            credentialDraft = ""
             credentialConfigured = selectedProviderID.flatMap { credentialStates[$0] } ?? false
             status = ""
         }
-    }
-    public var credentialDraft = ""
-    public var modelCatalog: [ProviderModelInfo] {
-        modelCatalogProvider == selectedProvider ? discoveredModelCatalog : []
     }
     public private(set) var isLoadingModels = false
     public private(set) var status = ""
@@ -192,7 +187,6 @@ public final class SettingsModel {
         } catch { self.error = "APIキーの状態を確認できません。" }
     }
     public func inspectCredential() async {
-        credentialDraft = ""
         guard let provider = selectedProvider else { credentialConfigured = false; return }
         credentialStates.removeValue(forKey: provider.id)
         credentialConfigured = false
@@ -268,7 +262,6 @@ public final class SettingsModel {
             credentialStates.removeValue(forKey: id)
             await inspectCredential()
         }
-        credentialDraft = ""
         status = "サービスを追加しました。"
     }
 
@@ -288,7 +281,7 @@ public final class SettingsModel {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { throw HostError("provider_credentials_missing") }
         try beginSaving(model: model, credentialMutation: true)
-        defer { isSaving = false; credentialDraft = "" }
+        defer { isSaving = false }
         var latest = await model.hostSettings()
         let index = try Self.editableProviderIndex(providerID, in: latest)
         latest.providers[index].requiresAPIKey = true
@@ -304,7 +297,7 @@ public final class SettingsModel {
 
     public func clearProviderCredential(providerID: String, model: AppModel) async throws {
         try beginSaving(model: model, credentialMutation: true)
-        defer { isSaving = false; credentialDraft = "" }
+        defer { isSaving = false }
         let latest = await model.hostSettings()
         let index = try Self.editableProviderIndex(providerID, in: latest)
         guard !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
@@ -384,61 +377,6 @@ public final class SettingsModel {
         host = await model.hostSettings()
     }
 
-    public func addProvider() {
-        let id = "service-" + UUID().uuidString.prefix(8).lowercased()
-        host.providers.append(ProviderSettings(id: id, baseURL: URL(string: "http://localhost:8080/v1")!, requiresAPIKey: false))
-        selectedProviderID = id
-        credentialDraft = ""
-        credentialConfigured = false
-        discoveredModelCatalog = []
-        modelCatalogProvider = nil
-    }
-    public func removeProvider() {
-        guard let id = selectedProvider?.id else { return }
-        discovery?.cancel()
-        host.providers.removeAll { $0.id == id }
-        if host.models.stage1Model.hasPrefix(id + ":") { host.models.stage1Model = "" }
-        if host.models.stage2Model.hasPrefix(id + ":") { host.models.stage2Model = "" }
-        selectedProviderID = host.providers.first?.id
-        discoveredModelCatalog = []
-        modelCatalogProvider = nil
-        credentialDraft = ""
-    }
-    public func save(model: AppModel) async {
-        do {
-            let draft = host
-            try await saveSettings(model: model) { latest in
-                latest.providers = draft.providers.filter { $0.kind != .chatGPTPlan } + latest.providers.filter { $0.kind == .chatGPTPlan }
-                latest.models = draft.models
-            }
-            status = "接続設定を保存しました。"
-        } catch {
-            self.error = (error as? HostError)?.code == "invalid_provider_rate_limits"
-                ? "レート制限には0から1,000,000,000までの整数を設定してください。"
-                : error.localizedDescription
-        }
-    }
-    public func clearCredential() async {
-        guard let provider = selectedProvider else { return }
-        do {
-            try await credentials.setKey(nil, for: provider.credentialID)
-            credentialDraft = ""
-            credentialStates[provider.id] = false
-            credentialConfigured = false
-        } catch { self.error = "APIキーを削除できませんでした。" }
-    }
-
-    public func discoverModels() async {
-        guard let provider = selectedProvider else { return }
-        do {
-            let models = Self.modelInfo(try await fetchModelCatalog(for: provider), provider: provider)
-            guard selectedProvider == provider else { return }
-            modelCatalogProvider = provider
-            discoveredModelCatalog = models
-            status = "\(models.count)個のモデルを取得しました。"
-        } catch is CancellationError { }
-        catch { self.error = "モデル一覧を取得できませんでした。" }
-    }
     public func cancelDiscovery() { discovery?.cancel() }
 
     private func fetchModelCatalog(for provider: ProviderSettings) async throws -> [FetchedProviderModel] {

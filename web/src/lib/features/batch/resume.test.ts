@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+import { sketchModeOf } from '../../sketch.ts';
 
 import {
 	batchStoppedPartWay,
@@ -139,7 +141,7 @@ test('T-63  a condition the work never recorded is not invented', () => {
 	assert.equal(conditionsOfWork({ render_wild: false }).wild, null);
 });
 
-test('resuming preserves batch defaults when switches were not recorded', () => {
+test('resuming preserves current choices when switches were not recorded', () => {
 	assert.equal(resumedWild(null, 'on'), 'on');
 	assert.equal(resumedWild(null, 'off'), 'off');
 	assert.equal(resumedWild(true, 'off'), 'on');
@@ -148,10 +150,24 @@ test('resuming preserves batch defaults when switches were not recorded', () => 
 	assert.equal(resumedComposition(null, 'off'), 'off');
 	assert.equal(resumedComposition('on', 'off'), 'on');
 	assert.equal(resumedComposition('off', 'on'), 'off');
+});
+
+test('batch resume restores recorded choices and leaves unrecorded choices as selected', async () => {
 	const page = readFileSync(new URL('../../../routes/+page.svelte', import.meta.url), 'utf8');
-	const resume = page.slice(page.indexOf('async function applyBatchRunConditions('), page.indexOf('async function resumeInterruptedBatch('));
-	assert.ok(resume.indexOf('Object.assign(choices, copyDrawOptions(work.drawDefaults.batch_text))') < resume.indexOf('resumedWild(conditions.wild, choices.wild)'));
-	assert.match(resume, /resumedComposition\(conditions\.composition, choices\.composition\)/);
+	const source = page.slice(page.indexOf('async function applyBatchRunConditions('), page.indexOf('async function resumeInterruptedBatch('));
+	const javascript = ts.transpile(source, { target: ts.ScriptTarget.ES2022 });
+	const choices = { route: 'stages', sketch: 'on', composition: 'on', wild: 'on',
+		catalog: { id: 'sumi', mode: 'auto' }, canvas_aspect: 'tate', models: { stage1: 'one', stage2: 'two' } };
+	const apply = new Function('work', 'loadModelReferences', 'resumedComposition', 'resumedWild', 'sketchModeOf', 'normalizeCanvasAspectId',
+		`${javascript}; return applyBatchRunConditions;`)({ batchTextOptions: choices }, async () => {}, resumedComposition, resumedWild, sketchModeOf, (id: string) => id);
+	await apply({ stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+		sketchGrain: null, wild: null, canvasAspectId: null, route: null, composition: null });
+	assert.deepEqual(choices, { route: 'stages', sketch: 'off', composition: 'on', wild: 'on',
+		catalog: { id: 'sumi', mode: 'auto' }, canvas_aspect: 'tate', models: { stage1: 'one', stage2: 'two' } });
+	await apply({ stage1Model: 'new-one', stage2Model: 'new-two', catalogId: 'other', catalogMode: 'fixed',
+		sketchGrain: 'on', wild: false, canvasAspectId: 'yoko', route: 'read_and_draw', composition: 'off' });
+	assert.deepEqual(choices, { route: 'read_and_draw', sketch: 'on', composition: 'off', wild: 'off',
+		catalog: { id: 'other', mode: 'fixed' }, canvas_aspect: 'yoko', models: { stage1: 'new-one', stage2: 'new-two' } });
 });
 
 test('T-66  a run made under auto says so, beside the catalog it resolved to', () => {

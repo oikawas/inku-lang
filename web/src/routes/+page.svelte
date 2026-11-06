@@ -97,7 +97,7 @@
 	import { demoInstructionModelGroups } from '$lib/demo';
 	import { resumedComposition, resumedWild, type BatchRunConditions, type NumberedLine } from '$lib/features/batch/resume';
 	import { loadBatchSavedWork } from '$lib/features/batch/saved-work';
-	import { copyDrawOptions, LEGACY_WILD_DEFAULT_KEY, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
+	import { LEGACY_WILD_DEFAULT_KEY, type DrawDefaults, type DrawOptions, type DrawTab, type RecordedDrawOptions } from '$lib/features/draw-options';
 	import { bindWildRenderState, wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
 	import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
@@ -759,7 +759,6 @@
 	/** Put back the conditions the last work of the stopped run was drawn under. */
 	async function applyBatchRunConditions(conditions: BatchRunConditions) {
 		const choices = work.batchTextOptions;
-		Object.assign(choices, copyDrawOptions(work.drawDefaults.batch_text));
 		await loadModelReferences([conditions.stage1Model, conditions.stage2Model].filter((ref): ref is string => !!ref).map((ref) => ({action: 'split_ref', ref})));
 		// `auto` reads each description anew, so a run made under it must resume
 		// under it -- the resolved id is what the last line happened to get, not

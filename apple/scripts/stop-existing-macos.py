@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop this user's verified Inku application instances before a rebuild."""
+"""Stop this user's verified Inku application instances immediately before installation."""
 
 import argparse
 import json

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: leave the running app alone during ordinary builds and stop it only immediately before `--install` replaces it.
+
 - macOS: remove files already created if a multi-work export fails partway through.
 
 - macOS: align sketch notes with Web and display each frozen batch model correctly.

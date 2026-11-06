@@ -60,7 +60,7 @@ rustup target add --toolchain 1.99.1 aarch64-apple-darwin x86_64-apple-darwin
 apple/scripts/build-macos.sh Release
 ```
 
-`build-macos.sh`は必要toolの確認後、resource／core／appの変更前に[停止helper](scripts/stop-existing-macos.py)を実行します。現在のユーザーが所有する既知のInku bundle IDと実行fileを検証し、PIDのidentityを再確認してSIGKILLで停止します。最大10秒で停止を確認できなければbuildを中止し、結果は`apple/build/macOS/stop-existing.json`へ記録します。未知のInku類似processは検証errorとして扱い、signalを送信しません。
+通常の`build-macos.sh`は実行中のInkuを止めません。`--install`では完成したappを検証した後、入れ替えの直前に[停止helper](scripts/stop-existing-macos.py)を実行します。現在のユーザーの既知のInku bundle IDと実行fileを検証し、PIDを再確認してSIGKILLで停止します。10秒以内に停止を確認できなければ入れ替えを中止し、結果を`apple/build/macOS/stop-existing.json`へ記録します。未知のInku類似processにはsignalを送らず、検証errorにします。
 
 通常のbuildはcommit済みのreview済みreference／default／catalog snapshotを使い、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。[3Dビューアのscript](scripts/sync-ddl3d-viewer.py)が、Webが登録した3DビューアをそのままInkuUI resourceへ写し、Webのものと比べます（下の3Dビューアの段落）。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名・公証した配布物は下の「配布物の作成」で作ります。
 

@@ -702,7 +702,7 @@ Tipsはbundle内のcurrent Server JA/EN辞書をsource keyから読込む。全�
 
 通常のbuildはcommit済み `ui-reference.json`、provider default、model catalogのreview済みsnapshotを使う。別のServer sourceへ追随する場合だけ `INKU_APPLE_REFERENCE_ROOT` またはexporterの `--source-root` を指定して明示更新し、差分をreviewする。rebuildだけで同梱正本を取り直さない。Swift packageの直接buildも同じsnapshotを使い、音数辞書とRust artifactは別に準備する。
 
-`build-macos.sh`は必要toolの確認後、resource／core／buildの変更前に[停止helper](scripts/stop-existing-macos.py)を呼ぶ。現在UIDの既知bundle IDと実行fileを検証し、PID identityを再確認してSIGKILLで停止する。最大10秒の再確認で実行中instanceが残ればbuildを中止する。未知のInku類似processはsignalを送らず検証errorとし、停止結果を`apple/build/macOS/stop-existing.json`へ記録する。
+通常の`build-macos.sh`は実行中のInkuを止めない。`--install`では完成したappの検証後、入れ替え直前に[停止helper](scripts/stop-existing-macos.py)を呼ぶ。現在UIDの既知bundle IDと実行fileを検証し、PIDを再確認してSIGKILLで停止する。10秒以内に停止を確認できなければ入れ替えを中止する。未知のInku類似processにはsignalを送らず検証errorとし、停止結果を`apple/build/macOS/stop-existing.json`へ記録する。
 
 自動backupは保存先、最新成功、次回予定、保持世代・各日時／容量を読み出す。状態再読込はbackupを新規作成せず、失敗理由を保持する。描画logも失敗表示を閉じる／もう一度読む操作を分け、読込失敗時に以前の記録を消さない。読込前を「記録なし」と認定せず、再読込でdriver再開やprovider再送を行わない。
 

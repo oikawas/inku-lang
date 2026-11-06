@@ -7,15 +7,12 @@ APPLE="$ROOT/apple"
 BUILD="$APPLE/build/macOS"
 CONFIGURATION=Release
 INSTALL_APP=false
-STOP_EXISTING=true
 
 usage() {
-    printf 'usage: apple/scripts/build-macos.sh [Debug|Release] [--install] [--keep-running]\n' >&2
+    printf 'usage: apple/scripts/build-macos.sh [Debug|Release] [--install]\n' >&2
     printf 'Default: Release application and release Rust archives.\n' >&2
     printf 'Set INKU_APPLE_PROFILE=debug to explicitly select debug Rust archives.\n' >&2
-    printf 'Existing Inku instances owned by this user are force-stopped before building.\n' >&2
-    printf 'With --keep-running, they are left running (not allowed with --install).\n' >&2
-    printf 'With --install, update the fixed ~/Applications/Inku.app.\n' >&2
+    printf 'With --install, stop existing Inku instances immediately before updating ~/Applications/Inku.app.\n' >&2
 }
 
 configuration_selected=false
@@ -27,11 +24,9 @@ for argument in "$@"; do
             configuration_selected=true
             ;;
         --install) INSTALL_APP=true ;;
-        --keep-running) STOP_EXISTING=false ;;
         *) usage; exit 2 ;;
     esac
 done
-[[ "$INSTALL_APP" == false || "$STOP_EXISTING" == true ]] || { usage; exit 2; }
 [[ "$(uname -s)" == Darwin ]] || { printf 'The macOS application build requires macOS and Xcode.\n' >&2; exit 2; }
 for tool in python3 node uv xcodegen xcodebuild xcrun; do
     command -v "$tool" >/dev/null || { printf 'Missing build prerequisite: %s\n' "$tool" >&2; exit 2; }
@@ -49,9 +44,6 @@ ALLOCATION="$(python3 "$APPLE/scripts/allocate-build-number.py" --floor "$BUILD_
 read -r MARKETING_VERSION BUILD_NUMBER <<< "$ALLOCATION"
 
 mkdir -p "$BUILD"
-if [[ "$STOP_EXISTING" == true ]]; then
-    python3 "$APPLE/scripts/stop-existing-macos.py" --report "$BUILD/stop-existing.json"
-fi
 xcrun swift -module-cache-path "$BUILD/IconModuleCache" "$APPLE/scripts/prepare-macos-icon.swift"
 # Normal builds use the reviewed, committed resource snapshot. Following a newer
 # Server checkout is an explicit source operation, independent of a rebuild.
@@ -97,5 +89,6 @@ done
 python3 "$APPLE/scripts/sync-ddl3d-viewer.py" --check --app "$APP"
 printf 'Built unsigned Universal application %s (%s): %s\n' "$MARKETING_VERSION" "$BUILD_NUMBER" "$APP"
 if [[ "$INSTALL_APP" == true ]]; then
+    python3 "$APPLE/scripts/stop-existing-macos.py" --report "$BUILD/stop-existing.json"
     python3 "$APPLE/scripts/install-macos.py" --app "$APP"
 fi

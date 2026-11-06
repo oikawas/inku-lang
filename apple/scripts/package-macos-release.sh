@@ -54,7 +54,7 @@ DIRTY="$(git -C "$ROOT" status --porcelain)"
 VERSION_FLOOR="$(tr -d '[:space:]' < "$APPLE/VERSION")"
 if [[ "$BUILD_APP" == true ]]; then
     # The release uses release Rust archives and the committed resource snapshot.
-    env -u INKU_APPLE_REFERENCE_ROOT INKU_APPLE_PROFILE=release "$APPLE/scripts/build-macos.sh" Release --keep-running
+    env -u INKU_APPLE_REFERENCE_ROOT INKU_APPLE_PROFILE=release "$APPLE/scripts/build-macos.sh" Release
 fi
 [[ -d "$BUILT_APP" ]] || fail "No Release build at $BUILT_APP"
 python3 "$APPLE/scripts/build-macos-notices.py" --check

@@ -33,7 +33,7 @@ public indirect enum ExactJSON: Sendable, Equatable {
     }
 
     public var data: Data { Data(text.utf8) }
-    /// Indent without changing numeric lexemes, and sort object keys as in `text`.
+    /// Indent without changing numeric lexemes, using Foundation's sorted-key order.
     public var prettyText: String { prettyText(depth: 0) }
 
     private func prettyText(depth: Int) -> String {
@@ -41,7 +41,11 @@ public indirect enum ExactJSON: Sendable, Equatable {
         let next = String(repeating: "  ", count: depth + 1)
         switch self {
         case .object(let fields) where !fields.isEmpty:
-            let rows = fields.keys.sorted().map { next + Self.quote($0) + " : " + fields[$0]!.prettyText(depth: depth + 1) }
+            let keys = fields.keys.sorted {
+                $0.compare($1, options: [.numeric, .caseInsensitive, .forcedOrdering], range: nil,
+                           locale: NSLocale.system as Locale) == .orderedAscending
+            }
+            let rows = keys.map { next + Self.quote($0) + " : " + fields[$0]!.prettyText(depth: depth + 1) }
             return "{\n" + rows.joined(separator: ",\n") + "\n" + current + "}"
         case .array(let values) where !values.isEmpty:
             return "[\n" + values.map { next + $0.prettyText(depth: depth + 1) }.joined(separator: ",\n") + "\n" + current + "]"

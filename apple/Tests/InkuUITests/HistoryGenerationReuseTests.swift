@@ -10,7 +10,7 @@ import XCTest
         let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"))
         await app.initialize()
         let database = try app.auxiliaryDatabase()
-        let work = SavedWork(id: "svg-work", at: 1, input: "test", score: "{}", svg: "<svg>fixture</svg>")
+        let work = SavedWork(id: "svg-work", at: 1, input: "test", score: "{}", svg: "<svg>fixture</svg>", lineageNodeID: "svg-node")
         try await database.save(work, node: LineageNode(id: "svg-node", historyID: work.id, at: work.at))
         let history = HistoryModel()
         await history.connect(app: app)

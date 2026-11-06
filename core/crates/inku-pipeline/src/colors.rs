@@ -3671,6 +3671,7 @@ struct Painting<'a> {
     redrawn_first: BTreeMap<usize, Color>,
     /// The colors each layer had before the colors.
     before: BTreeMap<usize, Vec<Color>>,
+    positions: BTreeMap<usize, Vec<usize>>,
 }
 
 impl<'a> Painting<'a> {
@@ -3709,6 +3710,7 @@ impl<'a> Painting<'a> {
             redrawn: None,
             redrawn_first: BTreeMap::new(),
             before,
+            positions,
         }
     }
 
@@ -3717,9 +3719,7 @@ impl<'a> Painting<'a> {
     }
 
     fn positions(&self, layer: usize) -> Vec<usize> {
-        laws::layers(&self.out.score)
-            .remove(&layer)
-            .unwrap_or_default()
+        self.positions.get(&layer).cloned().unwrap_or_default()
     }
 
     /// A layer's colors, by name.
@@ -4348,6 +4348,7 @@ impl<'a> Painting<'a> {
                 .score
                 .instructions
                 .splice(position..position, clones);
+            self.positions = laws::layers(&self.out.score);
             self.out.cycles.remove(&layer);
             self.out
                 .kasane

@@ -163,15 +163,21 @@ struct Builder<'a> {
 
 impl<'a> Builder<'a> {
     fn new(request: PerformanceRequest<'a>) -> Self {
-        let mut output = request.score.clone();
-        output.instructions.clear();
-        output.anchors.clear();
-        output.transform_groups.clear();
-        output.placement_groups.clear();
-        output.repetition_groups.clear();
-        output.fill_groups.clear();
-        output.mirror_relations.clear();
-        output.resource_policy = None;
+        let output = Score {
+            version: request.score.version.clone(),
+            canvas: request.score.canvas.clone(),
+            background: request.score.background,
+            presence: request.score.presence.clone(),
+            instructions: Vec::new(),
+            object_templates: request.score.object_templates.clone(),
+            anchors: Vec::new(),
+            transform_groups: Vec::new(),
+            placement_groups: Vec::new(),
+            repetition_groups: Vec::new(),
+            fill_groups: Vec::new(),
+            mirror_relations: Vec::new(),
+            resource_policy: None,
+        };
         Self {
             request,
             output,

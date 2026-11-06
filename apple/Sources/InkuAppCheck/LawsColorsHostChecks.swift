@@ -50,7 +50,7 @@ import InkuUI
           lawsEvent.object?["main_layer"] == ExactJSON.null,
           let refusedDDL = refused.visibleDDL, !refusedDDL.isEmpty,
           try await host.restoreSavedWork(workID: refusedID).ddl == refusedDDL,
-          colorsMessage.contains(#""name":"black","paint":"黒""#) else {
+          colorsMessage.contains("black | 黒 |") else {
         throw CheckFailure.message("P3: the host lost the laws event's null main_layer, the core's document or the color table")
     }
     report.append("P3 events \(lawsColorsEventTags(refused).filter { $0.hasPrefix("laws") || $0.hasPrefix("colors") })")

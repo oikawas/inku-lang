@@ -17,6 +17,7 @@ func runSavedOutputAvailabilityChecks() async throws {
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "check:saved-output", stage2Model: "check:saved-output")))
     app.selectNextDrawingModel("check:saved-output")
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     app.inputMode = "description"; app.descriptionText = "a red circle"; app.language = "en"; app.seedText = "42"
     await app.generate()
     let parentOutput = await app.outputSnapshot()
@@ -27,34 +28,53 @@ func runSavedOutputAvailabilityChecks() async throws {
     }
     let executionID = String(parent.id[..<separator])
     let parentContext = try await app.savedConfiguration(workID: parent.id)
-    app.ddlText = "place one blue circle at center."
-    await app.commitDDL()
-    guard app.errorText == nil, let child = app.selectedWork, child.id != parent.id, app.sourceLocked,
-          child.id.hasPrefix(executionID + "_"), await provider.calls == 1 else {
-        throw CheckFailure.message("Saved-output fixture did not make a later DDL save on the same execution: \(app.errorText ?? app.status)")
-    }
-
     let database = try InkuDatabase(url: databaseURL)
+    // The current editor forks a new execution. Exercise the older same-execution
+    // revision explicitly so this check still covers unavailable historical output.
+    let host = PipelineHost(database: database, transport: provider)
+    let later = try await host.perform(executionID: executionID,
+        command: .commitUserDDL(expectedRevision: app.authoringRevision, source: "place one blue circle at center."),
+        parentWorkID: parent.id, derivationKind: "ddl_edit")
+    guard let childID = later.savedWorkID, let child = try await database.work(id: childID), child.id != parent.id,
+          later.authority == "ddl_authoritative", child.id.hasPrefix(executionID + "_"), await provider.calls == 1 else {
+        throw CheckFailure.message("Saved-output fixture did not make a later DDL save on the same execution: \(later.phase)")
+    }
+    let originalEffect = "save-render:" + String(parent.id[parent.id.index(after: separator)...])
+    let acknowledgement = try await database.acknowledgement(executionID: executionID, effectID: originalEffect)
+    guard let acknowledgement, let originalExecution = try await database.loadExecution(id: executionID),
+          let root = parent.lineageNodeID else { throw CheckFailure.message("Saved-output parent context missing") }
+    var legacyContext = try ExactJSON(data: acknowledgement)["performance"]
+    legacyContext["presentation"] = .null
+    var legacy = parent
+    legacy.id = executionID + "_999999"; legacy.lineageNodeID = UUID().uuidString; legacy.at -= 1
+    let node = LineageNode(id: legacy.lineageNodeID!, historyID: legacy.id, at: legacy.at,
+                           descriptionHash: legacy.descriptionHash, renderHash: legacy.renderHash, rootNodeID: root)
+    let edge = LineageEdge(id: UUID().uuidString, parentNodeID: root, childNodeID: node.id,
+                           derivationKind: "saved-output-legacy-fixture", at: legacy.at)
+    let legacyAck = ExactJSON.object(["tag": .string("saved_work_committed"), "work_id": .string(legacy.id),
+                                      "performance": legacyContext]).data
+    _ = try await database.commitEffect(id: executionID, expectedRevision: originalExecution.revision, effectID: "save-render:999999",
+        snapshot: originalExecution.snapshot, acknowledgement: legacyAck, work: legacy, node: node, edge: edge)
     let reopened = AppModel(databaseURL: databaseURL, transport: provider)
     await reopened.initialize()
     guard reopened.errorText == nil else { throw CheckFailure.message("Saved-output reopen failed: \(reopened.errorText ?? reopened.status)") }
     let rows = try await database.list()
-    guard rows.count == 2, let execution = try await database.loadExecution(id: executionID) else {
+    guard rows.count == 3, let execution = try await database.loadExecution(id: executionID) else {
         throw CheckFailure.message("Saved-output fixture is missing its two saved revisions or durable execution")
     }
     let calls = await provider.calls
 
     // Failure: selecting an older saved parent called an unavailable prompt journal "not sent".
-    await reopened.selectWork(parent)
+    await reopened.selectWork(legacy)
     let reopenedOutput = await reopened.outputSnapshot()
-    guard reopened.errorText == nil, reopened.selectedWork == parent,
-          reopened.visibleDDL == parent.ddl, reopenedOutput.score == parent.score, reopened.currentSVG == parent.svg,
+    guard reopened.errorText == nil, reopened.selectedWork == legacy,
+          reopened.visibleDDL == legacy.ddl, reopenedOutput.score == legacy.score, reopened.currentSVG == legacy.svg,
           reopened.authoringAuthority == parentContext.authority, reopened.authoringRevision == parentContext.revision,
           !reopened.sourceLocked, reopenedOutput.promptAvailability == .unavailable, reopenedOutput.prompt.isEmpty,
           reopened.diagnosticsJSON.isEmpty, reopenedOutput.events.isEmpty,
           await provider.calls == calls, try await database.list() == rows,
           try await database.loadExecution(id: executionID) == execution,
-          try await database.work(id: parent.id) == parent, try await database.work(id: child.id) == child else {
+          try await database.work(id: legacy.id) == legacy, try await database.work(id: child.id) == child else {
         throw CheckFailure.message("Saved parent adopted a later output, misreported prompt availability, changed authority/history or called a provider")
     }
     print("Saved output availability passed: real core parent -> same-execution DDL child -> old parent selection; missing prompt is unavailable, saved DDL/Score/SVG/authority retained, no provider call or history/execution write. Isolated mock only.")

@@ -17,6 +17,7 @@
 	import { historyGridPageSize } from '$lib/historyManagerSizing';
 	import { getCanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
+	import { libraryArrowDestination } from '$lib/features/library/arrow-navigation';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -227,6 +228,7 @@
 	}
 
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
+	let pendingArrow = $state<{ offset: number; end: 'first' | 'last'; query: string; tab: 'thumbs' | 'list'; pageSize: number; event: KeyboardEvent } | null>(null);
 	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let historyDisplayMode = $state<'chronological' | 'lineage'>('chronological');
 	let lineageGroups = $state<LineageHistoryGroup[]>([]);
@@ -676,10 +678,63 @@
 	}
 
 	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
+		if (handleLibraryArrow(event, item)) return;
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
 		void openPreview(item);
 	}
+
+	function arrowQuery(): string {
+		return JSON.stringify([historySearch, historyManagerView, historyManagerStarredOnly, historyManagerForRevisionOnly, historyManagerForShareOnly]);
+	}
+
+	function focusAndPreview(item: HistoryItem): void {
+		if (!item.id) return;
+		const selector = `[data-library-work-id="${CSS.escape(item.id)}"]`;
+		const element = document.querySelector<HTMLElement>(selector);
+		if (!element) return;
+		element.focus({ preventScroll: true });
+		element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+		void openPreview(item);
+	}
+
+	function handleLibraryArrow(event: KeyboardEvent, item: HistoryItem): boolean {
+		if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return false;
+		if (!active || event.isComposing || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || historyManagerView !== 'active' || historyDisplayMode !== 'chronological' || historyManagerLoading) return false;
+		const index = managedHistoryItems.indexOf(item);
+		const grid = (event.currentTarget as HTMLElement).closest('.history-thumb-grid');
+		const columns = historyManagerTab === 'list' ? 1 : Math.max(1, grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length : 1);
+		const destination = libraryArrowDestination(index, managedHistoryItems.length, columns, event.key);
+		event.preventDefault();
+		if (destination.kind === 'index') focusAndPreview(managedHistoryItems[destination.index]);
+		else if (destination.kind === 'previous-page' || destination.kind === 'next-page') {
+			const previous = destination.kind === 'previous-page';
+			if (previous ? historyManagerOffset === 0 : historyManagerPage >= historyManagerTotalPages - 1) return true;
+			pendingArrow = { offset: previous ? Math.max(0, historyManagerOffset - historyManagerPageSize) : historyManagerOffset + historyManagerPageSize, end: previous ? 'last' : 'first', query: arrowQuery(), tab: historyManagerTab, pageSize: historyManagerPageSize, event };
+			onSetPage(historyManagerPage + (previous ? -1 : 1));
+		}
+		return true;
+	}
+
+	function cancelPendingArrow(event: Event): void {
+		if (pendingArrow && event !== pendingArrow.event) pendingArrow = null;
+	}
+
+	$effect(() => {
+		const pending = pendingArrow;
+		if (!pending) return;
+		if (!active || historyDisplayMode !== 'chronological' || historyManagerTab !== pending.tab || historyManagerPageSize !== pending.pageSize || arrowQuery() !== pending.query || historyManagerLoadFailed) {
+			pendingArrow = null;
+			return;
+		}
+		if (historyManagerLoading || historyManagerOffset !== pending.offset) return;
+		const item = pending.end === 'first' ? managedHistoryItems[0] : managedHistoryItems[managedHistoryItems.length - 1];
+		void tick().then(() => {
+			if (pendingArrow !== pending || historyManagerLoading || historyManagerOffset !== pending.offset || arrowQuery() !== pending.query) return;
+			pendingArrow = null;
+			if (item) focusAndPreview(item);
+		});
+	});
 
 	// The `#` buttons copy the work's UUID, not its render hash: two saved works
 	// can share one rh3, and a stored rh3 is rewritten when its scheme changes.
@@ -837,6 +892,8 @@
 		for (const controller of lineageMemberControllers.values()) controller.abort();
 	});
 </script>
+
+<svelte:window onpointerdown={cancelPendingArrow} onkeydown={cancelPendingArrow} />
 
 {#snippet shareStatus(item: HistoryItem)}
 	{#if !singleUserMode && (item.shared || hasAclShares(item) || isGroupShared(item))}
@@ -1300,6 +1357,7 @@
 									class="table-thumb-select"
 								onclick={() => void openPreview(it)}
 									ondblclick={() => openThumbnail(it)}
+									onkeydown={(event) => { handleLibraryArrow(event, it); }}
 									disabled={historyManagerView !== 'active'}
 									title={t().historyPreviewTitle}
 									aria-label={t().historyPreviewTitle}

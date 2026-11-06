@@ -468,20 +468,22 @@ export class HistoryBrowsingState {
 		await this.fetchOffset(this.offset, { preserveSelection: true });
 	}
 
-	async refreshExternal(): Promise<void> {
+	async refreshExternal(force = false): Promise<void> {
 		if (this.appliedSearch) return;
 		const now = (this.deps.now ?? Date.now)();
 		if (historyRefreshBlockedBy({
 			signedIn: this.deps.signedIn(),
 			managerOpen: this.manager.open,
 			starredOnly: this.starredOnly,
+			forRevisionOnly: this.forRevisionOnly,
+			forShareOnly: this.forShareOnly,
 			offset: this.offset,
 			loading: this.deps.drawing(),
 			visible: this.deps.visible(),
 			inFlight: this.externalRefreshInFlight || this.fetchInFlight > 0,
 			now,
 			lastRefreshAt: this.lastExternalRefreshAt,
-			minGapMs: HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS
+			minGapMs: force ? 0 : HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS
 		})) return;
 		this.externalRefreshInFlight = true;
 		this.lastExternalRefreshAt = now;
@@ -489,6 +491,7 @@ export class HistoryBrowsingState {
 			// Ask the cheap state endpoint before carrying the listing. A failed
 			// probe deliberately falls through to the old safe listing fetch.
 			const state = await this.fetchHistoryState();
+			if (!this.deps.visible()) return;
 			if (state && historyStripIsCurrent(state, {
 				total: this.total,
 				newestId: this.items[0]?.id ?? null,

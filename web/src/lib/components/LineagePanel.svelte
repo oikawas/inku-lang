@@ -695,7 +695,7 @@ $effect(() => {
 });
 $effect(() => {
 	const target = graph?.focus_node_id ?? null;
-	if (target && target !== okugakiLoadedTarget) void loadOkugaki();
+	if (okugakiOpen && target && target !== okugakiLoadedTarget) void loadOkugaki();
 });
 
 </script>
@@ -781,7 +781,7 @@ $effect(() => {
 			</div>
 
 			<div class="toolbar-group lineage-history-tools">
-				<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
+				<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; }}>{t().okugakiRead}</button>
 				<button type="button" class="detach-btn" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
 			</div>
 		</div>

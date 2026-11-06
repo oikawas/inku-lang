@@ -313,12 +313,12 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	/** Ask the shallow listing only whether the newest batch stopped early. */
-	async refreshResume(): Promise<void> {
+	async refreshResume(shared?: Promise<Response>): Promise<void> {
 		const discovery = ++this.resumeDiscovery;
 		if (this.resuming) return;
 		if (this.deps.signedIn()) {
 			try {
-				const response = await this.deps.apiFetch('/api/pipeline/batches', { cache: 'no-store' });
+				const response = shared ? (await shared).clone() : await this.deps.apiFetch('/api/pipeline/batches', { cache: 'no-store' });
 				if (response.status !== 404) {
 					if (!response.ok) throw new Error(`HTTP ${response.status}`);
 					const data = await response.json() as { batches?: BatchLeaseRecord[] };

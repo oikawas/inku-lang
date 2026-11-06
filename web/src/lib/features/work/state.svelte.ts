@@ -571,12 +571,12 @@ export function createWorkState(deps: WorkStateDeps) {
 		afterImageUploadNotice(() => { void paintImageFolder(fromStart); });
 	}
 
-	async function refreshImageBatchResume(reconcile = false, forStart = false): Promise<boolean> {
+	async function refreshImageBatchResume(reconcile = false, forStart = false, shared?: Promise<Response>): Promise<boolean> {
 		const record = forStart ? imageFolder.rawRecord : imageFolder.record;
 		if (!record?.batchRunId) { imageFolder.resumeBlocked = false; return true; }
 		imageFolder.resumeBlocked = true;
 		try {
-			const response = await apiFetch('/api/pipeline/batches', { cache: 'no-store' });
+			const response = shared ? (await shared).clone() : await apiFetch('/api/pipeline/batches', { cache: 'no-store' });
 			if (!response.ok) return false;
 			const data = await response.json() as { batches?: BatchLeaseRecord[] };
 			const found = data.batches?.find((item) => item.run_id === record.batchRunId);

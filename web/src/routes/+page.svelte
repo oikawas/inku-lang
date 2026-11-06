@@ -2705,9 +2705,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			void history.refreshExternal();
 		}, HISTORY_EXTERNAL_REFRESH_MS);
 		const checkBatchAfterDisconnect = () => {
-			if (work.inputMode === 'batch' && !batch.running && !batch.resuming) {
-				void batch.refreshResume();
-				void work.refreshImageBatchResume();
+			if (document.visibilityState === 'visible' && session.currentUser && work.inputMode === 'batch' && !batch.running && !batch.resuming) {
+				const shared = apiFetch('/api/pipeline/batches', { cache: 'no-store' });
+				void batch.refreshResume(shared);
+				void work.refreshImageBatchResume(false, false, shared);
 			}
 		};
 		const batchLeaseTimer = window.setInterval(checkBatchAfterDisconnect, 15_000);
@@ -2715,7 +2716,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		// Coming back to the tab still refreshes at once; what it no longer does
 		// is jump the floor. Both of these fire on a single alt-tab.
 		function onHistoryVisibilityChange() {
-			if (document.visibilityState === 'visible') void history.refreshExternal();
+			if (document.visibilityState === 'visible') { void history.refreshExternal(true); checkBatchAfterDisconnect(); }
 		}
 		function onHistoryWindowFocus() {
 			void history.refreshExternal();

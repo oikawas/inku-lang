@@ -45,6 +45,15 @@ struct EffectDigestMigrationTests {
         await #expect(throws: PersistenceError.effectConflict) {
             try await db.commitEffect(id: "saved", expectedRevision: 0, effectID: "effect", snapshot: Data([3]), acknowledgement: acknowledgement)
         }
+        await #expect(throws: PersistenceError.effectConflict) {
+            try await db.commitEffect(id: "saved", expectedRevision: 0, effectID: "effect", snapshot: snapshot, acknowledgement: Data([4]))
+        }
+        let differentWork = SavedWork(id: "different", at: 1, input: "test", score: "{}", svg: "<svg/>", lineageNodeID: "different-node")
+        let differentNode = LineageNode(id: "different-node", historyID: differentWork.id, at: 1)
+        await #expect(throws: PersistenceError.effectConflict) {
+            try await db.commitEffect(id: "saved", expectedRevision: 0, effectID: "effect", snapshot: snapshot,
+                                      acknowledgement: acknowledgement, work: differentWork, node: differentNode)
+        }
         let raw = try DatabaseQueue(path: file.path)
         try await raw.read { reader in
             let row = try #require(try Row.fetchOne(reader, sql: "SELECT snapshot_sha256,save_payload_sha256 FROM effect_acknowledgements"))

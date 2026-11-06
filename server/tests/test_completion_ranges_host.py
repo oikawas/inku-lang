@@ -98,6 +98,8 @@ def test_only_saved_and_settings_changed_starts_receive_the_record(saved_work, m
     service = make_service(store)
 
     class Run:
+        busy = False
+
         def __init__(self, config, context):
             self.config, self.context = config, context
             self.image_data = {}

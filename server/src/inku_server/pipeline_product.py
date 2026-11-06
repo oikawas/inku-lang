@@ -441,6 +441,8 @@ class ProductPipelineEffects:
             raise CandidateHostError("binding_palette_unavailable")
         for catalog in catalogs:
             identity = catalog["id"]
+            if mode != "auto" and identity != catalog_id:
+                continue
             color_map = render_color_map_for_catalog(identity)
             color_maps[identity] = color_map
             palette = json.loads(self.binding.resolve_palette(_bytes({
@@ -464,7 +466,8 @@ class ProductPipelineEffects:
             config["catalog_seed"] = str(seed)
         else:
             config.pop("catalog_seed", None)
-        actor = db.get_user(owner)
+        model_settings = db.get_model_settings()
+        actor = db.get_user(owner, model_settings=model_settings)
         # One model draws both stages (2026-09-30, the author). A request that
         # still names two keeps the Stage 1 one; one that names only Stage 2
         # (hand-written DDL, the old compose URL) is the one model; none takes
@@ -482,10 +485,10 @@ class ProductPipelineEffects:
             model_ref = f"{vision_provider}:{vision_model}" if vision_provider and vision_model else vision_model
             if not model_ref:
                 raise CandidateHostError("image_model_not_vision")
-        model = resolved_drawing_model(model_ref, actor)
+        model = resolved_drawing_model(model_ref, actor, model_settings=model_settings)
         from .model_settings import normalize_user_model_settings, provider_for_model, qualify_model_ref
-        model_settings = db.get_model_settings()
-        user_models = normalize_user_model_settings((actor or {}).get("model_settings") or {})
+        user_models = ((actor or {}).get("model_settings") or
+                       normalize_user_model_settings({}, providers=model_settings.get("providers", {})))
         resolution_settings = {
             **model_settings,
             "stage1_provider": user_models["stage1_provider"],
@@ -493,7 +496,8 @@ class ProductPipelineEffects:
             "stage2_provider": user_models["stage1_provider"],
             "stage2_model": user_models["stage1_model"],
         }
-        provider, model_id = provider_for_model(model, stage="stage1", settings=resolution_settings)
+        provider, model_id = provider_for_model(model, stage="stage1", settings=resolution_settings,
+                                                normalized_user=user_models, normalized_settings=model_settings)
         model = qualify_model_ref(provider, model_id, resolution_settings)
         selected.update(
             stage1_model=model,
@@ -510,17 +514,16 @@ class ProductPipelineEffects:
         selected.pop("chatgpt_profile", None)
         selected.pop("chatgpt_generation", None)
         try:
-            if provider_for_model(model, stage="stage1", settings=model_settings)[0] == "chatgpt":
+            if provider == "chatgpt":
                 from .chatgpt_provider import pin
                 selected["chatgpt_profile"], selected["chatgpt_generation"] = pin(owner)
                 model_settings = {**model_settings, "chatgpt_profile_id": selected["chatgpt_profile"],
                                   "chatgpt_generation": selected["chatgpt_generation"]}
             def reads_images() -> bool:
                 from .model_settings import model_is_offered
-                provider_id, model_id = provider_for_model(model, stage="stage1", settings=model_settings)
                 return (_model_offered_to(actor, model, stage="stage1", purpose="vision", settings=model_settings,
-                                          operation="vision") if provider_id == "chatgpt"
-                        else model_is_offered(provider_id, model_id, model_settings, purpose="vision"))
+                                          operation="vision", resolved=(provider, model_id), normalized_settings=model_settings) if provider == "chatgpt"
+                        else model_is_offered(provider, model_id, model_settings, purpose="vision", normalized_settings=model_settings))
             if kind == "image" and not reads_images():
                 raise CandidateHostError("image_model_not_vision")
             if kind == "description" and selected.get("route") == "read_and_draw":
@@ -532,7 +535,8 @@ class ProductPipelineEffects:
             for stage in (() if kind == "image" else
                           (("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",))):
                 if not _model_offered_to(
-                    actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline"
+                    actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline",
+                    resolved=(provider, model_id), normalized_settings=model_settings
                 ):
                     raise CandidateHostError("model_not_offered")
         except ChatGPTError as error:
@@ -564,7 +568,7 @@ class ProductPipelineEffects:
                     "attempt": int(action["identity"]["attempt"]), "bytes": count}
 
             transport = SingleAttemptProvider(ProviderOptions(
-                settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),
+                settings=db.get_model_settings(), settings_normalized=True, stage1_model=options.get("stage1_model", configured["stage1_model"]),
                 stage2_model=options.get("stage2_model", configured["stage2_model"]),
                 max_tokens=(configured.get("image_max_tokens", 8192) if action["tag"] in _WRITTEN_DDL_EFFECTS
                             else configured.get("stage1_max_tokens", configured["max_tokens"]) if stage == "stage1"
@@ -901,7 +905,7 @@ class ProductPipelineEffects:
                 if not isinstance(svg, str) or rendered.get("svg") != "":
                     raise CandidateHostError("invalid_render_boundary")
                 _validate_generated_svg(svg, svg_limit)
-                rendered["svg"] = svg
+                rendered = {**rendered, "svg": svg}
         if "error" in rendered:
             # The code is the answer; the core's reason is for the log only.
             _logger.warning("saved replay refused: %s: %s", rendered["error"], rendered.get("message"))

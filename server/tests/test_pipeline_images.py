@@ -134,7 +134,7 @@ def image_host(tmp_path, monkeypatch):
     monkeypatch.setattr(thumbnails, "submit_thumbnail_build", lambda _: None)
     admission = []
 
-    def offered(provider, model, settings, *, purpose):
+    def offered(provider, model, settings, *, purpose, normalized_settings=None):
         admission.append((provider, model, purpose))
         return provider == "openai" and model == "fixture-vision" and purpose == "vision"
 

@@ -18,7 +18,7 @@ from .persistence.schema import HistoryRow
 
 
 _logger = logging.getLogger(__name__)
-_POLL_SECONDS = 0.025
+_POLL_SECONDS = 0.25
 # While nothing settles, the stream still writes a line this often. The web
 # server's proxy (Node's fetch) drops a body silent for 300 s, as long as one
 # Stage 1 attempt may take; and a reader that has left is noticed only when a
@@ -63,13 +63,12 @@ def _wait(owner: str, view: dict, reader_left: Callable[[], bool] | None = None)
     service = _service()
     checked = time.monotonic()
     while view.get("busy"):
-        time.sleep(_POLL_SECONDS)
+        view = service.wait_for_change(owner, view, _POLL_SECONDS)
         if reader_left is not None and time.monotonic() - checked >= _READER_CHECK_SECONDS:
             checked = time.monotonic()
             if reader_left():
                 _end_abandoned_run(owner, view)
                 raise HTTPException(499, "client closed request")
-        view = service.get(owner, view["variation_id"])
     return view
 
 
@@ -494,8 +493,7 @@ def paint_events(owner: str, data: dict[str, Any], idempotency_key: str | None) 
             if time.monotonic() - last_line >= _WAIT_EVENT_SECONDS:
                 last_line = time.monotonic()
                 yield {"event": "wait", "elapsed_ms": int((last_line - started) * 1000)}
-            time.sleep(_POLL_SECONDS)
-            view = service.get(owner, view["variation_id"])
+            view = service.wait_for_change(owner, view, _POLL_SECONDS)
         if view.get("delivery") is not None and view.get("result") is None:
             latest = next((item for item in sent if item.startswith("progress:")), None)
             base = json.loads(latest.removeprefix("progress:")) if latest else None

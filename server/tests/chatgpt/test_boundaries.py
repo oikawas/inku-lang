@@ -26,7 +26,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("INKU_CHATGPT_PLAN_ENABLED", "1")
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     from inku_server import db
-    monkeypatch.setattr(db, "get_user", lambda owner: {"id": owner, "username": "owner"} if owner == "owner" else None)
+    monkeypatch.setattr(db, "get_user", lambda owner, **kwargs: {"id": owner, "username": "owner"} if owner == "owner" else None)
     monkeypatch.setattr(db, "single_user_mode_enabled", lambda: False)
     runtime.configure_startup("127.0.0.1", 8100, self_hosted=False)
     return CredentialStore()
@@ -597,11 +597,32 @@ def test_runtime_cancel_closes_blocked_stream_and_releases_slot(isolated, monkey
                                                      runtime.execution_cancel("owner", "execution")))
     with ThreadPoolExecutor(max_workers=1) as pool:
         service._pool = pool
-        run = SimpleNamespace(context={"host_options": {"chatgpt_profile": value["id"]}}, view=lambda: {"busy": True})
+        run = SimpleNamespace(context={"host_options": {"chatgpt_profile": value["id"]}}, busy=True, view=lambda: {"busy": True})
         service._schedule(("owner", "execution"), run)
         assert json.loads(service._jobs[("owner", "execution")].result())
     assert cancel.is_set() and not runtime.execution_cancel("owner", "execution").is_set()
     runtime.retire_execution("owner", "execution")
+
+
+def test_session_checker_caches_validation_but_not_cancellation(monkeypatch):
+    calls = []
+    now = [10.0]
+    cancel = threading.Event()
+    monkeypatch.setattr(runtime, "_stopping", threading.Event())
+    monkeypatch.setattr(runtime.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(runtime, "check_session", lambda *args: calls.append(args) or {"generation": 1})
+    check = runtime.session_checker("owner", "profile", 1, cancel)
+    assert check() == {"generation": 1}
+    now[0] += 0.5
+    assert check() == {"generation": 1}
+    assert len(calls) == 1
+    now[0] += 0.6
+    check()
+    assert len(calls) == 2
+    cancel.set()
+    with pytest.raises(ChatGPTError, match="cancelled"):
+        check()
+    assert len(calls) == 2
 
 
 def test_failed_initial_exchange_retains_issued_client_for_explicit_retry(isolated, monkeypatch):

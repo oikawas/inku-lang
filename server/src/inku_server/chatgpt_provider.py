@@ -17,7 +17,7 @@ import time
 import httpx
 
 from .chatgpt_auth import RESOURCE, access_token, auth_policy, read_limited
-from .chatgpt_runtime import check_session, guarded
+from .chatgpt_runtime import check_session, guarded, session_checker
 from .chatgpt_store import ChatGPTError, CredentialStore
 from .chatgpt_models import publication
 from . import provider_wire
@@ -118,8 +118,7 @@ class TextSSEDecoder(SSEDecoder):
 
 
 async def catalog(owner: str, profile_id: str, generation: int, deadline: float, cancel=None, *, force: bool = False, _wire_held: bool = False) -> list[dict]:
-    def check():
-        return check_session(owner, profile_id, generation, cancel)
+    check = session_checker(owner, profile_id, generation, cancel, validate=check_session)
     profile = check()
     cache = profile.get("catalog")
     from .verified_model_catalog import core_catalog
@@ -172,8 +171,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
     prompt = action["payload"]["prompt"]
     # Validate image references before catalog refresh or any other HTTP call.
     built = (provider_wire.chatgpt_request(model, prompt, limit, images=images) if image_effect else None)
-    def check():
-        return check_session(owner, profile_id, generation, cancel)
+    check = session_checker(owner, profile_id, generation, cancel, validate=check_session)
     store = CredentialStore()
     with store.lock("wire:" + owner + ":" + profile_id, deadline, check):
         try:
@@ -213,23 +211,21 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                             if observation and image_effect:
                                 raw.extend(content)
                             raise response_error(json.loads(content), status, response.headers.get("x-request-id"))
-                        iterator = response.aiter_bytes()
-                        received = 0
-                        reported = 0
-                        while True:
-                            try:
-                                chunk = await guarded(anext(iterator), check, deadline)
-                            except StopAsyncIteration:
-                                break
-                            if observation:
-                                raw.extend(chunk[:max(0, decoder.wire_limit + 1 - len(raw))])
-                            decoder.feed(chunk)
-                            received += len(chunk)
-                            if on_bytes is not None and received // 4096 > reported // 4096:
-                                reported = received
-                                on_bytes(received)
-                        check()
-                        return decoder.finish()
+                        async def consume():
+                            received = 0
+                            reported = 0
+                            async for chunk in response.aiter_bytes():
+                                if observation:
+                                    raw.extend(chunk[:max(0, decoder.wire_limit + 1 - len(raw))])
+                                decoder.feed(chunk)
+                                received += len(chunk)
+                                if on_bytes is not None and received // 4096 > reported // 4096:
+                                    reported = received
+                                    on_bytes(received)
+                            return decoder.finish()
+                        answer = await guarded(consume(), check, deadline)
+                        check(force=True)
+                        return answer
                     finally:
                         await stream.__aexit__(None, None, None)
             finally:

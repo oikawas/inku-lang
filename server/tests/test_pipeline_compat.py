@@ -295,7 +295,7 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
     monkeypatch.setattr(
         pipeline_provider,
         "connection_for",
-        lambda *args: {
+        lambda *args, **kwargs: {
             "id": "fixture",
             "kind": "openai_compatible",
             "base_url": "https://provider.invalid/v1",
@@ -396,7 +396,7 @@ def test_a_supplementing_sketch_reaches_stage1_and_is_saved(tmp_path, monkeypatc
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     monkeypatch.setattr(pipeline_provider, "provider_for_model", lambda *args, **kwargs: ("fixture", "fixture-model"))
     monkeypatch.setattr(api_common, "_model_offered_to", lambda *args, **kwargs: True)
-    monkeypatch.setattr(pipeline_provider, "connection_for", lambda *args: {
+    monkeypatch.setattr(pipeline_provider, "connection_for", lambda *args, **kwargs: {
         "id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1",
         "api_key": "test-only", "requires_api_key": True,
     })

@@ -558,7 +558,7 @@ def test_read_only_get_does_not_reserve_a_busy_slot():
             assert snapshot == {"config": {}, "action": None}
 
     record = SimpleNamespace(execution_id="saved", state_bytes=json.dumps({"snapshot": {"config": {}, "action": None}, "context": {}, "rendered": None}))
-    store = SimpleNamespace(read_latest_execution_for_variation=lambda *_: record)
+    store = SimpleNamespace(read_latest_execution_id=lambda *_: record.execution_id, read_execution=lambda *_: record)
     service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
                               max_workers=1, max_effect_steps=1, max_retained_runs=8)
     service._host = lambda *_: Run()
@@ -588,7 +588,7 @@ def test_get_resumes_an_unresident_busy_execution():
             return {"busy": True, "execution_id": "saved"}
 
     record = SimpleNamespace(execution_id="saved", state_bytes=json.dumps({"snapshot": {"config": {}, "action": {"tag": "generate_normalized_ddl"}}, "context": {}, "rendered": None}))
-    store = SimpleNamespace(read_latest_execution_for_variation=lambda *_: record, read_execution=lambda *_: record)
+    store = SimpleNamespace(read_latest_execution_id=lambda *_: record.execution_id, read_execution=lambda *_: record)
     service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
                               max_workers=1, max_effect_steps=1, max_retained_runs=8)
     service._host = lambda *_: Run()
@@ -602,10 +602,90 @@ def test_get_resumes_an_unresident_busy_execution():
         service.close()
 
 
+def test_compat_wait_uses_resident_run_without_snapshot_queries(monkeypatch):
+    import threading
+    from inku_server import pipeline_compat
+
+    class Run:
+        owner_id = "owner"
+        context = {}
+        image_data = {}
+        _snapshot = {"execution_id": "run", "variation_id": "variation", "sequence": "1", "action": {"tag": "work"}}
+        changed = threading.Event()
+        def view(self):
+            return {**self._snapshot, "busy": self._snapshot["action"] is not None}
+        def wait_for_change(self, sequence, timeout):
+            self.changed.wait(timeout)
+
+    class Store:
+        queries = 0
+        def read_latest_execution_id(self, *_):
+            self.queries += 1
+            return "run"
+        def read_execution(self, *_):
+            pytest.fail("resident run loaded a snapshot")
+
+    run = Run()
+    store = Store()
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1)
+    service._runs[("owner", "run")] = run
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
+    def finish():
+        time.sleep(0.05)
+        run._snapshot = {**run._snapshot, "sequence": "2", "action": None}
+        run.changed.set()
+    thread = threading.Thread(target=finish)
+    thread.start()
+    try:
+        assert pipeline_compat._wait("owner", service.get("owner", "variation"))["busy"] is False
+        assert 1 <= store.queries <= 3
+    finally:
+        thread.join()
+        service._runs.clear()
+        service.close()
+
+
+def test_get_uses_latest_database_execution_when_older_one_is_resident(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'latest.db'}")
+    Base.metadata.create_all(engine)
+    clock = [1]
+    store = VariationAuthorityStore(engine, now_ms=lambda: clock[0])
+    def saved(execution_id):
+        return json.dumps({"snapshot": {"execution_id": execution_id, "variation_id": "variation",
+                                         "config": {}, "action": None},
+                           "context": {}, "rendered": None}).encode()
+    store.create_execution("owner", "old", "variation", "0", saved("old"))
+    clock[0] = 2
+    store.create_execution("owner", "new", "variation", "0", saved("new"))
+
+    class Run:
+        context = {}
+        image_data = {}
+        def restore(self, snapshot, *, rendered):
+            self.snapshot = snapshot
+        def view(self):
+            return {"execution_id": self.snapshot["execution_id"], "busy": False}
+
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=2)
+    old = Run()
+    old.restore({"execution_id": "old", "variation_id": "variation"}, rendered=None)
+    service._runs[("owner", "old")] = old
+    service._host = lambda *_: Run()
+    try:
+        assert service.get("owner", "variation")["execution_id"] == "new"
+    finally:
+        service._runs.clear()
+        service.close()
+        engine.dispose()
+
+
 def test_reserve_evicts_least_recently_used_idle_run():
     class Run:
         context = {}
         image_data = {}
+        busy = False
         def view(self):
             return {"busy": False}
 
@@ -617,6 +697,43 @@ def test_reserve_evicts_least_recently_used_idle_run():
         service._reserve_run()
         assert list(service._runs) == [("owner", "first")]
     finally:
+        service.close()
+
+
+def test_slow_prepare_does_not_block_another_resident_get():
+    import threading
+
+    entered, release = threading.Event(), threading.Event()
+    class Run:
+        context = {}
+        image_data = {}
+        busy = False
+        _snapshot = {"execution_id": "old", "variation_id": "old-var", "action": None}
+        def view(self):
+            return {"execution_id": self._snapshot["execution_id"], "busy": False}
+        def start_new(self, _authoring):
+            self._snapshot = {"execution_id": "new", "variation_id": "new-var", "action": None}
+
+    def prepare(*_):
+        entered.set()
+        assert release.wait(2)
+        return {}, {}
+    from types import SimpleNamespace
+    store = SimpleNamespace(read_latest_execution_id=lambda *_: "old")
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
+                              prepare_for=prepare, max_workers=1, max_effect_steps=1, max_retained_runs=2)
+    service._runs[("owner", "old")] = Run()
+    service._host = lambda *_: Run()
+    worker = threading.Thread(target=lambda: service.start("owner", "direct_ddl", "circle"))
+    worker.start()
+    try:
+        assert entered.wait(1)
+        start = time.monotonic()
+        assert service.get("owner", "old-var")["execution_id"] == "old"
+        assert time.monotonic() - start < 0.5
+    finally:
+        release.set()
+        worker.join(2)
         service.close()
 
 
@@ -695,4 +812,42 @@ def test_logout_does_not_stop_api_drain():
         assert run.calls == 1 and not run.busy
     finally:
         retire_execution(run.owner_id, "api-run")
+        service.close()
+
+
+def test_snapshot_reuses_render_digest_until_render_or_ranges_change(monkeypatch):
+    from inku_server import pipeline_api
+
+    class Store:
+        def create_execution(self, *args):
+            pass
+        def compare_and_set_execution(self, *args, **kwargs):
+            pass
+
+    service = PipelineService(None, Store(), config_for=None, provider_for=None, render_for=None,
+                              project_result=lambda *args: {}, max_workers=1,
+                              max_effect_steps=1, max_retained_runs=1)
+    calls = []
+    original = pipeline_api.hashlib.sha256
+    def digest(value):
+        calls.append(1)
+        return original(value)
+    monkeypatch.setattr(pipeline_api.hashlib, "sha256", digest)
+    try:
+        run = service._host("owner", {}, {})
+        rendered = {"svg": "<svg/>"}
+        snapshot = {"execution_id": "e", "variation_id": "v", "sequence": "0"}
+        context = {}
+        run.save_snapshot(None, snapshot, context, rendered)
+        previous = snapshot
+        snapshot = {**snapshot, "sequence": "1"}
+        run.save_snapshot(previous, snapshot, context, rendered)
+        assert len(calls) == 1
+        previous = snapshot
+        snapshot = {**snapshot, "sequence": "2", "completion_ranges": {"ranges": []}}
+        run.save_snapshot(previous, snapshot, context, rendered)
+        assert len(calls) == 2
+        run.save_snapshot(snapshot, {**snapshot, "sequence": "3"}, context, {"svg": "<svg/>"})
+        assert len(calls) == 3
+    finally:
         service.close()

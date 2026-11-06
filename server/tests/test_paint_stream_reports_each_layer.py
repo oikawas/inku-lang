@@ -55,6 +55,9 @@ class _Service:
         self.last = next(self.views, self.last)
         return self.last
 
+    def wait_for_change(self, owner, view, _timeout):
+        return self.get(owner, view["variation_id"])
+
     def execution(self, owner, execution_id):
         return SimpleNamespace(context={"host_options": {"stage1_model": "model-1", "stage2_model": "model-2"}})
 

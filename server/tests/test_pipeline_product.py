@@ -755,3 +755,33 @@ def test_a_compact_work_saves_through_the_shared_replay(monkeypatch):
     assert "expanded_ddl" not in record
     assert record["svg"] == "<svg id='replayed'/>"
     assert record["render_metadata"]["render_engine_version"] == "71"
+
+
+def test_prepare_reads_model_settings_once_and_resolves_only_selected_palette(tmp_path, monkeypatch):
+    from inku_server import db
+    from inku_server.api_core import common
+
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'prepare-efficiency.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+    reads, palettes = [], []
+    get_settings, resolve = db.get_model_settings, binding.resolve_palette
+    def read_settings():
+        reads.append(1)
+        return get_settings()
+    def resolve_palette(value):
+        palettes.append(json.loads(value)["catalog_id"])
+        return resolve(value)
+    monkeypatch.setattr(db, "get_model_settings", read_settings)
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    binding.resolve_palette = resolve_palette
+    _, context = effects.prepare("author", "direct_ddl", "A line", {
+        "catalog_id": "default", "catalog_mode": "fixed", "stage1_model": "fixture:one",
+    }, None)
+    assert reads == [1]
+    assert palettes == ["default"]
+    assert set(context["color_maps"]) == {"default"}
+    engine.dispose()

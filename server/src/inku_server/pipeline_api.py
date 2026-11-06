@@ -22,6 +22,7 @@ from .pipeline_candidate import CandidateExecution, CandidateHostError, Pipeline
 from .pipeline_settings import select_canvas
 from .persistence.variation_authority import (
     LAWS_RECORD_KEYS,
+    _OwnedExecutionState,
     ExecutionSnapshotConflict,
     VariationAuthorityAdapterError,
 )
@@ -276,6 +277,7 @@ class PipelineService:
         self._images = PendingImages(max_retained_runs)
         self._runs: OrderedDict[tuple[str, str], CandidateExecution] = OrderedDict()
         self._jobs: dict[tuple[str, str], Future] = {}
+        self._starting = 0
         self._lock = threading.RLock()
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="inku-pipeline")
 
@@ -344,7 +346,10 @@ class PipelineService:
             transport = self.provider_with_context(owner, run.context) if self.provider_with_context else self.provider_for(owner)
             return transport(action)
 
+        last_rendered = last_ranges = last_digest = None
+
         def save(previous, snapshot, host_context, rendered):
+            nonlocal last_rendered, last_ranges, last_digest
             if rendered is None:
                 host_context.pop("result", None)
                 host_context.pop("render_digest", None)
@@ -352,14 +357,17 @@ class PipelineService:
                 projection = rendered
                 if snapshot.get("completion_ranges") is not None:
                     projection = {"rendered": rendered, "completion_ranges": snapshot["completion_ranges"]}
-                digest = hashlib.sha256(json.dumps(projection, sort_keys=True).encode()).hexdigest()
+                ranges = snapshot.get("completion_ranges")
+                # A saved rendered object is reused unchanged; SVG replacement creates a new dict.
+                if rendered is last_rendered and ranges == last_ranges and last_digest is not None:
+                    digest = last_digest
+                else:
+                    digest = hashlib.sha256(json.dumps(projection, sort_keys=True).encode()).hexdigest()
+                    last_rendered, last_ranges, last_digest = rendered, deepcopy(ranges), digest
                 if digest != host_context.get("render_digest"):
                     host_context["result"] = self.project_result(owner, snapshot, host_context, rendered)
                     host_context["render_digest"] = digest
-            state_bytes = json.dumps(
-                {"snapshot": snapshot, "context": host_context, "rendered": rendered},
-                ensure_ascii=False, allow_nan=False, separators=(",", ":"),
-            ).encode()
+            state_bytes = _OwnedExecutionState(snapshot, host_context, rendered)
             if previous is None:
                 self.store.create_execution(owner, snapshot["execution_id"], snapshot["variation_id"], snapshot["sequence"], state_bytes)
             else:
@@ -448,6 +456,9 @@ class PipelineService:
                 )
         with self._lock:
             self._reserve_run()
+            self._starting += 1
+        reserved = True
+        try:
             image = self._images.get(owner, image_id) if kind == "image" else None
             if prepared is not None:
                 config, resolved_context = prepared
@@ -495,8 +506,15 @@ class PipelineService:
                 self._images.consume(owner, image_id)
             run.context["execution_id"] = run.view()["execution_id"]
             key = (owner, run.view()["execution_id"])
-            self._runs[key] = run
-            self._schedule(key, run)
+            with self._lock:
+                self._starting -= 1
+                reserved = False
+                self._runs[key] = run
+                self._schedule(key, run)
+        finally:
+            if reserved:
+                with self._lock:
+                    self._starting -= 1
         return run.view()
 
     def author_ddl(self, owner: str, execution_id: str, body: AuthorDdlBody) -> dict:
@@ -556,11 +574,11 @@ class PipelineService:
         )
 
     def _reserve_run(self) -> None:
-        if len(self._runs) < self.max_retained_runs:
+        if len(self._runs) + self._starting < self.max_retained_runs:
             return
         for key, run in list(self._runs.items()):
             job = self._jobs.get(key)
-            if not run.view()["busy"] and (job is None or job.done()):
+            if not run.busy and (job is None or job.done()):
                 from .chatgpt_runtime import retire_execution
                 retire_execution(*key)
                 run.image_data.clear()
@@ -576,7 +594,7 @@ class PipelineService:
         current = self._jobs.get(key)
         if current is not None and not current.done():
             return
-        if run.view()["busy"]:
+        if run.busy:
             from .chatgpt_runtime import begin_execution
             begin_execution(*key, chatgpt=bool(run.context.get("host_options", {}).get("chatgpt_profile")))
             job = self._pool.submit(self._drain, run)
@@ -653,25 +671,36 @@ class PipelineService:
         key = (owner, execution_id)
         with self._lock:
             run = self._runs.get(key)
+            if run is not None:
+                self._runs.move_to_end(key)
+                return run
+        record = self.store.read_execution(owner, execution_id)
+        if record is None:
+            raise HTTPException(404, "variation_not_found")
+        saved = json.loads(record.state_bytes)
+        candidate = self._host(owner, saved["snapshot"]["config"], saved["context"])
+        candidate.restore(saved["snapshot"], rendered=saved["rendered"])
+        candidate.context["execution_id"] = execution_id
+        with self._lock:
+            run = self._runs.get(key)
             if run is None:
-                record = self.store.read_execution(owner, execution_id)
-                if record is None:
-                    raise HTTPException(404, "variation_not_found")
                 self._reserve_run()
-                saved = json.loads(record.state_bytes)
-                run = self._host(owner, saved["snapshot"]["config"], saved["context"])
-                run.restore(saved["snapshot"], rendered=saved["rendered"])
-                run.context["execution_id"] = execution_id
+                run = candidate
                 self._runs[key] = run
-                if (run.snapshot().get("image_ddl") is not None
-                        and (run.snapshot().get("action") or {}).get("tag") in {
-                            "select_image_catalog", "write_image_ddl", "draw_image_review", "review_image_ddl",
-                        }):
-                    self._stop_missing_image(run)
-                self._schedule(key, run)
+                registered = True
             else:
                 self._runs.move_to_end(key)
-            return run
+                registered = False
+        if registered:
+            snapshot = saved["snapshot"]
+            if (snapshot.get("image_ddl") is not None
+                    and (snapshot.get("action") or {}).get("tag") in {
+                        "select_image_catalog", "write_image_ddl", "draw_image_review", "review_image_ddl",
+                    }):
+                self._stop_missing_image(run)
+            with self._lock:
+                self._schedule(key, run)
+        return run
 
     def completion_range_states(self, owner: str, body: CompletionRangeStatesBody) -> dict:
         """Read this owner's trusted inputs without starting or resuming work."""
@@ -830,16 +859,21 @@ class PipelineService:
         return system_prompts_view(json.loads(record.state_bytes).get("context", {}))
 
     def get(self, owner: str, variation_id: str) -> dict:
-        record = self.store.read_latest_execution_for_variation(owner, variation_id)
-        if record is None:
+        execution_id = self.store.read_latest_execution_id(owner, variation_id)
+        if execution_id is None:
             raise HTTPException(404, "variation_not_found")
-        execution_id = record.execution_id
         key = (owner, execution_id)
         with self._lock:
             run = self._runs.get(key)
             if run is not None:
                 self._runs.move_to_end(key)
-            else:
+        if run is None:
+            record = self.store.read_execution(owner, execution_id)
+            if record is None:
+                raise HTTPException(404, "variation_not_found")
+            with self._lock:
+                run = self._runs.get((owner, execution_id))
+            if run is None:
                 saved = json.loads(record.state_bytes)
                 if saved["snapshot"].get("action") is not None:
                     run = self.execution(owner, execution_id)
@@ -855,6 +889,14 @@ class PipelineService:
                 raise error
             raise HTTPException(503, {"code": "pipeline_effect_failed", "message": "The authoring operation could not finish."})
         return run.view()
+
+    def wait_for_change(self, owner: str, view: dict, timeout: float = 0.25) -> dict:
+        with self._lock:
+            run = self._runs.get((owner, view["execution_id"]))
+        if run is None:
+            return self.get(owner, view["variation_id"])
+        run.wait_for_change(view.get("sequence"), timeout)
+        return self.get(owner, view["variation_id"])
 
     def command(self, owner: str, execution_id: str, payload: dict) -> dict:
         if payload.get("tag") == "perform":

@@ -6,6 +6,7 @@ import asyncio
 import os
 import threading
 import time
+from copy import deepcopy
 from dataclasses import dataclass
 
 from .chatgpt_store import ChatGPTError, CredentialStore
@@ -134,6 +135,24 @@ def check_session(owner: str, profile_id: str, generation: int, cancel: threadin
     if "error" in result:
         raise ChatGPTError(result["error"])
     return profile
+
+
+def session_checker(owner: str, profile_id: str, generation: int, cancel: threading.Event | None = None, *, validate=None):
+    """Reuse one send's validated profile briefly, while checking cancellation every time."""
+    checked_at = float("-inf")
+    cached = None
+    def check(*, force=False):
+        nonlocal checked_at, cached
+        if cancel is not None and cancel.is_set():
+            raise ChatGPTError("chatgpt_cancelled")
+        if _stopping.is_set():
+            raise ChatGPTError("chatgpt_startup_unverified")
+        now = time.monotonic()
+        if force or cached is None or now - checked_at >= 1.0:
+            cached = (validate or check_session)(owner, profile_id, generation, cancel)
+            checked_at = now
+        return deepcopy(cached)
+    return check
 
 
 async def guarded(awaitable, check, deadline: float):

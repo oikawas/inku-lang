@@ -100,6 +100,8 @@ def test_a_fork_and_change_the_layout_carry_the_records(saved_work, monkeypatch)
                                   {"host_options": {"render_seed": 7}}))
 
     class Run:
+        busy = False
+
         def __init__(self, config, context):
             self.config, self.context = config, context
             self.image_data = {}

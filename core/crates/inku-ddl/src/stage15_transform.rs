@@ -9,8 +9,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::sha256_hex;
 use serde_json::{Number, Value};
-use sha2::{Digest, Sha256};
 
 use crate::execution_projection::ExecutionProjection;
 use crate::{
@@ -457,8 +457,4 @@ fn optional_seed_value(seed: Option<u64>) -> Value {
         Some(seed) => Value::Number(Number::from(seed)),
         None => Value::Null,
     }
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    crate::lowercase_hex(&Sha256::digest(bytes))
 }

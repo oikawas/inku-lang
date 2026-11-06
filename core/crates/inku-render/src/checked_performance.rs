@@ -568,7 +568,7 @@ fn in_any_transform_group(groups: &[TransformGroup], index: usize) -> bool {
 /// Resolve checked relations and transform scopes through one dependency executor.
 pub fn resolve_checked_performance(
     request: PerformanceRequest<'_>,
-    policy: ScoreErrorPolicy,
+    _policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
     if request.score.uses_compact_resource_contract() {
         return Err(CheckedPerformanceError {
@@ -595,7 +595,7 @@ pub fn resolve_checked_performance(
             })
         });
     if needs_checked_execution {
-        anchor_execution::resolve(request, policy)
+        anchor_execution::resolve(request)
     } else {
         Ok(resolve_performance(request))
     }
@@ -664,12 +664,11 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
             owner: inku_score::SavedScoreResourceOwner::Score,
             reason: inku_score::SavedScoreResourceFailure::InvalidContract("non-canonical Score"),
         })?;
-    resolve_finalized_performance(request, policy, &finalized, &input_digest)
+    resolve_finalized_performance(request, &finalized, &input_digest)
 }
 
 pub(crate) fn resolve_finalized_performance(
     request: PerformanceRequest<'_>,
-    policy: ScoreErrorPolicy,
     finalized: &inku_score::FinalizedScore,
     input_digest: &str,
 ) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
@@ -689,17 +688,18 @@ pub(crate) fn resolve_finalized_performance(
         score: &finalized.score,
         ..request
     };
-    let mut performance = match crate::typed_performance::resolve_with_digest(
-        finalized_request,
-        policy,
-        input_digest,
-    ) {
-        Ok(performance) => performance,
-        Err(mut error) => {
-            remap_finalized_diagnostics(&mut error.diagnostics, &new_to_old, &new_anchor_to_old);
-            return Err(error.into());
-        }
-    };
+    let mut performance =
+        match crate::typed_performance::resolve_with_digest(finalized_request, input_digest) {
+            Ok(performance) => performance,
+            Err(mut error) => {
+                remap_finalized_diagnostics(
+                    &mut error.diagnostics,
+                    &new_to_old,
+                    &new_anchor_to_old,
+                );
+                return Err(error.into());
+            }
+        };
     for entry in &mut performance.performed {
         entry.original_instruction_index = new_to_old[entry.original_instruction_index];
     }

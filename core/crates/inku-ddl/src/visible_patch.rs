@@ -2,8 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::sha256_hex;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 use crate::{
     ClauseAtom, CompilerLockState, CoreRoleKind, MacroDefinition, MacroExpansionLimits,
@@ -1610,10 +1610,6 @@ fn outside_blocking_diagnostics(
 
 const fn overlaps(left: SourceSpan, right: SourceSpan) -> bool {
     left.start_byte < right.end_byte && right.start_byte < left.end_byte
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    crate::lowercase_hex(&Sha256::digest(bytes))
 }
 
 #[cfg(test)]

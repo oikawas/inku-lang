@@ -27,7 +27,7 @@ use inku_render::render::{CompatFillClipPolicy, render, render_with_resources};
 use inku_render::types::{CanvasSize, RenderOptions, RenderRequest, SvgProfile};
 use inku_score::{Color, Primitive, Score, ScoreErrorPolicy, lookup_canvas_format};
 
-use crate::laws::layer_of;
+use crate::laws::{layer_of, round3};
 
 /// The clip limits the Server draws with (its default manifest). The editable
 /// SVG clips no fill by them; the renderer takes them with a resource policy.
@@ -303,11 +303,6 @@ fn unit(rgb: [u8; 3]) -> [f64; 3] {
 
 fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
     ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
-}
-
-/// Python's `round(value, 3)`.
-fn round3(value: f64) -> f64 {
-    format!("{value:.3}").parse().unwrap_or(value)
 }
 
 /// Python's `round(value, 4)`.

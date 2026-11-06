@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: remove unused functions and duplicate calculations without changing drawing or request output.
+
 - macOS: avoid repeating unchanged calculations and image loads in input, generation details, and model settings.
 
 - Core: reduce repeated calculations and quadratic work without changing drawing or request output.

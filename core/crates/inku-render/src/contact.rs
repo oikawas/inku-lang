@@ -9,38 +9,6 @@ fn distance(a: Point, b: Point) -> f64 {
     (b.x - a.x).hypot(b.y - a.y)
 }
 
-/// Coverage and natural wavelength represented by an SVG dash specification.
-#[must_use]
-pub fn dash_spec_stats(dash: Option<&str>) -> (f64, f64) {
-    let Some(dash) = dash else {
-        return (1.0, 0.0);
-    };
-    let mut values: Vec<f64> = dash
-        .split(',')
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| {
-            value
-                .trim()
-                .parse::<f64>()
-                .expect("dash specification must contain numbers")
-        })
-        .map(f64::abs)
-        .collect();
-    let sum: f64 = values.iter().sum();
-    if values.is_empty() || sum <= 0.0 {
-        return (1.0, 0.0);
-    }
-    if values.len() % 2 == 1 {
-        values.extend_from_within(..);
-    }
-    let marks: Vec<f64> = values.iter().step_by(2).copied().collect();
-    let gaps: Vec<f64> = values.iter().skip(1).step_by(2).copied().collect();
-    let coverage = marks.iter().sum::<f64>() / values.iter().sum::<f64>();
-    let grain = marks.iter().sum::<f64>() / marks.len() as f64
-        + gaps.iter().sum::<f64>() / gaps.len() as f64;
-    (coverage, grain)
-}
-
 fn contact_field(t: f64, seed: Seed) -> f64 {
     0.62 * value_noise_1d(t, seed) + 0.38 * value_noise_1d(t * 2.7 + 13.1, seed + 977)
 }

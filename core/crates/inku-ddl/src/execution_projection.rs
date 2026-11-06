@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use sha2::{Digest, Sha256};
+use crate::sha256_hex;
 
 use crate::{
     CompilerExecutionDiagnostic, CompilerExecutionDisposition, CompilerExecutionIssueKind,
@@ -1020,10 +1020,6 @@ fn omitted_bindings(
             (!retained.contains(&complete.invocation_ordinal)).then_some(index)
         })
         .collect()
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    crate::lowercase_hex(&Sha256::digest(bytes))
 }
 
 #[cfg(test)]

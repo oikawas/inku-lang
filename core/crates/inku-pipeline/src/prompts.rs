@@ -639,6 +639,7 @@ pub fn build_sketch_prompt(
 }
 
 /// Build the typed `generate_normalized_ddl` request.
+#[cfg(test)]
 pub fn build_stage1_prompt(
     description: &str,
     language: ResolvedInstructionLanguage,

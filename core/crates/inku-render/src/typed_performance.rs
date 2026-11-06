@@ -1635,16 +1635,15 @@ fn remap_dense_diagnostics(
 #[cfg(test)]
 fn resolve(
     request: PerformanceRequest<'_>,
-    policy: inku_score::ScoreErrorPolicy,
+    _policy: inku_score::ScoreErrorPolicy,
 ) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
     let digest = inku_score::canonical_score_digest(request.score)
         .expect("finalized compact Score is canonical");
-    resolve_with_digest(request, policy, &digest)
+    resolve_with_digest(request, &digest)
 }
 
 pub(crate) fn resolve_with_digest(
     request: PerformanceRequest<'_>,
-    policy: inku_score::ScoreErrorPolicy,
     input_digest: &str,
 ) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
     let performance_seed = request.performance_seed;
@@ -1659,22 +1658,19 @@ pub(crate) fn resolve_with_digest(
         composition_seed,
         canvas,
     };
-    let mut performance = match crate::checked_performance::anchor_execution::resolve_typed(
-        dense_request,
-        policy,
-        typed,
-    ) {
-        Ok(performance) => performance,
-        Err(mut error) => {
-            remap_dense_diagnostics(
-                &mut error.diagnostics,
-                &source_diagnostics,
-                &dense_to_original,
-                &dense_anchor_to_original,
-            );
-            return Err(error);
-        }
-    };
+    let mut performance =
+        match crate::checked_performance::anchor_execution::resolve_typed(dense_request, typed) {
+            Ok(performance) => performance,
+            Err(mut error) => {
+                remap_dense_diagnostics(
+                    &mut error.diagnostics,
+                    &source_diagnostics,
+                    &dense_to_original,
+                    &dense_anchor_to_original,
+                );
+                return Err(error);
+            }
+        };
     if let Some(execution) = &mut performance.execution {
         remap_dense_diagnostics(
             &mut execution.diagnostics,

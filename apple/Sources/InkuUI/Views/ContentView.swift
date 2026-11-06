@@ -112,11 +112,8 @@ public struct ContentView: View {
     public var body: some View {
         ZStack {
             mainShell
-                .opacity(presentation ? 0 : 1)
-                .accessibilityHidden(presentation || ui.libraryOpen || ui.settingsOpen)
-                .allowsHitTesting(!presentation && !ui.libraryOpen && !ui.settingsOpen)
-                .environment(\.inkuTooltipsCovered, presentation || ui.libraryOpen || ui.settingsOpen)
-            if ui.libraryOpen && !presentation { libraryOverlay }
+                .modifier(InkuCoveredView(covered: presentation || ui.libraryOpen || ui.settingsOpen, hidden: presentation))
+            if ui.libraryOpen && !presentation { libraryOverlay.modifier(InkuCoveredView(covered: ui.settingsOpen)) }
             if ui.settingsOpen && !presentation { settingsOverlay }
             if presentation { presentationView }
         }
@@ -444,6 +441,9 @@ public struct ContentView: View {
         showCreation(tab: "artwork")
     }
     private func openLibrary() {
+        #if os(macOS)
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        #endif
         ui.settingsOpen = false
         ui.libraryOpen = true
         // Web `openManager()`: the library opens at the saved work shown in Create; an unsaved candidate is not one,
@@ -454,6 +454,9 @@ public struct ContentView: View {
     private func closeLibrary() { ui.libraryOpen = false }
     /// Web `openSettings()`: with no destination, the tab the author last chose (`settings_tab`), else the first.
     private func openSettings(_ destination: SettingsSection?) {
+        #if os(macOS)
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        #endif
         ui.settingsSection = destination ?? savedSettingsSection ?? .display
         ui.settingsOpen = true
     }

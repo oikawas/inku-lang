@@ -44,6 +44,7 @@ struct ArtworkCanvas: View {
     var replacement: ArtworkReplacement? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.inkuTooltipsCovered) private var covered
     @State private var picture = CanvasPicture()
     @State private var localViewport = CanvasViewport()
     @State private var gestureScale: CGFloat = 1
@@ -93,7 +94,7 @@ struct ArtworkCanvas: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .task(id: requestKey(box: fit.box)) { await render(box: fit.box) }
+            .task(id: covered ? nil : requestKey(box: fit.box)) { if !covered { await render(box: fit.box) } }
             .onChange(of: fit.zoom, initial: true) { _, zoom in fitZoom = zoom }
         }
         .overlay(alignment: zoomControlsAtTop ? .top : .bottom) {

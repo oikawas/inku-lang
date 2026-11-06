@@ -131,13 +131,14 @@ struct InkuTextEditor: View {
     var onCharacterHover: ((Int?) -> Void)? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.inkuTooltipsCovered) private var covered
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        BatchNativeInputEditor(text: $text, isEditable: isEditable && isEnabled,
+        BatchNativeInputEditor(text: $text, isEditable: isEditable && isEnabled && !covered,
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme,
-                               style: style, marks: marks, marksKey: marksKey, insertion: insertion,
+                               style: style, marks: marks, marksKey: marksKey, covered: covered, insertion: insertion,
                                rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions, onCharacterHover: onCharacterHover)
             .clipped()
     }
@@ -209,6 +210,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
     let style: InkuEditorStyle
     let marks: (String) -> [InkuEditorMark]
     let marksKey: InkuEditorMarksKey
+    let covered: Bool
     let insertion: Binding<InkuEditorInsertion?>?
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
@@ -354,6 +356,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             self.settings = settings
             text = settings.$text
             guard let editor, let scroll else { return }
+            editor.hoverEnabled = !settings.covered
             let source = text.wrappedValue
             editor.setAccessibilityLabel(settings.accessibilityLabel)
             if (settings.completions == nil) != (editor.completionRange == nil) {
@@ -645,6 +648,7 @@ private final class BatchEditorTextView: NSTextView {
     var onFocusChanged: (() -> Void)?
     /// The character under the pointer, for the range frame on hover (Web `hoveredRange`).
     var onHover: ((Int?) -> Void)?
+    var hoverEnabled = true { didSet { if oldValue != hoverEnabled { updateTrackingAreas() } } }
     private var hoverArea: NSTrackingArea?
     /// The word the completion list replaces; nil leaves completion off (the system's word range is not used).
     var completionRange: (() -> NSRange?)?
@@ -673,6 +677,8 @@ private final class BatchEditorTextView: NSTextView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
+        hoverArea = nil
+        guard hoverEnabled else { return }
         let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
         addTrackingArea(area); hoverArea = area
     }
@@ -825,6 +831,7 @@ private struct BatchNativeInputEditor: UIViewRepresentable {
     let style: InkuEditorStyle
     let marks: (String) -> [InkuEditorMark]
     let marksKey: InkuEditorMarksKey
+    let covered: Bool
     let insertion: Binding<InkuEditorInsertion?>?
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil

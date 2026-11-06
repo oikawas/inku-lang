@@ -14,4 +14,3 @@ export type HistoryForShareProjection = {
 	for_share?: boolean;
 	share_group_id?: string | null;
 };
-

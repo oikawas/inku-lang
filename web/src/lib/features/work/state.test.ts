@@ -381,6 +381,16 @@ test('a detached candidate neither clears nor adopts the main pipeline', async (
 	assert.equal(work.pipelineView, main);
 });
 
+test('an author choice made while a work opens prevents the older options from replacing it', () => {
+	const work = imageWork(async () => { throw new Error('no request expected'); });
+	const sequence = work.beginWorkOptions('describe');
+	const old = { ...work.drawOptions, models: { ...work.drawOptions.models }, catalog: { ...work.drawOptions.catalog } };
+	work.sketchMode = work.sketchMode === 'off' ? 'on' : 'off';
+	const chosen = work.sketchMode;
+	work.adoptWorkOptions(sequence, 'describe', old);
+	assert.equal(work.sketchMode, chosen);
+});
+
 test('a saved sketch reaches authoring only for its description with sketching on', async () => {
 	const requests: Array<{ text: string; options: { sketch: string; sketch_text?: string } }> = [];
 	const work = createWorkState({

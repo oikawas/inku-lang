@@ -816,6 +816,7 @@
 		if (nextAspectId === currentAspectId) {
 			return;
 		}
+		work.invalidateWorkOptions();
 		const existingPending = work.pendingCanvasAspectDerivation;
 		const parentNodeId = existingPending?.parentNodeId ?? await ensureVisibleLineageParentId();
 		work.pendingCanvasAspectDerivation = parentNodeId
@@ -964,6 +965,7 @@
 
 	async function confirmModelSelection() {
 		if (modelSelectionForDrawing) {
+			work.invalidateWorkOptions();
 			if (modelSelectionVisionOnly) work.drawOptions.models.vision = qualifiedModelRef(visionProvider, visionModel);
 			else work.drawOptions.models.stage1 = work.drawOptions.models.stage2 = qualifiedModelRef(stage1Provider, stage1Model);
 			restoreModelSelection();
@@ -994,6 +996,7 @@
 	}
 
 	function persistSelectedCatalog() {
+		if (work.tabCatalogSelection() !== colorCatalogSettings.selected) work.invalidateWorkOptions();
 		work.drawOptions.catalog.mode = colorCatalogSettings.selected === AUTO_CATALOG_ID ? 'auto' : 'fixed';
 		if (colorCatalogSettings.selected !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = colorCatalogSettings.selected;
 	}
@@ -1983,7 +1986,7 @@ $effect(() => {
 	/** Put an opened work's choices into its tab, by the shared core's rule
 	 *  (recorded value; off for an unrecorded switch; the tab default otherwise). */
 	async function adoptWorkOptions(recorded: RecordedDrawOptions | null | undefined, tab: DrawTab): Promise<void> {
-		const sequence = work.beginWorkOptions();
+		const sequence = work.beginWorkOptions(tab);
 		if (!session.currentUser) return;
 		try {
 			const response = await apiFetch('/api/auth/me/draw-options/for-tab', {
@@ -2821,7 +2824,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.qualified_id === work.drawOptions.models.stage1))}
 						sketchMode={work.sketchMode}
 						wild={work.drawOptions.wild === 'on'}
-						onSelectWild={(value) => (work.drawOptions.wild = value ? 'on' : 'off')}
+						onSelectWild={(value) => { if ((work.drawOptions.wild === 'on') !== value) work.invalidateWorkOptions(); work.drawOptions.wild = value ? 'on' : 'off'; }}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
 						drawRoute={work.drawRoute}
 						onSelectDrawRoute={work.selectDrawRoute}

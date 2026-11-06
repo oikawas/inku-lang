@@ -1,20 +1,25 @@
 package app.inku.mobile.ui
 
+import java.io.File
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 
 class DdlTitlesTest {
     @Test
-    fun aTitleLineIsTheWholeLineInOnePairOfBrackets() {
-        assertEquals("灯台", ddlTitleName("  「灯台」 "))
-        assertEquals("lighthouse", ddlTitleName("\"lighthouse\""))
-        assertEquals("lighthouse", ddlTitleName("“lighthouse”"))
-        assertEquals("the “low” moon", ddlTitleName("\"the “low” moon\""))
-        assertEquals("", ddlTitleName("「」"))
-        assertEquals("", ddlTitleName("\"\""))
-        assertNull(ddlTitleName("\""))
-        assertNull(ddlTitleName("「赤い円」を中心に置く。"))
-        assertNull(ddlTitleName("「赤」と「青」"))
+    fun sharedTitleCasesUseUtf16SpansAndRemoveTitles() {
+        val cases = JSONObject(File(requireNotNull(System.getProperty("inku.ddlTitleCases"))).readText()).getJSONArray("cases")
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val text = case.getString("text")
+            val lines = case.getJSONArray("lines")
+            val expected = (0 until lines.length()).map { i ->
+                val line = lines.getJSONArray(i)
+                text.offsetByCodePoints(0, line.getInt(0)) until text.offsetByCodePoints(0, line.getInt(1))
+            }
+            assertEquals(case.getString("why"), expected, ddlTitleLineSpans(text))
+            assertEquals(case.getString("why"), case.getString("without"), withoutDdlTitleLines(text))
+        }
     }
 
     @Test

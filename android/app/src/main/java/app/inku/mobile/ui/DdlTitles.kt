@@ -1,41 +1,36 @@
 package app.inku.mobile.ui
 
-// Chunk titles (DDL 27), the rule of the shared core's `chunk_title.rs`
-// (web's `ddl-titles.ts`): a line that is only a bracketed name, 「灯台」 or
-// "lighthouse" (or “lighthouse”), names the chunk of sentences after it. A
-// title draws nothing, so a DDL view shows it as a heading and colours no word
-// in it.
+import app.inku.mobile.pipeline.NativePipelineBridge
+import org.json.JSONArray
 
-private val TitleBrackets = listOf("「" to "」", "\"" to "\"", "“" to "”")
-
-/** The name a line gives when the whole line, without the spaces around it,
- *  is a title (empty for a title that ends a chunk); null for any other line.
- *  A name leaves out its own pair's characters only. */
-internal fun ddlTitleName(line: String): String? {
-    val trimmed = line.trim()
-    for ((open, close) in TitleBrackets) {
-        if (trimmed.length < open.length + close.length || !trimmed.startsWith(open) || !trimmed.endsWith(close)) continue
-        val inner = trimmed.substring(open.length, trimmed.length - close.length)
-        if (open !in inner && close !in inner && '\n' !in inner) return inner.trim()
-    }
-    return null
-}
+// DDL title lines are read from the shared core's `ddl_title_lines` through JNI.
 
 /** Where each title line stands in `text`, without its line break. */
-internal fun ddlTitleLineSpans(text: String): List<IntRange> {
-    val spans = mutableListOf<IntRange>()
-    var start = 0
-    for (line in text.split('\n')) {
-        val content = line.removeSuffix("\r")
-        if (ddlTitleName(content) != null) spans += start until start + content.length
-        start += line.length + 1
+internal fun ddlTitleLineSpans(text: String): List<IntRange> = runCatching {
+    val lines = JSONArray(NativePipelineBridge.ddlTitleLines(text))
+    val scalarCount = text.codePointCount(0, text.length)
+    var scalar = 0
+    var utf16 = 0
+    fun advance(target: Int): Int {
+        val bounded = target.coerceIn(0, scalarCount)
+        require(bounded >= scalar)
+        while (scalar < bounded) {
+            utf16 += Character.charCount(text.codePointAt(utf16))
+            scalar++
+        }
+        return utf16
     }
-    return spans
-}
+    (0 until lines.length()).map { index ->
+        val line = lines.getJSONArray(index)
+        val start = advance(line.getInt(0))
+        val end = advance(line.getInt(1))
+        start until end
+    }
+}.getOrDefault(emptyList())
 
 /** `text` without its title lines. */
 internal fun withoutDdlTitleLines(text: String): String =
-    text.split('\n').filter { ddlTitleName(it) == null }.joinToString("\n")
+    runCatching { NativePipelineBridge.withoutDdlTitleLines(text) }.getOrDefault(text)
 
 /** One coloured vocabulary word in a DDL view: `token` indexes the word list. */
 internal data class DdlKeywordSpan(val token: Int, val start: Int, val end: Int)

@@ -84,6 +84,7 @@ interface SharedPipelineBinding {
 
     fun descriptionHash(text: String): String = NativePipelineBridge.descriptionHash(text)
     fun descriptionLabelSpans(text: String): String = NativePipelineBridge.descriptionLabelSpans(text)
+    fun descriptionSourceLabels(text: String): String = NativePipelineBridge.descriptionSourceLabels(text)
     fun renderHash(itemJson: String): String? = NativePipelineBridge.renderHash(itemJson)
     fun canonicalJson(valueJson: String): String? = NativePipelineBridge.canonicalJson(valueJson)
     fun resolveInstructionLanguage(text: String, requested: String?, fallback: String): String? =

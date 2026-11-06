@@ -1026,7 +1026,7 @@ class AndroidWorkPipeline(
                 saveHistory = request.saveHistory,
                 sketch = PipelineSketchRequest.from(request.sketch),
                 route = "read_and_draw".takeIf { descriptionFlow && request.readAndDraw },
-                sourceLabelsJson = if (descriptionFlow && request.readAndDraw) descriptionSourceLabels(binding, text).toString() else null,
+                sourceLabelsJson = if (descriptionFlow && request.readAndDraw) binding.descriptionSourceLabels(text) else null,
                 compositionJson = "{\"mode\":\"on\"}".takeIf { descriptionFlow && request.readAndDraw && request.descriptionComposition },
                 parentHistoryId = request.parentHistoryId,
                 inputProvenanceJson = request.inputProvenance?.toJson()?.toString(),

@@ -870,7 +870,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null; } & PaintResult> {
 		// This compatibility request starts its own execution. Its result must not
 		// be accompanied by a stopped view belonging to an earlier drawing.
-		if (!options.batchRunId) pipelineController.clear();
+		if (!options.batchRunId && !options.detached) pipelineController.clear();
 		return runCurrentWork(
 			text,
 			options,
@@ -901,7 +901,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				},
 				attachSavedLineage: () => { lineageDetached = false; },
 				updateGenerationCount: (count) => session.updateGenerationCount(count),
-				adoptPipelineView: options.batchRunId ? undefined : (view) => pipelineController.adopt(view),
+				adoptPipelineView: options.batchRunId || options.detached ? undefined : (view) => pipelineController.adopt(view),
 				setProviderAttempt: (attempt) => { activeRunAttempt = attempt; },
 				setProgress: options.onProgress ?? ((progress) => { activeRunProgress = progress; })
 			}
@@ -1048,7 +1048,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			}),
 			paintInstruction: (prompt, paintOptions) => {
 				const model = qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
-				return paintOne(prompt, { ...paintOptions, stage1Model: model, stage2Model: model });
+				return paintOne(prompt, { ...paintOptions, detached: true, stage1Model: model, stage2Model: model });
 			},
 			onLatestResult: (painted) => {
 				ddl = painted.ddl;

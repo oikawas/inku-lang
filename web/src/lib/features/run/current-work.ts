@@ -109,6 +109,8 @@ export type PaintResult = {
 };
 
 export type PaintOptions = {
+	/** Draw a separate candidate without changing the main pipeline selection. */
+	detached?: boolean;
 	/** Plugin definitions from an imported DDL export, for a new work only. */
 	importedPlugins?: ImportedPlugin[];
 	historyInput?: string;

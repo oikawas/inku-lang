@@ -372,6 +372,15 @@ test('a new drawing uses the changed model and clears the preceding failure with
 	assert.deepEqual(models, ['chatgpt:luna', 'openai:other']);
 });
 
+test('a detached candidate neither clears nor adopts the main pipeline', async () => {
+	const work = imageWork(async () => failureResponse('candidate'), { describeApiError: () => 'candidate failed' });
+	await work.pipelineCompatibilityError(failureResponse('main'));
+	const main = work.pipelineView;
+	assert.ok(main);
+	await assert.rejects(work.paintOne('candidate', { detached: true }), /candidate failed/);
+	assert.equal(work.pipelineView, main);
+});
+
 test('a saved sketch reaches authoring only for its description with sketching on', async () => {
 	const requests: Array<{ text: string; options: { sketch: string; sketch_text?: string } }> = [];
 	const work = createWorkState({

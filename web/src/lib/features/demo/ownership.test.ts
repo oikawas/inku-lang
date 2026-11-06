@@ -30,7 +30,7 @@ test('T-905/T-907: DemoState uses narrow capabilities and identity, without tran
 	assert.ok(paintInstruction, 'DemoState receives a scoped paintInstruction callback');
 	const paintInstructionBody = paintInstruction[1].replace(/\s+/g, '');
 	assert.match(paintInstructionBody, /constmodel=qualifiedModelRef\(deps\.models\.stage1Provider\(\),deps\.models\.stage1Model\(\)\);/);
-	assert.match(paintInstructionBody, /returnpaintOne\(prompt,\{\.\.\.paintOptions,stage1Model:model,stage2Model:model\}\);/);
+	assert.match(paintInstructionBody, /returnpaintOne\(prompt,\{\.\.\.paintOptions,detached:true,stage1Model:model,stage2Model:model\}\);/);
 	assert.match(work, /refreshAfterServerSave: \(\) => deps\.history\(\)\.refreshAfterServerSave\(\)/);
 	assert.match(work, /refreshAfterRun: \(\) => deps\.history\(\)\.refreshAfterRun\(\)/);
 });

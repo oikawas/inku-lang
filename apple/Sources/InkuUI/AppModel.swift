@@ -203,7 +203,7 @@ public final class AppModel {
     public private(set) var pluginWords: [PluginWord] = [] { didSet { completionCache = nil } }
     private(set) var saijikiRevision = 0
     @ObservationIgnored private(set) var ddlHighlighter = DdlHighlighter(saijiki: [])
-    @ObservationIgnored private var completionCache: (disabled: [String], uiLanguage: String, value: DdlCompletions)?
+    @ObservationIgnored private var completionCache: (disabled: [String], uiLanguage: String, language: String, value: DdlCompletions)?
     public private(set) var productReference: ProductReference?
     public private(set) var drawingLimitDefinition: DrawingLimitDefinition?
     public private(set) var importedMacroNames: [String] = []
@@ -2817,9 +2817,9 @@ extension AppModel {
     public var ddlCompletions: DdlCompletions {
         let disabled = (settings.plugins?.disabledPackageIDs ?? []).sorted()
         let uiLanguage = display.preferences.language
-        if let cached = completionCache, cached.disabled == disabled, cached.uiLanguage == uiLanguage { return cached.value }
-        let value = DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: uiLanguage) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
-        completionCache = (disabled, uiLanguage, value)
+        if let cached = completionCache, cached.disabled == disabled, cached.uiLanguage == uiLanguage, cached.language == language { return cached.value }
+        let value = DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: uiLanguage, languageKey: language + "|" + uiLanguage) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+        completionCache = (disabled, uiLanguage, language, value)
         return value
     }
 

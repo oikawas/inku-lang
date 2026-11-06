@@ -323,6 +323,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var typedInsertion = false
         private var programmaticEdit = false
         private var completionValues: [String: String] = [:]
+        private var completionLanguage: (source: Data, key: String, value: String)?
         private var marksCache = InkuEditorMarksCache()
         private var descriptionLineMarks: [Data: [InkuEditorMark]] = [:]
         private var paintedNames: [NSRange]?
@@ -561,7 +562,16 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             let selection = editor.selectedRange()
             guard selection.length == 0 else { return nil }
             let body = rangeState.active.map { NSRange(location: $0.bodyStart, length: $0.bodyEnd - $0.bodyStart) }
-            return completions.match(text: editor.string, caret: selection.location, excluded: body, resolvedLanguage: resolvedLanguage)
+            let language = resolvedLanguage ?? completionLanguage(for: editor.string, completions: completions)
+            return completions.match(text: editor.string, caret: selection.location, excluded: body, resolvedLanguage: language)
+        }
+
+        private func completionLanguage(for text: String, completions: DdlCompletions) -> String {
+            let source = Data(text.utf8)
+            if let cached = completionLanguage, cached.source == source, cached.key == completions.languageKey { return cached.value }
+            let value = completions.language(text)
+            completionLanguage = (source, completions.languageKey, value)
+            return value
         }
 
         /// Web `activateOnTyping`: the list opens as the author types a word some candidate starts with. No item is
@@ -579,7 +589,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         func textView(_ textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
                       indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String] {
             guard let editor, let completions = settings?.completions else { return words }
-            let language = completions.language(editor.string)
+            let language = completionLanguage(for: editor.string, completions: completions)
             guard let match = completionMatch(resolvedLanguage: language), match.range == charRange else { return [] }
             index?.pointee = -1
             completionValues.removeAll()

@@ -8,10 +8,11 @@ public struct DdlCompletions {
     public let english: [String]
     private let plugins: [PluginWord]
     private let uiLanguage: String
+    let languageKey: String
     /// The instruction language of the whole text (`AppModel.instructionLanguage(for:)`).
     public let language: @MainActor (String) -> String
 
-    public init(saijiki: [SaijikiCategory], plugins: [PluginWord], uiLanguage: String = "ja", language: @escaping @MainActor (String) -> String) {
+    public init(saijiki: [SaijikiCategory], plugins: [PluginWord], uiLanguage: String = "ja", languageKey: String = "", language: @escaping @MainActor (String) -> String) {
         func unique(_ words: [String]) -> [String] {
             var seen = Set<String>()
             return words.filter { !$0.isEmpty && seen.insert($0).inserted }
@@ -21,6 +22,7 @@ public struct DdlCompletions {
         english = unique(words.compactMap(\.english) + plugins.map { $0.displayName(language: "en") })
         self.plugins = plugins
         self.uiLanguage = uiLanguage
+        self.languageKey = languageKey
         self.language = language
     }
 

@@ -104,7 +104,7 @@ ChatGPTプラン設定では接続状態を再確認でき、接続解除とは�
 - 手数は1〜10（既定5）、使う手は法則・取り合わせの1つ以上、方向性は前後を除いて1,000 UTF-16単位以内。モデルは既存の取り合わせと同じVision用途のpickerで1つ選び、一文の選択・指示書を書く送信・補完・法則の段をそのモデルに固定する。言語は画面の言語。「筆致制限を外す」は指定しなければ親のまま。手数・使う手・方向性を`interface.json`の`autonomousRefine`に覚える。
 - 法則の手は親の指示書・記述・completion_ranges・laws_layers・laws_basisを共有pipelineの`saved_laws`へ渡す。親の保存条件・種・palette・キャンバス・限りを使い、子は記述固定で`laws_change`（札は「法則」／Laws）になる。取り合わせの手は既存の`juxtaposition`を使い、coreの`rank`・`reuse`・除外文と系譜ですでに足した文を尊重して`joined`から描く。子は`description_edit`で、辺に`edited_from_history_id`・`juxtaposition`とcoreの`ai_move`を残す。
 - 法則の手は指示書を書く送信と構図の読みを再送しない。親の保存設定に`colors`があれば`choose_laws`の後に`choose_colors`も送り、無ければ`choose_laws`だけを送る。段を選ぶのは共有coreで、端末は保存設定を保つ。
-- 子はすべて通常の履歴に保存する。`kept`だけを次の親にし、差が小さい子も系譜に残す。終端は`moves_done`・`nothing_available`・`stalled`・`stopped`・`interrupted`・`failed`。停止時は進行中の送信・描画を取り消す。終端では最後の`kept`だけを通常履歴に出す。可視差は品質・順位・採否の判定ではなく、スター等は作者が決める。
+- 子はすべて通常の履歴に保存する。`kept`だけを次の親にし、差が小さい子も系譜に残す。終端は`moves_done`・`nothing_available`・`stalled`・`stopped`・`interrupted`・`failed`。停止時は進行中の送信・描画を取り消す。可視差は品質・順位・採否の判定ではなく、スター等は作者が決める。
 - runはAppModelが1つずつ回し、画面を閉じても続く。進み具合は作品DBと別の、DB名に対応する`.autonomous-runs.json`へatomic writeで残す。作品の正本は作品と辺の記録。次の起動で走行中のrunを`interrupted`にし、最後の`kept`を履歴へ出す。自動でLLM送信を再開しない。
 - 画面はWebと同じ順に、題・説明・固定注記・モデル・使う手・手数と「筆致制限を外す」・方向性・開始を出す。実行中は試みごとの小さな画・手番・手・結果・見える差・一文か主の法則・理由、終端後は終わり方と最後の子を開くボタンを出す。Webの`aiRefine*`を同梱し直し、常駐先の文だけ「サーバー」から「アプリ」へ適応する。
 - 旧Vision方式の自動実行と`aiRefine`の設定は廃止する。前の作品の`autonomous_refine_mode`（vision／random）や`vision_*`はそのまま読める。10-18節の自動推敲の方式・確認は、その時点の履歴である。

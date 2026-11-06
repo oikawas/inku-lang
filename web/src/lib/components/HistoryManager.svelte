@@ -17,7 +17,7 @@
 	import { historyGridPageSize } from '$lib/historyManagerSizing';
 	import { getCanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
-	import { libraryArrowDestination } from '$lib/features/library/arrow-navigation';
+	import { libraryArrowDestination, libraryPageTargetIndex } from '$lib/features/library/arrow-navigation';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -228,7 +228,7 @@
 	}
 
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
-	let pendingArrow = $state<{ offset: number; end: 'first' | 'last'; query: string; tab: 'thumbs' | 'list'; pageSize: number; event: KeyboardEvent } | null>(null);
+	let pendingArrow = $state<{ offset: number; position: number; query: string; tab: 'thumbs' | 'list'; pageSize: number; event: KeyboardEvent } | null>(null);
 	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let historyDisplayMode = $state<'chronological' | 'lineage'>('chronological');
 	let lineageGroups = $state<LineageHistoryGroup[]>([]);
@@ -710,7 +710,7 @@
 		else if (destination.kind === 'previous-page' || destination.kind === 'next-page') {
 			const previous = destination.kind === 'previous-page';
 			if (previous ? historyManagerOffset === 0 : historyManagerPage >= historyManagerTotalPages - 1) return true;
-			pendingArrow = { offset: previous ? Math.max(0, historyManagerOffset - historyManagerPageSize) : historyManagerOffset + historyManagerPageSize, end: previous ? 'last' : 'first', query: arrowQuery(), tab: historyManagerTab, pageSize: historyManagerPageSize, event };
+			pendingArrow = { offset: previous ? Math.max(0, historyManagerOffset - historyManagerPageSize) : historyManagerOffset + historyManagerPageSize, position: previous ? historyManagerOffset - 1 : historyManagerOffset + managedHistoryItems.length, query: arrowQuery(), tab: historyManagerTab, pageSize: historyManagerPageSize, event };
 			onSetPage(historyManagerPage + (previous ? -1 : 1));
 		}
 		return true;
@@ -728,7 +728,8 @@
 			return;
 		}
 		if (historyManagerLoading || historyManagerOffset !== pending.offset) return;
-		const item = pending.end === 'first' ? managedHistoryItems[0] : managedHistoryItems[managedHistoryItems.length - 1];
+		const index = libraryPageTargetIndex(pending.position, historyManagerOffset, managedHistoryItems.length);
+		const item = index === null ? null : managedHistoryItems[index];
 		void tick().then(() => {
 			if (pendingArrow !== pending || historyManagerLoading || historyManagerOffset !== pending.offset || arrowQuery() !== pending.query) return;
 			pendingArrow = null;

@@ -2,6 +2,11 @@ export type LibraryArrowDestination =
 	| { kind: 'index'; index: number }
 	| { kind: 'previous-page' | 'next-page' | 'none' };
 
+export function libraryPageTargetIndex(position: number, offset: number, count: number): number | null {
+	if (count <= 0) return null;
+	return Math.max(0, Math.min(count - 1, position - offset));
+}
+
 export function libraryArrowDestination(index: number, count: number, columns: number, key: string): LibraryArrowDestination {
 	if (!Number.isInteger(index) || !Number.isInteger(count) || !Number.isInteger(columns) || count <= 0 || columns <= 0 || index < 0 || index >= count) return { kind: 'none' };
 	switch (key) {

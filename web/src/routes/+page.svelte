@@ -690,7 +690,8 @@
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		const updated = await response.json() as UserItem;
 		if (session.currentUser?.id !== user.id) throw new Error('account changed');
-		if (session.acceptSettingsUpdate(token, updated) && updated.model_settings?.draw_defaults) work.setDrawDefaults(user.id, updated.model_settings.draw_defaults);
+		session.acceptSettingsUpdate(token, updated);
+		if (updated.model_settings?.draw_defaults) work.setDrawDefaults(user.id, updated.model_settings.draw_defaults);
 	}
 
 	async function persistInstructionCaptionVisible(visible: boolean) {

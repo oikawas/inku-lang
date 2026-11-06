@@ -165,7 +165,7 @@ test('T-275: only the latest strip request settles items, offset, and busy state
 	assert.deepEqual(state.manager.activeItems, []);
 });
 
-test('a superseded anchor lookup does not clear filters or selection', async () => {
+test('a superseded anchor lookup does not clear filters', async () => {
 	const { apiFetch, requests } = deferredTransport();
 	const { state, controls } = makeState(apiFetch);
 	state.items = [work('previous')];
@@ -176,7 +176,7 @@ test('a superseded anchor lookup does not clear filters or selection', async () 
 	requests[0].resolve(jsonResponse({ items: [], total: 0 }));
 	await sync;
 	assert.equal(state.starredOnly, true);
-	assert.equal(state.cursor, 0);
+	assert.equal(state.cursor, -1);
 	assert.equal(controls.starredNotices, 0);
 	requests[1].resolve(jsonResponse({ items: [work('previous')], total: 1, offset: 0 }));
 	await newer;
@@ -195,6 +195,15 @@ test('an older selection does not restart or abort the newer selection', async (
 	requests[1].resolve(jsonResponse({ items: [work('new')], total: 1, offset: 0 }));
 	await second;
 	assert.equal(state.items[state.cursor]?.id, 'new');
+});
+
+test('search clears the old selection when the opened work is not in the strip', async () => {
+	const { state } = makeState(async () => jsonResponse({ items: [work('old')], total: 1, offset: 0 }));
+	await state.setSearch('old');
+	state.select(0);
+	assert.equal(state.cursor, 0);
+	await state.syncToItem(work('different'));
+	assert.equal(state.cursor, -1);
 });
 
 test('T-276/T-278: anchored selection clears strip filters and seeds the one manager', async () => {

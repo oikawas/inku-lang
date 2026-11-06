@@ -305,8 +305,10 @@ export class HistoryBrowsingState {
 			return;
 		}
 		if (this.appliedSearch) {
+			this.cursor = -1;
 			return;
 		}
+		this.cursor = -1;
 		let found = await this.fetchOffset(0, { anchorId: item.id });
 		if (requestId !== this.selectionRequest) return;
 		if (found === 'missing' && this.filtered) {

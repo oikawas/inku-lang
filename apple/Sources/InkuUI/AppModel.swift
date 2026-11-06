@@ -529,7 +529,7 @@ public final class AppModel {
             }
             status = startupCatalogError.map { "プラグインのカタログを検証できませんでした: \($0.localizedDescription)" } ?? "準備完了"
             if database.vacuumDeferred {
-                status += " " + display.label("空き容量が足りないためデータベースの整理を次回に延期しました。", "Database compaction was postponed until the next launch because there is not enough free space.")
+                status = display.message(status) + " " + display.label("空き容量が足りないためデータベースの整理を次回に延期しました。", "Database compaction was postponed until the next launch because there is not enough free space.")
             }
         } catch {
             initialized = false

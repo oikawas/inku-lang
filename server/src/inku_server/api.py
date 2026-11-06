@@ -10,6 +10,7 @@ import asyncio
 import os
 import platform
 import re
+import anyio.to_thread
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +40,7 @@ from . import autonomous_refine as _autonomous_refine
 
 
 _DB_BACKUP_SCHEDULER_TICK_SECONDS = 60
+_ANYIO_THREAD_TOKENS = max(1, int(os.getenv("INKU_ANYIO_THREAD_TOKENS", "100")))
 
 
 async def _db_backup_scheduler_loop() -> None:
@@ -63,6 +65,9 @@ async def _db_backup_scheduler_loop() -> None:
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    previous_tokens = limiter.total_tokens
+    limiter.total_tokens = _ANYIO_THREAD_TOKENS
     task: asyncio.Task | None = None
     if os.getenv("INKU_DB_BACKUP_SCHEDULER", "1") != "0":
         task = asyncio.create_task(_db_backup_scheduler_loop())
@@ -81,7 +86,10 @@ async def _lifespan(_app: FastAPI):
         shutdown_bake_pool()
         # The refinement runs stop before the pipeline runs they wait on.
         _autonomous_refine.shutdown()
-        await asyncio.to_thread(_shutdown_pipeline)
+        try:
+            await asyncio.to_thread(_shutdown_pipeline)
+        finally:
+            limiter.total_tokens = previous_tokens
 
 
 # The groups the API reference (/docs) shows, in this order. Each router below

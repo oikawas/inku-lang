@@ -71,6 +71,9 @@ def auth_context():
 
 
 def test_health():
+    import inspect
+    from inku_server.api_core.routers.public import health
+    assert inspect.iscoroutinefunction(health)
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"ok": True}

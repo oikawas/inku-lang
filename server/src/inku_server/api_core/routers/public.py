@@ -112,7 +112,7 @@ class DemoInstructionResponse(BaseModel):
 
 
 @router.get("/health", summary="Check that the server is running")
-def health() -> dict[str, bool]:
+async def health() -> dict[str, bool]:
     """Report that the server process is up. Public: no sign-in is needed.
 
     Returns {"ok": true}. The check does not touch the database or the render engine.

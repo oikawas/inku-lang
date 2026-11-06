@@ -235,6 +235,9 @@ def test_a_stop_cancels_the_drawing_under_way(runner, monkeypatch):
         def get(self, _owner, _variation):
             return {"busy": True, "variation_id": "v", "execution_id": "e"}
 
+        def wait_for_change(self, owner, view, timeout):
+            return self.get(owner, view["variation_id"])
+
         def command(self, _owner, _execution, payload):
             commands.append(payload)
             return {"busy": False}

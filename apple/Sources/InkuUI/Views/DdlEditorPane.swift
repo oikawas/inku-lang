@@ -15,6 +15,7 @@ struct DdlEditorPane: View {
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
     @State private var pluginCalls: [PluginCall] = []
+    @State private var pluginCallsRevision = 0
     @State private var pluginSource = ""
     @State private var hoverIndex: Int?
     @State private var instructionLanguage = "ja"
@@ -24,7 +25,7 @@ struct DdlEditorPane: View {
     var onRangeBlocked: ((Bool) -> Void)?
     var onRangePreview: ((CompositionRanges.Preview?) -> Void)?
     private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
-    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, calls: pluginSource == text ? pluginCalls : []) }
+    private var highlighter: DdlHighlighter { model.ddlHighlighter.withCalls(pluginSource == text ? pluginCalls : []) }
 
     init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
          onRangeBlocked: ((Bool) -> Void)? = nil, onRangePreview: ((CompositionRanges.Preview?) -> Void)? = nil) {
@@ -96,7 +97,7 @@ struct DdlEditorPane: View {
                            style: .ddl, marks: { [highlighter, completionStates, completionSource] source in
                                // Tags describe the text they were read for and vanish once it changes (Web).
                                highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
-                           }, marksKey: .ddl(highlighter, completionStates, completionSource), insertion: $insertion,
+                           }, marksKey: .ddlRevision(model.saijikiRevision, pluginCallsRevision, pluginSource == text, completionStates, completionSource), insertion: $insertion,
                            rangeTable: CompositionRanges.table,
                            onRangeStatus: { status in
                                rangeStatus = status
@@ -127,7 +128,7 @@ struct DdlEditorPane: View {
             let source = text
             let calls = await model.pluginCalls(source: source)
             guard !Task.isCancelled, text == source else { return }
-            pluginCalls = calls; pluginSource = source
+            pluginCalls = calls; pluginCallsRevision &+= 1; pluginSource = source
             completionStates = model.completionRangeStates(source: source)
             completionSource = source
         }

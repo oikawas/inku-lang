@@ -69,6 +69,7 @@ struct InkuEditorMark: Equatable {
 enum InkuEditorMarksKey: Equatable {
     case description, none
     case ddl(DdlHighlighter, [CompletionRangeState], String)
+    case ddlRevision(Int, Int, Bool, [CompletionRangeState], String)
 }
 
 struct InkuEditorMarksCache {
@@ -650,6 +651,7 @@ private final class BatchEditorTextView: NSTextView {
     var onHover: ((Int?) -> Void)?
     var hoverEnabled = true { didSet { if oldValue != hoverEnabled { updateTrackingAreas() } } }
     private var hoverArea: NSTrackingArea?
+    private var lastHoverIndex: Int?
     /// The word the completion list replaces; nil leaves completion off (the system's word range is not used).
     var completionRange: (() -> NSRange?)?
     var normalizeCompletion: ((String) -> String)?
@@ -686,10 +688,15 @@ private final class BatchEditorTextView: NSTextView {
         super.mouseMoved(with: event)
         guard onHover != nil else { return }
         let point = convert(event.locationInWindow, from: nil)
-        onHover?(characterIndexForInsertion(at: point))
+        let index = characterIndexForInsertion(at: point)
+        guard lastHoverIndex != index else { return }
+        lastHoverIndex = index
+        onHover?(index)
     }
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
+        guard lastHoverIndex != nil else { return }
+        lastHoverIndex = nil
         onHover?(nil)
     }
     override func unmarkText() {

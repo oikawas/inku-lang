@@ -96,6 +96,12 @@ struct DdlHighlighter: Sendable, Equatable {
         self.calls = calls
     }
 
+    private init(buckets: [Character: [Entry]], calls: [PluginCall]) {
+        self.buckets = buckets; self.calls = calls
+    }
+
+    func withCalls(_ calls: [PluginCall]) -> DdlHighlighter { DdlHighlighter(buckets: buckets, calls: calls) }
+
     func marks(_ text: String) -> [InkuEditorMark] {
         let source = text as NSString
         let references = Dictionary(calls.map { ($0.range.location, $0) }, uniquingKeysWith: { first, _ in first })

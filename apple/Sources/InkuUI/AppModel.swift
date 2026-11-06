@@ -197,8 +197,13 @@ public final class AppModel {
     public private(set) var providerSettingsRevision = 0
     public private(set) var catalogs: [ColorCatalogOption] = []
     public private(set) var canvases: [CanvasOption] = []
-    public private(set) var saijiki: [SaijikiCategory] = []
-    public private(set) var pluginWords: [PluginWord] = []
+    public private(set) var saijiki: [SaijikiCategory] = [] {
+        didSet { saijikiRevision &+= 1; ddlHighlighter = DdlHighlighter(saijiki: saijiki); completionCache = nil }
+    }
+    public private(set) var pluginWords: [PluginWord] = [] { didSet { completionCache = nil } }
+    private(set) var saijikiRevision = 0
+    @ObservationIgnored private(set) var ddlHighlighter = DdlHighlighter(saijiki: [])
+    @ObservationIgnored private var completionCache: (disabled: [String], uiLanguage: String, value: DdlCompletions)?
     public private(set) var productReference: ProductReference?
     public private(set) var drawingLimitDefinition: DrawingLimitDefinition?
     public private(set) var importedMacroNames: [String] = []
@@ -2810,8 +2815,12 @@ extension AppModel {
 
     /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.
     public var ddlCompletions: DdlCompletions {
-        let disabled = settings.plugins?.disabledPackageIDs ?? []
-        return DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: display.preferences.language) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+        let disabled = (settings.plugins?.disabledPackageIDs ?? []).sorted()
+        let uiLanguage = display.preferences.language
+        if let cached = completionCache, cached.disabled == disabled, cached.uiLanguage == uiLanguage { return cached.value }
+        let value = DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: uiLanguage) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+        completionCache = (disabled, uiLanguage, value)
+        return value
     }
 
     private func chooseCanvasFit(source: String, recordedWork: SavedWork? = nil, paperID: String,

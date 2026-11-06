@@ -115,6 +115,7 @@ func runModelSettingsUIChecks() async throws {
     }
     expected.providers[0] = firstNormalized
     try await expectSettings("Model save changed unrelated settings")
+    app.selectNextDrawingModel("model-ui-a:ready")
     guard editor.publishedModels(for: expected.providers[0], purpose: "llm").map(\.id) == ["ready"],
           !editor.isModelAvailable("model-ui-a:vision:local"), !editor.isModelAvailable("model-ui-a:retired"),
           !editor.isModelAvailable("model-ui-a:plan-only"), !editor.isModelAvailable("model-ui-a:hidden"),
@@ -130,7 +131,7 @@ func runModelSettingsUIChecks() async throws {
     app.inputMode = "description"
     app.descriptionText = "a green square"
     app.selectNextDrawingModel("model-ui-a:vision:local")
-    guard app.nextDrawingModelReference == "model-ui-a:ready", !app.canGenerate,
+    guard app.nextDrawingModelReference == "model-ui-a:ready", !app.hasAvailableNextDrawingModel, !app.canGenerate,
           editor.availableModels(for: expected.providers[0]).contains(where: { $0.id == "model-ui-a:ready" }) else {
         throw CheckFailure.message("Disabling a model erased its saved reference or allowed new drawing")
     }

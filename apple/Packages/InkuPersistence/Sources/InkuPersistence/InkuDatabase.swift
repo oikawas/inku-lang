@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import CryptoKit
 
 public enum PersistenceError: Error, Sendable, Equatable {
     case invalidFileURL
@@ -18,7 +19,7 @@ public enum LibraryAnnotationMark: Sendable {
 
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
-    public static let currentSchemaVersion = 8
+    public static let currentSchemaVersion = 9
     public nonisolated let url: URL
     let queue: DatabaseQueue
 
@@ -135,6 +136,22 @@ public actor InkuDatabase {
         if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
             try Self.validateSchema(db)
             try db.execute(sql: Self.resourceSQL("migration-v8"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 8 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v9-prepare"))
+            let records = try Row.fetchCursor(db, sql: "SELECT execution_id, effect_id, revision, snapshot, acknowledgement, save_payload FROM effect_acknowledgements")
+            while let record = try records.next() {
+                let snapshot: Data = record["snapshot"], payload: Data = record["save_payload"]
+                let id: String = record["execution_id"], effect: String = record["effect_id"]
+                let revision: Int64 = record["revision"], ack: Data = record["acknowledgement"]
+                try db.execute(sql: """
+                    INSERT INTO effect_acknowledgements_v9
+                    (execution_id, effect_id, revision, snapshot_sha256, acknowledgement, save_payload_sha256)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, arguments: [id, effect, revision, Data(SHA256.hash(data: snapshot)), ack, Data(SHA256.hash(data: payload))])
+            }
+            try db.execute(sql: Self.resourceSQL("migration-v9"))
         }
     }
 
@@ -829,20 +846,21 @@ public actor InkuDatabase {
         let savePayload = try encoder.encode(EffectSave(work: work, node: node, edge: edge))
         return try queue.write { db in
             if let prior = try Row.fetchOne(db, sql: """
-                SELECT revision, snapshot, acknowledgement, save_payload FROM effect_acknowledgements
+                SELECT revision, snapshot_sha256, acknowledgement, save_payload_sha256 FROM effect_acknowledgements
                 WHERE execution_id = ? AND effect_id = ?
                 """, arguments: [id, effectID]) {
-                let priorSnapshot: Data = prior["snapshot"]
+                let priorSnapshotDigest: Data = prior["snapshot_sha256"]
                 let priorACK: Data = prior["acknowledgement"]
-                let priorSavePayload: Data = prior["save_payload"]
+                let priorSavePayloadDigest: Data = prior["save_payload_sha256"]
                 let priorRevision: Int64 = prior["revision"]
-                guard priorSnapshot == snapshot, priorACK == acknowledgement, priorSavePayload == savePayload,
+                guard priorSnapshotDigest == Data(SHA256.hash(data: snapshot)), priorACK == acknowledgement,
+                      priorSavePayloadDigest == Data(SHA256.hash(data: savePayload)),
                       expectedRevision >= 0, expectedRevision < Int64.max,
                       priorRevision == expectedRevision + 1 else {
                     throw PersistenceError.effectConflict
                 }
                 return EffectCommitResult(
-                    execution: ExecutionSnapshot(id: id, revision: priorRevision, snapshot: priorSnapshot),
+                    execution: ExecutionSnapshot(id: id, revision: priorRevision, snapshot: snapshot),
                     acknowledgement: priorACK, wasAlreadyCommitted: true)
             }
             guard !effectID.isEmpty else { throw PersistenceError.invalidRecord("empty effect ID") }
@@ -855,9 +873,9 @@ public actor InkuDatabase {
             }
             try db.execute(sql: """
                 INSERT INTO effect_acknowledgements
-                (execution_id, effect_id, revision, snapshot, acknowledgement, save_payload)
+                (execution_id, effect_id, revision, snapshot_sha256, acknowledgement, save_payload_sha256)
                 VALUES (?, ?, ?, ?, ?, ?)
-                """, arguments: [id, effectID, updated.revision, snapshot, acknowledgement, savePayload])
+                """, arguments: [id, effectID, updated.revision, Data(SHA256.hash(data: snapshot)), acknowledgement, Data(SHA256.hash(data: savePayload))])
             return EffectCommitResult(
                 execution: updated, acknowledgement: acknowledgement, wasAlreadyCommitted: false)
         }
@@ -1118,7 +1136,10 @@ public actor InkuDatabase {
         let sixth = fifth + "\n" + (try resourceSQL("migration-v6"))
         if version == 6 { return sixth }
         let seventh = sixth + "\n" + (try resourceSQL("migration-v7"))
-        return version == 7 ? seventh : seventh + "\n" + (try resourceSQL("migration-v8"))
+        if version == 7 { return seventh }
+        let eighth = seventh + "\n" + (try resourceSQL("migration-v8"))
+        if version == 8 { return eighth }
+        return eighth + "\n" + (try resourceSQL("migration-v9-prepare")) + "\n" + (try resourceSQL("migration-v9"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1140,7 +1161,7 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5, 6, 7, 8].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), (1...currentSchemaVersion).contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
@@ -1154,6 +1175,7 @@ public actor InkuDatabase {
         if version >= 6 { identifiers.append("swift-v6-plugin-names-v2") }
         if version >= 7 { identifiers.append("swift-v7-saijiki-v3") }
         if version >= 8 { identifiers.append("swift-v8-draw-options") }
+        if version >= 9 { identifiers.append("swift-v9-effect-digests") }
         guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
                 == identifiers else {

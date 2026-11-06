@@ -1142,8 +1142,8 @@ public final class AppModel {
         }
         // Server `_refuse_if_locked` after `_rewords`: a held parent takes only its own description back (the fork).
         if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked),
-           parentWorkID != selectedWorkID
-            || DescriptionLabels.rewords(description ?? descriptionText, selectedWork?.effectiveSourceText ?? "") {
+           try (parentWorkID != selectedWorkID
+            || DescriptionLabels.rewords(description ?? descriptionText, selectedWork?.effectiveSourceText ?? "")) {
             throw HostError("description_source_locked")
         }
         let sketch: SketchRequest = sketchOverride
@@ -1719,14 +1719,14 @@ public final class AppModel {
         guard let database, let host else { throw HostError("pipeline_unavailable") }
         _ = try await savedWorkEditContext(work)
         let written = work.effectiveSourceText
-        let description = Self.unlabelled(written)
+        let description = try Self.unlabelled(written)
         guard !description.isEmpty else { throw HostError("juxtaposition_source_has_no_description") }
         guard !work.svg.isEmpty else { throw HostError("juxtaposition_source_has_no_image") }
         var lineage: [String] = []
         var added: [String] = []
         if let nodeID = work.lineageNodeID, let branch = try await database.lineage(focusNodeID: nodeID, pathOnly: true) {
             for node in branch.nodes {
-                let text = Self.unlabelled(node.work?.effectiveSourceText ?? "")
+                let text = try Self.unlabelled(node.work?.effectiveSourceText ?? "")
                 if !text.isEmpty, lineage.last != text { lineage.append(text) }
             }
             for edge in branch.edges {
@@ -1754,12 +1754,13 @@ public final class AppModel {
             guard row.id != workID, !["DDL", "[demo]"].contains(label), !(row.note ?? "").lowercased().contains("test data"),
                   !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let summary = summaries[row.id],
                   SavedWorkActionState(origin: summary.origin, authority: summary.authority) == .description else { return nil }
-            return (row.id, InkuCore.descriptionWithoutLabels(row.text))
+            guard let text = try? InkuCore.descriptionWithoutLabels(row.text) else { return nil }
+            return (row.id, text)
         }
     }
 
-    private static func unlabelled(_ text: String) -> String {
-        InkuCore.descriptionWithoutLabels(text).trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func unlabelled(_ text: String) throws -> String {
+        try InkuCore.descriptionWithoutLabels(text).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Menu availability is read from saved authority, never inferred from a model label or DDL contents.

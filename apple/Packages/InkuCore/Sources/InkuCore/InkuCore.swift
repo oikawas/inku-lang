@@ -172,8 +172,9 @@ public enum InkuCore {
     public static var rasterAPIVersion: String { InkuCoreBindings.rasterApiVersion() }
     public static var canvasRegistry: Data { Data(InkuCoreBindings.canvasRegistry().utf8) }
 
-    public static func descriptionHash(_ text: String) -> String {
-        InkuCoreBindings.descriptionHash(text: text)
+    public static func descriptionHash(_ text: String) throws -> String {
+        do { return try InkuCoreBindings.descriptionHash(text: text) }
+        catch InkuCoreBindings.CoreCallFailure.InternalInvariant { throw CoreFailure.internalInvariant }
     }
 
     public static func renderHash(itemJSON: String) -> String? {
@@ -192,13 +193,15 @@ public enum InkuCore {
         InkuCoreBindings.normalizeInstructionLanguage(value: value, defaultLanguage: defaultLanguage)
     }
 
-    public static func descriptionWithoutLabels(_ text: String) -> String {
-        InkuCoreBindings.descriptionWithoutLabels(text: text)
+    public static func descriptionWithoutLabels(_ text: String) throws -> String {
+        do { return try InkuCoreBindings.descriptionWithoutLabels(text: text) }
+        catch InkuCoreBindings.CoreCallFailure.InternalInvariant { throw CoreFailure.internalInvariant }
     }
 
     /// `[[start, end, kind], ...]`, with Unicode scalar offsets owned by the shared core.
-    public static func descriptionLabelSpans(_ text: String) -> Data {
-        Data(InkuCoreBindings.descriptionLabelSpans(text: text).utf8)
+    public static func descriptionLabelSpans(_ text: String) throws -> Data {
+        do { return Data(try InkuCoreBindings.descriptionLabelSpans(text: text).utf8) }
+        catch InkuCoreBindings.CoreCallFailure.InternalInvariant { throw CoreFailure.internalInvariant }
     }
 
     public static func renderSeedWords(fromText text: String) throws -> (seed: String, text: String) {

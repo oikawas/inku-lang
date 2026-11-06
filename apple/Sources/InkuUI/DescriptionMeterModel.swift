@@ -45,7 +45,7 @@ public final class DescriptionMeterModel {
     }
 
     public static func pipelineDescription(_ text: String) -> String {
-        DescriptionLabels.pipelineDescription(text)
+        (try? DescriptionLabels.pipelineDescription(text)) ?? text
     }
 
     /// Web `japaneseForm`: by the phrases when they are a form, otherwise by the total.

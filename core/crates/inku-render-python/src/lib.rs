@@ -3,8 +3,8 @@
 //! Every call that renders, compiles or advances the pipeline detaches from
 //! the interpreter while Rust works. The server runs these calls on worker
 //! threads; holding the GIL there stopped every other Python thread, including
-//! the one serving HTTP, for the whole render. The core keeps no mutable
-//! global state, so concurrent calls are safe.
+//! the one serving HTTP, for the whole render. Shared font databases are
+//! immutable after loading and their cache is synchronized across threads.
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -731,6 +731,76 @@ impl FitTo {
     }
 }
 
+#[derive(Eq, Hash, PartialEq)]
+struct FontFileKey {
+    path: String,
+    size: u64,
+    modified: std::time::SystemTime,
+}
+
+fn font_database(
+    font_files: &[String],
+) -> Result<std::sync::Arc<resvg::usvg::fontdb::Database>, String> {
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    type FontCache = HashMap<Vec<FontFileKey>, Arc<resvg::usvg::fontdb::Database>>;
+    static CACHE: OnceLock<Mutex<FontCache>> = OnceLock::new();
+
+    let mut key = Vec::with_capacity(font_files.len());
+    for (index, path) in font_files.iter().enumerate() {
+        let metadata =
+            std::fs::metadata(path).and_then(|metadata| Ok((metadata.len(), metadata.modified()?)));
+        let (size, modified) = match metadata {
+            Ok(values) => values,
+            Err(error) => {
+                // Preserve the first read error if an earlier path could not
+                // have been read by the original sequential loader.
+                for earlier in &font_files[..index] {
+                    std::fs::read(earlier)
+                        .map_err(|error| format!("font file {earlier}: {error}"))?;
+                }
+                return Err(format!("font file {path}: {error}"));
+            }
+        };
+        key.push(FontFileKey {
+            path: path.clone(),
+            size,
+            modified,
+        });
+    }
+    let mut cache = CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(fonts) = cache.get(&key) {
+        return Ok(Arc::clone(fonts));
+    }
+    let mut fonts = resvg::usvg::fontdb::Database::new();
+    let mut unchanged = true;
+    for (path, expected) in font_files.iter().zip(&key) {
+        let data = std::fs::read(path).map_err(|error| format!("font file {path}: {error}"))?;
+        let metadata =
+            std::fs::metadata(path).map_err(|error| format!("font file {path}: {error}"))?;
+        let modified = metadata
+            .modified()
+            .map_err(|error| format!("font file {path}: {error}"))?;
+        unchanged &= metadata.len() == expected.size && modified == expected.modified;
+        fonts.load_font_data(data);
+    }
+    // resvg_py's names on Linux, where the Server runs.
+    fonts.set_serif_family("Liberation Serif");
+    fonts.set_sans_serif_family("Liberation Sans");
+    fonts.set_cursive_family("Comic Neue");
+    fonts.set_fantasy_family("Anton");
+    fonts.set_monospace_family("Liberation Mono");
+    let fonts = Arc::new(fonts);
+    if unchanged {
+        cache.insert(key, Arc::clone(&fonts));
+    }
+    Ok(fonts)
+}
+
 /// The PNG of `svg`, as resvg_py 0.5.0's `svg_to_bytes` drew it for the Server
 /// and the CLI, by the core's vendored resvg (whose displacement follows the
 /// specification, `core/vendor/resvg/INKU_PATCHES.md`).
@@ -766,17 +836,7 @@ fn png_of(
         ),
         (None, None) => (FitTo::Original, (100.0, 100.0)),
     };
-    let mut fonts = usvg::fontdb::Database::new();
-    for path in font_files {
-        let data = std::fs::read(path).map_err(|error| format!("font file {path}: {error}"))?;
-        fonts.load_font_data(data);
-    }
-    // resvg_py's names on Linux, where the Server runs.
-    fonts.set_serif_family("Liberation Serif");
-    fonts.set_sans_serif_family("Liberation Sans");
-    fonts.set_cursive_family("Comic Neue");
-    fonts.set_fantasy_family("Anton");
-    fonts.set_monospace_family("Liberation Mono");
+    let fonts = font_database(font_files)?;
     let options = usvg::Options {
         dpi: 0.0,
         font_family: "Liberation Serif".to_owned(),
@@ -784,7 +844,7 @@ fn png_of(
         languages: Vec::new(),
         default_size: usvg::Size::from_wh(default_size.0, default_size.1)
             .ok_or_else(|| "invalid size".to_owned())?,
-        fontdb: std::sync::Arc::new(fonts),
+        fontdb: fonts,
         style_sheet: Some(String::new()),
         ..usvg::Options::default()
     };
@@ -921,6 +981,22 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn raster_reuses_font_database_and_keeps_png_bytes() {
+        let font = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../server/src/inku_server/fonts/NotoSerifJP-Variable.ttf"
+        );
+        let fonts = vec![font.to_owned()];
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="160" height="48"><text x="4" y="30" font-family="Noto Serif JP" font-size="24">描画 test</text></svg>"#;
+        let first_png = super::png_of(svg, None, None, &fonts).unwrap();
+        let first_fonts = super::font_database(&fonts).unwrap();
+        let second_png = super::png_of(svg, None, None, &fonts).unwrap();
+        let second_fonts = super::font_database(&fonts).unwrap();
+        assert_eq!(first_png, second_png);
+        assert!(std::sync::Arc::ptr_eq(&first_fonts, &second_fonts));
+    }
+
     #[test]
     fn p0_oversized_svg_is_rejected_before_rasterization() {
         let svg = format!(

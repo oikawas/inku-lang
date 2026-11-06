@@ -312,6 +312,22 @@ test('T-279: a failed external state probe falls through to the safe listing fet
 	assert.equal(state.items[0]?.id, 'fallback');
 });
 
+test('a library opened during an external refresh receives the refreshed page', async () => {
+	let finishProbe!: (response: Response) => void;
+	const { state, controls } = makeState(async (path) => {
+		if (path === '/api/history/state') return new Promise<Response>((resolve) => { finishProbe = resolve; });
+		return jsonResponse({ items: [work('fresh')], total: 1, offset: 0 });
+	});
+	controls.now = 20_000;
+	let managerFetches = 0;
+	state.manager.fetch = async () => { managerFetches += 1; };
+	const refresh = state.refreshExternal();
+	state.manager.open = true;
+	finishProbe(jsonResponse({ total: 1, newest_at: 1, newest_id: 'fresh' }));
+	await refresh;
+	assert.equal(managerFetches, 1);
+});
+
 test('T-280: save/run refresh and named mark projections update browsing state', async () => {
 	const calls: string[] = [];
 	const { state, controls } = makeState(async (path) => {

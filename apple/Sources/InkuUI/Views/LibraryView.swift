@@ -71,8 +71,8 @@ struct LibraryView: View {
             }
         }
         .background(LibraryChrome.panel2)
-        .task(id: PreviewReadKey(workID: preview.work?.id, shows: preview.shows, mutating: library.mutating)) {
-            guard !library.mutating else { return }
+        .task(id: PreviewReadKey(workID: preview.work?.id, shows: preview.shows,
+                                 revision: library.mutationRevision(for: preview.work?.id))) {
             await loadPreview()
         }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
@@ -909,7 +909,7 @@ struct LibraryView: View {
     private struct PreviewReadKey: Equatable {
         let workID: String?
         let shows: Int
-        let mutating: Bool
+        let revision: Int
     }
 }
 

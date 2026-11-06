@@ -82,6 +82,11 @@ private struct LibraryTimelinePlace {
 @MainActor
 @Observable
 public final class LibraryModel {
+    private var workMutationRevisions: [String: Int] = [:]
+    private var allWorksMutationRevision = 0
+    public func mutationRevision(for id: String?) -> Int {
+        allWorksMutationRevision &+ (id.flatMap { workMutationRevisions[$0] } ?? 0)
+    }
     public var query = "" { didSet { if query != oldValue { changedFilter() } } }
     /// Canvas history uses its own search contract and never changes the library's query.
     public var canvasSearch = false
@@ -610,7 +615,7 @@ public final class LibraryModel {
     }
 
     public func toggleStar(_ work: SavedWork) async {
-        await mutate { try await $0.setStarred(ids: [work.id], starred: !work.starred); return "お気に入りを更新しました" }
+        await mutate(ids: [work.id]) { try await $0.setStarred(ids: [work.id], starred: !work.starred); return "お気に入りを更新しました" }
     }
 
     public func toggleRevision(_ work: SavedWork) async {
@@ -618,7 +623,7 @@ public final class LibraryModel {
     }
 
     private func toggleAnnotation(_ work: SavedWork, mark: LibraryAnnotationMark, status: String) async {
-        await mutate { database in
+        await mutate(ids: [work.id]) { database in
             let value = try await database.toggleAnnotation(id: work.id, mark: mark)
             self.rememberAnnotation(value, id: work.id)
             return status
@@ -626,7 +631,7 @@ public final class LibraryModel {
     }
 
     public func saveNote(id: String, note: String) async {
-        await mutate { database in
+        await mutate(ids: [id]) { database in
             try await database.setAnnotation(id: id, note: note)
             let value = try await database.libraryAnnotation(id: id)
             self.rememberAnnotation(value, id: id)
@@ -636,21 +641,21 @@ public final class LibraryModel {
 
     public func trash(ids: [String]? = nil) async {
         let ids = ids ?? selectedIDs.sorted()
-        if await mutate({ let count = try await $0.setTrashed(ids: ids, trashed: true); return "\(count) 件をごみ箱へ移しました" }) {
+        if await mutate(ids: ids, { let count = try await $0.setTrashed(ids: ids, trashed: true); return "\(count) 件をごみ箱へ移しました" }) {
             selectedIDs.subtract(ids)
         }
     }
 
     public func restore(ids: [String]? = nil) async {
         let ids = ids ?? selectedIDs.sorted()
-        if await mutate({ let count = try await $0.setTrashed(ids: ids, trashed: false); return "\(count) 件を戻しました" }) {
+        if await mutate(ids: ids, { let count = try await $0.setTrashed(ids: ids, trashed: false); return "\(count) 件を戻しました" }) {
             selectedIDs.subtract(ids)
         }
     }
 
     public func permanentlyDelete(ids: [String]? = nil) async {
         let ids = ids ?? selectedIDs.sorted()
-        if await mutate({ let count = try await $0.permanentlyDelete(ids: ids); return "\(count) 件を完全に削除しました" }) {
+        if await mutate(ids: ids, { let count = try await $0.permanentlyDelete(ids: ids); return "\(count) 件を完全に削除しました" }) {
             selectedIDs.subtract(ids)
             await thumbnails?.pruneOrphans()
         }
@@ -664,11 +669,17 @@ public final class LibraryModel {
     }
 
     @discardableResult
-    private func mutate(_ operation: (InkuDatabase) async throws -> String) async -> Bool {
+    private func mutate(ids: [String]? = nil, _ operation: (InkuDatabase) async throws -> String) async -> Bool {
         guard let database, !mutating else { return false }
         mutating = true; errorText = nil
         defer { mutating = false }
-        do { status = try await operation(database); await refresh(); await onMutation?(); return true }
+        do {
+            status = try await operation(database)
+            await refresh(); await onMutation?()
+            if let ids { for id in ids { workMutationRevisions[id, default: 0] &+= 1 } }
+            else { allWorksMutationRevision &+= 1 }
+            return true
+        }
         catch { errorText = error.localizedDescription; return false }
     }
 

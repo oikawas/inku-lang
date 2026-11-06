@@ -161,7 +161,6 @@ def init_db() -> None:
             database_path=db_path,
             create_schema=callbacks.create_schema,
             seed_fresh=callbacks.seed_fresh,
-            apply_legacy=callbacks.apply_legacy,
         )
     except MigrationExecutionError as exc:
         _logger.error("verified migration safety snapshot retained at %s", exc.snapshot.path)
@@ -1856,14 +1855,6 @@ def can_read_history_item(user_id: str, item_id: str, *, actor: dict | None = No
         _actor_of,
         _rows_to_dicts_with_lineage,
     ).can_read_item(user_id, item_id, **({"actor": actor} if actor is not None else {}))
-
-
-def delete_all(user_id: str) -> None:
-    return _history.HistoryOwnedDataPurgeWriter(
-        SessionLocal,
-        _owner_actor,
-        _delete_acl_for_histories,
-    ).delete_all(user_id)
 
 
 def trash_items(user_id: str, ids: list[str]) -> int:

@@ -27,22 +27,9 @@ class ColorCatalogSettings {
 		return resolveCatalogId(this.selected);
 	}
 
-	/**
-	 * Written back to the server when the modal closes.  The page lends the
-	 * call because it owns `apiFetch` and the current user.
-	 */
-	save = () => {
-		persist(this.selected);
-	};
 }
 
 export const colorCatalogSettings = new ColorCatalogSettings();
-
-let persist: (selected: string) => void = () => {};
-
-export function bindColorCatalogPersist(write: (selected: string) => void): void {
-	persist = write;
-}
 
 // The render slice lives in ./render.ts (plain .ts, so it is testable without
 // the rune compiler); it reads the live selection through this.

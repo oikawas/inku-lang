@@ -254,7 +254,7 @@ class World:
             (self.alice, self.alice_t), (self.bob, self.bob_t),
             (self.carol, self.carol_t), (self.root, self.root_t),
         ):
-            db.delete_all(user["id"])
+            db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
             db.delete_session(token)
             db.delete_user(user["id"], cascade=True)
         db.delete_user_group(self.circle_a)
@@ -453,7 +453,7 @@ def test_t197_an_owner_with_no_group_cannot_open_a_work_at_all(world) -> None:
             row = session.get(db.HistoryRow, work["id"])
             assert row.for_share == 0 and row.share_group_id is None
     finally:
-        db.delete_all(loner["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(loner["id"])
         db.delete_session(loner_t)
         db.delete_user(loner["id"], cascade=True)
 

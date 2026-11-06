@@ -889,7 +889,7 @@ $effect(() => {
 										{/if}
 									</div>
 									<div class="preview">
-										{#if node.history}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{withheldLabel(node) ?? (isJapanese ? '削除済み' : 'Deleted')}</span>{/if}
+										{#if node.history}<HistoryThumbnail item={node.history} size="manager" />{:else}<span>{withheldLabel(node) ?? (isJapanese ? '削除済み' : 'Deleted')}</span>{/if}
 									</div>
 									{#if node.history?.display_label}<div class="display-label">{node.history.display_label}</div>{/if}
 									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}

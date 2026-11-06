@@ -51,7 +51,6 @@ def _start(engine, path):
         engine=engine, database_path=path,
         create_schema=lambda _: pytest.fail("existing database recreated"),
         seed_fresh=lambda _: pytest.fail("existing database reseeded"),
-        apply_legacy=lambda _: pytest.fail("legacy migration replayed"),
     )
 
 

@@ -77,7 +77,7 @@ class World:
         for user, token in (
             (self.alice, self.alice_t), (self.bob, self.bob_t), (self.leader_a, self.leader_a_t),
         ):
-            db.delete_all(user["id"])
+            db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
             db.delete_session(token)
             db.delete_user(user["id"], cascade=True)
         db.delete_user_group(self.circle_a)

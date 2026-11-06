@@ -77,14 +77,6 @@ export class PipelineController {
 		this.setView(view);
 	}
 
-	markLegacy(historyId: string): void {
-		this.requestOrdinal += 1;
-		this.historySelection = null;
-		this.linkedHistoryId = null;
-		this.legacyHistoryId = historyId;
-		this.setView(null);
-	}
-
 	markLinkedHistory(historyId: string): void {
 		this.requestOrdinal += 1;
 		this.historySelection = null;

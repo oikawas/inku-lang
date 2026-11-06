@@ -67,7 +67,7 @@ def test_manual_unification_preserves_text_other_values_search_and_second_start(
     for expected in ("registered_upgrade", "current"):
         outcome = migrations.ensure_current_schema(
             engine=engine, database_path=path, create_schema=lambda _: pytest.fail("recreated schema"),
-            seed_fresh=lambda _: pytest.fail("reseeded"), apply_legacy=lambda _: pytest.fail("inverse transform"),
+            seed_fresh=lambda _: pytest.fail("reseeded"),
         )
         assert outcome.mode == expected
     engine.dispose()
@@ -111,7 +111,7 @@ def test_old_database_and_mismatched_current_physical_schema_cannot_start(tmp_pa
     _source(path)
     engine = create_engine(f"sqlite:///{path}")
     options = dict(engine=engine, database_path=path, create_schema=lambda _: pytest.fail("old startup write"),
-                   seed_fresh=lambda _: None, apply_legacy=lambda _: pytest.fail("legacy startup write"))
+                   seed_fresh=lambda _: None)
     with pytest.raises(migrations.MigrationStateError, match="manual history DDL"):
         migrations.ensure_current_schema(**options)
     with engine.begin() as connection:

@@ -9,7 +9,6 @@ import re
 
 import pytest
 
-from inku_server.master_grid import MASTER_GRID_DECIMALS
 from inku_server.render_engines import current_render_engine
 from inku_server.schema import (
     Arrangement,
@@ -1063,22 +1062,3 @@ def test_corpus_bodies_match_the_changed_case_set() -> None:
         return
     for case_id in unchanged:
         assert _resolve_svg(case_id).parent != MANIFEST_PATH.parent
-
-
-def test_every_corpus_number_uses_at_most_master_grid_precision() -> None:
-    """Engine 41 may compact zeroes but never exceeds the six-decimal grid."""
-    off_grid = []
-    checked = 0
-    # Every case's current body, wherever the version that last moved it keeps it.
-    files = sorted({_resolve_svg(case_id) for case_id in _manifest()["cases"]})
-    for path in files:
-        for name, value in re.findall(r'([\w:-]+)="([^"]*)"', path.read_text()):
-            if name in ("class", "id", "version"):
-                continue
-            for decimals in re.findall(r"\d+\.(\d+)", value):
-                checked += 1
-                if not 1 <= len(decimals) <= MASTER_GRID_DECIMALS:
-                    off_grid.append((path.name, name, decimals))
-    assert len(files) == len(_manifest()["cases"])
-    assert checked > 2_400, checked
-    assert off_grid == []

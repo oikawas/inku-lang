@@ -53,53 +53,12 @@ def test_history_owned_data_purge_writer_owns_delete_all_and_db_delegates(
     with pytest.raises(FrozenInstanceError):
         owner(None, None, None).session_factory = None
     assert str(inspect.signature(owner.delete_all)) == "(self, user_id: 'str') -> 'None'"
-    assert str(inspect.signature(db.delete_all)) == "(user_id: 'str') -> 'None'"
-
-    facade = ast.parse(inspect.getsource(db.delete_all)).body[0]
-    assert isinstance(facade, ast.FunctionDef)
-    assert len(facade.body) == 1 and isinstance(facade.body[0], ast.Return)
-    facade_source = inspect.getsource(db.delete_all)
-    assert "_history.HistoryOwnedDataPurgeWriter(" in facade_source
-    for dependency in ("SessionLocal", "_owner_actor", "_delete_acl_for_histories"):
-        assert dependency in facade_source
-    assert ").delete_all(user_id)" in facade_source
-    assert "session.query" not in facade_source
-
     owner_source = inspect.getsource(owner)
     assert "access._owned_by(owner, HistoryRow.user_id)" in owner_source
     for row_type in ("OkugakiRow", "LineageEdgeRow", "LineageNodeRow", "HistoryRow"):
         assert f"session.query({row_type})" in owner_source
     assert "db" not in owner_source
 
-    calls: list[tuple[tuple[object, ...], str]] = []
-
-    class RecordingWriter:
-        def __init__(self, *dependencies: object) -> None:
-            self.dependencies = dependencies
-
-        def delete_all(self, user_id: str) -> str:
-            calls.append((self.dependencies, user_id))
-            return "sentinel"
-
-    monkeypatch.setattr(db._history, "HistoryOwnedDataPurgeWriter", RecordingWriter)
-    first_dependencies = (object(), object(), object())
-    for name, dependency in zip(
-        ("SessionLocal", "_owner_actor", "_delete_acl_for_histories"),
-        first_dependencies,
-        strict=True,
-    ):
-        monkeypatch.setattr(db, name, dependency)
-    assert db.delete_all("actor") == "sentinel"
-
-    second_dependencies = (object(), object(), object())
-    for name, dependency in zip(
-        ("SessionLocal", "_owner_actor", "_delete_acl_for_histories"),
-        second_dependencies,
-        strict=True,
-    ):
-        monkeypatch.setattr(db, name, dependency)
-    assert db.delete_all("later") == "sentinel"
-    assert calls == [(first_dependencies, "actor"), (second_dependencies, "later")]
 
 
 def test_owned_data_purge_deletes_only_the_owners_history_domain_rows() -> None:

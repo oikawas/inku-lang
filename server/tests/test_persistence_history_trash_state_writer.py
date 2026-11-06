@@ -190,7 +190,7 @@ def test_authenticated_trash_and_restore_keep_response_seam_render_free(monkeypa
         assert trashed.status_code == restored.status_code == 200
         assert trashed.json() == restored.json() == {"ok": True, "count": 1}
     finally:
-        db.delete_all(owner["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(owner["id"])
         db.delete_session(token)
         db.delete_user(owner["id"])
         db.delete_user_group(group)

@@ -13,14 +13,14 @@ import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } f
 import { modelDisplayName, qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
-import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
+import { renderSettingsPayload } from '$lib/features/render-payload';
 import { runCurrentWork, type InstructionLang, type PaintOptions, type PaintResult, type Seed } from '$lib/features/run/current-work';
 import { batchSettings } from '$lib/features/batch/settings.svelte';
 import { wildOverride } from '$lib/features/wild/render';
 import type { NumberedLine } from '$lib/features/batch/resume';
 import { getCanvasAspectOption, type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import { canvasRatioLabel, canvasRatioOfAspect, declaredCanvasRatio, sameCanvasRatio, type CanvasRatio } from '$lib/canvas-ratio';
-import type { HistoryItem, Score } from '$lib/historyManagerState.svelte';
+import type { HistoryItem } from '$lib/historyManagerState.svelte';
 import type { ReplayComparison } from '$lib/features/history/replay';
 import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
 import type { AutonomousRun, AutonomousRunsApi } from '$lib/features/autonomous/runs';
@@ -256,13 +256,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()
 			? sketchText
 			: null;
-	}
-
-	/** What every request that begins at Stage 2 sends. Those paths never ask
-	 *  for a sketch -- they carry the one the work already has. */
-	function sketchPayloadFor(text: string): Record<string, string> {
-		const prose = sketchTextFor(text);
-		return prose ? { sketch_text: prose } : {};
 	}
 
 	/** Show the saved reading without changing the next drawing's choices. */
@@ -684,11 +677,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		}
 	}
 
-	function selectLegacyHistory(historyId: string): void {
-		if (pipelineView?.result?.history_id === historyId) return;
-		pipelineController.markLegacy(historyId);
-	}
-
 	function selectHistoryAuthority(historyId: string, variationId?: string | null, signal?: AbortSignal): Promise<boolean> {
 		return pipelineController.selectHistory(historyId, variationId, signal);
 	}
@@ -911,127 +899,6 @@ export function createWorkState(deps: WorkStateDeps) {
 				setProgress: options.onProgress ?? ((progress) => { activeRunProgress = progress; })
 			}
 		);
-	}
-
-	type InterpretResult = {
-		ddl: string;
-		thinking: string | null;
-		tokens_in: number | null;
-		tokens_out: number | null;
-	};
-
-	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
-		const uiLang = getLang();
-		stage1UserPrompt = text;
-		const resolvedStage1Model = modelOverride ?? tabModelRef('stage1');
-		const r = await apiFetch('/api/interpret', {
-			method: 'POST',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				description: text,
-				...(sketchTextFor(text) ? { sketch_text: sketchTextFor(text) } : {}),
-				model: resolvedStage1Model,
-				include_thinking: deps.models.includeThinking(),
-				instruction_lang: langOverride ?? instructionLang,
-				ui_lang: uiLang,
-			})
-		});
-		if (!r.ok) {
-			throw await pipelineCompatibilityError(r);
-		}
-		const data = await r.json() as {
-			ddl: string;
-			thinking: string | null;
-			tokens_in?: number | null;
-			tokens_out?: number | null;
-		};
-		return {
-			ddl: data.ddl,
-			thinking: data.thinking,
-			tokens_in: data.tokens_in ?? null,
-			tokens_out: data.tokens_out ?? null,
-		};
-	}
-
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { canvasAspectId?: CanvasAspectId; lineageParentNodeId?: string | null; renderOverrides?: RenderOverrides; } = {}): Promise<{
-		score: Score;
-		svg: string;
-		// The persisted source used for display, editing, and replay.
-		ddl?: string | null;
-		stage2_model?: string | null;
-		render_build_number?: string | null;
-		render_color_profile?: Record<string, string> | null;
-		render_engine_id?: string | null;
-		render_engine_version?: string | null;
-		render_hash?: string | null;
-		render_hash_short?: string | null;
-		render_color_catalog_id?: string | null;
-		render_color_catalog_name?: string | null;
-		render_color_catalog_sub?: string | null;
-		render_color_map?: Record<string, string> | null;
-		render_canvas_aspect?: string | null;
-		render_canvas_aspect_id?: string | null;
-		render_canvas_aspect_ratio?: number | null;
-		render_seed?: Seed | null;
-		render_wild?: boolean | null;
-		composition_seed?: Seed | null;
-		instruction_lang_requested?: string | null;
-		instruction_lang_resolved?: string | null;
-		ui_lang?: string | null;
-		elapsed_ms: number;
-		tokens_in: number | null;
-		tokens_out: number | null;
-		sketch_text?: string | null;
-		sketch_grain?: string | null;
-		sketch_state?: string | null;
-	}> {
-		const uiLang = getLang();
-		const resolvedStage2Model = modelOverride ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
-		const r = await apiFetch('/api/compose', {
-			method: 'POST',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				ddl: currentDdl,
-				model: resolvedStage2Model,
-				description: originalText,
-				...sketchPayloadFor(originalText),
-				instruction_lang: langOverride ?? instructionLang,
-				ui_lang: uiLang,
-				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
-				...renderSettingsPayload('compose', renderOptions.renderOverrides),
-				...(renderOptions.lineageParentNodeId ? { lineage_parent_node_id: renderOptions.lineageParentNodeId } : {}),
-			})
-		});
-		if (!r.ok) {
-			throw await pipelineCompatibilityError(r);
-		}
-		const data = await r.json() as {
-			score: Score;
-			svg: string;
-			stage2_model?: string | null;
-			render_build_number?: string | null;
-			render_color_profile?: Record<string, string> | null;
-			render_engine_id?: string | null;
-			render_engine_version?: string | null;
-			render_hash?: string | null;
-			render_hash_short?: string | null;
-			render_color_catalog_id?: string | null;
-			render_color_catalog_name?: string | null;
-			render_color_catalog_sub?: string | null;
-			render_color_map?: Record<string, string> | null;
-			render_canvas_aspect?: string | null;
-			render_canvas_aspect_id?: string | null;
-			render_canvas_aspect_ratio?: number | null;
-			render_seed?: Seed | null;
-			render_wild?: boolean | null;
-			composition_seed?: Seed | null;
-			elapsed_ms: number;
-			tokens_in: number | null;
-			tokens_out: number | null;
-		};
-		return data;
 	}
 
 	async function startDemo() {
@@ -1660,7 +1527,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		get activeRunProgress() { return activeRunProgress; },
 		refreshImageBatchResume,
 		sketchTextFor,
-		sketchPayloadFor,
 		adoptSketch,
 		currentRefineParent,
 		submitWouldRefine,
@@ -1677,14 +1543,11 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineCompatibilityError,
 		authorDescription,
 		authorDdl,
-		selectLegacyHistory,
 		selectHistoryAuthority,
 		beginNewAuthoring,
 		forkPipelineDescription,
 		approvePipelinePatch,
 		declinePipelinePatch,
-		interpretOne,
-		composeOne,
 		startDemo,
 		stopDemo,
 		requestSubmit,

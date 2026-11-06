@@ -325,11 +325,11 @@ def test_authenticated_mark_patches_are_render_free_and_hide_inaccessible_rows(m
         assert inaccessible.status_code == 404
         assert missing.status_code == 404
     finally:
-        db.delete_all(owner["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(owner["id"])
         db.delete_session(owner_token)
         db.delete_user(owner["id"])
         db.delete_user_group(owner_group)
-        db.delete_all(other["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(other["id"])
         db.delete_session(other_token)
         db.delete_user(other["id"])
         db.delete_user_group(other_group)

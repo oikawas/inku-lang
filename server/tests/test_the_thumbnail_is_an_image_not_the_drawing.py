@@ -119,8 +119,12 @@ def save_work(user: dict, svg: str = SQUARE_SVG) -> dict:
     })
 
 
-def bake_for(item: dict, scale: int = 1) -> None:
-    thumbnails.build_one(item["id"], item["svg"], item.get("render_hash"), scale)
+def bake_for(item: dict, scale: int = 1) -> bool:
+    png = thumbnails.bake(item["svg"], scale)
+    if png is None:
+        return False
+    thumbs_db.put_thumb(item["id"], scale, png, item.get("render_hash"))
+    return True
 
 
 @pytest.fixture(autouse=True)
@@ -163,7 +167,7 @@ def test_baking_never_runs_the_engine(owner, monkeypatch):
     monkeypatch.setattr("inku_server.renderer.render", refuse)
     monkeypatch.setattr("inku_server.api_core.rendering._render_score_svg", refuse)
 
-    assert thumbnails.build_one(item["id"], item["svg"], item.get("render_hash"), 1)
+    assert bake_for(item)
     row = thumbs_db.get_thumb(item["id"], 1)
     assert row is not None
     assert row["png"] == rasterize(IMPOSTOR_SVG, 256)

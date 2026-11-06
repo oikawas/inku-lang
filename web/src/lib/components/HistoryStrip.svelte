@@ -340,7 +340,7 @@
 						<!-- The badge sits on the picture, so a taller meta row under it
 						     cannot cover the badge or be covered by it. -->
 						<div class="thumb-picture">
-							<HistoryThumbnail item={it} scope="strip" size="strip" />
+							<HistoryThumbnail item={it} size="strip" />
 							{#if i === historyCursor}
 								<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
 							{/if}

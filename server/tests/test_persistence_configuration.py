@@ -135,7 +135,6 @@ def test_existing_consumers_use_the_public_persistence_owners():
     package = ROOT / "server/src/inku_server"
     db_source = (package / "db.py").read_text(encoding="utf-8")
     thumbnail_source = (package / "thumbs_db.py").read_text(encoding="utf-8")
-    migration_source = (package / "migrate_history.py").read_text(encoding="utf-8")
     runtime_sources = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted(package.rglob("*.py"))
     )
@@ -147,4 +146,3 @@ def test_existing_consumers_use_the_public_persistence_owners():
     assert "from .db import _DB_URL" not in thumbnail_source
     assert re.search(r"\b_DB_URL\b", runtime_sources) is None
     assert "PostgreSQL" not in db_source
-    assert "PostgreSQL" not in migration_source

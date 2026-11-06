@@ -83,7 +83,6 @@ export class HistoryBrowsingState {
 	search = $state('');
 	searchFailed = $state(false);
 	private appliedSearch = $state('');
-	trashItems = $state<HistoryItem[]>([]);
 	trashTotal = $state(0);
 
 	readonly manager: HistoryManagerState;
@@ -99,8 +98,7 @@ export class HistoryBrowsingState {
 
 	constructor(deps: HistoryBrowsingDependencies) {
 		this.deps = deps;
-		this.manager = new HistoryManagerState(deps.apiFetch, (items, total) => {
-			this.trashItems = items;
+		this.manager = new HistoryManagerState(deps.apiFetch, (_items, total) => {
 			this.trashTotal = total;
 		});
 	}
@@ -158,7 +156,6 @@ export class HistoryBrowsingState {
 		this.search = '';
 		this.appliedSearch = '';
 		this.searchFailed = false;
-		this.trashItems = [];
 		this.trashTotal = 0;
 		this.externalRefreshInFlight = false;
 		this.lastExternalRefreshAt = 0;
@@ -333,19 +330,17 @@ export class HistoryBrowsingState {
 
 	async fetchTrashPage(): Promise<void> {
 		if (!this.deps.signedIn()) {
-			this.trashItems = [];
 			this.trashTotal = 0;
 			return;
 		}
 		const requestId = ++this.trashRequest;
 		try {
 			const response = await this.deps.apiFetch(
-				'/api/history?offset=0&limit=100&trashed=true&include_svg=false'
+				'/api/history?offset=0&limit=1&trashed=true&include_svg=false'
 			);
 			if (requestId !== this.trashRequest || !response.ok) return;
-			const data = await response.json() as { items: HistoryItem[]; total: number };
+			const data = await response.json() as { total: number };
 			if (requestId !== this.trashRequest) return;
-			this.trashItems = data.items;
 			this.trashTotal = data.total;
 		} catch {
 			// The trash summary is opportunistic; the manager can fetch it later.
@@ -529,18 +524,12 @@ export class HistoryBrowsingState {
 		this.items = this.items.map((candidate) => candidate.id === item.id
 			? { ...candidate, starred: item.starred, note: hasNote ? item.note : candidate.note }
 			: candidate);
-		this.trashItems = this.trashItems.map((candidate) => candidate.id === item.id
-			? { ...candidate, starred: item.starred, note: hasNote ? item.note : candidate.note }
-			: candidate);
 		this.manager.applyStarState(item);
 	}
 
 	applyForRevisionState(item: HistoryForRevisionProjection): void {
 		if (!item.id) return;
 		this.items = this.items.map((candidate) => candidate.id === item.id
-			? { ...candidate, for_revision: item.for_revision }
-			: candidate);
-		this.trashItems = this.trashItems.map((candidate) => candidate.id === item.id
 			? { ...candidate, for_revision: item.for_revision }
 			: candidate);
 		this.manager.applyForRevisionState(item);
@@ -550,9 +539,6 @@ export class HistoryBrowsingState {
 		if (!item.id) return;
 		const next = { for_share: item.for_share, share_group_id: item.share_group_id };
 		this.items = this.items.map((candidate) => candidate.id === item.id
-			? { ...candidate, ...next }
-			: candidate);
-		this.trashItems = this.trashItems.map((candidate) => candidate.id === item.id
 			? { ...candidate, ...next }
 			: candidate);
 		this.manager.applyForShareState(item);

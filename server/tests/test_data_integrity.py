@@ -41,7 +41,7 @@ def _item(user_id: str, label: str, at: int) -> dict:
 
 
 def _cleanup(user: dict, token: str, group_id: str) -> None:
-    db.delete_all(user["id"])
+    db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
     db.delete_session(token)
     db.delete_user(user["id"])
     db.delete_user_group(group_id)

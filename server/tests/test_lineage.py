@@ -92,7 +92,7 @@ def test_lineage_records_explicit_derivation_and_tombstone():
         assert "history" not in tombstone
         assert after_delete["edges"][0]["metadata"] == {}
     finally:
-        db.delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
         assert db.delete_user(user["id"])
 
 
@@ -123,7 +123,7 @@ def test_history_lineage_metadata_reports_full_generation_depth():
         assert by_id[grandchild["id"]]["lineage_generation"] == 3
         assert {item["lineage_state"] for item in items} == {"active"}
     finally:
-        db.delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
         assert db.delete_user(user["id"])
 
 
@@ -168,7 +168,7 @@ def test_lineage_nodes_carry_lineage_generation():
         ]
         assert branch_gens == [1, 2, 3]
     finally:
-        db.delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
         assert db.delete_user(user["id"])
 
 
@@ -188,7 +188,7 @@ def test_legacy_visibility_input_cannot_hide_a_new_work():
         graph = db.get_lineage(user["id"], hidden["lineage_node_id"])
         assert graph["nodes"][0]["state"] == "active"
     finally:
-        db.delete_all(user["id"])
+        db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
         assert db.delete_user(user["id"])
 
 
@@ -211,5 +211,5 @@ def test_lineage_rejects_cross_user_parent():
             raise AssertionError("cross-user lineage parent must be rejected")
     finally:
         for user in (first, second):
-            db.delete_all(user["id"])
+            db._history.HistoryOwnedDataPurgeWriter(db.SessionLocal, db._owner_actor, db._delete_acl_for_histories).delete_all(user["id"])
             assert db.delete_user(user["id"])

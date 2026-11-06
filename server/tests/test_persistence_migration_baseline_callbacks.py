@@ -175,7 +175,7 @@ def test_init_db_builds_owner_from_live_dependencies_and_assigns_outcome(
     instance = owner["create_schema"].__self__
     assert owner["create_schema"] == instance.create_schema
     assert owner["seed_fresh"] == instance.seed_fresh
-    assert owner["apply_legacy"] == instance.apply_legacy
+    assert "apply_legacy" not in owner
     assert db._HISTORY_FTS_ENABLED is enabled
     assert statistics == [enabled]
 

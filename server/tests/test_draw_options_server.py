@@ -149,12 +149,12 @@ def test_v6_upgrade_keeps_old_rows_null_and_snapshot(tmp_path):
     def no_op(_):
         return None
     outcome = migrations.ensure_current_schema(engine=engine, database_path=path, create_schema=no_op,
-                                               seed_fresh=no_op, apply_legacy=no_op)
+                                               seed_fresh=no_op)
     assert outcome.mode == "registered_upgrade" and outcome.snapshot.path.is_file()
     with sqlite3.connect(path) as connection:
         assert connection.execute("SELECT ddl, draw_route, sketch_requested, composition_requested FROM history").fetchone() == ("preserved", None, None, None)
     with sqlite3.connect(outcome.snapshot.path) as original:
         assert "draw_route" not in {row[1] for row in original.execute("PRAGMA table_info(history)")}
     assert migrations.ensure_current_schema(engine=engine, database_path=path, create_schema=no_op,
-                                            seed_fresh=no_op, apply_legacy=no_op).mode == "current"
+                                            seed_fresh=no_op).mode == "current"
     engine.dispose()

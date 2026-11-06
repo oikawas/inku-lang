@@ -75,7 +75,7 @@
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
-	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import { bindGenerationInfoSettingsPersist } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
@@ -1015,19 +1015,6 @@
 		if (colorCatalogSettings.selected !== AUTO_CATALOG_ID) work.drawOptions.catalog.id = colorCatalogSettings.selected;
 	}
 
-	// The selection rides in the user's model_settings: a drawing needs a session,
-	// so a browser-wide value would only ever be the wrong user's.
-	async function persistColorCatalogSelection(selected: string) {
-		if (!session.currentUser) return;
-		const token = session.beginSettingsUpdate();
-		try {
-			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { color_catalog_id: selected } }) });
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.acceptSettingsUpdate(token, await r.json() as UserItem);
-		} catch (e) { console.warn('failed to save color catalog selection', e); }
-	}
-	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
-
 	// The folds ride in the user's model_settings for the same reason the
 	// catalogue does: neither section has anything to show without a session.
 	// A failed save leaves the fold as the user just set it -- it is a view
@@ -1417,7 +1404,6 @@
 	const historyForRevisionOnly = $derived(history.forRevisionOnly);
 	const historyForShareOnly = $derived(history.forShareOnly);
 	const historyStripFiltered = $derived(history.filtered);
-	const trashItems = $derived(history.trashItems);
 	const trashTotal = $derived(history.trashTotal);
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void; focusOnOpen?: boolean } | null>(null);
 	function confirmDiscardEdits(run: () => void, cancelRun: () => void): void {

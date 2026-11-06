@@ -60,3 +60,32 @@ def test_a_locked_server_refuses_writes_and_can_still_be_unlocked():
     state["unreadable"] = True
     assert client.post("/api/pipeline/variations").status_code == 503
     assert client.put("/api/settings/db-write-lock", json={"locked": False}).status_code == 200
+
+
+def test_lock_cache_updates_locally_and_refreshes_another_process(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from inku_server import db
+    from inku_server.persistence import settings
+    from inku_server.persistence.schema import Base
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'lock.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    clock = [10.0]
+    monkeypatch.setattr(db, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    try:
+        assert db.database_write_block_reason() is None
+        db.update_db_write_lock(True)
+        assert db.database_write_block_reason() == "database_write_locked"
+        db.update_db_write_lock(False)
+        assert db.database_write_block_reason() is None
+        settings.AppSettingsStore(db.SessionLocal, lambda: 1).write(settings.DB_WRITE_LOCK_SETTINGS_KEY, {"locked": True})
+        assert db.database_write_block_reason() is None
+        clock[0] += 1.1
+        assert db.database_write_block_reason() == "database_write_locked"
+    finally:
+        db._write_lock_cache.update(engine=None, checked=0.0, locked=True)
+        engine.dispose()

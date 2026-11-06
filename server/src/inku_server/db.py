@@ -6,6 +6,7 @@ import logging
 import os
 import secrets
 import threading
+import time
 import uuid
 from contextlib import nullcontext
 from pathlib import Path
@@ -173,19 +174,12 @@ def init_db() -> None:
 
 
 def _refresh_planner_statistics() -> None:
-    """Give SQLite's query planner statistics (sqlite_stat1), again at every start.
-
-    Without them the planner guesses, and production's SQLite 3.37 guessed that
-    "visible works" was a narrow index: opening one lineage in the history
-    library read every work (about 0.45 s). A start re-counts as the database
-    grows; on 4,200 works it took about 0.1 s. A database that cannot be
-    analysed now (locked, read-only) still serves, as it did before.
-    """
+    """Let SQLite refresh planner statistics when it considers them useful."""
     if engine.dialect.name != "sqlite":
         return
     try:
         with engine.begin() as connection:
-            connection.exec_driver_sql("ANALYZE")
+            connection.exec_driver_sql("PRAGMA optimize")
     except Exception:  # noqa: BLE001
         _logger.warning("could not refresh the query planner statistics", exc_info=True)
 
@@ -859,8 +853,24 @@ def get_db_write_lock() -> dict:
     return _settings.DbWriteLockSettingsStore(_app_settings_store()).get()
 
 
+_write_lock_cache_guard = threading.RLock()
+_write_lock_cache = {"engine": None, "checked": 0.0, "locked": True}
+
+
+def _cached_db_write_locked() -> bool:
+    with _write_lock_cache_guard:
+        now = time.monotonic()
+        if _write_lock_cache["engine"] is not engine or now - _write_lock_cache["checked"] >= 1.0:
+            value = bool(get_db_write_lock()["locked"])
+            _write_lock_cache.update(engine=engine, checked=now, locked=value)
+        return _write_lock_cache["locked"]
+
+
 def update_db_write_lock(locked: bool) -> dict:
-    return _settings.DbWriteLockSettingsStore(_app_settings_store()).update(locked)
+    with _write_lock_cache_guard:
+        value = _settings.DbWriteLockSettingsStore(_app_settings_store()).update(locked)
+        _write_lock_cache.update(engine=engine, checked=time.monotonic(), locked=bool(value["locked"]))
+        return value
 
 
 def get_render_limit_settings() -> dict:
@@ -992,7 +1002,7 @@ def database_write_block_reason() -> str | None:
     if db_restoring():
         return "database_restoring"
     try:
-        locked = get_db_write_lock()["locked"]
+        locked = _cached_db_write_locked()
     except Exception:  # noqa: BLE001
         return "database_write_locked"
     if locked:
@@ -1019,6 +1029,8 @@ def restore_db_backup(kind: str, name: str) -> dict:
     finally:
         engine.dispose()
         _settings.invalidate_model_cache()
+        with _write_lock_cache_guard:
+            _write_lock_cache.update(engine=None, checked=0.0, locked=True)
         _db_restoring.clear()
         _db_restore_lock.release()
 

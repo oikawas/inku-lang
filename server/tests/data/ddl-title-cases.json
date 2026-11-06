@@ -1,0 +1,124 @@
+{
+  "cases": [
+    {
+      "lines": [
+        [
+          0,
+          4,
+          "灯台"
+        ]
+      ],
+      "text": "「灯台」\n赤い円。",
+      "why": "Japanese brackets",
+      "without": "赤い円。"
+    },
+    {
+      "lines": [
+        [
+          0,
+          6,
+          "moon"
+        ]
+      ],
+      "text": "\"moon\"\nCircle.",
+      "why": "straight quotes",
+      "without": "Circle."
+    },
+    {
+      "lines": [
+        [
+          0,
+          6,
+          "moon"
+        ]
+      ],
+      "text": "“moon”\nCircle.",
+      "why": "curly quotes",
+      "without": "Circle."
+    },
+    {
+      "lines": [
+        [
+          0,
+          2,
+          ""
+        ]
+      ],
+      "text": "「」\n赤い円。",
+      "why": "empty title",
+      "without": "赤い円。"
+    },
+    {
+      "lines": [],
+      "text": "「灯「台」\n赤い円。",
+      "why": "nested same brackets are not a title",
+      "without": "「灯「台」\n赤い円。"
+    },
+    {
+      "lines": [
+        [
+          0,
+          8,
+          "灯台"
+        ]
+      ],
+      "text": "　「 灯台 」　\n赤い円。",
+      "why": "outer ideographic spaces",
+      "without": "赤い円。"
+    },
+    {
+      "lines": [
+        [
+          0,
+          4,
+          "灯台"
+        ],
+        [
+          12,
+          18,
+          "moon"
+        ]
+      ],
+      "text": "「灯台」\r\n赤い円。\r\n\"moon\"\r\nCircle.",
+      "why": "CRLF",
+      "without": "赤い円。\r\nCircle."
+    },
+    {
+      "lines": [],
+      "text": "「灯台」\r赤い円。",
+      "why": "lone CR does not split lines",
+      "without": "「灯台」\r赤い円。"
+    },
+    {
+      "lines": [],
+      "text": "「灯台」 赤い円。",
+      "why": "U+2028 does not split lines",
+      "without": "「灯台」 赤い円。"
+    },
+    {
+      "lines": [],
+      "text": "﻿「灯台」\n赤い円。",
+      "why": "leading BOM is not trimmed",
+      "without": "﻿「灯台」\n赤い円。"
+    },
+    {
+      "lines": [
+        [
+          6,
+          10,
+          "灯台"
+        ]
+      ],
+      "text": "🎨 描く。\n「灯台」\n赤い円。",
+      "why": "emoji before title counts as one scalar",
+      "without": "🎨 描く。\n赤い円。"
+    },
+    {
+      "lines": [],
+      "text": "画面比1:1。\n赤い円を置く。",
+      "why": "no title",
+      "without": "画面比1:1。\n赤い円を置く。"
+    }
+  ],
+  "note": "Read by core tests and, later, Web vitest; title behavior follows inku-ddl."
+}

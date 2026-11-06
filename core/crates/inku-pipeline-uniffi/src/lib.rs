@@ -418,6 +418,88 @@ pub fn description_label_spans_export(text: String) -> Result<String, CoreCallFa
     guarded_core_call(|| description_label_spans(text))
 }
 
+/// Title lines in Unicode scalar offsets, as JSON.
+pub fn ddl_title_lines(source: String) -> String {
+    let mut byte_cursor = 0;
+    let mut scalar_cursor = 0;
+    let titles: Vec<_> = inku_ddl::ddl_title_lines(&source)
+        .into_iter()
+        .map(|title| {
+            scalar_cursor += source[byte_cursor..title.span.start_byte].chars().count();
+            let start = scalar_cursor;
+            scalar_cursor += source[title.span.start_byte..title.span.end_byte]
+                .chars()
+                .count();
+            byte_cursor = title.span.end_byte;
+            serde_json::json!([start, scalar_cursor, title.name])
+        })
+        .collect();
+    serde_json::Value::Array(titles).to_string()
+}
+
+#[uniffi::export(name = "ddl_title_lines")]
+pub fn ddl_title_lines_export(source: String) -> Result<String, CoreCallFailure> {
+    guarded_core_call(|| ddl_title_lines(source))
+}
+
+/// The DDL source without its title lines.
+pub fn without_ddl_title_lines(source: String) -> String {
+    inku_ddl::without_ddl_title_lines(&source)
+}
+
+#[uniffi::export(name = "without_ddl_title_lines")]
+pub fn without_ddl_title_lines_export(source: String) -> Result<String, CoreCallFailure> {
+    guarded_core_call(|| without_ddl_title_lines(source))
+}
+
+/// Source comment contents as a JSON array.
+pub fn description_source_labels(text: String) -> String {
+    description_labels::description_source_labels(&text)
+}
+
+#[uniffi::export(name = "description_source_labels")]
+pub fn description_source_labels_export(text: String) -> Result<String, CoreCallFailure> {
+    guarded_core_call(|| description_source_labels(text))
+}
+
+/// Whether the words read by the pipeline differ.
+pub fn description_rewords(text: String, description: String) -> bool {
+    description_labels::description_rewords(&text, &description)
+}
+
+#[uniffi::export(name = "description_rewords")]
+pub fn description_rewords_export(
+    text: String,
+    description: String,
+) -> Result<bool, CoreCallFailure> {
+    guarded_core_call(|| description_rewords(text, description))
+}
+
+#[cfg(test)]
+mod shared_title_cases {
+    #[test]
+    fn title_lines_match_shared_cases() {
+        let table: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../server/tests/data/ddl-title-cases.json"
+        ))
+        .expect("shared title cases");
+        let cases = table["cases"].as_array().expect("cases");
+        assert!(!cases.is_empty());
+        for case in cases {
+            let text = case["text"].as_str().unwrap().to_owned();
+            let lines: serde_json::Value =
+                serde_json::from_str(&super::ddl_title_lines(text.clone())).unwrap();
+            assert_eq!(lines, case["lines"], "{}", case["why"]);
+            assert_eq!(
+                super::without_ddl_title_lines(text),
+                case["without"].as_str().unwrap(),
+                "{}",
+                case["why"]
+            );
+        }
+    }
+}
+
 /// Report the fixed binding and byte-protocol versions as stable JSON.
 #[uniffi::export]
 pub fn version_report() -> String {

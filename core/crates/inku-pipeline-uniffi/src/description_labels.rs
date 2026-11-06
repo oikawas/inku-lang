@@ -54,6 +54,34 @@ pub fn description_label_spans(text: &str) -> String {
     serde_json::Value::Array(spans).to_string()
 }
 
+/// Comment contents, with Python-compatible whitespace removed.
+pub fn description_source_labels(text: &str) -> String {
+    let labels: Vec<&str> = byte_spans(text)
+        .into_iter()
+        .filter(|(_, _, kind)| *kind == "comment")
+        .filter_map(|(start, end, _)| {
+            let comment = &text[start..end];
+            let inner = &comment[comment.chars().next()?.len_utf8()
+                ..comment.len() - comment.chars().next_back()?.len_utf8()];
+            let label = inku_pipeline::identity::python_strip(inner);
+            (!label.is_empty()).then_some(label)
+        })
+        .collect();
+    serde_json::to_string(&labels).expect("string array serializes")
+}
+
+/// Whether the words read by the pipeline differ, ignoring labels and spacing.
+pub fn description_rewords(text: &str, description: &str) -> bool {
+    fn words(value: &str) -> String {
+        pipeline_description(value)
+            .split(inku_pipeline::identity::is_python_space)
+            .filter(|word| !word.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+    words(text) != words(description)
+}
+
 /// The description with its labels removed, as every layer reads it.
 pub fn pipeline_description(text: &str) -> String {
     let spans = byte_spans(text);
@@ -81,7 +109,10 @@ pub fn pipeline_description(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{description_label_spans, pipeline_description};
+    use super::{
+        description_label_spans, description_rewords, description_source_labels,
+        pipeline_description,
+    };
 
     #[test]
     fn every_shared_case_cuts_what_server_cuts() {
@@ -107,6 +138,19 @@ mod tests {
                 case["spans"],
                 "{}",
                 case["why"].as_str().unwrap_or(text)
+            );
+            let labels: serde_json::Value =
+                serde_json::from_str(&description_source_labels(text)).unwrap();
+            assert_eq!(labels, case["source_labels"], "{}", case["why"]);
+        }
+        for case in table["rewords_cases"].as_array().expect("rewords cases") {
+            assert_eq!(
+                description_rewords(
+                    case["text"].as_str().unwrap(),
+                    case["description"].as_str().unwrap()
+                ),
+                case["rewords"].as_bool().unwrap(),
+                "{case}"
             );
         }
         eprintln!("compared {} shared label cases", cases.len());

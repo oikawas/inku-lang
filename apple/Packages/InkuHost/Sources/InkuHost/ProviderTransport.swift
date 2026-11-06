@@ -395,16 +395,21 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Parse
 
 private struct ProviderAttemptDeadline: Error {}
 
-/// Server provider_limits.py: Ollama Cloud refuses above two simultaneous requests, so its pipeline
-/// requests wait for one of two slots. The limit belongs to the builtin provider ID, not to a setting.
+/// Share core's per-provider concurrency limits across pipeline requests.
 actor ProviderConcurrencySlots {
     static let shared = ProviderConcurrencySlots()
-    static func limit(providerID: String) -> Int { providerID == "ollama-cloud" ? 2 : 0 }
+    private var limits: [String: Int] = [:]
+    func limit(providerID: String) -> Int {
+        if let saved = limits[providerID] { return saved }
+        let value = max(0, (try? ProviderCoreSettings.call("provider_concurrency", ["provider": providerID])["limit"] as? Int) ?? 0)
+        limits[providerID] = value
+        return value
+    }
     private var active: [String: Int] = [:]
     private var waiters: [String: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)]] = [:]
 
     nonisolated func holding<T: Sendable>(_ providerID: String, _ operation: @Sendable () async throws -> T) async throws -> T {
-        let limit = Self.limit(providerID: providerID)
+        let limit = await self.limit(providerID: providerID)
         guard limit > 0 else { return try await operation() }
         try await acquire(providerID, limit: limit)
         do {

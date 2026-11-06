@@ -156,7 +156,7 @@ public enum ProviderModelCatalog {
         var answers: [String: ProviderModelAccess] = [:]
         var pending = targets.compactMap { $0["id"] as? String }[...]
         await withTaskGroup(of: (String, ProviderModelAccess?).self) { group in
-            let limit = (try? ProviderCoreSettings.call("provider_concurrency", ["provider": provider.id])["limit"] as? Int) ?? 2
+            let limit = (try? ProviderCoreSettings.call("provider_concurrency", ["provider": provider.id])["limit"] as? Int) ?? 0
             for _ in 0..<max(1, limit) { if let id = pending.popFirst() { group.addTask { (id, await probe(id)) } } }
             while let (id, answer) = await group.next() {
                 if let answer { answers[id] = answer }

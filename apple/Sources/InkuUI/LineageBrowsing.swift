@@ -87,8 +87,15 @@ struct LineageScrollBridge: NSViewRepresentable {
     var cards: [CGRect] = []
     let onScroll: (LineageScrollPosition) -> Void
     func makeNSView(context: Context) -> Probe { Probe() }
+
+    /// The pan monitor runs only for a lineage the pointer can reach. The library, settings and a presentation cover
+    /// the shell without disabling it, so a covered lineage stops panning as a disabled one does; otherwise its
+    /// monitor takes presses on the library cards above its canvas (2026-11-06).
+    static func pans(isEnabled: Bool, covered: Bool) -> Bool { isEnabled && !covered }
+
     func updateNSView(_ view: Probe, context: Context) {
-        view.panEnabled = context.environment.isEnabled
+        view.panEnabled = Self.pans(isEnabled: context.environment.isEnabled,
+                                    covered: context.environment.inkuTooltipsCovered)
         view.onScroll = onScroll
         view.cards = cards
         view.request(revision: revision, position: position)

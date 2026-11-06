@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: while the library is open, the lineage view beneath it no longer takes presses for dragging, so a card above the lineage canvas is selected at once.
+
 - macOS: decide a single or double click on a library or lineage picture from the mouse-down on that picture, so quick clicks on different cards never open a work by mistake.
 
 - macOS: one click on a work's picture in the library changes the preview and the card frame without waiting; a double click opens the work.

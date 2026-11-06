@@ -2627,6 +2627,12 @@ fn lower_verified_stage15_shared<'a>(
         ..context
     }
     .with_declared_ratio(document.canvas_ratio);
+    let mut predicates_by_group = BTreeMap::new();
+    for predicate in &document.group_predicates {
+        predicates_by_group
+            .entry(predicate.group_index)
+            .or_insert(predicate);
+    }
     for (projected_group_index, group) in document.coordinated_head_groups.iter().enumerate() {
         let group_index = candidate
             .verified_effective_view()
@@ -2649,11 +2655,7 @@ fn lower_verified_stage15_shared<'a>(
             .map(|instruction| instruction.entity.head.source().span)
             .collect::<Vec<_>>();
         spans.extend(group.markers.iter().map(|marker| marker.span));
-        if let Some(predicate) = document
-            .group_predicates
-            .iter()
-            .find(|predicate| predicate.group_index == projected_group_index)
-        {
+        if let Some(predicate) = predicates_by_group.get(&projected_group_index) {
             let action = predicate
                 .action
                 .as_ref()

@@ -32,13 +32,13 @@ struct LibraryRemovalSearchTests {
             #expect(try await db.work(id: work.id) == work)
             #expect(try await db.node(id: "node")?.historyID == work.id)
             #expect(try await db.libraryAnnotation(id: work.id) == LibraryAnnotation(note: "Keep comment", forRevision: true))
-            #expect(try await db.loadExecution(id: "execution")?.snapshot == Data([0, 255, 7]))
+            #expect(try await db.loadExecution(id: "execution") == nil)
             let inspect = try DatabaseQueue(path: file.path)
             let fields = try await inspect.read { database in
                 (try Int.fetchOne(database, sql: "PRAGMA user_version"),
                  try String.fetchAll(database, sql: "SELECT name FROM pragma_table_info('library_annotations')"))
             }
-            #expect(fields.0 == 8)
+            #expect(fields.0 == InkuDatabase.currentSchemaVersion)
             #expect(fields.1 == ["history_id", "note", "for_revision"])
             try inspect.close()
         }

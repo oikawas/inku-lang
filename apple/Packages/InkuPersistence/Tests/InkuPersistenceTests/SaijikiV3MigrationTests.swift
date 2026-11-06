@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import GRDB
 import InkuCore
 import Testing
@@ -170,12 +171,12 @@ struct SaijikiV3MigrationTests {
         let fields = try await reader.read { db in
             (try Int.fetchOne(db, sql: "PRAGMA user_version"),
              try Data.fetchOne(db, sql: "SELECT snapshot FROM execution_snapshots WHERE id='good'"),
-             try Data.fetchOne(db, sql: "SELECT snapshot FROM effect_acknowledgements WHERE execution_id='good'"),
+             try Data.fetchOne(db, sql: "SELECT snapshot_sha256 FROM effect_acknowledgements WHERE execution_id='good'"),
              try String.fetchOne(db, sql: "SELECT json_extract(CAST(acknowledgement AS TEXT), '$.performance.document.saijiki') FROM effect_acknowledgements WHERE execution_id='good'"))
         }
-        #expect(fields.0 == 8)
+        #expect(fields.0 == InkuDatabase.currentSchemaVersion)
         #expect(fields.1 == Data("historical".utf8))
-        #expect(fields.2 == Data("historical".utf8))
+        #expect(fields.2 == Data(SHA256.hash(data: Data("historical".utf8))))
         #expect(fields.3 == "inku.saijiki.v3")
         try reader.close()
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
@@ -184,7 +185,7 @@ struct SaijikiV3MigrationTests {
         #expect(report["changed"] as? Int == 1)
         #expect(report["already"] as? Int == 1)
         #expect((report["refused"] as? [[String: String]])?.count == 2)
-        let backupURL = try #require(files.first { $0.lastPathComponent.hasPrefix(".inku-before-v7-") })
+        let backupURL = try #require(files.first { $0.lastPathComponent.hasPrefix(".inku-before-v9-") })
         let backup = try DatabaseQueue(path: backupURL.path)
         #expect(try await backup.read { try Int.fetchOne($0, sql: "PRAGMA user_version") } == 6)
         try backup.close()

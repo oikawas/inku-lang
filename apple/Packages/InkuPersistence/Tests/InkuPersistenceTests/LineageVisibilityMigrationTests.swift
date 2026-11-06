@@ -35,7 +35,7 @@ struct LineageVisibilityMigrationTests {
         #expect(migrated?.ddl == hidden.ddl && migrated?.score == hidden.score && migrated?.svg == hidden.svg)
         #expect(try await db.node(id: "hidden-node")?.state == "active")
         #expect(try await db.libraryPage().total == 2)
-        let backup = try #require(FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).first { $0.lastPathComponent.hasPrefix(".inku-before-v5-") })
+        let backup = try #require(FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).first { $0.lastPathComponent.hasPrefix(".inku-before-v9-") })
         let snapshot = try DatabaseQueue(path: backup.path)
         #expect(try await snapshot.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM history WHERE history_visibility = 'lineage_only'") } == 1)
         try snapshot.close()

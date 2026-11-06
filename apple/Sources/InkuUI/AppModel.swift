@@ -17,6 +17,13 @@ public enum PromptAvailability: Sendable, Equatable {
     case loading, recorded, notRecorded, unavailable
 }
 
+public struct OutputSnapshot: Sendable {
+    public let prompt: String
+    public let promptAvailability: PromptAvailability
+    public let events: String
+    public let score: String
+}
+
 /// A complete, immutable adjustment snapshot. Views display model facts but never interpret its operation.
 public struct DrawingAdjustmentPlan: Sendable {
     public let stage1Model: String?
@@ -152,7 +159,6 @@ public final class AppModel {
     public private(set) var previewWork: SavedWork?
     public private(set) var currentSVG = ""
     public private(set) var visibleDDL = ""
-    public private(set) var scoreJSON = ""
     public private(set) var status = "準備中"
     public private(set) var providerProgress: ProviderProgressSnapshot?
     private var progressJournals: [String: RunProgressJournal] = [:]
@@ -196,15 +202,11 @@ public final class AppModel {
     public private(set) var productReference: ProductReference?
     public private(set) var drawingLimitDefinition: DrawingLimitDefinition?
     public private(set) var importedMacroNames: [String] = []
-    public private(set) var macroDiagnostics = ""
     public private(set) var authoringRevision = "0"
     public private(set) var authoringAuthority = ""
     public private(set) var authoringOrigin = ""
     public private(set) var authoringPhase = ""
     public private(set) var diagnosticsJSON = ""
-    public private(set) var promptJSON = ""
-    public private(set) var promptAvailability: PromptAvailability = .notRecorded
-    public private(set) var eventsJSON = ""
     public private(set) var holeIDs: [String] = []
     public private(set) var patchProposalJSON = ""
     public private(set) var patchCandidate = ""
@@ -239,7 +241,6 @@ public final class AppModel {
         guard ddlBoxDraftWorkID == work.id || text != (work.ddl ?? "") else { return }
         ddlBoxDraftWorkID = work.id; ddlBoxDraft = text
     }
-    public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
     public private(set) var imageWorkProvenance: [String: String] = [:]
     public private(set) var savedDisplayLabels: [String: String] = [:]
@@ -488,8 +489,9 @@ public final class AppModel {
             restoreNextConditions()
             self.saijiki = bootstrap.saijiki
             self.pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
-            let macro = try bootstrap.macroCatalog(language: instructionLanguage(for: currentInputText), settings: settings)
-            self.macroDiagnostics = try Self.pretty(try Bootstrap.bytes(macro))
+            var startupCatalogError: Error?
+            do { _ = try bootstrap.macroCatalog(language: instructionLanguage(for: currentInputText), settings: settings) }
+            catch { startupCatalogError = error }
             library.onMutation = { [weak self] in await self?.refreshWorks() }
             // Web `inku-history-display-mode` and the thumbnail/list tab come back with the library.
             if let layout = display.preferences.libraryLayout.flatMap(LibraryLayout.init(rawValue:)), layout != .lineage {
@@ -508,7 +510,7 @@ public final class AppModel {
             if let latest = try await database.libraryPage(limit: 1).items.first?.work, selectedWorkID == nil {
                 await selectWork(latest)
             }
-            status = "準備完了"
+            status = startupCatalogError.map { "プラグインのカタログを検証できませんでした: \($0.localizedDescription)" } ?? "準備完了"
         } catch {
             initialized = false
             report(error)
@@ -525,7 +527,6 @@ public final class AppModel {
             } else { _ = await drawNewDDL(ddlText, presentation: .workspace) }
             return
         }
-        let token = UUID()
         let runningMode = inputMode
         let runningImage = runningMode == "image" ? imageInput : nil
         let freshRequest: GenerationRequest
@@ -537,25 +538,12 @@ public final class AppModel {
                     derivationKind: parentWorkID == nil ? "new" : "description_edit")
             }
         } catch { report(error); return }
-        activeSingleInputMode = runningMode
-        generationToken = token
-        providerProgress = nil
-        activeExecutionID = nil
-        progressJournals.removeAll()
-        currentExecutionID = nil
-        backgroundDrawing = false
-        stopping = false
-        isBusy = true
-        errorText = nil
-        status = runningMode == "description" && drawRoute == "read_and_draw" ? display.webCopy(sketchMode == "on" ? "readDrawReading" : "readDrawWriting", sketchMode == "on" ? "記述を読んでいます…" : "指示書を書いています…") : "生成中"
-        let operation = Task { @MainActor [weak self] in
+        let initialStatus = runningMode == "description" && drawRoute == "read_and_draw" ? display.webCopy(sketchMode == "on" ? "readDrawReading" : "readDrawWriting", sketchMode == "on" ? "記述を読んでいます…" : "指示書を書いています…") : "生成中"
+        _ = await performSerialized(status: initialStatus, singleInputMode: runningMode, clearProgressJournals: true) { [weak self] token in
             guard let self else { return }
             await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID,
                                      runningMode: runningMode, image: runningImage, freshRequest: freshRequest)
         }
-        activeOperation = operation
-        await operation.value
-        finishOperation(token: token)
     }
 
     private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?,
@@ -623,13 +611,9 @@ public final class AppModel {
         patchCandidate = ""
         completionIssues = []
         diagnosticsJSON = ""
-        promptJSON = ""
-        promptAvailability = .loading
-        unreadOutputs.remove("prompt")
-        eventsJSON = ""
         await library.loadSelectedAnnotation(workID: work.id)
         guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
-        guard let host else { promptAvailability = .unavailable; return }
+        guard let host else { return }
         let recordedMetrics = (try? await host.savedProviderMetrics(workID: work.id)) ?? []
         guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
         providerMetrics = recordedMetrics
@@ -660,10 +644,7 @@ public final class AppModel {
             authoringPhase = "completed"
             let presentation = try await host.savedWorkPresentation(workID: work.id)
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
-            promptJSON = try presentation.promptJSON.map(Self.pretty) ?? ""
-            promptAvailability = presentation.promptJSON == nil ? .notRecorded : .recorded
             diagnosticsJSON = try presentation.diagnosticsJSON.map(Self.pretty) ?? ""
-            eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             if adoptDrawOptions, let recorded = try? prepareRecordedOptions(work, isImage: false),
@@ -671,7 +652,6 @@ public final class AppModel {
                 drawSelections["describe"] = options
             }
             if (error as? HostError)?.code == "saijiki_migration_required" { errorText = failureMessage(error) }
-            promptAvailability = .unavailable
             authoringAuthority = "legacy_unknown"
             authoringOrigin = work.ddlSourceOrigin ?? "legacy_unknown"
             authoringRevision = "0"
@@ -697,11 +677,6 @@ public final class AppModel {
                 await self.library.loadSelectedAnnotation(workID: work.id)
             }
         }
-        if currentView?.savedWorkID != work.id {
-            promptJSON = ""
-            promptAvailability = .unavailable
-            unreadOutputs.remove("prompt")
-        }
         providerMetrics = currentView?.savedWorkID == work.id ? currentView?.providerMetrics ?? [] : []
         if currentView?.savedWorkID != work.id, let host {
             Task { @MainActor [weak self] in
@@ -713,30 +688,16 @@ public final class AppModel {
         }
         currentSVG = work.svg
         visibleDDL = work.ddl ?? ""
-        scoreJSON = work.score
         ddlText = work.ddl ?? ""
         descriptionText = work.effectiveSourceText
     }
 
     public func replay(_ work: SavedWork) async {
         guard !isBusy, let host else { return }
-        let token = UUID()
-        generationToken = token
-        providerProgress = nil
-        activeExecutionID = nil
-        currentExecutionID = nil
-        backgroundDrawing = false
-        stopping = false
-        isBusy = true
-        errorText = nil
-        status = "再演奏中"
-        let operation = Task { @MainActor [weak self] in
+        _ = await performSerialized(status: "再演奏中") { [weak self] token in
             guard let self else { return }
             await self.runReplay(work: work, host: host, token: token)
         }
-        activeOperation = operation
-        await operation.value
-        finishOperation(token: token)
     }
 
     private func runReplay(work: SavedWork, host: PipelineHost, token: UUID) async {
@@ -782,11 +743,10 @@ public final class AppModel {
     func reloadPluginPackages() throws {
         guard let directory = localDataDirectory() else { throw HostError("database_unavailable") }
         let updated = try Bootstrap(pluginDataDirectory: directory)
-        let diagnostics = try Self.pretty(updated.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings,
-                                                                     importedPlugins: importedDDL?.plugins ?? []).data)
+        _ = try updated.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings,
+                                           importedPlugins: importedDDL?.plugins ?? [])
         bootstrap = updated
         pluginWords = updated.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
-        macroDiagnostics = diagnostics
     }
 
     public func checkPluginPackage(data: Data, isArchive: Bool) async throws -> PluginPackageCheck {
@@ -883,7 +843,7 @@ public final class AppModel {
                 throw HostError("invalid_operational_limits")
             }
         }
-        let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
+        _ = try bootstrap?.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings, importedPlugins: importedDDL?.plugins ?? [])
         settings = try await settingsStore.save(settings)
         let previousSettings = self.settings
         self.settings = settings
@@ -892,7 +852,6 @@ public final class AppModel {
         pruneComparisonModels()
         if let bootstrap {
             pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
-            macroDiagnostics = diagnostics ?? ""
         }
     }
 
@@ -1110,11 +1069,10 @@ public final class AppModel {
     public func applyDDLImport(_ value: DDLPackageImport) throws {
         guard !isBusy, let bootstrap else { throw HostError("ddl_import_busy_or_unavailable") }
         let language = value.language ?? instructionLanguage(for: value.source)
-        let catalog = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
+        _ = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
         clearWorkOutput()
         importedDDL = value; importedMacroNames = value.names
         inputMode = "ddl"; ddlText = value.source
-        macroDiagnostics = try Self.pretty(catalog.data)
         status = "DDLを読み込みました。生成して保存できます。"
         if let count = value.migratedEdits {
             status += " " + display.webCopyFormat("ddlImportMigrated", "旧い歳時記から %@ 箇所を書き換えました。", count)
@@ -1208,6 +1166,63 @@ public final class AppModel {
         return try requestForCurrentInput(inputMode: "description", source: "", description: description,
             parentWorkID: nil, derivationKind: "new", catalogModeOverride: catalogMode,
             sketchOverride: sketchMode == "on" ? .on : .off)
+    }
+
+    func makeBatchRows(_ entries: [(Int, String)], sketchMode: String, batchRunID: String) async throws -> [BatchRow] {
+        guard ["off", "on"].contains(sketchMode) else { throw HostError("invalid_batch_sketch_mode") }
+        guard let bootstrap else { throw HostError("installation_unavailable") }
+        guard SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings) else {
+            throw HostError("drawing_model_not_available")
+        }
+        let capturedSettings = nextGenerationHostSettings
+        let requestedLanguage = language, uiLanguage = display.preferences.language
+        let chosenCatalog = catalogID, selectedCanvas = canvasID, mode = catalogMode, seed = seedText
+        let useWild = wild, route = drawRoute, composition = descriptionComposition
+        let review = SettingsModel.isRegisteredModelAvailable(capturedSettings.models.stage1Model, purpose: "vision", settings: capturedSettings)
+        let captureIO = developerModeEnabled && display.preferences.captureProviderIO == true
+        let catalogChoices = bootstrap.catalogs.map(\.id).filter { $0 != chosenCatalog }
+        let task = Task.detached {
+            struct Key: Hashable { let language: String; let catalog: String }
+            let languages = entries.map { InkuCore.resolveInstructionLanguage(text: $0.1, requested: requestedLanguage, fallback: uiLanguage) ?? "ja" }
+            let invariant = try bootstrap.batchInvariant(languages: Set(languages), settings: capturedSettings)
+            var templates: [Key: (GenerationRequest, String)] = [:]
+            var rows: [BatchRow] = []
+            for (index, entry) in entries.enumerated() {
+                try Task.checkCancellation()
+                let selected: String
+                if mode == "random" {
+                    guard let choice = catalogChoices.randomElement() else { throw HostError("catalog_selection_unavailable") }
+                    selected = choice
+                } else { selected = chosenCatalog }
+                let actualSeed = seed.isEmpty ? String(UInt64.random(in: 0...((UInt64(1) << 53) - 1))) : seed
+                let key = Key(language: languages[index], catalog: selected)
+                var request: GenerationRequest
+                if let cached = templates[key] {
+                    request = cached.1 == actualSeed ? cached.0 : try bootstrap.reseedBatchRequest(cached.0, seed: actualSeed,
+                        language: key.language, invariant: invariant)
+                }
+                else {
+                    request = try bootstrap.request(inputMode: "description", source: "", description: entry.1,
+                        language: key.language, catalogID: chosenCatalog, canvasID: selectedCanvas, seed: actualSeed,
+                        wild: useWild, settings: capturedSettings, catalogMode: mode,
+                        sketch: sketchMode == "on" ? .on : .off, batchInvariant: invariant,
+                        batchSelectedCatalog: mode == "random" ? selected : nil)
+                    if route == "read_and_draw" {
+                        request.drawRoute = route; request.descriptionComposition = composition; request.descriptionReview = review
+                    }
+                    request.recordsDrawOptions = true; request.captureProviderIO = captureIO
+                    templates[key] = (request, actualSeed)
+                }
+                request.authoring = .description(entry.1, autoCatalog: mode == "auto", sketch: sketchMode == "on" ? .on : .off)
+                request.description = entry.1
+                var provenance = request.provenance ?? GenerationProvenance()
+                provenance.batchRunID = batchRunID; provenance.batchLineNumber = entry.0
+                provenance.displayLabel = "#\(entry.0)"; request.provenance = provenance
+                rows.append(BatchRow(line: entry.0, input: entry.1, request: request))
+            }
+            return rows
+        }
+        return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
     }
 
     public func requestForDemoDescription(_ description: String, sketchMode: String) throws -> GenerationRequest {
@@ -1448,8 +1463,7 @@ public final class AppModel {
             guard generationToken == token, !stopping, !Task.isCancelled else { return saved }
             if let view, view.savedWorkID == saved.id { apply(view) }
             else {
-                diagnosticsJSON = ""; promptJSON = ""; eventsJSON = ""; unreadOutputs = []
-                promptAvailability = .unavailable
+                diagnosticsJSON = ""
             }
             displayWork(saved)
             selectedContext = context
@@ -1978,6 +1992,7 @@ public final class AppModel {
     /// The busy flag remains held until cancellation has drained the active task.
     @discardableResult
     public func performSerialized(status: String, allowsBrowsing: Bool = false, singleInputMode: String? = nil,
+                                  clearProgressJournals: Bool = false,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
         let token = UUID()
@@ -1985,6 +2000,7 @@ public final class AppModel {
         activeSingleInputMode = singleInputMode
         providerProgress = nil
         activeExecutionID = nil
+        if clearProgressJournals { progressJournals.removeAll() }
         if !allowsBrowsing { currentExecutionID = nil }
         backgroundDrawing = allowsBrowsing
         stopping = false
@@ -2106,7 +2122,6 @@ public final class AppModel {
         currentExecutionID = nil
         currentSVG = ""
         visibleDDL = ""
-        scoreJSON = ""
         authoringAuthority = ""
         authoringOrigin = ""
         authoringRevision = "0"
@@ -2117,11 +2132,7 @@ public final class AppModel {
         holeIDs = []
         selectedHoleIDs = []
         diagnosticsJSON = ""
-        promptJSON = ""
-        promptAvailability = .notRecorded
-        eventsJSON = ""
         errorText = nil
-        unreadOutputs = []
         inputMode = activeDrawTab == "image" ? "image" : "description"
         descriptionText = ""
         ddlText = ""
@@ -2269,12 +2280,10 @@ public final class AppModel {
             let input = ExactJSON.object(["document": document, "definitions": config["definitions"], "compiler": config["compiler"]]).data
             let result = await Task.detached { InkuCore.compile(input) }.value
             diagnosticsJSON = try Self.pretty(result)
-            unreadOutputs.insert("diagnostics")
             status = "DDLを検査しました（未確定）"
         } catch { report(error) }
     }
 
-    public func markOutputRead(_ output: String) { unreadOutputs.remove(output) }
 
     public func prepareExportSources(works: [SavedWork], profile: String = "display", requiresPluginDefinitions: Bool = false, lineAnimation: Bool = false) async throws -> [ExportSource] {
         guard !isBusy, let host, let database else { throw HostError("export_busy_or_unavailable") }
@@ -2374,7 +2383,6 @@ public final class AppModel {
             generationToken = nil
             currentSVG = ""
             visibleDDL = ""
-            scoreJSON = ""
             selectedWorkID = nil
             selectedWork = nil
             previewWork = nil
@@ -2461,7 +2469,6 @@ public final class AppModel {
                     currentExecutionID = nil
                     currentSVG = ""
                     visibleDDL = ""
-                    scoreJSON = ""
                 }
             }
         }
@@ -2580,6 +2587,32 @@ public final class AppModel {
         return try await host.drawingLogs()
     }
 
+    /// Checks and inspectors request these durable outputs only when they need them.
+    public func outputSnapshot() async -> OutputSnapshot {
+        let score = displayedWork?.score ?? currentView?.scoreJSON.map { String(decoding: $0, as: UTF8.self) } ?? ""
+        if let view = currentView {
+            let restored: PipelineView
+            if let host, let value = try? await host.restore(executionID: view.executionID) { restored = value }
+            else { restored = view }
+            let prompt = restored.promptJSON.flatMap { try? Self.pretty($0) } ?? ""
+            let events = (try? Self.pretty(restored.eventsJSON)) ?? String(decoding: restored.eventsJSON, as: UTF8.self)
+            return OutputSnapshot(prompt: prompt, promptAvailability: prompt.isEmpty ? .notRecorded : .recorded,
+                                  events: events, score: score)
+        }
+        guard let host, let work = selectedWork else {
+            return OutputSnapshot(prompt: "", promptAvailability: .unavailable, events: "", score: score)
+        }
+        do {
+            let presentation = try await host.savedWorkPresentation(workID: work.id)
+            let prompt = try presentation.promptJSON.map(Self.pretty) ?? ""
+            let events = try presentation.eventsJSON.map(Self.pretty) ?? ""
+            return OutputSnapshot(prompt: prompt, promptAvailability: presentation.promptJSON == nil ? .notRecorded : .recorded,
+                                  events: events, score: score)
+        } catch {
+            return OutputSnapshot(prompt: "", promptAvailability: .unavailable, events: "", score: score)
+        }
+    }
+
     private func recordDrawingProgress(_ progress: PipelineProgress) {
         // Durable logs outlive the UI token, including delayed terminal callbacks after Stop.
         switch progress {
@@ -2624,14 +2657,9 @@ public final class AppModel {
         if let ddl = view.visibleDDL, ddl != visibleDDL {
             visibleDDL = ddl
             ddlText = ddl
-            unreadOutputs.insert("ddl")
         }
         if let svg = view.svg { currentSVG = svg }
         else if view.phase == "failed" { currentSVG = "" }
-        if let score = view.scoreJSON {
-            let value = String(decoding: score, as: UTF8.self)
-            if value != scoreJSON { scoreJSON = value; unreadOutputs.insert("score") }
-        }
         authoringRevision = view.revision
         authoringAuthority = view.authority
         authoringOrigin = view.origin
@@ -2645,18 +2673,8 @@ public final class AppModel {
         } else { patchCandidate = "" }
         if let bytes = view.deliveryJSON {
             let newDiagnostics = (try? Self.pretty(bytes)) ?? String(decoding: bytes, as: UTF8.self)
-            if newDiagnostics != diagnosticsJSON { diagnosticsJSON = newDiagnostics; unreadOutputs.insert("diagnostics") }
+            if newDiagnostics != diagnosticsJSON { diagnosticsJSON = newDiagnostics }
         }
-        if let bytes = view.promptJSON {
-            let prompt = (try? Self.pretty(bytes)) ?? String(decoding: bytes, as: UTF8.self)
-            promptAvailability = prompt.isEmpty ? .notRecorded : .recorded
-            if prompt != promptJSON { promptJSON = prompt; unreadOutputs.insert("prompt") }
-        } else {
-            promptJSON = ""
-            promptAvailability = .notRecorded
-            unreadOutputs.remove("prompt")
-        }
-        eventsJSON = (try? Self.pretty(view.eventsJSON)) ?? String(decoding: view.eventsJSON, as: UTF8.self)
         status = statusText(for: view)
     }
     /// Web PipelineStatus prints `pipelineAttentionText` for a failed run, not a bare "failed".

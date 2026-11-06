@@ -41,7 +41,7 @@ func runReplayComparisonChecks() async throws {
     let lineage = try await database.lineage(focusNodeID: originalNodeID)
     let execution = try await database.loadExecution(id: executionID)
     let status = app.status
-    let svg = app.currentSVG; let ddl = app.visibleDDL; let score = app.scoreJSON
+    let svg = app.currentSVG; let ddl = app.visibleDDL; let score = await app.outputSnapshot().score
     let authority = app.authoringAuthority; let revision = app.authoringRevision
     let displayedWorks = app.works
     app.catalogID = app.catalogs.first(where: { $0.id != original.catalogID })!.id
@@ -60,7 +60,7 @@ func runReplayComparisonChecks() async throws {
           savedSnapshot.recordedVersion == original.renderEngineVersion,
           savedSnapshot.currentVersion == original.renderEngineVersion, savedSnapshot.provisionalSeed == nil,
           app.selectedWork == original, app.displayedWork == original, app.previewWork == nil,
-          app.currentSVG == svg, app.visibleDDL == ddl, app.scoreJSON == score,
+          app.currentSVG == svg, app.visibleDDL == ddl, await app.outputSnapshot().score == score,
           app.authoringAuthority == authority, app.authoringRevision == revision,
           app.status == status, app.works == displayedWorks,
           try await database.list() == rows, try await database.lineage(focusNodeID: originalNodeID) == lineage,
@@ -98,7 +98,7 @@ func runReplayComparisonChecks() async throws {
           wordSnapshot.currentVersion == savedSnapshot.currentVersion, wordSnapshot.provisionalSeed == nil,
           try await database.work(id: legacy.id) == legacy, try await database.work(id: wordSeeded.id) == wordSeeded,
           legacy.compositionSeed == nil, wordSeeded.compositionSeed == nil,
-          app.selectedWork == original, app.currentSVG == svg, app.visibleDDL == ddl, app.scoreJSON == score,
+          app.selectedWork == original, app.currentSVG == svg, app.visibleDDL == ddl, await app.outputSnapshot().score == score,
           app.status == status, try await database.list() == rows,
           try await database.lineage(focusNodeID: originalNodeID) == lineage, await provider.calls == 0 else {
         throw CheckFailure.message("Old-work replay lost raw seed absence, recorded numeric seed, archived words, versions or read-only state")
@@ -127,7 +127,7 @@ func runReplayComparisonChecks() async throws {
     let stoppedResult = await pending.value
     guard busyUntilDrained, !stoppedResult, !acceptedLateSnapshot, !app.isBusy,
           app.status == "停止しました", app.selectedWork == original, app.currentSVG == svg,
-          app.visibleDDL == ddl, app.scoreJSON == score, app.works == displayedWorks,
+          app.visibleDDL == ddl, await app.outputSnapshot().score == score, app.works == displayedWorks,
           try await database.list() == rows, try await database.lineage(focusNodeID: originalNodeID) == lineage,
           try await database.work(id: original.id) == original, await provider.calls == 0 else {
         throw CheckFailure.message("Stopped replay accepted a late snapshot or changed persisted/displayed state")

@@ -30,7 +30,12 @@ import InkuPersistence
 
         let journalURL = root.appendingPathComponent("batch-journal.json")
         var journal = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: journalURL)) as? [String: Any])
-        var rows = try XCTUnwrap(journal["rows"] as? [[String: Any]])
+        // Write the original single-file v1 shape, then recover it with the new store.
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        let originalRequests = try original.rows.map { try encoder.encode($0.request) }
+        var rows = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original.rows)) as? [[String: Any]])
+        journal.removeValue(forKey: "version"); journal.removeValue(forKey: "baseRequest")
+        journal["round"] = 0
         rows[0]["state"] = "uncertain"; rows[0].removeValue(forKey: "workID")
         rows[1]["state"] = "uncertain"; rows[1].removeValue(forKey: "workID"); rows[1]["executionID"] = UUID().uuidString
         journal["rows"] = rows
@@ -41,6 +46,7 @@ import InkuPersistence
         XCTAssertEqual(resumed.uncertainCount, 2)
         await resumed.resumeBatch(app: app)
         XCTAssertEqual(resumed.rows.map(\.state), [.succeeded, .succeeded])
+        XCTAssertEqual(try resumed.rows.map { try encoder.encode($0.request) }, originalRequests)
         XCTAssertEqual(resumed.rows[0].workID, savedID)
         XCTAssertEqual(resumed.rows[0].executionID, savedExecution)
         XCTAssertNotNil(resumed.rows[1].workID)

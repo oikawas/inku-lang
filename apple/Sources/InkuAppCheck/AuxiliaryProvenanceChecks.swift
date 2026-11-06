@@ -193,7 +193,7 @@ func runAuxiliaryProvenanceChecks() async throws {
         task.cancel(); await runner.stop(app: app)
         throw CheckFailure.message("Stop fixture never reached a second laws request: \(runner.run?.error ?? "nil")")
     }
-    runner.didClose()
+    await runner.didClose()
     await runner.initialize(app: app, work: first)
     await runner.start(app: app)
     guard runner.running, runner.run?.id == interrupted.id else {

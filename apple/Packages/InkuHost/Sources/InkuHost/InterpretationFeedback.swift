@@ -6,6 +6,26 @@ public struct FeedbackLexeme: Sendable {
     public init(surface: String, category: String) { self.surface = surface; self.category = category }
 }
 
+/// Index once while retaining the original order for equally long entries.
+public struct FeedbackVocabulary: Sendable {
+    fileprivate let byInitial: [UInt16: [FeedbackLexeme]]
+    public init(_ entries: [FeedbackLexeme]) {
+        let ordered = entries.enumerated().sorted {
+            $0.element.surface.utf16.count == $1.element.surface.utf16.count ? $0.offset < $1.offset
+                : $0.element.surface.utf16.count > $1.element.surface.utf16.count
+        }
+        var index: [UInt16: [FeedbackLexeme]] = [:]
+        for entry in ordered {
+            guard let first = entry.element.surface.utf16.first else { continue }
+            index[Self.initial(first), default: []].append(entry.element)
+        }
+        byInitial = index
+    }
+    fileprivate static func initial(_ value: UInt16) -> UInt16 {
+        (65...90).contains(value) ? value + 32 : value
+    }
+}
+
 public enum FeedbackTone: String, Sendable { case strong, medium, weak }
 
 public struct FeedbackPart: Sendable, Identifiable {
@@ -20,15 +40,15 @@ public enum InterpretationFeedback {
     private static let emotions = ["美しい", "美しく", "激しい", "激しく", "静かな", "静かに", "素敵", "きれい", "やさしい", "切ない", "哀しい", "儚い", "神秘的", "幻想的", "寂しい", "爽やか"]
 
     public static func parts(description: String, ddl: String, vocabulary: [FeedbackLexeme]) -> [FeedbackPart] {
+        parts(description: description, ddl: ddl, vocabulary: FeedbackVocabulary(vocabulary))
+    }
+
+    public static func parts(description: String, ddl: String, vocabulary: FeedbackVocabulary) -> [FeedbackPart] {
         // A title line quotes the description's words without drawing them, so a word is read only where
         // a drawing sentence carries it (DDL 27).
         let ddl = DdlTitles.withoutTitleLines(ddl)
         guard !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
-        let entries = vocabulary.enumerated().sorted {
-            $0.element.surface.utf16.count == $1.element.surface.utf16.count ? $0.offset < $1.offset
-                : $0.element.surface.utf16.count > $1.element.surface.utf16.count
-        }.map(\.element)
         let emotions = emotions.sorted { $0.utf16.count > $1.utf16.count }
         let source = description as NSString
         let lowered = ddl.lowercased()
@@ -58,6 +78,7 @@ public enum InterpretationFeedback {
             return true
         }
         while position < source.length {
+            let entries = vocabulary.byInitial[FeedbackVocabulary.initial(source.character(at: position))] ?? []
             if let entry = entries.first(where: { match($0.surface, at: position, boundary: $0.surface.utf8.allSatisfy { (32...126).contains($0) }) }) {
                 plain(to: position)
                 let text = source.substring(with: NSRange(location: position, length: entry.surface.utf16.count))
@@ -74,6 +95,10 @@ public enum InterpretationFeedback {
     }
 
     public static func unreadWords(description: String, ddl: String, vocabulary: [FeedbackLexeme]) -> [String] {
+        unreadWords(description: description, ddl: ddl, vocabulary: FeedbackVocabulary(vocabulary))
+    }
+
+    public static func unreadWords(description: String, ddl: String, vocabulary: FeedbackVocabulary) -> [String] {
         let pattern = try! NSRegularExpression(pattern: "[一-龯々ぁ-んァ-ヶー]{2,}|[A-Za-z][A-Za-z'-]+")
         return parts(description: description, ddl: ddl, vocabulary: vocabulary).filter { $0.tone == .weak }.flatMap { part in
             pattern.matches(in: part.text, range: NSRange(part.text.startIndex..., in: part.text)).map { (part.text as NSString).substring(with: $0.range) }

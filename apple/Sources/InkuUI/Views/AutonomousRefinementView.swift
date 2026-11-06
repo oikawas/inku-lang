@@ -64,7 +64,7 @@ public struct AutonomousRefinementView: View {
         }
         .frame(minWidth: 560, idealWidth: 720, minHeight: 440, idealHeight: 600)
         .task { await refinement.initialize(app: model, work: work) }
-        .onDisappear { refinement.didClose() }
+        .onDisappear { Task { await refinement.didClose() } }
         .onChange(of: choices) { _, _ in if !refinement.running { refinement.remember(app: model) } }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: refinement.modelReference, immediateSelection: true,

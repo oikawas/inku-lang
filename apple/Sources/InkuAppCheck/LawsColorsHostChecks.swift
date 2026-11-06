@@ -19,6 +19,7 @@ import InkuUI
                                    models: [ProviderModelSettings(id: "pinned")])
     let models = ModelSelection(stage1Model: "laws-check:pinned", stage2Model: "laws-check:pinned")
     try await app.updateHostSettings(HostSettings(providers: [service], models: models))
+    app.selectNextDrawingModel("laws-check:pinned")
     app.inputMode = "description"; app.language = "ja"; app.seedText = "7"
     let database = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
     let credentials = LawsColorsEmptyCredentials()
@@ -49,7 +50,7 @@ import InkuUI
           lawsEvent.object?["main_layer"] == ExactJSON.null,
           let refusedDDL = refused.visibleDDL, !refusedDDL.isEmpty,
           try await host.restoreSavedWork(workID: refusedID).ddl == refusedDDL,
-          colorsMessage.contains(#""name":"black","paint":"黒""#) else {
+          colorsMessage.contains("black | 黒 |") else {
         throw CheckFailure.message("P3: the host lost the laws event's null main_layer, the core's document or the color table")
     }
     report.append("P3 events \(lawsColorsEventTags(refused).filter { $0.hasPrefix("laws") || $0.hasPrefix("colors") })")

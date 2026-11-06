@@ -31,7 +31,7 @@ func runLibraryBrowsingChecks() async throws {
     let draftDDL = app.ddlText
     let draftDescription = app.descriptionText
     let svg = app.currentSVG
-    let score = app.scoreJSON
+    let score = await app.outputSnapshot().score
     let rows = try await database.list()
     let lineage = try await database.lineage(focusNodeID: original.lineageNodeID!)
     guard app.errorText == nil, app.library.works.map(\.id) == [original.id],
@@ -60,7 +60,7 @@ func runLibraryBrowsingChecks() async throws {
     preview.close()
     guard preview.work == nil, export.map(\.id) == [inspected.id],
           app.selectedWorkID == original.id, app.ddlText == draftDDL, app.descriptionText == draftDescription,
-          app.currentSVG == svg, app.scoreJSON == score,
+          app.currentSVG == svg, await app.outputSnapshot().score == score,
           try await database.list() == rows, try await database.lineage(focusNodeID: original.lineageNodeID!) == lineage,
           await provider.calls == 0 else {
         throw CheckFailure.message("Library preview/close/export changed Create A or borrowed its export target")

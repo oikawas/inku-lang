@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import InkuPersistence
 
@@ -66,7 +67,18 @@ public actor AuxiliaryProvider {
     public static let allowedKinds = ["catalog_change", "layout_change"]
     private let transport: any AuxiliaryTransport
     private let credentials: any CredentialStore
-    private var observationsCache: [(key: String, at: Date, response: String)] = []
+    private struct CacheKey: Hashable {
+        let model: String
+        let language: String
+        let system: String
+        let message: String
+        let images: [Data]
+        let providers: [String]
+        let profileID: String?
+        let generation: Int64?
+    }
+    private struct CacheValue { let at: Date; let response: String }
+    private var observationsCache: [CacheKey: CacheValue] = [:]
 
     public init(transport: any AuxiliaryTransport = URLSessionProviderTransport(),
                 credentials: any CredentialStore = KeychainCredentialStore()) {
@@ -188,11 +200,12 @@ public actor AuxiliaryProvider {
                             run: AuxiliaryRun) async throws -> String {
         // Requests include only public configuration, never a key or another branch's future. A pinned ChatGPT
         // profile keeps its readings apart (Server okugaki._vision_cache_key).
-        let key = model + "\n" + language + "\n" + prompt.system + "\n" + prompt.message + "\n" + prompt.images.joined(separator: "\n")
-            + "\n" + settings.providers.map { $0.id + ":" + $0.baseURL.absoluteString }.joined(separator: "\n")
-            + (run.chatGPTSession.map { "\nchatgpt:" + $0.profileID + ":" + String($0.generation) } ?? "")
-        observationsCache.removeAll { Date().timeIntervalSince($0.at) > 1800 }
-        if let cached = observationsCache.first(where: { $0.key == key }) {
+        let key = CacheKey(model: model, language: language, system: prompt.system, message: prompt.message,
+                           images: prompt.images.map { Data(SHA256.hash(data: Data($0.utf8))) },
+                           providers: settings.providers.map { $0.id + ":" + $0.baseURL.absoluteString },
+                           profileID: run.chatGPTSession?.profileID, generation: run.chatGPTSession?.generation)
+        observationsCache = observationsCache.filter { Date().timeIntervalSince($0.value.at) <= 1800 }
+        if let cached = observationsCache[key] {
             try await transport.checkAuxiliaryRun(run, modelReference: model, settings: settings)
             return cached.response
         }
@@ -200,8 +213,10 @@ public actor AuxiliaryProvider {
             settings: settings, credentials: credentials, run: run, onBytes: { _ in })
         try Task.checkCancellation()
         if !response.isEmpty {
-            observationsCache.append((key, Date(), response))
-            if observationsCache.count > 256 { observationsCache.removeFirst(observationsCache.count - 256) }
+            observationsCache[key] = CacheValue(at: Date(), response: response)
+            if observationsCache.count > 256, let oldest = observationsCache.min(by: { $0.value.at < $1.value.at })?.key {
+                observationsCache.removeValue(forKey: oldest)
+            }
         }
         return response
     }

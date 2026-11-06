@@ -15,6 +15,7 @@ import InkuUI
         let model = ProviderModelSettings(id: "fixture", purposes: vision ? ["llm", "vision"] : ["llm"])
         let service = ProviderSettings(id: "fixture", baseURL: URL(string: "https://fixture.invalid")!, requiresAPIKey: false, models: [model])
         try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "fixture:fixture", stage2Model: "fixture:fixture")))
+        app.selectNextDrawingModel("fixture:fixture")
         app.inputMode = "description"; app.descriptionText = "🌙 紫の にほへる妹 [大海人皇子] 人妻ゆゑに"; app.language = "ja"; app.seedText = "42"
         app.descriptionComposition = composed
         guard app.drawRoute == "read_and_draw", app.sketchMode == "on" else { throw CheckFailure.message("read and draw defaults") }
@@ -33,7 +34,7 @@ import InkuUI
                 throw CheckFailure.message("only review receives one PNG")
             }
         }
-        let events = try ExactJSON(data: Data(app.eventsJSON.utf8)).array ?? []
+        let events = try ExactJSON(data: Data((await app.outputSnapshot()).events.utf8)).array ?? []
         guard events.contains(where: { $0["tag"].string == "visible_ddl_ready" && $0["payload"]["reason"].string == "description_ddl" }) else { throw CheckFailure.message("description commit reason missing") }
         guard let work = app.selectedWork else { throw CheckFailure.message("read and draw did not save") }
         let context = try await app.savedConfiguration(workID: work.id)

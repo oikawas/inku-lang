@@ -124,7 +124,10 @@ public struct ContentView: View {
                              enabled: !model.isBusy && !automation.isOccupied && dialog == nil && !presentation && !ui.settingsOpen,
                              onImported: openImportedDDL)
         .environment(importer)
-        .onDisappear { importer.cancel() }
+        .onDisappear { importer.cancel(); automation.flushDemoPreferences() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            automation.flushDemoPreferences()
+        }
         #endif
         .environment(model.display)
         .confirmationDialog(model.display.webCopy("batchClearResumeConfirm", "中断したバッチを再開できなくなります。"),

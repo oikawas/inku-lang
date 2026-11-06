@@ -37,6 +37,12 @@ public struct AutonomousRun: Codable, Sendable, Identifiable {
     }
 }
 
+private actor AutonomousRunWriter {
+    func save(_ runs: [AutonomousRun], to url: URL) throws {
+        try JSONEncoder().encode(runs).write(to: url, options: .atomic)
+    }
+}
+
 /// The app owns the task; the sheet only reads it. The core owns all decisions.
 @MainActor @Observable
 public final class AutonomousRefinementModel {
@@ -54,6 +60,7 @@ public final class AutonomousRefinementModel {
     public private(set) var stopping = false
     public private(set) var errorText: String?
     @ObservationIgnored private var storeURL: URL?
+    @ObservationIgnored private let writer = AutonomousRunWriter()
     @ObservationIgnored private var database: InkuDatabase?
     @ObservationIgnored private var runs: [AutonomousRun] = []
     @ObservationIgnored private var operation: Task<Void, Never>?
@@ -99,7 +106,7 @@ public final class AutonomousRefinementModel {
                 runs[index] = saved
             }
         }
-        try persist()
+        try await persist()
         connected = true
     }
 
@@ -166,7 +173,7 @@ public final class AutonomousRefinementModel {
             wild: inheritWild ? nil : wild)
         children = [:]; stopping = false; errorText = nil
         remember(app: app)
-        do { try checkpoint() } catch { errorText = error.localizedDescription; run = nil; return }
+        do { try await checkpoint() } catch { errorText = error.localizedDescription; run = nil; return }
         let pending = Task { @MainActor [self] in
             var parent = source
             var answers: [Int: Juxtaposition.Result] = [:]
@@ -195,7 +202,7 @@ public final class AutonomousRefinementModel {
                     try Task.checkCancellation()
                     if let reason = next["stop"]["reason"].string { try await finish(reason: reason, app: app); return }
                     let step = next["next"]
-                    run?.current = step; try checkpoint()
+                    run?.current = step; try await checkpoint()
                     let kind = try step.requiredString("kind")
                     let turn = try Self.int(step["turn"])
                     var attempt: ExactJSON = .object(["kind": .string(kind), "attempt": step["attempt"]])
@@ -263,7 +270,7 @@ public final class AutonomousRefinementModel {
                             ownsAppOperation = false
                         }
                         // A saved child is journaled before cancellation is observed or its gate is measured.
-                        children[child.id] = child; run?.pendingChildID = child.id; try checkpoint()
+                        children[child.id] = child; run?.pendingChildID = child.id; try await checkpoint()
                         let measured = try await Self.core(.object(["action": .string("measure"), "before": .string(parent.svg), "after": .string(child.svg)]))
                         let outcome = kind == "chunks" || measured["passes"].bool == true ? "kept" : "not_visible"
                         if kind == "laws" {
@@ -307,7 +314,7 @@ public final class AutonomousRefinementModel {
                         var attempts = turns[turn - 1]["attempts"].array ?? []
                         attempts.append(attempt); turns[turn - 1]["attempts"] = .array(attempts); run?.turns = turns
                     }
-                    run?.current = nil; run?.pendingChildID = nil; try checkpoint()
+                    run?.current = nil; run?.pendingChildID = nil; try await checkpoint()
                 }
             } catch is CancellationError {
                 do { try await finish(reason: "stopped", app: app) } catch { errorText = error.localizedDescription }
@@ -335,31 +342,35 @@ public final class AutonomousRefinementModel {
     }
 
     /// Web reopens a completed work with the controls for a new run. A recovered interruption is shown once.
-    public func didClose() {
+    public func didClose() async {
         guard !running else { return }
+        let closingID = run?.id
         if run?.state == "interrupted" {
             run?.acknowledged = true
-            do { try checkpoint() } catch { errorText = error.localizedDescription; return }
+            do { try await checkpoint() } catch { errorText = error.localizedDescription; return }
         }
-        run = nil
+        if !running && run?.id == closingID { run = nil }
     }
 
     private func finish(reason: String, app: AppModel) async throws {
         run?.stopReason = reason; run?.state = ["stopped", "failed", "interrupted"].contains(reason) ? reason : "done"
         run?.current = nil
-        try checkpoint()
+        try await checkpoint()
         await app.refreshWorks()
     }
 
-    private func checkpoint() throws {
+    private func checkpoint() async throws {
         if let run {
             if let index = runs.firstIndex(where: { $0.id == run.id }) { runs[index] = run } else { runs.append(run) }
         }
-        try persist()
+        try await persist()
     }
-    private func persist() throws {
+    private func persist() async throws {
         guard let storeURL else { throw HostError("autonomous_store_unavailable") }
-        try JSONEncoder().encode(runs).write(to: storeURL, options: .atomic)
+        let completed = runs.indices.filter { runs[$0].state != "running" && runs[$0].pendingChildID == nil }
+        let remove = Set(completed.prefix(max(0, completed.count - 50)))
+        if !remove.isEmpty { runs = runs.enumerated().compactMap { remove.contains($0.offset) ? nil : $0.element } }
+        try await writer.save(runs, to: storeURL)
     }
     private static func chunkComposition(_ context: SavedAuthoringContext) -> ExactJSON? {
         guard let bytes = context.descriptionDDL, let record = try? ExactJSON(data: bytes),
@@ -433,7 +444,7 @@ public final class AutonomousRefinementModel {
                     child = try await app.runAutonomousMove(request: drawing)
                     ownsAppOperation = false
                     if let child {
-                        children[child.id] = child; self.run?.pendingChildID = child.id; try checkpoint()
+                        children[child.id] = child; self.run?.pendingChildID = child.id; try await checkpoint()
                         let info = try await app.savedGenerationInformation(work: child)
                         let d = try info.presentation?.diagnosticsJSON.map(ExactJSON.init(data:)) ?? .object([:])
                         let n = fields.reduce(0) { $0 + (d[$1].array?.count ?? 0) } + (d["render_diagnostics"]["diagnostics"].array?.count ?? 0)
@@ -442,7 +453,7 @@ public final class AutonomousRefinementModel {
                 } catch is CancellationError { throw CancellationError() }
                 catch { ownsAppOperation = false; child = nil }
                 result = try await Self.chunkCore(.object(["action": .string("drawn"), "config": config, "state": state, "drawn": drawn]))
-                if result["todo"].string != "keep" { self.run?.pendingChildID = nil; try checkpoint() }
+                if result["todo"].string != "keep" { self.run?.pendingChildID = nil; try await checkpoint() }
             case "keep":
                 guard let child else { throw HostError("chunk_child_missing") }
                 return (child, result["record"])

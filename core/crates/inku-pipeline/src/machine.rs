@@ -3540,6 +3540,7 @@ impl PipelineSnapshot {
     /// 2026-10-06, the author's decision Q3). The request keeps the stage's
     /// attempt budget, as the Stage 1 compiler feedback does; when the budget is
     /// spent the first answer stands.
+    #[allow(clippy::too_many_arguments)]
     fn ask_holes_again(
         &mut self,
         base: &TypedDdlCompilation,

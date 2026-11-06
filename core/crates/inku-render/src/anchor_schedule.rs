@@ -111,7 +111,7 @@ pub(crate) fn schedule(score: &Score, omitted_relations: &[bool]) -> AnchorSched
                 .copied()
                 .find(|group| target_chain.contains(group));
             let source_group = below_common(&source_chain, common);
-            let target_final = below_common(&target_chain, common)
+            let target_final = below_common(target_chain, common)
                 .map(|group| count + group)
                 .or(target_instruction);
             // Between may see one target inside the source scope and one

@@ -460,7 +460,9 @@ fn paint_object_body(
     };
     let performed = if let Some(policy) = &template.body.resource_policy {
         let result = if template.body.uses_compact_resource_contract() {
-            if !finalized_templates.contains_key(&template.instruction_index) {
+            if let std::collections::btree_map::Entry::Vacant(entry) =
+                finalized_templates.entry(template.instruction_index)
+            {
                 let finalized = inku_score::finalize_saved_score_with_omitted_instructions(
                     &template.body,
                     &policy.hard_policy,
@@ -476,7 +478,7 @@ fn paint_object_body(
                         ),
                     })
                 })?;
-                finalized_templates.insert(template.instruction_index, (finalized, digest));
+                entry.insert((finalized, digest));
             }
             let (finalized, digest) = &finalized_templates[&template.instruction_index];
             crate::checked_performance::resolve_finalized_performance(
@@ -1674,6 +1676,7 @@ mod tests {
             &mut surfaces,
             &mut allowance,
             &mut Vec::new(),
+            &mut Default::default(),
         )
         .unwrap();
         assert_eq!(body.children().len(), 2);
@@ -1813,6 +1816,7 @@ mod tests {
                 &mut Vec::new(),
                 &mut OutputAllowance::default(),
                 &mut Vec::new(),
+                &mut Default::default(),
             )
             .unwrap();
             let mut doc = Document::new(request.options.canvas);

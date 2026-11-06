@@ -1632,7 +1632,17 @@ fn remap_dense_diagnostics(
     }
 }
 
-pub(crate) fn resolve(
+#[cfg(test)]
+fn resolve(
+    request: PerformanceRequest<'_>,
+    policy: inku_score::ScoreErrorPolicy,
+) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
+    let digest = inku_score::canonical_score_digest(request.score)
+        .expect("finalized compact Score is canonical");
+    resolve_with_digest(request, policy, &digest)
+}
+
+pub(crate) fn resolve_with_digest(
     request: PerformanceRequest<'_>,
     policy: inku_score::ScoreErrorPolicy,
     input_digest: &str,

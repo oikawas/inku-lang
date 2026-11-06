@@ -900,13 +900,7 @@ pub(crate) fn qualified_macro_match(
         let lock_indices: Vec<usize> = names
             .iter()
             .enumerate()
-            .filter_map(|(index, names)| {
-                names
-                    .as_ref()?
-                    .iter()
-                    .any(|visible| *visible == normalized)
-                    .then_some(index)
-            })
+            .filter_map(|(index, names)| names.as_ref()?.contains(&normalized).then_some(index))
             .collect();
         return Some(match lock_indices.as_slice() {
             [] => QualifiedMacroMatch::Unlocked { end_byte },

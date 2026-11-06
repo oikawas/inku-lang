@@ -8,6 +8,8 @@ use sha2::{Digest, Sha256};
 
 #[cfg(test)]
 use crate::bind_macro_parameters;
+#[cfg(test)]
+use crate::macro_expansion::expand_selected_macros;
 use crate::{
     ClauseAtom, CoreRoleKind, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
     ExpansionPathSegment, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance, MacroDefinition,

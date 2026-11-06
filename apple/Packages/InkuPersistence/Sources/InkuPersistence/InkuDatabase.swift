@@ -1247,10 +1247,10 @@ public actor InkuDatabase {
         if version >= 7 { identifiers.append("swift-v7-saijiki-v3") }
         if version >= 8 { identifiers.append("swift-v8-draw-options") }
         if version >= 9 { identifiers.append("swift-v9-effect-digests") }
+        guard try schemaObjects(in: db) == expectedObjects else { throw PersistenceError.unknownSchema }
         let actualIdentifiers = try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
         let completedIdentifiers = version >= 9 ? (identifiers + [vacuumMarker]).sorted() : identifiers
-        guard try schemaObjects(in: db) == expectedObjects,
-              actualIdentifiers == identifiers || actualIdentifiers == completedIdentifiers else {
+        guard actualIdentifiers == identifiers || actualIdentifiers == completedIdentifiers else {
             throw PersistenceError.unknownSchema
         }
     }

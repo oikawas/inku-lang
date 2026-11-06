@@ -90,41 +90,7 @@ public actor InkuDatabase {
             let reportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-\(UUID().uuidString).json")
             let v7ReportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v3-v7-\(UUID().uuidString).json")
             do { try queue.write { db in
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v2"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v3"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v4"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v5"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
-                    try Self.validateSchema(db)
-                    let report = try PluginNamesMigration.run(db)
-                    let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                    try encoder.encode(report).write(to: reportURL, options: .atomic)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
-                    try db.execute(sql: Self.resourceSQL("migration-v6"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
-                    try Self.validateSchema(db)
-                    let report = try SaijikiV3Migration.run(db)
-                    try report.write(to: v7ReportURL, options: .atomic)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
-                    try db.execute(sql: Self.resourceSQL("migration-v7"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v8"))
-                }
+                try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL)
             } } catch {
                 try? FileManager.default.removeItem(at: reportURL)
                 try? FileManager.default.removeItem(at: v7ReportURL)
@@ -132,6 +98,44 @@ public actor InkuDatabase {
             }
         }
         try queue.read { try Self.validateSchema($0) }
+    }
+
+    private static func migrate(_ db: Database, reportURL: URL, v7ReportURL: URL) throws {
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v2"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v3"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v4"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v5"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
+            try Self.validateSchema(db)
+            let report = try PluginNamesMigration.run(db)
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(report).write(to: reportURL, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
+            try db.execute(sql: Self.resourceSQL("migration-v6"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
+            try Self.validateSchema(db)
+            let report = try SaijikiV3Migration.run(db)
+            try report.write(to: v7ReportURL, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
+            try db.execute(sql: Self.resourceSQL("migration-v7"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v8"))
+        }
     }
 
     public nonisolated static func applicationSupportURL(hostIdentifier: String) throws -> URL {
@@ -1008,34 +1012,7 @@ public actor InkuDatabase {
         var restored = false
         defer { if !restored { try? FileManager.default.removeItem(at: reportURL); try? FileManager.default.removeItem(at: v7ReportURL) } }
         try isolated.write { db in
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
-                try db.execute(sql: Self.resourceSQL("migration-v2"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
-                try db.execute(sql: Self.resourceSQL("migration-v3"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
-                try db.execute(sql: Self.resourceSQL("migration-v4"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
-                try db.execute(sql: Self.resourceSQL("migration-v5"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
-                let report = try PluginNamesMigration.run(db)
-                let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                try encoder.encode(report).write(to: reportURL, options: .atomic)
-                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
-                try db.execute(sql: Self.resourceSQL("migration-v6"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
-                let report = try SaijikiV3Migration.run(db)
-                try report.write(to: v7ReportURL, options: .atomic)
-                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
-                try db.execute(sql: Self.resourceSQL("migration-v7"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
-                try db.execute(sql: Self.resourceSQL("migration-v8"))
-            }
+            try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL)
         }
         try isolated.read { try Self.validateRestore($0) }
         // Artwork rollback must not reopen reservations already charged by this DB.

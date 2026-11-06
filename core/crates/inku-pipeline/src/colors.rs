@@ -4780,12 +4780,22 @@ impl<'a> Painting<'a> {
         if options.iter().any(Vec::is_empty) {
             return None;
         }
+        let before_near = if self.context.ground_from.is_none()
+            && self.context.fixed.values().any(|law| law == "B15")
+        {
+            self.aerial_near(&self.before)
+        } else {
+            None
+        };
         let valid = |chosen: &BTreeMap<usize, Color>| {
             let mut colors = fixed.clone();
             for (layer, color) in chosen {
                 colors.insert(*layer, vec![*color]);
             }
-            self.tool_predicate(&colors) && self.aerial_broken(&colors).is_none()
+            self.tool_predicate(&colors)
+                && self
+                    .aerial_broken_with_before(&colors, || before_near)
+                    .is_none()
         };
         let evaluate = |chosen: &BTreeMap<usize, Color>| -> Option<SearchKey> {
             if !valid(chosen) {
@@ -5114,16 +5124,22 @@ impl<'a> Painting<'a> {
         &self,
         colors: &BTreeMap<usize, Vec<Color>>,
     ) -> Option<(usize, f64, usize, f64)> {
+        self.aerial_broken_with_before(colors, || self.aerial_near(&self.before))
+    }
+
+    fn aerial_broken_with_before(
+        &self,
+        colors: &BTreeMap<usize, Vec<Color>>,
+        before_near: impl FnOnce() -> Option<(usize, f64)>,
+    ) -> Option<(usize, f64, usize, f64)> {
         if !self.context.fixed.values().any(|law| law == "B15") {
             return None;
         }
         let (main, near) = self.aerial_near(colors)?;
         // On a new ground every distant layer is read again.
         #[allow(clippy::float_cmp)]
-        let near_changed = self.context.ground_from.is_some()
-            || self
-                .aerial_near(&self.before)
-                .is_none_or(|(_, was)| was != near);
+        let near_changed =
+            self.context.ground_from.is_some() || before_near().is_none_or(|(_, was)| was != near);
         for (layer, law) in &self.context.fixed {
             if law != "B15" {
                 continue;

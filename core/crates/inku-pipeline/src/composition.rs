@@ -2782,9 +2782,19 @@ impl<'a> Work<'a> {
         let b = relation.b.map(|ib| &boxes[ib]);
         let ka = self.kinds[ia];
         let ca = center(a);
-        let obstacles: Vec<usize> = (0..boxes.len())
-            .filter(|i| *i != ia && roles[*i] != Role::Field && !self.sparse[*i])
-            .collect();
+        let obstacles: Vec<usize> = if matches!(
+            relation.kind,
+            RelationKind::Rising
+                | RelationKind::Falling
+                | RelationKind::Flowing
+                | RelationKind::Isolated
+        ) {
+            (0..boxes.len())
+                .filter(|i| *i != ia && roles[*i] != Role::Field && !self.sparse[*i])
+                .collect()
+        } else {
+            Vec::new()
+        };
         let side_penalty = |b: &Rect| {
             let cb = center(b);
             let mut pen = 0.0;

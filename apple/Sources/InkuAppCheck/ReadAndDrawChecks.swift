@@ -33,7 +33,7 @@ import InkuUI
                 throw CheckFailure.message("only review receives one PNG")
             }
         }
-        let events = try ExactJSON(data: Data(app.eventsJSON.utf8)).array ?? []
+        let events = try ExactJSON(data: Data((await app.outputSnapshot()).events.utf8)).array ?? []
         guard events.contains(where: { $0["tag"].string == "visible_ddl_ready" && $0["payload"]["reason"].string == "description_ddl" }) else { throw CheckFailure.message("description commit reason missing") }
         guard let work = app.selectedWork else { throw CheckFailure.message("read and draw did not save") }
         let context = try await app.savedConfiguration(workID: work.id)

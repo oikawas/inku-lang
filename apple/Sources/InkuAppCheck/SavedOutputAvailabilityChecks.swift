@@ -17,8 +17,9 @@ func runSavedOutputAvailabilityChecks() async throws {
         models: ModelSelection(stage1Model: "check:saved-output", stage2Model: "check:saved-output")))
     app.inputMode = "description"; app.descriptionText = "a red circle"; app.language = "en"; app.seedText = "42"
     await app.generate()
+    let parentOutput = await app.outputSnapshot()
     guard app.errorText == nil, let parent = app.selectedWork, !app.sourceLocked,
-          app.promptAvailability == .recorded, !app.promptJSON.isEmpty, await provider.calls == 1,
+          parentOutput.promptAvailability == .recorded, !parentOutput.prompt.isEmpty, await provider.calls == 1,
           let separator = parent.id.lastIndex(of: "_") else {
         throw CheckFailure.message("Saved-output parent fixture did not retain its actual prompt journal: \(app.errorText ?? app.status)")
     }
@@ -43,11 +44,12 @@ func runSavedOutputAvailabilityChecks() async throws {
 
     // Failure: selecting an older saved parent called an unavailable prompt journal "not sent".
     await reopened.selectWork(parent)
+    let reopenedOutput = await reopened.outputSnapshot()
     guard reopened.errorText == nil, reopened.selectedWork == parent,
-          reopened.visibleDDL == parent.ddl, reopened.scoreJSON == parent.score, reopened.currentSVG == parent.svg,
+          reopened.visibleDDL == parent.ddl, reopenedOutput.score == parent.score, reopened.currentSVG == parent.svg,
           reopened.authoringAuthority == parentContext.authority, reopened.authoringRevision == parentContext.revision,
-          !reopened.sourceLocked, reopened.promptAvailability == .unavailable, reopened.promptJSON.isEmpty,
-          reopened.diagnosticsJSON.isEmpty, reopened.eventsJSON.isEmpty,
+          !reopened.sourceLocked, reopenedOutput.promptAvailability == .unavailable, reopenedOutput.prompt.isEmpty,
+          reopened.diagnosticsJSON.isEmpty, reopenedOutput.events.isEmpty,
           await provider.calls == calls, try await database.list() == rows,
           try await database.loadExecution(id: executionID) == execution,
           try await database.work(id: parent.id) == parent, try await database.work(id: child.id) == child else {

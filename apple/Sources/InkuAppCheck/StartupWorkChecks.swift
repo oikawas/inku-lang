@@ -33,7 +33,7 @@ func runStartupWorkChecks() async throws {
     let app = AppModel(databaseURL: url, transport: provider)
     await app.initialize()
     guard app.errorText == nil, app.selectedWork == newest, app.currentSVG == newest.svg,
-          app.visibleDDL == newest.ddl, app.ddlText == newest.ddl, app.scoreJSON == newest.score,
+          app.visibleDDL == newest.ddl, app.ddlText == newest.ddl, await app.outputSnapshot().score == newest.score,
           app.descriptionText == newest.effectiveSourceText, app.library.selectedAnnotation?.note == "Newest note" else {
         throw CheckFailure.message("Startup did not open the latest normal saved work with its own image, instructions, source and note")
     }

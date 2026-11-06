@@ -116,7 +116,7 @@ func runAuthoringChecks() async throws {
     guard model.authoringPhase == "awaiting_patch_approval" else { throw CheckFailure.message("Explicit completion retry did not propose a patch") }
     await model.approvePatch()
     guard model.errorText == nil, model.authoringPhase == "completed", model.selectedWork?.ddl?.contains("8 square") == true,
-          model.sourceLocked, !model.promptJSON.isEmpty else {
+          model.sourceLocked, !(await model.outputSnapshot()).prompt.isEmpty else {
         throw CheckFailure.message("Approved patch did not commit/render: \(model.errorText ?? model.status)")
     }
     print("Authoring passed: 7 canonical macros and digest locks; read-only draft check; saved Score replay conditions; committed revision/source lock/lineage; hole propose/decline/retry/approve; sent prompts. No external provider calls.")

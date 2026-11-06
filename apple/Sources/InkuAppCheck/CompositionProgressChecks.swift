@@ -59,7 +59,7 @@ func runCompositionProgressChecks() async throws {
           await provider.models == Array(repeating: "check:pinned", count: 5) else {
         throw CheckFailure.message("Composition progress lost native stage/model/retry/time facts or did not complete: \(app.errorText ?? app.status)")
     }
-    let prompts = try ExactJSON(data: Data(app.promptJSON.utf8))
+    let prompts = try ExactJSON(data: Data((await app.outputSnapshot()).prompt.utf8))
     guard let entries = prompts.array,
           Set(entries.compactMap { $0["action"].string }) == ["generate_normalized_ddl", "read_composition", "choose_laws", "choose_colors"],
           let composition = entries.last(where: { $0["action"].string == "read_composition" }),

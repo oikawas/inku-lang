@@ -1088,7 +1088,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
     return _user_account_projector().project(row, group_name)
 
 
-def add_item(item: dict) -> dict:
+def add_item(item: dict, *, session=None, actor=None) -> dict:
     return _history.HistoryWriter(
         session_factory=SessionLocal,
         actor_of_fn=_actor_of,
@@ -1100,7 +1100,7 @@ def add_item(item: dict) -> dict:
         normalize_canvas_aspect_id_fn=normalize_canvas_aspect_id,
         canvas_aspect_ratio_for_aspect_fn=canvas_aspect_ratio_for_aspect,
         canonical_json_fn=_canonical_json,
-    ).add_item(item)
+    ).add_item(item, **({"session": session, "actor": actor} if session is not None else {}))
 
 
 def record_unread_words(user_id: str, words: list[str], context: str, *, at: int) -> None:
@@ -1300,8 +1300,9 @@ def _user_generation_counter() -> _accounts.UserGenerationCounter:
     return _accounts.UserGenerationCounter(SessionLocal)
 
 
-def increment_user_generation_count(user_id: str, amount: int = 1) -> int | None:
-    return _user_generation_counter().increment_user_generation_count(user_id, amount=amount)
+def increment_user_generation_count(user_id: str, amount: int = 1, *, session=None) -> int | None:
+    return _user_generation_counter().increment_user_generation_count(
+        user_id, amount=amount, **({"session": session} if session is not None else {}))
 
 
 def _user_settings_updater() -> _settings.UserSettingsUpdater:

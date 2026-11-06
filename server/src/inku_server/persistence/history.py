@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from contextlib import nullcontext
 from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
@@ -1080,7 +1081,7 @@ class HistoryWriter:
     canvas_aspect_ratio_for_aspect_fn: Callable[[str], float]
     canonical_json_fn: Callable[[dict], str]
 
-    def add_item(self, item: dict) -> dict:
+    def add_item(self, item: dict, *, session=None, actor=None) -> dict:
         canvas_aspect_id = item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect")
         if canvas_aspect_id is not None:
             canvas_aspect_id = self.normalize_canvas_aspect_id_fn(canvas_aspect_id)
@@ -1173,8 +1174,9 @@ class HistoryWriter:
             description_hash=desc_hash, render_hash=render_hash, at=item["at"],
             root_node_id=node_id,
         )
-        actor = self.actor_of_fn(item["user_id"])
-        with self.session_factory() as session:
+        actor = actor if actor is not None else self.actor_of_fn(item["user_id"])
+        own_session = session is None
+        with (self.session_factory() if own_session else nullcontext(session)) as session:
             idempotency_key = item.get("idempotency_key")
             if idempotency_key:
                 existing = session.query(HistoryRow).filter(
@@ -1235,6 +1237,8 @@ class HistoryWriter:
             try:
                 session.flush()
             except IntegrityError:
+                if not own_session:
+                    raise
                 session.rollback()
                 if not idempotency_key:
                     raise
@@ -1253,8 +1257,11 @@ class HistoryWriter:
                     child_node_id=node_id, derivation_kind=derivation_kind,
                     metadata_json=self.canonical_json_fn(derivation_metadata), at=item["at"],
                 ))
-            session.commit()
-            session.refresh(row)
+            if own_session:
+                session.commit()
+                session.refresh(row)
+            else:
+                session.flush()
             result = self.row_to_dict_fn(row)
             if parent_node_id:
                 result["lineage_parent_node_id"] = parent_node_id

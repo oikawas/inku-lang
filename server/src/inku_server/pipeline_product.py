@@ -805,7 +805,7 @@ class ProductPipelineEffects:
         if parent is None and context.get("parent_legacy_history_id"):
             items = db.get_items(owner, [context["parent_legacy_history_id"]])
             parent = items[0].get("lineage_node_id") if items else None
-        item = db.add_item({
+        item_values = {
             **result, "id": item_id, "user_id": owner, "at": at,
             "input": settings.get("history_input") if settings.get("history_input") is not None else result["description"],
             "output_path": str(_output_prefix(owner, item_id, at)),
@@ -816,24 +816,27 @@ class ProductPipelineEffects:
             "lineage_parent_node_id": parent,
             "derivation_kind": (settings.get("derivation_kind") or ("ddl_edit" if context.get("derivation_kind") in {"legacy_ddl_fork", "variation_ddl_fork"} else "description_edit")) if parent else None,
             "derivation_metadata": settings.get("derivation_metadata", {}),
-        })
+        }
         store = VariationAuthorityStore(db.engine)
-        if item.get("_idempotent_replay"):
-            link = store.history_link(owner, item["id"])
-            if link is None or link["variation_id"] != snapshot["variation_id"] or link["revision"] != snapshot["authority"]["revision"]:
-                raise CandidateHostError("idempotency_conflict")
-        store.link_history(owner, item["id"], snapshot["variation_id"],
-                           snapshot["authority"]["revision"], snapshot["delivery"]["source_digest"],
-                           snapshot=snapshot, context=context,
-                           pipeline_diagnostics=pipeline_diagnostics)
+        actor = db._actor_of(owner)
+        with db.SessionLocal.begin() as session:
+            item = db.add_item(item_values, session=session, actor=actor)
+            if item.get("_idempotent_replay"):
+                link = store.history_link(owner, item["id"], connection=session.connection())
+                if link is None or link["variation_id"] != snapshot["variation_id"] or link["revision"] != snapshot["authority"]["revision"]:
+                    raise CandidateHostError("idempotency_conflict")
+            store.link_history(owner, item["id"], snapshot["variation_id"],
+                               snapshot["authority"]["revision"], snapshot["delivery"]["source_digest"],
+                               snapshot=snapshot, context=context,
+                               pipeline_diagnostics=pipeline_diagnostics, connection=session.connection())
+            if not item.get("_idempotent_replay") and settings.get("count_generation") is not False:
+                result["user_generation_count"] = db.increment_user_generation_count(owner, session=session)
         result.update({"history_id": item["id"], "history_at": item["at"], "draw_options": item["draw_options"],
                        **{key: item.get(key) for key in ("lineage_node_id", "lineage_parent_node_id", "derivation_kind", "description_hash")}})
         if not item.get("_idempotent_replay"):
             if settings.get("save_artifacts") is not False:
                 _submit_history_artifact_save(item)
                 submit_thumbnail_build(item)
-            if settings.get("count_generation") is not False:
-                result["user_generation_count"] = db.increment_user_generation_count(owner)
         return result
 
     def replay(self, owner: str, request: dict, work: dict | None) -> dict:

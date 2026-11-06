@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from hashlib import pbkdf2_hmac
 import json
 import secrets
+from contextlib import nullcontext
 from typing import Any
 
 from sqlalchemy import or_, select, text
@@ -733,10 +734,11 @@ class CurrentUserProfileUpdater:
 class UserGenerationCounter:
     session_factory: Callable[[], Any]
 
-    def increment_user_generation_count(self, user_id: str, amount: int = 1) -> int | None:
+    def increment_user_generation_count(self, user_id: str, amount: int = 1, *, session=None) -> int | None:
         if amount <= 0:
             raise ValueError("amount must be positive")
-        with self.session_factory() as session:
+        own_session = session is None
+        with (self.session_factory() if own_session else nullcontext(session)) as session:
             result = session.execute(
                 text(
                     """
@@ -748,9 +750,11 @@ class UserGenerationCounter:
                 {"amount": amount, "user_id": user_id},
             )
             if result.rowcount == 0:
-                session.rollback()
+                if own_session:
+                    session.rollback()
                 return None
-            session.commit()
+            if own_session:
+                session.commit()
             row = session.get(UserAccountRow, user_id)
             if not row:
                 return None

@@ -182,7 +182,9 @@ def test_history_writer_owns_add_item_and_db_delegates() -> None:
                 "item",
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 annotation="dict",
-            )
+            ),
+            inspect.Parameter("session", inspect.Parameter.KEYWORD_ONLY, default=None),
+            inspect.Parameter("actor", inspect.Parameter.KEYWORD_ONLY, default=None),
         ],
         return_annotation="dict",
     )
@@ -194,7 +196,7 @@ def test_history_writer_owns_add_item_and_db_delegates() -> None:
     assert isinstance(function.body[0], ast.Return)
     facade_source = inspect.getsource(db.add_item)
     assert "_history.HistoryWriter(" in facade_source
-    assert ").add_item(item)" in facade_source
+    assert ").add_item(item," in facade_source
     assert "HistoryRow(" not in facade_source
     assert "session.flush" not in facade_source
 

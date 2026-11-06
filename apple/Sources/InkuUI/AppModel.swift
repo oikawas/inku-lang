@@ -525,7 +525,6 @@ public final class AppModel {
             } else { _ = await drawNewDDL(ddlText, presentation: .workspace) }
             return
         }
-        let token = UUID()
         let runningMode = inputMode
         let runningImage = runningMode == "image" ? imageInput : nil
         let freshRequest: GenerationRequest
@@ -537,25 +536,12 @@ public final class AppModel {
                     derivationKind: parentWorkID == nil ? "new" : "description_edit")
             }
         } catch { report(error); return }
-        activeSingleInputMode = runningMode
-        generationToken = token
-        providerProgress = nil
-        activeExecutionID = nil
-        progressJournals.removeAll()
-        currentExecutionID = nil
-        backgroundDrawing = false
-        stopping = false
-        isBusy = true
-        errorText = nil
-        status = runningMode == "description" && drawRoute == "read_and_draw" ? display.webCopy(sketchMode == "on" ? "readDrawReading" : "readDrawWriting", sketchMode == "on" ? "記述を読んでいます…" : "指示書を書いています…") : "生成中"
-        let operation = Task { @MainActor [weak self] in
+        let initialStatus = runningMode == "description" && drawRoute == "read_and_draw" ? display.webCopy(sketchMode == "on" ? "readDrawReading" : "readDrawWriting", sketchMode == "on" ? "記述を読んでいます…" : "指示書を書いています…") : "生成中"
+        _ = await performSerialized(status: initialStatus, singleInputMode: runningMode, clearProgressJournals: true) { [weak self] token in
             guard let self else { return }
             await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID,
                                      runningMode: runningMode, image: runningImage, freshRequest: freshRequest)
         }
-        activeOperation = operation
-        await operation.value
-        finishOperation(token: token)
     }
 
     private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?,
@@ -720,23 +706,10 @@ public final class AppModel {
 
     public func replay(_ work: SavedWork) async {
         guard !isBusy, let host else { return }
-        let token = UUID()
-        generationToken = token
-        providerProgress = nil
-        activeExecutionID = nil
-        currentExecutionID = nil
-        backgroundDrawing = false
-        stopping = false
-        isBusy = true
-        errorText = nil
-        status = "再演奏中"
-        let operation = Task { @MainActor [weak self] in
+        _ = await performSerialized(status: "再演奏中") { [weak self] token in
             guard let self else { return }
             await self.runReplay(work: work, host: host, token: token)
         }
-        activeOperation = operation
-        await operation.value
-        finishOperation(token: token)
     }
 
     private func runReplay(work: SavedWork, host: PipelineHost, token: UUID) async {
@@ -1978,6 +1951,7 @@ public final class AppModel {
     /// The busy flag remains held until cancellation has drained the active task.
     @discardableResult
     public func performSerialized(status: String, allowsBrowsing: Bool = false, singleInputMode: String? = nil,
+                                  clearProgressJournals: Bool = false,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
         let token = UUID()
@@ -1985,6 +1959,7 @@ public final class AppModel {
         activeSingleInputMode = singleInputMode
         providerProgress = nil
         activeExecutionID = nil
+        if clearProgressJournals { progressJournals.removeAll() }
         if !allowsBrowsing { currentExecutionID = nil }
         backgroundDrawing = allowsBrowsing
         stopping = false

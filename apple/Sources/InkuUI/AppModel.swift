@@ -624,7 +624,7 @@ public final class AppModel {
             let context = try await host.savedAuthoringContext(workID: work.id)
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             if let document = context.document,
-               (try ExactJSON(data: document))["saijiki"].string != "inku.saijiki.v3" {
+               (try ExactJSON(data: document))["saijiki"].string != SaijikiEdition.current {
                 throw HostError("saijiki_migration_required")
             }
             selectedContext = context
@@ -2250,7 +2250,7 @@ public final class AppModel {
             })
             let locksJSON = try ExactJSON(data: locks)
             var document = selectedContext?.document.flatMap { try? ExactJSON(data: $0) } ?? .object([
-                "source": .string(ddlText), "language": .string(language), "macro_locks": locksJSON, "saijiki": .string("inku.saijiki.v3"),
+                "source": .string(ddlText), "language": .string(language), "macro_locks": locksJSON, "saijiki": .string(SaijikiEdition.current),
             ])
             document["source"] = .string(ddlText)
             let input = ExactJSON.object(["document": document, "definitions": config["definitions"], "compiler": config["compiler"]]).data

@@ -1,4 +1,8 @@
 import Foundation
+
+public enum SaijikiEdition {
+    public static let current = "inku.saijiki.v3"
+}
 import InkuPersistence
 import InkuCore
 

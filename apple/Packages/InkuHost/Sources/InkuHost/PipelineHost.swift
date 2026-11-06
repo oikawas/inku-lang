@@ -220,7 +220,7 @@ public actor PipelineHost {
         let document = try context.document.map { try ExactJSON(data: $0) } ?? .object([
             "source": .string(work.ddl ?? ""),
             "language": .string(work.instructionLangResolved ?? configuration["language"].string ?? "ja"),
-            "macro_locks": .array(locks), "saijiki": .string("inku.saijiki.v3")
+            "macro_locks": .array(locks), "saijiki": .string(SaijikiEdition.current)
         ])
         return .object(["document": document, "definitions": configuration["definitions"], "compiler": compiler,
                         "options": try ExactJSON(data: context.renderOptions), "clip": try ExactJSON(data: context.clipPolicy),

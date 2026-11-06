@@ -120,7 +120,7 @@ public struct DDLPackageImport: Sendable, Equatable {
             migratedEdits = edits.count
             plugins = zip(entries, plugins).map { ImportedMacroDefinition(definition: $0.0["definition"], note: $0.1.note) }
             plugins += recovered.map { ImportedMacroDefinition(definition: $0["definition"], note: "") }
-        } else if file["saijiki"].string != "inku.saijiki.v3" {
+        } else if file["saijiki"].string != SaijikiEdition.current {
             throw HostError("ddl_export_invalid")
         }
         let value = Self(source: outputSource, language: language, plugins: plugins, migratedEdits: migratedEdits)

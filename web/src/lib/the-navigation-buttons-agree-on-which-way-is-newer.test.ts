@@ -521,7 +521,7 @@ test("T-22  a late listing answer cannot put its page back over a newer one", ()
 	assert.ok(assignAt > 0, 'the strip is no longer written where this gate is looking');
 	const lastAwait = body.lastIndexOf('await ', assignAt);
 	assert.ok(lastAwait > 0, 'nothing is awaited before the strip is written');
-	const guard = /if \(requestId !== this\.fetchRequest\) return/g;
+	const guard = /if \(requestId !== this\.fetchRequest(?: \|\| controller\.signal\.aborted)?\) return/g;
 	const guards = [...body.matchAll(guard)].map((m) => m.index!);
 	assert.ok(guards.length > 0, 'the listing fetch takes no request number');
 	// Between the last await and the assignment, not merely somewhere above it:

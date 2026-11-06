@@ -58,6 +58,7 @@ export type HistoryBrowsingDependencies = {
 export type FetchHistoryOptions = {
 	preserveSelection?: boolean;
 	anchorId?: string;
+	signal?: AbortSignal;
 };
 export type FetchHistoryResult = 'found' | 'missing' | 'superseded' | 'failed';
 
@@ -211,6 +212,9 @@ export class HistoryBrowsingState {
 		const requestId = ++this.fetchRequest;
 		this.fetchController?.abort();
 		const controller = new AbortController();
+		const cancel = () => controller.abort();
+		if (options.signal?.aborted) controller.abort();
+		else options.signal?.addEventListener('abort', cancel, { once: true });
 		this.fetchController = controller;
 		// Only the current page can block navigation; superseded requests may
 		// still be settling even after their network transfer has been aborted.
@@ -242,7 +246,7 @@ export class HistoryBrowsingState {
 			const response = await this.deps.apiFetch(`/api/history?${params.toString()}`, {
 				signal: controller.signal
 			});
-			if (requestId !== this.fetchRequest) return 'superseded';
+			if (requestId !== this.fetchRequest || controller.signal.aborted) return 'superseded';
 			if (!response.ok) return 'failed';
 			const data = await response.json() as {
 				items: HistoryItem[];
@@ -258,7 +262,7 @@ export class HistoryBrowsingState {
 				? data.items.slice(0, this.windowSize)
 				: data.items;
 			// Keep the identity check adjacent to the state write it protects.
-			if (requestId !== this.fetchRequest) return 'superseded';
+			if (requestId !== this.fetchRequest || controller.signal.aborted) return 'superseded';
 			this.items = stripItems;
 			this.total = data.total;
 			this.offset = resolvedOffset;
@@ -286,6 +290,7 @@ export class HistoryBrowsingState {
 		} catch {
 			return requestId !== this.fetchRequest || controller.signal.aborted ? 'superseded' : 'failed';
 		} finally {
+			options.signal?.removeEventListener('abort', cancel);
 			if (requestId === this.fetchRequest) {
 				this.fetchInFlight = 0;
 				this.fetchController = null;
@@ -293,7 +298,7 @@ export class HistoryBrowsingState {
 		}
 	}
 
-	async syncToItem(item: Pick<HistoryItem, 'id' | 'trashed'>): Promise<void> {
+	async syncToItem(item: Pick<HistoryItem, 'id' | 'trashed'>, signal?: AbortSignal): Promise<void> {
 		const requestId = ++this.selectionRequest;
 		if (!item.id || item.trashed) {
 			this.cursor = -1;
@@ -309,8 +314,8 @@ export class HistoryBrowsingState {
 			return;
 		}
 		this.cursor = -1;
-		let found = await this.fetchOffset(0, { anchorId: item.id });
-		if (requestId !== this.selectionRequest) return;
+		let found = await this.fetchOffset(0, { anchorId: item.id, signal });
+		if (requestId !== this.selectionRequest || signal?.aborted) return;
 		if (found === 'missing' && this.filtered) {
 			// All strip filters come off together because the missing response
 			// does not say which independent mark hid the current work.
@@ -320,9 +325,9 @@ export class HistoryBrowsingState {
 			this.forShareOnly = false;
 			if (clearedStarred) this.deps.onStarredFilterCleared();
 			else this.deps.onOtherFilterCleared();
-			found = await this.fetchOffset(0, { anchorId: item.id });
+			found = await this.fetchOffset(0, { anchorId: item.id, signal });
 		}
-		if (requestId !== this.selectionRequest) return;
+		if (requestId !== this.selectionRequest || signal?.aborted) return;
 		if (found === 'missing') this.cursor = -1;
 	}
 

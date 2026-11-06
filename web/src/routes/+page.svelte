@@ -642,13 +642,14 @@
 	 * behaves as it did before any of this, which is the point of not removing
 	 * the field.
 	 */
-	async function ensureIterationSvg(it: { id?: string; svg?: string }): Promise<string> {
+	async function ensureIterationSvg(it: { id?: string; svg?: string }, signal?: AbortSignal): Promise<string> {
 		if (it.svg) return it.svg;
 		if (!it.id) return '';
 		try {
-			const r = await apiFetch(`/api/history/${encodeURIComponent(it.id)}/svg`, { cache: 'no-store' });
+			const r = await apiFetch(`/api/history/${encodeURIComponent(it.id)}/svg`, { cache: 'no-store', signal });
 			if (!r.ok) return '';
 			const svg = await r.text();
+			if (signal?.aborted) return '';
 			it.svg = svg;
 			return svg;
 		} catch {
@@ -2006,24 +2007,27 @@ $effect(() => {
 
 	/** Put an opened work's choices into its tab, by the shared core's rule
 	 *  (recorded value; off for an unrecorded switch; the tab default otherwise). */
-	async function adoptWorkOptions(recorded: RecordedDrawOptions | null | undefined, tab: DrawTab): Promise<void> {
+	async function adoptWorkOptions(recorded: RecordedDrawOptions | null | undefined, tab: DrawTab, signal?: AbortSignal): Promise<void> {
 		const sequence = work.beginWorkOptions(tab);
 		if (!session.currentUser) return;
 		try {
 			const response = await apiFetch('/api/auth/me/draw-options/for-tab', {
 				method: 'POST', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ options: recorded ?? {}, tab }),
+				body: JSON.stringify({ options: recorded ?? {}, tab }), signal,
 			});
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			const answer = await response.json() as { options: DrawOptions };
-			work.adoptWorkOptions(sequence, tab, answer.options);
+			if (!signal?.aborted) work.adoptWorkOptions(sequence, tab, answer.options);
 		} catch (cause) {
-			console.warn('failed to adopt the opened work\'s drawing choices', cause);
+			if (!signal?.aborted) console.warn('failed to adopt the opened work\'s drawing choices', cause);
 		}
 	}
 
+	let openedWorkController: AbortController | null = null;
 	function loadIterationItem(it: Iteration, options: { preserveAuthoring?: boolean } = {}) {
 		if (demoRunning) return;
+		openedWorkController?.abort();
+		const signal = (openedWorkController = new AbortController()).signal;
 		const preserveLineageTab = outputTab === 'lineage';
 		const projection = projectHistoryCurrentWork(it);
 		const sameTree = !!lineageBrowsingState.treeId && it.lineage_root_node_id === lineageBrowsingState.treeId;
@@ -2031,9 +2035,9 @@ $effect(() => {
 		work.pendingCanvasAspectDerivation = null;
 		work.displayedHistoryItem = it;
 		const imageWork = !!it.image_ddl || it.image_provenance != null;
-		void adoptWorkOptions(it.draw_options, imageWork ? 'image' : 'describe');
-		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id);
-		void history.syncToItem(it);
+		void adoptWorkOptions(it.draw_options, imageWork ? 'image' : 'describe', signal);
+		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id, signal).catch((error) => { if (!signal.aborted) console.warn(error); });
+		void history.syncToItem(it, signal);
 		work.lineageDetached = false;
 		if (!options.preserveAuthoring) {
 			if (work.inputMode !== 'batch') work.inputMode = imageWork ? 'image' : 'single';
@@ -2056,14 +2060,14 @@ $effect(() => {
 		// The listing carries thumbnails, not drawings, so the work being put on
 		// the canvas fetches its own. One request for the one work being looked
 		// at, rather than a page of them for the one that gets opened.
-		if (!it.svg && it.id) void fillCanvasSvg(it);
+		if (!it.svg && it.id) void fillCanvasSvg(it, signal);
 	}
 
 	/** Put the fetched drawing on the canvas, unless the reader has moved on. */
-	async function fillCanvasSvg(it: Iteration): Promise<void> {
+	async function fillCanvasSvg(it: Iteration, signal: AbortSignal): Promise<void> {
 		const target = it.id;
-		const svg = await ensureIterationSvg(it);
-		if (!svg || work.displayedHistoryItem?.id !== target || !work.result) return;
+		const svg = await ensureIterationSvg(it, signal);
+		if (signal.aborted || !svg || work.displayedHistoryItem?.id !== target || !work.result) return;
 		work.result = { ...work.result, svg };
 		canvasViewport.fit();
 	}

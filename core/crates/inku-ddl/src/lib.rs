@@ -288,3 +288,12 @@ pub use visible_patch::{
     VisibleDdlPatchEdit, VisiblePatchDiagnostic, VisiblePatchFailure, validate_visible_ddl_patch,
     validate_visible_ddl_patch_detailed,
 };
+pub(crate) fn lowercase_hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut result = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        result.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        result.push(char::from(DIGITS[usize::from(byte & 15)]));
+    }
+    result
+}

@@ -891,12 +891,12 @@ fn bearer() -> (&'static str, &'static str, &'static str) {
 /// The images a pipeline request carries: the `data:` URLs the host sends,
 /// each the image the prompt names in its place by type, length and SHA-256
 /// (the image stages, 2026-10-24). A prompt without images takes none.
-fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal> {
+fn prompt_images<'a>(request: &'a Value, prompt: &Value) -> Result<Vec<&'a str>, Refusal> {
     let sent = match get(request, "images") {
         None => Vec::new(),
         Some(Value::Array(items)) => items
             .iter()
-            .map(|item| as_str(Some(item)).map(str::to_owned))
+            .map(|item| as_str(Some(item)))
             .collect::<Option<_>>()
             .ok_or_else(|| Refusal::invalid("images must be strings"))?,
         Some(_) => return Err(Refusal::invalid("images must be a list")),
@@ -911,7 +911,7 @@ fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal
     }
     for (url, image) in sent.iter().zip(named) {
         let (media, data) = image_parts(url)?;
-        let bytes = chatgpt::base64_decode(&data)
+        let bytes = chatgpt::base64_decode(data)
             .ok_or_else(|| Refusal::invalid("images must be base64"))?;
         let length = match get(image, "byte_len") {
             Some(Value::Integer(digits)) => digits.parse::<usize>().ok(),
@@ -922,7 +922,7 @@ fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        if as_str(get(image, "media_type")) != Some(media.as_str())
+        if as_str(get(image, "media_type")) != Some(media)
             || length != Some(bytes.len())
             || as_str(get(image, "sha256")) != Some(digest.as_str())
         {
@@ -933,7 +933,7 @@ fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal
 }
 
 /// OpenAI Responses parts: the text, then each image.
-fn responses_parts(text: &str, images: &[String]) -> Value {
+fn responses_parts<T: AsRef<str>>(text: &str, images: &[T]) -> Value {
     let mut parts = vec![object(vec![
         ("type", string("input_text")),
         ("text", string(text)),
@@ -941,14 +941,14 @@ fn responses_parts(text: &str, images: &[String]) -> Value {
     parts.extend(images.iter().map(|image| {
         object(vec![
             ("type", string("input_image")),
-            ("image_url", string(image)),
+            ("image_url", string(image.as_ref())),
         ])
     }));
     Value::Array(parts)
 }
 
 /// OpenAI-compatible chat parts: the text, then each image.
-fn chat_parts(text: &str, images: &[String]) -> Value {
+fn chat_parts<T: AsRef<str>>(text: &str, images: &[T]) -> Value {
     let mut parts = vec![object(vec![
         ("type", string("text")),
         ("text", string(text)),
@@ -956,25 +956,25 @@ fn chat_parts(text: &str, images: &[String]) -> Value {
     parts.extend(images.iter().map(|image| {
         object(vec![
             ("type", string("image_url")),
-            ("image_url", object(vec![("url", string(image))])),
+            ("image_url", object(vec![("url", string(image.as_ref()))])),
         ])
     }));
     Value::Array(parts)
 }
 
 /// Anthropic blocks: each image, then the text.
-fn anthropic_blocks(text: &str, images: &[String]) -> Result<Value, Refusal> {
+fn anthropic_blocks<T: AsRef<str>>(text: &str, images: &[T]) -> Result<Value, Refusal> {
     let mut blocks = Vec::with_capacity(images.len() + 1);
     for image in images {
-        let (media, data) = image_parts(image)?;
+        let (media, data) = image_parts(image.as_ref())?;
         blocks.push(object(vec![
             ("type", string("image")),
             (
                 "source",
                 object(vec![
                     ("type", string("base64")),
-                    ("media_type", string(&media)),
-                    ("data", string(&data)),
+                    ("media_type", string(media)),
+                    ("data", string(data)),
                 ]),
             ),
         ]));
@@ -987,13 +987,13 @@ fn anthropic_blocks(text: &str, images: &[String]) -> Result<Value, Refusal> {
 }
 
 /// Gemini parts: the text, then each image inline.
-fn gemini_parts(text: &str, images: &[String]) -> Result<Value, Refusal> {
+fn gemini_parts<T: AsRef<str>>(text: &str, images: &[T]) -> Result<Value, Refusal> {
     let mut parts = vec![object(vec![("text", string(text))])];
     for image in images {
-        let (media, data) = image_parts(image)?;
+        let (media, data) = image_parts(image.as_ref())?;
         parts.push(object(vec![(
             "inlineData",
-            object(vec![("mimeType", string(&media)), ("data", string(&data))]),
+            object(vec![("mimeType", string(media)), ("data", string(data))]),
         )]));
     }
     Ok(Value::Array(parts))
@@ -1002,12 +1002,12 @@ fn gemini_parts(text: &str, images: &[String]) -> Result<Value, Refusal> {
 /// `SingleAttemptProvider._request`'s body for one pipeline effect. The
 /// images the prompt names follow its message in each dialect's Vision parts;
 /// a request without images is written as it was.
-fn pipeline_request(
+fn pipeline_request<T: AsRef<str>>(
     connection: &Connection,
     model: &str,
     prompt: &Value,
     max_tokens: i64,
-    images: &[String],
+    images: &[T],
 ) -> Result<Built, Refusal> {
     let field = |name: &str| {
         as_str(get(prompt, name))
@@ -1246,16 +1246,13 @@ fn pipeline_request(
 }
 
 /// `vision_client._image_parts`: (media type, base64 data) of a `data:` URL.
-fn image_parts(image: &str) -> Result<(String, String), Refusal> {
+fn image_parts(image: &str) -> Result<(&str, &str), Refusal> {
     let (head, data) = image.split_once(',').unwrap_or((image, ""));
     if !head.starts_with("data:") || !head.contains(";base64") || data.is_empty() {
         return Err(Refusal::rejected("Vision images must be base64 data URLs"));
     }
     let media = head["data:".len()..].split(';').next().unwrap_or("");
-    Ok((
-        if media.is_empty() { "image/png" } else { media }.to_owned(),
-        data.to_owned(),
-    ))
+    Ok((if media.is_empty() { "image/png" } else { media }, data))
 }
 
 /// One text answer, with images when there are any: the colophon and the

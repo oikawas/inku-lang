@@ -849,10 +849,20 @@ fn lower_macro_instruction(
             _ => None,
         })
         .collect::<Vec<_>>();
+    let mut emit_positions = BTreeMap::new();
+    for (index, (binding, _, _)) in emit_nodes.iter().enumerate() {
+        if let Some(binding) = binding {
+            emit_positions.entry(*binding).or_insert(index);
+        }
+    }
     let mut successful_anchors: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
     let mut unavailable_anchor_targets = BTreeSet::new();
-    for delivery in &delivery_nodes {
-        if is_in_invalid_transform(delivery, &invalid_transforms) {
+    let excluded: Vec<bool> = delivery_nodes
+        .iter()
+        .map(|delivery| is_in_invalid_transform(delivery, &invalid_transforms))
+        .collect();
+    for (delivery, excluded) in delivery_nodes.iter().zip(&excluded) {
+        if *excluded {
             continue;
         }
         let ExpandedMacroNode::Anchor {
@@ -915,8 +925,8 @@ fn lower_macro_instruction(
     }
     let mut relation_by_to = BTreeMap::new();
     let mut anchor_relation_by_to = BTreeMap::new();
-    for delivery in &delivery_nodes {
-        if is_in_invalid_transform(delivery, &invalid_transforms) {
+    for (delivery, excluded) in delivery_nodes.iter().zip(&excluded) {
+        if *excluded {
             continue;
         }
         let node = delivery.node;
@@ -938,9 +948,7 @@ fn lower_macro_instruction(
             continue;
         }
         if let Some(anchor_index) = successful_anchors.get(from) {
-            let to_position = emit_nodes
-                .iter()
-                .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
+            let to_position = emit_positions.get(to).copied();
             if to_position.is_some()
                 && kind == "connected"
                 && target_path_position.is_none()
@@ -952,12 +960,8 @@ fn lower_macro_instruction(
                 continue;
             }
         }
-        let from_position = emit_nodes
-            .iter()
-            .position(|(binding, _, _)| binding.is_some_and(|binding| binding == from));
-        let to_position = emit_nodes
-            .iter()
-            .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
+        let from_position = emit_positions.get(from).copied();
+        let to_position = emit_positions.get(to).copied();
         let secondary = (kind == "between")
             .then(|| {
                 from_position
@@ -1009,9 +1013,9 @@ fn lower_macro_instruction(
     let mut successful_bindings: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
     let mut successful_emits = BTreeMap::new();
 
-    for delivery in &delivery_nodes {
+    for (delivery, excluded) in delivery_nodes.iter().zip(&excluded) {
         let node = delivery.node;
-        if is_in_invalid_transform(delivery, &invalid_transforms) {
+        if *excluded {
             continue;
         }
         let ExpandedMacroNode::Emit {
@@ -2627,6 +2631,12 @@ fn lower_verified_stage15_shared<'a>(
         ..context
     }
     .with_declared_ratio(document.canvas_ratio);
+    let mut predicates_by_group = BTreeMap::new();
+    for predicate in &document.group_predicates {
+        predicates_by_group
+            .entry(predicate.group_index)
+            .or_insert(predicate);
+    }
     for (projected_group_index, group) in document.coordinated_head_groups.iter().enumerate() {
         let group_index = candidate
             .verified_effective_view()
@@ -2649,11 +2659,7 @@ fn lower_verified_stage15_shared<'a>(
             .map(|instruction| instruction.entity.head.source().span)
             .collect::<Vec<_>>();
         spans.extend(group.markers.iter().map(|marker| marker.span));
-        if let Some(predicate) = document
-            .group_predicates
-            .iter()
-            .find(|predicate| predicate.group_index == projected_group_index)
-        {
+        if let Some(predicate) = predicates_by_group.get(&projected_group_index) {
             let action = predicate
                 .action
                 .as_ref()
@@ -3080,17 +3086,32 @@ fn lower_verified_stage15_shared<'a>(
     let mut anchors = Vec::new();
     let mut anchor_origins = Vec::new();
     let mut instruction_origins = Vec::new();
+    let inline_region_operands: BTreeSet<usize> = document
+        .instructions
+        .iter()
+        .filter_map(|owner| match &owner.fill_target {
+            Some(crate::SemanticFillTarget::InlineShape {
+                target_instruction_index,
+                ..
+            }) => Some(*target_instruction_index),
+            _ => None,
+        })
+        .chain(
+            document
+                .group_predicates
+                .iter()
+                .filter_map(|owner| match &owner.fill_target {
+                    Some(crate::SemanticFillTarget::InlineShape {
+                        target_instruction_index,
+                        ..
+                    }) => Some(*target_instruction_index),
+                    _ => None,
+                }),
+        )
+        .collect();
     for (projected_index, instruction) in document.instructions.iter().enumerate() {
         // An inline region operand supplies geometry; it is not an extra drawing.
-        if document.instructions.iter().any(|owner| {
-            matches!(owner.fill_target,
-            Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
-                if target_instruction_index == projected_index)
-        }) || document.group_predicates.iter().any(|owner| {
-            matches!(owner.fill_target,
-            Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
-                if target_instruction_index == projected_index)
-        }) {
+        if inline_region_operands.contains(&projected_index) {
             let source_index = view
                 .source_instruction_index(projected_index)
                 .expect("verified view maps each region operand");

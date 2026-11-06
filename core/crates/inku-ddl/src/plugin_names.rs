@@ -5,6 +5,8 @@ use crate::{
     parser::core_modifier_surface_forms,
     saijiki::{SaijikiEdition, parser_candidate_surfaces},
 };
+use std::collections::HashSet;
+use std::sync::OnceLock;
 use unicode_normalization::UnicodeNormalization;
 
 /// Normalize the user-visible name for lookup; the written source remains unchanged.
@@ -65,33 +67,42 @@ pub fn valid_plugin_name(name: &str, language: ResolvedInstructionLanguage) -> b
 /// Compare against the same asset surfaces and parser-owned modifier forms.
 pub fn plugin_name_is_core_word(name: &str) -> bool {
     let wanted = normalize_plugin_name(name);
-    let asset = SaijikiEdition::CURRENT.asset();
-    let asset_match = asset
-        .categories
-        .iter()
-        .flat_map(|category| &category.words)
-        .any(|word| {
-            [
+    static CORE_WORDS: OnceLock<HashSet<String>> = OnceLock::new();
+    CORE_WORDS
+        .get_or_init(|| {
+            let mut words = HashSet::new();
+            for word in SaijikiEdition::CURRENT
+                .asset()
+                .categories
+                .iter()
+                .flat_map(|category| &category.words)
+            {
+                for language in [
+                    ResolvedInstructionLanguage::Ja,
+                    ResolvedInstructionLanguage::En,
+                ] {
+                    words.extend(
+                        parser_candidate_surfaces(word, language)
+                            .into_iter()
+                            .map(|surface| normalize_plugin_name(&surface)),
+                    );
+                }
+            }
+            for language in [
                 ResolvedInstructionLanguage::Ja,
                 ResolvedInstructionLanguage::En,
-            ]
-            .into_iter()
-            .flat_map(|language| parser_candidate_surfaces(word, language))
-            .any(|surface| normalize_plugin_name(&surface) == wanted)
-        });
-    asset_match
-        || [
-            ResolvedInstructionLanguage::Ja,
-            ResolvedInstructionLanguage::En,
-        ]
-        .into_iter()
-        .any(|language| {
-            let forms = core_modifier_surface_forms(language);
-            std::iter::once(forms.regular)
-                .chain(forms.thinness.iter().map(|(s, _)| *s))
-                .chain(forms.relative_scale.iter().map(|(s, _)| *s))
-                .any(|surface| normalize_plugin_name(surface) == wanted)
+            ] {
+                let forms = core_modifier_surface_forms(language);
+                words.extend(
+                    std::iter::once(forms.regular)
+                        .chain(forms.thinness.iter().map(|(s, _)| *s))
+                        .chain(forms.relative_scale.iter().map(|(s, _)| *s))
+                        .map(normalize_plugin_name),
+                );
+            }
+            words
         })
+        .contains(&wanted)
 }
 
 #[cfg(test)]

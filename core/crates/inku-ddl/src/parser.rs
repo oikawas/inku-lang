@@ -339,9 +339,13 @@ pub(crate) fn parse_neutral_lexemes_in(
     let mut diagnostics = Vec::new();
     let mut recognized_delivery_count = 0;
     let mut cursor = 0;
+    let mut pending = None;
 
     while cursor < source.len() {
-        match selection_at(edition, document, cursor, language) {
+        match pending
+            .take()
+            .or_else(|| selection_at(edition, document, cursor, language))
+        {
             Some(Selection::Token { end_byte, kind }) => {
                 tokens.push(NeutralToken {
                     span: SourceSpan {
@@ -396,7 +400,7 @@ pub(crate) fn parse_neutral_lexemes_in(
                     continue;
                 }
 
-                let end_byte = unknown_end(edition, document, cursor, language);
+                let (end_byte, next) = unknown_end(edition, document, cursor, language);
                 diagnostics.push(diagnostic(
                     source,
                     cursor,
@@ -405,6 +409,7 @@ pub(crate) fn parse_neutral_lexemes_in(
                     false,
                 ));
                 cursor = end_byte;
+                pending = next;
             }
         }
     }
@@ -560,18 +565,23 @@ fn candidates_at_with_locked_macro_boundary(
 ) -> Vec<Candidate> {
     let source = document.source();
     let mut candidates = candidates_at(edition, source, start_byte, language, true);
+    if document.macro_locks().is_empty() {
+        return candidates;
+    }
     // A sidecar-locked Macro is also a recognized left boundary for Japanese
     // particles. The ordinary asset-only boundary scan cannot see that head.
-    let left_end = source[..start_byte].trim_end_matches(is_separator).len();
-    let bracket_end = source[..start_byte]
-        .trim_end_matches(|ch| is_separator(ch) && !matches!(ch, '}' | '｝'))
-        .len();
-    let preceded_by_bracket_macro = language == ResolvedInstructionLanguage::Ja
-        && source[..bracket_end].char_indices().any(|(start, ch)| {
-            matches!(ch, '{' | '｛') && matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
-        });
-    let preceded_by_locked_macro = preceded_by_bracket_macro
-        || document.legacy_names_for_migration()
+    let preceded = std::cell::OnceCell::new();
+    let preceded_by_locked_macro = || {
+        *preceded.get_or_init(|| {
+        let left_end = source[..start_byte].trim_end_matches(is_separator).len();
+        let bracket_end = source[..start_byte]
+            .trim_end_matches(|ch| is_separator(ch) && !matches!(ch, '}' | '｝'))
+            .len();
+        let preceded_by_bracket_macro = language == ResolvedInstructionLanguage::Ja
+            && source[..bracket_end].rfind(['{', '｛']).is_some_and(|start| {
+                matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
+            });
+        preceded_by_bracket_macro || document.legacy_names_for_migration()
             && language == ResolvedInstructionLanguage::Ja
             && document.macro_locks().iter().any(|macro_lock| {
                 macro_lock.visible_names().any(|name| {
@@ -584,12 +594,14 @@ fn candidates_at_with_locked_macro_boundary(
                             if end_byte == left_end)
                         })
                 })
-            });
+            })
+    })
+    };
     // The ordinary coordination right-boundary check sees built-in words
     // and qualified Macro names, but not a bracketed sidecar-locked word.
     if language == ResolvedInstructionLanguage::Ja
         && source[start_byte..].starts_with('と')
-        && (preceded_by_locked_macro
+        && (preceded_by_locked_macro()
             || has_japanese_recognized_left_candidate(edition, source, start_byte)
             || has_japanese_recognized_left_candidate_across_separators(
                 edition, source, start_byte,
@@ -629,7 +641,7 @@ fn candidates_at_with_locked_macro_boundary(
                     | Some(QualifiedMacroMatch::AmbiguousLocks { .. })
             );
         let already_present = candidates.iter().any(|existing| existing == &candidate);
-        if (followed_by_locked_macro || preceded_by_locked_macro) && !already_present {
+        if !already_present && (followed_by_locked_macro || preceded_by_locked_macro()) {
             candidates.push(candidate);
         }
     }
@@ -650,10 +662,138 @@ struct Candidate {
     delivery: CandidateDelivery,
 }
 
+struct AssetWordCandidate {
+    surface: String,
+    suffix: Option<&'static str>,
+    identity: String,
+    delivery: CandidateDelivery,
+}
+
+struct AssetRelationCandidate {
+    surface: &'static str,
+    identity: String,
+    delivery: CandidateDelivery,
+}
+
+fn asset_relation_candidates(
+    edition: SaijikiEdition,
+    language: ResolvedInstructionLanguage,
+) -> &'static [AssetRelationCandidate] {
+    use std::sync::OnceLock;
+    static V1_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V1_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V2_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V2_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V3_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V3_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    let cache = match (edition, language) {
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::Ja) => &V2_JA,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+    };
+    cache.get_or_init(|| {
+        let mut entries = Vec::new();
+        for relation in &edition.asset().relations {
+            let (surface, literals) = match language {
+                ResolvedInstructionLanguage::Ja => {
+                    (relation.surface_ja.as_str(), &relation.literals_ja)
+                }
+                ResolvedInstructionLanguage::En => {
+                    (relation.surface_en.as_str(), &relation.literals_en)
+                }
+            };
+            for (surface, form) in std::iter::once((surface, CanonicalRelationForm::Short)).chain(
+                literals
+                    .iter()
+                    .map(|literal| (literal.as_str(), CanonicalRelationForm::FullLiteral)),
+            ) {
+                let delivery = canonical_relation_identity(&relation.relation_type, form)
+                    .map(|mut canonical_identity| {
+                        canonical_identity.target = relation.literal_targets.get(surface).copied();
+                        CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
+                            asset_id: edition.asset_id().to_owned(),
+                            relation_type: relation.relation_type.clone(),
+                            canonical_identity,
+                        })
+                    })
+                    .unwrap_or(CandidateDelivery::Hole);
+                entries.push(AssetRelationCandidate {
+                    surface,
+                    identity: format!("relation:{}:{}", relation.relation_type, form.as_str()),
+                    delivery,
+                });
+            }
+        }
+        entries
+    })
+}
+
+fn asset_word_candidates(
+    edition: SaijikiEdition,
+    language: ResolvedInstructionLanguage,
+) -> &'static [AssetWordCandidate] {
+    use std::sync::OnceLock;
+    static V1_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V1_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V2_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V2_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V3_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V3_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    let cache = match (edition, language) {
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
+        (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::Ja) => &V2_JA,
+        (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
+        (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+    };
+    cache.get_or_init(|| {
+        let mut entries = Vec::new();
+        for category in &edition.asset().categories {
+            for word in &category.words {
+                let surfaces = parser_candidate_surfaces(word, language);
+                let mut add = |surface: String, suffix| {
+                    entries.push(AssetWordCandidate {
+                        surface,
+                        suffix,
+                        identity: format!("word:{}:{}", category.key, word.surface_ja),
+                        delivery: CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                            asset_id: edition.asset_id().to_owned(),
+                            category_key: category.key.clone(),
+                            canonical_surface_ja: word.surface_ja.clone(),
+                        }),
+                    })
+                };
+                for surface in &surfaces {
+                    add(surface.to_string(), None);
+                }
+                let Some(surface) = surfaces.first().map(|surface| surface.as_ref()) else {
+                    continue;
+                };
+                if language == ResolvedInstructionLanguage::En && category.key == "katachi" {
+                    add(format!("{surface}s"), None);
+                }
+                if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {
+                    if JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1.contains(&word.surface_ja.as_str()) {
+                        add(surface.to_owned(), Some("い"));
+                    }
+                    add(surface.to_owned(), Some("色"));
+                }
+            }
+        }
+        entries
+    })
+}
+
 #[derive(Default)]
 struct ParseMemo {
     candidates: HashMap<(usize, &'static str), Vec<Candidate>>,
     relative_heads: HashMap<(usize, &'static str), bool>,
+    left_ends: Option<Rc<LeftCandidateEnds>>,
+    normalized_lock_names: Option<Rc<Vec<Option<Vec<String>>>>>,
 }
 
 thread_local! {
@@ -719,31 +859,48 @@ pub(crate) fn qualified_macro_match(
     let source = document.source();
     if let Some((end_byte, name)) = bracketed_plugin_at(source, start_byte) {
         let normalized = crate::plugin_names::normalize_plugin_name(name);
-        let lock_indices: Vec<usize> = document
-            .macro_locks()
+        let memo = PARSE_MEMO.with(|slot| slot.borrow().clone());
+        let cached = memo
+            .as_ref()
+            .and_then(|memo| memo.borrow().normalized_lock_names.clone());
+        let names = cached.unwrap_or_else(|| {
+            let names = Rc::new(
+                document
+                    .macro_locks()
+                    .iter()
+                    .map(|lock| {
+                        let (_, heading) = lock.qualified_name().split_once('.')?;
+                        let names = if lock.plugin_names().is_empty() {
+                            let aliases = lock
+                                .aliases()
+                                .iter()
+                                .filter_map(|alias| {
+                                    alias.split_once('.').map(|(_, name)| name.to_owned())
+                                })
+                                .collect::<Vec<_>>();
+                            let (ja, en) = crate::plugin_names::v1_plugin_names(heading, &aliases);
+                            ja.into_iter().chain(en).collect::<Vec<_>>()
+                        } else {
+                            lock.plugin_names().to_vec()
+                        };
+                        Some(
+                            names
+                                .iter()
+                                .map(|name| crate::plugin_names::normalize_plugin_name(name))
+                                .collect(),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            if let Some(memo) = memo {
+                memo.borrow_mut().normalized_lock_names = Some(Rc::clone(&names));
+            }
+            names
+        });
+        let lock_indices: Vec<usize> = names
             .iter()
             .enumerate()
-            .filter_map(|(index, lock)| {
-                let (_, heading) = lock.qualified_name().split_once('.')?;
-                let aliases = lock
-                    .aliases()
-                    .iter()
-                    .filter_map(|alias| alias.split_once('.').map(|(_, name)| name.to_owned()))
-                    .collect::<Vec<_>>();
-                let (ja, en) = crate::plugin_names::v1_plugin_names(heading, &aliases);
-                let fallback = ja.into_iter().chain(en).collect::<Vec<_>>();
-                let names = if lock.plugin_names().is_empty() {
-                    &fallback
-                } else {
-                    lock.plugin_names()
-                };
-                names
-                    .iter()
-                    .any(|visible| {
-                        crate::plugin_names::normalize_plugin_name(visible) == normalized
-                    })
-                    .then_some(index)
-            })
+            .filter_map(|(index, names)| names.as_ref()?.contains(&normalized).then_some(index))
             .collect();
         return Some(match lock_indices.as_slice() {
             [] => QualifiedMacroMatch::Unlocked { end_byte },
@@ -871,7 +1028,6 @@ fn candidates_at_uncached(
     require_boundary: bool,
 ) -> Vec<Candidate> {
     let mut candidates = Vec::new();
-    let asset = edition.asset();
 
     match language {
         ResolvedInstructionLanguage::Ja => {
@@ -972,6 +1128,7 @@ fn candidates_at_uncached(
     for (surface, value) in modifier_forms.thinness {
         if language == ResolvedInstructionLanguage::Ja
             && require_boundary
+            && source.get(start_byte..start_byte + surface.len()) == Some(*surface)
             && !has_japanese_recognized_left_boundary(edition, source, start_byte)
         {
             continue;
@@ -1028,86 +1185,49 @@ fn candidates_at_uncached(
         );
     }
 
-    for category in &asset.categories {
-        for word in &category.words {
-            let surfaces = parser_candidate_surfaces(word, language);
-            for surface in &surfaces {
-                push_surface_candidate(
-                    edition,
-                    &mut candidates,
-                    source,
-                    start_byte,
-                    language,
-                    require_boundary,
-                    surface.as_ref(),
-                    PRIORITY_ASSET,
-                    format!("word:{}:{}", category.key, word.surface_ja),
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                        asset_id: edition.asset_id().to_owned(),
-                        category_key: category.key.clone(),
-                        canonical_surface_ja: word.surface_ja.clone(),
-                    }),
-                );
+    for entry in asset_word_candidates(edition, language) {
+        let suffix = entry.suffix.unwrap_or("");
+        let end = start_byte + entry.surface.len() + suffix.len();
+        let Some(actual) = source.get(start_byte..end) else {
+            continue;
+        };
+        let matches = if entry.suffix.is_some() {
+            actual.starts_with(&entry.surface) && &actual[entry.surface.len()..] == suffix
+        } else {
+            match language {
+                ResolvedInstructionLanguage::Ja => actual == entry.surface,
+                ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(&entry.surface),
             }
-            let Some(surface) = surfaces.first().map(|surface| surface.as_ref()) else {
-                continue;
-            };
-            if language == ResolvedInstructionLanguage::En && category.key == "katachi" {
-                // Registered primitive heads use regular English noun plurals.
-                // Number agreement changes spelling, never quantity or identity.
-                push_surface_candidate(
-                    edition,
-                    &mut candidates,
-                    source,
-                    start_byte,
-                    language,
-                    require_boundary,
-                    &format!("{surface}s"),
-                    PRIORITY_ASSET,
-                    format!("word:{}:{}", category.key, word.surface_ja),
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                        asset_id: edition.asset_id().to_owned(),
-                        category_key: category.key.clone(),
-                        canonical_surface_ja: word.surface_ja.clone(),
-                    }),
-                );
-            }
-            if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {
-                if JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1.contains(&word.surface_ja.as_str()) {
-                    push_japanese_derived_surface_candidate(
-                        edition,
-                        &mut candidates,
-                        source,
-                        start_byte,
-                        require_boundary,
-                        surface,
-                        "い",
-                        PRIORITY_ASSET,
-                        format!("word:{}:{}", category.key, word.surface_ja),
-                        CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                            asset_id: edition.asset_id().to_owned(),
-                            category_key: category.key.clone(),
-                            canonical_surface_ja: word.surface_ja.clone(),
-                        }),
-                    );
-                }
-                push_japanese_derived_surface_candidate(
-                    edition,
-                    &mut candidates,
-                    source,
-                    start_byte,
-                    require_boundary,
-                    surface,
-                    "色",
-                    PRIORITY_ASSET,
-                    format!("word:{}:{}", category.key, word.surface_ja),
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                        asset_id: edition.asset_id().to_owned(),
-                        category_key: category.key.clone(),
-                        canonical_surface_ja: word.surface_ja.clone(),
-                    }),
-                );
-            }
+        };
+        if !matches {
+            continue;
+        }
+        if let Some(suffix) = entry.suffix {
+            push_japanese_derived_surface_candidate(
+                edition,
+                &mut candidates,
+                source,
+                start_byte,
+                require_boundary,
+                &entry.surface,
+                suffix,
+                PRIORITY_ASSET,
+                entry.identity.clone(),
+                entry.delivery.clone(),
+            );
+        } else {
+            push_surface_candidate(
+                edition,
+                &mut candidates,
+                source,
+                start_byte,
+                language,
+                require_boundary,
+                &entry.surface,
+                PRIORITY_ASSET,
+                entry.identity.clone(),
+                entry.delivery.clone(),
+            );
         }
     }
 
@@ -1136,30 +1256,14 @@ fn candidates_at_uncached(
         );
     }
 
-    for relation in &asset.relations {
-        let (surface, full_literals) = match language {
-            ResolvedInstructionLanguage::Ja => {
-                (relation.surface_ja.as_str(), &relation.literals_ja)
-            }
-            ResolvedInstructionLanguage::En => {
-                (relation.surface_en.as_str(), &relation.literals_en)
-            }
-        };
-        for (surface, form) in std::iter::once((surface, CanonicalRelationForm::Short)).chain(
-            full_literals
-                .iter()
-                .map(|literal| (literal.as_str(), CanonicalRelationForm::FullLiteral)),
-        ) {
-            let delivery = canonical_relation_identity(&relation.relation_type, form)
-                .map(|mut canonical_identity| {
-                    canonical_identity.target = relation.literal_targets.get(surface).copied();
-                    CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
-                        asset_id: edition.asset_id().to_owned(),
-                        relation_type: relation.relation_type.clone(),
-                        canonical_identity,
-                    })
-                })
-                .unwrap_or(CandidateDelivery::Hole);
+    for entry in asset_relation_candidates(edition, language) {
+        let matches = source
+            .get(start_byte..start_byte + entry.surface.len())
+            .is_some_and(|actual| match language {
+                ResolvedInstructionLanguage::Ja => actual == entry.surface,
+                ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(entry.surface),
+            });
+        if matches {
             push_surface_candidate(
                 edition,
                 &mut candidates,
@@ -1167,15 +1271,25 @@ fn candidates_at_uncached(
                 start_byte,
                 language,
                 require_boundary,
-                surface,
+                entry.surface,
                 PRIORITY_ASSET,
-                format!("relation:{}:{}", relation.relation_type, form.as_str()),
-                delivery,
+                entry.identity.clone(),
+                entry.delivery.clone(),
             );
         }
     }
 
     for definition in grammar_marker_definitions(language) {
+        let surface = definition.id.surface();
+        let matches = source
+            .get(start_byte..start_byte + surface.len())
+            .is_some_and(|actual| match language {
+                ResolvedInstructionLanguage::Ja => actual == surface,
+                ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(surface),
+            });
+        if !matches {
+            continue;
+        }
         let candidate_identity = if definition.id == MarkerId::JaBackground {
             "document:background".to_owned()
         } else {
@@ -1526,8 +1640,19 @@ thread_local! {
 }
 
 fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidateEnds> {
+    let memo = PARSE_MEMO.with(|cell| cell.borrow().clone());
+    if let Some(ends) = memo
+        .as_ref()
+        .and_then(|memo| memo.borrow().left_ends.clone())
+        && ends.edition == edition
+    {
+        return ends;
+    }
     let cached = LEFT_CANDIDATE_ENDS.with(|cell| cell.borrow().clone());
     if let Some(ends) = cached.filter(|ends| ends.edition == edition && ends.source == source) {
+        if let Some(memo) = &memo {
+            memo.borrow_mut().left_ends = Some(Rc::clone(&ends));
+        }
         return ends;
     }
     let mut earliest_start = HashMap::new();
@@ -1576,6 +1701,9 @@ fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidat
         earliest_start,
     });
     LEFT_CANDIDATE_ENDS.with(|cell| *cell.borrow_mut() = Some(Rc::clone(&ends)));
+    if let Some(memo) = memo {
+        memo.borrow_mut().left_ends = Some(Rc::clone(&ends));
+    }
     ends
 }
 
@@ -1923,10 +2051,32 @@ fn push_japanese_native_tsu_counter_candidate(
     });
 }
 
+fn japanese_number_run_start(source: &str, end_byte: usize) -> usize {
+    let mut start = end_byte;
+    for (index, ch) in source[..end_byte].char_indices().rev() {
+        if ch.is_ascii_digit()
+            || ('０'..='９').contains(&ch)
+            || japanese_digit(ch).is_some()
+            || japanese_small_unit(ch).is_some()
+            || japanese_large_unit(ch).is_some()
+            || NATIVE_TSU_CARDINALS_JA
+                .iter()
+                .any(|(surface, _)| surface.contains(ch))
+        {
+            start = index;
+        } else {
+            break;
+        }
+    }
+    start
+}
+
 fn japanese_exact_number_before(source: &str, end_byte: usize) -> Option<u64> {
-    source[..end_byte]
+    let run_start = japanese_number_run_start(source, end_byte);
+    source[run_start..end_byte]
         .char_indices()
-        .find_map(|(start_byte, _)| {
+        .find_map(|(offset, _)| {
+            let start_byte = run_start + offset;
             NATIVE_TSU_CARDINALS_JA
                 .iter()
                 .find_map(|(surface, value)| {
@@ -1954,20 +2104,25 @@ fn japanese_exact_number_before(source: &str, end_byte: usize) -> Option<u64> {
 }
 
 fn japanese_exact_number_ends_at(source: &str, end_byte: usize) -> bool {
-    source[..end_byte].char_indices().any(|(start_byte, _)| {
-        NATIVE_TSU_CARDINALS_JA.iter().any(|(surface, _)| {
-            start_byte + surface.len() == end_byte
-                && source.get(start_byte..end_byte) == Some(*surface)
-        }) || japanese_kanji_cardinal_at(source, start_byte)
-            .is_some_and(|(candidate_end, _)| candidate_end == end_byte)
-            || japanese_fullwidth_decimal_at(source, start_byte)
-                .is_some_and(|(candidate_end, value)| candidate_end == end_byte && value.is_some())
-            || (source.as_bytes()[start_byte].is_ascii_digit()
-                && source.as_bytes()[start_byte..end_byte]
-                    .iter()
-                    .all(u8::is_ascii_digit)
-                && source[start_byte..end_byte].parse::<u64>().is_ok())
-    })
+    let run_start = japanese_number_run_start(source, end_byte);
+    source[run_start..end_byte]
+        .char_indices()
+        .any(|(offset, _)| {
+            let start_byte = run_start + offset;
+            NATIVE_TSU_CARDINALS_JA.iter().any(|(surface, _)| {
+                start_byte + surface.len() == end_byte
+                    && source.get(start_byte..end_byte) == Some(*surface)
+            }) || japanese_kanji_cardinal_at(source, start_byte)
+                .is_some_and(|(candidate_end, _)| candidate_end == end_byte)
+                || japanese_fullwidth_decimal_at(source, start_byte).is_some_and(
+                    |(candidate_end, value)| candidate_end == end_byte && value.is_some(),
+                )
+                || (source.as_bytes()[start_byte].is_ascii_digit()
+                    && source.as_bytes()[start_byte..end_byte]
+                        .iter()
+                        .all(u8::is_ascii_digit)
+                    && source[start_byte..end_byte].parse::<u64>().is_ok())
+        })
 }
 
 fn japanese_fullwidth_decimal_at(source: &str, start_byte: usize) -> Option<(usize, Option<u64>)> {
@@ -2342,6 +2497,14 @@ fn unsupported_numeric_end(source: &str, start_byte: usize) -> Option<usize> {
 }
 
 fn qualified_macro_end(source: &str, start_byte: usize) -> Option<usize> {
+    if !source
+        .get(start_byte..)?
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_alphabetic())
+    {
+        return None;
+    }
     let mut end_byte = start_byte;
     for (offset, character) in source[start_byte..].char_indices() {
         if is_macro_segment_character(character) || character == '.' {
@@ -2390,7 +2553,7 @@ fn unknown_end(
     document: &NormalizedDdlDocument,
     start_byte: usize,
     language: ResolvedInstructionLanguage,
-) -> usize {
+) -> (usize, Option<Selection>) {
     let source = document.source();
     let first = source[start_byte..]
         .chars()
@@ -2402,13 +2565,15 @@ fn unknown_end(
             .chars()
             .next()
             .expect("unknown resynchronization remains inside source");
-        if is_separator(character) || selection_at(edition, document, end_byte, language).is_some()
-        {
-            break;
+        if is_separator(character) {
+            return (end_byte, None);
+        }
+        if let Some(next) = selection_at(edition, document, end_byte, language) {
+            return (end_byte, Some(next));
         }
         end_byte += character.len_utf8();
     }
-    end_byte
+    (end_byte, None)
 }
 
 fn is_separator(character: char) -> bool {

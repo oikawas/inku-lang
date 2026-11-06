@@ -61,34 +61,52 @@ pub fn project_macro_semantic_ref(
     category_key: &str,
     canonical_surface_ja: &str,
 ) -> Option<MacroSemanticRefProjection> {
-    let (category, asset_key) = SEMANTIC_CATEGORIES
-        .iter()
-        .find(|(_, asset_key)| *asset_key == category_key)?;
-    let word = saijiki_asset()
-        .categories
-        .iter()
-        .find(|candidate| candidate.key == *asset_key)?
-        .words
-        .iter()
-        .find(|word| {
-            word.surface_ja == canonical_surface_ja
-                || word
-                    .parser_surfaces_ja
-                    .iter()
-                    .flatten()
-                    .any(|surface| surface == canonical_surface_ja)
-        })?;
-    let lexical_id = word
-        .score_value
+    type Projections = BTreeMap<String, BTreeMap<String, Option<MacroSemanticRefProjection>>>;
+    static PROJECTIONS: std::sync::OnceLock<Projections> = std::sync::OnceLock::new();
+    let projections = PROJECTIONS.get_or_init(|| {
+        let mut categories = BTreeMap::new();
+        for (category, asset_key) in SEMANTIC_CATEGORIES {
+            let Some(asset) = saijiki_asset()
+                .categories
+                .iter()
+                .find(|candidate| candidate.key == asset_key)
+            else {
+                continue;
+            };
+            let mut words = BTreeMap::new();
+            for word in &asset.words {
+                let lexical = word
+                    .score_value
+                    .clone()
+                    .or_else(|| word.surface_en.as_deref().map(canonical_wire_id));
+                let projection = lexical
+                    .and_then(|id| {
+                        canonical_semantic_id(asset_key, &id)
+                            .expect("embedded Saijiki semantic aliases must validate")
+                    })
+                    .map(|canonical_id| {
+                        debug_assert!(known_semantic_id(category, &canonical_id));
+                        MacroSemanticRefProjection {
+                            category: category.to_owned(),
+                            canonical_id,
+                        }
+                    });
+                for surface in std::iter::once(&word.surface_ja)
+                    .chain(word.parser_surfaces_ja.iter().flatten())
+                {
+                    words
+                        .entry(surface.clone())
+                        .or_insert_with(|| projection.clone());
+                }
+            }
+            categories.insert(asset_key.to_owned(), words);
+        }
+        categories
+    });
+    projections
+        .get(category_key)?
+        .get(canonical_surface_ja)?
         .clone()
-        .or_else(|| word.surface_en.as_deref().map(canonical_wire_id))?;
-    let canonical_id = canonical_semantic_id(asset_key, &lexical_id)
-        .expect("embedded Saijiki semantic aliases must validate")?;
-    debug_assert!(known_semantic_id(category, &canonical_id));
-    Some(MacroSemanticRefProjection {
-        category: (*category).to_owned(),
-        canonical_id,
-    })
 }
 
 /// A bytewise-key-ordered semantic map that rejects duplicate JSON members.
@@ -1187,10 +1205,7 @@ impl MacroDefinition {
         framed.extend_from_slice(&(canonical_json.len() as u64).to_be_bytes());
         framed.extend_from_slice(&canonical_json);
         let full_digest: [u8; 32] = Sha256::digest(framed).into();
-        let full_digest_hex = full_digest
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let full_digest_hex = crate::lowercase_hex(&full_digest);
         MacroDefinitionIdentity {
             qualified_name: self
                 .qualified_name()

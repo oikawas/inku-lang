@@ -783,6 +783,21 @@ struct PendingSemanticSequence {
     unit_head_starts: Vec<Vec<usize>>,
 }
 
+pub(crate) fn sentence_end_positions(stream: &ClauseStream) -> Vec<usize> {
+    let mut ends = stream
+        .separators
+        .iter()
+        .filter(|separator| separator.kind == ClauseSeparatorKind::SentenceEnd)
+        .map(|separator| separator.span.end_byte)
+        .collect::<Vec<_>>();
+    ends.sort_unstable();
+    ends
+}
+
+pub(crate) fn indexed_sentence_region(ends: &[usize], span: SourceSpan) -> usize {
+    ends.partition_point(|end| *end <= span.start_byte)
+}
+
 fn collect_semantic_sequences(
     document: &NormalizedDdlDocument,
     stream: &ClauseStream,
@@ -794,6 +809,7 @@ fn collect_semantic_sequences(
     let mut pending = Vec::new();
     let mut issues = Vec::new();
     let mut claimed_color_starts = BTreeSet::new();
+    let sentence_ends = sentence_end_positions(stream);
 
     for (clause_index, clause) in stream.clauses.iter().enumerate() {
         let operators = clause
@@ -808,7 +824,7 @@ fn collect_semantic_sequences(
             })
             .collect::<Vec<_>>();
         if operators.len() > 1 {
-            let region_index = sentence_region_index(stream, operators[0].1.span);
+            let region_index = indexed_sentence_region(&sentence_ends, operators[0].1.span);
             let mut clause_color_indices = BTreeSet::new();
             let mut clause_marker_indices = BTreeSet::new();
             for (operator_index, operator_term) in &operators {
@@ -896,7 +912,7 @@ fn collect_semantic_sequences(
             continue;
         }
         for (operator_index, operator_term) in operators {
-            let region_index = sentence_region_index(stream, operator_term.span);
+            let region_index = indexed_sentence_region(&sentence_ends, operator_term.span);
             let operator = project_remaining_term(
                 document,
                 operator_term,
@@ -1019,6 +1035,7 @@ fn collect_semantic_member_sequences(
     let mut issues = Vec::new();
     let mut claimed_value_starts = BTreeSet::new();
     let mut claimed_quantity_starts = BTreeSet::new();
+    let sentence_ends = sentence_end_positions(stream);
 
     for (clause_index, clause) in stream.clauses.iter().enumerate() {
         let operators = clause
@@ -1040,7 +1057,7 @@ fn collect_semantic_member_sequences(
         }
         if operators.len() > 1 {
             for (operator_index, term) in operators {
-                let region_index = sentence_region_index(stream, term.span);
+                let region_index = indexed_sentence_region(&sentence_ends, term.span);
                 issues.push(SemanticSequenceIssue {
                     kind: SemanticSequenceIssueKind::MultipleOperators,
                     operator: project_remaining_term(
@@ -1058,7 +1075,7 @@ fn collect_semantic_member_sequences(
             continue;
         }
         let (operator_index, operator_term) = operators[0];
-        let region_index = sentence_region_index(stream, operator_term.span);
+        let region_index = indexed_sentence_region(&sentence_ends, operator_term.span);
         let operator = project_remaining_term(
             document,
             operator_term,
@@ -2348,10 +2365,11 @@ fn build_semantic_entities(
     let mut issues = Vec::new();
     let mut owned_occurrence_count = 0;
     let mut explicit_previous_references = Vec::new();
+    let sentence_ends = sentence_end_positions(&clause_stream);
 
     for (clause_index, clause) in clause_stream.clauses.iter().enumerate() {
-        let region_index = sentence_region_index(
-            &clause_stream,
+        let region_index = indexed_sentence_region(
+            &sentence_ends,
             clause
                 .atoms
                 .first()
@@ -2881,8 +2899,10 @@ fn associate_instrument_phrases(
     regions: &BTreeMap<usize, AssociationRegion>,
     ownership: &mut PreHeadPhraseOwnership,
 ) {
+    let sentence_ends = sentence_end_positions(stream);
     for (clause_index, clause) in stream.clauses.iter().enumerate() {
-        let Some(region) = regions.get(&sentence_region_index(stream, clause.span)) else {
+        let Some(region) = regions.get(&indexed_sentence_region(&sentence_ends, clause.span))
+        else {
             continue;
         };
         let mut heads = region
@@ -3067,6 +3087,7 @@ fn associate_fill_geometry_ownership(
     regions: &BTreeMap<usize, AssociationRegion>,
     ownership: &mut PreHeadPhraseOwnership,
 ) {
+    let sentence_ends = sentence_end_positions(stream);
     for clause in &stream.clauses {
         let actions = clause
             .atoms
@@ -3097,7 +3118,8 @@ fn associate_fill_geometry_ownership(
         ) else {
             continue;
         };
-        let Some(region) = regions.get(&sentence_region_index(stream, action.span)) else {
+        let Some(region) = regions.get(&indexed_sentence_region(&sentence_ends, action.span))
+        else {
             continue;
         };
         for range in [target, motif] {

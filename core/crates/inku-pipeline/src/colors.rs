@@ -3671,6 +3671,7 @@ struct Painting<'a> {
     redrawn_first: BTreeMap<usize, Color>,
     /// The colors each layer had before the colors.
     before: BTreeMap<usize, Vec<Color>>,
+    positions: BTreeMap<usize, Vec<usize>>,
 }
 
 impl<'a> Painting<'a> {
@@ -3709,6 +3710,7 @@ impl<'a> Painting<'a> {
             redrawn: None,
             redrawn_first: BTreeMap::new(),
             before,
+            positions,
         }
     }
 
@@ -3717,9 +3719,7 @@ impl<'a> Painting<'a> {
     }
 
     fn positions(&self, layer: usize) -> Vec<usize> {
-        laws::layers(&self.out.score)
-            .remove(&layer)
-            .unwrap_or_default()
+        self.positions.get(&layer).cloned().unwrap_or_default()
     }
 
     /// A layer's colors, by name.
@@ -4348,6 +4348,7 @@ impl<'a> Painting<'a> {
                 .score
                 .instructions
                 .splice(position..position, clones);
+            self.positions = laws::layers(&self.out.score);
             self.out.cycles.remove(&layer);
             self.out
                 .kasane
@@ -4780,15 +4781,36 @@ impl<'a> Painting<'a> {
         if options.iter().any(Vec::is_empty) {
             return None;
         }
-        let valid = |chosen: &BTreeMap<usize, Color>| {
-            let mut colors = fixed.clone();
-            for (layer, color) in chosen {
-                colors.insert(*layer, vec![*color]);
-            }
-            self.tool_predicate(&colors) && self.aerial_broken(&colors).is_none()
+        let before_near = if self.context.ground_from.is_none()
+            && self.context.fixed.values().any(|law| law == "B15")
+        {
+            self.aerial_near(&self.before)
+        } else {
+            None
         };
-        let evaluate = |chosen: &BTreeMap<usize, Color>| -> Option<SearchKey> {
-            if !valid(chosen) {
+        let mut colors = fixed.clone();
+        let valid = |chosen: &BTreeMap<usize, Color>, colors: &mut BTreeMap<usize, Vec<Color>>| {
+            let mut prior = Vec::with_capacity(chosen.len());
+            for (layer, color) in chosen {
+                prior.push((*layer, colors.insert(*layer, vec![*color])));
+            }
+            let result = self.tool_predicate(colors)
+                && self
+                    .aerial_broken_with_before(colors, || before_near)
+                    .is_none();
+            for (layer, old) in prior {
+                if let Some(old) = old {
+                    colors.insert(layer, old);
+                } else {
+                    colors.remove(&layer);
+                }
+            }
+            result
+        };
+        let evaluate = |chosen: &BTreeMap<usize, Color>,
+                        colors: &mut BTreeMap<usize, Vec<Color>>|
+         -> Option<SearchKey> {
+            if !valid(chosen, colors) {
                 return None;
             }
             let mut all = before.clone();
@@ -4823,10 +4845,10 @@ impl<'a> Painting<'a> {
                     .map(|(k, (layer, digit))| (*layer, options[k][*digit]))
                     .collect();
                 if self.trial {
-                    if valid(&chosen) {
+                    if valid(&chosen, &mut colors) {
                         return Some(chosen);
                     }
-                } else if let Some(key) = evaluate(&chosen)
+                } else if let Some(key) = evaluate(&chosen, &mut colors)
                     && better(key, best.as_ref().map(|(key, _)| *key))
                 {
                     best = Some((key, chosen));
@@ -4867,14 +4889,14 @@ impl<'a> Painting<'a> {
                         )
                     })
                     .collect();
-                let key = evaluate(&all_free).unwrap_or((f64::MIN, 0));
+                let key = evaluate(&all_free, &mut colors).unwrap_or((f64::MIN, 0));
                 if better(key, best.map(|(key, _)| key)) {
                     best = Some((key, *color));
                 }
             }
             chosen.insert(*layer, best.map_or(options[k][0], |(_, color)| color));
         }
-        evaluate(&chosen).map(|_| chosen)
+        evaluate(&chosen, &mut colors).map(|_| chosen)
     }
 
     fn assign_by_tool(&mut self) -> Result<(), Refusal> {
@@ -5114,16 +5136,22 @@ impl<'a> Painting<'a> {
         &self,
         colors: &BTreeMap<usize, Vec<Color>>,
     ) -> Option<(usize, f64, usize, f64)> {
+        self.aerial_broken_with_before(colors, || self.aerial_near(&self.before))
+    }
+
+    fn aerial_broken_with_before(
+        &self,
+        colors: &BTreeMap<usize, Vec<Color>>,
+        before_near: impl FnOnce() -> Option<(usize, f64)>,
+    ) -> Option<(usize, f64, usize, f64)> {
         if !self.context.fixed.values().any(|law| law == "B15") {
             return None;
         }
         let (main, near) = self.aerial_near(colors)?;
         // On a new ground every distant layer is read again.
         #[allow(clippy::float_cmp)]
-        let near_changed = self.context.ground_from.is_some()
-            || self
-                .aerial_near(&self.before)
-                .is_none_or(|(_, was)| was != near);
+        let near_changed =
+            self.context.ground_from.is_some() || before_near().is_none_or(|(_, was)| was != near);
         for (layer, law) in &self.context.fixed {
             if law != "B15" {
                 continue;

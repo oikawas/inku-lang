@@ -1054,6 +1054,20 @@ fn brush_tile_id(name: &str) -> String {
 /// leaving an edge reappear on the opposite edge, and neighbours on a row keep
 /// a small lift instead of overlapping round caps.
 pub(crate) fn brush_tile_definition(weight: Weight) -> Option<Element> {
+    static THIN: std::sync::OnceLock<Option<Element>> = std::sync::OnceLock::new();
+    static THICK: std::sync::OnceLock<Option<Element>> = std::sync::OnceLock::new();
+    match weight {
+        Weight::BrushThin => THIN
+            .get_or_init(|| make_brush_tile_definition(weight))
+            .clone(),
+        Weight::BrushThick => THICK
+            .get_or_init(|| make_brush_tile_definition(weight))
+            .clone(),
+        _ => None,
+    }
+}
+
+fn make_brush_tile_definition(weight: Weight) -> Option<Element> {
     let (name, size, width, (short, long)) = brush_recipe(weight)?;
     let rows = (size / (width * 0.6)).round();
     let pitch = size / rows;

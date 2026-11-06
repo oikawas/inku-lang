@@ -89,11 +89,24 @@ pub fn resolve_macro_invocations(
     document: &NormalizedDdlDocument,
     definitions: &[MacroDefinition],
 ) -> Result<MacroInvocationLockResolutionResult, ClauseStreamError> {
+    let identities: Vec<_> = definitions
+        .iter()
+        .map(|definition| definition.identity())
+        .collect();
+    resolve_macro_invocations_with_identities(document, definitions, &identities)
+}
+
+pub(crate) fn resolve_macro_invocations_with_identities(
+    document: &NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    identities: &[Result<MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
+) -> Result<MacroInvocationLockResolutionResult, ClauseStreamError> {
     let relation_reference_evidence = collect_relation_reference_evidence(document)?;
     let definition_records = definitions
         .iter()
+        .zip(identities)
         .enumerate()
-        .map(|(index, definition)| DefinitionRecord {
+        .map(|(index, (definition, identity))| DefinitionRecord {
             index,
             object_aspect: definition
                 .plugin_v2
@@ -103,7 +116,7 @@ pub fn resolve_macro_invocations(
                 .and_then(|aspect| aspect.split_once(':'))
                 .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))),
             qualified_name: definition.qualified_name(),
-            identity: definition.identity().map_err(|validation| {
+            identity: identity.as_ref().cloned().map_err(|validation| {
                 validation
                     .diagnostics()
                     .iter()

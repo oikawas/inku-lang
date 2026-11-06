@@ -475,7 +475,9 @@ pub fn export_geometry(
                 color_map: &colors,
                 work_assignment: &assignment,
                 render_seed: request.options.render_seed,
-                instruction_seed_override: performed.seed_override,
+                instruction_seed_override: Some(performed.seed_override.unwrap_or_else(|| {
+                    crate::determinism::instruction_seed(instruction, request.options.render_seed)
+                })),
                 instruction_index: performed.instruction_index,
                 mark_index: instance_index,
                 wild: request.options.wild,

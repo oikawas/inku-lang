@@ -435,6 +435,10 @@ fn paint_object_body(
     surface_definitions: &mut Vec<Element>,
     allowance: &mut OutputAllowance,
     body_diagnostics: &mut Vec<inku_score::ScoreExecutionDiagnostic>,
+    finalized_templates: &mut std::collections::BTreeMap<
+        usize,
+        (inku_score::FinalizedScore, String),
+    >,
 ) -> Result<Element, RenderError> {
     let (canvas, box_transform) =
         crate::object_template::object_box_transform(parent, request.options.canvas, containing)
@@ -455,13 +459,43 @@ fn paint_object_body(
         canvas: Some(canvas),
     };
     let performed = if let Some(policy) = &template.body.resource_policy {
-        resolve_checked_performance_with_resources(
-            body_request,
-            request.options.error_policy,
-            &policy.hard_policy,
-            policy.operational_budget,
-        )
-        .map_err(|error| match error {
+        let result = if template.body.uses_compact_resource_contract() {
+            if let std::collections::btree_map::Entry::Vacant(entry) =
+                finalized_templates.entry(template.instruction_index)
+            {
+                let finalized = inku_score::finalize_saved_score_with_omitted_instructions(
+                    &template.body,
+                    &policy.hard_policy,
+                    policy.operational_budget,
+                    &[],
+                )
+                .map_err(RenderError::ResourceAuthority)?;
+                let digest = inku_score::canonical_score_digest(&template.body).map_err(|_| {
+                    RenderError::ResourceAuthority(inku_score::SavedScoreResourceError {
+                        owner: inku_score::SavedScoreResourceOwner::Score,
+                        reason: inku_score::SavedScoreResourceFailure::InvalidContract(
+                            "non-canonical Score",
+                        ),
+                    })
+                })?;
+                entry.insert((finalized, digest));
+            }
+            let (finalized, digest) = &finalized_templates[&template.instruction_index];
+            crate::checked_performance::resolve_finalized_performance(
+                body_request,
+                request.options.error_policy,
+                finalized,
+                digest,
+            )
+        } else {
+            resolve_checked_performance_with_resources(
+                body_request,
+                request.options.error_policy,
+                &policy.hard_policy,
+                policy.operational_budget,
+            )
+        };
+        result.map_err(|error| match error {
             CheckedPerformanceWithResourcesError::Resources(error) => {
                 RenderError::ResourceAuthority(error)
             }
@@ -616,6 +650,9 @@ fn paint_object_body(
                     .checked_add(body_mark_index)
                     .ok_or(RenderError::InvalidScore("object mark index overflow"))?,
                 effects: copy.effects,
+                instruction_seed_override: Some(context.instruction_seed_override.unwrap_or_else(
+                    || crate::determinism::instruction_seed(instruction, context.render_seed),
+                )),
                 ..context
             };
             check_mark_extent(geometry, instruction, context)?;
@@ -681,12 +718,15 @@ fn paint_object_body(
                 max_output_vertices: 200_000,
             },
         });
-        let mut definitions = material_definitions.clone();
-        definitions.extend(surface_definitions.iter().cloned());
-        let before = definitions.len();
+        let existing_definitions = material_definitions
+            .iter()
+            .chain(surface_definitions.iter())
+            .collect::<Vec<_>>();
+        let mut definitions = Vec::new();
         let (paint, diagnostics, _) = forest.finish(
             &scopes,
             profile,
+            &existing_definitions,
             &mut definitions,
             clip_policy,
             &performed.performed,
@@ -697,8 +737,8 @@ fn paint_object_body(
                 "object body fill clipping failed",
             ));
         }
-        allowance.spend(definitions[before..].iter())?;
-        material_definitions.extend(definitions.into_iter().skip(before));
+        allowance.spend(definitions.iter())?;
+        material_definitions.extend(definitions);
         for element in paint {
             group.push(element);
         }
@@ -1063,6 +1103,7 @@ fn render_impl(
     let keeps_obstacles = performance.score.uses_free_line();
     let mut obstacles = Vec::new();
     let mut object_diagnostics = Vec::new();
+    let mut finalized_templates = std::collections::BTreeMap::new();
     for (performed_index, (instruction, performed)) in ordered {
         let visible =
             instruction_limit.is_none_or(|limit| performed.original_instruction_index < limit);
@@ -1173,6 +1214,7 @@ fn render_impl(
                     &mut surface_definitions,
                     &mut allowance,
                     &mut body_diagnostics,
+                    &mut finalized_templates,
                 )?;
                 if visible {
                     for mut diagnostic in body_diagnostics {
@@ -1199,7 +1241,9 @@ fn render_impl(
                 color_map: &request.options.resolved_color_map,
                 work_assignment: &assignment,
                 render_seed: request.options.render_seed,
-                instruction_seed_override,
+                instruction_seed_override: Some(instruction_seed_override.unwrap_or_else(|| {
+                    crate::determinism::instruction_seed(single, request.options.render_seed)
+                })),
                 instruction_index,
                 mark_index,
                 wild: request.options.wild,
@@ -1286,18 +1330,21 @@ fn render_impl(
     if has_fill_scopes {
         let (_, _, clip_policy) =
             resources.expect("typed fill requires explicit resource authority");
-        let mut definitions = material_definitions.clone();
-        definitions.extend(surface_definitions.iter().cloned());
-        let before = definitions.len();
+        let existing_definitions = material_definitions
+            .iter()
+            .chain(surface_definitions.iter())
+            .collect::<Vec<_>>();
+        let mut definitions = Vec::new();
         let (paint, diagnostics, omitted) = fill_forest.finish(
             &performance.fill_scopes,
             profile,
+            &existing_definitions,
             &mut definitions,
             clip_policy,
             &performance.performed,
             instruction_limit,
         );
-        material_definitions.extend(definitions.into_iter().skip(before));
+        material_definitions.extend(definitions);
         for element in paint {
             content.push(element);
         }
@@ -1426,7 +1473,11 @@ fn render_impl(
     // class contains either word, and host colors are hex, so a match is a number.
     // The whole text is searched because a few numbers (a hatch spacing in a
     // class name) are written without `write_number`, which counts them.
-    if svg.contains("NaN") || svg.contains("inf") {
+    if svg
+        .as_bytes()
+        .windows(3)
+        .any(|bytes| bytes == b"NaN" || bytes == b"inf")
+    {
         return Err(RenderError::NonFiniteSvg {
             instruction_index: first_non_finite,
         });
@@ -1625,6 +1676,7 @@ mod tests {
             &mut surfaces,
             &mut allowance,
             &mut Vec::new(),
+            &mut Default::default(),
         )
         .unwrap();
         assert_eq!(body.children().len(), 2);
@@ -1764,6 +1816,7 @@ mod tests {
                 &mut Vec::new(),
                 &mut OutputAllowance::default(),
                 &mut Vec::new(),
+                &mut Default::default(),
             )
             .unwrap();
             let mut doc = Document::new(request.options.canvas);

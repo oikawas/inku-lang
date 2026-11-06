@@ -136,8 +136,15 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
     // Explicit installation definitions precede bundled editions. Both travel
     // through the same parser, validation, identity and resource boundary.
     for package_id in input.bundled_packages {
-        let package: BundledPackage = match package_id.as_str() {
-            "Nature.leaves" => serde_json::from_str(NATURE_LEAVES_V2_JSON).map_err(|_| ())?,
+        let package: &BundledPackage = match package_id.as_str() {
+            "Nature.leaves" => {
+                static PACKAGE: std::sync::OnceLock<Option<BundledPackage>> =
+                    std::sync::OnceLock::new();
+                PACKAGE
+                    .get_or_init(|| serde_json::from_str(NATURE_LEAVES_V2_JSON).ok())
+                    .as_ref()
+                    .ok_or(())?
+            }
             _ => {
                 diagnostics.push(omitted(
                     package_id,
@@ -149,13 +156,13 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
                 continue;
             }
         };
-        for entry in package.words {
+        for entry in &package.words {
             input.canonical.push(CanonicalCandidate {
                 source_id: format!("bundled:{package_id}"),
                 definition_json: entry.definition.to_string(),
                 summary: match input.language {
-                    ResolvedInstructionLanguage::Ja => entry.note_ja,
-                    ResolvedInstructionLanguage::En => entry.note_en,
+                    ResolvedInstructionLanguage::Ja => entry.note_ja.clone(),
+                    ResolvedInstructionLanguage::En => entry.note_en.clone(),
                 },
             });
         }

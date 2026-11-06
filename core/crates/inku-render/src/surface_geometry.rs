@@ -1,7 +1,7 @@
 //! Pure contour and scan geometry used by surface painting.
 
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
-use crate::determinism::hash01;
+use crate::determinism::{SaltedStream, hash01};
 use crate::geometry::{
     circle_points, crescent_contour_points, ellipse_perimeter, point_to_pixels, polygon_points,
     size_to_pixels, stroke_sample_count,
@@ -400,21 +400,23 @@ pub(crate) fn scatter(contour: &[Point], count: usize, seed: Seed) -> Vec<Point>
     }
     let normal = Point::new(-angle.sin(), angle.cos());
     let mut points = Vec::new();
+    let share_stream = SaltedStream::new(seed, "surface-share");
+    let u_stream = SaltedStream::new(seed, "surface-u");
+    let n_stream = SaltedStream::new(seed, "surface-n");
     for (segment_index, ((_, start, end), length)) in segments.iter().zip(lengths).enumerate() {
         let share = count as f64 * length / total;
         let mut taken = share.floor() as usize;
-        if hash01(segment_index as i64, seed, "surface-share") < share - taken as f64 {
+        if share_stream.unit(segment_index as i64) < share - taken as f64 {
             taken += 1;
         }
         for point_index in 0..taken {
             let salt_index = segment_index * 4096 + point_index;
-            let u =
-                (point_index as f64 + hash01(salt_index as i64, seed, "surface-u")) / taken as f64;
+            let u = (point_index as f64 + u_stream.unit(salt_index as i64)) / taken as f64;
             let point = Point::new(
                 start.x + (end.x - start.x) * u,
                 start.y + (end.y - start.y) * u,
             );
-            let drift = (hash01(salt_index as i64, seed, "surface-n") - 0.5) * spacing * 0.8;
+            let drift = (n_stream.unit(salt_index as i64) - 0.5) * spacing * 0.8;
             let shifted = Point::new(point.x + normal.x * drift, point.y + normal.y * drift);
             points.push(if point_in_polygon(shifted, contour) {
                 shifted

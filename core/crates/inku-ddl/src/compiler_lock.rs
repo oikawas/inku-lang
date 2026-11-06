@@ -6,6 +6,10 @@ use serde::Serialize;
 use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
+#[cfg(test)]
+use crate::bind_macro_parameters;
+#[cfg(test)]
+use crate::macro_expansion::expand_selected_macros;
 use crate::{
     ClauseAtom, CoreRoleKind, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
     ExpansionPathSegment, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance, MacroDefinition,
@@ -18,10 +22,11 @@ use crate::{
     SemanticInstruction, SemanticInstructionIssueKind, SemanticInstructionOccurrenceRole,
     SemanticIssueCausalProvenance, SemanticMacroInvocationHead, SemanticMacroParameterValue,
     SemanticRelationIssueKind, SemanticTerm, SourceOccurrence, SourceSpan,
-    associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
+    associate_semantic_document_with_macro_binding, derive_macro_seed,
     geometry_resolution_policy_digest,
     macro_expansion::{
-        MacroExpansionExecutionOwner, MacroExpansionSelection, expand_selected_macros,
+        MacroExpansionExecutionOwner, MacroExpansionSelection,
+        expand_selected_macros_with_identities,
     },
     project_macro_semantic_ref,
     semantic_association::{
@@ -543,15 +548,24 @@ pub fn compile_typed_ddl(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
 ) -> TypedDdlCompilation {
-    let document = document.with_definition_names(definitions);
+    let identities: Vec<_> = definitions
+        .iter()
+        .map(|definition| definition.identity())
+        .collect();
+    let document = document.with_definition_names_and_identities(definitions, &identities);
     if !valid_limits(limits) {
         return integrity_failure(document, "invalid_expansion_limits");
     }
 
-    let parameter_binding = match bind_macro_parameters(&document, definitions) {
-        Ok(binding) => binding,
-        Err(_) => return integrity_failure(document, "clause_stream_integrity"),
-    };
+    let parameter_binding =
+        match crate::macro_parameter_binding::bind_macro_parameters_with_identities(
+            &document,
+            definitions,
+            &identities,
+        ) {
+            Ok(binding) => binding,
+            Err(_) => return integrity_failure(document, "clause_stream_integrity"),
+        };
     let clause_stream = &parameter_binding
         .macro_resolution
         .relation_reference_evidence
@@ -637,7 +651,14 @@ pub fn compile_typed_ddl(
                 seeds.push(derive_macro_seed(canonical, &invocation, composition_seed));
             }
         }
-        let expanded = expand_selected_macros(binding, definitions, &seeds, limits, selection);
+        let expanded = expand_selected_macros_with_identities(
+            binding,
+            definitions,
+            &seeds,
+            limits,
+            selection,
+            &identities,
+        );
         project_expansion_diagnostics(&document, &expanded, &mut projection);
         if let Ok(owners) = &execution_owners {
             if expanded.diagnostics.is_empty() {
@@ -674,7 +695,7 @@ pub fn compile_typed_ddl(
     };
     let lock = build_lock(
         &document,
-        definitions,
+        &identities,
         composition_seed,
         &projection,
         structured_semantic_occurrence_digest,
@@ -1490,11 +1511,12 @@ fn project_deliveries(
     let covered_spans = projection
         .deliveries
         .iter()
-        .filter_map(|delivery| delivery.span)
-        .collect::<Vec<_>>();
+        .filter_map(|delivery| delivery.span.map(|span| (span.start_byte, span.end_byte)))
+        .collect::<std::collections::HashSet<_>>();
     for clause in &association.clause_stream.clauses {
         for atom in &clause.atoms {
-            if !covered_spans.contains(&atom.span()) {
+            let span = atom.span();
+            if !covered_spans.contains(&(span.start_byte, span.end_byte)) {
                 let kind = match atom {
                     ClauseAtom::CoreRole(_) => "core_role_transport",
                     ClauseAtom::CoreModifier(_) => "core_modifier_transport",
@@ -2632,17 +2654,18 @@ fn add_blocking_with_members(
 }
 
 fn sort_projection(projection: &mut Projection) {
-    projection.deliveries.sort_by_key(|item| {
-        let span = item.span.unwrap_or(SourceSpan {
-            start_byte: usize::MAX,
-            end_byte: usize::MAX,
-        });
-        (
-            span.start_byte,
-            span.end_byte,
-            item.kind.as_str(),
-            item.id.clone(),
-        )
+    projection.deliveries.sort_by(|left, right| {
+        let key = |item: &SemanticDelivery| {
+            let span = item.span.unwrap_or(SourceSpan {
+                start_byte: usize::MAX,
+                end_byte: usize::MAX,
+            });
+            (span.start_byte, span.end_byte)
+        };
+        key(left)
+            .cmp(&key(right))
+            .then_with(|| left.kind.as_str().cmp(right.kind.as_str()))
+            .then_with(|| left.id.cmp(&right.id))
     });
     projection
         .holes
@@ -2697,7 +2720,7 @@ fn compiler_state(projection: &Projection) -> CompilerLockState {
 #[allow(clippy::too_many_arguments)]
 fn build_lock(
     document: &NormalizedDdlDocument,
-    definitions: &[MacroDefinition],
+    identities: &[Result<crate::MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
     composition_seed: Option<u64>,
     projection: &Projection,
     structured_semantic_occurrence_digest: String,
@@ -2711,7 +2734,7 @@ fn build_lock(
     let canonical_pre_expansion_digest = canonical_bytes.map(sha256_hex);
     let has_structured_meaning = canonical_pre_expansion_digest.is_some();
     let definition_identities = if has_structured_meaning {
-        definition_identities(document, definitions)
+        definition_identities(document, identities)
     } else {
         Vec::new()
     };
@@ -2810,7 +2833,7 @@ pub fn compiler_lock_hash_input(lock: &TypedDdlCompilerLock) -> Vec<u8> {
 
 fn definition_identities(
     document: &NormalizedDdlDocument,
-    definitions: &[MacroDefinition],
+    identities: &[Result<crate::MacroDefinitionIdentity, crate::MacroDefinitionValidation>],
 ) -> Vec<CompilerDefinitionIdentity> {
     document
         .macro_locks()
@@ -2819,9 +2842,9 @@ fn definition_identities(
             qualified_name: sidecar.qualified_name().to_owned(),
             version: sidecar.version().to_owned(),
             sidecar_digest: sidecar.digest().to_owned(),
-            resolved_definition_digest: definitions
+            resolved_definition_digest: identities
                 .iter()
-                .filter_map(|definition| definition.identity().ok())
+                .filter_map(|identity| identity.as_ref().ok())
                 .find(|identity| {
                     identity.qualified_name() == sidecar.qualified_name()
                         && identity.version() == sidecar.version()
@@ -4740,10 +4763,7 @@ fn compact_json(value: &Value) -> String {
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    crate::lowercase_hex(&Sha256::digest(bytes))
 }
 
 fn identity(domain: &str, payload: &[u8]) -> String {

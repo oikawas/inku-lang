@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::compat_clip::{ClipError, ClipLimits, ClipOptions, clip_element};
+use crate::compat_clip::{ClipError, ClipLimits, ClipOptions, clip_element_refs};
 use crate::performance::{PerformedFillScope, PerformedInstruction};
 use crate::svg::{Element, Node};
 use crate::types::SvgProfile;
@@ -82,10 +82,12 @@ impl FillPaintForest {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn finish(
         mut self,
         scopes: &[PerformedFillScope],
         profile: SvgProfile,
+        existing_definitions: &[&Element],
         definitions: &mut Vec<Element>,
         clip_policy: CompatFillClipPolicy,
         performed: &[PerformedInstruction],
@@ -99,6 +101,7 @@ impl FillPaintForest {
                 paint,
                 scopes,
                 profile,
+                existing_definitions,
                 definitions,
                 clip_policy,
                 &mut failures,
@@ -116,7 +119,7 @@ impl FillPaintForest {
                 .any(|index| failures.contains_key(index))
             {
                 collect_paints(
-                    &paint.element,
+                    paint.element,
                     &mut Vec::new(),
                     &self.paint_order,
                     &mut paints,
@@ -155,11 +158,13 @@ impl FillPaintForest {
         (elements, diagnostics, omitted)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn resolve(
         &mut self,
         paint: Paint,
         scopes: &[PerformedFillScope],
         profile: SvgProfile,
+        existing_definitions: &[&Element],
         definitions: &mut Vec<Element>,
         clip_policy: CompatFillClipPolicy,
         failures: &mut BTreeMap<usize, ScoreExecutionReason>,
@@ -176,9 +181,15 @@ impl FillPaintForest {
         let scope = &scopes[index];
         let mut group = Element::new("g").attr("id", format!("{}fill_{index}", self.prefix));
         for child in std::mem::take(&mut self.children[index]) {
-            if let Some(element) =
-                self.resolve(child, scopes, profile, definitions, clip_policy, failures)
-            {
+            if let Some(element) = self.resolve(
+                child,
+                scopes,
+                profile,
+                existing_definitions,
+                definitions,
+                clip_policy,
+                failures,
+            ) {
                 group.push(element.element);
             }
         }
@@ -197,10 +208,13 @@ impl FillPaintForest {
             });
         }
         let prefix = format!("{}fill_clip_{index}", self.prefix);
-        match clip_element(
+        match clip_element_refs(
             &group,
             &scope.prepared_region,
-            definitions,
+            existing_definitions
+                .iter()
+                .copied()
+                .chain(definitions.iter()),
             ClipOptions {
                 tolerance: clip_policy.tolerance_pixels,
                 id_prefix: &prefix,
@@ -230,13 +244,13 @@ impl FillPaintForest {
 }
 
 fn collect_paints(
-    element: &Element,
+    element: Element,
     clips: &mut Vec<String>,
     order: &BTreeMap<String, (usize, usize)>,
     output: &mut Vec<(usize, Element)>,
 ) {
     if let Some(&(paint_order, _)) = element.attribute("id").and_then(|id| order.get(id)) {
-        let mut paint = element.clone();
+        let mut paint = element;
         for clip in clips.iter().rev() {
             let mut wrapper = Element::new("g").attr("clip-path", clip);
             wrapper.push(paint);
@@ -245,11 +259,11 @@ fn collect_paints(
         output.push((paint_order, paint));
         return;
     }
-    let clip = element.attribute("clip-path");
-    if let Some(clip) = clip {
-        clips.push(clip.to_owned());
+    let clip = element.attribute("clip-path").map(str::to_owned);
+    if let Some(clip) = &clip {
+        clips.push(clip.clone());
     }
-    for child in element.children() {
+    for child in element.into_children() {
         if let Node::Element(child) = child {
             collect_paints(child, clips, order, output);
         }

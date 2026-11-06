@@ -54,6 +54,11 @@ fn catalog() -> &'static Value {
     static CATALOG: OnceLock<Value> = OnceLock::new();
     CATALOG.get_or_init(|| serde_json::from_str(SOURCE).expect("embedded model catalog"))
 }
+fn provider_definitions_source() -> &'static Vec<Value> {
+    static DEFINITIONS: OnceLock<Vec<Value>> = OnceLock::new();
+    DEFINITIONS
+        .get_or_init(|| serde_json::from_str(PROVIDERS).expect("embedded provider definitions"))
+}
 fn retired_providers() -> &'static Vec<Value> {
     static RETIRED: OnceLock<Vec<Value>> = OnceLock::new();
     RETIRED.get_or_init(|| {
@@ -415,8 +420,7 @@ fn info() -> Value {
 }
 
 fn provider_definitions(host: &str) -> Vec<Value> {
-    let mut definitions: Vec<Value> =
-        serde_json::from_str(PROVIDERS).expect("embedded provider definitions");
+    let mut definitions = provider_definitions_source().clone();
     let defaults = info()["defaults"].clone();
     definitions.retain(|provider| host != "android" || provider["id"] != "ollama");
     for provider in &mut definitions {
@@ -561,8 +565,7 @@ fn normalize_user(
             clean[key] = json!(text);
         }
     }
-    let definitions: Vec<Value> =
-        serde_json::from_str(PROVIDERS).expect("embedded provider definitions");
+    let definitions = provider_definitions_source();
     let providers: Map<String, Value> = definitions
         .iter()
         .filter_map(|p| p["id"].as_str().map(|id| (id.to_owned(), json!({}))))
@@ -926,8 +929,7 @@ fn provider_catalog(
     purpose: &str,
 ) -> Vec<Value> {
     let providers = &settings["providers"];
-    let definitions: Vec<Value> =
-        serde_json::from_str(PROVIDERS).expect("embedded provider definitions");
+    let definitions = provider_definitions_source();
     let mut result = Vec::new();
     for id in array(Some(order)).iter().filter_map(Value::as_str) {
         let provider = &providers[id];
@@ -1126,8 +1128,7 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         }
         Some("public_settings") => {
             let mut providers = Map::new();
-            let defs: Vec<Value> =
-                serde_json::from_str(PROVIDERS).expect("embedded provider definitions");
+            let defs = provider_definitions_source();
             for id in array(request.get("order")).iter().filter_map(Value::as_str) {
                 let p = &request["settings"]["providers"][id];
                 if p.get("active").is_some_and(|v| !truthy(v)) {
@@ -1149,8 +1150,7 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         }
         Some("provider_concurrency") => {
             let id = request["provider"].as_str().unwrap_or("");
-            let definitions: Vec<Value> =
-                serde_json::from_str(PROVIDERS).expect("embedded provider definitions");
+            let definitions = provider_definitions_source();
             let limit = definitions
                 .iter()
                 .find(|d| d["id"] == id)

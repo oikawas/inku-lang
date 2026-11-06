@@ -1185,9 +1185,21 @@ impl PipelineSnapshot {
         if self.protocol != PROTOCOL_NAME || self.version != PROTOCOL_VERSION {
             return Err(ProtocolError::ProtocolMismatch);
         }
-        let mut copy = self.clone();
-        copy.seal()?;
-        if copy.snapshot_digest != self.snapshot_digest {
+        // `snapshot_digest` is the final, always-present field of the derived
+        // serializer. Replace only its serialized value, preserving field order
+        // and every other byte produced by that serializer.
+        let mut bytes = serde_json::to_vec(self).map_err(|_| ProtocolError::SchemaViolation)?;
+        let encoded_digest = serde_json::to_vec(&self.snapshot_digest)
+            .map_err(|_| ProtocolError::SchemaViolation)?;
+        let mut suffix = b",\"snapshot_digest\":".to_vec();
+        suffix.extend_from_slice(&encoded_digest);
+        suffix.push(b'}');
+        if !bytes.ends_with(&suffix) {
+            return Err(ProtocolError::SchemaViolation);
+        }
+        bytes.truncate(bytes.len() - encoded_digest.len() - 1);
+        bytes.extend_from_slice(b"\"\"}");
+        if digest("inku.pipeline-snapshot.v1", &[&bytes]) != self.snapshot_digest {
             return Err(ProtocolError::StaleResult);
         }
         // A saved document of a retired edition is migrated by its host before anything else.
@@ -2343,28 +2355,25 @@ impl PipelineSnapshot {
         reading: &CheckedReading,
     ) -> Result<(VisibleDocument, ComposedPlan), &'static str> {
         let background = plan.background.as_deref().unwrap_or("white");
-        let searched =
-            composition::search(&plan.layers, reading, background).map_err(|unsolved| {
-                match unsolved {
-                    composition::Unsolved::NoRanges => "no_ranges",
-                    composition::Unsolved::UnknownPlace(_) => "unknown_place",
-                }
-            })?;
+        let prepared = composition::PreparedWork::new(&plan.layers, reading, background).map_err(
+            |unsolved| match unsolved {
+                composition::Unsolved::NoRanges => "no_ranges",
+                composition::Unsolved::UnknownPlace(_) => "unknown_place",
+            },
+        )?;
+        let searched = prepared.search().map_err(|unsolved| match unsolved {
+            composition::Unsolved::NoRanges => "no_ranges",
+            composition::Unsolved::UnknownPlace(_) => "unknown_place",
+        })?;
         let composition_seed = self
             .config
             .compiler
             .composition_seed()
             .map_err(|_| "policy")?;
         let work_id = candidate.source_digest();
-        let solution = composition::solve(
-            &plan.layers,
-            reading,
-            background,
-            &searched,
-            composition_seed.unwrap_or(1),
-            &work_id,
-        )
-        .map_err(|_| "unsolved")?;
+        let solution = prepared
+            .solve(&searched, composition_seed.unwrap_or(1), &work_id)
+            .map_err(|_| "unsolved")?;
         let jointed = composition::join(
             &plan.layers,
             reading,
@@ -3531,8 +3540,10 @@ impl PipelineSnapshot {
     /// 2026-10-06, the author's decision Q3). The request keeps the stage's
     /// attempt budget, as the Stage 1 compiler feedback does; when the budget is
     /// spent the first answer stands.
+    #[allow(clippy::too_many_arguments)]
     fn ask_holes_again(
         &mut self,
+        base: &TypedDdlCompilation,
         prompt: &LlmPrompt,
         results: &[serde_json::Value],
         proposals: &[Option<String>],
@@ -3573,7 +3584,7 @@ impl PipelineSnapshot {
                 if result["status"] == "rejected"
                     && let Some(proposal) = proposal
                 {
-                    let unread = self.unread_in_proposal(index, proposal);
+                    let unread = self.unread_in_proposal(base, index, proposal);
                     if !unread.is_empty() {
                         entry["unread"] = json!(unread);
                     }
@@ -3629,10 +3640,12 @@ impl PipelineSnapshot {
     /// The words the compiler cannot read once a refused proposal replaces its
     /// hole alone (A1 stage 3), named in the second request. The holes are in
     /// the source order the short ids use.
-    fn unread_in_proposal(&self, index: usize, proposal: &str) -> Vec<String> {
-        let Ok(base) = self.compilation() else {
-            return vec![];
-        };
+    fn unread_in_proposal(
+        &self,
+        base: &inku_ddl::TypedDdlCompilation,
+        index: usize,
+        proposal: &str,
+    ) -> Vec<String> {
         let PipelinePhase::AwaitingLlm { hole_ids, .. } = &self.phase else {
             return vec![];
         };
@@ -3971,7 +3984,9 @@ impl PipelineSnapshot {
         if current
             && previous.is_none()
             && results.iter().any(|result| result["status"] == "rejected")
-            && self.ask_holes_again(&prompt, &results, &proposals, hole_ids, spent_ms, events)?
+            && self.ask_holes_again(
+                &base, &prompt, &results, &proposals, hole_ids, spent_ms, events,
+            )?
         {
             return Ok(());
         }

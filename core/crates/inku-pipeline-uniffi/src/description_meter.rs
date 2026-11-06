@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 use regex::Regex;
 use sudachi::analysis::{Mode, Tokenize, stateless_tokenizer::StatelessTokenizer};
@@ -19,6 +19,13 @@ static ENGLISH: OnceLock<Mutex<EnglishCache>> = OnceLock::new();
 fn regex(pattern: &str) -> Regex {
     Regex::new(pattern).expect("static Server meter pattern")
 }
+
+static BREAKS: LazyLock<Regex> = LazyLock::new(|| regex(r"[\s、。，．,.!！?？・]+"));
+static UNREAD_CATEGORY: LazyLock<Regex> = LazyLock::new(|| regex(r"[\p{L}\p{N}]"));
+static KANJI: LazyLock<Regex> = LazyLock::new(|| regex(r"[㐀-䶿一-鿿豈-﫿々〆〇]"));
+static ENGLISH_FINAL_LE: LazyLock<Regex> = LazyLock::new(|| regex(r"[^aeiouy]le$"));
+static ENGLISH_VOWELS: LazyLock<Regex> = LazyLock::new(|| regex(r"[aeiouy]+"));
+static ENGLISH_WORDS: LazyLock<Regex> = LazyLock::new(|| regex(r"[A-Za-z]+(?:'[A-Za-z]+)*"));
 
 fn japanese_dictionary(directory: &str) -> Result<Arc<JapaneseDictionary>, String> {
     let mut cache = JAPANESE
@@ -70,12 +77,9 @@ fn katakana(reading: &str) -> String {
 fn japanese(source: &str, directory: &str) -> Result<serde_json::Value, String> {
     let dictionary = japanese_dictionary(directory)?;
     let tokenizer = StatelessTokenizer::new(dictionary);
-    let breaks = regex(r"[\s、。，．,.!！?？・]+");
-    let unread_category = regex(r"[\p{L}\p{N}]");
-    let kanji = regex(r"[㐀-䶿一-鿿豈-﫿々〆〇]");
     let mut phrases = Vec::new();
     let mut unread = Vec::new();
-    for phrase in breaks.split(source).filter(|phrase| !phrase.is_empty()) {
+    for phrase in BREAKS.split(source).filter(|phrase| !phrase.is_empty()) {
         let morphemes = tokenizer
             .tokenize(phrase, Mode::C, false)
             .map_err(|_| "meter_tokenization_failed")?;
@@ -93,8 +97,8 @@ fn japanese(source: &str, directory: &str) -> Result<serde_json::Value, String> 
                     continue;
                 }
                 let single = ch.to_string();
-                if unread_category.is_match(&single) {
-                    count += if kanji.is_match(&single) { 2 } else { 1 };
+                if UNREAD_CATEGORY.is_match(&single) {
+                    count += if KANJI.is_match(&single) { 2 } else { 1 };
                     unread.push(single);
                 }
             }
@@ -139,20 +143,19 @@ fn english_dictionary(directory: &str) -> Result<Arc<HashMap<String, usize>>, St
 
 fn estimated_syllables(word: &str) -> usize {
     let mut word = word.to_lowercase().replace('\'', "");
-    if word.len() > 2 && word.ends_with('e') && !regex(r"[^aeiouy]le$").is_match(&word) {
+    if word.len() > 2 && word.ends_with('e') && !ENGLISH_FINAL_LE.is_match(&word) {
         word.pop();
     }
-    regex(r"[aeiouy]+").find_iter(&word).count().max(1)
+    ENGLISH_VOWELS.find_iter(&word).count().max(1)
 }
 
 fn english(source: &str, directory: &str) -> Result<serde_json::Value, String> {
     let dictionary = english_dictionary(directory)?;
-    let words = regex(r"[A-Za-z]+(?:'[A-Za-z]+)*");
     let mut lines = Vec::new();
     let mut unknown = Vec::new();
     for line in source.split('\n').filter(|line| !line.trim().is_empty()) {
         let mut count = 0;
-        for word in words.find_iter(line).map(|word| word.as_str()) {
+        for word in ENGLISH_WORDS.find_iter(line).map(|word| word.as_str()) {
             count += match dictionary.get(&word.to_lowercase()) {
                 Some(count) => *count,
                 None => {

@@ -4,7 +4,7 @@
 //! allocating any instance-sized collection. Holes and intersecting contours are
 //! rejected, never replaced by a convex hull. This does not alter surface scatter.
 
-use crate::determinism::hash01;
+use crate::determinism::SaltedStream;
 use crate::types::{Point, Seed};
 
 /// Bounds the input-dependent preparation and clipping work.
@@ -125,14 +125,15 @@ impl PreparedRegion {
     #[must_use]
     pub fn sample(&self, seed: Seed, group: usize, member: usize, instance: usize) -> Point {
         let salt = format!("exact-fill:{group}:{member}:{instance}");
-        let target = hash01(0, seed, &salt) * self.area;
+        let stream = SaltedStream::new(seed, &salt);
+        let target = stream.unit(0) * self.area;
         let index = self
             .cumulative_area
             .partition_point(|&area| area <= target)
             .min(self.triangles.len() - 1);
         let [a, b, c] = self.triangles[index];
-        let u = hash01(1, seed, &salt).sqrt();
-        let v = hash01(2, seed, &salt);
+        let u = stream.unit(1).sqrt();
+        let v = stream.unit(2);
         Point::new(
             a.x * (1.0 - u) + b.x * (u * (1.0 - v)) + c.x * (u * v),
             a.y * (1.0 - u) + b.y * (u * (1.0 - v)) + c.y * (u * v),

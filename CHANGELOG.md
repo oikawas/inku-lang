@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: reduce repeated calculations and quadratic work without changing drawing or request output.
+
 - Server: add listing indexes to new databases, explicit database compaction, and execution-record retention that defaults to indefinite.
 
 - macOS: retrying a library preview also reloads the work's image.

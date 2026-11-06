@@ -1773,6 +1773,17 @@ fn other_of<'a>(
     work_id: &str,
     work: impl FnOnce() -> Result<Work<'a>, Unsolved>,
 ) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
+    other_of_with_totals(searched, current, seed, work_id, work, None)
+}
+
+fn other_of_with_totals<'a>(
+    searched: &Searched,
+    current: Option<&[usize]>,
+    seed: u64,
+    work_id: &str,
+    work: impl FnOnce() -> Result<Work<'a>, Unsolved>,
+    totals: Option<&[f64]>,
+) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
     let near: Vec<&Vec<usize>> = searched
         .near
         .iter()
@@ -1815,14 +1826,17 @@ fn other_of<'a>(
         });
     }
     let mut digits = vec![0_usize; sizes.len()];
+    let mut choice = vec![0_usize; sizes.len()];
+    let mut combination_index = 0usize;
     loop {
-        let choice: Vec<usize> = digits
-            .iter()
-            .enumerate()
-            .map(|(layer, digit)| work.options[layer][*digit])
-            .collect();
+        for (layer, digit) in digits.iter().enumerate() {
+            choice[layer] = work.options[layer][*digit];
+        }
         if choice != current {
-            let total = work.score(&choice, &mut terms).total;
+            let total = totals.map_or_else(
+                || work.score(&choice, &mut terms).total,
+                |totals| totals[combination_index],
+            );
             let better = match &best {
                 None => true,
                 Some((best_total, best_choice)) => {
@@ -1831,17 +1845,38 @@ fn other_of<'a>(
                 }
             };
             if better {
-                best = Some((total, choice));
+                best = Some((total, choice.clone()));
             }
         }
         if !advance(&mut digits, &sizes) {
             break;
         }
+        combination_index += 1;
     }
     Ok(match best {
         Some((_, choice)) => (choice, OtherAnswer::Next),
         None => (current.to_vec(), OtherAnswer::None),
     })
+}
+
+pub(crate) fn search_and_other(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    background: &str,
+    current: Option<&[usize]>,
+    seed: u64,
+    work_id: &str,
+) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
+    let work = Work::new(layers, reading, background)?;
+    let (searched, totals) = search_work_with_totals(&work)?;
+    other_of_with_totals(
+        &searched,
+        current,
+        seed,
+        work_id,
+        || Ok(work),
+        totals.as_deref(),
+    )
 }
 
 /// Ranges chosen by chance (automatism, the author's decision 2026-10-04): each
@@ -1925,8 +1960,15 @@ pub fn other_joined_answer(
         &group.jointed(),
     )?
     .with_joined(group.joined);
-    let searched = search_work(&work)?;
-    other_of(&searched, current, seed, work_id, || Ok(work))
+    let (searched, totals) = search_work_with_totals(&work)?;
+    other_of_with_totals(
+        &searched,
+        current,
+        seed,
+        work_id,
+        || Ok(work),
+        totals.as_deref(),
+    )
 }
 
 /// [`chance_answer`] for instructions whose sentences carry joints (I-711 C6):
@@ -2782,9 +2824,19 @@ impl<'a> Work<'a> {
         let b = relation.b.map(|ib| &boxes[ib]);
         let ka = self.kinds[ia];
         let ca = center(a);
-        let obstacles: Vec<usize> = (0..boxes.len())
-            .filter(|i| *i != ia && roles[*i] != Role::Field && !self.sparse[*i])
-            .collect();
+        let obstacles: Vec<usize> = if matches!(
+            relation.kind,
+            RelationKind::Rising
+                | RelationKind::Falling
+                | RelationKind::Flowing
+                | RelationKind::Isolated
+        ) {
+            (0..boxes.len())
+                .filter(|i| *i != ia && roles[*i] != Role::Field && !self.sparse[*i])
+                .collect()
+        } else {
+            Vec::new()
+        };
         let side_penalty = |b: &Rect| {
             let cb = center(b);
             let mut pen = 0.0;
@@ -3319,13 +3371,42 @@ pub fn search(
     search_work(&Work::new(layers, reading, background)?)
 }
 
+pub(crate) struct PreparedWork<'a>(Work<'a>);
+
+impl<'a> PreparedWork<'a> {
+    pub(crate) fn new(
+        layers: &'a [WorkPlanLayer],
+        reading: &'a CheckedReading,
+        background: &str,
+    ) -> Result<Self, Unsolved> {
+        Ok(Self(Work::new(layers, reading, background)?))
+    }
+
+    pub(crate) fn search(&self) -> Result<Searched, Unsolved> {
+        search_work(&self.0)
+    }
+
+    pub(crate) fn solve(
+        &self,
+        searched: &Searched,
+        seed: u64,
+        work_id: &str,
+    ) -> Result<Solution, Unsolved> {
+        solve_work(&self.0, searched, seed, work_id)
+    }
+}
+
 fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
+    search_work_with_totals(work).map(|(searched, _)| searched)
+}
+
+fn search_work_with_totals(work: &Work<'_>) -> Result<(Searched, Option<Vec<f64>>), Unsolved> {
     let combinations = work.combinations();
     if combinations == 0 {
         return Err(Unsolved::NoRanges);
     }
     if combinations > MAX_COMBINATIONS {
-        return Ok(search_by_layers(work, combinations));
+        return Ok((search_by_layers(work, combinations), None));
     }
     let sizes: Vec<usize> = work.options.iter().map(Vec::len).collect();
     let choice_of = |digits: &[usize]| -> Vec<usize> {
@@ -3338,8 +3419,12 @@ fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
     let mut totals = Vec::with_capacity(usize::try_from(combinations).unwrap_or_default());
     let mut terms = Terms::default();
     let mut digits = vec![0_usize; sizes.len()];
+    let mut choice = vec![0_usize; sizes.len()];
     loop {
-        totals.push(work.score(&choice_of(&digits), &mut terms).total);
+        for (layer, digit) in digits.iter().enumerate() {
+            choice[layer] = work.options[layer][*digit];
+        }
+        totals.push(work.score(&choice, &mut terms).total);
         if !advance(&mut digits, &sizes) {
             break;
         }
@@ -3359,11 +3444,14 @@ fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
             .map(|i| region_key(*i))
             .cmp(y.iter().map(|i| region_key(*i)))
     });
-    Ok(Searched {
-        best,
-        near,
-        combinations,
-    })
+    Ok((
+        Searched {
+            best,
+            near,
+            combinations,
+        },
+        Some(totals),
+    ))
 }
 
 /// The layers `keep` of a plan and its reading of them, numbered in that

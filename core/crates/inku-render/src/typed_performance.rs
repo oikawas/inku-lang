@@ -158,19 +158,46 @@ struct Builder<'a> {
     diagnostics: Vec<ScoreExecutionDiagnostic>,
     /// Top-level transform groups already cloned into `output`.
     cloned_top_transforms: HashSet<usize>,
+    instance_prefixes: BTreeMap<(usize, usize), Sha256>,
+    groups_by_start: BTreeMap<usize, Vec<GroupId>>,
 }
 
 impl<'a> Builder<'a> {
     fn new(request: PerformanceRequest<'a>) -> Self {
-        let mut output = request.score.clone();
-        output.instructions.clear();
-        output.anchors.clear();
-        output.transform_groups.clear();
-        output.placement_groups.clear();
-        output.repetition_groups.clear();
-        output.fill_groups.clear();
-        output.mirror_relations.clear();
-        output.resource_policy = None;
+        let output = Score {
+            version: request.score.version.clone(),
+            canvas: request.score.canvas.clone(),
+            background: request.score.background,
+            presence: request.score.presence.clone(),
+            instructions: Vec::new(),
+            object_templates: request.score.object_templates.clone(),
+            anchors: Vec::new(),
+            transform_groups: Vec::new(),
+            placement_groups: Vec::new(),
+            repetition_groups: Vec::new(),
+            fill_groups: Vec::new(),
+            mirror_relations: Vec::new(),
+            resource_policy: None,
+        };
+        let mut groups_by_start: BTreeMap<usize, Vec<GroupId>> = BTreeMap::new();
+        for (index, group) in request.score.placement_groups.iter().enumerate() {
+            groups_by_start
+                .entry(group.start)
+                .or_default()
+                .push(GroupId::Placement(index));
+        }
+        for (index, group) in request.score.fill_groups.iter().enumerate() {
+            groups_by_start
+                .entry(group.start)
+                .or_default()
+                .push(GroupId::Fill(index));
+        }
+        for (index, group) in request.score.repetition_groups.iter().enumerate() {
+            groups_by_start
+                .entry(group.member.start)
+                .or_default()
+                .push(GroupId::Repetition(index));
+        }
         Self {
             request,
             output,
@@ -187,6 +214,8 @@ impl<'a> Builder<'a> {
             scope_sources: Vec::new(),
             diagnostics: Vec::new(),
             cloned_top_transforms: HashSet::new(),
+            instance_prefixes: BTreeMap::new(),
+            groups_by_start,
         }
     }
 
@@ -263,14 +292,32 @@ impl<'a> Builder<'a> {
             anchor_target: relation.and_then(|value| value.target_anchor_index),
         });
         self.output.instructions.push(instruction);
+        let prefix = self
+            .instance_prefixes
+            .entry((context, old))
+            .or_insert_with(|| {
+                let mut bytes =
+                    serde_json::to_vec(&(&resolved.owner, &self.contexts[context].path))
+                        .expect("typed instance seed prefix is serializable");
+                bytes.pop();
+                bytes.push(b',');
+                let mut hash = Sha256::new();
+                hash.update(bytes);
+                hash
+            });
+        let mut hash = prefix.clone();
+        hash.update(instance_ordinal.to_string().as_bytes());
+        hash.update(b"]");
+        if let Some(seed) = self.request.performance_seed {
+            hash.update(format!(":render:{seed}").as_bytes());
+        }
+        let digest = hash.finalize();
+        let seed_override = i128::from(u64::from_le_bytes(
+            digest[..8].try_into().expect("eight digest bytes"),
+        ));
         self.dense.push(DenseInstruction {
             original_index: old,
-            seed_override: Some(instance_seed(
-                &resolved.owner,
-                &self.contexts[context].path,
-                instance_ordinal,
-                self.request.performance_seed,
-            )),
+            seed_override: Some(seed_override),
             fill_scope_index: innermost_fill,
             context_path: self.contexts[context].path.clone(),
             semantic_anchor: Some(target.unwrap_or_else(|| {
@@ -412,30 +459,10 @@ impl<'a> Builder<'a> {
     }
 
     fn group_at(&self, start: usize, end: usize, skipped: &[GroupId]) -> Option<GroupId> {
-        let candidates = self
-            .request
-            .score
-            .placement_groups
+        self.groups_by_start
+            .get(&start)?
             .iter()
-            .enumerate()
-            .map(|(index, _)| GroupId::Placement(index))
-            .chain(
-                self.request
-                    .score
-                    .fill_groups
-                    .iter()
-                    .enumerate()
-                    .map(|(index, _)| GroupId::Fill(index)),
-            )
-            .chain(
-                self.request
-                    .score
-                    .repetition_groups
-                    .iter()
-                    .enumerate()
-                    .map(|(index, _)| GroupId::Repetition(index)),
-            );
-        candidates
+            .copied()
             .filter(|id| !skipped.contains(id))
             .filter(|&id| {
                 let range = self.group_range(id);
@@ -1174,7 +1201,15 @@ impl<'a> Builder<'a> {
             .collect()
     }
 
-    fn finish(mut self) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
+    #[cfg(test)]
+    fn finish(self) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
+        self.finish_with_digest(None)
+    }
+
+    fn finish_with_digest(
+        mut self,
+        input_digest: Option<&str>,
+    ) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
         self.expand_range(0, 0, self.request.score.instructions.len(), &[], None);
         self.clone_top_level_state();
         self.remap_relations();
@@ -1195,8 +1230,10 @@ impl<'a> Builder<'a> {
         (
             self.output,
             TypedExecutionPlan {
-                input_score_digest: inku_score::canonical_score_digest(self.request.score)
-                    .expect("finalized compact Score is canonical"),
+                input_score_digest: input_digest.map(str::to_owned).unwrap_or_else(|| {
+                    inku_score::canonical_score_digest(self.request.score)
+                        .expect("finalized compact Score is canonical")
+                }),
                 placement_scopes,
                 placement_fill_scope_indices,
                 transform_fill_scope_indices: self.transform_fill_scope_indices,
@@ -1392,6 +1429,7 @@ fn translate_instruction_to(
     result
 }
 
+#[allow(dead_code)]
 fn instance_seed(
     owner: &inku_score::ScoreSourceOwner,
     context: &[u64],
@@ -1594,15 +1632,26 @@ fn remap_dense_diagnostics(
     }
 }
 
-pub(crate) fn resolve(
+#[cfg(test)]
+fn resolve(
     request: PerformanceRequest<'_>,
     policy: inku_score::ScoreErrorPolicy,
+) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
+    let digest = inku_score::canonical_score_digest(request.score)
+        .expect("finalized compact Score is canonical");
+    resolve_with_digest(request, policy, &digest)
+}
+
+pub(crate) fn resolve_with_digest(
+    request: PerformanceRequest<'_>,
+    policy: inku_score::ScoreErrorPolicy,
+    input_digest: &str,
 ) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
     let performance_seed = request.performance_seed;
     let composition_seed = request.composition_seed;
     let canvas = request.canvas;
     let (dense, typed, dense_to_original, dense_anchor_to_original) =
-        Builder::new(request).finish();
+        Builder::new(request).finish_with_digest(Some(input_digest));
     let source_diagnostics = typed.diagnostics.clone();
     let dense_request = PerformanceRequest {
         score: &dense,

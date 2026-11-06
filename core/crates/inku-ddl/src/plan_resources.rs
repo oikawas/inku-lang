@@ -374,6 +374,7 @@ fn account_composition_plan(
         contributions: collect.then(Vec::new),
     };
     // Check source node capacity before allocating ownership vectors.
+    let mut body_demands = Vec::with_capacity(plan.objects.len());
     for object in &plan.objects {
         let owner = PlanResourceOwner::Object(object.origin().clone());
         let body = object
@@ -388,6 +389,7 @@ fn account_composition_plan(
                 })
             })
             .transpose()?;
+        body_demands.push(body);
         let nodes = body.map_or(Some(0), |body| Some(body.template_nodes));
         let nodes = nodes
             .and_then(|n| 1_u64.checked_add(n))
@@ -546,18 +548,7 @@ fn account_composition_plan(
                 owner: Box::new(owner.clone()),
                 reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks),
             })?;
-        let body = object
-            .plugin_template
-            .as_ref()
-            .map(|(_, _, body)| {
-                inku_score::object_body_resource_demand(body).map_err(|dimension| {
-                    PlanResourceError {
-                        owner: Box::new(owner.clone()),
-                        reason: PlanResourceFailure::ArithmeticOverflow(dimension),
-                    }
-                })
-            })
-            .transpose()?;
+        let body = body_demands[index];
         let primitive_marks = copies
             .checked_mul(body.map_or(1, |body| body.primitive_marks))
             .ok_or_else(|| PlanResourceError {

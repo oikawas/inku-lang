@@ -10,7 +10,7 @@
 
 use inku_score::{shown_support, srgb_channels};
 
-use crate::determinism::hash01;
+use crate::determinism::SaltedStream;
 use crate::svg::{Element, format_number};
 use crate::types::{CanvasGroundSpec, CanvasSize, GroundGrain, GroundMaterial, Seed};
 
@@ -48,22 +48,20 @@ pub(crate) struct GroundPlan {
 }
 
 struct GroundRandom {
-    seed: Seed,
-    salt: &'static str,
+    stream: SaltedStream,
     index: i64,
 }
 
 impl GroundRandom {
     fn new(seed: Seed, salt: &'static str) -> Self {
         Self {
-            seed,
-            salt,
+            stream: SaltedStream::new(seed, salt),
             index: 0,
         }
     }
 
     fn unit(&mut self) -> f64 {
-        let value = hash01(self.index, self.seed, self.salt);
+        let value = self.stream.unit(self.index);
         self.index += 1;
         value
     }

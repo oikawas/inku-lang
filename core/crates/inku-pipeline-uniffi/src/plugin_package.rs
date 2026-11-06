@@ -6,6 +6,7 @@ use regex::Regex;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 const MAX_PACKAGE: usize = 1_000_000;
 const MAX_PICTURE: usize = 2 * 1024 * 1024;
@@ -136,20 +137,22 @@ fn parse(
     if s(&raw["schema"]) != "inku.plugin-package.v2" {
         problems.push(problem("schema", "wrong_schema", "inku.plugin-package.v2"));
     }
-    let ident = Regex::new(r"^[A-Za-z][A-Za-z0-9_-]*$").unwrap();
+    static IDENT: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^[A-Za-z][A-Za-z0-9_-]*$").unwrap());
     let mut namespace = s(&raw["namespace"]);
     let mut name = s(&raw["name"]);
-    if !ident.is_match(namespace.strip_suffix('\n').unwrap_or(namespace)) {
+    if !IDENT.is_match(namespace.strip_suffix('\n').unwrap_or(namespace)) {
         blocking.push(problem("namespace", "invalid_identifier", ""));
         namespace = "";
     }
-    if !ident.is_match(name.strip_suffix('\n').unwrap_or(name)) {
+    if !IDENT.is_match(name.strip_suffix('\n').unwrap_or(name)) {
         blocking.push(problem("name", "invalid_identifier", ""));
         name = "";
     }
     let version = s(&raw["version"]);
-    let version_re = Regex::new(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$").unwrap();
-    let version = if version_re.is_match(version.strip_suffix('\n').unwrap_or(version)) {
+    static VERSION: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$").unwrap());
+    let version = if VERSION.is_match(version.strip_suffix('\n').unwrap_or(version)) {
         version
     } else {
         problems.push(problem("version", "invalid_semantic_version", ""));
@@ -377,7 +380,7 @@ fn start(input: &Value) -> Result<Value, Vec<Value>> {
     ))
     .unwrap();
     let mut def_problems = vec![Vec::<Value>::new(); words.len()];
-    let path_re = Regex::new(r":\d+:\d+$").unwrap();
+    static PATH_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r":\d+:\d+$").unwrap());
     if let Some(diagnostics) = resolved["diagnostics"].as_array() {
         for diagnostic in diagnostics {
             let Some(i) = s(&diagnostic["source_id"])
@@ -390,7 +393,7 @@ fn start(input: &Value) -> Result<Value, Vec<Value>> {
             let base = format!("words[{}].definition", words[i]["index"]);
             if let Some(findings) = diagnostic["findings"].as_array().filter(|a| !a.is_empty()) {
                 for finding in findings {
-                    let path = path_re.replace(s(&finding["path"]), "");
+                    let path = PATH_RE.replace(s(&finding["path"]), "");
                     let suffix = if path.is_empty() || path == "$" {
                         String::new()
                     } else if let Some(p) = path.strip_prefix('$') {

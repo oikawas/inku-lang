@@ -195,11 +195,11 @@ fn cache_key(system: &str, schema: &Value) -> String {
 /// required; streamed and not stored, with the cache routing hint last. The
 /// images the prompt names follow its message as the Vision request sends
 /// them; without images the body is as it was.
-pub(super) fn pipeline_request(
+pub(super) fn pipeline_request<T: AsRef<str>>(
     model: &str,
     prompt: &Value,
     answer_limit: usize,
-    images: &[String],
+    images: &[T],
 ) -> Result<Value, Refusal> {
     let field = |name: &str| {
         as_str(get(prompt, name))
@@ -464,6 +464,13 @@ impl<T> Ordered<T> {
     fn get(&self, key: &str) -> Option<&T> {
         self.members
             .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, item)| item)
+    }
+
+    fn get_mut(&mut self, key: &str) -> Option<&mut T> {
+        self.members
+            .iter_mut()
             .find(|(name, _)| name == key)
             .map(|(_, item)| item)
     }
@@ -743,19 +750,36 @@ impl Decoder {
                 if !self.items.contains(&key) {
                     return fail("chatgpt_response_invalid");
                 }
-                let mut value = match self.arguments.get(&key) {
-                    None => String::new(),
-                    Some(Value::String(text)) => text.clone(),
-                    Some(_) => return shape(),
-                };
-                match index(event, "delta")? {
-                    Value::String(delta) => value.push_str(delta),
+                if self
+                    .arguments
+                    .get(&key)
+                    .is_some_and(|value| !matches!(value, Value::String(_)))
+                {
+                    return shape();
+                }
+                let delta = match index(event, "delta")? {
+                    Value::String(delta) => delta,
                     _ => return shape(),
+                };
+                match self.arguments.get_mut(&key) {
+                    Some(Value::String(text)) => {
+                        if text
+                            .len()
+                            .checked_add(delta.len())
+                            .is_none_or(|length| length > self.limits.answer)
+                        {
+                            return fail("chatgpt_response_too_large");
+                        }
+                        text.push_str(delta);
+                    }
+                    None => {
+                        if delta.len() > self.limits.answer {
+                            return fail("chatgpt_response_too_large");
+                        }
+                        self.arguments.insert(key, Value::String(delta.clone()));
+                    }
+                    Some(_) => return shape(),
                 }
-                if value.len() > self.limits.answer {
-                    return fail("chatgpt_response_too_large");
-                }
-                self.arguments.insert(key, Value::String(value));
             }
             "response.function_call_arguments.done" => {
                 let key = key_of(Some(index(event, "item_id")?))?;

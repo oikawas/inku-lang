@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: the instruction dialog (new and edit) and Another composition no longer offer the drawing model or Lift the stroke limit. Both draw with the conditions of the input panel's current tab, and an instruction edit no longer carries over the parent's stroke limit.
-
-- Server: `/api/compose` with `work_id` took the saved work's model before the request's `model`, and drew and recorded the candidate with it. It now draws with the requested model.
-
 - macOS: while the library is open, the lineage view beneath it no longer takes presses for dragging, so a card above the lineage canvas is selected at once.
 
 - macOS: decide a single or double click on a library or lineage picture from the mouse-down on that picture, so quick clicks on different cards never open a work by mistake.
@@ -610,6 +606,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.325 (2026-11-06 / Build 1401)
+
+- Web: the instruction dialog (new and edit) and Another composition no longer offer the drawing model or Lift the stroke limit. Both draw with the conditions of the input panel's current tab, and an instruction edit no longer carries over the parent's stroke limit.
+
+- Server: `/api/compose` with `work_id` took the saved work's model before the request's `model`, and drew and recorded the candidate with it. It now draws with the requested model.
 
 ## v2.15.324 (2026-11-05 / Build 1400)
 

@@ -185,11 +185,8 @@
 		// The staffage level a work was drawn at, for works saved before the axis
 		// was folded away (v2.11.0). Developer mode only, and only when set.
 		statusTenkei: string | null;
-		// The drawing (Stage 2) model, the same one DdlEditorDialog offers and with
-		// the same effect: choosing here rewrites the default and persists it.
-		refineDrawingModelId: string;
-		refineDrawingModelGroups: ProviderGroup[];
-		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
+		// The model comparison's stroke limit switch. The layout options draw with
+		// the input panel's model and stroke limit (2026-11-06, the author).
 		refineWildValue: boolean;
 		onSetRefineWild: (value: boolean | null) => void;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
@@ -315,9 +312,6 @@
 		statusDescriptionLocked,
 		developerMode,
 		statusTenkei,
-		refineDrawingModelId,
-		refineDrawingModelGroups,
-		onSelectRefineDrawingModel,
 		refineWildValue,
 		onSetRefineWild,
 		onSaveOkugakiModel,
@@ -929,8 +923,6 @@
 					compositionFormSwitch={!statusWork?.description_ddl?.composition}
 					{statusStage1Model}
 					{statusStage2Model}
-					{refineDrawingModelId}
-					{refineDrawingModelGroups}
 					{refineWildValue}
 					onClose={requestCloseRefineModal}
 					{onGenerateVariationCandidates}
@@ -943,7 +935,6 @@
 					catalogName={statusCatalogName}
 					onSaveAndClose={saveCandidatesAndClose}
 					onDiscardAndClose={discardCandidatesAndClose}
-					{onSelectRefineDrawingModel}
 					{onSetRefineWild}
 				/>
 			{:else if outputTab === 'lineage'}

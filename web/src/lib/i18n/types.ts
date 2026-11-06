@@ -447,7 +447,6 @@ export interface LangPack {
 	modelCatalogLoading: string;
 	modelCatalogLoadFailed: string;
 	modelCatalogRetry: string;
-	ddlDialogDrawingModel: string;
 	// A namespaced name the server does not hold. Not an error: plugins can be
 	// installed later, so the wording says "not on this server", not "wrong".
 	ddlUnknownNameTitle: string;

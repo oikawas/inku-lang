@@ -7,7 +7,6 @@
 	import RefinementCompositionFormView from './RefinementCompositionFormView.svelte';
 	import './refinement-workspace.css';
 	import { t } from '$lib/i18n/index.svelte';
-	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import type {
 		RefinementSession,
@@ -32,8 +31,7 @@
 		compositionFormSwitch: boolean;
 		statusStage1Model: string;
 		statusStage2Model: string;
-		refineDrawingModelId: string;
-		refineDrawingModelGroups: ProviderGroup[];
+		/** The model comparison's stroke limit switch. */
 		refineWildValue: boolean;
 		/** The catalog the work uses, named in the color change dialog. */
 		catalogName: string;
@@ -47,7 +45,6 @@
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
-		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSetRefineWild: (value: boolean | null) => void;
 	};
 
@@ -67,8 +64,6 @@
 		compositionFormSwitch,
 		statusStage1Model,
 		statusStage2Model,
-		refineDrawingModelId,
-		refineDrawingModelGroups,
 		refineWildValue,
 		catalogName,
 		onClose,
@@ -81,7 +76,6 @@
 		onGenerateModelCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
-		onSelectRefineDrawingModel,
 		onSetRefineWild
 	}: Props = $props();
 
@@ -124,14 +118,9 @@
 			{refinementSession}
 			{statusStage1Model}
 			{statusStage2Model}
-			{refineDrawingModelId}
-			{refineDrawingModelGroups}
-			{refineWildValue}
 			{onGenerateVariationCandidates}
 			{onSaveAndClose}
 			{onDiscardAndClose}
-			{onSelectRefineDrawingModel}
-			{onSetRefineWild}
 		/>
 	{:else if view === 'color' || view === 'color-arrangement'}
 		<RefinementColorCatalogView

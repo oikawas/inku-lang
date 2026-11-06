@@ -201,7 +201,6 @@
 	let ddlDialogReturnFocus = $state<HTMLElement | null>(null);
 	let ddlDialogDrawing = $state(false);
 	let ddlDialogError = $state<string | null>(null);
-	let ddlDialogWildOverride = $state<boolean | null>(null);
 	// DDL-authored (standalone) artworks carry the display_label marker 'DDL'.
 	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
@@ -1577,6 +1576,7 @@
 		render: {
 			canvasAspectId: effectiveCanvasAspectId,
 			wild: () => effectiveRefineWild,
+			layoutWild: () => work.drawOptions.wild === 'on',
 			fanoutLimit: () => renderFanoutLimit
 		},
 		seeds: {
@@ -1806,10 +1806,9 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		lineageParentNodeId: node.id,
 		derivationKind: 'ddl_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
-		renderOverrides: {
-			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(ddlDialogWildOverride ?? recordedWild(node.history))
-		},
+		// The model and the stroke limit are the input panel's for its tab, which
+		// the run takes when nothing overrides them (2026-11-06, the author).
+		renderOverrides: colorCatalogOverride(lineageCatalogId(node)),
 	}, signal);
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
 	return true;
@@ -1837,7 +1836,6 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal, importedPlugins?
 
 function openNewDdlDialog(): void {
 	ddlDialogReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-	ddlDialogWildOverride = null;
 	ddlDialogMode = 'new';
 	ddlDialogNode = null;
 	ddlDialogInitial = '';
@@ -1862,7 +1860,6 @@ async function openCurrentDdlEditor(): Promise<void> {
 
 function openLineageDdlEditor(node: LineageNode, opener = document.activeElement instanceof HTMLElement ? document.activeElement : null): void {
 	ddlDialogReturnFocus = opener;
-	ddlDialogWildOverride = null;
 	ddlDialogMode = 'edit';
 	ddlDialogNode = node;
 	ddlDialogInitial = node.history?.ddl ?? '';
@@ -1908,14 +1905,6 @@ function closeDdlDialog(): void {
 function refreshLineageAfterRefine(): void {
 	const focusId = lineageState.graph?.focus_node_id ?? work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null;
 	if (focusId) void lineageState.load(focusId, true);
-}
-
-// The DDL and refinement dialogs choose the drawing model of the tab on
-// screen, as the input panel's picker does. It is a choice for the next
-// drawing, not a saved setting (the defaults live in Settings, 2026-11-05).
-async function selectDdlDialogDrawingModel(provider: Provider, model: string): Promise<void> {
-	const ref = qualifiedModelRef(provider, model);
-	if (ref) work.drawOptions.models.stage1 = work.drawOptions.models.stage2 = ref;
 }
 
 async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
@@ -3255,9 +3244,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				statusDescriptionLocked={work.descriptionLocked}
 				statusTenkei={work.displayedHistoryItem?.tenkei ?? null}
 				{developerMode}
-				refineDrawingModelId={work.tabModelRef('stage2')}
-				refineDrawingModelGroups={availableModelCatalog}
-				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
 				refineWildValue={effectiveRefineWild}
 				onSetRefineWild={setRefineWild}
 				onSaveOkugakiModel={persistOkugakiModel}
@@ -3357,9 +3343,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			returnFocusTo={ddlDialogReturnFocus}
 			drawing={ddlDialogDrawing}
 			stage2ModelLabel={work.stage2ModelLabel}
-			drawingModelId={work.tabModelRef('stage2')}
-			drawingModelGroups={availableModelCatalog}
-			onSelectDrawingModel={selectDdlDialogDrawingModel}
 			runTokensIn={work.activeRunTokensIn}
 			runTokensOut={work.activeRunTokensOut}
 			runAttempt={work.activeRunAttempt}
@@ -3368,8 +3351,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			previewForWord={saijikiPreview}
 			previewForPlugin={pluginPreview}
 			{pluginEntries}
-			wildValue={ddlDialogWildOverride ?? (ddlDialogMode === 'edit' && ddlDialogNode ? recordedWild(ddlDialogNode.history) : work.drawOptions.wild === 'on')}
-			onSelectWild={(next) => (ddlDialogWildOverride = next)}
 			onDraw={handleDdlDialogDraw}
 			onClose={closeDdlDialog}
 		/>

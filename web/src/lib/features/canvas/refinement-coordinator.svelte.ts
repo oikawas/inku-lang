@@ -48,6 +48,8 @@ export type RefinementCoordinatorDeps = {
 	render: {
 		canvasAspectId: () => CanvasAspectId;
 		wild: () => boolean;
+		/** The layout options' stroke limit: the input panel's for its tab (2026-11-06, the author). */
+		layoutWild: () => boolean;
 		fanoutLimit: () => number;
 	};
 	seeds: {
@@ -75,7 +77,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			...data,
 			ddl: data.ddl,
 			thinking: data.thinking ?? thinking,
-			stage1_model: work.result?.stage1_model ?? deps.models.stage1(),
+			// One model draws both stages; the parent's is not the one that drew this.
+			stage1_model: data.stage2_model ?? deps.models.stage2(),
 			stage2_model: data.stage2_model ?? deps.models.stage2(),
 			elapsed_stage1_ms: 0,
 			elapsed_stage2_ms: data.elapsed_ms ?? 0,
@@ -121,10 +124,10 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	}
 
 	// A refinement uses the saved work's catalog and the chosen switch for this round.
-	function refinementRenderOverrides(): RenderOverrides {
+	function refinementRenderOverrides(wild = deps.render.wild()): RenderOverrides {
 		return {
 			...colorCatalogOverride(refinementCatalogId()),
-			...wildOverride(deps.render.wild())
+			...wildOverride(wild)
 		};
 	}
 
@@ -147,7 +150,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				// The server forks the candidate from this saved work, with its
 				// saved settings and seeds; an unsaved result starts afresh.
 				...workReferencePayload(refinementWorkId()),
-				...renderSettingsPayload('compose', refinementRenderOverrides()),
+				...renderSettingsPayload('compose', refinementRenderOverrides(deps.render.layoutWild())),
 				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
 		}, mode, signal, apiFetch, work.pipelineCompatibilityError);
 		const layout = layoutCandidateResult(data, baseDdl, compositionSeed, mode);

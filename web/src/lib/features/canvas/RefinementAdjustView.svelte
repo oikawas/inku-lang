@@ -1,12 +1,9 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import ModelCardPicker from '$lib/components/ModelCardPicker.svelte';
 	import PaintButton from '$lib/components/PaintButton.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import VariationLanes from '$lib/components/VariationLanes.svelte';
-	import WildToggle from '$lib/components/WildToggle.svelte';
-	import type { Provider, ProviderGroup } from '$lib/models';
 	import RefinementCandidateGrid from './RefinementCandidateGrid.svelte';
 	import type {
 		RefinementSession,
@@ -23,16 +20,11 @@
 		refinementSession: RefinementSession;
 		statusStage1Model: string;
 		statusStage2Model: string;
-		refineDrawingModelId: string;
-		refineDrawingModelGroups: ProviderGroup[];
-		refineWildValue: boolean;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
 		/** Save the chosen options, then leave; the rest are dropped. */
 		onSaveAndClose: () => void | Promise<void>;
 		/** Drop every unsaved option, then leave. */
 		onDiscardAndClose: () => void | Promise<void>;
-		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
-		onSetRefineWild: (value: boolean | null) => void;
 	};
 
 	let {
@@ -45,14 +37,9 @@
 		refinementSession,
 		statusStage1Model,
 		statusStage2Model,
-		refineDrawingModelId,
-		refineDrawingModelGroups,
-		refineWildValue,
 		onGenerateVariationCandidates,
 		onSaveAndClose,
-		onDiscardAndClose,
-		onSelectRefineDrawingModel,
-		onSetRefineWild
+		onDiscardAndClose
 	}: Props = $props();
 
 	// The layout dialog. It was also the drawing parameters until the elements
@@ -116,18 +103,8 @@
 								<span>{costLabel}</span>
 							</div>
 						{/if}
-						<!-- Same picker and same semantics as DdlEditorDialog: it rewrites
-						     the saved default, which the status row above shows. Stage 1 is
-						     not touched here; the model-comparison view changes that. -->
-						<div class="refine-model-row">
-							<ModelCardPicker
-								label={t().ddlDialogDrawingModel}
-								selectedModel={refineDrawingModelId}
-								providerGroups={refineDrawingModelGroups}
-								onSelect={onSelectRefineDrawingModel}
-							/>
-						</div>
-						<div class="refine-settings-row"><WildToggle value={refineWildValue} onSelect={(next) => onSetRefineWild(next)} /></div>
+						<!-- The candidates are drawn with the input panel's model and stroke
+						     limit for its tab; this dialog offers neither (2026-11-06, the author). -->
 
 					{#if refinementSession.busy || refinementSession.gridBusy}
 						<RunStatus

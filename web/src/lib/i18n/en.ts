@@ -579,7 +579,6 @@ export const en: LangPack = {
 	ddlNewDialogSubtitle: 'Write the instructions directly and perform them as a standalone work.',
 	ddlEditDialogSubtitle: 'Drawing saves a new child of the chosen work.',
 	ddlSyntaxGuide: 'Instructions (DDL) quick guide\nThe instructions are not the picture itself. They are a compact visual instruction from which the picture is performed. They turn natural language into a performable description made of color, shape, place, motion, and material. This grammar is defined as DDL (Drawing Description Language).\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, watercolor, or pencil.',
-	ddlDialogDrawingModel: 'Drawing model',
 	ddlUnknownNameTitle: 'Plugin names',
 	ddlUnknownNameUnregistered: 'This name is not registered',
 	ddlPluginReason: (reason, suggestion, candidates) => {

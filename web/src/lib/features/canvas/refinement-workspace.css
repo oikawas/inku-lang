@@ -296,8 +296,6 @@
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover .model-hover-card,
 	.model-metadata-hover:focus-within .model-hover-card { display: block; }
-	.refine-settings-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-	.refine-model-row { margin-top: 6px; }
 
 	.model-choice-grid {
 		display: grid;

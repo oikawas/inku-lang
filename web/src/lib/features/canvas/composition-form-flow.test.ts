@@ -50,7 +50,7 @@ test('four composition-form forks retain the parent settings and only selected e
 		apiFetch, apiError: async () => new Error('request failed'), work, session,
 		history: { syncToItem: async () => {} }, models: { stage1: () => 'm', stage2: () => 'm' },
 		catalog: { defaultId: () => 'default', effectiveId: () => 'default', available: () => [], name: () => 'default' },
-		render: { canvasAspectId: () => 'square', wild: () => false, fanoutLimit: () => 4 },
+		render: { canvasAspectId: () => 'square', wild: () => false, layoutWild: () => false, fanoutLimit: () => 4 },
 		seeds: { composition: () => 1 }, lineageParentId: () => 'node', ensureVisibleLineageParentId: async () => 'node',
 		pushHistory: async () => { throw new Error('must save execution'); }, resetTargetScopedState: () => {},
 	} as unknown as Parameters<typeof createRefinementCoordinator>[0]);

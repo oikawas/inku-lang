@@ -59,7 +59,7 @@ for (const { kind, count } of [{ kind: 'layout', count: 1 }, { kind: 'layout', c
 					},
 					models: { stage1: () => 'reader', stage2: () => 'performer' },
 					seeds: { composition: () => ++seed },
-					render: { canvasAspectId: () => 'square', wild: () => false, fanoutLimit: () => 1 },
+					render: { canvasAspectId: () => 'square', wild: () => false, layoutWild: () => false, fanoutLimit: () => 1 },
 					catalog: { defaultId: () => 'catalog', effectiveId: () => 'catalog', available: () => [], name: (id: string) => id },
 					lineageParentId: () => 'parent-node', ensureVisibleLineageParentId: async () => 'parent-node',
 					apiFetch: async (path: string) => {
@@ -191,7 +191,8 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 			},
 			models: { stage1: () => 'reader', stage2: () => 'performer' },
 			seeds: { composition: (excluded: Set<number>) => { assert.ok(excluded.has(7)); return 42; } },
-			render: { canvasAspectId: () => 'square', wild: () => false, fanoutLimit: () => 1 },
+			// The work's recorded switch is off; the input panel's is on.
+			render: { canvasAspectId: () => 'square', wild: () => false, layoutWild: () => true, fanoutLimit: () => 1 },
 			catalog: { defaultId: () => 'catalog', effectiveId: () => 'catalog', available: () => [], name: (id: string) => id },
 			lineageParentId: () => 'parent-node', ensureVisibleLineageParentId: async () => 'parent-node',
 			apiFetch: async (path: string, init?: RequestInit) => {
@@ -205,6 +206,10 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 				// The server forks the candidate from this saved work, with its
 				// saved settings and seeds (SPEC §12.7.1).
 				assert.equal(payload.work_id, 'parent-work');
+				// The layout options draw with the input panel's model and stroke
+				// limit, not the work's (2026-11-06, the author).
+				assert.equal(payload.model, 'performer');
+				assert.equal(payload.wild, true);
 				return new Response(JSON.stringify({ ddl: 'recomposed instructions', svg: '<svg/>', score: { instructions: [] } }));
 			},
 			pushHistory: async (item: HistoryItem, options?: SaveHistoryOptions) => {
@@ -255,7 +260,7 @@ test('a saved work opened beside an unfinished draft is refined from its own wor
 			},
 			models: { stage1: () => 'reader', stage2: () => 'performer' },
 			seeds: { composition: () => 42 },
-			render: { canvasAspectId: () => 'square', wild: () => false, fanoutLimit: () => 1 },
+			render: { canvasAspectId: () => 'square', wild: () => false, layoutWild: () => false, fanoutLimit: () => 1 },
 			catalog: { defaultId: () => 'catalog', effectiveId: () => 'catalog', available: () => [{ id: 'catalog' }, { id: 'other' }], name: (id: string) => id },
 			lineageParentId: () => 'shown-node', ensureVisibleLineageParentId: async () => 'shown-node',
 			apiFetch: async (path: string, init?: RequestInit) => {

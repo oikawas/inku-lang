@@ -180,6 +180,7 @@ public struct HostSettings: Codable, Sendable, Equatable {
 
 public actor ProviderSettingsStore {
     public nonisolated let url: URL
+    private var cachedSVGLimitBytes: UInt64?
     public init(url: URL) { self.url = url }
     private func readRaw() throws -> HostSettings {
         guard FileManager.default.fileExists(atPath: url.path) else { return .init() }
@@ -191,6 +192,7 @@ public actor ProviderSettingsStore {
         let before = try readRaw()
         let settings = try ProviderCoreSettings.normalize(before)
         if settings != before { try write(settings) }
+        cachedSVGLimitBytes = try SVGGenerationLimit.bytes(settings.svgLimitMiB)
         return settings
     }
     public func loadNormalized() throws -> HostSettings { try load() }
@@ -201,6 +203,7 @@ public actor ProviderSettingsStore {
         let before = try readRaw()
         let normalized = try ProviderCoreSettings.update(before, to: settings)
         try write(normalized)
+        cachedSVGLimitBytes = try SVGGenerationLimit.bytes(normalized.svgLimitMiB)
         return normalized
     }
     private func write(_ settings: HostSettings) throws {
@@ -208,5 +211,8 @@ public actor ProviderSettingsStore {
         try JSONEncoder().encode(settings).write(to: url, options: .atomic)
     }
 
-    public func svgLimitBytes() throws -> UInt64 { try SVGGenerationLimit.bytes(load().svgLimitMiB) }
+    public func svgLimitBytes() throws -> UInt64 {
+        if let cachedSVGLimitBytes { return cachedSVGLimitBytes }
+        return try SVGGenerationLimit.bytes(load().svgLimitMiB)
+    }
 }

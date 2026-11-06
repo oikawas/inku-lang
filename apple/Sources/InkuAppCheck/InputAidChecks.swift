@@ -97,7 +97,7 @@ func runInputAidChecks() async throws {
         let expected = (item["spans"].array ?? []).map { span in
             (span.array ?? []).map { $0.string ?? $0.text }.joined(separator: ",")
         }
-        guard DescriptionLabels.pipelineDescription(text) == item["pipeline"].string, spans == expected else {
+        guard try DescriptionLabels.pipelineDescription(text) == item["pipeline"].string, spans == expected else {
             throw CheckFailure.message("Label rule differs from the corpus for \(item["why"].string ?? text): \(spans) vs \(expected)")
         }
     }

@@ -47,7 +47,7 @@ public actor PipelineHost {
         if !request.authoring.isDirect, let parentID = request.parentWorkID,
            try await savedAuthoringContext(workID: parentID).authority == "ddl_authoritative" {
             guard let parent = try await database.work(id: parentID),
-                  !DescriptionLabels.rewords(request.description, parent.effectiveSourceText) else {
+                  try !DescriptionLabels.rewords(request.description, parent.effectiveSourceText) else {
                 throw HostError("description_source_locked")
             }
         }
@@ -793,7 +793,7 @@ private actor ExecutionDriver {
         var authoring = request.authoring.json
         if case .description(let text, _, _) = request.authoring, request.drawRoute == "read_and_draw" {
             authoring["route"] = .string("read_and_draw")
-            authoring["description"] = .string(InkuCore.descriptionWithoutLabels(text))
+            authoring["description"] = .string(try InkuCore.descriptionWithoutLabels(text))
             if request.descriptionComposition == true { authoring["composition"] = .object(["mode": .string("on")]) }
             let spans = try ExactJSON(data: InkuCore.descriptionLabelSpans(text)).array ?? []
             let scalars = Array(text.unicodeScalars)
@@ -812,7 +812,7 @@ private actor ExecutionDriver {
         if let direction = request.savedLawsDirection {
             guard case .directDDL(let source) = request.authoring else { throw HostError("saved_laws_requires_saved_ddl") }
             authoring = .object(["tag": .string("saved_laws"), "source": .string(source),
-                "description": .string(InkuCore.descriptionWithoutLabels(request.description)),
+                "description": .string(try InkuCore.descriptionWithoutLabels(request.description)),
                 "direction": try ExactJSON(data: direction)])
         }
         if request.authoring.isDirect, let record = request.completionRanges { authoring["completion_ranges"] = try ExactJSON(data: record) }
@@ -1278,7 +1278,7 @@ private actor ExecutionDriver {
         let id = WorkIdentity.savedID(executionID: try executionID(), sequence: try snapshot.requiredString("sequence"))
         let nodeID = newID(); let now = Int64(Date().timeIntervalSince1970 * 1000)
         let renderHash = try WorkIdentity.render(score: score, options: options, metadata: metadata)
-        let descriptionHash = WorkIdentity.description(state.description)
+        let descriptionHash = try WorkIdentity.description(state.description)
         let compiler = delivery["compiler_options"]
         let compositionSeed = score["composition_seed"].string ?? score["composition_seed"].number ?? compiler["composition_seed"].string
         let renderSeed = options["render_seed"].string ?? compiler["host"]["palette"]["render_seed"].string

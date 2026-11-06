@@ -259,7 +259,7 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(body["top_p"].number, "0.95")
         XCTAssertEqual(body["top_k"].number, "64")
         // Failure: a platform-specific hash replaces the Server contract's dh1/rh3 identity.
-        XCTAssertEqual(WorkIdentity.description(" \r\nA\u{030A}\r "), "dh1:0a94dc9d420d1142d6b71de60f9bf7e2f345a4d62c9f141b091539769ddf3075")
+        XCTAssertEqual(try WorkIdentity.description(" \r\nA\u{030A}\r "), "dh1:0a94dc9d420d1142d6b71de60f9bf7e2f345a4d62c9f141b091539769ddf3075")
         let hashOptions: ExactJSON = .object(["render_seed": .string("18446744073709551615"), "wild": .bool(false), "catalog_id": .string("default")])
         let hashMetadata: ExactJSON = .object(["render_engine_id": .string("rust"), "render_engine_version": .string("1")])
         XCTAssertEqual(try WorkIdentity.render(score: .object(["instructions": .array([])]), options: hashOptions, metadata: hashMetadata),

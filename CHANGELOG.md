@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: stop the affected operation instead of crashing on an internal core failure.
+
 - macOS: report plugin-catalog validation failures without stopping startup.
 
 - macOS: store shared text-batch conditions separately from row states while retaining legacy resume.

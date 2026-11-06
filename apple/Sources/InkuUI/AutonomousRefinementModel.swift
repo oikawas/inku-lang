@@ -187,8 +187,9 @@ public final class AutonomousRefinementModel {
                     let main = basis["main_law"].string
                     var names = basis["laws"].object?.keys.sorted() ?? basis["laws"].array?.compactMap { $0.string ?? $0["law"].string } ?? []
                     if let main { names.removeAll { $0 == main }; names.insert(main, at: 0) }
+                    let sourceText = try InkuCore.descriptionWithoutLabels(parent.effectiveSourceText)
                     var facts: ExactJSON = .object(["description_locked": .bool(context.authority == "ddl_authoritative"),
-                        "ddl_work": .bool(context.origin == "user_authored_ddl" || InkuCore.descriptionWithoutLabels(parent.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+                        "ddl_work": .bool(context.origin == "user_authored_ddl" || sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                         "laws": .array(names.map(ExactJSON.string))])
                     if current.kinds.contains("chunks") {
                         var units: ExactJSON = .object(["action": .string("units"), "ddl": .string(parent.ddl ?? ""), "language": .string(parent.instructionLangResolved ?? "ja")])
@@ -407,7 +408,7 @@ public final class AutonomousRefinementModel {
         let turn = try Self.int(step["turn"])
         let seedHex = SHA256.hash(data: Data("\(current.id):\(turn)".utf8)).map { String(format: "%02x", $0) }.joined()
         let seed = UInt64(seedHex.prefix(15), radix: 16) ?? 0
-        let shown: ExactJSON = .object(["description": .string(InkuCore.descriptionWithoutLabels(parent.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)),
+        let shown: ExactJSON = .object(["description": .string(try InkuCore.descriptionWithoutLabels(parent.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)),
             "reading_core": record["reading"]["core"].array.map(ExactJSON.array) ?? .array([]), "thesis": record["composition"]["answer"]["thesis"].string.map(ExactJSON.string) ?? .string(""),
             "direction": .string(current.note ?? ""), "history": .array(previous), "generation": .integer(previous.count + 1), "of": .integer(previous.count + current.moves - turn + 1)])
         var start: ExactJSON = .object(["action": .string("start"), "config": config, "ddl": .string(parent.ddl ?? ""), "context": shown,

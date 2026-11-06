@@ -5,8 +5,8 @@ import InkuPersistence
 
 public enum WorkIdentity {
     static func sha256(_ value: Data) -> String { SHA256.hash(data: value).map { String(format: "%02x", $0) }.joined() }
-    public static func description(_ text: String) -> String {
-        InkuCore.descriptionHash(text)
+    public static func description(_ text: String) throws -> String {
+        try InkuCore.descriptionHash(text)
     }
     public static func render(score: ExactJSON, options: ExactJSON, metadata: ExactJSON) throws -> String {
         let item: ExactJSON = .object(["score": score, "render_seed": options["render_seed"],

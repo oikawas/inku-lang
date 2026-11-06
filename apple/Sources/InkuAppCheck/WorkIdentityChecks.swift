@@ -105,7 +105,7 @@ func runSharedCoreStep1Checks(casesDirectory: URL) async throws {
     let unicodeSpans = DescriptionLabels.excludedSpans(unicodeText)
     guard unicodeSpans.map(\.range) == [NSRange(location: 3, length: 3), NSRange(location: 8, length: 3)],
           unicodeSpans.allSatisfy({ $0.kind == .comment }),
-          DescriptionLabels.pipelineDescription(unicodeText).utf8.elementsEqual("😀ae\u{301}".utf8) else {
+          try DescriptionLabels.pipelineDescription(unicodeText).utf8.elementsEqual("😀ae\u{301}".utf8) else {
         throw CheckFailure.message("Non-BMP/combining label positions drifted")
     }
     let multiline = "1. 😀[😀]\n2. e\u{301}［x］"
@@ -113,7 +113,7 @@ func runSharedCoreStep1Checks(casesDirectory: URL) async throws {
     guard multilineSpans.map(\.range) == [NSRange(location: 0, length: 3), NSRange(location: 5, length: 4),
         NSRange(location: 10, length: 3), NSRange(location: 15, length: 3)],
           multilineSpans.map(\.kind) == [.number, .comment, .number, .comment],
-          DescriptionLabels.pipelineDescription(multiline).utf8.elementsEqual("😀\ne\u{301}".utf8) else {
+          try DescriptionLabels.pipelineDescription(multiline).utf8.elementsEqual("😀\ne\u{301}".utf8) else {
         throw CheckFailure.message("Multiline scalar/UTF-16 label conversion drifted")
     }
     guard InkuCore.canonicalJSON("{\"a\":}") == nil, InkuCore.renderHash(itemJSON: "[]") == nil else {
@@ -148,7 +148,7 @@ func runWorkIdentityInventory(databaseURL: URL, outputURL: URL) async throws {
                 render = nil; error = String(describing: failure)
             }
             rows.append(IdentityInventoryRow(id: work.id, storedDescription: work.descriptionHash,
-                calculatedDescription: WorkIdentity.description(work.input), storedRender: work.renderHash,
+                calculatedDescription: try WorkIdentity.description(work.input), storedRender: work.renderHash,
                 calculatedRender: render, renderError: error))
         }
         offset += works.count

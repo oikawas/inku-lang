@@ -21,6 +21,10 @@ public struct DrawOptions: Codable, Equatable, Sendable {
     public var canvasAspect: String
     public var models: Models
 
+    static let empty = DrawOptions(route: "", sketch: "", composition: "", wild: "",
+                                   catalog: Catalog(id: "", mode: ""), canvasAspect: "",
+                                   models: Models(stage1: nil, stage2: nil, vision: nil))
+
     enum CodingKeys: String, CodingKey {
         case route, sketch, composition, wild, catalog, models
         case canvasAspect = "canvas_aspect"

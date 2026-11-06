@@ -88,7 +88,7 @@ public final class AppModel {
         })
     }
     private var currentDrawOptions: DrawOptions {
-        get { drawSelections[activeDrawTab] ?? DrawOptionsCore.release[activeDrawTab]! }
+        get { drawSelections[activeDrawTab] ?? DrawOptionsCore.release[activeDrawTab] ?? .empty }
         set { drawSelections[activeDrawTab] = newValue }
     }
     public var imageCanvasID: String {

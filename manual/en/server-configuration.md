@@ -169,6 +169,8 @@ Base URLs, keys, and published models can also be managed from the admin UI. Key
 
 ### 3.1 SQLite
 
+In the administrator's DB settings, compaction runs only when explicitly requested and stops writes while it runs. An empty execution-record retention period means indefinite retention. Saving a number removes only older finished records, keeping works, lineage, links, and busy executions.
+
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 ```

@@ -2,6 +2,17 @@ import type { ComposeFallbackState } from '$lib/composeFallback';
 import type { EnglishForm, VerseForm } from '$lib/verseForm';
 
 export interface LangPack {
+	settingsDbMaintenance: string;
+	settingsDbRetention: string;
+	settingsDbRetentionHint: string;
+	settingsDbRetentionInvalid: string;
+	settingsDbRetentionConfirm: string;
+	settingsDbRetentionSave: string;
+	settingsDbRetentionSaved: string;
+	settingsDbVacuum: string;
+	settingsDbVacuumConfirm: string;
+	settingsDbVacuumResult: (before: string, after: string) => string;
+	settingsDbMaintenanceError: string;
 	imageTab: string;
 	imageTabHint: string;
 	imageProvenanceLabel: string;

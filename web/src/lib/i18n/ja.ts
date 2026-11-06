@@ -2,6 +2,17 @@ import type { LangPack } from './types';
 import { groupDigits } from '../formatNumber';
 
 export const ja: LangPack = {
+	settingsDbMaintenance: 'データベースの管理',
+	settingsDbRetention: '実行の記録の保存期間（日）',
+	settingsDbRetentionHint: '空欄は無期限です。日数を保存すると、期間を過ぎた完了済みの実行記録を削除します。作品と系譜は消しません。',
+	settingsDbRetentionInvalid: '1〜36500日を入力するか、空欄にしてください。',
+	settingsDbRetentionConfirm: '期間を過ぎた完了済みの実行記録を削除します。よろしいですか？',
+	settingsDbRetentionSave: '保存期間を保存',
+	settingsDbRetentionSaved: '保存期間を保存しました。',
+	settingsDbVacuum: 'データベースを整理',
+	settingsDbVacuumConfirm: 'データベースを整理します。実行中は書き込みを停止します。よろしいですか？',
+	settingsDbVacuumResult: (before, after) => `整理前 ${before}、整理後 ${after}`,
+	settingsDbMaintenanceError: 'データベースの管理操作に失敗しました。',
 	imageTab: '画像',
 	imageTabHint: '画像を見て、日本語の指示書を書き、描きます。',
 	imageProvenanceLabel: '来歴',

@@ -66,6 +66,9 @@ type SettingsControllerDeps<TActor extends SettingsActor> = {
 };
 
 export type SettingsController = SettingsNavigation & ServerAdministration & ModelAdministration & {
+	readonly loadDatabaseRetention: () => Promise<number | null>;
+	readonly saveDatabaseRetention: (days: number | null) => Promise<void>;
+	readonly vacuumDatabase: () => Promise<{ before_bytes: number; after_bytes: number }>;
 	readonly chatgpt: ChatGPTSettingsController;
 	readonly modelAdministration: ModelAdministration;
 	readonly userAdministration: SettingsUserAdministration;
@@ -118,6 +121,21 @@ export function createSettingsController<TActor extends SettingsActor>(
 	});
 
 	return {
+		async loadDatabaseRetention() {
+			const response = await deps.apiFetch('/api/settings/execution-retention');
+			if (!response.ok) throw new Error('retention unavailable');
+			return ((await response.json()) as { retention_days: number | null }).retention_days;
+		},
+		async saveDatabaseRetention(days: number | null) {
+			const response = await deps.apiFetch('/api/settings/execution-retention', { method: 'PUT',
+				headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retention_days: days }) });
+			if (!response.ok) throw new Error('retention failed');
+		},
+		async vacuumDatabase() {
+			const response = await deps.apiFetch('/api/settings/database/vacuum', { method: 'POST' });
+			if (!response.ok) throw new Error('vacuum failed');
+			return await response.json() as { before_bytes: number; after_bytes: number };
+		},
 		chatgpt,
 		get opened() { return navigation.opened; },
 		get mode() { return navigation.mode; },

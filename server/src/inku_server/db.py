@@ -1024,6 +1024,99 @@ def require_background_write() -> None:
         raise CandidateHostError(reason)
 
 
+def database_maintenance_settings() -> dict:
+    stored = _app_settings_store().read("execution_retention") or {}
+    days = stored.get("retention_days")
+    return {"retention_days": days if type(days) is int and 1 <= days <= 36500 else None}
+
+
+def update_execution_retention(days: int | None) -> dict:
+    if days is not None and (type(days) is not int or not 1 <= days <= 36500):
+        raise ValueError("retention days must be between 1 and 36500 or null")
+    settings = _app_settings_store().write("execution_retention", {"retention_days": days})
+    if days is not None:
+        prune_execution_records(days)
+    return settings
+
+
+def prune_execution_records(days: int | None) -> dict:
+    if days is None:
+        return {"executions": 0, "observations": 0, "autonomous": 0}
+    if type(days) is not int or not 1 <= days <= 36500:
+        raise ValueError("invalid retention days")
+    import hashlib
+    from sqlalchemy import delete, select, tuple_
+    from .persistence.schema import PipelineCandidateExecutionRow as Execution, ProviderObservationRow as Observation
+    require_background_write()
+    cutoff = _now_ms() - days * 86400000
+    counts = {"executions": 0, "observations": 0, "autonomous": 0}
+    with engine.connect() as connection:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        try:
+            rows = connection.execute(select(Execution.owner_id, Execution.execution_id, Execution.state_bytes,
+                                             Execution.state_digest, Execution.updated_at)).all()
+            busy, deletable = set(), []
+            for owner, execution, state, digest, updated in rows:
+                try:
+                    if hashlib.sha256(state).hexdigest() != digest:
+                        raise ValueError("state digest mismatch")
+                    snapshot = json.loads(state)["snapshot"]
+                    idle = isinstance(snapshot, dict) and "action" in snapshot and snapshot["action"] is None
+                except (ValueError, TypeError, KeyError):
+                    idle = False
+                if not idle:
+                    busy.add((owner, execution))
+                elif updated < cutoff:
+                    deletable.append((owner, execution))
+            observations = connection.execute(select(Observation.owner_id, Observation.execution_id,
+                Observation.action_id, Observation.request_digest).where(Observation.updated_at < cutoff)).all()
+            for owner, execution, action, digest in observations:
+                if (owner, execution) not in busy:
+                    counts["observations"] += connection.execute(delete(Observation).where(
+                        Observation.owner_id == owner, Observation.execution_id == execution,
+                        Observation.action_id == action, Observation.request_digest == digest)).rowcount
+            for start in range(0, len(deletable), 400):
+                counts["executions"] += connection.execute(delete(Execution).where(
+                    tuple_(Execution.owner_id, Execution.execution_id).in_(deletable[start:start + 400]))).rowcount
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+    from .autonomous_refine import AutonomousRunRow, runs_db_url
+    from .persistence.config import sqlite_database_path
+    url = runs_db_url(PERSISTENCE_CONFIG.canonical_url)
+    path = sqlite_database_path(url, setting="INKU_AUTONOMOUS_RUNS_DB_URL")
+    if path is not None and path.is_file():
+        from .persistence.engine import THUMBNAIL_SQLITE_PRAGMAS, create_sqlite_engine
+        runs_engine = create_sqlite_engine(url, setting="INKU_AUTONOMOUS_RUNS_DB_URL", pragmas=THUMBNAIL_SQLITE_PRAGMAS)
+        try:
+            with runs_engine.begin() as connection:
+                counts["autonomous"] = connection.execute(delete(AutonomousRunRow).where(
+                    AutonomousRunRow.state.in_(("done", "stopped", "failed", "interrupted")),
+                    AutonomousRunRow.updated_at < cutoff)).rowcount
+        finally:
+            runs_engine.dispose()
+    return counts
+
+
+def vacuum_database() -> dict:
+    if not _db_restore_lock.acquire(blocking=False):
+        raise ValueError("Another DB restore or maintenance is in progress")
+    _db_restoring.set()
+    try:
+        before = database_info()["file_size_bytes"]
+        if before is None:
+            raise ValueError("VACUUM requires a file database")
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+            connection.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+            connection.exec_driver_sql("VACUUM")
+            connection.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+        return {"before_bytes": before, "after_bytes": database_info()["file_size_bytes"]}
+    finally:
+        _db_restoring.clear()
+        _db_restore_lock.release()
+
+
 def restore_db_backup(kind: str, name: str) -> dict:
     # Writes are refused while the copy goes in (the write-lock middleware reads
     # db_restoring), and pooled connections are dropped afterwards so none keeps

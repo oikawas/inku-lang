@@ -4785,6 +4785,8 @@ and four generations. Manual backups can be created immediately and are stored
 separately from the automatic generation limit. Backup and restore use the
 SQLite file boundary.
 
+An administrator may explicitly compact the database; writes stop during compaction and its size before and after is shown. Execution records are retained indefinitely by default. Saving a retention period removes older finished executions, autonomous refinement runs, and provider observations; busy executions, works, lineage, history links, and variation authority remain.
+
 **The interval decides which day and the time of day decides when on that day.**
 The next due moment is derived from the last backup taken, not from the moment
 the scheduler happens to wake, so a backup taken late at night does not drag its

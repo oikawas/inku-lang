@@ -618,11 +618,16 @@ def test_compat_wait_uses_resident_run_without_snapshot_queries(monkeypatch):
             self.changed.wait(timeout)
 
     class Store:
+        queries = 0
         def read_latest_execution_id(self, *_):
-            pytest.fail("resident run queried the store")
+            self.queries += 1
+            return "run"
+        def read_execution(self, *_):
+            pytest.fail("resident run loaded a snapshot")
 
     run = Run()
-    service = PipelineService(None, Store(), config_for=None, provider_for=None, render_for=None,
+    store = Store()
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
                               max_workers=1, max_effect_steps=1, max_retained_runs=1)
     service._runs[("owner", "run")] = run
     monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
@@ -634,10 +639,46 @@ def test_compat_wait_uses_resident_run_without_snapshot_queries(monkeypatch):
     thread.start()
     try:
         assert pipeline_compat._wait("owner", service.get("owner", "variation"))["busy"] is False
+        assert 1 <= store.queries <= 3
     finally:
         thread.join()
         service._runs.clear()
         service.close()
+
+
+def test_get_uses_latest_database_execution_when_older_one_is_resident(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'latest.db'}")
+    Base.metadata.create_all(engine)
+    clock = [1]
+    store = VariationAuthorityStore(engine, now_ms=lambda: clock[0])
+    def saved(execution_id):
+        return json.dumps({"snapshot": {"execution_id": execution_id, "variation_id": "variation",
+                                         "config": {}, "action": None},
+                           "context": {}, "rendered": None}).encode()
+    store.create_execution("owner", "old", "variation", "0", saved("old"))
+    clock[0] = 2
+    store.create_execution("owner", "new", "variation", "0", saved("new"))
+
+    class Run:
+        context = {}
+        image_data = {}
+        def restore(self, snapshot, *, rendered):
+            self.snapshot = snapshot
+        def view(self):
+            return {"execution_id": self.snapshot["execution_id"], "busy": False}
+
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=2)
+    old = Run()
+    old.restore({"execution_id": "old", "variation_id": "variation"}, rendered=None)
+    service._runs[("owner", "old")] = old
+    service._host = lambda *_: Run()
+    try:
+        assert service.get("owner", "variation")["execution_id"] == "new"
+    finally:
+        service._runs.clear()
+        service.close()
+        engine.dispose()
 
 
 def test_reserve_evicts_least_recently_used_idle_run():
@@ -677,7 +718,9 @@ def test_slow_prepare_does_not_block_another_resident_get():
         entered.set()
         assert release.wait(2)
         return {}, {}
-    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+    from types import SimpleNamespace
+    store = SimpleNamespace(read_latest_execution_id=lambda *_: "old")
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
                               prepare_for=prepare, max_workers=1, max_effect_steps=1, max_retained_runs=2)
     service._runs[("owner", "old")] = Run()
     service._host = lambda *_: Run()

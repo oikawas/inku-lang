@@ -563,7 +563,8 @@ class CandidateExecution:
         if svg is not None:
             if not isinstance(rendered, dict) or rendered.get("svg") != "":
                 raise CandidateHostError("invalid_render_boundary")
-            rendered["svg"] = svg
+            rendered = {**rendered, "svg": svg}
+            result["rendered"] = rendered
             self.context.pop("svg_refusal", None)
         elif svg_limit is not None and rendered is not None:
             raise CandidateHostError("invalid_render_boundary")

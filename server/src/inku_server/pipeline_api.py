@@ -358,6 +358,7 @@ class PipelineService:
                 if snapshot.get("completion_ranges") is not None:
                     projection = {"rendered": rendered, "completion_ranges": snapshot["completion_ranges"]}
                 ranges = snapshot.get("completion_ranges")
+                # A saved rendered object is reused unchanged; SVG replacement creates a new dict.
                 if rendered is last_rendered and ranges == last_ranges and last_digest is not None:
                     digest = last_digest
                 else:
@@ -858,17 +859,15 @@ class PipelineService:
         return system_prompts_view(json.loads(record.state_bytes).get("context", {}))
 
     def get(self, owner: str, variation_id: str) -> dict:
+        execution_id = self.store.read_latest_execution_id(owner, variation_id)
+        if execution_id is None:
+            raise HTTPException(404, "variation_not_found")
+        key = (owner, execution_id)
         with self._lock:
-            run = next((candidate for (actor, _), candidate in reversed(self._runs.items())
-                        if actor == owner and (getattr(candidate, "_snapshot", None) or {}).get("variation_id") == variation_id), None)
+            run = self._runs.get(key)
             if run is not None:
-                execution_id = run._snapshot["execution_id"]
-                key = (owner, execution_id)
                 self._runs.move_to_end(key)
         if run is None:
-            execution_id = self.store.read_latest_execution_id(owner, variation_id)
-            if execution_id is None:
-                raise HTTPException(404, "variation_not_found")
             record = self.store.read_execution(owner, execution_id)
             if record is None:
                 raise HTTPException(404, "variation_not_found")

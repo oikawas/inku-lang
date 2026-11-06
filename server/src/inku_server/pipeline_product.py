@@ -905,7 +905,7 @@ class ProductPipelineEffects:
                 if not isinstance(svg, str) or rendered.get("svg") != "":
                     raise CandidateHostError("invalid_render_boundary")
                 _validate_generated_svg(svg, svg_limit)
-                rendered["svg"] = svg
+                rendered = {**rendered, "svg": svg}
         if "error" in rendered:
             # The code is the answer; the core's reason is for the log only.
             _logger.warning("saved replay refused: %s: %s", rendered["error"], rendered.get("message"))

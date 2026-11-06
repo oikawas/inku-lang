@@ -8,6 +8,8 @@ import app.inku.mobile.llm.chatGptRequest
 import app.inku.mobile.ui.camera.CameraImageDdl
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
+import org.json.JSONArray
+import java.io.File
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -69,8 +71,20 @@ class ImageDdlPipelineTest {
 
     @Test
     fun sourceLabelsUseCoreScalarOffsetsIncludingEmoji() {
-        val labels = descriptionSourceLabels(NativePipelineBridge, "1. 🌸花 [ 作者 ] ［本］")
+        val labels = JSONArray(NativePipelineBridge.descriptionSourceLabels("1. 🌸花 [ 作者 ] ［本］"))
         assertEquals(listOf("作者", "本"), (0 until labels.length()).map { labels.getString(it) })
+    }
+
+    @Test
+    fun sourceLabelsMatchSharedDescriptionCases() {
+        val cases = JSONObject(File(requireNotNull(System.getProperty("inku.descriptionLabelCases"))).readText()).getJSONArray("cases")
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val expected = case.getJSONArray("source_labels")
+            val actual = JSONArray(NativePipelineBridge.descriptionSourceLabels(case.getString("text")))
+            assertEquals(case.getString("why"), (0 until expected.length()).map { expected.getString(it) },
+                (0 until actual.length()).map { actual.getString(it) })
+        }
     }
 
     @Test

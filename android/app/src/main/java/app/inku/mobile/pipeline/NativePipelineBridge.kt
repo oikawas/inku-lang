@@ -34,6 +34,9 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun pipelineDescription(text: String): String
     external override fun descriptionHash(text: String): String
     external override fun descriptionLabelSpans(text: String): String
+    external override fun descriptionSourceLabels(text: String): String
+    external fun ddlTitleLines(text: String): String
+    external fun withoutDdlTitleLines(text: String): String
     external override fun renderHash(itemJson: String): String?
     external override fun canonicalJson(valueJson: String): String?
     external override fun resolveInstructionLanguage(text: String, requested: String?, fallback: String): String?

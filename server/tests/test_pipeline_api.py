@@ -544,3 +544,46 @@ def test_failed_drain_records_failure_and_releases_capacity(error, code):
         assert not service._runs
     finally:
         service.close()
+
+
+def test_read_only_get_does_not_reserve_a_busy_slot():
+    from types import SimpleNamespace
+
+    class Run:
+        context = {}
+        image_data = {}
+        def view(self):
+            return {"busy": True, "execution_id": "saved"}
+        def restore(self, snapshot, *, rendered):
+            assert snapshot == {"config": {}}
+
+    record = SimpleNamespace(execution_id="saved", state_bytes=json.dumps({"snapshot": {"config": {}}, "context": {}, "rendered": None}))
+    store = SimpleNamespace(read_latest_execution_for_variation=lambda *_: record)
+    service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=8)
+    service._host = lambda *_: Run()
+    service._runs.update({("owner", str(i)): Run() for i in range(8)})
+    try:
+        assert service.get("owner", "variation")["execution_id"] == "saved"
+        assert len(service._runs) == 8
+    finally:
+        service._runs.clear()
+        service.close()
+
+
+def test_reserve_evicts_least_recently_used_idle_run():
+    class Run:
+        context = {}
+        image_data = {}
+        def view(self):
+            return {"busy": False}
+
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=2)
+    service._runs.update({("owner", "first"): Run(), ("owner", "second"): Run()})
+    try:
+        service.execution("owner", "first")
+        service._reserve_run()
+        assert list(service._runs) == [("owner", "first")]
+    finally:
+        service.close()

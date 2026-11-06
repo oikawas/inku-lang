@@ -7,6 +7,7 @@ import json
 import logging
 import threading
 import time
+from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import asdict
@@ -273,7 +274,7 @@ class PipelineService:
         self.image_review_options = image_review_options
         from .pipeline_images import PendingImages
         self._images = PendingImages(max_retained_runs)
-        self._runs: dict[tuple[str, str], CandidateExecution] = {}
+        self._runs: OrderedDict[tuple[str, str], CandidateExecution] = OrderedDict()
         self._jobs: dict[tuple[str, str], Future] = {}
         self._lock = threading.RLock()
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="inku-pipeline")
@@ -648,6 +649,8 @@ class PipelineService:
                         }):
                     self._stop_missing_image(run)
                 self._schedule(key, run)
+            else:
+                self._runs.move_to_end(key)
             return run
 
     def completion_range_states(self, owner: str, body: CompletionRangeStatesBody) -> dict:
@@ -811,7 +814,15 @@ class PipelineService:
         if record is None:
             raise HTTPException(404, "variation_not_found")
         execution_id = record.execution_id
-        run = self.execution(owner, execution_id)
+        key = (owner, execution_id)
+        with self._lock:
+            run = self._runs.get(key)
+            if run is not None:
+                self._runs.move_to_end(key)
+            else:
+                saved = json.loads(record.state_bytes)
+                run = self._host(owner, saved["snapshot"]["config"], saved["context"])
+                run.restore(saved["snapshot"], rendered=saved["rendered"])
         if run.context.get("svg_refusal") is not None:
             raise HTTPException(422, run.context["svg_refusal"])
         job = self._jobs.get((owner, execution_id))

@@ -14,9 +14,14 @@ import XCTest
         let app = AppModel(databaseURL: directory.appendingPathComponent("works.sqlite"))
         await app.initialize()
         let service = ProviderSettings(id: "choice", baseURL: URL(string: "http://127.0.0.1:1")!, requiresAPIKey: false,
-            models: [.init(id: "drawing"), .init(id: "vision", purposes: ["vision"])])
-        try await app.updateHostSettings(HostSettings(providers: [service]))
+            models: [.init(id: "drawing"), .init(id: "saved"), .init(id: "vision", purposes: ["vision"])])
+        try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "choice:saved", stage2Model: "choice:saved")))
         app.selectNextDrawingModel("choice:drawing")
+        app.wild = true
+        let ddlRequest = try app.requestForCurrentInput(inputMode: "ddl", source: "place one red circle at center.")
+        XCTAssertEqual(ddlRequest.models.stage1Model, "choice:drawing")
+        XCTAssertEqual(ddlRequest.models.stage2Model, "choice:drawing")
+        XCTAssertEqual(try ExactJSON(data: ddlRequest.renderOptions)["wild"].bool, true)
         app.catalogID = try XCTUnwrap(app.catalogs.first { $0.id != "default" }?.id)
         app.canvasID = try XCTUnwrap(app.canvases.first { $0.id != "square" }?.id)
         let chosen = try XCTUnwrap(app.drawSelections["describe"])

@@ -1152,7 +1152,7 @@ public final class AppModel {
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
             description: description ?? descriptionText,
             language: instructionLanguage(for: mode == "ddl" ? source ?? ddlText : description ?? descriptionText), catalogID: catalogID,
-            canvasID: canvasID, seed: seedText, wild: wildOverride ?? wild, settings: mode == "ddl" ? settings : nextGenerationHostSettings,
+            canvasID: canvasID, seed: seedText, wild: wildOverride ?? wild, settings: nextGenerationHostSettings,
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])

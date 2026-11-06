@@ -155,7 +155,6 @@ public enum PipelineCommand: Sendable {
     case completeHoles(expectedRevision: String, holeIDs: [String])
     case approvePatch(expectedRevision: String, proposalDigest: String)
     case declinePatch(proposalDigest: String)
-    case render(options: Data, clip: Data)
     case cancel
     func payload() throws -> ExactJSON {
         switch self {
@@ -168,7 +167,6 @@ public enum PipelineCommand: Sendable {
         case .approvePatch(let revision, let digest):
             return .object(["tag": .string("approve_patch"), "expected_revision": .string(revision), "proposal_digest": .string(digest)])
         case .declinePatch(let digest): return .object(["tag": .string("decline_patch"), "proposal_digest": .string(digest)])
-        case .render(let options, let clip): return .object(["tag": .string("render"), "options": try ExactJSON(data: options), "clip": try ExactJSON(data: clip)])
         case .cancel: return .object(["tag": .string("cancel")])
         }
     }

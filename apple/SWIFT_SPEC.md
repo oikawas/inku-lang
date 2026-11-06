@@ -180,6 +180,8 @@ The author's instruction (2026-10-18, "start implementing 3D"). It follows the f
 
 ## 2026-10-18 Library page numbers, typed page numbers, and the work search in the history strip
 
+In the macOS chronological thumbnail grid, arrow keys on a focused card preview the adjacent work horizontally or the work in the same column vertically, moving to the adjacent page at its edge.
+
 The author's instruction (2026-10-18, "reflect the following changes"). It follows the Web's Library and history strip changes of Builds 1265–1267 (`72cc0ca77`, `0f579f3d8`, `c69ede09f`, `c265e28bb`, `f62812ed3`). The next section's "Library changes the Web received after the starting point (Builds 1261–1265 …) are not included" is taken in here.
 
 - Page numbers: the pagers of the timeline and lineage views number pages from the newest (Web `libraryPagePosition`, Swift `LibraryPagePosition`). A Library opened at the selected work counts the pages in front of it (the works before the start divided by the page size, rounded up), and ← Newer takes one off while Older → adds one. Only when reaching the newest realigns the pages can the total drop by one. Paging itself is unchanged.

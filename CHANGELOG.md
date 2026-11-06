@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: use arrow keys to preview works in the chronological library thumbnail grid.
+
 - macOS: the DDL editor and layout adjustments use the current input tab's drawing model and wild setting.
 
 - macOS: while the library is open, the lineage view beneath it no longer takes presses for dragging, so a card above the lineage canvas is selected at once.

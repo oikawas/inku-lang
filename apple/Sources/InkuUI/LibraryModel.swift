@@ -348,6 +348,13 @@ public final class LibraryModel {
         await refresh(refreshLineage: false)
     }
 
+    /// Focus a work already loaded on this page without changing the page's position.
+    func requestVisibleFocus(workID: String) {
+        guard !isGrouped, works.contains(where: { $0.id == workID }) else { return }
+        focusVisits += 1
+        focusRequest = LibraryFocusRequest(workID: workID, visit: focusVisits)
+    }
+
     /// Web `setLatestPage`: the newest works, wherever the pages began.
     public func setLatestPage() async {
         startOffset = 0

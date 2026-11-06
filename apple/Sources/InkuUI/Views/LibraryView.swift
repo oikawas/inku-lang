@@ -37,6 +37,7 @@ struct LibraryView: View {
     @State private var modelLines = LibraryModelLineMemo()
     /// Keyboard focus by the reused card slot: a page turn changes no focus binding, only what the slot shows.
     @FocusState private var focusedSlot: Int?
+    @State private var movingGridPage = false
     @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
@@ -350,7 +351,9 @@ struct LibraryView: View {
                           alignment: .leading, spacing: LibraryGridPaging.gap) {
                     // Reuse the finite page's native card slots instead of destroying every
                     // button/menu on each turn. Work-specific state has its own identity below.
-                    ForEach(Array(library.works.enumerated()), id: \.offset) { slot, work in gridCard(work, slot: slot) }
+                    ForEach(Array(library.works.enumerated()), id: \.offset) { slot, work in
+                        gridCard(work, slot: slot, columns: LibraryGridPaging.columns(width: geometry.size.width - 20))
+                    }
                 }
                 .padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
             }
@@ -403,9 +406,9 @@ struct LibraryView: View {
     // MARK: Cards (Web .manager-thumb-wrap)
 
     /// The card takes values read here, so SwiftUI rebuilds a slot only when what it shows changed.
-    private func gridCard(_ work: SavedWork, slot: Int) -> some View {
+    private func gridCard(_ work: SavedWork, slot: Int, columns: Int) -> some View {
         LibraryGridCard(
-            model: model, work: work, slot: slot,
+            model: model, work: work, slot: slot, columns: columns,
             label: model.savedDisplayLabels[work.id],
             note: library.annotation(for: work.id).note,
             generation: work.lineageNodeID.flatMap { library.generations[$0] },
@@ -419,9 +422,41 @@ struct LibraryView: View {
             hashCopied: library.copiedHash == work.id,
             modelLines: modelLines.lines(for: work, providers: providers, stageProvider: model.stageDefaultProviderID),
             focus: $focusedSlot,
-            actions: LibraryGridCardActions(open: openWork, openThumbnail: openThumbnail, openLineage: openLineage,
+            actions: LibraryGridCardActions(open: openWork, openThumbnail: openThumbnail, openLineage: openLineage, move: moveGridFocus,
                                             recordHeight: recordCardHeight, menu: menuActions))
             .equatable()
+    }
+
+    private func moveGridFocus(slot: Int, direction: LibraryGridPaging.Direction, columns: Int) -> KeyPress.Result {
+        guard focusedSlot == slot else { return .ignored }
+        guard !model.isBrowsingLocked, !library.mutating, !library.loading, !movingGridPage else { return .handled }
+        let destination = LibraryGridPaging.destination(slot: slot, direction: direction, columns: columns,
+            count: library.works.count, hasPrevious: library.hasNewer, hasNext: library.shownTo < library.total)
+        switch destination {
+        case .stay: break
+        case .slot(let next):
+            guard library.works.indices.contains(next) else { return .handled }
+            focusedSlot = next
+            openWork(library.works[next])
+        case .previousPage, .nextPage:
+            movingGridPage = true
+            let previous = destination == .previousPage
+            let targetPage = library.page + (previous ? -1 : 1)
+            let pageSize = library.pageSize
+            let expectedOffset = max(0, library.startOffset + targetPage * pageSize)
+            let filter = library.filter
+            Task { @MainActor in
+                defer { movingGridPage = false }
+                await library.setPage(targetPage)
+                guard !model.isBrowsingLocked, !library.mutating, !library.loading, library.errorText == nil,
+                      !library.isGrouped, library.layout == .grid, library.filter == filter, library.pageSize == pageSize,
+                      library.shownFrom - 1 == expectedOffset,
+                      let work = previous ? library.works.last : library.works.first else { return }
+                openWork(work)
+                library.requestVisibleFocus(workID: work.id)
+            }
+        }
+        return .handled
     }
 
     /// Native facts the Web card does not print: saved time and SVG size, with the colour catalog on hover.
@@ -1242,6 +1277,7 @@ private struct LibraryGridCardActions {
     let open: (SavedWork) -> Void
     let openThumbnail: (SavedWork) -> Void
     let openLineage: (SavedWork) -> Void
+    let move: (Int, LibraryGridPaging.Direction, Int) -> KeyPress.Result
     let recordHeight: (CGFloat, String) -> Void
     let menu: LibraryWorkMenuActions
 }
@@ -1254,6 +1290,7 @@ private struct LibraryGridCard: View, Equatable {
     let model: AppModel
     let work: SavedWork
     let slot: Int
+    let columns: Int
     let label: String?
     let note: String?
     let generation: Int?
@@ -1272,7 +1309,7 @@ private struct LibraryGridCard: View, Equatable {
     private var library: LibraryModel { model.library }
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.slot == rhs.slot && lhs.work == rhs.work && lhs.label == rhs.label && lhs.note == rhs.note
+        lhs.slot == rhs.slot && lhs.columns == rhs.columns && lhs.work == rhs.work && lhs.label == rhs.label && lhs.note == rhs.note
             && lhs.generation == rhs.generation && lhs.selected == rhs.selected && lhs.previewed == rhs.previewed
             && lhs.shown == rhs.shown && lhs.focused == rhs.focused && lhs.browsingLocked == rhs.browsingLocked
             && lhs.writingDisabled == rhs.writingDisabled && lhs.mutating == rhs.mutating && lhs.hashCopied == rhs.hashCopied
@@ -1284,7 +1321,12 @@ private struct LibraryGridCard: View, Equatable {
         let title = model.workPresentationTitle(work)
         return VStack(alignment: .leading, spacing: 5) {
             // HistoryManager.svelte:1202: the click previews, a double click opens the work.
-            LibraryClickButton(preview: { actions.open(work) }, open: { actions.openThumbnail(work) }) {
+            LibraryClickButton(preview: {
+                #if os(macOS)
+                focus.wrappedValue = slot
+                #endif
+                actions.open(work)
+            }, open: { actions.openThumbnail(work) }) {
                 ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                     .aspectRatio(82.0 / 58.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
@@ -1324,6 +1366,12 @@ private struct LibraryGridCard: View, Equatable {
         }
         .contextMenu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: actions.menu) }
         .focusable().focused(focus, equals: slot)
+        #if os(macOS)
+        .onKeyPress(.leftArrow) { actions.move(slot, .left, columns) }
+        .onKeyPress(.rightArrow) { actions.move(slot, .right, columns) }
+        .onKeyPress(.upArrow) { actions.move(slot, .up, columns) }
+        .onKeyPress(.downArrow) { actions.move(slot, .down, columns) }
+        #endif
         .onKeyPress(.return) {
             guard focus.wrappedValue == slot, !model.isBrowsingLocked else { return .ignored }
             actions.open(work); return .handled

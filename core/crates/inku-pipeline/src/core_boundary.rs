@@ -161,9 +161,14 @@ impl ResolvedHostOptions {
                 HostOptionsError::CanvasRegistryIdMismatch,
             ));
         }
-        let current_digest = canvas_format_registry_digest()
-            .map_err(|_| BoundaryError::HostOptions(HostOptionsError::CanvasRegistryUnavailable))?;
-        if self.canvas_format_registry_digest != current_digest {
+        static REGISTRY_DIGEST: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+        let current_digest = REGISTRY_DIGEST
+            .get_or_init(|| canvas_format_registry_digest().ok())
+            .as_ref()
+            .ok_or(BoundaryError::HostOptions(
+                HostOptionsError::CanvasRegistryUnavailable,
+            ))?;
+        if self.canvas_format_registry_digest != *current_digest {
             return Err(BoundaryError::HostOptions(
                 HostOptionsError::CanvasRegistryDigestMismatch,
             ));
@@ -397,6 +402,13 @@ impl CompiledDelivery {
     }
 
     pub fn validate(&self) -> Result<(), BoundaryError> {
+        self.validate_with_score_digest(None)
+    }
+
+    fn validate_with_score_digest(
+        &self,
+        computed_digest: Option<&str>,
+    ) -> Result<(), BoundaryError> {
         if self.schema_id != COMPILED_DELIVERY_SCHEMA_ID
             || self.compiler_execution_schema_id != RESOURCE_COMPILER_EXECUTION_SCHEMA_ID
             || self.compilation_schema_id != TYPED_DDL_COMPILATION_SCHEMA_ID
@@ -425,8 +437,14 @@ impl CompiledDelivery {
 
         match (&self.score, self.score_digest.as_deref(), self.outcome) {
             (Some(score), Some(expected), outcome) if outcome != ScoreLoweringOutcome::Stopped => {
-                let actual =
-                    canonical_score_digest(score).map_err(|_| BoundaryError::ScoreSerialization)?;
+                let computed;
+                let actual = if let Some(digest) = computed_digest {
+                    digest
+                } else {
+                    computed = canonical_score_digest(score)
+                        .map_err(|_| BoundaryError::ScoreSerialization)?;
+                    &computed
+                };
                 if actual != expected {
                     return Err(BoundaryError::ScoreIdentityMismatch);
                 }
@@ -622,7 +640,7 @@ fn delivery_from_result(
         instruction_origins: serialize_exact_values(result.instruction_origins())?,
         anchor_origins: serialize_exact_values(result.anchor_origins())?,
     };
-    delivery.validate()?;
+    delivery.validate_with_score_digest(delivery.score_digest.as_deref())?;
     Ok(delivery)
 }
 

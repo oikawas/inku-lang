@@ -42,7 +42,7 @@ struct BatchPanelView: View {
             && model.hasAvailableBatchDrawingModel
     }
     /// Web `batchNonEmpty`: lines with something to draw besides numbers and comments.
-    private var paintableCount: Int { BatchInputLines.paintableCount(in: automation.batchText) }
+    private var paintableCount: Int { automation.paintableBatchCount }
     private var inputHeight: CGFloat { editorHeight ?? min(220, max(140, (windowSize?.height ?? 880) * 0.22)) }
     private var issueRows: [BatchRow] { automation.rows.filter { $0.state == .uncertain } }
     private var displayedWork: SavedWork? {

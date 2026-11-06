@@ -4,6 +4,14 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class BatchRequestPreparationTests: XCTestCase {
+    func testCachedBatchCountMatchesPaintableEntries() {
+        let automation = AutomationModel()
+        let lines = (0..<200).map { "花 \($0)" }
+        automation.batchText = lines.joined(separator: "\n")
+        XCTAssertEqual(automation.paintableBatchCount, BatchInputLines.paintableEntries(in: automation.batchText).count)
+        automation.batchText += "。"
+        XCTAssertEqual(automation.paintableBatchCount, BatchInputLines.paintableEntries(in: automation.batchText).count)
+    }
     func testPreparedRequestsMatchIndividualRequests() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-batch-preparation-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }

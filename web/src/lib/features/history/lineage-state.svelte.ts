@@ -91,6 +91,9 @@ export class LineageQueryState {
 
 	private loadedFocus: string | null = null;
 	private requestId = 0;
+	private controller: AbortController | null = null;
+	private pendingFocus: string | null = null;
+	private pendingLoad: Promise<void> | null = null;
 	private readonly apiFetch: ApiFetch;
 	private readonly browsingState?: LineageBrowsingState;
 
@@ -103,6 +106,10 @@ export class LineageQueryState {
 	 * Clear the graph and invalidate any graph answer already in flight.
 	 */
 	reset(): void {
+		this.controller?.abort();
+		this.controller = null;
+		this.pendingFocus = null;
+		this.pendingLoad = null;
 		this.requestId += 1;
 		this.loading = false;
 		this.error = null;
@@ -110,14 +117,31 @@ export class LineageQueryState {
 		this.loadedFocus = null;
 	}
 
-	load = async (nodeId: string, force = false, descendantDepth = 3): Promise<void> => {
-		if (!nodeId || (!force && this.loadedFocus === nodeId)) return;
+	load = (nodeId: string, force = false, descendantDepth = 3): Promise<void> => {
+		if (nodeId && this.pendingFocus === nodeId && this.pendingLoad) return this.pendingLoad;
+		if (!nodeId) return Promise.resolve();
+		if (!force && this.loadedFocus === nodeId) {
+			if (this.pendingLoad) { this.controller?.abort(); this.requestId++; this.pendingLoad = null; this.pendingFocus = null; this.loading = false; }
+			return Promise.resolve();
+		}
+		this.controller?.abort();
+		const controller = this.controller = new AbortController();
+		this.pendingFocus = nodeId;
+		const pending = this.loadFocus(nodeId, descendantDepth, controller);
+		this.pendingLoad = pending;
+		void pending.finally(() => {
+			if (this.pendingLoad === pending) { this.pendingLoad = null; this.pendingFocus = null; }
+		});
+		return pending;
+	};
+
+	private async loadFocus(nodeId: string, descendantDepth: number, controller: AbortController): Promise<void> {
 		const requestId = ++this.requestId;
 		this.loading = true;
 		this.error = null;
 		try {
 			const readGraph = async (id: string, depth: number): Promise<LineageGraph> => {
-				const response = await this.apiFetch(`/api/lineage/${encodeURIComponent(id)}?descendant_depth=${depth}&node_limit=200&include_svg=false`, { cache: 'no-store' });
+				const response = await this.apiFetch(`/api/lineage/${encodeURIComponent(id)}?descendant_depth=${depth}&node_limit=200&include_svg=false`, { cache: 'no-store', signal: controller.signal });
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
 				return await response.json() as LineageGraph;
 			};
@@ -138,7 +162,7 @@ export class LineageQueryState {
 			this.graph = { ...graph, focus_node_id: nodeId };
 			this.loadedFocus = nodeId;
 		} catch (cause) {
-			if (requestId === this.requestId) {
+			if (requestId === this.requestId && !controller.signal.aborted) {
 				this.error = cause instanceof Error ? cause.message : String(cause);
 				this.graph = null;
 				this.loadedFocus = null;
@@ -147,10 +171,11 @@ export class LineageQueryState {
 		} finally {
 			if (requestId === this.requestId) this.loading = false;
 		}
-	};
+	}
 
 	loadBranch = async (nodeId: string): Promise<void> => {
 		if (!this.graph) return;
+		this.controller?.abort(); this.pendingLoad = null; this.pendingFocus = null;
 		const focusNodeId = this.graph.focus_node_id;
 		const requestId = ++this.requestId;
 		this.loading = true;
@@ -180,6 +205,7 @@ export class LineageQueryState {
 	loadOverview = async (fallbackFocusNodeId: string | null | undefined): Promise<void> => {
 		const focusNodeId = this.graph?.focus_node_id ?? fallbackFocusNodeId ?? null;
 		if (!focusNodeId || !this.graph) return;
+		this.controller?.abort(); this.pendingLoad = null; this.pendingFocus = null;
 		const childIds = new Set(this.graph.edges.map((edge) => edge.child_node_id));
 		const rootNodeId = this.graph.nodes.find((node) => !childIds.has(node.id))?.id ?? focusNodeId;
 		const requestId = ++this.requestId;

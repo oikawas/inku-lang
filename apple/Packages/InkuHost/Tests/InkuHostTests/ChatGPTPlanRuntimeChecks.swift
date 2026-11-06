@@ -5,6 +5,18 @@ import XCTest
 @testable import InkuHost
 
 final class ChatGPTPlanRuntimeChecks: XCTestCase {
+    func testStoreReloadsAfterAnotherStoreReplacesFile() throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let reader = ChatGPTPlanStore(directory: fixture.folder, keys: fixture.store.keys)
+        let before = try reader.load()
+        XCTAssertEqual(try reader.load().profiles[fixture.activeID]?.generation, 1)
+        var changed = before
+        changed.profiles[fixture.activeID]?.generation += 1
+        try fixture.store.write(changed)
+        XCTAssertEqual(try reader.load().profiles[fixture.activeID]?.generation, 2)
+    }
+
     // The core's owner limit still admits one local listener and rejects a second until cancellation.
     func testCoreAttemptLimitKeepsSingleLocalAuthorization() async throws {
         let fixture = try RuntimeFixture(expired: false)

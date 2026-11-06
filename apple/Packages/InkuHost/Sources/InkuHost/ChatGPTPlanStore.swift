@@ -129,11 +129,36 @@ struct ChatGPTKeychainVaultKeyStore: ChatGPTVaultKeyStore {
     }
 }
 
+private struct ChatGPTVaultFileIdentity: Equatable {
+    let device: dev_t
+    let inode: ino_t
+    let size: off_t
+    let modifiedSeconds: time_t
+    let modifiedNanoseconds: Int
+    init(_ info: stat) {
+        device = info.st_dev; inode = info.st_ino; size = info.st_size
+        modifiedSeconds = info.st_mtimespec.tv_sec; modifiedNanoseconds = info.st_mtimespec.tv_nsec
+    }
+}
+
+private final class ChatGPTVaultCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entry: (ChatGPTVaultFileIdentity, ChatGPTVaultState)?
+    func value(for identity: ChatGPTVaultFileIdentity) -> ChatGPTVaultState? {
+        lock.withLock { entry.flatMap { $0.0 == identity ? $0.1 : nil } }
+    }
+    func set(_ value: ChatGPTVaultState, identity: ChatGPTVaultFileIdentity) {
+        lock.withLock { entry = (identity, value) }
+    }
+    func clear() { lock.withLock { entry = nil } }
+}
+
 /// Profiles, identity and rotated tokens have a single atomic encrypted-file commit.
 struct ChatGPTPlanStore: Sendable {
     private static let maximumBytes = 1_048_576
     let directory: URL
     let keys: any ChatGPTVaultKeyStore
+    private let cache = ChatGPTVaultCache()
     var stateURL: URL { directory.appendingPathComponent("profiles.sealed") }
     init(directory: URL, keys: (any ChatGPTVaultKeyStore)? = nil) {
         self.directory = directory
@@ -141,15 +166,17 @@ struct ChatGPTPlanStore: Sendable {
         self.keys = keys ?? ChatGPTKeychainVaultKeyStore(account: account)
     }
     func load() throws -> ChatGPTVaultState {
-        guard FileManager.default.fileExists(atPath: stateURL.path) else { return .init() }
+        guard FileManager.default.fileExists(atPath: stateURL.path) else { cache.clear(); return .init() }
         try checkDirectory()
         let descriptor = Darwin.open(stateURL.path, O_RDONLY | O_NOFOLLOW)
         guard descriptor >= 0 else { throw HostError("chatgpt_credentials_unavailable") }
         defer { Darwin.close(descriptor) }
         var info = stat()
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
-              info.st_mode & 0o077 == 0, info.st_uid == getuid(), info.st_size <= Self.maximumBytes,
-              let key = try keys.readKey() else { throw HostError("chatgpt_credentials_unavailable") }
+              info.st_mode & 0o077 == 0, info.st_uid == getuid(), info.st_size <= Self.maximumBytes else { throw HostError("chatgpt_credentials_unavailable") }
+        let identity = ChatGPTVaultFileIdentity(info)
+        if let cached = cache.value(for: identity) { return cached }
+        guard let key = try keys.readKey() else { throw HostError("chatgpt_credentials_unavailable") }
         var data = Data(); var buffer = [UInt8](repeating: 0, count: 16384)
         while true {
             let count = Darwin.read(descriptor, &buffer, buffer.count)
@@ -164,6 +191,7 @@ struct ChatGPTPlanStore: Sendable {
             guard value.schema == "inku.chatgpt-plan.v1", value.profiles.count <= 8, value.pendingRegistrations.count <= 8 else {
                 throw HostError("chatgpt_credentials_unavailable")
             }
+            cache.set(value, identity: identity)
             return value
         } catch { throw HostError("chatgpt_credentials_unavailable") }
     }
@@ -196,6 +224,9 @@ struct ChatGPTPlanStore: Sendable {
         guard directoryFD >= 0 else { throw HostError("chatgpt_credentials_write_failed") }
         defer { Darwin.close(directoryFD) }
         guard fsync(directoryFD) == 0 else { throw HostError("chatgpt_credentials_write_failed") }
+        var info = stat()
+        if fstat(descriptor, &info) == 0 { cache.set(value, identity: ChatGPTVaultFileIdentity(info)) }
+        else { cache.clear() }
     }
     func ensureDirectory() throws {
         if !FileManager.default.fileExists(atPath: directory.path) {

@@ -851,3 +851,22 @@ def test_snapshot_reuses_render_digest_until_render_or_ranges_change(monkeypatch
         assert len(calls) == 3
     finally:
         service.close()
+
+
+@pytest.mark.parametrize("reason", ["database_restoring", "database_write_locked"])
+def test_blocked_pipeline_snapshot_does_not_write(monkeypatch, reason):
+    from inku_server import db
+    from inku_server.pipeline_candidate import CandidateHostError
+
+    monkeypatch.setattr(db, "database_write_block_reason", lambda: reason)
+    class Store:
+        def create_execution(self, *args):
+            pytest.fail("blocked snapshot was written")
+    service = PipelineService(None, Store(), config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1)
+    try:
+        run = service._host("owner", {}, {})
+        with pytest.raises(CandidateHostError, match=reason):
+            run.save_snapshot(None, {"execution_id": "e", "variation_id": "v", "sequence": "0"}, {}, None)
+    finally:
+        service.close()

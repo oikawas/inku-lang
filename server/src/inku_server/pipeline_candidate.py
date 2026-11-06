@@ -367,6 +367,14 @@ class CandidateExecution:
             if self._snapshot is not None and self._snapshot.get("action") is not None:
                 self.command({"tag": "cancel"})
 
+    def fail_without_persist(self, reason: str) -> None:
+        """Stop a resident run without writing while database writes are blocked."""
+        with self._changed:
+            if self._snapshot is not None:
+                self._snapshot = {**self._snapshot, "action": None}
+                self.context["host_failure"] = reason
+                self._changed.notify_all()
+
     @property
     def busy(self) -> bool:
         snapshot = self._snapshot

@@ -350,6 +350,8 @@ class PipelineService:
 
         def save(previous, snapshot, host_context, rendered):
             nonlocal last_rendered, last_ranges, last_digest
+            from . import db
+            db.require_background_write()
             if rendered is None:
                 host_context.pop("result", None)
                 host_context.pop("render_digest", None)
@@ -632,7 +634,10 @@ class PipelineService:
             code = detail.get("code") if isinstance(detail, dict) else getattr(error, "code", None)
             if not isinstance(code, str) or not code:
                 code = str(error) if isinstance(error, CandidateHostError) else "pipeline_effect_failed"
-            run.command({"tag": "cancel"}, context_updates={"host_failure": code})
+            if code in {"database_restoring", "database_write_locked"}:
+                run.fail_without_persist(code)
+            else:
+                run.command({"tag": "cancel"}, context_updates={"host_failure": code})
         finally:
             # An unsuccessful host job is not allowed to retain source pixels.
             if not run.view()["busy"] or run.context.get("image_provenance") is not None:
@@ -641,6 +646,8 @@ class PipelineService:
     def _drain_steps(self, run: CandidateExecution) -> None:
         # This is a host work cap, never a replacement retry policy.
         for _ in range(self.max_effect_steps):
+            from . import db
+            db.require_background_write()
             view = run.view()
             if not view["busy"]:
                 run.image_data.clear()

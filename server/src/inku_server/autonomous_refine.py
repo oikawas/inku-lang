@@ -199,6 +199,8 @@ class RunStore:
         self.engine = create_sqlite_engine(url, setting=RUNS_DB_ENV, pragmas=THUMBNAIL_SQLITE_PRAGMAS)
         _Base.metadata.create_all(self.engine)
         self._sessions = sessionmaker(bind=self.engine, autocommit=False, autoflush=False)
+        self._blocked_runs: dict[str, dict[str, Any]] = {}
+        self._blocked_lock = threading.Lock()
 
     @staticmethod
     def _run(row: AutonomousRunRow) -> dict[str, Any]:
@@ -212,6 +214,7 @@ class RunStore:
         }
 
     def save(self, run: dict[str, Any]) -> None:
+        _db.require_background_write()
         run["updated_at"] = _now()
         with self._sessions() as session:
             row = session.get(AutonomousRunRow, run["id"])
@@ -229,32 +232,56 @@ class RunStore:
             row.updated_at = run["updated_at"]
             session.commit()
 
+    def record_blocked(self, run: dict[str, Any]) -> None:
+        with self._blocked_lock:
+            self._blocked_runs[run["id"]] = dict(run)
+
+    def _reconcile_blocked(self) -> None:
+        with self._blocked_lock:
+            if not self._blocked_runs:
+                return
+            try:
+                _db.require_background_write()
+                for run_id, run in list(self._blocked_runs.items()):
+                    self.save(run)
+                    del self._blocked_runs[run_id]
+            except CandidateHostError:
+                return
+
     def get(self, owner: str, run_id: str) -> dict[str, Any] | None:
+        self._reconcile_blocked()
+        blocked = self._blocked_runs.get(run_id)
+        if blocked is not None and blocked["owner_id"] == owner:
+            return dict(blocked)
         with self._sessions() as session:
             row = session.get(AutonomousRunRow, run_id)
             return self._run(row) if row is not None and row.owner_id == owner else None
 
     def running(self, owner: str) -> dict[str, Any] | None:
+        self._reconcile_blocked()
         with self._sessions() as session:
-            row = session.scalars(select(AutonomousRunRow).where(
+            rows = session.scalars(select(AutonomousRunRow).where(
                 AutonomousRunRow.owner_id == owner, AutonomousRunRow.state == "running",
-            ).order_by(AutonomousRunRow.created_at.desc())).first()
+            ).order_by(AutonomousRunRow.created_at.desc())).all()
+            row = next((candidate for candidate in rows if candidate.id not in self._blocked_runs), None)
             return self._run(row) if row is not None else None
 
     def list_running(self, owner: str | None = None) -> list[dict[str, Any]]:
+        self._reconcile_blocked()
         with self._sessions() as session:
             query = select(AutonomousRunRow).where(AutonomousRunRow.state == "running")
             if owner is not None:
                 query = query.where(AutonomousRunRow.owner_id == owner)
             rows = session.scalars(query.order_by(AutonomousRunRow.created_at.desc())).all()
-            return [self._run(row) for row in rows]
+            return [self._run(row) for row in rows if row.id not in self._blocked_runs]
 
     def for_history(self, owner: str, history_id: str, limit: int = 5) -> list[dict[str, Any]]:
+        self._reconcile_blocked()
         with self._sessions() as session:
             rows = session.scalars(select(AutonomousRunRow).where(
                 AutonomousRunRow.owner_id == owner, AutonomousRunRow.history_id == history_id,
             ).order_by(AutonomousRunRow.created_at.desc()).limit(limit)).all()
-            return [self._run(row) for row in rows]
+            return [dict(self._blocked_runs.get(row.id) or self._run(row)) for row in rows]
 
     def interrupt_running(self) -> list[dict[str, Any]]:
         """Mark the runs that were being taken when the Server stopped, and return them."""
@@ -279,7 +306,7 @@ class _Stopped(Exception):
 def _code(error: Exception) -> str:
     """A short reason for a try from what refused it."""
     if isinstance(error, CandidateHostError):
-        return error.code
+        return str(error)
     if isinstance(error, HTTPException):
         detail = error.detail
         if isinstance(detail, dict):
@@ -482,7 +509,12 @@ class AutonomousRunner:
             _logger.exception("autonomous_run_failed run=%s", run["id"])
             run["current"] = None
             run["error"] = f"{type(error).__name__}: {error}"[:500]
-            self._finish(run, "failed", "error")
+            code = _code(error)
+            if code in {"database_restoring", "database_write_locked"}:
+                run["state"], run["stop_reason"] = "failed", code
+                self.store.record_blocked(run)
+            else:
+                self._finish(run, "failed", "error")
         finally:
             from .chatgpt_runtime import retire_execution
             retire_execution(run["owner_id"], f"autonomous:{run['id']}")
@@ -571,6 +603,7 @@ class AutonomousRunner:
         if recorded.get("outcome") != "ok":
             raise RuntimeError(f"record refused: {recorded.get('reason')}: {recorded.get('detail')}")
         if child.get("lineage_node_id"):
+            _db.require_background_write()
             _db.set_lineage_edge_metadata(run["owner_id"], child["lineage_node_id"],
                                           {**initial, **recorded["metadata"]})
         return {"outcome": outcome, "share": measured["share"], "history_id": child.get("history_id"),

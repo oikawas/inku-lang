@@ -267,7 +267,7 @@ app.add_middleware(CrossSiteWriteGuardMiddleware, origin_allowed=_cors_origin_al
 # An administrator's lock on every write; the switch and signing in and out pass.
 app.add_middleware(
     DbWriteLockMiddleware,
-    is_locked=lambda: _db.db_restoring() or bool(_db.get_db_write_lock()["locked"]),
+    is_locked=lambda: _db.database_write_block_reason() is not None,
     exempt_paths=frozenset({"/api/settings/db-write-lock", "/api/auth/login", "/api/auth/logout"}),
 )
 

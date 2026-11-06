@@ -988,6 +988,25 @@ def db_restoring() -> bool:
     return _db_restoring.is_set()
 
 
+def database_write_block_reason() -> str | None:
+    if db_restoring():
+        return "database_restoring"
+    try:
+        locked = get_db_write_lock()["locked"]
+    except Exception:  # noqa: BLE001
+        return "database_write_locked"
+    if locked:
+        return "database_write_locked"
+    return None
+
+
+def require_background_write() -> None:
+    from .pipeline_candidate import CandidateHostError
+    reason = database_write_block_reason()
+    if reason:
+        raise CandidateHostError(reason)
+
+
 def restore_db_backup(kind: str, name: str) -> dict:
     # Writes are refused while the copy goes in (the write-lock middleware reads
     # db_restoring), and pooled connections are dropped afterwards so none keeps

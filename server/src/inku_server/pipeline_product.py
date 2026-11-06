@@ -654,6 +654,7 @@ class ProductPipelineEffects:
 
     def save_result(self, owner: str, snapshot: dict, context: dict, rendered: dict) -> dict:
         from . import db
+        db.require_background_write()
         from .api_core.common import _build_number
         from .api_core.rendering import _output_prefix, _render_warnings, _submit_history_artifact_save, _SRGB_COLOR_PROFILE
         from .api_core.thumbnails import submit_thumbnail_build

@@ -18,6 +18,7 @@ public enum LibraryAnnotationMark: Sendable {
 
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
+    public static let currentSchemaVersion = 8
     public nonisolated let url: URL
     let queue: DatabaseQueue
 
@@ -1120,7 +1121,7 @@ public actor InkuDatabase {
         return try String(contentsOf: resource, encoding: .utf8)
     }
 
-    private static func schemaSQL(version: Int = 8) throws -> String {
+    private static func schemaSQL(version: Int = InkuDatabase.currentSchemaVersion) throws -> String {
         let baseline = try resourceSQL("schema-v1")
         if version == 1 { return baseline }
         let second = baseline + "\n" + (try resourceSQL("migration-v2"))

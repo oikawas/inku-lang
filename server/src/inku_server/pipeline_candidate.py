@@ -443,6 +443,10 @@ class CandidateExecution:
                               busy=False, rendered=None, result=None)
             if self.context.get("provider_failure") is not None:
                 result["provider_failure"] = self.context["provider_failure"]
+            if self.context.get("host_failure") is not None:
+                code = self.context["host_failure"]
+                result["phase"] = {"tag": "failed", "reason": code}
+                result["provider_failure"] = {"failure": code, "stage": "host", "attempt": 0}
             if self.context.get("image_failure") is not None:
                 result["image_failure"] = self.context["image_failure"]
             attempt = self._provider_attempt(state)

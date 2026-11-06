@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import threading
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import asdict
@@ -39,6 +40,22 @@ _UNSAVED_PARENT_STEPS = 8
 
 
 _logger = logging.getLogger(__name__)
+
+
+def _wait_for_render_capacity(render: Callable[[], object]):
+    from .api_core.state import _RENDER_TURN_WAIT_SECONDS
+
+    deadline = time.monotonic() + _RENDER_TURN_WAIT_SECONDS
+    while True:
+        try:
+            return render()
+        except HTTPException as error:
+            if error.status_code != 503 or error.detail != "render capacity is full":
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(0.1, remaining))
 
 
 def _drawn_description(text: str) -> str:
@@ -574,6 +591,13 @@ class PipelineService:
     def _drain(self, run: CandidateExecution) -> None:
         try:
             self._drain_steps(run)
+        except Exception as error:
+            _logger.exception("pipeline_job_failed execution_id=%s", run.view()["execution_id"])
+            detail = error.detail if isinstance(error, HTTPException) else None
+            code = detail.get("code") if isinstance(detail, dict) else getattr(error, "code", None)
+            if not isinstance(code, str) or not code:
+                code = str(error) if isinstance(error, CandidateHostError) else "pipeline_effect_failed"
+            run.command({"tag": "cancel"}, context_updates={"host_failure": code})
         finally:
             # An unsuccessful host job is not allowed to retain source pixels.
             if not run.view()["busy"] or run.context.get("image_provenance") is not None:
@@ -598,7 +622,7 @@ class PipelineService:
                 if payload is not None:
                     # Persist the acknowledged source's safe performance before
                     # bounded provider I/O can fail or produce a declined patch.
-                    run.command(payload)
+                    _wait_for_render_capacity(lambda: run.command(payload))
             run.run_effect()
         if run.view()["busy"]:
             raise CandidateHostError("pipeline_effect_limit")

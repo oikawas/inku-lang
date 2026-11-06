@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
+import pytest
 from sqlalchemy import create_engine, select
 
 from inku_server.persistence.schema import Base, HistoryRow
@@ -508,3 +510,37 @@ def test_a_job_that_stops_on_an_exception_leaves_it_in_the_log(caplog):
     caplog.clear()
     PipelineService._log_job_failure(("owner", "execution-2"), finished)
     assert caplog.records == []
+
+
+@pytest.mark.parametrize("error, code", [
+    (RuntimeError("unexpected"), "pipeline_effect_failed"),
+    (HTTPException(503, {"code": "render_busy"}), "render_busy"),
+])
+def test_failed_drain_records_failure_and_releases_capacity(error, code):
+    class Run:
+        owner_id = "owner"
+        image_data = {}
+        context = {}
+        busy = True
+
+        def view(self):
+            return {"execution_id": "run", "busy": self.busy}
+
+        def command(self, payload, *, context_updates):
+            assert payload == {"tag": "cancel"}
+            self.context.update(context_updates)
+            self.busy = False
+
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1)
+    run = Run()
+    service._runs[("owner", "run")] = run
+    service._drain_steps = lambda _: (_ for _ in ()).throw(error)
+    try:
+        service._drain(run)
+        assert run.context["host_failure"] == code
+        assert not run.view()["busy"]
+        service._reserve_run()
+        assert not service._runs
+    finally:
+        service.close()

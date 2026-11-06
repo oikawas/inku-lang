@@ -159,6 +159,7 @@ struct Builder<'a> {
     /// Top-level transform groups already cloned into `output`.
     cloned_top_transforms: HashSet<usize>,
     instance_prefixes: BTreeMap<(usize, usize), Sha256>,
+    groups_by_start: BTreeMap<usize, Vec<GroupId>>,
 }
 
 impl<'a> Builder<'a> {
@@ -178,6 +179,25 @@ impl<'a> Builder<'a> {
             mirror_relations: Vec::new(),
             resource_policy: None,
         };
+        let mut groups_by_start: BTreeMap<usize, Vec<GroupId>> = BTreeMap::new();
+        for (index, group) in request.score.placement_groups.iter().enumerate() {
+            groups_by_start
+                .entry(group.start)
+                .or_default()
+                .push(GroupId::Placement(index));
+        }
+        for (index, group) in request.score.fill_groups.iter().enumerate() {
+            groups_by_start
+                .entry(group.start)
+                .or_default()
+                .push(GroupId::Fill(index));
+        }
+        for (index, group) in request.score.repetition_groups.iter().enumerate() {
+            groups_by_start
+                .entry(group.member.start)
+                .or_default()
+                .push(GroupId::Repetition(index));
+        }
         Self {
             request,
             output,
@@ -195,6 +215,7 @@ impl<'a> Builder<'a> {
             diagnostics: Vec::new(),
             cloned_top_transforms: HashSet::new(),
             instance_prefixes: BTreeMap::new(),
+            groups_by_start,
         }
     }
 
@@ -438,30 +459,10 @@ impl<'a> Builder<'a> {
     }
 
     fn group_at(&self, start: usize, end: usize, skipped: &[GroupId]) -> Option<GroupId> {
-        let candidates = self
-            .request
-            .score
-            .placement_groups
+        self.groups_by_start
+            .get(&start)?
             .iter()
-            .enumerate()
-            .map(|(index, _)| GroupId::Placement(index))
-            .chain(
-                self.request
-                    .score
-                    .fill_groups
-                    .iter()
-                    .enumerate()
-                    .map(|(index, _)| GroupId::Fill(index)),
-            )
-            .chain(
-                self.request
-                    .score
-                    .repetition_groups
-                    .iter()
-                    .enumerate()
-                    .map(|(index, _)| GroupId::Repetition(index)),
-            );
-        candidates
+            .copied()
             .filter(|id| !skipped.contains(id))
             .filter(|&id| {
                 let range = self.group_range(id);

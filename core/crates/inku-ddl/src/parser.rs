@@ -727,6 +727,7 @@ struct ParseMemo {
     candidates: HashMap<(usize, &'static str), Vec<Candidate>>,
     relative_heads: HashMap<(usize, &'static str), bool>,
     left_ends: Option<Rc<LeftCandidateEnds>>,
+    normalized_lock_names: Option<Rc<Vec<Option<Vec<String>>>>>,
 }
 
 thread_local! {
@@ -792,29 +793,52 @@ pub(crate) fn qualified_macro_match(
     let source = document.source();
     if let Some((end_byte, name)) = bracketed_plugin_at(source, start_byte) {
         let normalized = crate::plugin_names::normalize_plugin_name(name);
-        let lock_indices: Vec<usize> = document
-            .macro_locks()
+        let memo = PARSE_MEMO.with(|slot| slot.borrow().clone());
+        let cached = memo
+            .as_ref()
+            .and_then(|memo| memo.borrow().normalized_lock_names.clone());
+        let names = cached.unwrap_or_else(|| {
+            let names = Rc::new(
+                document
+                    .macro_locks()
+                    .iter()
+                    .map(|lock| {
+                        let (_, heading) = lock.qualified_name().split_once('.')?;
+                        let names = if lock.plugin_names().is_empty() {
+                            let aliases = lock
+                                .aliases()
+                                .iter()
+                                .filter_map(|alias| {
+                                    alias.split_once('.').map(|(_, name)| name.to_owned())
+                                })
+                                .collect::<Vec<_>>();
+                            let (ja, en) = crate::plugin_names::v1_plugin_names(heading, &aliases);
+                            ja.into_iter().chain(en).collect::<Vec<_>>()
+                        } else {
+                            lock.plugin_names().to_vec()
+                        };
+                        Some(
+                            names
+                                .iter()
+                                .map(|name| crate::plugin_names::normalize_plugin_name(name))
+                                .collect(),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            if let Some(memo) = memo {
+                memo.borrow_mut().normalized_lock_names = Some(Rc::clone(&names));
+            }
+            names
+        });
+        let lock_indices: Vec<usize> = names
             .iter()
             .enumerate()
-            .filter_map(|(index, lock)| {
-                let (_, heading) = lock.qualified_name().split_once('.')?;
-                let aliases = lock
-                    .aliases()
-                    .iter()
-                    .filter_map(|alias| alias.split_once('.').map(|(_, name)| name.to_owned()))
-                    .collect::<Vec<_>>();
-                let (ja, en) = crate::plugin_names::v1_plugin_names(heading, &aliases);
-                let fallback = ja.into_iter().chain(en).collect::<Vec<_>>();
-                let names = if lock.plugin_names().is_empty() {
-                    &fallback
-                } else {
-                    lock.plugin_names()
-                };
+            .filter_map(|(index, names)| {
                 names
+                    .as_ref()?
                     .iter()
-                    .any(|visible| {
-                        crate::plugin_names::normalize_plugin_name(visible) == normalized
-                    })
+                    .any(|visible| *visible == normalized)
                     .then_some(index)
             })
             .collect();

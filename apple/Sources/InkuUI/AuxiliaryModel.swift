@@ -282,10 +282,6 @@ public final class AuxiliaryModel {
         return app.catalogs.filter { $0.id != current }.randomElement()?.id ?? current ?? app.catalogs.first?.id
     }
 
-    public static func kindLabel(_ kind: String) -> String {
-        ["reinterpretation": "読み取り", "catalog_change": "色", "layout_change": "配置", "touch_change": "タッチ", "variation": "変奏"][kind] ?? kind
-    }
-
     /// The thumbnail is an observation input; the saved SVG is never rewritten.
     nonisolated static func png(svgs: [String], visionAdvice: Bool = false, visionSide: UInt32 = 768) async throws -> Data? {
         let clean = svgs.filter { !$0.isEmpty }

@@ -460,14 +460,6 @@ struct LibraryView: View {
         return .handled
     }
 
-    /// Native facts the Web card does not print: saved time and SVG size, with the colour catalog on hover.
-    private func savedFacts(_ work: SavedWork) -> some View {
-        (Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
-            + Text(" · " + ByteCountFormatter.string(fromByteCount: svgBytes(work), countStyle: .file)))
-            .inkuFont(10).monospacedDigit().foregroundStyle(.tertiary).lineLimit(1)
-            .inkuTooltip(display.tooltipValue(display.localized("色") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? display.localized("未記録"))), focus: .none)
-    }
-
     private var currentBadge: some View { LibraryCurrentBadge(display: display) }
 
     private func selectionCheck(_ work: SavedWork) -> some View {
@@ -717,7 +709,7 @@ struct LibraryView: View {
             .overlay(alignment: .topTrailing) {
                 // HistoryManager.svelte:1054 `.lineage-generation-badge`, in the thumbnail lane only.
                 if model.selectedWorkID == work.id { currentBadge.padding(3) }
-                else if library.layout != .list { generationBadge(work, plate: false).padding(8) }
+                else if library.layout != .list { generationBadge(work).padding(8) }
             }
             HStack(spacing: 4) {
                 LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
@@ -893,17 +885,14 @@ struct LibraryView: View {
             : display.tooltip("作品UUIDをコピー", serverKey: "historyIdCopyTitle")
     }
 
-    @ViewBuilder private func generationBadge(_ work: SavedWork, plate: Bool) -> some View {
+    @ViewBuilder private func generationBadge(_ work: SavedWork) -> some View {
         if let generation = work.lineageNodeID.flatMap({ library.generations[$0] }) {
             Text("\(generation)")
-                .font(.system(size: (plate ? 10 : 9) * display.preferences.textScale, weight: plate ? .semibold : .regular))
-                .monospacedDigit()
-                .foregroundStyle(plate ? Color.secondary : Color.accentColor)
-                .padding(.horizontal, plate ? 3 : 5).padding(.vertical, plate ? 0 : 1)
-                .frame(minWidth: 16, minHeight: plate ? 16 : nil)
-                .background(plate ? AnyShapeStyle(.background.opacity(0.9)) : AnyShapeStyle(Color.accentColor.opacity(0.14)),
-                            in: RoundedRectangle(cornerRadius: plate ? 3 : 8))
-                .overlay(RoundedRectangle(cornerRadius: plate ? 3 : 8).stroke(plate ? LibraryChrome.border : Color.clear))
+                .font(.system(size: 9 * display.preferences.textScale, weight: .regular))
+                .monospacedDigit().foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 5).padding(.vertical, 1).frame(minWidth: 16)
+                .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.clear))
                 .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"), focus: .none)
         }
     }

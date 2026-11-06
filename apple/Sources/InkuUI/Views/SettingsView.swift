@@ -32,23 +32,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         #endif
         }
     }
-    var symbol: String {
-        switch self {
-        case .display: "slider.horizontal.3"; case .making: "paintbrush.pointed"; case .drawDefaults: "paintpalette"
-        case .demo: "play.rectangle"
-        #if os(macOS)
-        case .image: "photo"
-        #endif
-        case .models: "cpu"; case .personalPlan: "person.crop.circle"
-        case .database: "externaldrive"; case .export: "square.and.arrow.up"
-        case .clipboard: "doc.on.clipboard"; case .plugins: "puzzlepiece.extension"
-        case .unread: "text.magnifyingglass"; case .limits: "gauge.with.dots.needle.33percent"
-        case .other: "ellipsis.circle"; case .native: "desktopcomputer"
-        #if !os(macOS)
-        case .about: "info.circle"
-        #endif
-        }
-    }
+
 }
 
 @MainActor struct SettingsView: View {
@@ -67,10 +51,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @State private var fanoutDraft = "4"
     @State private var fanoutError: String?
     private var detailed: Bool { model.display.preferences.settingsDetail == "detailed" }
-    private var sections: [SettingsSection] {
-        SettingsSection.allCases.filter { detailed || ![.plugins, .unread, .limits].contains($0) }
-    }
-
     var onClose: () -> Void = {}
 
     var body: some View {

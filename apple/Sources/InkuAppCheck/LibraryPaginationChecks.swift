@@ -308,11 +308,24 @@ private actor PaginationLineageReader: LineageReading {
 /// Use a disposable Backup API copy, never the author's live canonical database.
 @MainActor
 func runLibraryPaginationBenchmark(url: URL) async throws {
-    guard url.lastPathComponent == "identity-check.sqlite", FileManager.default.fileExists(atPath: url.path) else {
+    let resolved = url.standardizedFileURL.resolvingSymlinksInPath()
+    let path = resolved.path
+    let temporaryRoots = [FileManager.default.temporaryDirectory, URL(fileURLWithPath: "/private/tmp", isDirectory: true)]
+        .map { $0.standardizedFileURL.resolvingSymlinksInPath().path + "/" }
+    let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+        .standardizedFileURL.resolvingSymlinksInPath().path
+    let inApplicationSupport = applicationSupport.map { path == $0 || path.hasPrefix($0 + "/") } ?? true
+    let markedCopy = resolved.deletingLastPathComponent().pathComponents.contains { component in
+        let name = component.lowercased()
+        return ["disposable", "rehearsal", "scratch", "test-copy"].contains { name.contains($0) }
+    }
+    guard url.isFileURL, !inApplicationSupport, resolved.lastPathComponent == "identity-check.sqlite",
+          temporaryRoots.contains(where: { path.hasPrefix($0) }) || markedCopy,
+          FileManager.default.fileExists(atPath: path) else {
         throw CheckFailure.message("Use an existing disposable identity-check.sqlite copy")
     }
-    let database = try InkuDatabase(url: url)
-    let store = try ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url))
+    let database = try InkuDatabase(url: resolved)
+    let store = try ThumbnailStore(url: ThumbnailStore.url(besideDatabase: resolved))
     let host = PipelineHost(database: database)
     print("offset,include_svg,median_list_ms,svg_bytes_copied,thumbnail_ms,store_hits,memory_hits,baked")
     for offset in [0, 56, 112, 168] {

@@ -322,14 +322,14 @@ struct CreationView: View {
                 }.pickerStyle(.segmented).disabled(controlsDisabled)
                 if batchKind == "image" { imageFolderPanel }
                 else {
-                    BatchPanelView(model: model, automation: automation, inputOnly: true,
+                    BatchPanelView(model: model, automation: automation,
                                    onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                                    followsLatestWork: batchWorkspace.followsLatest,
                                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
                                    onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
                 }
                 #else
-                BatchPanelView(model: model, automation: automation, inputOnly: true,
+                BatchPanelView(model: model, automation: automation,
                     onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                     followsLatestWork: batchWorkspace.followsLatest,
                     selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,

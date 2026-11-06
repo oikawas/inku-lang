@@ -248,6 +248,43 @@ struct Bootstrap: @unchecked Sendable {
         return BatchInvariant(maps: maps, encodedMaps: encoded, catalogs: catalogs)
     }
 
+    func reseedBatchRequest(_ template: GenerationRequest, seed: String, language: String,
+                            invariant: BatchInvariant) throws -> GenerationRequest {
+        guard let parsed = UInt64(seed), String(parsed) == seed else { throw HostError("invalid_seed") }
+        var request = template
+        var options = try Self.object(request.renderOptions)
+        guard let selected = options["catalog_id"] as? String else { throw HostError("color_catalogs_invalid") }
+        options["render_seed"] = seed
+        request.renderOptions = try Self.bytes(options)
+        var config = try ExactJSON(data: request.configuration)
+        let host = config["compiler"]["host"]
+        let background = try Self.object(host.data)["background"] ?? "white"
+        let hasColors = config["colors"].object != nil
+        func palette(_ id: String) throws -> ExactJSON {
+            guard let map = invariant.maps[id], let record = catalogRecords.first(where: { $0["id"] as? String == id }) else {
+                throw HostError("color_catalogs_invalid")
+            }
+            let value = try Self.object(InkuCore.resolvePalette(Self.bytes([
+                "color_map": map, "catalog_id": id, "render_seed": seed, "background": background,
+            ])))
+            let named = hasColors ? Self.withPaintNames(value, record: record, language: language) ?? value : value
+            return try ExactJSON(data: Self.bytes(named))
+        }
+        config["compiler"]["host"]["palette"] = try palette(selected)
+        if hasColors { config["colors"]["render_seed"] = .string(seed) }
+        if template.catalogMode == "auto" {
+            config["catalog_seed"] = .string(seed)
+            guard var catalogs = config["catalogs"].array else { throw HostError("color_catalogs_invalid") }
+            for index in catalogs.indices {
+                guard let id = catalogs[index]["prompt"]["catalog_id"].string else { throw HostError("color_catalogs_invalid") }
+                catalogs[index]["resolved"]["palette"] = try palette(id)
+            }
+            config["catalogs"] = .array(catalogs)
+        }
+        request.configuration = config.data
+        return request
+    }
+
     func request(inputMode: String, source: String, description: String, language: String,
                  catalogID: String, canvasID: String, seed: String, wild: Bool,
                  settings: HostSettings, parentWorkID: String? = nil, derivationKind: String = "new",

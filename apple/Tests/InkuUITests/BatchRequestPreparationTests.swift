@@ -61,5 +61,24 @@ import XCTest
             }
             print("FOLLOWUP_M7_CANDIDATE mode=\(mode) total=\(elapsed) main_gap=\(maximumGap)")
         }
+        for mode in ["fixed", "auto", "random"] {
+            app.catalogMode = mode; app.seedText = ""
+            let originalCatalog = app.catalogID
+            let rows = try await app.makeBatchRows(Array(entries.prefix(12)), sketchMode: "off", batchRunID: "fixture")
+            for (index, row) in rows.enumerated() {
+                let options = try ExactJSON(data: row.request.renderOptions)
+                let selected = try XCTUnwrap(options["catalog_id"].string)
+                let seed = try XCTUnwrap(options["render_seed"].string)
+                app.seedText = seed
+                if mode == "random" { app.catalogMode = "fixed"; app.catalogID = selected }
+                var reference = try app.requestForBatchDescription(row.input, sketchMode: "off")
+                if mode == "random" { reference.catalogMode = "random" }
+                var provenance = reference.provenance ?? GenerationProvenance()
+                provenance.batchRunID = "fixture"; provenance.batchLineNumber = entries[index].0
+                provenance.displayLabel = "#\(entries[index].0)"; reference.provenance = provenance
+                XCTAssertEqual(try encoder.encode(row.request), try encoder.encode(reference), "generated seed \(mode) row \(index)")
+            }
+            app.catalogID = originalCatalog
+        }
     }
 }

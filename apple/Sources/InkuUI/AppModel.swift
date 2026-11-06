@@ -1182,10 +1182,10 @@ public final class AppModel {
         let captureIO = developerModeEnabled && display.preferences.captureProviderIO == true
         let catalogChoices = bootstrap.catalogs.map(\.id).filter { $0 != chosenCatalog }
         let task = Task.detached {
-            struct Key: Hashable { let language: String; let seed: String; let catalog: String }
+            struct Key: Hashable { let language: String; let catalog: String }
             let languages = entries.map { InkuCore.resolveInstructionLanguage(text: $0.1, requested: requestedLanguage, fallback: uiLanguage) ?? "ja" }
             let invariant = try bootstrap.batchInvariant(languages: Set(languages), settings: capturedSettings)
-            var templates: [Key: GenerationRequest] = [:]
+            var templates: [Key: (GenerationRequest, String)] = [:]
             var rows: [BatchRow] = []
             for (index, entry) in entries.enumerated() {
                 try Task.checkCancellation()
@@ -1195,9 +1195,12 @@ public final class AppModel {
                     selected = choice
                 } else { selected = chosenCatalog }
                 let actualSeed = seed.isEmpty ? String(UInt64.random(in: 0...((UInt64(1) << 53) - 1))) : seed
-                let key = Key(language: languages[index], seed: actualSeed, catalog: selected)
+                let key = Key(language: languages[index], catalog: selected)
                 var request: GenerationRequest
-                if let cached = templates[key] { request = cached }
+                if let cached = templates[key] {
+                    request = cached.1 == actualSeed ? cached.0 : try bootstrap.reseedBatchRequest(cached.0, seed: actualSeed,
+                        language: key.language, invariant: invariant)
+                }
                 else {
                     request = try bootstrap.request(inputMode: "description", source: "", description: entry.1,
                         language: key.language, catalogID: chosenCatalog, canvasID: selectedCanvas, seed: actualSeed,
@@ -1208,7 +1211,7 @@ public final class AppModel {
                         request.drawRoute = route; request.descriptionComposition = composition; request.descriptionReview = review
                     }
                     request.recordsDrawOptions = true; request.captureProviderIO = captureIO
-                    if !seed.isEmpty { templates[key] = request }
+                    templates[key] = (request, actualSeed)
                 }
                 request.authoring = .description(entry.1, autoCatalog: mode == "auto", sketch: sketchMode == "on" ? .on : .off)
                 request.description = entry.1

@@ -396,7 +396,10 @@ class CandidateExecution:
             self._attempt_began = (action, int(time.time() * 1000))
         try:
             # Cancellation can invalidate the action during bounded provider I/O.
-            time.sleep(int(action["delay_ms"]) / 1000)
+            from .chatgpt_runtime import execution_cancel
+            cancel = execution_cancel(self.owner_id, self._snapshot["execution_id"])
+            if cancel.wait(int(action["delay_ms"]) / 1000):
+                return None
             with self._lock:
                 if self._snapshot["action"] != action:
                     return None

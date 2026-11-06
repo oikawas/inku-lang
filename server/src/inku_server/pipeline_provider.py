@@ -58,6 +58,7 @@ class ProviderOptions:
     chatgpt_profile: str | None = None
     chatgpt_generation: int | None = None
     chatgpt_cancel: Any = None
+    execution_cancel: Any = None
 
 
 def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
@@ -69,6 +70,10 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
     if model:
         return str(model).strip()
     return _resolved_default_model("stage1", actor)
+
+
+class _ExecutionCancelled(Exception):
+    pass
 
 
 class SingleAttemptProvider:
@@ -142,13 +147,19 @@ class SingleAttemptProvider:
                 if connection["requires_api_key"] and not connection.get("api_key"):
                     self.failure_detail = "credentials_unavailable"
                     raise ValueError("provider credentials unavailable")
-                with provider_slot(provider_id, timeout=timeout):
+                with provider_slot(provider_id, timeout=timeout, cancel=self.options.execution_cancel):
                     remaining = timeout - (time.monotonic() - started)
                     if remaining <= 0:
                         raise TimeoutError
-                    response = asyncio.run(self._request(
-                        connection, model, action, action["payload"]["prompt"], remaining
-                    ))
+                    async def cancellable_request():
+                        from .chatgpt_runtime import guarded
+                        def check():
+                            if self.options.execution_cancel is not None and self.options.execution_cancel.is_set():
+                                raise _ExecutionCancelled()
+                        return await guarded(self._request(connection, model, action, action["payload"]["prompt"], remaining), check, started + timeout)
+                    response = asyncio.run(cancellable_request())
+        except _ExecutionCancelled:
+            failure = "transport_unavailable"
         except ChatGPTError as error:
             failure = error.failure
             self.chatgpt_failure_detail = {"code": error.code, "action": error.action,

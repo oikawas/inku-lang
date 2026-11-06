@@ -8,7 +8,7 @@ import logging
 import threading
 import time
 from collections import OrderedDict
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from copy import deepcopy
 from dataclasses import asdict
 from typing import Callable, Literal
@@ -283,12 +283,24 @@ class PipelineService:
         from .chatgpt_runtime import stop
         stop()
         with self._lock:
-            for run in self._runs.values():
+            runs = list(self._runs.values())
+            jobs = list(self._jobs.values())
+        def cancel_run(run):
+            try:
                 if run.view()["busy"]:
                     run.command({"tag": "cancel"})
-        self._pool.shutdown(wait=True, cancel_futures=True)
+            except Exception:
+                _logger.exception("pipeline_shutdown_cancel_failed")
+        deadline = time.monotonic() + 5.0
+        cancel_threads = [threading.Thread(target=cancel_run, args=(run,), daemon=True) for run in runs]
+        for thread in cancel_threads:
+            thread.start()
+        self._pool.shutdown(wait=False, cancel_futures=True)
+        wait(jobs, timeout=max(0, deadline - time.monotonic()))
+        for thread in cancel_threads:
+            thread.join(timeout=max(0, deadline - time.monotonic()))
         self._images.clear()
-        for run in self._runs.values():
+        for run in runs:
             run.image_data.clear()
 
     def activity(self, owner: str | None) -> list[dict]:
@@ -560,9 +572,8 @@ class PipelineService:
         if current is not None and not current.done():
             return
         if run.view()["busy"]:
-            if run.context.get("host_options", {}).get("chatgpt_profile"):
-                from .chatgpt_runtime import begin_execution
-                begin_execution(*key)
+            from .chatgpt_runtime import begin_execution
+            begin_execution(*key)
             job = self._pool.submit(self._drain, run)
             job.add_done_callback(lambda done, key=key: self._log_job_failure(key, done))
             self._jobs[key] = job
@@ -625,6 +636,9 @@ class PipelineService:
                     # bounded provider I/O can fail or produce a declined patch.
                     _wait_for_render_capacity(lambda: run.command(payload))
             run.run_effect()
+            from .chatgpt_runtime import execution_cancel
+            if execution_cancel(run.owner_id, view["execution_id"]).is_set():
+                return
         if run.view()["busy"]:
             raise CandidateHostError("pipeline_effect_limit")
         run.image_data.clear()

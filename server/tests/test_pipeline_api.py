@@ -587,3 +587,31 @@ def test_reserve_evicts_least_recently_used_idle_run():
         assert list(service._runs) == [("owner", "first")]
     finally:
         service.close()
+
+
+def test_drain_stops_after_an_effect_is_cancelled():
+    from inku_server.chatgpt_runtime import begin_execution, cancel_execution, retire_execution
+
+    class Run:
+        owner_id = "cancel-owner"
+        image_data = {}
+        context = {}
+        calls = 0
+        def view(self):
+            return {"busy": True, "execution_id": "cancel-run", "rendered": None}
+        def snapshot(self):
+            return {"action": {"tag": "generate_normalized_ddl"}}
+        def run_effect(self):
+            self.calls += 1
+            cancel_execution(self.owner_id, "cancel-run")
+
+    run = Run()
+    service = PipelineService(None, None, config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=2, max_retained_runs=1)
+    begin_execution(run.owner_id, "cancel-run")
+    try:
+        service._drain_steps(run)
+        assert run.calls == 1
+    finally:
+        retire_execution(run.owner_id, "cancel-run")
+        service.close()

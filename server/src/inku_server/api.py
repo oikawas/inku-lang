@@ -81,7 +81,7 @@ async def _lifespan(_app: FastAPI):
         shutdown_bake_pool()
         # The refinement runs stop before the pipeline runs they wait on.
         _autonomous_refine.shutdown()
-        _shutdown_pipeline()
+        await asyncio.to_thread(_shutdown_pipeline)
 
 
 # The groups the API reference (/docs) shows, in this order. Each router below

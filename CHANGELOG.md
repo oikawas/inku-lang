@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: DB v9 replaces duplicate saved data with digests and compacts the database. Drawing logs for failed or stopped executions without a saved effect are removed during migration.
+
 - macOS: avoid repeating unchanged calculations and image loads in input, generation details, and model settings.
 
 - macOS: retrying a library preview also reloads the work's image.

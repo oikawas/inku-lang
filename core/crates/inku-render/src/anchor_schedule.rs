@@ -1,6 +1,6 @@
 //! Dependency order for positioned, non-drawing targets and their transform scopes.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use inku_score::{RelationType, Score, TransformGroup};
 
@@ -63,6 +63,7 @@ pub(crate) fn schedule(score: &Score, omitted_relations: &[bool]) -> AnchorSched
         }
     }
 
+    let mut group_chains = BTreeMap::new();
     for (source_index, instruction) in score.instructions.iter().enumerate() {
         if omitted_relations[source_index] {
             continue;
@@ -70,7 +71,10 @@ pub(crate) fn schedule(score: &Score, omitted_relations: &[bool]) -> AnchorSched
         let Some(relation) = &instruction.relation else {
             continue;
         };
-        let source_chain = group_chain(score, Some(source_index), None);
+        let source_chain = group_chains
+            .entry((Some(source_index), None))
+            .or_insert_with(|| group_chain(score, Some(source_index), None))
+            .clone();
         let targets = if let Some(anchor) = relation.target_anchor_index {
             vec![(None, Some(anchor))]
         } else if let Some(target) = relation.target_instruction_index {
@@ -99,7 +103,9 @@ pub(crate) fn schedule(score: &Score, omitted_relations: &[bool]) -> AnchorSched
                 // The existing boundary reports a missing reference; no guessed edge.
                 continue;
             }
-            let target_chain = group_chain(score, target_instruction, target_anchor);
+            let target_chain = group_chains
+                .entry((target_instruction, target_anchor))
+                .or_insert_with(|| group_chain(score, target_instruction, target_anchor));
             let common = source_chain
                 .iter()
                 .copied()

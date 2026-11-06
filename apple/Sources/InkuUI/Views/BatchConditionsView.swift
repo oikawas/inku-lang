@@ -50,7 +50,7 @@ struct BatchConditionsView: View {
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
         }
         .sheet(isPresented: $showColorCatalogs) {
-            ColorCatalogView(model: model, descriptionOnly: true).environment(model.display).disabled(disabled)
+            ColorCatalogView(model: model).environment(model.display).disabled(disabled)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.colorCatalog)
         }
         .onChange(of: disabled) { _, busy in

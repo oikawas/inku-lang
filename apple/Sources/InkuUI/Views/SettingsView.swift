@@ -294,7 +294,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         if section == .models {
             ModelSettingsView(model: model, settings: settings, automation: automation)
         } else if section == .demo {
-            AutomationView(model: model, automation: automation, demoOnly: true)
+            AutomationView(model: model, automation: automation)
         } else {
             Form {
                 switch section {

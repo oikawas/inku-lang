@@ -9,23 +9,21 @@ struct ColorCatalogView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draftCatalogID: String
     @State private var draftMode: String
-    private let descriptionOnly: Bool
     #if os(macOS)
     private let sheetSize: CGSize
     #endif
 
-    init(model: AppModel, descriptionOnly: Bool = false) {
+    init(model: AppModel) {
         self.model = model
-        self.descriptionOnly = descriptionOnly
         _draftCatalogID = State(initialValue: model.catalogID)
-        _draftMode = State(initialValue: model.catalogMode == "auto" && (descriptionOnly || model.inputMode == "description") ? "auto" : "fixed")
+        _draftMode = State(initialValue: model.catalogMode == "auto" ? "auto" : "fixed")
         #if os(macOS)
         let available = NSApp.keyWindow?.contentView?.bounds.size ?? CGSize(width: 1212, height: 868)
         sheetSize = CGSize(width: min(1180, max(640, available.width - 32)), height: min(820, max(440, available.height - 48)))
         #endif
     }
 
-    private var allowsDescriptionAuto: Bool { descriptionOnly || model.inputMode == "description" }
+    private var allowsDescriptionAuto: Bool { true }
     private var selectedCatalog: ColorCatalogOption? { model.catalogs.first { $0.id == draftCatalogID } }
     private var canConfirm: Bool {
         !model.isBusy && selectedCatalog != nil && ["fixed", "auto"].contains(draftMode)
@@ -64,9 +62,6 @@ struct ColorCatalogView: View {
         #if os(macOS)
         .frame(width: sheetSize.width, height: sheetSize.height)
         #endif
-        .onChange(of: model.inputMode) { _, mode in
-            if !descriptionOnly, mode == "ddl", draftMode == "auto" { draftMode = "fixed" }
-        }
     }
 
     private func confirm() {

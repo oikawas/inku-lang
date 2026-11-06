@@ -141,7 +141,7 @@ struct CreationView: View {
         }
         .animation(.easeOut(duration: 0.2), value: ui.saijikiOpen)
         .sheet(isPresented: $showColorCatalogs) {
-            ColorCatalogView(model: model, descriptionOnly: true)
+            ColorCatalogView(model: model)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.colorCatalog)
         }
         .sheet(isPresented: $showModelPicker) {

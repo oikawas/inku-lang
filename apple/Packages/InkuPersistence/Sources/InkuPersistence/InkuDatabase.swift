@@ -78,6 +78,21 @@ public actor InkuDatabase {
                     throw error
                 }
             }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 9 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v9-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
             try inspection.close()
         } else {
             try FileManager.default.createDirectory(
@@ -105,6 +120,9 @@ public actor InkuDatabase {
         }
         try queue.read { try Self.validateSchema($0) }
         self.vacuumDeferred = try !Self.compactV9(queue, at: self.url)
+        if exists, !self.vacuumDeferred {
+            try Self.removeOlderMigrationBackups(in: self.url.deletingLastPathComponent(), queue: queue)
+        }
     }
 
     private static func migrate(_ db: Database, reportURL: URL, v7ReportURL: URL) throws {
@@ -180,6 +198,31 @@ public actor InkuDatabase {
         try queue.read { try validateRestore($0) }
         try queue.write { try $0.execute(sql: "INSERT INTO schema_migrations(identifier) VALUES (?)", arguments: [vacuumMarker]) }
         return true
+    }
+
+    private static func removeOlderMigrationBackups(in directory: URL, queue: DatabaseQueue) throws {
+        let urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .creationDateKey], options: [])
+        let pattern = try NSRegularExpression(pattern: #"^\.inku-before-v([0-9]+)-([0-9A-Fa-f-]{36})\.sqlite$"#)
+        var backups: [(url: URL, version: Int, created: Date)] = []
+        for url in urls {
+            let name = url.lastPathComponent
+            guard let match = pattern.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+                  let versionRange = Range(match.range(at: 1), in: name), let version = Int(name[versionRange]),
+                  let uuidRange = Range(match.range(at: 2), in: name), UUID(uuidString: String(name[uuidRange])) != nil else { continue }
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .creationDateKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true, let created = values.creationDate else { continue }
+            backups.append((url, version, created))
+        }
+        guard let latest = backups.filter({ $0.version == 9 }).max(by: { $0.created < $1.created }) else { return }
+        let older = backups.filter { $0.url != latest.url && $0.created < latest.created }
+        guard !older.isEmpty else { return }
+        do {
+            let saved = try readOnlyQueue(at: latest.url)
+            defer { try? saved.close() }
+            try saved.read { try validateRestore($0) }
+        } catch { return }
+        try queue.read { try validateRestore($0) }
+        for backup in older { try FileManager.default.removeItem(at: backup.url) }
     }
 
     public nonisolated static func applicationSupportURL(hostIdentifier: String) throws -> URL {

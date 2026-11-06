@@ -781,6 +781,7 @@ public struct ContentView: View {
     }
     private func preparePresentation(work target: SavedWork? = nil) async {
         guard canReadWork, let work = target ?? workTarget, !work.svg.isEmpty else { return }
+        model.stopFollowingRun()
         let token = UUID(); presentationLoadID = token
         let fromLibrary = ui.libraryOpen
         let viewer = HistoryModel()

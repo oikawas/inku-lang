@@ -127,7 +127,7 @@ struct ChatGPTModelsSheet: View {
             }
             HStack(spacing: 10) {
                 Button(display.webCopy("chatgptRefreshModels", "モデル一覧を更新")) { Task { await refresh() } }
-                    .disabled(working || dirty || model.isBrowsingLocked)
+                    .disabled(working || dirty || model.isSettingsInteractionLocked)
                     .inkuTooltip(dirty ? display.tooltip("未保存の変更を保存または取り消してからモデルリストを取得してください。", serverKey: "settingsModelFetchDisabledWhileDirty") : "")
                 Button(display.webCopy("settingsModelSelectVisible", "表示中を全て選択")) { selected.formUnion(visibleModels.filter(\.isSelectable).map(\.id)) }
                     .disabled(working || visibleModels.isEmpty)
@@ -214,7 +214,7 @@ struct ChatGPTModelsSheet: View {
                     .keyboardShortcut(.cancelAction).disabled(working)
                 Button(display.localized("保存")) { Task { await save() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(working || !dirty || missingPurpose || catalogModels.contains { selected.contains($0.id) && !$0.isSelectable } || model.isBrowsingLocked)
+                    .disabled(working || !dirty || missingPurpose || catalogModels.contains { selected.contains($0.id) && !$0.isSelectable } || model.isSettingsInteractionLocked)
             }
         }.padding(16)
     }

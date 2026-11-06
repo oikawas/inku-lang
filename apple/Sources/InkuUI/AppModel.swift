@@ -177,8 +177,15 @@ public final class AppModel {
     public private(set) var automationFailureMessage: String?
     /// Retained between batch rows so browsing does not clear the last row's progress or failure.
     private var backgroundDrawing = false
-    /// Browsing may continue during an explicitly backgrounded batch row; writers still use isBusy.
-    public var isBrowsingLocked: Bool { isBusy && !backgroundDrawing }
+    private var demoBrowsingLocked = false
+    private var operationBrowsingLocked = false
+    private var runFollowed = true
+    /// Only the demo holds browsing, including the pauses between its operations.
+    public var isBrowsingLocked: Bool { demoBrowsingLocked || operationBrowsingLocked }
+    /// Preserve the pre-existing gate for settings and other non-browsing actions.
+    var isSettingsInteractionLocked: Bool { isBusy && !backgroundDrawing }
+    func setDemoBrowsingLocked(_ locked: Bool) { demoBrowsingLocked = locked }
+    func stopFollowingRun() { if isBusy { runFollowed = false } }
     public var errorText: String?
     /// The ChatGPT plan diagnostic each execution reported last, for its failure text.
     @ObservationIgnored private var chatGPTFailureCodes: [String: String] = [:]
@@ -277,7 +284,7 @@ public final class AppModel {
     @ObservationIgnored private var activeExecutionID: String? {
         didSet { journalExecutionID = activeExecutionID }
     }
-    @ObservationIgnored private var currentExecutionID: String?
+    @ObservationIgnored private(set) var currentExecutionID: String?
     @ObservationIgnored private var displayToken = UUID()
     @ObservationIgnored private var generationToken: UUID?
     @ObservationIgnored private var activeOperation: Task<Void, Never>?
@@ -566,8 +573,9 @@ public final class AppModel {
             if let saved { context = try await host.savedAuthoringContext(workID: saved.id) }
             else { context = nil }
             guard generationToken == token, !Task.isCancelled else { return }
-            apply(view)
-            if let work = saved {
+            if runFollowed { apply(view) }
+            else { finishProviderStage(view); status = statusText(for: view) }
+            if runFollowed, let work = saved {
                 displayWork(work)
                 selectedContext = context
                 savedImageDDL = selectedContext?.imageDDL
@@ -598,7 +606,8 @@ public final class AppModel {
 
     public func selectWork(_ work: SavedWork, adoptDrawOptions: Bool = true) async {
         guard !isBrowsingLocked else { return }
-        if !backgroundDrawing {
+        stopFollowingRun()
+        if !isBusy && !backgroundDrawing {
             providerProgress = nil
             errorText = nil
         }
@@ -709,10 +718,15 @@ public final class AppModel {
             await notifySavedWork(result)
             guard generationToken == token, !Task.isCancelled else { return }
             try await reloadWorks()
-            displayWork(result)
-            selectedContext = try? await host.savedAuthoringContext(workID: result.id)
-            currentExecutionID = nil
-            currentView = nil
+            if runFollowed {
+                let context = try? await host.savedAuthoringContext(workID: result.id)
+                if runFollowed {
+                    displayWork(result)
+                    selectedContext = context
+                    currentExecutionID = nil
+                    currentView = nil
+                }
+            }
             status = "再演奏を保存しました"
         } catch {
             guard generationToken == token, !Task.isCancelled else { return }
@@ -733,6 +747,7 @@ public final class AppModel {
         chatGPTFailureCodes.removeAll()
         journalExecutionID = nil
         activeSingleInputMode = nil
+        operationBrowsingLocked = false
         stopping = false
         isBusy = false
     }
@@ -831,7 +846,7 @@ public final class AppModel {
     }
 
     public func updateHostSettings(_ settings: HostSettings) async throws {
-        guard !isBrowsingLocked, let settingsStore,
+        guard !isSettingsInteractionLocked, let settingsStore,
               !isBusy || settings.plugins == self.settings.plugins else { throw HostError("settings_busy_or_unavailable") }
         var settings = settings
         if self.settings.providerDefaultsInstalled == true { settings.providerDefaultsInstalled = true }
@@ -980,9 +995,12 @@ public final class AppModel {
             await self.notifySavedWork(saved)
             guard saved.id == previewWork.id else { throw HostError("candidate_identity_changed") }
             try await self.reloadWorks()
-            self.displayWork(saved)
-            self.selectedContext = try await host.savedAuthoringContext(workID: saved.id)
-            self.currentExecutionID = nil
+            let context = try await host.savedAuthoringContext(workID: saved.id)
+            if self.runFollowed {
+                self.displayWork(saved)
+                self.selectedContext = context
+                self.currentExecutionID = nil
+            }
             self.status = "選択した候補を保存しました"
         }
     }
@@ -1339,9 +1357,9 @@ public final class AppModel {
             guard saved.id == work.id else { throw HostError("candidate_identity_changed") }
             await self.notifySavedWork(saved)
             try await self.reloadWorks()
-            self.displayWork(saved)
-            self.selectedContext = try await host.savedAuthoringContext(workID: saved.id)
             result = saved
+            let context = try await host.savedAuthoringContext(workID: saved.id)
+            if self.runFollowed { self.displayWork(saved); self.selectedContext = context }
         }
         return result
     }
@@ -1453,11 +1471,11 @@ public final class AppModel {
         recordDrawingLog(executionID: candidate.executionID)
         await notifySavedWork(saved)
         do { try await reloadWorks() } catch { report(error) }
-        guard generationToken == token, !stopping, !Task.isCancelled else { return saved }
+        guard generationToken == token, !stopping, !Task.isCancelled, runFollowed else { return saved }
         do {
             let context = try await host.savedAuthoringContext(workID: saved.id)
             let view = try? await host.restore(executionID: candidate.executionID)
-            guard generationToken == token, !stopping, !Task.isCancelled else { return saved }
+            guard generationToken == token, !stopping, !Task.isCancelled, runFollowed else { return saved }
             if let view, view.savedWorkID == saved.id { apply(view) }
             else {
                 diagnosticsJSON = ""
@@ -1657,7 +1675,7 @@ public final class AppModel {
         guard let host, let database else { throw HostError("pipeline_unavailable") }
         var child: SavedWork?
         var failure: Error?
-        let ran = await performSerialized(status: "生成中", allowsBrowsing: true) { [self] token in
+        let ran = await performSerialized(status: "生成中", background: true) { [self] token in
             do {
                 try await validatePinnedRequest(request)
                 let view = try await host.generate(request) { [weak self] progress in
@@ -1809,7 +1827,7 @@ public final class AppModel {
         _ = await performSerialized(status: "生成中") { [weak self] token in
             guard let self else { return }
             defer {
-                if !adopted { self.currentExecutionID = previousExecution; self.currentView = previousView }
+                if !adopted && self.runFollowed { self.currentExecutionID = previousExecution; self.currentView = previousView }
             }
             let candidate = try await self.generateCandidate(request: request, token: token, comparison: false)
             try Task.checkCancellation()
@@ -1817,9 +1835,11 @@ public final class AppModel {
             self.recordDrawingLog(executionID: candidate.executionID)
             result = saved
             guard self.generationToken == token, !self.stopping, !Task.isCancelled else { return }
+            guard self.runFollowed else { try await self.reloadWorks(); return }
             let view = try await host.restore(executionID: candidate.executionID)
             let context = try await host.savedAuthoringContext(workID: saved.id)
             guard self.generationToken == token, !self.stopping, !Task.isCancelled else { return }
+            guard self.runFollowed else { try await self.reloadWorks(); return }
             self.apply(view)
             self.displayWork(saved)
             self.selectedContext = context
@@ -1873,7 +1893,11 @@ public final class AppModel {
         let originalWorkID = selectedWorkID
         let originalStatus = self.status
         return await performSerialized(status: status) { [weak self] token in
-            defer { self?.currentExecutionID = self?.selectedWorkID == originalWorkID ? execution : nil }
+            defer {
+                if let self, self.runFollowed {
+                    self.currentExecutionID = self.selectedWorkID == originalWorkID ? execution : nil
+                }
+            }
             try await operation(token)
             if restoreDisplayStatus { self?.status = originalStatus }
         }
@@ -1988,7 +2012,7 @@ public final class AppModel {
 
     /// The busy flag remains held until cancellation has drained the active task.
     @discardableResult
-    public func performSerialized(status: String, allowsBrowsing: Bool = false, singleInputMode: String? = nil,
+    public func performSerialized(status: String, background: Bool = false, locksBrowsing: Bool = false, singleInputMode: String? = nil,
                                   clearProgressJournals: Bool = false,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
@@ -1998,8 +2022,10 @@ public final class AppModel {
         providerProgress = nil
         activeExecutionID = nil
         if clearProgressJournals { progressJournals.removeAll() }
-        if !allowsBrowsing { currentExecutionID = nil }
-        backgroundDrawing = allowsBrowsing
+        if !background { currentExecutionID = nil }
+        backgroundDrawing = background
+        operationBrowsingLocked = locksBrowsing
+        runFollowed = true
         stopping = false
         isBusy = true
         errorText = nil
@@ -2012,7 +2038,7 @@ public final class AppModel {
                 if !Task.isCancelled { succeeded = true }
             } catch {
                 if self.generationToken == token && !Task.isCancelled {
-                    if allowsBrowsing {
+                    if background {
                         self.automationFailureMessage = self.failureMessage(error)
                         if !self.stopping { self.providerProgress?.finish(.failed, at: Date()) }
                         self.status = "処理を完了できませんでした"
@@ -2028,12 +2054,12 @@ public final class AppModel {
         return succeeded
     }
 
-    public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, allowsBrowsing: Bool = false,
+    public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, background: Bool = false, locksBrowsing: Bool = false,
                               singleInputMode: String? = nil,
                               onExecutionStarted: (@MainActor @Sendable (String) async throws -> Void)? = nil) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
-        _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing, singleInputMode: singleInputMode) { [weak self] token in
+        _ = await performSerialized(status: "生成中", background: background, locksBrowsing: locksBrowsing, singleInputMode: singleInputMode) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
@@ -2045,9 +2071,9 @@ public final class AppModel {
                 if let message = self.drawingFailureText(view) {
                     self.automationFailureMessage = message
                     // Background batch failures belong to their original row, not the single-drawing notice.
-                    if !allowsBrowsing, self.errorText == nil { self.errorText = message }
+                    if !background, self.errorText == nil { self.errorText = message }
                 }
-                if allowsBrowsing {
+                if background {
                     self.finishProviderStage(view)
                     self.status = self.statusText(for: view)
                 }
@@ -2055,21 +2081,25 @@ public final class AppModel {
             await self.recordDescriptionFeedback(request: request, view: view)
             await self.notifyCommittedWork(view)
             try Task.checkCancellation()
-            if !allowsBrowsing { self.apply(view) }
+            if !background && self.runFollowed { self.apply(view) }
+            else if !background { self.finishProviderStage(view); self.status = self.statusText(for: view) }
             try await self.reloadWorks()
             if let id = view.savedWorkID, let work = try await self.database?.work(id: id) {
-                if !allowsBrowsing {
-                    self.displayWork(work)
-                    self.selectedContext = try await host.savedAuthoringContext(workID: id)
-                    if request.retainedDocument != nil {
-                        // Retained compilation stores a completed candidate, not an editable core execution.
-                        self.currentExecutionID = nil
-                        self.currentView = nil
+                if !background && self.runFollowed {
+                    let context = try await host.savedAuthoringContext(workID: id)
+                    if self.runFollowed {
+                        self.displayWork(work)
+                        self.selectedContext = context
+                        if request.retainedDocument != nil {
+                            // Retained compilation stores a completed candidate, not an editable core execution.
+                            self.currentExecutionID = nil
+                            self.currentView = nil
+                        }
                     }
                 }
                 result = work
             } else if !request.saveHistory, let work = view.candidateWork {
-                if !allowsBrowsing {
+                if !background && self.runFollowed {
                     self.previewWork = work
                     self.providerMetrics = view.providerMetrics
                     self.status = "未保存の候補を表示しています"
@@ -2184,7 +2214,7 @@ public final class AppModel {
         _ = await performSerialized(status: "DDLを処理中") { [weak self] token in
             guard let self else { return }
             self.activeExecutionID = executionID
-            self.currentExecutionID = executionID
+            if self.runFollowed { self.currentExecutionID = executionID }
             let stage2: Bool?
             switch command {
             case .completeHoles: stage2 = true
@@ -2209,11 +2239,13 @@ public final class AppModel {
             }
             await self.notifyCommittedWork(view)
             try Task.checkCancellation()
-            self.apply(view)
+            if self.runFollowed { self.apply(view) }
+            else { self.finishProviderStage(view); self.status = self.statusText(for: view) }
             try await self.reloadWorks()
-            if let id = view.savedWorkID, let work = try await self.database?.work(id: id) {
+            if self.runFollowed, let id = view.savedWorkID, let work = try await self.database?.work(id: id), self.runFollowed {
                 self.displayWork(work)
-                self.selectedContext = try await host.savedAuthoringContext(workID: id)
+                let context = try await host.savedAuthoringContext(workID: id)
+                if self.runFollowed { self.selectedContext = context }
             }
         }
     }
@@ -2229,10 +2261,15 @@ public final class AppModel {
                 await self.notifySavedWork(result)
                 try Task.checkCancellation()
                 try await self.reloadWorks()
-                self.displayWork(result)
-                self.selectedContext = try await host.savedAuthoringContext(workID: result.id)
-                self.currentView = nil
-                self.currentExecutionID = nil
+                if self.runFollowed {
+                    let context = try await host.savedAuthoringContext(workID: result.id)
+                    if self.runFollowed {
+                        self.displayWork(result)
+                        self.selectedContext = context
+                        self.currentView = nil
+                        self.currentExecutionID = nil
+                    }
+                }
                 self.status = "再演奏を保存しました"
             }
         } catch { report(error) }
@@ -2369,7 +2406,7 @@ public final class AppModel {
         clipboardMessageKey = nil
         let copied = await performSerialized(status: "コピー画像を準備中") { [weak self] _ in
             guard let self else { return }
-            defer { self.currentExecutionID = executionID }
+            defer { if self.runFollowed { self.currentExecutionID = executionID } }
             let options = self.display.preferences.clipboardExportOptions(height: height)
             let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
             try Task.checkCancellation()
@@ -2449,7 +2486,7 @@ public final class AppModel {
         receiveProviderProgress(progress, models: models, comparison: false)
         switch progress {
         case .changed(let view):
-            if backgroundDrawing { status = statusText(for: view) }
+            if backgroundDrawing || !runFollowed { status = statusText(for: view) }
             else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
             if let stage = providerProgress?.stage, [.descriptionReading, .descriptionComposition, .descriptionWriting, .descriptionReview].contains(stage) {
@@ -2473,7 +2510,7 @@ public final class AppModel {
         guard generationToken == token, !stopping else { return }
         receiveProviderProgress(progress, models: models, comparison: comparison)
         switch progress {
-        case .changed(let view): currentExecutionID = view.executionID
+        case .changed(let view): if runFollowed { currentExecutionID = view.executionID }
         case .providerAttempt(_, _, _, let deadline):
             if let choosing = choosingStatus(comparison: comparison) { status = choosing }
             else if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図を読んでいます" : "構図を読んでいます" }
@@ -2775,9 +2812,14 @@ extension AppModel {
                 await self.notifySavedWork(result)
                 try Task.checkCancellation()
                 try await self.reloadWorks()
-                self.displayWork(result)
-                self.selectedContext = try await host.savedAuthoringContext(workID: result.id)
-                self.currentView = nil; self.currentExecutionID = nil
+                if self.runFollowed {
+                    let context = try await host.savedAuthoringContext(workID: result.id)
+                    if self.runFollowed {
+                        self.displayWork(result)
+                        self.selectedContext = context
+                        self.currentView = nil; self.currentExecutionID = nil
+                    }
+                }
                 self.status = "はめ込みを保存しました"
             }
         } catch { report(error); return false }

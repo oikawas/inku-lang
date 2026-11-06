@@ -54,7 +54,7 @@ import InkuHost
                             .labelsHidden()
                             .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
                             .onChange(of: svgDraft) { _, _ in message = "" }
-                    }.disabled(saving || model.isBrowsingLocked)
+                    }.disabled(saving || model.isSettingsInteractionLocked)
                     Text(model.display.localized("1〜32 MiBの整数。既定・推奨値は12 MiBです。実際に生成するときの保存設定を使います。"))
                         .inkuFont(12).foregroundStyle(.secondary)
                 }
@@ -71,7 +71,7 @@ import InkuHost
                                 .buttonStyle(.borderedProminent)
                                 .disabled((try? definition.parsedDraft(draft)) == nil || !validSVG)
                         }
-                    }.disabled(saving || model.isBrowsingLocked)
+                    }.disabled(saving || model.isSettingsInteractionLocked)
                     if changed, (try? definition.parsedDraft(draft)) == nil {
                         Text(model.display.localized("制限値には整数を入力してください。"))
                             .inkuFont(12).foregroundStyle(.red)
@@ -111,7 +111,7 @@ import InkuHost
                         .accessibilityLabel(copy.limitLabels[key] ?? key)
                         .inkuTooltip(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "", focus: .text)
                     Button { step(key, by: 1, definition: definition) } label: { Image(systemName: "plus") }
-                }.buttonStyle(.borderless).disabled(saving || model.isBrowsingLocked)
+                }.buttonStyle(.borderless).disabled(saving || model.isSettingsInteractionLocked)
             }
             HStack(spacing: 16) {
                 Text(model.display.localizedFormat("現在: %ld", Int(saved[key] ?? 0)))

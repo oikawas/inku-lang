@@ -240,7 +240,7 @@ public final class AutonomousRefinementModel {
                                 try Task.checkCancellation()
                                 var answer: Juxtaposition.Result?
                                 ownsAppOperation = true
-                                let ran = await app.performSerialized(status: "一文を選んでいます…", allowsBrowsing: true) { _ in
+                                let ran = await app.performSerialized(status: "一文を選んでいます…", background: true) { _ in
                                     answer = try await provider.juxtaposition(description: inputs.description, written: inputs.written,
                                         lineage: inputs.lineage, candidates: candidates, png: png, modelReference: current.model,
                                         language: current.language, settings: settings)
@@ -430,7 +430,7 @@ public final class AutonomousRefinementModel {
                 let kind = app.display.webCopy("aiRefineKindChunks", "まとまりの手")
                 let status = app.display.webCopyFormat("aiRefineTaking", "%@手目：%@を打っています…", String(turn),
                     app.display.preferences.language == "en" ? kind.lowercased() : kind)
-                let ran = await app.performSerialized(status: status, allowsBrowsing: true) { _ in
+                let ran = await app.performSerialized(status: status, background: true) { _ in
                     answer = try await app.sendChunkPrompt(asked, png: png, request: request)
                 }
                 ownsAppOperation = false

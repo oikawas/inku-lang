@@ -197,7 +197,7 @@ struct ProviderServiceEditorSheet: View {
         return (try? provider.validate()) != nil
     }
     private var canSave: Bool {
-        guard !isSaving, !model.isBrowsingLocked, !settings.isLoadingModels else { return false }
+        guard !isSaving, !model.isSettingsInteractionLocked, !settings.isLoadingModels else { return false }
         switch mode {
         case .add: return serviceIDIssue == nil && validURL
             && (apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !credentialsLocked)
@@ -342,7 +342,7 @@ struct ProviderModelsSheet: View {
             }
             HStack(spacing: 10) {
                 Button(model.display.localized(isFetching ? "取得中…" : "モデルリスト取得")) { Task { await fetch() } }
-                    .disabled(isWorking || model.isBrowsingLocked || settings.isLoadingModels || draft.isDirty || provider == nil)
+                    .disabled(isWorking || model.isSettingsInteractionLocked || settings.isLoadingModels || draft.isDirty || provider == nil)
                     .inkuTooltip(draft.isDirty ? model.display.tooltip("未保存の変更を保存または取り消してからモデルリストを取得してください。", serverKey: "settingsModelFetchDisabledWhileDirty") : "")
                 Button(model.display.webCopy("settingsModelSelectVisible", "表示中を全て選択")) { draft.setVisible(models: visibleModels, enabled: true) }
                     .disabled(isWorking || visibleModels.isEmpty)
@@ -495,7 +495,7 @@ struct ProviderModelsSheet: View {
                     .keyboardShortcut(.cancelAction).disabled(isWorking)
                 Button(model.display.localized("保存")) { Task { await save() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(isWorking || model.isBrowsingLocked || settings.isLoadingModels || provider == nil)
+                    .disabled(isWorking || model.isSettingsInteractionLocked || settings.isLoadingModels || provider == nil)
             }
         }.padding(16)
     }
@@ -506,7 +506,7 @@ struct ProviderModelsSheet: View {
     }
 
     private func save() async {
-        guard !isWorking, !model.isBrowsingLocked, !settings.isLoadingModels, provider != nil else { return }
+        guard !isWorking, !model.isSettingsInteractionLocked, !settings.isLoadingModels, provider != nil else { return }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -519,7 +519,7 @@ struct ProviderModelsSheet: View {
     }
 
     private func fetch() async {
-        guard !isWorking, !model.isBrowsingLocked, !settings.isLoadingModels, !draft.isDirty, provider != nil else { return }
+        guard !isWorking, !model.isSettingsInteractionLocked, !settings.isLoadingModels, !draft.isDirty, provider != nil else { return }
         isFetching = true
         errorMessage = nil
         statusMessage = nil

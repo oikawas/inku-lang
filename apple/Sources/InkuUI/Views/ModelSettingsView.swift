@@ -17,7 +17,7 @@ struct ModelSettingsView: View {
     /// `/api/me/chatgpt/models/settings` fails (no connected, plan-scoped active profile).
     @State private var chatGPT: ChatGPTPlanPublication?
 
-    private var actionsDisabled: Bool { model.isBrowsingLocked || saving }
+    private var actionsDisabled: Bool { model.isSettingsInteractionLocked || saving }
     private var credentialsLocked: Bool { model.isBusy || automation.isOccupied }
     private var credentialActionsDisabled: Bool { actionsDisabled || credentialsLocked }
     private var drawingModels: ModelSelection { drawingDraft ?? settings.host.models }

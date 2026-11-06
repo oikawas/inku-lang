@@ -152,7 +152,7 @@ private struct ImageFolderJournal: Codable, Sendable {
                     let request = try app.requestForImage(image, provenance: provenance(url), options: options)
                     let pinned = try await app.pinPersonalPlanRequests([request])[0]
                     drawing = true
-                    let work = await app.runAutomation(request: pinned, image: image, allowsBrowsing: true)
+                    let work = await app.runAutomation(request: pinned, image: image, background: true)
                     drawing = false
                     if stopRequested || Task.isCancelled { journal?.rows[index].state = "uncertain" }
                     else if let work { journal?.rows[index].state = "succeeded"; journal?.rows[index].workID = work.id }

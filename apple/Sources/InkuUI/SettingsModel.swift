@@ -318,7 +318,7 @@ public final class SettingsModel {
 
     @discardableResult
     public func fetchProviderModels(providerID: String, model: AppModel) async throws -> [ProviderModelSettings] {
-        guard !model.isBrowsingLocked else { throw HostError("settings_busy_or_unavailable") }
+        guard !model.isSettingsInteractionLocked else { throw HostError("settings_busy_or_unavailable") }
         let latest = await model.hostSettings()
         let provider = latest.providers[try Self.editableProviderIndex(providerID, in: latest)]
         let fetched = try await fetchModelCatalog(for: provider)
@@ -348,7 +348,7 @@ public final class SettingsModel {
     }
 
     private func beginSaving(model: AppModel, credentialMutation: Bool = false) throws {
-        guard !isSaving, !(credentialMutation ? model.isBusy : model.isBrowsingLocked) else {
+        guard !isSaving, !(credentialMutation ? model.isBusy : model.isSettingsInteractionLocked) else {
             throw HostError("settings_busy_or_unavailable")
         }
         isSaving = true

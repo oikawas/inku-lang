@@ -640,7 +640,7 @@ The saved work displayed on the canvas can be starred or unstarred during a batc
 
 New drawing, redrawing, edit commits, imports, work mutations other than the canvas star action, and batch input/conditions/resume decisions retain the whole-batch execution lock, including gaps between rows. Display settings and ordinary provider/model/URL/rate/drawing-limit saves apply to future runs without changing pinned models, connections, budgets, or retry conditions. API-key writes/deletions, personal ChatGPT connection changes, plugin changes, database restore/backup, and result-file logging switches remain restricted during execution. Sheets opened beforehand recheck current execution state when beginning a key change.
 
-The initial source/documentation save stopped before building; the author's later instruction completed the Universal build, fixed-app update, and normal launch described above. Test execution and concurrent native-operation acceptance remain unverified. Ordinary foreground drawing and demos retain their execution boundaries; only batch rows opt into background processing that permits browsing.
+The initial source/documentation save stopped before building; the author's later instruction completed the Universal build, fixed-app update, and normal launch described above. Test execution and concurrent native-operation acceptance remain unverified. Users can now choose works during single drawing and other operations; the drawing continues through saving, the chosen work stays displayed, and progress and failures remain visible. Work selection is disabled during demos, and drawing-time restrictions on writing actions remain in place.
 
 ## 2026-10-05 Following shared Rust parallelism and test-profile optimizations
 

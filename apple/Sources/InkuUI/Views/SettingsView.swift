@@ -551,7 +551,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     Toggle(model.display.localized("生成時の送受信を記録"), isOn: Binding(
                         get: { display.preferences.captureProviderIO == true },
                         set: { display.preferences.captureProviderIO = $0 }))
-                        .disabled(model.isBrowsingLocked)
+                        .disabled(model.isSettingsInteractionLocked)
                     Text(model.display.localized("モデルへ送った本文と受け取った応答を端末内に保存します。接続先・ヘッダー・認証情報は記録しません。"))
                         .inkuFont(13).foregroundStyle(.secondary)
                 }

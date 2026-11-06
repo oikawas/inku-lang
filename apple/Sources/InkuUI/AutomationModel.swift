@@ -588,7 +588,7 @@ public final class AutomationModel {
                         try await self.saveJournal()
                         self.batchRowStartedAt = Date()
                         let rowID = self.rows[index].id
-                        let result = await app.runAutomation(request: self.rows[index].request, allowsBrowsing: true) { executionID in
+                        let result = await app.runAutomation(request: self.rows[index].request, background: true) { executionID in
                             guard self.token == runToken, !self.stopping,
                                   let rowIndex = self.rows.firstIndex(where: { $0.id == rowID && $0.state == .running }) else { throw CancellationError() }
                             self.rows[rowIndex].executionID = executionID
@@ -649,6 +649,8 @@ public final class AutomationModel {
             guard let template = try await app.pinPersonalPlanRequests([draft]).first else { throw HostError("personal_plan_demo_pin_incomplete") }
             let runToken = UUID()
             token = runToken; running = true; stopping = false; mode = "demo"; errorText = nil; demoCount = 0
+            app.setDemoBrowsingLocked(true)
+            defer { app.setDemoBrowsingLocked(false) }
             preparing = false
             let startedAt = Date()
             let timeoutAt = startedAt.addingTimeInterval(Double(duration))
@@ -669,7 +671,7 @@ public final class AutomationModel {
                         self.demoWaitUntil = nil
                         self.status = "次の記述を生成中"
                         var instruction: String?
-                        let read = await app.performSerialized(status: self.status) { _ in
+                        let read = await app.performSerialized(status: self.status, locksBrowsing: true) { _ in
                             instruction = try await provider.demoInstruction(seedPhrase: seedPhrase, modelReference: reference,
                                 language: language, settings: settings)
                         }
@@ -683,7 +685,7 @@ public final class AutomationModel {
                         request.saveHistory = saveWorks
                         self.status = "デモの作品を生成中"
                         self.demoDrawing = true
-                        let drawing = await app.runAutomation(request: request)
+                        let drawing = await app.runAutomation(request: request, locksBrowsing: true)
                         self.demoDrawing = false
                         guard let work = drawing else {
                             try Task.checkCancellation(); throw HostError(app.errorText ?? "demo_generation_failed")

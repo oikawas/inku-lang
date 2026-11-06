@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: choosing another work during drawing keeps it displayed while the drawing finishes and is saved to history. Work selection remains disabled during a demo.
+
 - macOS: leave the running app alone during ordinary builds and stop it only immediately before `--install` replaces it.
 
 - macOS: remove files already created if a multi-work export fails partway through.

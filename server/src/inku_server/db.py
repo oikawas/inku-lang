@@ -1067,7 +1067,7 @@ def _group_to_dict(row: UserGroupRow) -> dict:
     return _groups.group_to_dict(row)
 
 
-def _user_account_projector() -> _accounts.UserAccountProjector:
+def _user_account_projector(model_settings: dict | None = None) -> _accounts.UserAccountProjector:
     from sqlalchemy.orm import object_session
     from .model_settings import normalize_user_model_settings
 
@@ -1079,7 +1079,8 @@ def _user_account_projector() -> _accounts.UserAccountProjector:
         _UI_CUSTOM_KEYS,
         _SETTINGS_TABS,
         normalize_history_strip_fields,
-        normalize_user_model_settings,
+        (normalize_user_model_settings if model_settings is None else
+         lambda value: normalize_user_model_settings(value, providers=model_settings.get("providers", {}))),
     )
 
 
@@ -1126,10 +1127,11 @@ def delete_user_group(group_id: str) -> bool:
     return _groups.UserGroupStore(SessionLocal, uuid.uuid4, _now_ms).delete_user_group(group_id)
 
 
-def _account_reader() -> _accounts.UserAccountReader:
+def _account_reader(model_settings: dict | None = None) -> _accounts.UserAccountReader:
     return _accounts.UserAccountReader(
         SessionLocal,
-        _user_to_dict,
+        (_user_to_dict if model_settings is None else
+         lambda row, group_name: _user_account_projector(model_settings).project(row, group_name)),
         verify_password,
         _DUMMY_PASSWORD_HASH,
     )
@@ -1139,8 +1141,8 @@ def list_users() -> list[dict]:
     return _account_reader().list_users()
 
 
-def get_user(user_id: str) -> dict | None:
-    return _account_reader().get_user(user_id)
+def get_user(user_id: str, *, model_settings: dict | None = None) -> dict | None:
+    return _account_reader(model_settings).get_user(user_id)
 
 
 def authenticate_user(username: str, password: str) -> dict | None:

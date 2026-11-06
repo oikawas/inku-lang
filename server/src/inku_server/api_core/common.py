@@ -94,10 +94,10 @@ def _resolved_vision_model(model: str | None, actor: dict | None = None) -> str:
     return _resolved_default_model("vision", actor)
 
 
-def _resolved_default_model(stage: str, actor: dict | None) -> str:
+def _resolved_default_model(stage: str, actor: dict | None, *, model_settings: dict | None = None) -> str:
     settings = (actor or {}).get("model_settings") or {}
     return core_catalog("resolve_stage_default", stage=stage, user_settings=settings,
-                        providers=_db.get_model_settings().get("providers", {}))["ref"]
+                        providers=(model_settings if model_settings is not None else _db.get_model_settings()).get("providers", {}))["ref"]
 
 
 def _model_metadata(*, stage1_model: str | None = None, stage2_model: str | None = None) -> dict[str, str]:
@@ -128,7 +128,8 @@ DESCRIPTION_LOCKED_DETAIL = {
 MODEL_NOT_OFFERED_DETAIL = "model is not offered on this server"
 
 
-def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, purpose: str, settings: dict, operation: str | None = None) -> bool:
+def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, purpose: str, settings: dict, operation: str | None = None,
+                      resolved: tuple[str, str] | None = None, normalized_settings: dict | None = None) -> bool:
     """Whether the server will call this model with its own credentials for `actor`.
 
     Administrators may name any configured model: they choose what to offer
@@ -138,7 +139,7 @@ def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, 
     it -- or named a model no provider lists -- still reached the provider, on
     the server's account.
     """
-    provider_id, model_id = provider_for_model(model_ref or None, stage=stage, settings=settings)
+    provider_id, model_id = resolved or provider_for_model(model_ref or None, stage=stage, settings=settings)
     if provider_id == "chatgpt":
         if actor is None or (operation, purpose) not in (("pipeline", "llm"), ("vision", "vision")):
             return False
@@ -147,4 +148,6 @@ def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, 
                        profile_id=settings.get("chatgpt_profile_id"), generation=settings.get("chatgpt_generation"))
     if actor is not None and _db.has_permission_group(actor, "admins"):
         return True
-    return model_is_offered(provider_id, model_id, settings, purpose=purpose)
+    if normalized_settings is None:
+        return model_is_offered(provider_id, model_id, settings, purpose=purpose)
+    return model_is_offered(provider_id, model_id, settings, purpose=purpose, normalized_settings=normalized_settings)

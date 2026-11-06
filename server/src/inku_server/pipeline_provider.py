@@ -59,9 +59,10 @@ class ProviderOptions:
     chatgpt_generation: int | None = None
     chatgpt_cancel: Any = None
     execution_cancel: Any = None
+    settings_normalized: bool = False
 
 
-def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
+def resolved_drawing_model(model: str | None, actor: dict | None, *, model_settings: dict | None = None) -> str:
     """Keep explicit references for the common provider resolver.
 
     One model draws both stages (2026-09-30), so this reads the Stage 1 keys; a
@@ -69,7 +70,7 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
     """
     if model:
         return str(model).strip()
-    return _resolved_default_model("stage1", actor)
+    return _resolved_default_model("stage1", actor, model_settings=model_settings)
 
 
 class _ExecutionCancelled(Exception):
@@ -129,7 +130,13 @@ class SingleAttemptProvider:
                 raise TimeoutError
             stage = "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1"
             model_ref = self.options.stage2_model if stage == "stage2" else self.options.stage1_model
-            provider_id, model = provider_for_model(model_ref, stage=stage, settings=self.options.settings)
+            if self.options.settings_normalized:
+                from .model_settings import normalize_user_model_settings
+                defaults = normalize_user_model_settings(self.options.settings, providers=self.options.settings.get("providers", {}))
+                provider_id, model = provider_for_model(model_ref, stage=stage, settings=self.options.settings,
+                                                        normalized_user=defaults, normalized_settings=self.options.settings)
+            else:
+                provider_id, model = provider_for_model(model_ref, stage=stage, settings=self.options.settings)
             self._target = (provider_id, model)
             if provider_id == "chatgpt":
                 from .chatgpt_provider import request
@@ -143,7 +150,8 @@ class SingleAttemptProvider:
                     images=self.images, transport=self.transport, usage=chatgpt_usage, on_bytes=self.on_bytes,
                 ))
             else:
-                connection = connection_for(provider_id, self.options.settings)
+                connection = (connection_for(provider_id, self.options.settings, normalized_settings=self.options.settings)
+                              if self.options.settings_normalized else connection_for(provider_id, self.options.settings))
                 if connection["requires_api_key"] and not connection.get("api_key"):
                     self.failure_detail = "credentials_unavailable"
                     raise ValueError("provider credentials unavailable")

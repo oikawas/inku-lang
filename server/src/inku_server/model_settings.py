@@ -112,17 +112,22 @@ def _host_providers() -> dict[str, Any] | None:
     }
 
 
-def _user_catalog_context() -> dict[str, Any]:
+def _user_catalog_context(providers: dict[str, Any] | None = None) -> dict[str, Any]:
     from .color_catalogs import DEFAULT_COLOR_CATALOG_ID, color_catalog_ids
     context: dict[str, Any] = {"color_ids": sorted(color_catalog_ids()), "default_color": DEFAULT_COLOR_CATALOG_ID}
-    providers = _host_providers()
+    if providers is None:
+        providers = _host_providers()
+    else:
+        providers = {str(provider_id): {"models": [{"id": model["id"]} for model in row.get("models") or []
+                                                     if isinstance(model, dict) and model.get("id")]}
+                     for provider_id, row in providers.items() if isinstance(row, dict)}
     if providers is not None:
         context["providers"] = providers
     return context
 
 
-def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
-    return core_catalog("normalize_user", settings=settings, **_user_catalog_context())["settings"]
+def normalize_user_model_settings(settings: dict[str, Any] | None, *, providers: dict[str, Any] | None = None) -> dict[str, Any]:
+    return core_catalog("normalize_user", settings=settings, **_user_catalog_context(providers))["settings"]
 
 
 def release_draw_defaults() -> dict[str, Any]:
@@ -153,6 +158,7 @@ def model_is_offered(
     settings: dict[str, Any] | None,
     *,
     purpose: str,
+    normalized_settings: dict[str, Any] | None = None,
 ) -> bool:
     """Whether an active provider lists this model for `purpose` and it is switched on.
 
@@ -160,7 +166,7 @@ def model_is_offered(
     model may be called (see model_provider_catalog), and the built-in Stage
     defaults sit with a provider that only developer mode shows.
     """
-    clean = normalize_model_settings(settings)
+    clean = normalized_settings if normalized_settings is not None else normalize_model_settings(settings)
     return core_catalog("model_offered", settings=clean, order=list(clean["providers"]),
                         provider=provider_id, model=model_id, purpose=purpose)["offered"]
 
@@ -243,7 +249,9 @@ def qualify_model_ref(provider: str, ref: str, settings: dict[str, Any] | None) 
                         providers={key: {} for key in _known_provider_ids(settings)})["ref"]
 
 
-def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any]) -> tuple[str, str]:
+def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any],
+                       normalized_user: dict[str, Any] | None = None,
+                       normalized_settings: dict[str, Any] | None = None) -> tuple[str, str]:
     """Resolve a model reference to (provider, model). Three rules, no guessing.
 
     1. explicit qualification wins
@@ -259,8 +267,8 @@ def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any
     one.
     """
     stage_key = "stage1" if stage == "stage1" else "stage2"
-    defaults = normalize_user_model_settings(settings)
-    catalog = normalize_model_settings(settings)
+    defaults = normalized_user if normalized_user is not None else normalize_user_model_settings(settings)
+    catalog = normalized_settings if normalized_settings is not None else normalize_model_settings(settings)
     result = core_catalog("resolve_ref", ref=str(model or ""), providers=catalog["providers"],
                           default_provider=str(defaults[f"{stage_key}_provider"]),
                           default_model=str(defaults[f"{stage_key}_model"]))
@@ -271,8 +279,8 @@ def provider_concurrency_limit(provider_id: str) -> int:
     return core_catalog("provider_concurrency", provider=provider_id)["limit"]
 
 
-def connection_for(provider_id: str, settings: dict[str, Any]) -> dict[str, Any]:
-    clean = normalize_model_settings(settings)
+def connection_for(provider_id: str, settings: dict[str, Any], *, normalized_settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    clean = normalized_settings if normalized_settings is not None else normalize_model_settings(settings)
     answer = core_catalog("connection", provider=provider_id, settings=clean)
     if "error" in answer:
         raise ValueError(answer["error"])

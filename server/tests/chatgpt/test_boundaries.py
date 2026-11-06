@@ -26,7 +26,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("INKU_CHATGPT_PLAN_ENABLED", "1")
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     from inku_server import db
-    monkeypatch.setattr(db, "get_user", lambda owner: {"id": owner, "username": "owner"} if owner == "owner" else None)
+    monkeypatch.setattr(db, "get_user", lambda owner, **kwargs: {"id": owner, "username": "owner"} if owner == "owner" else None)
     monkeypatch.setattr(db, "single_user_mode_enabled", lambda: False)
     runtime.configure_startup("127.0.0.1", 8100, self_hosted=False)
     return CredentialStore()

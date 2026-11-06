@@ -17,6 +17,10 @@ import type { PluginCall } from './plugin-calls';
 const pluginCalls = Facet.define<{ source: string; calls: readonly PluginCall[] }, { source: string; calls: readonly PluginCall[] }>({ combine: values => values[0] ?? { source: '', calls: [] } });
 type Token = { from: number; to: number; part: Part };
 
+export function samePluginCalls(a: readonly PluginCall[] | undefined, b: readonly PluginCall[] | undefined): boolean {
+	return a === b || JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+}
+
 function syntaxFor(state: EditorState): { tokens: Token[]; decorations: DecorationSet } {
 	let from = 0;
 	const source = state.doc.toString(), answer = state.facet(pluginCalls);
@@ -291,7 +295,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 		configure(next) {
 			const previous = options;
 			options = next;
-			if (view && (previous.disabled !== next.disabled || previous.pluginCalls !== next.pluginCalls || previous.pluginCallSource !== next.pluginCallSource || previous.ranges !== next.ranges
+			if (view && (previous.disabled !== next.disabled || !samePluginCalls(previous.pluginCalls, next.pluginCalls) || ((previous.pluginCalls?.length || next.pluginCalls?.length) && previous.pluginCallSource !== next.pluginCallSource) || previous.ranges !== next.ranges
 				|| previous.label !== next.label || previous.placeholder !== next.placeholder || previous.lineNumbers !== next.lineNumbers)) view.dispatch({ effects: configuration.reconfigure(configurable()) });
 			if (view && next.completionLabels && (previous.completionSource !== next.completionSource || previous.completionStates !== next.completionStates || previous.completionLabels !== next.completionLabels)) {
 				view.dispatch({ effects: completionRangeTagsChanged.of({ source: next.completionSource ?? '', ranges: next.completionStates ?? [], labels: next.completionLabels }) });

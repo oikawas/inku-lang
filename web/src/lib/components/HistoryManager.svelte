@@ -18,6 +18,7 @@
 	import { getCanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
 	import { libraryArrowDestination, libraryPageTargetIndex } from '$lib/features/library/arrow-navigation';
+	import { LINEAGE_CHUNK_SIZE, visibleLineageCount } from '$lib/features/library/lineage-pagination';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -75,6 +76,8 @@
 	type Props = {
 		/** Kept mounted between library visits so its list, scroll, and preview survive. */
 		active: boolean;
+		historyDisplayMode?: 'chronological' | 'lineage';
+		onDisplayModeChange?: (mode: 'chronological' | 'lineage') => void;
 		singleUserMode?: boolean;
 		historyManagerView: 'active' | 'trash';
 		historyManagerTab: 'thumbs' | 'list';
@@ -149,6 +152,7 @@
 
 	let {
 		active,
+		historyDisplayMode = 'chronological', onDisplayModeChange = () => {},
 		singleUserMode = false,
 		historyManagerView,
 		historyManagerTab = $bindable('thumbs'),
@@ -230,7 +234,7 @@
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
 	let pendingArrow = $state<{ offset: number; position: number; query: string; tab: 'thumbs' | 'list'; pageSize: number; event: KeyboardEvent } | null>(null);
 	let searchInputEl = $state<HTMLInputElement | null>(null);
-	let historyDisplayMode = $state<'chronological' | 'lineage'>('chronological');
+	let visibleLineageCounts = $state<Record<string, number>>({});
 	let lineageGroups = $state<LineageHistoryGroup[]>([]);
 	let lineageGroupTotal = $state(0);
 	let lineageGroupPage = $state(0);
@@ -373,9 +377,6 @@
 	}
 
 	onMount(() => {
-		try {
-			if (localStorage.getItem('inku-history-display-mode') === 'lineage') historyDisplayMode = 'lineage';
-		} catch {}
 		return () => {
 			previewController?.abort();
 			lineageGroupController?.abort();
@@ -386,7 +387,7 @@
 
 	function setHistoryDisplayMode(mode: 'chronological' | 'lineage') {
 		focusedVisit = -1;
-		historyDisplayMode = mode;
+		onDisplayModeChange(mode);
 		lineageGroupPage = 0;
 		lineageStartOffset = 0;
 		lineageAnchorVisit = -1;
@@ -449,6 +450,14 @@
 		return [ordered[rootIndex], ...ordered.slice(0, rootIndex), ...ordered.slice(rootIndex + 1)];
 	}
 
+	function visibleLineageItems(group: LineageHistoryGroup): HistoryItem[] {
+		return lineageLaneItems(group).slice(0, visibleLineageCount(visibleLineageCounts[group.root_node_id]));
+	}
+
+	function showMoreLineage(root: string): void {
+		visibleLineageCounts = { ...visibleLineageCounts, [root]: visibleLineageCount(visibleLineageCounts[root]) + LINEAGE_CHUNK_SIZE };
+	}
+
 	async function fetchLineageGroups(): Promise<void> {
 		if (!active) return;
 		const requestId = ++lineageRequestId;
@@ -487,6 +496,7 @@
 			lineageGroups = data.groups;
 			lineageGroupTotal = data.total;
 			lineageGroupItems = {};
+			visibleLineageCounts = {};
 			expandedRootIds = [];
 			if (lineageThumbsMode) {
 				// The works are the point of this view, so they load with the page
@@ -541,7 +551,11 @@
 			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
 			const data = await response.json() as { items: HistoryItem[] };
-			if (active && requestId === lineageRequestId && !controller.signal.aborted) lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
+			if (active && requestId === lineageRequestId && !controller.signal.aborted) {
+				lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
+				const index = data.items.findIndex((item) => item.id === focusRequest?.id);
+				if (index >= 200) visibleLineageCounts = { ...visibleLineageCounts, [rootNodeId]: Math.ceil((index + 1) / 200) * 200 };
+			}
 		} catch (error) {
 			if (requestId === lineageRequestId && !(error instanceof DOMException && error.name === 'AbortError')) {
 				lineageLoadFailed = true;
@@ -1232,7 +1246,7 @@
 								<div class="lineage-history-message">{t().historyLoading}</div>
 							{:else}
 								<div class="lineage-member-grid">
-									{#each lineageThumbsMode ? lineageLaneItems(group) : membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
+									{#each lineageThumbsMode ? visibleLineageItems(group) : membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 											{#if lineageThumbsMode && it.id && currentHistoryId === it.id}<span class="lineage-current-badge">{t().historyCurrentBadge}</span>{:else if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
@@ -1257,6 +1271,9 @@
 										</div>
 									{/each}
 								</div>
+								{#if lineageThumbsMode && visibleLineageItems(group).length < lineageLaneItems(group).length}
+									<button class="ghost-btn" type="button" onclick={() => showMoreLineage(group.root_node_id)}>{t().historyLineageShowMore}</button>
+								{/if}
 							{/if}
 						{/if}
 					</article>

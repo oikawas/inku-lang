@@ -63,7 +63,7 @@
 	$effect(() => {
 		const source = value, work = completionWork, fetchStates = apiFetch;
 		completionQuery.cancel();
-		completionStates = [];
+		if (completionStates.length) completionStates = [];
 		completionSource = source;
 		if (!work || !fetchStates) return;
 		const timer = setTimeout(() => {
@@ -75,7 +75,7 @@
 	$effect(() => {
 		const source = value, work = completionWork, fetchCalls = apiFetch;
 		const lang = resolveInstructionLang(source, isJapanese ? 'ja' : 'en');
-		pluginQuery.cancel(); calls = []; callSource = '';
+		pluginQuery.cancel(); if (calls.length) calls = []; callSource = '';
 		const nextKey = JSON.stringify(work);
 		if (nextKey !== catalogKey) { workEntries = []; catalogKey = nextKey; }
 		if (!fetchCalls) return;

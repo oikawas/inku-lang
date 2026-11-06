@@ -42,6 +42,8 @@ export type HistoryRefreshConditions = {
 	signedIn: boolean;
 	managerOpen: boolean;
 	starredOnly: boolean;
+	forRevisionOnly?: boolean;
+	forShareOnly?: boolean;
 	offset: number;
 	loading: boolean;
 	visible: boolean;
@@ -72,6 +74,8 @@ export function historyRefreshBlockedBy(c: HistoryRefreshConditions): string | n
 	if (!c.signedIn) return 'signed-out';
 	if (c.managerOpen) return 'manager-open';
 	if (c.starredOnly) return 'starred-only';
+	if (c.forRevisionOnly) return 'for-revision-only';
+	if (c.forShareOnly) return 'for-share-only';
 	if (c.offset !== 0) return 'not-the-first-page';
 	if (c.loading) return 'drawing';
 	if (!c.visible) return 'tab-hidden';

@@ -3,6 +3,7 @@
 	import { fallbackSvgSrc, thumbnailConditions, thumbnailSrc } from '$lib/thumbnailSource';
 	import { composeFallbackReason, hasFallbackMark } from '$lib/composeFallback';
 	import { svgImage } from '$lib/svgImage';
+	import { thumbnailSvgQueue } from '$lib/features/library/svg-queue';
 	type HistoryItem = {
 		id?: string;
 		svg: string;
@@ -32,17 +33,34 @@
 	// A listing does not carry the SVG, so a work with no thumbnail yet -- one
 	// saved a moment ago -- fetches its stored drawing instead of staying blank.
 	let fetchedSvg = $state('');
+	let host = $state<HTMLElement | null>(null);
+	let visible = $state(false);
 
-	async function onThumbMissing(): Promise<void> {
-		thumbMissing = true;
-		const src = fallbackSvgSrc(item);
+	$effect(() => {
+		item.id; item.render_hash;
+		thumbMissing = false;
+		fetchedSvg = '';
+	});
+
+	$effect(() => {
+		if (!host) return;
+		const observer = new IntersectionObserver((entries) => { visible = !!entries[0]?.isIntersecting; });
+		observer.observe(host);
+		return () => { observer.disconnect(); visible = false; };
+	});
+
+	$effect(() => {
+		const src = thumbMissing && visible ? fallbackSvgSrc(item) : null;
 		if (!src) return;
-		try {
-			const response = await fetch(src, { credentials: 'same-origin' });
-			if (response.ok) fetchedSvg = await response.text();
-		} catch {
-			// Blank, as before; the next listing asks for the thumbnail again.
-		}
+		const controller = new AbortController();
+		void thumbnailSvgQueue.load(src, controller.signal).then((svg) => {
+			if (!controller.signal.aborted) fetchedSvg = svg;
+		}).catch(() => {});
+		return () => controller.abort();
+	});
+
+	function onThumbMissing(): void {
+		thumbMissing = true;
 	}
 
 	// One mark for both layers, worded so it names the one that fell. The
@@ -56,7 +74,7 @@
 	);
 </script>
 
-<div class="history-thumbnail" class:strip={size === 'strip'} class:manager={size === 'manager'} class:mini={size === 'mini'}>
+<div bind:this={host} class="history-thumbnail" class:strip={size === 'strip'} class:manager={size === 'manager'} class:mini={size === 'mini'}>
 	{#if hasFallbackMark(item)}
 		<span class="thumb-fallback-mark" title={fallbackMarkLabel} aria-label={fallbackMarkLabel}></span>
 	{/if}

@@ -44,6 +44,18 @@ function deferredTransport() {
 	return { apiFetch, requests };
 }
 
+test('cancelling a work selection aborts its strip request and ignores a late answer', async () => {
+	const { apiFetch, requests } = deferredTransport();
+	const { state } = makeState(apiFetch);
+	const controller = new AbortController();
+	const pending = state.syncToItem(work('old'), controller.signal);
+	controller.abort();
+	assert.equal(requests[0].init?.signal?.aborted, true);
+	requests[0].resolve(jsonResponse({ items: [work('old')], total: 1, offset: 0 }));
+	await pending;
+	assert.notEqual(state.items[0]?.id, 'old');
+});
+
 function makeState(apiFetch: (path: string, init?: RequestInit) => Promise<Response>) {
 	const controls = {
 		signedIn: true,

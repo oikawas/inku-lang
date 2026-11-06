@@ -12,6 +12,8 @@
 	import { highlightDDL } from '$lib/highlight';
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
+	import { stableCompletionWork } from '$lib/features/ddl-editor/completion-range-states';
+	import { ddlWorkKey } from '$lib/features/ddl-editor/work-key';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -640,13 +642,14 @@
 	 * behaves as it did before any of this, which is the point of not removing
 	 * the field.
 	 */
-	async function ensureIterationSvg(it: { id?: string; svg?: string }): Promise<string> {
+	async function ensureIterationSvg(it: { id?: string; svg?: string }, signal?: AbortSignal): Promise<string> {
 		if (it.svg) return it.svg;
 		if (!it.id) return '';
 		try {
-			const r = await apiFetch(`/api/history/${encodeURIComponent(it.id)}/svg`, { cache: 'no-store' });
+			const r = await apiFetch(`/api/history/${encodeURIComponent(it.id)}/svg`, { cache: 'no-store', signal });
 			if (!r.ok) return '';
 			const svg = await r.text();
+			if (signal?.aborted) return '';
 			it.svg = svg;
 			return svg;
 		} catch {
@@ -1950,11 +1953,12 @@ function detachLineage(): void {
 }
 
 const currentLineageNodeId = $derived(work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null);
+const retainCompletionWork = stableCompletionWork();
 const currentCompletionWork: CompletionRangeWork | null = $derived.by(() => {
 	const historyId = work.displayedHistoryItem?.id ?? work.result?.history_id;
 	const view = work.pipelineView;
-	if (view && (!historyId || view.result?.history_id === historyId)) return { execution_id: view.execution_id };
-	return historyId ? { history_id: historyId } : null;
+	if (view && (!historyId || view.result?.history_id === historyId)) return retainCompletionWork({ execution_id: view.execution_id });
+	return retainCompletionWork(historyId ? { history_id: historyId } : null);
 });
 const dialogCompletionWork: CompletionRangeWork | null = $derived.by(() => {
 	const historyId = ddlDialogMode === 'edit' ? ddlDialogNode?.history?.id : null;
@@ -2003,24 +2007,27 @@ $effect(() => {
 
 	/** Put an opened work's choices into its tab, by the shared core's rule
 	 *  (recorded value; off for an unrecorded switch; the tab default otherwise). */
-	async function adoptWorkOptions(recorded: RecordedDrawOptions | null | undefined, tab: DrawTab): Promise<void> {
+	async function adoptWorkOptions(recorded: RecordedDrawOptions | null | undefined, tab: DrawTab, signal?: AbortSignal): Promise<void> {
 		const sequence = work.beginWorkOptions(tab);
 		if (!session.currentUser) return;
 		try {
 			const response = await apiFetch('/api/auth/me/draw-options/for-tab', {
 				method: 'POST', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ options: recorded ?? {}, tab }),
+				body: JSON.stringify({ options: recorded ?? {}, tab }), signal,
 			});
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			const answer = await response.json() as { options: DrawOptions };
-			work.adoptWorkOptions(sequence, tab, answer.options);
+			if (!signal?.aborted) work.adoptWorkOptions(sequence, tab, answer.options);
 		} catch (cause) {
-			console.warn('failed to adopt the opened work\'s drawing choices', cause);
+			if (!signal?.aborted) console.warn('failed to adopt the opened work\'s drawing choices', cause);
 		}
 	}
 
+	let openedWorkController: AbortController | null = null;
 	function loadIterationItem(it: Iteration, options: { preserveAuthoring?: boolean } = {}) {
 		if (demoRunning) return;
+		openedWorkController?.abort();
+		const signal = (openedWorkController = new AbortController()).signal;
 		const preserveLineageTab = outputTab === 'lineage';
 		const projection = projectHistoryCurrentWork(it);
 		const sameTree = !!lineageBrowsingState.treeId && it.lineage_root_node_id === lineageBrowsingState.treeId;
@@ -2028,9 +2035,9 @@ $effect(() => {
 		work.pendingCanvasAspectDerivation = null;
 		work.displayedHistoryItem = it;
 		const imageWork = !!it.image_ddl || it.image_provenance != null;
-		void adoptWorkOptions(it.draw_options, imageWork ? 'image' : 'describe');
-		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id);
-		void history.syncToItem(it);
+		void adoptWorkOptions(it.draw_options, imageWork ? 'image' : 'describe', signal);
+		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id, signal).catch((error) => { if (!signal.aborted) console.warn(error); });
+		void history.syncToItem(it, signal);
 		work.lineageDetached = false;
 		if (!options.preserveAuthoring) {
 			if (work.inputMode !== 'batch') work.inputMode = imageWork ? 'image' : 'single';
@@ -2053,14 +2060,14 @@ $effect(() => {
 		// The listing carries thumbnails, not drawings, so the work being put on
 		// the canvas fetches its own. One request for the one work being looked
 		// at, rather than a page of them for the one that gets opened.
-		if (!it.svg && it.id) void fillCanvasSvg(it);
+		if (!it.svg && it.id) void fillCanvasSvg(it, signal);
 	}
 
 	/** Put the fetched drawing on the canvas, unless the reader has moved on. */
-	async function fillCanvasSvg(it: Iteration): Promise<void> {
+	async function fillCanvasSvg(it: Iteration, signal: AbortSignal): Promise<void> {
 		const target = it.id;
-		const svg = await ensureIterationSvg(it);
-		if (!svg || work.displayedHistoryItem?.id !== target || !work.result) return;
+		const svg = await ensureIterationSvg(it, signal);
+		if (signal.aborted || !svg || work.displayedHistoryItem?.id !== target || !work.result) return;
 		work.result = { ...work.result, svg };
 		canvasViewport.fit();
 	}
@@ -2698,9 +2705,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			void history.refreshExternal();
 		}, HISTORY_EXTERNAL_REFRESH_MS);
 		const checkBatchAfterDisconnect = () => {
-			if (work.inputMode === 'batch' && !batch.running && !batch.resuming) {
-				void batch.refreshResume();
-				void work.refreshImageBatchResume();
+			if (document.visibilityState === 'visible' && session.currentUser && work.inputMode === 'batch' && !batch.running && !batch.resuming) {
+				const shared = apiFetch('/api/pipeline/batches', { cache: 'no-store' });
+				void batch.refreshResume(shared);
+				void work.refreshImageBatchResume(false, false, shared);
 			}
 		};
 		const batchLeaseTimer = window.setInterval(checkBatchAfterDisconnect, 15_000);
@@ -2708,7 +2716,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		// Coming back to the tab still refreshes at once; what it no longer does
 		// is jump the floor. Both of these fire on a single alt-tab.
 		function onHistoryVisibilityChange() {
-			if (document.visibilityState === 'visible') void history.refreshExternal();
+			if (document.visibilityState === 'visible') { void history.refreshExternal(true); checkBatchAfterDisconnect(); }
 		}
 		function onHistoryWindowFocus() {
 			void history.refreshExternal();
@@ -3029,7 +3037,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								ranges={compositionRanges}
 								completionWork={currentCompletionWork}
 								{apiFetch}
-								workKey={work.result}
+								workKey={ddlWorkKey(work.displayedHistoryItem?.id, work.result)}
 								onDdlChange={(ddl) => { if (canEditCurrentDdl && !rangeEditingLocked) work.ddl = ddl; }}
 								onRangePreview={(preview) => { ddlRangePreview = preview; }}
 								{pluginEntries}
@@ -3590,6 +3598,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{#await import('$lib/components/HistoryManager.svelte') then { default: HistoryManager }}
 		<HistoryManager
 			active={historyManager.open}
+			historyDisplayMode={historyManager.displayMode}
+			onDisplayModeChange={historyManager.setDisplayMode}
 			{singleUserMode}
 			historyManagerLoadFailed={historyManager.loadFailed}
 			onRetryLoad={historyManager.retry}

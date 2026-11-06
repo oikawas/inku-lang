@@ -74,6 +74,12 @@ const HELD = {
 };
 const SAME = { total: 21, newest_at: 1_700_000_000_000, newest_id: 'work-a' };
 
+test('refresh waits while hidden or revision and share filters are active', () => {
+	assert.equal(historyRefreshBlockedBy({ ...NOTHING_IN_THE_WAY, visible: false }), 'tab-hidden');
+	assert.equal(historyRefreshBlockedBy({ ...NOTHING_IN_THE_WAY, forRevisionOnly: true }), 'for-revision-only');
+	assert.equal(historyRefreshBlockedBy({ ...NOTHING_IN_THE_WAY, forShareOnly: true }), 'for-share-only');
+});
+
 // ── T-1: nothing changed, so the gallery stays where it is ──────────────────
 
 test('T-1 an unchanged answer means the listing is not fetched', () => {
@@ -223,7 +229,7 @@ test('T-6 the owner hands the guards its live values', () => {
 	assert.match(REFRESH, /visible: this\.deps\.visible\(\)/);
 	assert.match(REFRESH, /inFlight: this\.externalRefreshInFlight/);
 	assert.match(REFRESH, /lastRefreshAt: this\.lastExternalRefreshAt/);
-	assert.match(REFRESH, /minGapMs: HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS/);
+	assert.match(REFRESH, /minGapMs: force \? 0 : HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS/);
 	assert.match(REFRESH, /if \(historyRefreshBlockedBy\(\{[^}]*\}\)\) return;/s);
 	// The page must hold no second copy of the guards, or removing one from the
 	// module changes nothing.
@@ -258,13 +264,11 @@ test('T-7 no caller can ask the floor to be skipped', () => {
 	);
 });
 
-test('T-7 the page calls the owner refresh with nothing to force', () => {
-	assert.match(BROWSING_SOURCE, /async refreshExternal\(\): Promise<void>/);
+test('T-7 only visibility restoration forces a refresh', () => {
+	assert.match(BROWSING_SOURCE, /async refreshExternal\(force = false\): Promise<void>/);
 	const calls = PAGE_SOURCE.match(/history\.refreshExternal\([^)]*\)/g) ?? [];
 	assert.ok(calls.length >= 3, `expected the timer and both handlers, found ${calls.length}`);
-	for (const call of calls) {
-		assert.equal(call, 'history.refreshExternal()', `${call} still forces the round`);
-	}
+	assert.equal(calls.filter((call) => call === 'history.refreshExternal(true)').length, 1);
 });
 
 // ── T-8: coming back to the tab still refreshes ─────────────────────────────
@@ -291,7 +295,7 @@ test('T-8 the page still listens for the tab coming back', () => {
 	assert.match(MOUNT, /window\.addEventListener\('focus', onHistoryWindowFocus\)/);
 	assert.match(
 		MOUNT,
-		/function onHistoryVisibilityChange\(\) \{\s*if \(document\.visibilityState === 'visible'\) void history\.refreshExternal\(\);\s*\}/
+		/function onHistoryVisibilityChange\(\) \{\s*if \(document\.visibilityState === 'visible'\) \{ void history\.refreshExternal\(true\); checkBatchAfterDisconnect\(\); \}\s*\}/
 	);
 	assert.match(
 		MOUNT,

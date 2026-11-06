@@ -162,6 +162,7 @@ export class HistoryManagerState {
 	selectionResetReason = $state<'query' | 'filter' | 'trash' | null>(null);
 	view = $state<HistoryManagerView>('active');
 	tab = $state<HistoryManagerTab>('thumbs');
+	displayMode = $state<'chronological' | 'lineage'>('chronological');
 	page = $state(0);
 	startOffset = $state(0);
 	focusRequest = $state<{ id: string; visit: number; rootId?: string | null } | null>(null);
@@ -213,7 +214,16 @@ export class HistoryManagerState {
 	constructor(apiFetch: ApiFetch, syncTrashPage: TrashPageSync) {
 		this.apiFetch = apiFetch;
 		this.syncTrashPage = syncTrashPage;
+		try { if (typeof localStorage !== 'undefined' && localStorage.getItem('inku-history-display-mode') === 'lineage') this.displayMode = 'lineage'; } catch {}
 	}
+
+	setDisplayMode = (mode: 'chronological' | 'lineage'): void => {
+		if (mode === this.displayMode) return;
+		this.displayMode = mode;
+		this.requestId++;
+		this.loading = false;
+		if (mode === 'chronological' && this.open) void this.fetch();
+	};
 
 	/**
 	 * One page's worth of the works in hand.
@@ -260,6 +270,14 @@ export class HistoryManagerState {
 	}
 
 	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number, anchorId: string | null = null) {
+		if (this.displayMode === 'lineage') {
+			this.open = true;
+			this.libraryInitialized = true;
+			this.activeTotal = activeTotal;
+			this.trashTotal = trashTotal;
+			this.focusRequest = anchorId ? { id: anchorId, visit: ++this.focusVisit, rootId: activeItems.find((item) => item.id === anchorId)?.lineage_root_node_id } : null;
+			return;
+		}
 		if (anchorId && this.view === 'active') {
 			this.open = true;
 			this.libraryInitialized = true;
@@ -358,6 +376,7 @@ export class HistoryManagerState {
 	}
 
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
+		if (this.displayMode === 'lineage') return;
 		const view = options.view ?? this.view;
 		const page = options.page ?? this.page;
 		const search = options.search ?? this.search.trim();
@@ -380,7 +399,7 @@ export class HistoryManagerState {
 			if (!silent) this.loading = true;
 			return;
 		}
-		const isCurrent = () => request.id === this.requestId && offset === this.startOffset + this.page * this.pageSize
+		const isCurrent = () => this.displayMode === 'chronological' && request.id === this.requestId && offset === this.startOffset + this.page * this.pageSize
 			&& view === this.view && search === this.search.trim() && starredOnly === this.starredOnly
 			&& forRevisionOnly === this.forRevisionOnly && forShareOnly === this.forShareOnly;
 		this.inFlight.push(request);

@@ -39,6 +39,22 @@ function graph(focus: string, nodes = [focus], edges: LineageGraph['edges'] = []
 	};
 }
 
+test('same focus shares its request and a new focus aborts the old request', async () => {
+	const { apiFetch, requests } = deferredTransport();
+	const state = new LineageQueryState(apiFetch);
+	const first = state.load('a');
+	const shared = state.load('a', true);
+	assert.equal(first, shared);
+	assert.equal(requests.length, 1);
+	const second = state.load('b');
+	assert.equal(requests[0].init?.signal?.aborted, true);
+	requests[1].resolve(jsonResponse(graph('b')));
+	await second;
+	requests[0].resolve(jsonResponse(graph('a')));
+	await first;
+	assert.equal(state.graph?.focus_node_id, 'b');
+});
+
 test('T-267/T-268: the latest base lineage request alone may settle state', async () => {
 	const { apiFetch, requests } = deferredTransport();
 	const state = new LineageQueryState(apiFetch);

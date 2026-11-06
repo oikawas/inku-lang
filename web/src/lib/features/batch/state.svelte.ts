@@ -313,12 +313,12 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	/** Ask the shallow listing only whether the newest batch stopped early. */
-	async refreshResume(): Promise<void> {
+	async refreshResume(shared?: Promise<Response>): Promise<void> {
 		const discovery = ++this.resumeDiscovery;
 		if (this.resuming) return;
 		if (this.deps.signedIn()) {
 			try {
-				const response = await this.deps.apiFetch('/api/pipeline/batches', { cache: 'no-store' });
+				const response = shared ? (await shared).clone() : await this.deps.apiFetch('/api/pipeline/batches', { cache: 'no-store' });
 				if (response.status !== 404) {
 					if (!response.ok) throw new Error(`HTTP ${response.status}`);
 					const data = await response.json() as { batches?: BatchLeaseRecord[] };
@@ -829,12 +829,13 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		return normalized;
 	}
 
-	private async fetchWorksPage(offset: number, limit: number): Promise<TWork[]> {
+	private async fetchWorksPage(offset: number, limit: number, runId: string | null = null): Promise<TWork[]> {
 		const params = new URLSearchParams({
 			offset: String(offset),
 			limit: String(limit),
 			include_svg: 'false',
 		});
+		if (runId !== null) params.set('batch_run_id', runId);
 		const response = await this.deps.apiFetch(`/api/history?${params.toString()}`, { cache: 'no-store' });
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		const data = await response.json() as { items?: TWork[] };
@@ -908,7 +909,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	private async collectRunWorks(runId: string | null, need: number): Promise<TWork[]> {
 		const collected: TWork[] = [];
 		for (let offset = 0; ; offset += BATCH_RESUME_SCAN_PAGE) {
-			const page = await this.fetchWorksPage(offset, BATCH_RESUME_SCAN_PAGE);
+			const page = await this.fetchWorksPage(offset, BATCH_RESUME_SCAN_PAGE, runId);
 			if (page.length === 0) break;
 			const mine = page.filter((item) =>
 				typeof item.batch_line_number === 'number'

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: reduce requests during execution and cancel the previous work's requests when switching works. Show lineage thumbnails in groups of 200, with Show more for the rest. Pause periodic history refreshes while the page is hidden or filters are active.
+
+- Server: add a batch-run ID filter to the history API for reconciling the caller's own works.
+
 - macOS: avoid repeating unchanged calculations and image loads in input, generation details, and model settings.
 
 - macOS: retrying a library preview also reloads the work's image.

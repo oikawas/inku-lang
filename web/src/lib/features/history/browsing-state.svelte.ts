@@ -58,6 +58,7 @@ export type HistoryBrowsingDependencies = {
 export type FetchHistoryOptions = {
 	preserveSelection?: boolean;
 	anchorId?: string;
+	signal?: AbortSignal;
 };
 export type FetchHistoryResult = 'found' | 'missing' | 'superseded' | 'failed';
 
@@ -211,6 +212,9 @@ export class HistoryBrowsingState {
 		const requestId = ++this.fetchRequest;
 		this.fetchController?.abort();
 		const controller = new AbortController();
+		const cancel = () => controller.abort();
+		if (options.signal?.aborted) controller.abort();
+		else options.signal?.addEventListener('abort', cancel, { once: true });
 		this.fetchController = controller;
 		// Only the current page can block navigation; superseded requests may
 		// still be settling even after their network transfer has been aborted.
@@ -242,7 +246,7 @@ export class HistoryBrowsingState {
 			const response = await this.deps.apiFetch(`/api/history?${params.toString()}`, {
 				signal: controller.signal
 			});
-			if (requestId !== this.fetchRequest) return 'superseded';
+			if (requestId !== this.fetchRequest || controller.signal.aborted) return 'superseded';
 			if (!response.ok) return 'failed';
 			const data = await response.json() as {
 				items: HistoryItem[];
@@ -258,7 +262,7 @@ export class HistoryBrowsingState {
 				? data.items.slice(0, this.windowSize)
 				: data.items;
 			// Keep the identity check adjacent to the state write it protects.
-			if (requestId !== this.fetchRequest) return 'superseded';
+			if (requestId !== this.fetchRequest || controller.signal.aborted) return 'superseded';
 			this.items = stripItems;
 			this.total = data.total;
 			this.offset = resolvedOffset;
@@ -286,6 +290,7 @@ export class HistoryBrowsingState {
 		} catch {
 			return requestId !== this.fetchRequest || controller.signal.aborted ? 'superseded' : 'failed';
 		} finally {
+			options.signal?.removeEventListener('abort', cancel);
 			if (requestId === this.fetchRequest) {
 				this.fetchInFlight = 0;
 				this.fetchController = null;
@@ -293,7 +298,7 @@ export class HistoryBrowsingState {
 		}
 	}
 
-	async syncToItem(item: Pick<HistoryItem, 'id' | 'trashed'>): Promise<void> {
+	async syncToItem(item: Pick<HistoryItem, 'id' | 'trashed'>, signal?: AbortSignal): Promise<void> {
 		const requestId = ++this.selectionRequest;
 		if (!item.id || item.trashed) {
 			this.cursor = -1;
@@ -309,8 +314,8 @@ export class HistoryBrowsingState {
 			return;
 		}
 		this.cursor = -1;
-		let found = await this.fetchOffset(0, { anchorId: item.id });
-		if (requestId !== this.selectionRequest) return;
+		let found = await this.fetchOffset(0, { anchorId: item.id, signal });
+		if (requestId !== this.selectionRequest || signal?.aborted) return;
 		if (found === 'missing' && this.filtered) {
 			// All strip filters come off together because the missing response
 			// does not say which independent mark hid the current work.
@@ -320,9 +325,9 @@ export class HistoryBrowsingState {
 			this.forShareOnly = false;
 			if (clearedStarred) this.deps.onStarredFilterCleared();
 			else this.deps.onOtherFilterCleared();
-			found = await this.fetchOffset(0, { anchorId: item.id });
+			found = await this.fetchOffset(0, { anchorId: item.id, signal });
 		}
-		if (requestId !== this.selectionRequest) return;
+		if (requestId !== this.selectionRequest || signal?.aborted) return;
 		if (found === 'missing') this.cursor = -1;
 	}
 
@@ -463,20 +468,22 @@ export class HistoryBrowsingState {
 		await this.fetchOffset(this.offset, { preserveSelection: true });
 	}
 
-	async refreshExternal(): Promise<void> {
+	async refreshExternal(force = false): Promise<void> {
 		if (this.appliedSearch) return;
 		const now = (this.deps.now ?? Date.now)();
 		if (historyRefreshBlockedBy({
 			signedIn: this.deps.signedIn(),
 			managerOpen: this.manager.open,
 			starredOnly: this.starredOnly,
+			forRevisionOnly: this.forRevisionOnly,
+			forShareOnly: this.forShareOnly,
 			offset: this.offset,
 			loading: this.deps.drawing(),
 			visible: this.deps.visible(),
 			inFlight: this.externalRefreshInFlight || this.fetchInFlight > 0,
 			now,
 			lastRefreshAt: this.lastExternalRefreshAt,
-			minGapMs: HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS
+			minGapMs: force ? 0 : HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS
 		})) return;
 		this.externalRefreshInFlight = true;
 		this.lastExternalRefreshAt = now;
@@ -484,6 +491,7 @@ export class HistoryBrowsingState {
 			// Ask the cheap state endpoint before carrying the listing. A failed
 			// probe deliberately falls through to the old safe listing fetch.
 			const state = await this.fetchHistoryState();
+			if (!this.deps.visible()) return;
 			if (state && historyStripIsCurrent(state, {
 				total: this.total,
 				newestId: this.items[0]?.id ?? null,

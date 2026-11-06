@@ -103,6 +103,10 @@ struct CatalogReadingDetails: Equatable {
 /// Same definitions as the Server's web/src/lib/svgWeight.ts: containers and
 /// annotations are excluded, points tokens plus pairs of path numbers are counted.
 struct SavedSVGWeight {
+    private static let objectsPattern = try? NSRegularExpression(pattern: #"<([a-zA-Z][a-zA-Z0-9_-]*)"#)
+    private static let pointsPattern = try? NSRegularExpression(pattern: #"points="([^"]*)""#)
+    private static let pathPattern = try? NSRegularExpression(pattern: #"\bd="([^"]*)""#)
+    private static let numberPattern = try? NSRegularExpression(pattern: #"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"#)
     let bytes: Int
     let objects: Int
     let points: Int
@@ -110,18 +114,17 @@ struct SavedSVGWeight {
     init(_ source: String) {
         bytes = source.utf8.count
         let text = source as NSString
-        func captures(_ pattern: String, in input: NSString) -> [String] {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        func captures(_ regex: NSRegularExpression?, in input: NSString) -> [String] {
+            guard let regex else { return [] }
             return regex.matches(in: input as String, range: NSRange(location: 0, length: input.length))
                 .map { input.substring(with: $0.range(at: 1)) }
         }
         let structure = Set(["svg", "title", "desc", "metadata", "defs"])
-        objects = captures(#"<([a-zA-Z][a-zA-Z0-9_-]*)"#, in: text).filter { !structure.contains($0) }.count
-        let pointTokens = captures(#"points="([^"]*)""#, in: text)
+        objects = captures(Self.objectsPattern, in: text).filter { !structure.contains($0) }.count
+        let pointTokens = captures(Self.pointsPattern, in: text)
             .reduce(0) { $0 + $1.split(whereSeparator: \.isWhitespace).count }
-        let number = try? NSRegularExpression(pattern: #"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"#)
-        let pathPoints = captures(#"\bd="([^"]*)""#, in: text).reduce(0) { count, path in
-            count + (number?.numberOfMatches(in: path, range: NSRange(path.startIndex..., in: path)) ?? 0) / 2
+        let pathPoints = captures(Self.pathPattern, in: text).reduce(0) { count, path in
+            count + (Self.numberPattern?.numberOfMatches(in: path, range: NSRange(path.startIndex..., in: path)) ?? 0) / 2
         }
         points = pointTokens + pathPoints
     }

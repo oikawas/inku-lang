@@ -26,6 +26,12 @@ struct CreationWorkInfoView: View {
     @State private var copyToken = UUID()
     @State private var loadToken = UUID()
     @State private var note = LibraryNoteEditorModel()
+    @State private var svgWeight: SavedSVGWeight?
+    @State private var scoreText = ""
+    @State private var scoreLight = AttributedString()
+    @State private var scoreDark = AttributedString()
+    @State private var pluginOffersJA: [String] = []
+    @State private var pluginOffersEN: [String] = []
 
     /// Set when the view is the drawer over the canvas rather than a sheet.
     private let onClose: (() -> Void)?
@@ -90,7 +96,15 @@ struct CreationWorkInfoView: View {
         .padding(onClose == nil ? 20 : 16)
         .frame(minWidth: onClose == nil ? 660 : nil, idealWidth: onClose == nil ? 760 : nil,
                minHeight: onClose == nil ? 520 : nil, idealHeight: onClose == nil ? 740 : nil)
-        .task(id: work?.id) { copied = nil; copyToken = UUID(); await load() }
+        .task(id: work?.id) {
+            copied = nil; copyToken = UUID()
+            svgWeight = work.map { SavedSVGWeight($0.svg) }
+            scoreText = work.map { prettyScore($0.score) } ?? ""
+            scoreLight = JSONHighlight.attributed(scoreText, dark: false)
+            scoreDark = JSONHighlight.attributed(scoreText, dark: true)
+            pluginOffersJA = []; pluginOffersEN = []
+            await load()
+        }
     }
 
     private var absent: String { copy("historyVersionNotRecorded", "記録なし") }
@@ -124,7 +138,7 @@ struct CreationWorkInfoView: View {
                     }
                 }
                 if let data = information?.context?.descriptionDDL, let record = try? ExactJSON(data: data) {
-                    ReadDrawInfoView(record: record, display: model.display, pluginOffers: information?.pluginOffers(japanese: model.display.preferences.language != "en") ?? [])
+                    ReadDrawInfoView(record: record, display: model.display, pluginOffers: pluginOffers)
                 }
                 if information?.context?.descriptionDDL == nil && (work.sketchGrain != nil || work.sketchState != nil) {
                     group(information?.context?.descriptionDDL != nil ? model.display.label("写生（読み）", "Sketch from life (reading)") : copy("sketchLabel", "写生")) {
@@ -169,10 +183,11 @@ struct CreationWorkInfoView: View {
                     colorMap(work)
                     row(model.display.localized("キャンバス"), work.renderCanvasAspect ?? work.renderCanvasAspectID, hint: "provenanceHintCanvas")
                     row(copy("provenanceLabelCanvasRatio", "キャンバスの比率"), work.renderCanvasAspectRatio.map { String(format: "%.3f", $0) }, hint: "provenanceHintCanvasRatio")
-                    let weight = SavedSVGWeight(work.svg)
+                    if let weight = svgWeight {
                     row(model.display.localized("SVG サイズ"), ByteCountFormatter.string(fromByteCount: Int64(weight.bytes), countStyle: .file), hint: "provenanceHintSvgSize")
                     row(model.display.localized("SVG オブジェクト数"), weight.objects.formatted(), hint: "provenanceHintSvgObjects")
                     row(model.display.localized("SVG 点数"), weight.points.formatted(), hint: "provenanceHintSvgPoints")
+                    }
                 }
                 group(copy("provenanceSectionIdentity", "同一性")) {
                     HStack(alignment: .firstTextBaseline) {
@@ -195,7 +210,7 @@ struct CreationWorkInfoView: View {
                     if let line = provenance?.batchLineNumber { row(copy("provenanceLabelBatchLine", "バッチ行番号"), String(line), hint: "provenanceHintBatchLine") }
                 }
                 group(copy("provenanceSectionRun", "実行")) {
-                    let offers = information?.pluginOffers(japanese: model.display.preferences.language != "en") ?? []
+                    let offers = pluginOffers
                     if !offers.isEmpty { row(model.display.localized("提示したプラグイン"), offers.joined(separator: "\n"), hint: "provenanceHintPluginOffers") }
                     row(model.display.localized("作成日"), Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .standard), hint: "provenanceHintCreated")
                     row(model.display.localized("処理時間"), work.elapsedMS.map { $0 > 0 ? String(format: "%.1fs", Double($0) / 1000) : copy("provenanceElapsedNotRecorded", "記録なし") }, hint: "provenanceHintElapsed")
@@ -257,7 +272,7 @@ struct CreationWorkInfoView: View {
 
     /// OutputTabsContent.svelte `.score-*`: a toolbar on bg2, a line-number gutter on bg2, and Web JSON colors.
     private func score(_ work: SavedWork) -> some View {
-        let text = prettyScore(work.score)
+        let text = scoreText
         let count = text.components(separatedBy: "\n").count
         return VStack(spacing: 0) {
             HStack { Spacer(); copyButton(text, id: "score") }.padding(.vertical, 6).padding(.horizontal, 8).background(InkuColor.bg2)
@@ -269,7 +284,7 @@ struct CreationWorkInfoView: View {
                         .padding(.vertical, 12).padding(.horizontal, 8).frame(minWidth: 42, alignment: .trailing)
                         .background(InkuColor.bg2)
                         .overlay(alignment: .trailing) { Rectangle().fill(InkuColor.border).frame(width: 1) }
-                    Text(JSONHighlight.attributed(text, dark: colorScheme == .dark)).textSelection(.enabled)
+                    Text(colorScheme == .dark ? scoreDark : scoreLight).textSelection(.enabled)
                         .fixedSize().padding(12)
                 }
                 .inkuFont(12, design: .monospaced).lineSpacing(4)
@@ -423,14 +438,18 @@ struct CreationWorkInfoView: View {
         guard let work else { loading = false; return }
         let token = UUID(); loadToken = token
         loading = true; loadError = nil; information = nil
+        pluginOffersJA = []; pluginOffersEN = []
         defer { if loadToken == token { loading = false } }
         do {
             let result = try await model.savedGenerationInformation(work: work)
             guard loadToken == token, !Task.isCancelled else { return }
             information = result
+            pluginOffersJA = result.pluginOffers(japanese: true)
+            pluginOffersEN = result.pluginOffers(japanese: false)
             note.receive(workID: work.id, state: .available(result.annotation))
         }
         catch is CancellationError { }
         catch { if loadToken == token, !Task.isCancelled { loadError = error.localizedDescription; note.receive(workID: work.id, state: .unavailable) } }
     }
+    private var pluginOffers: [String] { model.display.preferences.language == "en" ? pluginOffersEN : pluginOffersJA }
 }

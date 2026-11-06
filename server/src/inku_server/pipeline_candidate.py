@@ -296,6 +296,7 @@ class CandidateExecution:
         self._rendered: dict | None = None
         self._snapshot: dict | None = None
         self._lock = threading.RLock()
+        self._changed = threading.Condition(self._lock)
         self._fresh = False
         self._provider_in_flight = False
         self._render_in_flight = False
@@ -365,6 +366,13 @@ class CandidateExecution:
         with self._lock:
             if self._snapshot is not None and self._snapshot.get("action") is not None:
                 self.command({"tag": "cancel"})
+
+    def wait_for_change(self, sequence: str, timeout: float) -> None:
+        with self._changed:
+            self._changed.wait_for(
+                lambda: self._snapshot is None or self._snapshot.get("sequence") != sequence,
+                timeout=timeout,
+            )
 
     def run_effect(self) -> dict | None:
         """Execute the current effect once. No effect means author input is next."""
@@ -625,6 +633,8 @@ class CandidateExecution:
             self.save_snapshot(state, next_snapshot, self.context, rendered)
         self._snapshot = next_snapshot
         self._rendered = rendered
+        with self._changed:
+            self._changed.notify_all()
         if self.transcript is not None:
             self.last_output = output
         return output

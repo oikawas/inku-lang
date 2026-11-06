@@ -1281,6 +1281,18 @@ class VariationAuthorityStore:
             )
         return None if row is None else _execution_record(row)
 
+    def read_latest_execution_id(self, owner_id: str, variation_id: str) -> str | None:
+        """Find a variation's last execution without loading its snapshot."""
+        with self.engine.connect() as connection:
+            return connection.execute(
+                select(pipeline_candidate_executions.c.execution_id)
+                .where(and_(pipeline_candidate_executions.c.owner_id == owner_id,
+                            pipeline_candidate_executions.c.variation_id == variation_id))
+                .order_by(pipeline_candidate_executions.c.updated_at.desc(),
+                          pipeline_candidate_executions.c.execution_id.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+
     def record_render_refusal(
         self, owner_id: str, execution_id: str, *, expected_sequence: str, detail: dict,
     ) -> None:

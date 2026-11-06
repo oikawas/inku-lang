@@ -830,16 +830,23 @@ class PipelineService:
         return system_prompts_view(json.loads(record.state_bytes).get("context", {}))
 
     def get(self, owner: str, variation_id: str) -> dict:
-        record = self.store.read_latest_execution_for_variation(owner, variation_id)
-        if record is None:
-            raise HTTPException(404, "variation_not_found")
-        execution_id = record.execution_id
-        key = (owner, execution_id)
         with self._lock:
-            run = self._runs.get(key)
+            run = next((candidate for (actor, _), candidate in reversed(self._runs.items())
+                        if actor == owner and (getattr(candidate, "_snapshot", None) or {}).get("variation_id") == variation_id), None)
             if run is not None:
+                execution_id = run._snapshot["execution_id"]
+                key = (owner, execution_id)
                 self._runs.move_to_end(key)
-            else:
+        if run is None:
+            execution_id = self.store.read_latest_execution_id(owner, variation_id)
+            if execution_id is None:
+                raise HTTPException(404, "variation_not_found")
+            record = self.store.read_execution(owner, execution_id)
+            if record is None:
+                raise HTTPException(404, "variation_not_found")
+            with self._lock:
+                run = self._runs.get((owner, execution_id))
+            if run is None:
                 saved = json.loads(record.state_bytes)
                 if saved["snapshot"].get("action") is not None:
                     run = self.execution(owner, execution_id)
@@ -855,6 +862,14 @@ class PipelineService:
                 raise error
             raise HTTPException(503, {"code": "pipeline_effect_failed", "message": "The authoring operation could not finish."})
         return run.view()
+
+    def wait_for_change(self, owner: str, view: dict, timeout: float = 0.25) -> dict:
+        with self._lock:
+            run = self._runs.get((owner, view["execution_id"]))
+        if run is None:
+            return self.get(owner, view["variation_id"])
+        run.wait_for_change(view.get("sequence"), timeout)
+        return self.get(owner, view["variation_id"])
 
     def command(self, owner: str, execution_id: str, payload: dict) -> dict:
         if payload.get("tag") == "perform":

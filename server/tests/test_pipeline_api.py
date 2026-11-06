@@ -558,7 +558,7 @@ def test_read_only_get_does_not_reserve_a_busy_slot():
             assert snapshot == {"config": {}, "action": None}
 
     record = SimpleNamespace(execution_id="saved", state_bytes=json.dumps({"snapshot": {"config": {}, "action": None}, "context": {}, "rendered": None}))
-    store = SimpleNamespace(read_latest_execution_for_variation=lambda *_: record)
+    store = SimpleNamespace(read_latest_execution_id=lambda *_: record.execution_id, read_execution=lambda *_: record)
     service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
                               max_workers=1, max_effect_steps=1, max_retained_runs=8)
     service._host = lambda *_: Run()
@@ -588,7 +588,7 @@ def test_get_resumes_an_unresident_busy_execution():
             return {"busy": True, "execution_id": "saved"}
 
     record = SimpleNamespace(execution_id="saved", state_bytes=json.dumps({"snapshot": {"config": {}, "action": {"tag": "generate_normalized_ddl"}}, "context": {}, "rendered": None}))
-    store = SimpleNamespace(read_latest_execution_for_variation=lambda *_: record, read_execution=lambda *_: record)
+    store = SimpleNamespace(read_latest_execution_id=lambda *_: record.execution_id, read_execution=lambda *_: record)
     service = PipelineService(None, store, config_for=None, provider_for=None, render_for=None,
                               max_workers=1, max_effect_steps=1, max_retained_runs=8)
     service._host = lambda *_: Run()
@@ -598,6 +598,44 @@ def test_get_resumes_an_unresident_busy_execution():
         assert service.get("owner", "variation")["busy"] is True
         assert scheduled == [(('owner', 'saved'), service._runs[('owner', 'saved')])]
     finally:
+        service._runs.clear()
+        service.close()
+
+
+def test_compat_wait_uses_resident_run_without_snapshot_queries(monkeypatch):
+    import threading
+    from inku_server import pipeline_compat
+
+    class Run:
+        owner_id = "owner"
+        context = {}
+        image_data = {}
+        _snapshot = {"execution_id": "run", "variation_id": "variation", "sequence": "1", "action": {"tag": "work"}}
+        changed = threading.Event()
+        def view(self):
+            return {**self._snapshot, "busy": self._snapshot["action"] is not None}
+        def wait_for_change(self, sequence, timeout):
+            self.changed.wait(timeout)
+
+    class Store:
+        def read_latest_execution_id(self, *_):
+            pytest.fail("resident run queried the store")
+
+    run = Run()
+    service = PipelineService(None, Store(), config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1)
+    service._runs[("owner", "run")] = run
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
+    def finish():
+        time.sleep(0.05)
+        run._snapshot = {**run._snapshot, "sequence": "2", "action": None}
+        run.changed.set()
+    thread = threading.Thread(target=finish)
+    thread.start()
+    try:
+        assert pipeline_compat._wait("owner", service.get("owner", "variation"))["busy"] is False
+    finally:
+        thread.join()
         service._runs.clear()
         service.close()
 

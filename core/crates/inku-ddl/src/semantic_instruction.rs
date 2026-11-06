@@ -777,6 +777,12 @@ fn build_semantic_instructions(
             });
         }
     }
+    let mut sequences_by_entity = BTreeMap::new();
+    for sequence in &association.ast.sequences {
+        sequences_by_entity
+            .entry(sequence.target_entity_index)
+            .or_insert(&sequence.sequence);
+    }
     for (entity_index, entity) in association.ast.entities.iter().enumerate() {
         let region_index = entity.head.source().region_index;
         let head_start = entity.head.source().span.start_byte;
@@ -820,12 +826,9 @@ fn build_semantic_instructions(
         };
         instructions.push(SemanticInstruction {
             entity: entity.clone(),
-            sequence: association
-                .ast
-                .sequences
-                .iter()
-                .find(|sequence| sequence.target_entity_index == entity_index)
-                .map(|sequence| sequence.sequence.clone()),
+            sequence: sequences_by_entity
+                .get(&entity_index)
+                .map(|sequence| (*sequence).clone()),
             action,
             position,
             layout_direction: None,

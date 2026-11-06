@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import CryptoKit
 
 public enum PersistenceError: Error, Sendable, Equatable {
     case invalidFileURL
@@ -18,8 +19,10 @@ public enum LibraryAnnotationMark: Sendable {
 
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
-    public static let currentSchemaVersion = 8
+    public static let currentSchemaVersion = 9
+    private static let vacuumMarker = "swift-v9-vacuum-complete"
     public nonisolated let url: URL
+    public nonisolated let vacuumDeferred: Bool
     let queue: DatabaseQueue
 
     public init(url: URL) throws {
@@ -75,6 +78,21 @@ public actor InkuDatabase {
                     throw error
                 }
             }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 9 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v9-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
             try inspection.close()
         } else {
             try FileManager.default.createDirectory(
@@ -85,46 +103,15 @@ public actor InkuDatabase {
         configuration.busyMode = .timeout(5)
         self.queue = try DatabaseQueue(path: self.url.path, configuration: configuration)
         if !exists {
-            try queue.write { db in try db.execute(sql: Self.schemaSQL()) }
+            try queue.write { db in
+                try db.execute(sql: Self.schemaSQL())
+                try db.execute(sql: "INSERT INTO schema_migrations(identifier) VALUES (?)", arguments: [Self.vacuumMarker])
+            }
         } else {
             let reportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-\(UUID().uuidString).json")
             let v7ReportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v3-v7-\(UUID().uuidString).json")
             do { try queue.write { db in
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v2"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v3"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v4"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v5"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
-                    try Self.validateSchema(db)
-                    let report = try PluginNamesMigration.run(db)
-                    let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                    try encoder.encode(report).write(to: reportURL, options: .atomic)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
-                    try db.execute(sql: Self.resourceSQL("migration-v6"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
-                    try Self.validateSchema(db)
-                    let report = try SaijikiV3Migration.run(db)
-                    try report.write(to: v7ReportURL, options: .atomic)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
-                    try db.execute(sql: Self.resourceSQL("migration-v7"))
-                }
-                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
-                    try Self.validateSchema(db)
-                    try db.execute(sql: Self.resourceSQL("migration-v8"))
-                }
+                try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL)
             } } catch {
                 try? FileManager.default.removeItem(at: reportURL)
                 try? FileManager.default.removeItem(at: v7ReportURL)
@@ -132,6 +119,110 @@ public actor InkuDatabase {
             }
         }
         try queue.read { try Self.validateSchema($0) }
+        self.vacuumDeferred = try !Self.compactV9(queue, at: self.url)
+        if exists, !self.vacuumDeferred {
+            try Self.removeOlderMigrationBackups(in: self.url.deletingLastPathComponent(), queue: queue)
+        }
+    }
+
+    private static func migrate(_ db: Database, reportURL: URL, v7ReportURL: URL) throws {
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v2"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v3"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v4"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v5"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
+            try Self.validateSchema(db)
+            let report = try PluginNamesMigration.run(db)
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(report).write(to: reportURL, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
+            try db.execute(sql: Self.resourceSQL("migration-v6"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
+            try Self.validateSchema(db)
+            let report = try SaijikiV3Migration.run(db)
+            try report.write(to: v7ReportURL, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
+            try db.execute(sql: Self.resourceSQL("migration-v7"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v8"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 8 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v9-prepare"))
+            let records = try Row.fetchCursor(db, sql: "SELECT execution_id, effect_id, revision, snapshot, acknowledgement, save_payload FROM effect_acknowledgements")
+            while let record = try records.next() {
+                let snapshot: Data = record["snapshot"], payload: Data = record["save_payload"]
+                let id: String = record["execution_id"], effect: String = record["effect_id"]
+                let revision: Int64 = record["revision"], ack: Data = record["acknowledgement"]
+                try db.execute(sql: """
+                    INSERT INTO effect_acknowledgements_v9
+                    (execution_id, effect_id, revision, snapshot_sha256, acknowledgement, save_payload_sha256)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, arguments: [id, effect, revision, Data(SHA256.hash(data: snapshot)), ack, Data(SHA256.hash(data: payload))])
+            }
+            try db.execute(sql: Self.resourceSQL("migration-v9"))
+        }
+    }
+
+    /// Runs outside a transaction. A missing marker means a prior migration still needs compaction.
+    private static func compactV9(_ queue: DatabaseQueue, at url: URL) throws -> Bool {
+        let complete = try queue.read { db in
+            try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE identifier = ?)", arguments: [vacuumMarker]) == true
+        }
+        if complete { return true }
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        let volume = try FileManager.default.attributesOfFileSystem(forPath: url.deletingLastPathComponent().path)
+        let free = (volume[.systemFreeSize] as? NSNumber)?.int64Value ?? 0
+        guard free >= size else { return false }
+        do {
+            try queue.writeWithoutTransaction { try $0.execute(sql: "VACUUM") }
+        } catch let error as DatabaseError where error.resultCode.rawValue == 13 {
+            return false
+        }
+        try queue.read { try validateRestore($0) }
+        try queue.write { try $0.execute(sql: "INSERT INTO schema_migrations(identifier) VALUES (?)", arguments: [vacuumMarker]) }
+        return true
+    }
+
+    private static func removeOlderMigrationBackups(in directory: URL, queue: DatabaseQueue) throws {
+        let urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .creationDateKey], options: [])
+        let pattern = try NSRegularExpression(pattern: #"^\.inku-before-v([0-9]+)-([0-9A-Fa-f-]{36})\.sqlite$"#)
+        var backups: [(url: URL, version: Int, created: Date)] = []
+        for url in urls {
+            let name = url.lastPathComponent
+            guard let match = pattern.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+                  let versionRange = Range(match.range(at: 1), in: name), let version = Int(name[versionRange]),
+                  let uuidRange = Range(match.range(at: 2), in: name), UUID(uuidString: String(name[uuidRange])) != nil else { continue }
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .creationDateKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true, let created = values.creationDate else { continue }
+            backups.append((url, version, created))
+        }
+        guard let latest = backups.filter({ $0.version == 9 }).max(by: { $0.created < $1.created }) else { return }
+        let older = backups.filter { $0.url != latest.url && $0.created < latest.created }
+        guard !older.isEmpty else { return }
+        do {
+            let saved = try readOnlyQueue(at: latest.url)
+            defer { try? saved.close() }
+            try saved.read { try validateRestore($0) }
+        } catch { return }
+        try queue.read { try validateRestore($0) }
+        for backup in older { try FileManager.default.removeItem(at: backup.url) }
     }
 
     public nonisolated static func applicationSupportURL(hostIdentifier: String) throws -> URL {
@@ -825,20 +916,21 @@ public actor InkuDatabase {
         let savePayload = try encoder.encode(EffectSave(work: work, node: node, edge: edge))
         return try queue.write { db in
             if let prior = try Row.fetchOne(db, sql: """
-                SELECT revision, snapshot, acknowledgement, save_payload FROM effect_acknowledgements
+                SELECT revision, snapshot_sha256, acknowledgement, save_payload_sha256 FROM effect_acknowledgements
                 WHERE execution_id = ? AND effect_id = ?
                 """, arguments: [id, effectID]) {
-                let priorSnapshot: Data = prior["snapshot"]
+                let priorSnapshotDigest: Data = prior["snapshot_sha256"]
                 let priorACK: Data = prior["acknowledgement"]
-                let priorSavePayload: Data = prior["save_payload"]
+                let priorSavePayloadDigest: Data = prior["save_payload_sha256"]
                 let priorRevision: Int64 = prior["revision"]
-                guard priorSnapshot == snapshot, priorACK == acknowledgement, priorSavePayload == savePayload,
+                guard priorSnapshotDigest == Data(SHA256.hash(data: snapshot)), priorACK == acknowledgement,
+                      priorSavePayloadDigest == Data(SHA256.hash(data: savePayload)),
                       expectedRevision >= 0, expectedRevision < Int64.max,
                       priorRevision == expectedRevision + 1 else {
                     throw PersistenceError.effectConflict
                 }
                 return EffectCommitResult(
-                    execution: ExecutionSnapshot(id: id, revision: priorRevision, snapshot: priorSnapshot),
+                    execution: ExecutionSnapshot(id: id, revision: priorRevision, snapshot: snapshot),
                     acknowledgement: priorACK, wasAlreadyCommitted: true)
             }
             guard !effectID.isEmpty else { throw PersistenceError.invalidRecord("empty effect ID") }
@@ -851,9 +943,9 @@ public actor InkuDatabase {
             }
             try db.execute(sql: """
                 INSERT INTO effect_acknowledgements
-                (execution_id, effect_id, revision, snapshot, acknowledgement, save_payload)
+                (execution_id, effect_id, revision, snapshot_sha256, acknowledgement, save_payload_sha256)
                 VALUES (?, ?, ?, ?, ?, ?)
-                """, arguments: [id, effectID, updated.revision, snapshot, acknowledgement, savePayload])
+                """, arguments: [id, effectID, updated.revision, Data(SHA256.hash(data: snapshot)), acknowledgement, Data(SHA256.hash(data: savePayload))])
             return EffectCommitResult(
                 execution: updated, acknowledgement: acknowledgement, wasAlreadyCommitted: false)
         }
@@ -1008,36 +1100,10 @@ public actor InkuDatabase {
         var restored = false
         defer { if !restored { try? FileManager.default.removeItem(at: reportURL); try? FileManager.default.removeItem(at: v7ReportURL) } }
         try isolated.write { db in
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
-                try db.execute(sql: Self.resourceSQL("migration-v2"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
-                try db.execute(sql: Self.resourceSQL("migration-v3"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
-                try db.execute(sql: Self.resourceSQL("migration-v4"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
-                try db.execute(sql: Self.resourceSQL("migration-v5"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
-                let report = try PluginNamesMigration.run(db)
-                let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                try encoder.encode(report).write(to: reportURL, options: .atomic)
-                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
-                try db.execute(sql: Self.resourceSQL("migration-v6"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
-                let report = try SaijikiV3Migration.run(db)
-                try report.write(to: v7ReportURL, options: .atomic)
-                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
-                try db.execute(sql: Self.resourceSQL("migration-v7"))
-            }
-            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 7 {
-                try db.execute(sql: Self.resourceSQL("migration-v8"))
-            }
+            try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL)
         }
         try isolated.read { try Self.validateRestore($0) }
+        _ = try Self.compactV9(isolated, at: temporary)
         // Artwork rollback must not reopen reservations already charged by this DB.
         try retainLiveProviderRates(in: isolated)
         try isolated.read { try Self.validateRestore($0) }
@@ -1141,7 +1207,10 @@ public actor InkuDatabase {
         let sixth = fifth + "\n" + (try resourceSQL("migration-v6"))
         if version == 6 { return sixth }
         let seventh = sixth + "\n" + (try resourceSQL("migration-v7"))
-        return version == 7 ? seventh : seventh + "\n" + (try resourceSQL("migration-v8"))
+        if version == 7 { return seventh }
+        let eighth = seventh + "\n" + (try resourceSQL("migration-v8"))
+        if version == 8 { return eighth }
+        return eighth + "\n" + (try resourceSQL("migration-v9-prepare")) + "\n" + (try resourceSQL("migration-v9"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1163,7 +1232,7 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5, 6, 7, 8].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), (1...currentSchemaVersion).contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
@@ -1177,9 +1246,11 @@ public actor InkuDatabase {
         if version >= 6 { identifiers.append("swift-v6-plugin-names-v2") }
         if version >= 7 { identifiers.append("swift-v7-saijiki-v3") }
         if version >= 8 { identifiers.append("swift-v8-draw-options") }
-        guard try schemaObjects(in: db) == expectedObjects,
-              try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
-                == identifiers else {
+        if version >= 9 { identifiers.append("swift-v9-effect-digests") }
+        guard try schemaObjects(in: db) == expectedObjects else { throw PersistenceError.unknownSchema }
+        let actualIdentifiers = try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
+        let completedIdentifiers = version >= 9 ? (identifiers + [vacuumMarker]).sorted() : identifiers
+        guard actualIdentifiers == identifiers || actualIdentifiers == completedIdentifiers else {
             throw PersistenceError.unknownSchema
         }
     }

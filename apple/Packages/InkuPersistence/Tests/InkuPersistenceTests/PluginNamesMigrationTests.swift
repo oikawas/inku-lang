@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 import InkuCore
+import CryptoKit
 import Testing
 @testable import InkuPersistence
 
@@ -80,9 +81,11 @@ struct PluginNamesMigrationTests {
         #expect(!(afterScore["instructions"] as? [Any] ?? []).isEmpty)
         let reader = try DatabaseQueue(path: file.path)
         try await reader.read { db in
-            #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == 8)
+            #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == InkuDatabase.currentSchemaVersion)
             let ack = try #require(try Data.fetchOne(db, sql: "SELECT acknowledgement FROM effect_acknowledgements WHERE execution_id = 'good'"))
-            let payload = try #require(try Data.fetchOne(db, sql: "SELECT save_payload FROM effect_acknowledgements WHERE execution_id = 'good'"))
+            let payloadDigest = try #require(try Data.fetchOne(db, sql: "SELECT save_payload_sha256 FROM effect_acknowledgements WHERE execution_id = 'good'"))
+            let payload = try #require(try Data.fetchOne(db, sql: "SELECT CAST(json_set(CAST(? AS TEXT), '$.work.ddl', ?) AS BLOB)", arguments: [good.2, "｛若葉｝。"]))
+            #expect(payloadDigest == Data(SHA256.hash(data: payload)))
             #expect(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.performance.document.source')", arguments: [ack]) == "｛若葉｝。")
             #expect(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.work.ddl')", arguments: [payload]) == "｛若葉｝。")
             #expect(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.performance.document.macro_locks')", arguments: [ack]) == String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.performance.document.macro_locks')", arguments: [good.1]))
@@ -91,15 +94,13 @@ struct PluginNamesMigrationTests {
             let encoded = try #require(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.snapshot')", arguments: [outer]))
             let inner = try #require(Data(base64Encoded: encoded))
             #expect(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.document.source')", arguments: [inner]) == "｛若葉｝。")
-            let effectSnapshot = try #require(try Data.fetchOne(db, sql: "SELECT snapshot FROM effect_acknowledgements WHERE execution_id = 'good'"))
-            let effectEncoded = try #require(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.snapshot')", arguments: [effectSnapshot]))
-            let effectInner = try #require(Data(base64Encoded: effectEncoded))
-            #expect(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.document.source')", arguments: [effectInner]) == "｛若葉｝。")
+            let effectDigest = try #require(try Data.fetchOne(db, sql: "SELECT snapshot_sha256 FROM effect_acknowledgements WHERE execution_id = 'good'"))
+            #expect(effectDigest == Data(SHA256.hash(data: outer)))
             #expect(try Data.fetchOne(db, sql: "SELECT snapshot FROM execution_snapshots WHERE id = 'bad'") == bad.0)
         }
         try reader.close()
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-        let backupURL = try #require(files.first { $0.lastPathComponent.hasPrefix(".inku-before-v6-") })
+        let backupURL = try #require(files.first { $0.lastPathComponent.hasPrefix(".inku-before-v9-") })
         let backup = try DatabaseQueue(path: backupURL.path)
         #expect(try await backup.read { try Int.fetchOne($0, sql: "PRAGMA user_version") } == 5)
         try backup.close()
@@ -110,7 +111,7 @@ struct PluginNamesMigrationTests {
         let reopened = try InkuDatabase(url: file)
         #expect(try await reopened.work(id: "good_1")?.ddl == "｛若葉｝。")
         let again = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-        #expect(again.filter { $0.lastPathComponent.hasPrefix(".inku-before-v6-") }.count == 1)
+        #expect(again.filter { $0.lastPathComponent.hasPrefix(".inku-before-v9-") }.count == 1)
         #expect(again.filter { $0.lastPathComponent.hasPrefix(".inku-plugin-names-v6-") }.count == 1)
     }
 }

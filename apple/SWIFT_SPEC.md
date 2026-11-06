@@ -58,7 +58,7 @@ When DDL completion awaits approval, the creation panel shows the committed and 
 
 ## 2026-10-29 Plugin v2 and saved-work migration
 
-Bundled leaves and editor reference diagnostics use the shared core. The Saijiki, completion, settings, and generation information show braced names. Portable DDL uses `inku.ddl-export.v2` and the work's locks; v1 files are refused. On startup, database migration v6 verifies a `.inku-before-v6-*.sqlite` snapshot before updating the saved DDL copies, leaves refused works intact, and writes a JSON report beside the database. Definitions, locks, Score, and SVG are retained.
+Bundled leaves and editor reference diagnostics use the shared core. The Saijiki, completion, settings, and generation information show braced names. Portable DDL uses `inku.ddl-export.v2` and the work's locks; v1 files are refused. On startup, database migration v6 verifies a `.inku-before-v6-*.sqlite` snapshot before updating the saved DDL copies, leaves refused works intact, and writes a JSON report beside the database. Definitions, locks, Score, and SVG are retained. After v9 migration, compaction, and validation succeed, older pre-migration copies are removed.
 
 ## 2026-10-27 macOS build numbers
 
@@ -1013,13 +1013,15 @@ Restoring a saved execution is read-only and never automatically repeats an inte
 
 ### Storage, reading, and saved Score replay
 
-Storage semantics follow the [portable persistence contract](../persistence/README.md), [contract.json](../persistence/contract.json), and [logical projection v2](../persistence/reference/logical-projection-v2.sql). Swift has an independent physical schema v1, defined by its [bundled SQL](Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql), [schema export](../persistence/reference/swift-schema-v1.json), and [record mapping](Packages/InkuPersistence/Sources/InkuPersistence/Records.swift). Its physical schema version is not interchangeable with the portable contract or other hosts' schema versions.
+Storage semantics follow the [portable persistence contract](../persistence/README.md), [contract.json](../persistence/contract.json), and [logical projection v2](../persistence/reference/logical-projection-v2.sql). Swift has an independent physical schema, currently v9, built from the [bundled v1 SQL](Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql) and successive migrations; see also the [v1 schema export](../persistence/reference/swift-schema-v1.json) and [record mapping](Packages/InkuPersistence/Sources/InkuPersistence/Records.swift). Its physical schema version is not interchangeable with the portable contract or other hosts' schema versions.
 
 `ddl` is the only instruction body used for saving, display, editing, and replay. Optional `ddl_source_origin` records adoption of a legacy body; it is neither a second body nor authoring authority. NULL versus empty strings, unknown states/fallbacks and JSON fields, and original whitespace and line endings are preserved. When `source_text` is NULL, readers can display `input` without changing the stored value. Seeds are decimal TEXT; `at` is Unix epoch milliseconds.
 
 One `InkuDatabase` actor and a GRDB `DatabaseQueue` own the writer. Existing DBs undergo read-only schema validation before a writer opens. Unknown, future, or partial schemas are refused. Only new DBs are created with the current schema, and there is no destructive fallback. Swift does not directly open Server or Android databases, and macOS/iOS do not share a live DB file.
 
 A work, its lineage node, and an optional edge are saved in one transaction. History primary-key collisions are refused; render hashes are not unique. `commitEffect` atomically commits the next snapshot/storage revision, ACK, and optional work/lineage records. A success ACK is returned only after the DB commit. Retrying an identical effect does not duplicate a save; different contents or a stale storage revision cause a conflict. Storage revisions are distinct from document authority revisions.
+
+DB v9 replaces each effect's full snapshot and save payload with SHA-256 digests while retaining its ACK and revision. Retries compare the digests and ACK. Migration removes snapshots and drawing logs for failed or stopped executions with no saved effect. Before migration, it makes a validated `.inku-before-v9-<UUID>.sqlite` copy; after migration, VACUUM, and validation succeed, it removes older pre-migration copies. VACUUM runs once outside the transaction. If free space is insufficient, the app reports the deferral and retries at the next launch.
 
 Selecting or reading a saved work uses its stored DDL, Score, and canonical SVG without compiling or rendering again. Explicit replay validates the saved Score and its attested policies, clip, and options, invokes the shared `renderSaved` boundary, and saves a new work and lineage child. It does not rewrite the source work or invent policies for a work without rendering context. The current UI replays with the saved options.
 

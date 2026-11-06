@@ -13,7 +13,7 @@ let package = Package(
         .target(
             name: "InkuPersistence",
             dependencies: [.product(name: "GRDB", package: "GRDB.swift"), "InkuCore"],
-            resources: [.copy("Resources/schema-v1.sql"), .copy("Resources/migration-v2.sql"), .copy("Resources/migration-v3.sql"), .copy("Resources/migration-v4.sql"), .copy("Resources/migration-v5.sql"), .copy("Resources/migration-v6.sql"), .copy("Resources/migration-v7.sql"), .copy("Resources/migration-v8.sql")]),
+            resources: [.copy("Resources/schema-v1.sql"), .copy("Resources/migration-v2.sql"), .copy("Resources/migration-v3.sql"), .copy("Resources/migration-v4.sql"), .copy("Resources/migration-v5.sql"), .copy("Resources/migration-v6.sql"), .copy("Resources/migration-v7.sql"), .copy("Resources/migration-v8.sql"), .copy("Resources/migration-v9-prepare.sql"), .copy("Resources/migration-v9.sql")]),
         .testTarget(name: "InkuPersistenceTests", dependencies: [
             "InkuPersistence", "InkuCore", .product(name: "GRDB", package: "GRDB.swift")
         ])

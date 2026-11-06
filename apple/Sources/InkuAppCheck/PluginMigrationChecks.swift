@@ -46,7 +46,7 @@ import InkuPersistence
         throw CheckFailure.message("v6 migration failed to update the saved DDL copies")
     }
     let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-    guard files.contains(where: { $0.lastPathComponent.hasPrefix(".inku-before-v6-") }),
+    guard files.contains(where: { $0.lastPathComponent.hasPrefix(".inku-before-v9-") }),
           files.contains(where: { $0.lastPathComponent.hasPrefix(".inku-plugin-names-v6-") }) else {
         throw CheckFailure.message("v6 snapshot or report is missing")
     }

@@ -53,17 +53,20 @@ enum PluginNamesMigration {
 
     static func run(_ db: Database) throws -> Report {
         var report = Report()
-        var acknowledgements: [String: [(String, String, Data, Data, Data)]] = [:]
-        for row in try Row.fetchAll(db, sql: "SELECT execution_id, effect_id, snapshot, acknowledgement, save_payload FROM effect_acknowledgements") {
+        var acknowledgements: [String: [(String, String)]] = [:]
+        let acknowledgementRows = try Row.fetchCursor(db, sql: "SELECT execution_id, effect_id, acknowledgement FROM effect_acknowledgements")
+        while let row = try acknowledgementRows.next() {
             let execution: String = row["execution_id"], effect: String = row["effect_id"]
-            let snapshot: Data = row["snapshot"], ack: Data = row["acknowledgement"], payload: Data = row["save_payload"]
+            let ack: Data = row["acknowledgement"]
             if let workID = try jsonValue(db, ack, "$.work_id") {
-                acknowledgements[workID, default: []].append((execution, effect, snapshot, ack, payload))
+                acknowledgements[workID, default: []].append((execution, effect))
             }
         }
         var refusedExecutions = Set<String>()
-        var snapshotUpdates: [(String, Data)] = []
-        for row in try Row.fetchAll(db, sql: "SELECT id, snapshot FROM execution_snapshots") {
+        try db.execute(sql: "CREATE TEMP TABLE plugin_snapshot_updates (id TEXT PRIMARY KEY, snapshot BLOB NOT NULL)")
+        defer { try? db.execute(sql: "DROP TABLE IF EXISTS temp.plugin_snapshot_updates") }
+        let executionRows = try Row.fetchCursor(db, sql: "SELECT id, snapshot FROM execution_snapshots")
+        while let row = try executionRows.next() {
             let id: String = row["id"], outer: Data = row["snapshot"]
             guard let encoded = try jsonValue(db, outer, "$.snapshot"), let inner = Data(base64Encoded: encoded),
                   try Int.fetchOne(db, sql: "SELECT json_valid(CAST(? AS TEXT))", arguments: [inner]) == 1 else {
@@ -82,10 +85,11 @@ enum PluginNamesMigration {
                 guard migrated != source else { continue }
                 let newInner = try replacing(db, inner, "$.document.source", migrated)
                 let newOuter = try replacing(db, outer, "$.snapshot", newInner.base64EncodedString())
-                snapshotUpdates.append((id, newOuter))
+                try db.execute(sql: "INSERT INTO temp.plugin_snapshot_updates (id, snapshot) VALUES (?, ?)", arguments: [id, newOuter])
             }
         }
-        for row in try Row.fetchAll(db, sql: "SELECT id, ddl, instruction_lang_resolved FROM history") {
+        let historyRows = try Row.fetchCursor(db, sql: "SELECT id, ddl, instruction_lang_resolved FROM history")
+        while let row = try historyRows.next() {
             let id: String = row["id"]
             let source: String? = row["ddl"], language: String? = row["instruction_lang_resolved"]
             report.historyRows += 1
@@ -95,7 +99,11 @@ enum PluginNamesMigration {
                 for record in acknowledgements[id] ?? [] { refusedExecutions.insert(record.0) }
                 report.unchanged += 1; report.refused.append(Refusal(kind: "history", id: id, reason: "missing_or_ambiguous_context")); continue
             }
-            let (execution, effect, savedSnapshot, ack, payload) = records[0]
+            let (execution, effect) = records[0]
+            guard let saved = try Row.fetchOne(db, sql: "SELECT snapshot, acknowledgement, save_payload FROM effect_acknowledgements WHERE execution_id = ? AND effect_id = ?", arguments: [execution, effect]) else {
+                throw PersistenceError.corruptDatabase
+            }
+            let savedSnapshot: Data = saved["snapshot"], ack: Data = saved["acknowledgement"], payload: Data = saved["save_payload"]
             guard !refusedExecutions.contains(execution) else {
                 report.unchanged += 1; report.refused.append(Refusal(kind: "history", id: id, reason: "execution_refused")); continue
             }
@@ -139,7 +147,10 @@ enum PluginNamesMigration {
                 report.changed += 1
             }
         }
-        for (id, snapshot) in snapshotUpdates where !refusedExecutions.contains(id) {
+        let updates = try Row.fetchCursor(db, sql: "SELECT id, snapshot FROM temp.plugin_snapshot_updates ORDER BY rowid")
+        while let row = try updates.next() {
+            let id: String = row["id"], snapshot: Data = row["snapshot"]
+            guard !refusedExecutions.contains(id) else { continue }
             try db.execute(sql: "UPDATE execution_snapshots SET snapshot = ? WHERE id = ?", arguments: [snapshot, id])
             report.snapshotsChanged += 1
         }

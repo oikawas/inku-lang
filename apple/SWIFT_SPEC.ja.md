@@ -58,7 +58,7 @@ DDL の補完案が承認待ちになったら、保存作品の有無にかか�
 
 ## 2026-10-29 プラグイン v2 と保存作品の移行
 
-同梱の葉、編集時の参照と診断は共有 core の答えを使う。歳時記・補完・設定・生成情報には括弧つきの名を出す。DDL の持ち運びは `inku.ddl-export.v2` と作品の lock に基づき、v1 ファイルを拒否する。DB v6 は起動時に検証済み `.inku-before-v6-*.sqlite` を残してから作品の DDL の写しを移し、core が断った作品は保持し理由を DB の横の JSON に記録する。定義・lock・Score・SVG は保持する。
+同梱の葉、編集時の参照と診断は共有 core の答えを使う。歳時記・補完・設定・生成情報には括弧つきの名を出す。DDL の持ち運びは `inku.ddl-export.v2` と作品の lock に基づき、v1 ファイルを拒否する。DB v6 は起動時に検証済み `.inku-before-v6-*.sqlite` を作ってから作品の DDL の写しを移し、core が断った作品は保持し理由を DB の横の JSON に記録する。定義・lock・Score・SVG は保持する。v9 への移行・整理・検査が成功すると、v9 より古い移行前コピーは消す。
 
 ## 2026-10-27 macOSのBuild番号
 
@@ -1013,13 +1013,15 @@ provider requestの開始前にpending claimを保存し、旧responseが取消�
 
 ### 保存、読出し、保存Scoreの再演奏
 
-保存の意味は[共通保存契約](../persistence/README.ja.md)、[contract.json](../persistence/contract.json)、[論理projection v2](../persistence/reference/logical-projection-v2.sql)に従う。Swiftの物理schemaは独立したv1であり、[bundled SQL](Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)、[schema export](../persistence/reference/swift-schema-v1.json)、[record mapping](Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)を正本とする。物理schemaの版をportable契約や他hostのschema版と同一視しない。
+保存の意味は[共通保存契約](../persistence/README.ja.md)、[contract.json](../persistence/contract.json)、[論理projection v2](../persistence/reference/logical-projection-v2.sql)に従う。Swiftの物理schemaは独立しており、現行は v9 である。[bundled SQL の v1 土台](Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)と順次 migration、[v1 schema export](../persistence/reference/swift-schema-v1.json)、[record mapping](Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)を参照する。物理schemaの版をportable契約や他hostのschema版と同一視しない。
 
 保存・表示・編集・再演奏の指示書本文は`ddl`だけとする。optionalな`ddl_source_origin`は旧本文を採用した由来であり、第二の本文やauthorityではない。NULLと空文字、未知のstate／fallbackやJSON項目、元の改行と空白を保持する。`source_text`がNULLの作品は表示時に`input`へfallbackできるが、保存値を変更しない。seedは十進TEXT、`at`はUnix epoch millisecondsで保持する。
 
 一つの`InkuDatabase` actorとGRDB `DatabaseQueue`がwriterを所有する。既存DBはwriterを開く前に読み取り専用でschemaを照合し、未知・将来・部分schemaを拒否する。新規DBだけを現行schemaで作り、destructive fallbackを設けない。Server／AndroidのDBを直接開いたり、macOS／iOS間でlive DBを共有したりしない。
 
 作品・lineage node・任意edgeは一つのtransactionで保存する。history主キー衝突を拒否し、render hashは非uniqueとする。`commitEffect`は次snapshot／保存revision、ACK、任意作品・系譜を原子的に確定し、成功ACKをDB commit後に返す。同一effectの同一内容の再試行は保存を重複させず、異なる内容や古い保存revisionはconflictとして拒否する。保存revisionとdocument authorityのrevisionを混同しない。
+
+DB v9 は effect ごとの snapshot と保存 payload の全文を SHA-256 digest に置き換え、ACK と revision を保つ。再試行は digest と ACK を照合する。移行時、保存記録が一つもない失敗・停止した実行の snapshot と描画ログは削除する。移行前に検査済みの `.inku-before-v9-<UUID>.sqlite` を作り、移行・VACUUM・検査の成功後にそれより古い移行前コピーを消す。VACUUM は transaction 外で一度だけ行い、空き容量が不足すれば状態に表示して次回起動時に再試行する。
 
 保存作品の選択・再読出しは保存DDL、Score、canonical SVGをそのまま使い、compileや描画を起動しない。明示的な再演奏は保存Scoreと保存時のpolicy／clip／optionsを検証して共通`renderSaved`を呼び、新しい作品と系譜childを保存する。元の作品は書き換えず、描画contextが欠けている作品へ推測したpolicyを補わない。現在のUIは保存optionsのまま再演奏する。
 

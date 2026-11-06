@@ -24,7 +24,7 @@ struct DrawOptionsMigrationTests {
         #expect(work.renderHash == "exact" && work.svg == "<svg/>" && work.renderWild == true)
         #expect(work.drawRoute == nil && work.sketchRequested == nil && work.compositionRequested == nil && work.catalogMode == nil)
         let reader = try DatabaseQueue(path: file.path)
-        #expect(try await reader.read { try Int.fetchOne($0, sql: "PRAGMA user_version") } == 8)
+        #expect(try await reader.read { try Int.fetchOne($0, sql: "PRAGMA user_version") } == InkuDatabase.currentSchemaVersion)
         try reader.close()
     }
 }

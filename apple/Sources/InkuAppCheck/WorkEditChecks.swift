@@ -35,7 +35,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     await reopened.initialize()
     reopened.selectDrawRoute("stages"); reopened.sketchMode = "off"
     await reopened.selectWork(parent)
-    guard !reopened.sourceLocked, !reopened.canRegenerateDescription, await reopened.canEditSavedWork(parent) else {
+    guard !reopened.sourceLocked, await reopened.canEditSavedWork(parent) else {
         throw CheckFailure.message("Fixture must reopen a description-authoritative saved work without a live editor execution")
     }
     let database = try InkuDatabase(url: databaseURL)

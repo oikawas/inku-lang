@@ -186,10 +186,6 @@ public final class AppModel {
     @ObservationIgnored private var chatGPTFailureCodes: [String: String] = [:]
     /// Web CanvasPanel `clipboardMessage`: the copy button names the result, 2.5 s after success and 8 s after a failure.
     public private(set) var clipboardMessageKey: String?
-    public var providerURL = "http://localhost:8080/v1"
-    public var providerModel = ""
-    public var providerKind = "openai_compatible"
-    public var providerKey = ""
     public private(set) var nextDrawingModelReference: String {
         get { currentDrawOptions.models.stage1 ?? "" }
         set { currentDrawOptions.models.stage1 = newValue; currentDrawOptions.models.stage2 = newValue }
@@ -265,10 +261,6 @@ public final class AppModel {
     public let thumbnails = ArtworkThumbnails()
     @ObservationIgnored public var onSavedWork: (@MainActor (SavedWork) async -> Void)?
     @ObservationIgnored public var onDrawingLog: (@MainActor (DrawingLogRecord) async -> Void)?
-    public let versionSummary: String = {
-        let report = try? JSONSerialization.jsonObject(with: Data(InkuCore.versionReport.utf8)) as? [String: String]
-        return "共通コア接続 \(report?["binding_version"] ?? "不明") · 描画接続 \(InkuCore.rasterAPIVersion)"
-    }()
 
     @ObservationIgnored private let databaseURL: URL?
     @ObservationIgnored private let openDatabase: @Sendable (URL) throws -> InkuDatabase
@@ -387,14 +379,12 @@ public final class AppModel {
     }
     public var displayedWork: SavedWork? { previewWork ?? selectedWork }
     public var isPreview: Bool { previewWork != nil }
-    public var hasConfiguredProviders: Bool { !settings.providers.isEmpty }
     public var hasNextDrawingModel: Bool {
         settings.providers.contains { nextDrawingModelReference.hasPrefix($0.id + ":") && nextDrawingModelReference.count > $0.id.count + 1 }
     }
     public var canCommitDDL: Bool { !isBusy && !isPreview && !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (currentExecutionID != nil || selectedContext != nil) }
     public var canEditCurrentDDL: Bool { !isBusy && !isPreview && (currentExecutionID != nil || selectedContext != nil) }
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
-    public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
     public var hasAvailableNextDrawingModel: Bool {
         hasNextDrawingModel && (drawingAvailability[nextDrawingModelReference]?.drawing ?? false)
     }
@@ -516,12 +506,6 @@ public final class AppModel {
             }
             if let grouped = display.libraryGrouped { library.grouped = grouped }
             await library.connect(database: database)
-            if let provider = settings.providers.first {
-                providerURL = provider.baseURL.absoluteString
-                providerKind = provider.apiProfile == "mlx" ? "mlx" : provider.kind.rawValue
-                providerModel = settings.models.stage1Model.hasPrefix("\(provider.id):")
-                    ? String(settings.models.stage1Model.dropFirst(provider.id.count + 1)) : settings.models.stage1Model
-            }
             try await reloadWorks()
             // Web completeAuthentication opens the first normal history item once at startup.
             if let latest = try await database.libraryPage(limit: 1).items.first?.work, selectedWorkID == nil {
@@ -878,10 +862,6 @@ public final class AppModel {
     public func operationalLimitDefaults() throws -> [String: UInt32] {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         return try bootstrap.operationalLimitDefaults()
-    }
-
-    public func operationalLimits() throws -> [String: UInt32] {
-        try operationalLimitDefaults().merging(settings.operationalLimits ?? [:]) { _, selected in selected }
     }
 
     public func updateOperationalLimits(_ limits: [String: UInt32]?) async throws {
@@ -2190,13 +2170,6 @@ public final class AppModel {
         }
     }
 
-    public func regenerateDescription() async {
-        guard canRegenerateDescription, let id = currentExecutionID else { return }
-        let sketch: SketchRequest = sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off
-        await performCommand(executionID: id, command: .generateFromDescription(expectedRevision: authoringRevision,
-            description: descriptionText, autoCatalog: catalogMode == "auto", sketch: sketch), kind: "description_edit")
-    }
-
     public func completeHoles() async {
         guard canCompleteHoles, let id = currentExecutionID else { return }
         let selected = selectedHoleIDs.isEmpty ? holeIDs : holeIDs.filter { selectedHoleIDs.contains($0) }
@@ -2360,33 +2333,6 @@ public final class AppModel {
         return sources
     }
 
-    public func saveProvider() async {
-        guard settingsStore != nil, let url = URL(string: providerURL),
-              !providerModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            report(HostError("provider_settings_incomplete"))
-            return
-        }
-        do {
-            let kind: ProviderKind = providerKind == "mlx" ? .openAICompatible
-                : ProviderKind(rawValue: providerKind) ?? .openAICompatible
-            let provider = ProviderSettings(id: "local", kind: kind, baseURL: url,
-                apiProfile: providerKind == "mlx" ? "mlx" : nil,
-                requiresAPIKey: url.scheme == "https")
-            try provider.validate()
-            if !providerKey.isEmpty { try await credentials.setKey(providerKey, for: provider.credentialID) }
-            let modelID = "local:\(providerModel)"
-            var changed = settings
-            if let index = changed.providers.firstIndex(where: { $0.id == provider.id }) { changed.providers[index] = provider }
-            else { changed.providers.append(provider) }
-            changed.models.stage1Model = modelID
-            changed.models.stage2Model = modelID
-            try await updateHostSettings(changed)
-            providerKey = ""
-            errorText = nil
-            status = "接続設定を保存しました"
-        } catch { report(error) }
-    }
-
     @discardableResult
     public func backup(to url: URL) async -> Bool {
         guard let database else { return false }
@@ -2447,20 +2393,6 @@ public final class AppModel {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do { try Data(work.svg.utf8).write(to: url, options: .atomic); status = "SVGを書き出しました" }
         catch { report(error) }
-    }
-
-    public func exportPNG(to url: URL, height: UInt32) async {
-        guard let work = selectedWork else { return }
-        let options = display.preferences.singleWorkPNGOptions(height: Int(height))
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
-            try Task.checkCancellation()
-            guard let artifact = artifacts.first else { throw HostError("png_encode_failed") }
-            try artifact.data.write(to: url, options: .atomic)
-            status = "PNGを書き出しました"
-        } catch { report(error) }
     }
 
     public func copyImage(work target: SavedWork? = nil) async {

@@ -174,12 +174,19 @@ def init_db() -> None:
 
 
 def _refresh_planner_statistics() -> None:
-    """Let SQLite refresh planner statistics when it considers them useful."""
+    """Seed missing statistics; without them production SQLite chose a slow lineage plan.
+
+    Once seeded, let SQLite decide when to refresh them.
+    """
     if engine.dialect.name != "sqlite":
         return
     try:
         with engine.begin() as connection:
-            connection.exec_driver_sql("PRAGMA optimize")
+            exists = connection.exec_driver_sql(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_stat1'"
+            ).first()
+            populated = exists and connection.exec_driver_sql("SELECT 1 FROM sqlite_stat1 LIMIT 1").first()
+            connection.exec_driver_sql("PRAGMA optimize" if populated else "ANALYZE")
     except Exception:  # noqa: BLE001
         _logger.warning("could not refresh the query planner statistics", exc_info=True)
 

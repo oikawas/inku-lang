@@ -94,7 +94,7 @@ func runSavedOutputAvailabilityChecks() async throws {
           try await database.loadExecution(id: executionID) == execution else {
         throw CheckFailure.message("A missing saved performance was not reported as unavailable")
     }
-    print("Saved output availability passed: real core parent -> same-execution DDL child -> old parent selection; missing prompt is unavailable, saved DDL/Score/SVG/authority retained, no provider call or history/execution write. Isolated mock only.")
+    print("Saved output availability passed: same-execution DDL child and historical selection; absent presentation is not recorded, absent performance is unavailable; saved facts retained without provider calls or history/execution writes. Isolated mock only.")
 }
 
 private actor SavedOutputAvailabilityProvider: ProviderTransport {

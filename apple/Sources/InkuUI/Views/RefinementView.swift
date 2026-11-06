@@ -86,4 +86,3 @@ public struct RefinementView: View {
         if await refinement.close(app: model) { finish() } else { closing = false }
     }
 }
-

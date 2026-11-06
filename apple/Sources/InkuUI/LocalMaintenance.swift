@@ -11,7 +11,7 @@ private struct BackupManifest: Codable, Sendable {
     var pendingDeletion: [String]?
 }
 
-public struct LocalBackupGeneration: Identifiable, Sendable {
+public struct LocalBackupGeneration: Identifiable, Sendable, Equatable {
     public let name: String
     public let modifiedAt: Date?
     public let byteCount: Int64
@@ -194,22 +194,30 @@ public final class LocalMaintenance {
     public func refreshBackupInfo(app: AppModel) async {
         connect(app: app)
         await refreshBackupInfo()
-        databaseBytes = app.databaseFileURL.flatMap {
+        let bytes = app.databaseFileURL.flatMap {
             (try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? NSNumber)?.int64Value
         }
+        if databaseBytes != bytes { databaseBytes = bytes }
     }
     public func refreshBackupInfo() async {
-        guard let store else { backupInfoError = "バックアップの保存先を利用できません。"; return }
+        guard let store else {
+            let message = "バックアップの保存先を利用できません。"
+            if backupInfoError != message { backupInfoError = message }
+            return
+        }
         do {
             let snapshot = try await store.snapshot()
             try Task.checkCancellation()
-            backupLastSuccess = snapshot.lastSuccess
-            backupGenerations = snapshot.generations
-            backupTotalBytes = snapshot.totalBytes
-            backupInfoLoaded = true
-            backupInfoError = nil
+            if backupLastSuccess != snapshot.lastSuccess { backupLastSuccess = snapshot.lastSuccess }
+            if backupGenerations != snapshot.generations { backupGenerations = snapshot.generations }
+            if backupTotalBytes != snapshot.totalBytes { backupTotalBytes = snapshot.totalBytes }
+            if !backupInfoLoaded { backupInfoLoaded = true }
+            if backupInfoError != nil { backupInfoError = nil }
         } catch is CancellationError { }
-        catch { backupInfoError = "バックアップの状態を読み込めませんでした: \(error.localizedDescription)" }
+        catch {
+            let message = "バックアップの状態を読み込めませんでした: \(error.localizedDescription)"
+            if backupInfoError != message { backupInfoError = message }
+        }
     }
     public func deleteRetainedBackup(name: String, display: DisplaySettings? = nil) async {
         guard let store else { return }

@@ -290,7 +290,7 @@ public final class AuxiliaryModel {
     nonisolated static func png(svgs: [String], visionAdvice: Bool = false, visionSide: UInt32 = 768) async throws -> Data? {
         let clean = svgs.filter { !$0.isEmpty }
         guard !clean.isEmpty else { return nil }
-        return try await Task.detached {
+        let task = Task.detached {
             try Task.checkCancellation()
             let source: String
             let width: UInt32
@@ -314,6 +314,11 @@ public final class AuxiliaryModel {
             guard CGImageDestinationFinalize(destination) else { throw HostError("png_encode_failed") }
             try Task.checkCancellation()
             return data as Data
-        }.value
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 }

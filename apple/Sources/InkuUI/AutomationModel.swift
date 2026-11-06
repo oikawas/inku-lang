@@ -178,6 +178,7 @@ public final class AutomationModel {
     @ObservationIgnored private var token: UUID?
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var demoPreferencesURL: URL?
+    @ObservationIgnored private var demoPreferencesTask: Task<Void, Never>?
     @ObservationIgnored private var demoSaveOperation: Task<SavedWork?, Never>?
     @ObservationIgnored private var batchObservationToken = UUID()
 
@@ -609,6 +610,18 @@ public final class AutomationModel {
     }
 
     private func persistDemoPreferences() {
+        guard demoPreferencesURL != nil else { return }
+        demoPreferencesTask?.cancel()
+        demoPreferencesTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+            self?.flushDemoPreferences()
+        }
+    }
+
+    public func flushDemoPreferences() {
+        guard demoPreferencesTask != nil else { return }
+        demoPreferencesTask?.cancel()
+        demoPreferencesTask = nil
         guard let demoPreferencesURL else { return }
         do {
             guard DemoIntervalPolicy.acceptsStoredValue(demoInterval) else { throw HostError("invalid_demo_interval") }

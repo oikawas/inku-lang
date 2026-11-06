@@ -234,13 +234,13 @@ def test_mark_writer_preserves_real_sqlalchemy_access_state_and_order(
     ordered = history.HistoryMarkWriter(lambda: Session(), lambda _: {"id": "owner"}, lambda value: events.append("project") or {"id": value.id})
     assert ordered.set_item_starred("owner", "ordered", True, "after") == {"id": "ordered"}
     assert row.starred == 1 and row.for_revision == 1 and row.note == "after"
-    assert events == ["query", "writable", "filter", "first", "commit", "refresh", "project"]
+    assert events == ["query", "writable", "filter", "first", "project", "commit"]
 
     events.clear()
     row = SimpleNamespace(id="ordered", starred=1, for_revision=1, note="after")
     assert ordered.set_item_for_revision("owner", "ordered", False) == {"id": "ordered"}
     assert row.starred == 1 and row.for_revision == 0 and row.note == "after"
-    assert events == ["query", "writable", "filter", "first", "commit", "refresh", "project"]
+    assert events == ["query", "writable", "filter", "first", "project", "commit"]
 
     class FailingSession(Session):
         def commit(self) -> None:
@@ -259,7 +259,7 @@ def test_mark_writer_preserves_real_sqlalchemy_access_state_and_order(
         events.clear()
         with pytest.raises(RuntimeError, match="commit failure"):
             getattr(failing, method_name)(*arguments)
-        assert events == ["query", "writable", "filter", "first", "commit"]
+        assert events == ["query", "writable", "filter", "first", "project", "commit"]
 
 
 def _api_item(user_id: str) -> dict:

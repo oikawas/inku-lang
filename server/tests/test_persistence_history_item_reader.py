@@ -22,6 +22,9 @@ class _Query:
         self.filters = filters
         return self
 
+    def options(self, *options: object) -> "_Query":
+        return self
+
     def all(self) -> list[SimpleNamespace]:
         self._session.rows_seen = self._session.rows
         return self._session.rows

@@ -100,6 +100,14 @@ def get_thumb(history_id: str, scale: int) -> dict | None:
         }
 
 
+def get_thumb_metadata(history_id: str, scale: int) -> dict | None:
+    with SessionLocal() as session:
+        row = session.execute(select(ThumbRow.history_id, ThumbRow.scale, ThumbRow.source_render_hash,
+                                     ThumbRow.built_at).where(ThumbRow.history_id == history_id,
+                                                             ThumbRow.scale == scale)).mappings().one_or_none()
+        return dict(row) if row else None
+
+
 def put_thumb(history_id: str, scale: int, png: bytes, source_render_hash: str | None) -> None:
     """Write a thumbnail, replacing any earlier one for the same id and scale.
 

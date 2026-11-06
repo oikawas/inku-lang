@@ -207,6 +207,7 @@ def api_history_get(
         position = _db.item_position(
             actor["id"], anchor_id, trashed=trashed, starred=starred,
             for_revision=for_revision, for_share=for_share,
+            actor=actor,
             **({"query_text": q} if q.strip() else {}),
         )
         if position is not None:
@@ -221,6 +222,7 @@ def api_history_get(
         for_revision=for_revision,
         for_share=for_share,
         include_svg=include_svg,
+        actor=actor,
         **({"canvas_search": True} if canvas_search else {}),
     )
     # When the picture is present, count it here. When it is withheld,
@@ -445,8 +447,15 @@ def api_history_thumb(
     # A thumbnail page asks once per image; loading every SVG and lineage just
     # to answer the permission question made those requests compete with their
     # own PNG transfer.
-    if not _db.can_read_history_item(actor["id"], item_id):
+    if not _db.can_read_history_item(actor["id"], item_id, actor=actor):
         raise HTTPException(status_code=404, detail="history item not found")
+    if request.headers.get("if-none-match"):
+        metadata = _thumbs_db.get_thumb_metadata(item_id, scale)
+        if metadata is None:
+            raise HTTPException(status_code=404, detail="thumbnail not found")
+        etag = _thumb_etag(metadata)
+        if request.headers["if-none-match"] == etag:
+            return Response(status_code=304, headers={"ETag": etag, "Cache-Control": _THUMB_CACHE_CONTROL})
     row = _thumbs_db.get_thumb(item_id, scale)
     if row is None:
         raise HTTPException(status_code=404, detail="thumbnail not found")
@@ -830,6 +839,23 @@ def api_history_post(
             raise
         except Exception as e:  # noqa: BLE001
             raise _unexpected_http_error("history score render", 422) from e
+    def persist_managed(item):
+        store, linked = replay_link
+        with _db.SessionLocal.begin() as session:
+            saved = _db.add_item(item, session=session, actor=actor)
+            store.link_history(actor["id"], saved["id"], linked.variation_id, linked.revision,
+                linked.ddl_digest, snapshot={
+                    "variation_id": linked.variation_id, "authority": {"revision": linked.revision},
+                    "document": {"source": body.ddl}, "delivery": {"source_digest": linked.ddl_digest},
+                    "config": linked.saved_config, "completion_ranges": linked.completion_ranges,
+                    "laws_layers": linked.laws_layers, "laws_basis": linked.laws_basis,
+                }, context={"host_options": linked.host_options, "macro_catalog": linked.macro_catalog},
+                pipeline_diagnostics=diagnostics, connection=session.connection())
+            if body.count_generation and not saved.get("_idempotent_replay"):
+                if _db.increment_user_generation_count(actor["id"], session=session) is None:
+                    raise HTTPException(status_code=404, detail="user not found")
+            return saved
+
     item_dict = _add_history_item(
         actor=actor,
         input_text=body.input,
@@ -870,22 +896,11 @@ def api_history_post(
         # work this endpoint saves as older than the column.
         sketch_state=body.sketch_state or _derived_sketch_state(body),
         coerce_observability=coerce_observability.persistable() if coerce_observability else None,
+        persist_item=persist_managed if replay_link is not None else None,
     )
     if replay_link is not None:
-        store, linked = replay_link
-        # Reuse the source's exact immutable authoring revision. Only this
-        # performance's renderer diagnostics are replaced by the fresh render.
-        store.link_history(actor["id"], item_dict["id"], linked.variation_id, linked.revision,
-            linked.ddl_digest, snapshot={
-                "variation_id": linked.variation_id, "authority": {"revision": linked.revision},
-                "document": {"source": body.ddl}, "delivery": {"source_digest": linked.ddl_digest},
-                "config": linked.saved_config, "completion_ranges": linked.completion_ranges,
-                # The same instructions, so the source's laws records hold (2026-10-20).
-                "laws_layers": linked.laws_layers, "laws_basis": linked.laws_basis,
-            }, context={"host_options": linked.host_options, "macro_catalog": linked.macro_catalog},
-            pipeline_diagnostics=diagnostics)
         item_dict = _db.get_items(actor["id"], [item_dict["id"]])[0]
-    if body.count_generation and not item_dict.get("_idempotent_replay"):
+    if replay_link is None and body.count_generation and not item_dict.get("_idempotent_replay"):
         if _db.increment_user_generation_count(actor["id"]) is None:
             raise HTTPException(status_code=404, detail="user not found")
     return HistoryItem(**item_dict)

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from contextlib import nullcontext
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -1099,6 +1100,7 @@ class VariationAuthorityStore:
         snapshot: Mapping[str, Any],
         context: Mapping[str, Any],
         pipeline_diagnostics: Mapping[str, Any],
+        connection=None,
     ) -> None:
         revision, _ = _decimal_u64(revision, "history revision")
         context_bytes, context_digest = _history_fork_context_bytes(
@@ -1113,7 +1115,7 @@ class VariationAuthorityStore:
                       revision=revision, ddl_digest=ddl_digest,
                       fork_context_bytes=context_bytes,
                       fork_context_digest=context_digest)
-        with self.engine.begin() as connection:
+        with (self.engine.begin() if connection is None else nullcontext(connection)) as connection:
             owned_source = connection.execute(select(HistoryRow.ddl).where(
                 HistoryRow.id == history_id, HistoryRow.user_id == owner_id,
             )).scalar_one_or_none()
@@ -1140,8 +1142,8 @@ class VariationAuthorityStore:
                 return
             connection.execute(pipeline_history_links.insert().values(**values))
 
-    def history_link(self, owner_id: str, history_id: str) -> dict | None:
-        with self.engine.connect() as connection:
+    def history_link(self, owner_id: str, history_id: str, *, connection=None) -> dict | None:
+        with (self.engine.connect() if connection is None else nullcontext(connection)) as connection:
             row = connection.execute(select(pipeline_history_links).where(
                 pipeline_history_links.c.owner_id == owner_id,
                 pipeline_history_links.c.history_id == history_id,

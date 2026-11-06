@@ -335,6 +335,9 @@ def test_permanent_delete_drops_fork_links_and_reports_the_deleted_ids() -> None
 
 
 class _RecordingQuery:
+    def options(self, *options):
+        return self
+
     def __init__(self, session: "_RecordingSession", model: object) -> None:
         self.session = session
         self.model = model

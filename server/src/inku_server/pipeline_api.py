@@ -350,6 +350,8 @@ class PipelineService:
 
         def save(previous, snapshot, host_context, rendered):
             nonlocal last_rendered, last_ranges, last_digest
+            from . import db
+            db.require_background_write()
             if rendered is None:
                 host_context.pop("result", None)
                 host_context.pop("render_digest", None)
@@ -578,7 +580,7 @@ class PipelineService:
             return
         for key, run in list(self._runs.items()):
             job = self._jobs.get(key)
-            if not run.busy and (job is None or job.done()):
+            if not run.busy and not getattr(run, "pending_host_failure", False) and (job is None or job.done()):
                 from .chatgpt_runtime import retire_execution
                 retire_execution(*key)
                 run.image_data.clear()
@@ -632,7 +634,10 @@ class PipelineService:
             code = detail.get("code") if isinstance(detail, dict) else getattr(error, "code", None)
             if not isinstance(code, str) or not code:
                 code = str(error) if isinstance(error, CandidateHostError) else "pipeline_effect_failed"
-            run.command({"tag": "cancel"}, context_updates={"host_failure": code})
+            if code in {"database_restoring", "database_write_locked"}:
+                run.fail_without_persist(code)
+            else:
+                run.command({"tag": "cancel"}, context_updates={"host_failure": code})
         finally:
             # An unsuccessful host job is not allowed to retain source pixels.
             if not run.view()["busy"] or run.context.get("image_provenance") is not None:
@@ -641,6 +646,8 @@ class PipelineService:
     def _drain_steps(self, run: CandidateExecution) -> None:
         # This is a host work cap, never a replacement retry policy.
         for _ in range(self.max_effect_steps):
+            from . import db
+            db.require_background_write()
             view = run.view()
             if not view["busy"]:
                 run.image_data.clear()
@@ -673,7 +680,11 @@ class PipelineService:
             run = self._runs.get(key)
             if run is not None:
                 self._runs.move_to_end(key)
-                return run
+        if run is not None:
+            reconcile = getattr(run, "reconcile_host_failure", None)
+            if reconcile is not None:
+                reconcile()
+            return run
         record = self.store.read_execution(owner, execution_id)
         if record is None:
             raise HTTPException(404, "variation_not_found")
@@ -880,6 +891,9 @@ class PipelineService:
                 else:
                     run = self._host(owner, saved["snapshot"]["config"], saved["context"])
                     run.restore(saved["snapshot"], rendered=saved["rendered"])
+        reconcile = getattr(run, "reconcile_host_failure", None)
+        if reconcile is not None:
+            reconcile()
         if run.context.get("svg_refusal") is not None:
             raise HTTPException(422, run.context["svg_refusal"])
         job = self._jobs.get((owner, execution_id))

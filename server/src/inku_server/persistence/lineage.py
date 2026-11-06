@@ -249,34 +249,9 @@ class LineageStore:
         than stored in a database column, so this remains its single source of truth
         when it is included in lineage responses.
         """
-        memo: dict[str, int] = {}
-
-        def resolve(node_id: str) -> int:
-            if node_id in memo:
-                return memo[node_id]
-            chain: list[str] = []
-            seen: set[str] = set()
-            current = node_id
-            while current not in memo:
-                if current in seen:
-                    break  # cycle guard: treat the repeated node as a root
-                seen.add(current)
-                chain.append(current)
-                edge = session.query(LineageEdgeRow).filter(
-                    access._readable_edge(actor),
-                    LineageEdgeRow.child_node_id == current,
-                ).first()
-                if edge is None:
-                    break
-                current = edge.parent_node_id
-            base = memo.get(current, 0)
-            for offset, nid in enumerate(reversed(chain), start=1):
-                memo[nid] = base + offset
-            return memo[node_id]
-
-        for node_id in node_ids:
-            resolve(node_id)
-        return memo
+        from .ancestry import ancestors, generations
+        _, edges, readable = ancestors(session, node_ids, actor)
+        return generations(node_ids, edges, readable)
 
     def get_lineage(
         self,

@@ -56,6 +56,7 @@ def _expected_list_items(
     for_share: bool = False,
     include_svg: bool = True,
     canvas_search: bool = False,
+    actor: dict | None = None,
 ) -> tuple[list[dict], int]:
     raise NotImplementedError
 
@@ -92,6 +93,9 @@ class _HydrationQuery:
 
     def filter(self, *clauses):
         self.filters.extend(clauses)
+        return self
+
+    def options(self, *options):
         return self
 
     def order_by(self, *clauses):

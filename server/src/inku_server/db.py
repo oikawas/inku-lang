@@ -6,6 +6,7 @@ import logging
 import os
 import secrets
 import threading
+import time
 import uuid
 from contextlib import nullcontext
 from pathlib import Path
@@ -173,19 +174,19 @@ def init_db() -> None:
 
 
 def _refresh_planner_statistics() -> None:
-    """Give SQLite's query planner statistics (sqlite_stat1), again at every start.
+    """Seed missing statistics; without them production SQLite chose a slow lineage plan.
 
-    Without them the planner guesses, and production's SQLite 3.37 guessed that
-    "visible works" was a narrow index: opening one lineage in the history
-    library read every work (about 0.45 s). A start re-counts as the database
-    grows; on 4,200 works it took about 0.1 s. A database that cannot be
-    analysed now (locked, read-only) still serves, as it did before.
+    Once seeded, let SQLite decide when to refresh them.
     """
     if engine.dialect.name != "sqlite":
         return
     try:
         with engine.begin() as connection:
-            connection.exec_driver_sql("ANALYZE")
+            exists = connection.exec_driver_sql(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_stat1'"
+            ).first()
+            populated = exists and connection.exec_driver_sql("SELECT 1 FROM sqlite_stat1 LIMIT 1").first()
+            connection.exec_driver_sql("PRAGMA optimize" if populated else "ANALYZE")
     except Exception:  # noqa: BLE001
         _logger.warning("could not refresh the query planner statistics", exc_info=True)
 
@@ -566,8 +567,9 @@ def juxtaposition_sources(user_id: str) -> list[tuple[str, str]]:
     """(id, description) of the user's own works that may lend a sentence to a juxtaposition."""
     from .persistence.juxtaposition import owned_description_sources
 
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
-        return owned_description_sources(session, _actor_of(user_id))
+        return owned_description_sources(session, actor)
 
 
 def lineage_node_description_locked(node_id: str) -> bool:
@@ -858,8 +860,24 @@ def get_db_write_lock() -> dict:
     return _settings.DbWriteLockSettingsStore(_app_settings_store()).get()
 
 
+_write_lock_cache_guard = threading.RLock()
+_write_lock_cache = {"engine": None, "checked": 0.0, "locked": True}
+
+
+def _cached_db_write_locked() -> bool:
+    with _write_lock_cache_guard:
+        now = time.monotonic()
+        if _write_lock_cache["engine"] is not engine or now - _write_lock_cache["checked"] >= 1.0:
+            value = bool(get_db_write_lock()["locked"])
+            _write_lock_cache.update(engine=engine, checked=now, locked=value)
+        return _write_lock_cache["locked"]
+
+
 def update_db_write_lock(locked: bool) -> dict:
-    return _settings.DbWriteLockSettingsStore(_app_settings_store()).update(locked)
+    with _write_lock_cache_guard:
+        value = _settings.DbWriteLockSettingsStore(_app_settings_store()).update(locked)
+        _write_lock_cache.update(engine=engine, checked=time.monotonic(), locked=bool(value["locked"]))
+        return value
 
 
 def get_render_limit_settings() -> dict:
@@ -987,6 +1005,25 @@ def db_restoring() -> bool:
     return _db_restoring.is_set()
 
 
+def database_write_block_reason() -> str | None:
+    if db_restoring():
+        return "database_restoring"
+    try:
+        locked = _cached_db_write_locked()
+    except Exception:  # noqa: BLE001
+        return "database_write_locked"
+    if locked:
+        return "database_write_locked"
+    return None
+
+
+def require_background_write() -> None:
+    from .pipeline_candidate import CandidateHostError
+    reason = database_write_block_reason()
+    if reason:
+        raise CandidateHostError(reason)
+
+
 def restore_db_backup(kind: str, name: str) -> dict:
     # Writes are refused while the copy goes in (the write-lock middleware reads
     # db_restoring), and pooled connections are dropped afterwards so none keeps
@@ -998,6 +1035,9 @@ def restore_db_backup(kind: str, name: str) -> dict:
         return _backup_service().restore_backup(kind, name)
     finally:
         engine.dispose()
+        _settings.invalidate_model_cache()
+        with _write_lock_cache_guard:
+            _write_lock_cache.update(engine=None, checked=0.0, locked=True)
         _db_restoring.clear()
         _db_restore_lock.release()
 
@@ -1067,7 +1107,7 @@ def _group_to_dict(row: UserGroupRow) -> dict:
     return _groups.group_to_dict(row)
 
 
-def _user_account_projector(model_settings: dict | None = None) -> _accounts.UserAccountProjector:
+def _user_account_projector(model_settings: dict | None = None, *, raw: bool = False) -> _accounts.UserAccountProjector:
     from sqlalchemy.orm import object_session
     from .model_settings import normalize_user_model_settings
 
@@ -1079,16 +1119,36 @@ def _user_account_projector(model_settings: dict | None = None) -> _accounts.Use
         _UI_CUSTOM_KEYS,
         _SETTINGS_TABS,
         normalize_history_strip_fields,
-        (normalize_user_model_settings if model_settings is None else
+        ((lambda value: value) if raw else normalize_user_model_settings if model_settings is None else
          lambda value: normalize_user_model_settings(value, providers=model_settings.get("providers", {}))),
     )
 
 
 def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
-    return _user_account_projector().project(row, group_name)
+    from sqlalchemy.orm import object_session
+    from .model_settings import normalize_model_settings
+    session = object_session(row)
+    if session is None:
+        raise RuntimeError("_user_to_dict needs an attached row to read permission groups")
+    stored = session.get(_settings.AppSettingRow, _settings.MODEL_SETTINGS_KEY)
+    try:
+        value = json.loads(stored.value) if stored else None
+    except (ValueError, TypeError):
+        value = None
+    return _user_account_projector(normalize_model_settings(value)).project(row, group_name)
 
 
-def add_item(item: dict) -> dict:
+def _user_to_dict_raw(row: UserAccountRow, group_name: str | None = None) -> dict:
+    return _user_account_projector(raw=True).project(row, group_name)
+
+
+def _normalize_session_user(user: dict) -> dict:
+    from .model_settings import normalize_user_model_settings
+    user["model_settings"] = normalize_user_model_settings(user["model_settings"])
+    return user
+
+
+def add_item(item: dict, *, session=None, actor=None) -> dict:
     return _history.HistoryWriter(
         session_factory=SessionLocal,
         actor_of_fn=_actor_of,
@@ -1100,7 +1160,7 @@ def add_item(item: dict) -> dict:
         normalize_canvas_aspect_id_fn=normalize_canvas_aspect_id,
         canvas_aspect_ratio_for_aspect_fn=canvas_aspect_ratio_for_aspect,
         canonical_json_fn=_canonical_json,
-    ).add_item(item)
+    ).add_item(item, **({"session": session, "actor": actor} if session is not None else {}))
 
 
 def record_unread_words(user_id: str, words: list[str], context: str, *, at: int) -> None:
@@ -1156,7 +1216,8 @@ def _session_store() -> _sessions.SessionStore:
         _hash_token,
         _now_ms,
         _SESSION_MAX_AGE_SECONDS,
-        _user_to_dict,
+        _user_to_dict_raw,
+        _normalize_session_user,
     )
 
 
@@ -1300,12 +1361,13 @@ def _user_generation_counter() -> _accounts.UserGenerationCounter:
     return _accounts.UserGenerationCounter(SessionLocal)
 
 
-def increment_user_generation_count(user_id: str, amount: int = 1) -> int | None:
-    return _user_generation_counter().increment_user_generation_count(user_id, amount=amount)
+def increment_user_generation_count(user_id: str, amount: int = 1, *, session=None) -> int | None:
+    return _user_generation_counter().increment_user_generation_count(
+        user_id, amount=amount, **({"session": session} if session is not None else {}))
 
 
 def _user_settings_updater() -> _settings.UserSettingsUpdater:
-    return _settings.UserSettingsUpdater(SessionLocal, _user_to_dict)
+    return _settings.UserSettingsUpdater(SessionLocal, _user_to_dict, get_model_settings)
 
 
 def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
@@ -1527,6 +1589,7 @@ def list_items(
     for_share: bool = False,
     include_svg: bool = True,
     canvas_search: bool = False,
+    actor: dict | None = None,
 ) -> tuple[list[dict], int]:
     arguments = (
         user_id,
@@ -1538,6 +1601,9 @@ def list_items(
         for_revision,
         for_share,
     )
+    if actor is not None:
+        return _history_search_service().list_items(*arguments, include_svg=include_svg,
+                                                   canvas_search=canvas_search, actor=actor)
     if canvas_search:
         return _history_search_service().list_items(*arguments, include_svg=include_svg, canvas_search=True)
     if include_svg:
@@ -1630,9 +1696,11 @@ def item_position(
     for_revision: bool = False,
     for_share: bool = False,
     query_text: str = "",
+    actor: dict | None = None,
 ) -> int | None:
     return _history.HistoryItemPositionReader(SessionLocal, _actor_of, _history_search_service().position_search_clause).item_position(
-        user_id, item_id, trashed, starred, for_revision, for_share, query_text
+        user_id, item_id, trashed, starred, for_revision, for_share, query_text,
+        **({"actor": actor} if actor is not None else {})
     )
 
 
@@ -1676,13 +1744,13 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
     ).get_items(user_id, ids)
 
 
-def can_read_history_item(user_id: str, item_id: str) -> bool:
+def can_read_history_item(user_id: str, item_id: str, *, actor: dict | None = None) -> bool:
     """Decide access to one active history work without loading its payload."""
     return _history.HistoryItemReader(
         SessionLocal,
         _actor_of,
         _rows_to_dicts_with_lineage,
-    ).can_read_item(user_id, item_id)
+    ).can_read_item(user_id, item_id, **({"actor": actor} if actor is not None else {}))
 
 
 def delete_all(user_id: str) -> None:

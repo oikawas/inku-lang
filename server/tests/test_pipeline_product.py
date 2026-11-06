@@ -589,6 +589,19 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
         "render_warnings": render_warnings,
         "plugin_diagnostics": [],
     }
+    from inku_server.persistence.schema import LineageNodeRow
+    with db.SessionLocal() as session:
+        before = (session.query(HistoryRow).count(), session.query(LineageNodeRow).count(),
+                  session.get(UserAccountRow, "author").image_generation_count)
+    with monkeypatch.context() as failing:
+        def refuse_link(*args, **kwargs):
+            raise RuntimeError("link failed")
+        failing.setattr(VariationAuthorityStore, "link_history", refuse_link)
+        with pytest.raises(RuntimeError, match="link failed"):
+            effects.save_result("author", snapshot, run.context, rendered)
+    with db.SessionLocal() as session:
+        assert (session.query(HistoryRow).count(), session.query(LineageNodeRow).count(),
+                session.get(UserAccountRow, "author").image_generation_count) == before
     result = effects.save_result("author", snapshot, run.context, rendered)
     replay = effects.save_result("author", snapshot, run.context, rendered)
     assert result["history_id"] == replay["history_id"]

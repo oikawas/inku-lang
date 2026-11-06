@@ -651,6 +651,7 @@ def _add_history_item(
     sketch_grain: str | None = None,
     sketch_state: str | None = None,
     coerce_observability: dict | None = None,
+    persist_item=None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     # A compact Score arrives as a dict and is kept exactly as sent.
@@ -671,7 +672,7 @@ def _add_history_item(
             )
         )
     try:
-        item_dict = _db.add_item({
+        item_dict = (persist_item or _db.add_item)({
         "id": item_id,
         "user_id": actor["id"],
         "output_path": str(prefix),

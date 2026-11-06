@@ -10,6 +10,7 @@ from collections import OrderedDict, deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from threading import BoundedSemaphore, Lock
+import anyio
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -204,7 +205,7 @@ class DbWriteLockMiddleware:
             and scope.get("path", "") not in self._exempt_paths
         ):
             try:
-                locked = self._is_locked()
+                locked = await anyio.to_thread.run_sync(self._is_locked)
             except Exception:  # noqa: BLE001
                 locked = True
             if locked:

@@ -40,6 +40,33 @@ def _store(session_factory, *, now: int = 2_000, max_age: int = 1):
     )
 
 
+def test_session_user_projection_never_holds_two_connections(tmp_path, monkeypatch):
+    from sqlalchemy import create_engine, event
+    from sqlalchemy.orm import sessionmaker
+    from inku_server.persistence.schema import Base, UserAccountRow, UserSessionRow
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'session-connections.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    with db.SessionLocal.begin() as session:
+        session.add(UserAccountRow(id="user", username="user", email="u@example.test",
+                                   password_hash="unused", role="user", at=1))
+        session.add(UserSessionRow(token_hash=db._hash_token("token"), user_id="user", at=db._now_ms()))
+    active, peak = [0], [0]
+    @event.listens_for(engine, "checkout")
+    def checkout(*_):
+        active[0] += 1
+        peak[0] = max(peak[0], active[0])
+    @event.listens_for(engine, "checkin")
+    def checkin(*_):
+        active[0] -= 1
+    assert db.get_session_user("token")["id"] == "user"
+    assert peak[0] == 1
+    assert active[0] == 0
+    engine.dispose()
+
+
 def test_persistence_sessions_owns_store_and_db_delegates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -87,8 +114,8 @@ def test_persistence_sessions_owns_store_and_db_delegates(
     monkeypatch.setattr(db, "_hash_token", hash_fn)
     monkeypatch.setattr(db, "_now_ms", now_fn)
     monkeypatch.setattr(db, "_SESSION_MAX_AGE_SECONDS", 17)
-    monkeypatch.setattr(db, "_user_to_dict", project_fn)
-    expected_dependencies = (session_factory, token_fn, hash_fn, now_fn, 17, project_fn)
+    monkeypatch.setattr(db, "_user_to_dict_raw", project_fn)
+    expected_dependencies = (session_factory, token_fn, hash_fn, now_fn, 17, project_fn, db._normalize_session_user)
 
     assert db.create_session("user") == "sentinel"
     assert db._session_expiry_cutoff_ms(10) == "sentinel"

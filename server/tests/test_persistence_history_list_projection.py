@@ -15,11 +15,19 @@ from inku_server.persistence.schema import HistoryAclRow, LineageEdgeRow, Lineag
 def description_lock_projection(monkeypatch):
     # SQL ownership of description locks has its own real-database checks.
     # These fixtures isolate lineage projection while checking both lock values.
-    def locks(session, history_ids):
+    def locks(session, history_ids, **kwargs):
         session.description_lock_ids = list(history_ids)
         return {"root-work"} & set(history_ids)
 
     monkeypatch.setattr(history, "locked_history_ids", locks)
+    from inku_server.persistence import ancestry
+    def ancestors(session, node_ids, actor=None):
+        nodes = {node.id: node for node in session.nodes}
+        edges = {edge.child_node_id: edge for batch in session.edge_batches for edge in batch}
+        if session.edge_batches:
+            session.edge_batches = [session.edge_batches[0]]
+        return nodes, edges, {edge.id for edge in edges.values()}
+    monkeypatch.setattr(ancestry, "ancestors", ancestors)
 
 
 class _Query:
@@ -72,11 +80,12 @@ def _row(row_id: str, user_id: str, node_id: str | None) -> SimpleNamespace:
 
 
 def _node(node_id: str, user_id: str, root_id: str | None, state: str = "active") -> SimpleNamespace:
-    return SimpleNamespace(id=node_id, user_id=user_id, root_node_id=root_id, state=state)
+    return SimpleNamespace(id=node_id, user_id=user_id, history_id=None, root_node_id=root_id, state=state)
 
 
 def _edge(child_id: str, parent_id: str, user_id: str, kind: str = "touch_change") -> SimpleNamespace:
     return SimpleNamespace(
+        id=f"edge-{child_id}",
         child_node_id=child_id,
         parent_node_id=parent_id,
         user_id=user_id,
@@ -222,22 +231,9 @@ def test_projector_preserves_queries_generation_owner_gates_and_provenance():
     assert items[2] == {"id": "mismatch-work", "has_acl_shares": False, "description_locked": False}
     assert session.description_lock_ids == ["child-work", "root-work", "mismatch-work"]
     assert edge_calls == ["child"]
-    assert [model for model, _ in session.calls] == [
-        LineageNodeRow,
-        LineageEdgeRow,
-        LineageEdgeRow,
-        LineageEdgeRow,
-        LineageEdgeRow,
-    ]
-    assert _in_filter_values(session.calls[0][1], "id") == {"child", "root", "mismatch"}
-    assert _in_filter_values(session.calls[1][1], "user_id") == {"owner"}
-    assert _in_filter_values(session.calls[1][1], "child_node_id") == {"child", "root", "mismatch"}
-    assert _in_filter_values(session.calls[2][1], "user_id") == {"owner"}
-    assert _in_filter_values(session.calls[2][1], "child_node_id") == {"child", "root", "mismatch"}
-    assert _in_filter_values(session.calls[3][1], "user_id") == {"owner"}
-    assert _in_filter_values(session.calls[3][1], "child_node_id") == {"parent", "untrusted-parent"}
-    assert _in_filter_values(session.calls[4][1], "user_id") == {"owner"}
-    assert _in_filter_values(session.calls[4][1], "child_node_id") == {"root"}
+    assert [model for model, _ in session.calls] == [LineageEdgeRow]
+    assert _in_filter_values(session.calls[0][1], "user_id") == {"owner"}
+    assert _in_filter_values(session.calls[0][1], "child_node_id") == {"child", "root", "mismatch"}
 
 
 def test_projector_stops_on_missing_parents_and_cycles_without_attaching_missing_data():
@@ -270,4 +266,4 @@ def test_projector_stops_on_missing_parents_and_cycles_without_attaching_missing
         "derivation_metadata": {"kind": "touch_change"},
         "description_locked": False,
     }
-    assert len(session.calls) == 4
+    assert len(session.calls) == 1

@@ -851,3 +851,62 @@ def test_snapshot_reuses_render_digest_until_render_or_ranges_change(monkeypatch
         assert len(calls) == 3
     finally:
         service.close()
+
+
+@pytest.mark.parametrize("reason", ["database_restoring", "database_write_locked"])
+def test_blocked_pipeline_snapshot_does_not_write(monkeypatch, reason):
+    from inku_server import db
+    from inku_server.pipeline_candidate import CandidateHostError
+
+    monkeypatch.setattr(db, "database_write_block_reason", lambda: reason)
+    class Store:
+        def create_execution(self, *args):
+            pytest.fail("blocked snapshot was written")
+    service = PipelineService(None, Store(), config_for=None, provider_for=None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1)
+    try:
+        run = service._host("owner", {}, {})
+        with pytest.raises(CandidateHostError, match=reason):
+            run.save_snapshot(None, {"execution_id": "e", "variation_id": "v", "sequence": "0"}, {}, None)
+    finally:
+        service.close()
+
+
+def test_blocked_pipeline_failure_is_persisted_before_eviction(tmp_path, monkeypatch):
+    from inku_server import db
+    from inku_server.pipeline_defaults import default_manifest
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'blocked-execution.db'}")
+    Base.metadata.create_all(engine)
+    binding = PipelineBinding()
+    config = default_manifest(binding)["pipeline"]
+    store = VariationAuthorityStore(engine)
+    blocked = [None]
+    monkeypatch.setattr(db, "database_write_block_reason", lambda: blocked[0])
+    service = PipelineService(binding, store, config_for=None, provider_for=lambda _: None, render_for=None,
+                              max_workers=1, max_effect_steps=1, max_retained_runs=1)
+    try:
+        run = service._host("owner", config, {})
+        run.start_new({"tag": "description", "description": "A line", "auto_catalog": False})
+        view = run.view()
+        key = ("owner", view["execution_id"])
+        service._runs[key] = run
+        blocked[0] = "database_write_locked"
+        service._drain(run)
+        assert run.view()["phase"] == {"tag": "failed", "reason": "database_write_locked"}
+        assert json.loads(store.read_execution(*key).state_bytes)["snapshot"]["action"] is not None
+        with pytest.raises(HTTPException) as full:
+            service._reserve_run()
+        assert full.value.status_code == 429
+        blocked[0] = None
+        assert service.get("owner", view["variation_id"])["busy"] is False
+        saved = json.loads(store.read_execution(*key).state_bytes)
+        assert saved["snapshot"]["action"] is None
+        assert saved["context"]["host_failure"] == "database_write_locked"
+        service._reserve_run()
+        assert key not in service._runs
+        assert service.get("owner", view["variation_id"])["busy"] is False
+        assert not service._jobs
+    finally:
+        service.close()
+        engine.dispose()

@@ -4,12 +4,15 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from contextvars import ContextVar
+from copy import deepcopy
+from contextlib import nullcontext
 from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
-from sqlalchemy import LargeBinary, and_, case, func, or_, select
+from sqlalchemy import LargeBinary, and_, case, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import defer
 
@@ -22,6 +25,7 @@ from .schema import (
     LineageNodeRow,
     OkugakiRow,
     PipelineHistoryLinkRow,
+    UserAccountRow,
     UserGroupRow,
 )
 from .description_lock import DESCRIPTION_READING_KINDS, locked_history_ids
@@ -68,6 +72,8 @@ LINEAGE_DERIVATION_KINDS = {
     # client sends it.
     "chunk_move",
 }
+
+_projection_options_cache: ContextVar[dict | None] = ContextVar("history_projection_options", default=None)
 
 
 @dataclass(frozen=True)
@@ -331,7 +337,7 @@ class HistoryLineageGroupReader:
             )
             representative_id_by_root = {root: history_id for root, history_id in representative_pairs}
             representative_ids = list(representative_id_by_root.values())
-            representatives = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids))
+            representatives = session.query(HistoryRow).options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace)).filter(HistoryRow.id.in_(representative_ids))
             if include_svg:
                 representative_items = self.rows_to_dicts_with_lineage_fn(session, representatives.all(), actor)
             else:
@@ -425,7 +431,7 @@ class HistoryLineageGroupReader:
             if search:
                 query = query.filter(self.history_search_clause_fn(search))
             total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
-            page = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit)
+            page = query.options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace)).order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit)
             if include_svg:
                 rows = page.all()
                 return self.rows_to_dicts_with_lineage_fn(session, rows, actor), total
@@ -518,6 +524,7 @@ class HistoryItemReader:
         with self.session_factory() as session:
             rows = (
                 session.query(HistoryRow)
+                .options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace))
                 .filter(
                     access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                     HistoryRow.id.in_(ids),
@@ -528,14 +535,14 @@ class HistoryItemReader:
             items = self.rows_to_dicts_with_lineage_fn(session, rows, actor)
             return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
-    def can_read_item(self, user_id: str, item_id: str) -> bool:
+    def can_read_item(self, user_id: str, item_id: str, *, actor: dict | None = None) -> bool:
         """Check one active work's visibility without materializing its artwork.
 
         A thumbnail request needs the same permission decision as ``get_items()``,
         but not its SVG, Score, or lineage projection.  Those fields can be
         megabytes each, and the browser asks this question once per thumbnail.
         """
-        actor = self.actor_of_fn(user_id)
+        actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of_fn(user_id)
         with self.session_factory() as session:
             return (
                 session.query(HistoryRow.id)
@@ -573,9 +580,9 @@ class HistoryMarkWriter:
             if note is not None:
                 clean_note = note.strip()[:240]
                 row.note = clean_note or None
+            result = self.row_to_dict_fn(row)
             session.commit()
-            session.refresh(row)
-            return self.row_to_dict_fn(row)
+            return result
 
     def set_item_for_revision(self, user_id: str, item_id: str, for_revision: bool) -> dict | None:
         """Raise or drop the revision mark. Independent of starred: neither reads the other."""
@@ -589,9 +596,9 @@ class HistoryMarkWriter:
             if not row:
                 return None
             row.for_revision = 1 if for_revision else 0
+            result = self.row_to_dict_fn(row)
             session.commit()
-            session.refresh(row)
-            return self.row_to_dict_fn(row)
+            return result
 
 
 @dataclass(frozen=True)
@@ -661,7 +668,7 @@ class HistoryPermanentDeleteWriter:
             return 0
         actor = self.actor_of_fn(user_id)
         with self.session_factory() as session:
-            query = session.query(HistoryRow).filter(
+            query = session.query(HistoryRow).options(defer(HistoryRow.svg)).filter(
                 access._writable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(ids),
             )
@@ -817,9 +824,9 @@ class HistoryShareWriter:
                 return None
             if not for_share:
                 row.for_share = 0
+                result = self.row_to_dict_fn(row)
                 session.commit()
-                session.refresh(row)
-                return self.row_to_dict_fn(row)
+                return result
             # Only a NAMED group is checked, not the one already on the row. `chmod
             # g+r` asks nothing of the group the file is in; re-opening a work its
             # owner had opened before is the same act, and requiring administrator
@@ -827,7 +834,8 @@ class HistoryShareWriter:
             # who chose it.
             if share_group_id and share_group_id != actor.get("group_id") and not self.has_permission_group_fn(actor, "admins"):
                 raise PermissionError("only administrators may share a work outside their own group")
-            owner_group_id = self.actor_of_fn(row.user_id)["group_id"] if row.user_id else None
+            owner = session.get(UserAccountRow, row.user_id) if row.user_id else None
+            owner_group_id = owner.group_id if owner else None
             # The destination the work already carries wins over the owner's own: it
             # is what "the bit went down and came back up" has to mean, and a fresh
             # work has none, so the owner's group is what fills the blank.
@@ -838,9 +846,9 @@ class HistoryShareWriter:
                 raise ValueError(f"no such organisation group: {target_group}")
             row.for_share = 1
             row.share_group_id = target_group
+            result = self.row_to_dict_fn(row)
             session.commit()
-            session.refresh(row)
-            return self.row_to_dict_fn(row)
+            return result
 
 
 @dataclass(frozen=True)
@@ -900,8 +908,9 @@ class HistoryItemPositionReader:
         for_revision: bool = False,
         for_share: bool = False,
         query_text: str = "",
+        actor: dict | None = None,
     ) -> int | None:
-        actor = self.actor_of_fn(user_id)
+        actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of_fn(user_id)
         with self.session_factory() as session:
             visible = session.query(HistoryRow.id, HistoryRow.at).filter(
                 access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
@@ -955,22 +964,29 @@ class HistoryListProjector:
         Set only when true, so `response_model_exclude_none` keeps it off the wire
         for the ordinary case of a person looking at their own works.
         """
-        if include_svg:
-            items = [self.row_to_dict_fn(row) for row in rows]
-        else:
-            svg_bytes_by_id = svg_bytes_by_id or {}
-            items = [
-                self.row_to_dict_fn(
-                    row,
-                    include_svg=False,
-                    svg_bytes=svg_bytes_by_id.get(row.id, 0),
-                )
-                for row in rows
-            ]
-        if rows:
+        token = _projection_options_cache.set({})
+        try:
+            if include_svg:
+                items = [self.row_to_dict_fn(row) for row in rows]
+            else:
+                svg_bytes_by_id = svg_bytes_by_id or {}
+                items = [self.row_to_dict_fn(row, include_svg=False, svg_bytes=svg_bytes_by_id.get(row.id, 0))
+                         for row in rows]
+        finally:
+            _projection_options_cache.reset(token)
+        from .ancestry import ancestors, generations
+        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
+        ancestry = ancestors(session, node_ids, actor)
+        ancestor_nodes, _, _ = ancestry
+        link_keys = {(row.user_id, row.id) for row in rows if row.user_id}
+        link_keys.update((node.user_id, node.history_id) for node in ancestor_nodes.values()
+                         if node.user_id and node.history_id)
+        links = []
+        if link_keys:
             links = session.query(PipelineHistoryLinkRow).filter(
-                PipelineHistoryLinkRow.history_id.in_([row.id for row in rows]),
+                tuple_(PipelineHistoryLinkRow.owner_id, PipelineHistoryLinkRow.history_id).in_(link_keys),
             ).all()
+        if rows:
             links_by_work = {(link.owner_id, link.history_id): link for link in links}
             for item, row in zip(items, rows, strict=True):
                 link = links_by_work.get((row.user_id, row.id))
@@ -1017,40 +1033,19 @@ class HistoryListProjector:
                     item["shared"] = True
         # A work its DDL holds (edited, or derived from an edited one) is not
         # drawn from its description again; the client offers the fork instead.
-        locked = locked_history_ids(session, [row.id for row in rows])
+        locked = locked_history_ids(session, [row.id for row in rows], ancestry=ancestry, links=links)
         for item, row in zip(items, rows, strict=True):
             item["description_locked"] = row.id in locked
-        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         if not node_ids:
             return items
-        nodes = session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(node_ids)).all()
-        node_by_id = {node.id: node for node in nodes}
+        node_by_id, ancestor_edges, readable_edges = ancestry
         user_ids = {row.user_id for row in rows}
         edges = session.query(LineageEdgeRow).filter(
             LineageEdgeRow.user_id.in_(user_ids),
             LineageEdgeRow.child_node_id.in_(node_ids),
         ).all()
         edge_by_child = {edge.child_node_id: edge for edge in edges}
-        generation_by_node = {node_id: 1 for node_id in node_ids}
-        ancestor_by_target = {node_id: node_id for node_id in node_ids}
-        seen_by_target = {node_id: {node_id} for node_id in node_ids}
-        frontier = set(node_ids)
-        while frontier:
-            ancestor_edges = session.query(LineageEdgeRow).filter(
-                LineageEdgeRow.user_id.in_(user_ids),
-                LineageEdgeRow.child_node_id.in_(frontier),
-            ).all()
-            parent_by_child = {edge.child_node_id: edge.parent_node_id for edge in ancestor_edges}
-            next_frontier: set[str] = set()
-            for target_id, ancestor_id in ancestor_by_target.items():
-                parent_id = parent_by_child.get(ancestor_id)
-                if parent_id is None or parent_id in seen_by_target[target_id]:
-                    continue
-                seen_by_target[target_id].add(parent_id)
-                ancestor_by_target[target_id] = parent_id
-                generation_by_node[target_id] += 1
-                next_frontier.add(parent_id)
-            frontier = next_frontier
+        generation_by_node = generations(node_ids, ancestor_edges, readable_edges)
 
         for row, item in zip(rows, items, strict=True):
             node = node_by_id.get(row.lineage_node_id)
@@ -1080,7 +1075,7 @@ class HistoryWriter:
     canvas_aspect_ratio_for_aspect_fn: Callable[[str], float]
     canonical_json_fn: Callable[[dict], str]
 
-    def add_item(self, item: dict) -> dict:
+    def add_item(self, item: dict, *, session=None, actor=None) -> dict:
         canvas_aspect_id = item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect")
         if canvas_aspect_id is not None:
             canvas_aspect_id = self.normalize_canvas_aspect_id_fn(canvas_aspect_id)
@@ -1173,8 +1168,9 @@ class HistoryWriter:
             description_hash=desc_hash, render_hash=render_hash, at=item["at"],
             root_node_id=node_id,
         )
-        actor = self.actor_of_fn(item["user_id"])
-        with self.session_factory() as session:
+        actor = actor if actor is not None else self.actor_of_fn(item["user_id"])
+        own_session = session is None
+        with (self.session_factory() if own_session else nullcontext(session)) as session:
             idempotency_key = item.get("idempotency_key")
             if idempotency_key:
                 existing = session.query(HistoryRow).filter(
@@ -1206,36 +1202,35 @@ class HistoryWriter:
                         if row.image_ddl is None:
                             row.image_ddl = parent_work.image_ddl
             row.idempotency_key = idempotency_key
-            if item.get("coerce_catalog_digest") and item.get("coerce_catalog_snapshot") is not None:
-                digest = item["coerce_catalog_digest"]
-                trace_version = item.get("coerce_trace_version") or 1
-                snapshot_json = json.dumps(
-                    item["coerce_catalog_snapshot"], ensure_ascii=False, separators=(",", ":")
-                )
-                if sha256(snapshot_json.encode("utf-8")).hexdigest() != digest:
-                    raise ValueError("coerce catalog digest does not match its snapshot bytes")
-                catalog = session.get(CoerceTraceCatalogRow, digest)
-                if catalog is None:
-                    session.add(
-                        CoerceTraceCatalogRow(
-                            digest=digest,
-                            trace_version=trace_version,
-                            snapshot_json=snapshot_json,
-                        )
-                    )
-                elif (
-                    catalog.trace_version != trace_version
-                    or catalog.snapshot_json != snapshot_json
-                ):
-                    raise ValueError("coerce catalog digest does not match its immutable snapshot")
-            session.add(row)
-            session.add(node)
             # SQLite foreign-key enforcement requires the new child node to exist
             # before its edge is inserted. Both writes remain in one transaction.
             try:
-                session.flush()
+                if not own_session:
+                    connection = session.connection()
+                    if connection.dialect.name == "sqlite" and not connection.connection.driver_connection.in_transaction:
+                        # A released SQLite savepoint must remain inside the caller's transaction.
+                        connection.exec_driver_sql("BEGIN")
+                with (nullcontext() if own_session else session.begin_nested()):
+                    if item.get("coerce_catalog_digest") and item.get("coerce_catalog_snapshot") is not None:
+                        digest = item["coerce_catalog_digest"]
+                        trace_version = item.get("coerce_trace_version") or 1
+                        snapshot_json = json.dumps(
+                            item["coerce_catalog_snapshot"], ensure_ascii=False, separators=(",", ":")
+                        )
+                        if sha256(snapshot_json.encode("utf-8")).hexdigest() != digest:
+                            raise ValueError("coerce catalog digest does not match its snapshot bytes")
+                        catalog = session.get(CoerceTraceCatalogRow, digest)
+                        if catalog is None:
+                            session.add(CoerceTraceCatalogRow(digest=digest, trace_version=trace_version,
+                                                             snapshot_json=snapshot_json))
+                        elif catalog.trace_version != trace_version or catalog.snapshot_json != snapshot_json:
+                            raise ValueError("coerce catalog digest does not match its immutable snapshot")
+                    session.add(row)
+                    session.add(node)
+                    session.flush()
             except IntegrityError:
-                session.rollback()
+                if own_session:
+                    session.rollback()
                 if not idempotency_key:
                     raise
                 existing = session.query(HistoryRow).filter(
@@ -1253,8 +1248,11 @@ class HistoryWriter:
                     child_node_id=node_id, derivation_kind=derivation_kind,
                     metadata_json=self.canonical_json_fn(derivation_metadata), at=item["at"],
                 ))
-            session.commit()
-            session.refresh(row)
+            if own_session:
+                session.commit()
+                session.refresh(row)
+            else:
+                session.flush()
             result = self.row_to_dict_fn(row)
             if parent_node_id:
                 result["lineage_parent_node_id"] = parent_node_id
@@ -1334,7 +1332,14 @@ def row_to_dict(
         "render_canvas_aspect", "stage1_model", "stage2_model",
     )}
     record["image_ddl"] = {} if image_ddl is not None else None
-    item["draw_options"] = core_catalog("options_of_work", record=record)["options"]
+    cache = _projection_options_cache.get()
+    key = json.dumps(record, ensure_ascii=False, sort_keys=True) if cache is not None else None
+    if cache is not None and key in cache:
+        item["draw_options"] = deepcopy(cache[key])
+    else:
+        item["draw_options"] = core_catalog("options_of_work", record=record)["options"]
+        if cache is not None:
+            cache[key] = deepcopy(item["draw_options"])
     if image_ddl is not None:
         try:
             record = json.loads(image_ddl)

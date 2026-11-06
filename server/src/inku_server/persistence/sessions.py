@@ -23,6 +23,7 @@ class SessionStore:
     now_ms_fn: Callable[[], int]
     max_age_seconds: int
     user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+    normalize_user_fn: Callable[[dict], dict] | None = None
 
     def create_session(self, user_id: str) -> str:
         token = self.token_urlsafe_fn(32)
@@ -79,7 +80,8 @@ class SessionStore:
                 session.commit()
                 return None
             group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-            return self.user_to_dict_fn(row, group_name)
+            user = self.user_to_dict_fn(row, group_name)
+        return self.normalize_user_fn(user) if self.normalize_user_fn else user
 
     def delete_session(self, token: str) -> bool:
         with self.session_factory() as session:

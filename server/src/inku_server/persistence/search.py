@@ -116,6 +116,7 @@ class HistorySearchService:
 
     def _project_rows(self, session, query, actor: dict, *, include_svg: bool) -> list[dict]:
         """Project a list page without fetching artwork the caller declined."""
+        query = query.options(defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace))
         if include_svg:
             return self.rows_to_dicts_with_lineage(session, query.all(), actor)
         projected = query.options(defer(HistoryRow.svg)).add_columns(
@@ -234,8 +235,9 @@ class HistorySearchService:
         for_share: bool = False,
         include_svg: bool = True,
         canvas_search: bool = False,
+        actor: dict | None = None,
     ) -> tuple[list[dict], int]:
-        actor = self.actor_of(user_id)
+        actor = actor if actor is not None and actor.get("id") == user_id else self.actor_of(user_id)
         with self.session_factory() as session:
             query = session.query(HistoryRow).filter(
                 self.readable_by(actor, HistoryRow.user_id, HistoryRow.id),

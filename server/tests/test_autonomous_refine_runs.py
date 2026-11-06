@@ -235,6 +235,9 @@ def test_a_stop_cancels_the_drawing_under_way(runner, monkeypatch):
         def get(self, _owner, _variation):
             return {"busy": True, "variation_id": "v", "execution_id": "e"}
 
+        def wait_for_change(self, owner, view, timeout):
+            return self.get(owner, view["variation_id"])
+
         def command(self, _owner, _execution, payload):
             commands.append(payload)
             return {"busy": False}
@@ -292,3 +295,42 @@ def test_an_owner_takes_one_run_at_a_time(author, runner, monkeypatch):
             break
         time.sleep(0.05)
     assert state == "stopped"
+
+
+@pytest.mark.parametrize("reason", ["database_restoring", "database_write_locked"])
+def test_blocked_autonomous_run_save_does_not_write(tmp_path, monkeypatch, reason):
+    from inku_server import autonomous_refine, db
+    from inku_server.pipeline_candidate import CandidateHostError
+
+    store = autonomous_refine.RunStore(f"sqlite:///{tmp_path / 'blocked-runs.db'}")
+    monkeypatch.setattr(db, "database_write_block_reason", lambda: reason)
+    with pytest.raises(CandidateHostError, match=reason):
+        store.save({"id": "r", "owner_id": "owner", "history_id": "h"})
+    assert store.get("owner", "r") is None
+    store.engine.dispose()
+
+
+def test_blocked_run_failure_is_persisted_after_unlock(tmp_path, monkeypatch):
+    path = tmp_path / "deferred-failure.db"
+    store = RunStore(f"sqlite:///{path}")
+    run = {"id": "r", "owner_id": "owner", "history_id": "h", "state": "running",
+           "stop_reason": None, "settings": {"moves": 1, "kinds": ["laws"], "note": None},
+           "turns": [], "current": None, "created_at": 1}
+    monkeypatch.setattr(db, "database_write_block_reason", lambda: None)
+    store.save(run)
+    monkeypatch.setattr(db, "database_write_block_reason", lambda: "database_write_locked")
+    monkeypatch.setattr(autonomous_refine, "_core", lambda _request: {"outcome": "ok", "next": {"turn": 1, "attempt": 1, "kind": "laws"}})
+    runner = AutonomousRunner(store)
+    try:
+        runner._drive(run, {"id": "owner"}, {"facts": {}}, threading.Event())
+        assert store.get("owner", "r")["stop_reason"] == "database_write_locked"
+        monkeypatch.setattr(db, "database_write_block_reason", lambda: None)
+        assert store.get("owner", "r")["state"] == "failed"
+        another = RunStore(f"sqlite:///{path}")
+        try:
+            assert another.get("owner", "r")["stop_reason"] == "database_write_locked"
+        finally:
+            another.engine.dispose()
+    finally:
+        runner._pool.shutdown(wait=True)
+        store.engine.dispose()

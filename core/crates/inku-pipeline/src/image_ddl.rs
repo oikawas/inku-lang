@@ -665,9 +665,18 @@ pub fn check_image_document(
     definitions: &[MacroDefinition],
     compiler: &CompilerOptions,
 ) -> Result<ImageDdlCheck, ImageDdlError> {
-    let source = document.source();
     let result = compile_with_resources(document.clone(), definitions, compiler)
         .map_err(ImageDdlError::Boundary)?;
+    check_image_document_with_compilation(document, definitions, compiler, &result)
+}
+
+pub(crate) fn check_image_document_with_compilation(
+    document: &NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    compiler: &CompilerOptions,
+    result: &inku_ddl::CompilerResourceExecutionResult,
+) -> Result<ImageDdlCheck, ImageDdlError> {
+    let source = document.source();
     let mut found: Vec<(Option<SourceSpan>, String)> = Vec::new();
     let compilation = result.compilation();
     for hole in &compilation.holes {

@@ -392,15 +392,20 @@ class PipelineService:
     def _image_review(self, run: CandidateExecution, action: dict) -> dict:
         from .pipeline_images import review_drawing
         result = {"tag": "image_review_undrawn", "identity": action["identity"]}
+        run.context.pop("image_review_skipped", None)
         if self.image_review_options is None:
             return result
         try:
             snapshot = run.snapshot()
-            drawing = review_drawing(self.binding, snapshot, self.image_review_options(snapshot, run.context), owner=run.owner_id)
+            drawing = _wait_for_render_capacity(lambda: review_drawing(self.binding, snapshot, self.image_review_options(snapshot, run.context), owner=run.owner_id))
             if drawing is not None:
                 reference, data_url = drawing
                 run.image_data[reference["sha256"]] = data_url
                 return {"tag": "image_review_drawn", "identity": action["identity"], "drawing": reference}
+        except HTTPException as error:
+            if error.status_code == 503 and error.detail == "render capacity is full":
+                run.context["image_review_skipped"] = "render_capacity"
+            _logger.warning("pipeline_image_review_undrawn execution_id=%s", run.view()["execution_id"])
         except Exception:
             # Neither an SVG nor an input image can enter this diagnostic.
             _logger.warning("pipeline_image_review_undrawn execution_id=%s", run.view()["execution_id"])

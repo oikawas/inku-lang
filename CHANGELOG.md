@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- On macOS, drawing model guidance now opens the appropriate settings for adding a connection or choosing a drawing model.
+- macOS: guide users to add a connection, choose a default drawing model, or select demo models in the demo panel.
 
 - macOS: show a readable reason when importing instructions in the new instruction editor fails.
 

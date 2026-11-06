@@ -1580,3 +1580,4 @@
 
 "モデル設定で接続先を追加してください。" = "Add a connection in Model Settings.";
 "描くときのデフォルトで、使える描画モデルを選んでください。" = "Choose an available drawing model in Drawing Defaults.";
+"上のボタンでデモのモデルを選んでください。" = "Choose the demo models with the buttons above.";

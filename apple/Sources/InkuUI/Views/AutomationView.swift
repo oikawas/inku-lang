@@ -109,12 +109,14 @@ private enum DemoModelPicker: String, Identifiable {
             Button(model.display.localized("デモを開始"), systemImage: "play.fill") { Task { await automation.startDemo(app: model) } }
                 .disabled(!automation.canStartDemo(app: model))
             if automation.demoModel.isEmpty || automation.demoStage1Model.isEmpty || automation.demoStage2Model.isEmpty {
-                Button(model.display.localized(model.hasDrawingConnection
-                    ? "描くときのデフォルトで、使える描画モデルを選んでください。"
-                    : "モデル設定で接続先を追加してください。"), systemImage: "gearshape") {
-                    let section = SettingsSection.drawingGuidance(hasConnection: model.hasDrawingConnection)
-                    NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": section.rawValue])
-                }.inkuFont(12).disabled(model.isBrowsingLocked)
+                if let section = SettingsSection.demoGuidance(hasConnection: model.hasDrawingConnection) {
+                    Button(model.display.localized("モデル設定で接続先を追加してください。"), systemImage: "gearshape") {
+                        NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": section.rawValue])
+                    }.inkuFont(12).disabled(model.isBrowsingLocked)
+                } else {
+                    Text(model.display.localized("上のボタンでデモのモデルを選んでください。"))
+                        .inkuFont(12).foregroundStyle(.secondary)
+                }
             }
             demoStatistics
             if let work = automation.demoWork {

@@ -12,6 +12,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     static func drawingGuidance(hasConnection: Bool) -> SettingsSection {
         hasConnection ? .drawDefaults : .models
     }
+    static func demoGuidance(hasConnection: Bool) -> SettingsSection? {
+        hasConnection ? nil : .models
+    }
     var id: String { rawValue }
     var title: String {
         switch self {

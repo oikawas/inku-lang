@@ -7,6 +7,8 @@ import XCTest
     func testDrawingGuidanceRoutesByConnection() {
         XCTAssertEqual(SettingsSection.drawingGuidance(hasConnection: false), .models)
         XCTAssertEqual(SettingsSection.drawingGuidance(hasConnection: true), .drawDefaults)
+        XCTAssertEqual(SettingsSection.demoGuidance(hasConnection: false), .models)
+        XCTAssertNil(SettingsSection.demoGuidance(hasConnection: true))
     }
 
     func testSavingTokenLimitsPreservesUnavailableModels() async throws {

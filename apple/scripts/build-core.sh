@@ -42,6 +42,11 @@ if [[ -f "$RUST_SYSROOT/lib/libLLVM.dylib" ]]; then
 fi
 
 mkdir -p "$BUILD/generated" "$BUILD/headers" "$BUILD/macos" "$PACKAGE/Sources/InkuCoreBindings" "$PACKAGE/Artifacts"
+copy_if_changed() {
+    if [[ ! -f "$2" ]] || ! cmp -s "$1" "$2"; then
+        cp "$1" "$2"
+    fi
+}
 export CARGO_TARGET_DIR="$RUST_TARGET"
 export MACOSX_DEPLOYMENT_TARGET=14.0
 export IPHONEOS_DEPLOYMENT_TARGET=17.0
@@ -63,28 +68,32 @@ done
 "$ROOT/scripts/rust-toolchain.sh" build --locked -p inku-display-gpu --features graphite,skia-safe/no-compile \
     --bin inku-display-gpu --target aarch64-apple-darwin "${PROFILE_ARGS[@]}"
 mkdir -p "$BUILD/display-gpu"
-cp "$RUST_TARGET/aarch64-apple-darwin/$PROFILE/inku-display-gpu" "$BUILD/display-gpu/inku-display-gpu"
+copy_if_changed "$RUST_TARGET/aarch64-apple-darwin/$PROFILE/inku-display-gpu" "$BUILD/display-gpu/inku-display-gpu"
 
 # The Cargo.lock-pinned 0.32.0 generator inspects this exact archive's metadata.
 "$ROOT/scripts/rust-toolchain.sh" run --locked -p inku-pipeline-uniffi --features cli --bin uniffi-bindgen -- \
     generate "$RUST_TARGET/aarch64-apple-darwin/$PROFILE/libinku_pipeline_uniffi.a" \
     --language swift --crate inku_pipeline_uniffi --config "$ROOT/apple/scripts/uniffi-swift.toml" \
     --out-dir "$BUILD/generated" --no-format
-cp "$BUILD/generated/InkuCoreBindings.swift" "$PACKAGE/Sources/InkuCoreBindings/InkuCoreBindings.swift"
-cp "$BUILD/generated/InkuCoreFFI.h" "$BUILD/headers/InkuCoreFFI.h"
-cp "$BUILD/generated/InkuCoreFFI.modulemap" "$BUILD/headers/module.modulemap"
+copy_if_changed "$BUILD/generated/InkuCoreBindings.swift" "$PACKAGE/Sources/InkuCoreBindings/InkuCoreBindings.swift"
+copy_if_changed "$BUILD/generated/InkuCoreFFI.h" "$BUILD/headers/InkuCoreFFI.h"
+copy_if_changed "$BUILD/generated/InkuCoreFFI.modulemap" "$BUILD/headers/module.modulemap"
 
 xcrun lipo -create \
     "$RUST_TARGET/aarch64-apple-darwin/$PROFILE/libinku_pipeline_uniffi.a" \
     "$RUST_TARGET/x86_64-apple-darwin/$PROFILE/libinku_pipeline_uniffi.a" \
-    -output "$BUILD/macos/libinku_pipeline_uniffi.a"
+    -output "$BUILD/macos/libinku_pipeline_uniffi.new.a"
+copy_if_changed "$BUILD/macos/libinku_pipeline_uniffi.new.a" "$BUILD/macos/libinku_pipeline_uniffi.a"
+rm "$BUILD/macos/libinku_pipeline_uniffi.new.a"
 FRAMEWORK_ARGS=(-library "$BUILD/macos/libinku_pipeline_uniffi.a" -headers "$BUILD/headers")
 if [[ "$MODE" == all ]]; then
     mkdir -p "$BUILD/ios-simulator"
     xcrun lipo -create \
         "$RUST_TARGET/aarch64-apple-ios-sim/$PROFILE/libinku_pipeline_uniffi.a" \
         "$RUST_TARGET/x86_64-apple-ios/$PROFILE/libinku_pipeline_uniffi.a" \
-        -output "$BUILD/ios-simulator/libinku_pipeline_uniffi.a"
+        -output "$BUILD/ios-simulator/libinku_pipeline_uniffi.new.a"
+    copy_if_changed "$BUILD/ios-simulator/libinku_pipeline_uniffi.new.a" "$BUILD/ios-simulator/libinku_pipeline_uniffi.a"
+    rm "$BUILD/ios-simulator/libinku_pipeline_uniffi.new.a"
     FRAMEWORK_ARGS+=(
         -library "$RUST_TARGET/aarch64-apple-ios/$PROFILE/libinku_pipeline_uniffi.a" -headers "$BUILD/headers"
         -library "$BUILD/ios-simulator/libinku_pipeline_uniffi.a" -headers "$BUILD/headers"
@@ -95,8 +104,10 @@ fi
 OUTPUT="$BUILD/InkuCoreFFI.xcframework"
 [[ ! -d "$OUTPUT" ]] || rm -rf "$OUTPUT"
 xcodebuild -create-xcframework "${FRAMEWORK_ARGS[@]}" -output "$OUTPUT"
-[[ ! -d "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" ]] || rm -rf "$PACKAGE/Artifacts/InkuCoreFFI.xcframework"
-cp -R "$OUTPUT" "$PACKAGE/Artifacts/InkuCoreFFI.xcframework"
+if [[ ! -d "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" ]] || ! diff -qr "$OUTPUT" "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" >/dev/null; then
+    [[ ! -d "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" ]] || rm -rf "$PACKAGE/Artifacts/InkuCoreFFI.xcframework"
+    cp -R "$OUTPUT" "$PACKAGE/Artifacts/InkuCoreFFI.xcframework"
+fi
 python3 - "$ROOT" "$PACKAGE" "$RUST_TARGET" "$PROFILE" "$CHANNEL" "$MODE" "${TARGETS[@]}" <<'__INKU_CORE_MANIFEST__'
 import hashlib
 import json
@@ -153,6 +164,9 @@ identity = {
         "sha256": file_digest(root / "apple/scripts/.build/core/display-gpu/inku-display-gpu"),
     },
 }
-(package / "Artifacts/build-manifest.json").write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
+manifest = package / "Artifacts/build-manifest.json"
+content = json.dumps(identity, indent=2, sort_keys=True) + "\n"
+if not manifest.is_file() or manifest.read_text() != content:
+    manifest.write_text(content)
 __INKU_CORE_MANIFEST__
 printf 'Generated %s (%s, macOS 14 / iOS 17).\n' "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" "$MODE"

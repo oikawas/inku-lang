@@ -59,7 +59,9 @@ func prepareIcon() throws {
     guard conversion.terminationStatus == 0 else { throw IconPreparationFailure("iconutil failed (\(conversion.terminationStatus)).") }
     try files.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
     let data = try Data(contentsOf: generated)
-    try data.write(to: output, options: .atomic)
+    if (try? Data(contentsOf: output)) != data {
+        try data.write(to: output, options: .atomic)
+    }
     print("Prepared incu macOS icon: \(output.path) (10 slots, 16–1024px, nearest resizing, \(data.count) bytes)")
 }
 

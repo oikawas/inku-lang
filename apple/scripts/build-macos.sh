@@ -63,7 +63,7 @@ python3 "$APPLE/scripts/prepare-meter-resources.py"
 # The Web's registered 3D viewer is not committed here: copy it unchanged, then compare every file with the Web's.
 python3 "$APPLE/scripts/sync-ddl3d-viewer.py"
 "$APPLE/scripts/build-core.sh" macos
-xcodegen generate --spec "$APPLE/project.yml" --project "$APPLE" --project-root "$APPLE"
+xcodegen generate --use-cache --spec "$APPLE/project.yml" --project "$APPLE" --project-root "$APPLE"
 
 mkdir -p "$BUILD"
 xcodebuild \

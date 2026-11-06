@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import filecmp
 import hashlib
 import json
 import shutil
@@ -37,8 +38,12 @@ def main() -> None:
         raise SystemExit("Pinned meter license files unavailable")
     OUTPUT.mkdir(parents=True, exist_ok=True)
     for name, path in {**sources, **licenses}.items():
-        shutil.copyfile(path, OUTPUT / name)
-    shutil.copyfile(MANIFEST, OUTPUT / "manifest.json")
+        destination = OUTPUT / name
+        if not destination.is_file() or not filecmp.cmp(path, destination, shallow=False):
+            shutil.copyfile(path, destination)
+    manifest_output = OUTPUT / "manifest.json"
+    if not manifest_output.is_file() or not filecmp.cmp(MANIFEST, manifest_output, shallow=False):
+        shutil.copyfile(MANIFEST, manifest_output)
     print(f"Prepared pinned Japanese/English native meter resources: {OUTPUT}")
 
 

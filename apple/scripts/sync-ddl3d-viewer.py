@@ -107,6 +107,21 @@ def compare(copy: Path, label: str) -> int:
 def sync() -> None:
     build = registered_build(WEB_REGISTRATION)
     APP_COPY.mkdir(parents=True, exist_ok=True)
+    expected = {"installation.json"}
+    if build is not None:
+        expected.update((build, HOST))
+        build_files = files(WEB_BUILDS / build)
+        host_files = files(SHARED_HOST)
+    else:
+        build_files = host_files = {}
+    entries = {path.name for path in APP_COPY.iterdir() if path.name not in IGNORED}
+    registration = APP_COPY / "installation.json"
+    if (entries == expected and registration.is_file() and not registration.is_symlink()
+            and registration.read_bytes() == WEB_REGISTRATION.read_bytes()
+            and (build is None or (not (APP_COPY / build).is_symlink() and not (APP_COPY / HOST).is_symlink()
+                 and files(APP_COPY / build) == build_files and files(APP_COPY / HOST) == host_files))):
+        print(f"3D viewer copy unchanged: {APP_COPY.relative_to(ROOT)}")
+        return
     for path in APP_COPY.iterdir():
         if path.name == "installation.json":
             continue

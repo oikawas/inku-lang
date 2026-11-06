@@ -104,11 +104,13 @@ pipelineのeffect実行poolはこれとは別です。manifestの`host_limits`�
 
 | 変数 | 目的 | 実装既定値 |
 |---|---|---|
-| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | catalog選択・穴補完policyのattempt／total秒 | `120` |
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | catalog選択・穴補完policyのattempt／total秒、およびデモ指示・Vision送信の全体の期限 | `120` |
 | `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | 写生・型を埋める・構図の読み・法則・配色・書く・見比べ・画像から書く・画像との見比べの1試行の上限秒（色カタログと補完には効かない。変数の名は以前の`Stage 1`の名のまま） | `300` |
 | `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | 同じ送信の総予算秒（attempt以上へ正規化） | `540` |
 | `INKU_LLM_RETRY_ATTEMPTS` | policyの最大試行回数 | `4` |
 | `INKU_LLM_RETRY_BASE_DELAY` | policyの試行間待機秒 | `2.0` |
+
+デモ指示と Vision の応答本文は 32 MB が上限です。
 
 配布templateは運用例としてretry値を明示しています。実装既定値とtemplate値を意識して変更してください。
 

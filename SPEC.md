@@ -2216,7 +2216,7 @@ After selecting ordinary history, description generation and DDL drawing wait fo
 
 ### 12.8 Error Recovery
 
-In the Server pipeline, sketch from life, composition, laws, colors and fill-the-plan retries default to 300 seconds per attempt and 540 seconds in total, configurable with `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` and `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS`. Catalog and hole-filling retries default to 120 seconds both per attempt and in total, using `INKU_LLM_REQUEST_TIMEOUT_SECONDS`. Waiting to send to the provider counts against the stage deadline.
+In the Server pipeline, sketch from life, composition, laws, colors and fill-the-plan retries default to 300 seconds per attempt and 540 seconds in total, configurable with `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` and `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS`. Catalog and hole-filling retries default to 120 seconds both per attempt and in total, using `INKU_LLM_REQUEST_TIMEOUT_SECONDS`. Waiting to send to the provider counts against the stage deadline. Demo instruction and Vision requests use the same overall deadline, including admission and response receipt, and limit response bodies to 32 MB.
 
 Each LLM stage makes retry decisions only within its caller-supplied
 `max_attempts` and `total_timeout_ms`. Transport failures and empty, too-short,

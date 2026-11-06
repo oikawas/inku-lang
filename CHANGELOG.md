@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Demo instruction and Vision requests now have an overall deadline including admission and limit response bodies to 32 MB.
+
 - Server: return 500 for unexpected internal failures in rendering, history redraws, and account administration, logging exception details instead of putting them in responses.
 
 - Web: reduce requests during execution and cancel the previous work's requests when switching works. Show lineage thumbnails in groups of 200, with Show more for the rest. Pause periodic history refreshes while the page is hidden or filters are active.

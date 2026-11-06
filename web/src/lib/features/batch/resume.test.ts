@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
 	batchStoppedPartWay,
@@ -147,6 +148,10 @@ test('resuming preserves batch defaults when switches were not recorded', () => 
 	assert.equal(resumedComposition(null, 'off'), 'off');
 	assert.equal(resumedComposition('on', 'off'), 'on');
 	assert.equal(resumedComposition('off', 'on'), 'off');
+	const page = readFileSync(new URL('../../../routes/+page.svelte', import.meta.url), 'utf8');
+	const resume = page.slice(page.indexOf('async function applyBatchRunConditions('), page.indexOf('async function resumeInterruptedBatch('));
+	assert.ok(resume.indexOf('Object.assign(choices, copyDrawOptions(work.drawDefaults.batch_text))') < resume.indexOf('resumedWild(conditions.wild, choices.wild)'));
+	assert.match(resume, /resumedComposition\(conditions\.composition, choices\.composition\)/);
 });
 
 test('T-66  a run made under auto says so, beside the catalog it resolved to', () => {

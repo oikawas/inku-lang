@@ -355,7 +355,9 @@ struct LibraryView: View {
             }
             // A page holds only complete rows; an always-on scroller would also take width from the columns.
             .scrollIndicators(.hidden)
+            #if os(macOS)
             .focusSection()
+            #endif
             .background { focusFollower(scroll: nil) }
             .onAppear { reportPageSize(viewport: geometry.size) }
             .onChange(of: geometry.size) { _, size in reportPageSize(viewport: size) }
@@ -543,7 +545,7 @@ struct LibraryView: View {
         #else
         ScrollView {
             LazyVStack(spacing: 8) {
-                ForEach(Array(library.works.enumerated()), id: \.element.id) { slot, work in gridCard(work, slot: slot) }
+                ForEach(Array(library.works.enumerated()), id: \.element.id) { slot, work in gridCard(work, slot: slot, columns: 1) }
             }.padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
         }
         .background { focusFollower(scroll: nil) }
@@ -581,7 +583,9 @@ struct LibraryView: View {
                 }
                 .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
             }
+            #if os(macOS)
             .focusSection()
+            #endif
             .background { focusFollower(scroll: proxy) }
         }
     }

@@ -75,8 +75,12 @@ internal fun InAppCameraCapture(
     DisposableEffect(lifecycleOwner) {
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
+        // Both the listener and onDispose run on the main thread. A screen
+        // closed before the provider resolved must not open the camera after.
+        var disposed = false
         future.addListener(
             {
+                if (disposed) return@addListener
                 try {
                     val ready = future.get()
                     provider = ready
@@ -91,7 +95,10 @@ internal fun InAppCameraCapture(
             },
             ContextCompat.getMainExecutor(context),
         )
-        onDispose { provider?.unbindAll() }
+        onDispose {
+            disposed = true
+            provider?.unbindAll()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {

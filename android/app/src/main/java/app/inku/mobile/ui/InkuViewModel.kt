@@ -82,6 +82,8 @@ import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.modelReadinessIssue
 import app.inku.mobile.ui.camera.clearCameraOrigin
 import app.inku.mobile.ui.camera.locksCameraInteraction
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
@@ -544,6 +546,16 @@ class InkuViewModel @JvmOverloads constructor(
     private val repository = repositoryOverride
         ?: InkuRepository(application.applicationContext, (application as? InkuApplication)?.database ?: app.inku.mobile.data.db.InkuDatabase.open(application))
     private val localState = MutableStateFlow(InkuUiState())
+    /**
+     * The scope this model's work runs in: viewModelScope's job, with a
+     * handler that turns an unexpected failure (a database or file error in a
+     * star, trash, setting or lineage write) into a message rather than ending
+     * the app. Actions with their own failure text still catch their errors.
+     */
+    private val guardedScope = CoroutineScope(viewModelScope.coroutineContext + CoroutineExceptionHandler { _, error ->
+        android.util.Log.w("InkuViewModel", "unhandled failure", error)
+        localState.update { it.copy(message = messageFor(error, strings(), strings().operationFailed)) }
+    })
     private var authoringReturnState: InkuUiState? = null
     private var pausedWorkState: InkuUiState? = null
     private val history = repository.history()
@@ -628,7 +640,7 @@ class InkuViewModel @JvmOverloads constructor(
     val runProgress = repository.runProgress
 
     init {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.autonomousRefinement.updates.collect { json ->
                 if (json != null) {
                     localState.value = localState.value.copy(autonomousStatus = AutonomousRefinementStatus.fromRun(JSONObject(json)))
@@ -636,7 +648,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }
         }
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.ensureDefaultModelAssets()
             repository.ensureDefaultProviderSettings()
             repository.ensureDefaultExportTemplates()
@@ -807,7 +819,7 @@ class InkuViewModel @JvmOverloads constructor(
         val originalPhoto = cameraRetryInput?.originalPhoto?.takeIf { view.executionId == cameraPipelineExecutionId }
         val runId = beginDrawingRun()
         localState.value = localState.value.copy(isDrawing = true)
-        drawingJob = viewModelScope.launch {
+        drawingJob = guardedScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
                     if (approve) {
@@ -845,7 +857,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun declinePipelinePatch() {
         val view = localState.value.pipelineView ?: return
         if (localState.value.isDrawing) return
-        viewModelScope.launch {
+        guardedScope.launch {
             val proposal = view.patchProposal ?: return@launch
             runCatching { withContext(Dispatchers.IO) { repository.declinePipelinePatch(view.executionId, proposal.proposalDigest) } }
                 .onSuccess { if (localState.value.pipelineView?.executionId == view.executionId) presentPipelineView(it) }
@@ -891,7 +903,7 @@ class InkuViewModel @JvmOverloads constructor(
             historyDescriptionLocked = null,
             historyAuthorityLoading = false,
         )
-        cameraJob = viewModelScope.launch {
+        cameraJob = guardedScope.launch {
             try {
                 val snapshot = cameraComposeSnapshot ?: localState.value
                 val cameraProviders = providerSettings.first()
@@ -920,7 +932,7 @@ class InkuViewModel @JvmOverloads constructor(
                 // Load a local Vision model while the author is still framing the shot.
                 if (isLocalVisionModel(visionModelId)) {
                     litertWarmupJob?.cancel()
-                    litertWarmupJob = viewModelScope.launch(Dispatchers.IO) {
+                    litertWarmupJob = guardedScope.launch(Dispatchers.IO) {
                         runCatching { repository.warmupLocalModelIfReady(visionModelId) }
                     }
                 }
@@ -970,7 +982,7 @@ class InkuViewModel @JvmOverloads constructor(
         cameraRunSerial += 1
         val serial = cameraRunSerial
         cameraJob?.cancel()
-        cameraJob = viewModelScope.launch {
+        cameraJob = guardedScope.launch {
             // A description model chosen over the preview was not there for the
             // check before the capture; the drawing model is checked again
             // before drawing (`cameraRouteReadiness`).
@@ -1172,7 +1184,7 @@ class InkuViewModel @JvmOverloads constructor(
         cameraRunSerial += 1
         val serial = cameraRunSerial
         cameraJob?.cancel()
-        cameraJob = viewModelScope.launch {
+        cameraJob = guardedScope.launch {
             val cameraProviders = providerSettings.first()
             cameraRouteReadiness(input.route, cameraProviders, modelAssets.first())?.let { message ->
                 if (serial == cameraRunSerial) {
@@ -1232,7 +1244,7 @@ class InkuViewModel @JvmOverloads constructor(
             isDrawing = false,
             message = null,
         )
-        viewModelScope.launch {
+        guardedScope.launch {
             // Native inference and warmup must finish before their engine is closed.
             withContext(NonCancellable) {
                 job?.join()
@@ -1501,7 +1513,7 @@ class InkuViewModel @JvmOverloads constructor(
         // restored at start or presented after a stop -- for good, as the stop
         // itself does; left open, it was restored again at every start.
         localState.value.pipelineView?.takeIf { !it.terminal }?.let { view ->
-            viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
+            guardedScope.launch { runCatching { withContext(Dispatchers.IO) { repository.cancelPipeline(view.executionId) } } }
         }
         discardStagedCameraPhoto()
         cameraRetryInput = null
@@ -1706,7 +1718,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (state.value.isRunning || item.trashed) return
         localState.value = localState.value.copy(workActionsTarget = item, workActionsDescriptionLocked = null)
         // 取り合わせ is held while the lock is read, so a DDL-led work never offers it.
-        viewModelScope.launch {
+        guardedScope.launch {
             val locked = runCatching { withContext(Dispatchers.IO) { repository.isDescriptionLocked(item) } }.getOrNull()
             if (localState.value.workActionsTarget?.id == item.id) {
                 localState.value = localState.value.copy(workActionsDescriptionLocked = locked)
@@ -1735,7 +1747,7 @@ class InkuViewModel @JvmOverloads constructor(
         val serial = ++canvasSearchSerial
         canvasSearchJob?.cancel()
         localState.value = localState.value.copy(canvasSearchQuery = query, canvasSearchBusy = true, canvasSearchFailed = false, canvasSearchResultIds = emptyList())
-        canvasSearchJob = viewModelScope.launch {
+        canvasSearchJob = guardedScope.launch {
             delay(250)
             runCatching {
                 withContext(Dispatchers.IO) { repository.canvasSearchEntries().filter { it.matches(query) }.map { it.id } }
@@ -1753,7 +1765,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun selectCanvasSearchResult(id: String) {
         if (state.value.isRunning || id !in localState.value.canvasSearchResultIds) return
         val serial = canvasSearchSerial
-        viewModelScope.launch {
+        guardedScope.launch {
             val item = withContext(Dispatchers.IO) { repository.getHistoryById(id) } ?: return@launch
             if (serial != canvasSearchSerial || !localState.value.canvasSearchOpen || state.value.isRunning || item.trashed) return@launch
             closeCanvasSearch()
@@ -1767,7 +1779,7 @@ class InkuViewModel @JvmOverloads constructor(
         closeRefinement()
         val serial = ++replaySerial
         localState.value = localState.value.copy(replayOpen = true, replayBusy = true, replayComparison = null, replayError = null, replaySavedHistoryId = null)
-        replayJob = viewModelScope.launch {
+        replayJob = guardedScope.launch {
             try {
                 val comparison = withContext(Dispatchers.IO) { repository.replaySavedWork(item.id) }
                 if (serial == replaySerial && localState.value.replayOpen) {
@@ -1794,7 +1806,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (current.replayBusy || current.replaySaving || current.replaySavedHistoryId != null) return
         val comparison = current.replayComparison ?: return
         localState.value = current.copy(replaySaving = true, replayError = null)
-        viewModelScope.launch {
+        guardedScope.launch {
             try {
                 val saved = withContext(Dispatchers.IO) { repository.saveReplayChild(comparison) }
                 localState.value = localState.value.copy(replaySavedHistoryId = saved.id)
@@ -1890,7 +1902,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun openWorkLineage(item: HistoryListItem) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.getHistoryById(item.id)?.let { openWorkLineage(it) }
         }
     }
@@ -1968,7 +1980,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun authorizeChatGpt(profileId: String? = null, consent: Boolean = false) {
-        viewModelScope.launch {
+        guardedScope.launch {
             try {
                 val url = withContext(Dispatchers.IO) { repository.chatGptPlan.authorize(profileId, consent, !state.value.uiLanguage.isEnglish) }
                 mutableChatGptAuthorizationRequests.emit(url)
@@ -1980,14 +1992,14 @@ class InkuViewModel @JvmOverloads constructor(
     fun cancelChatGptAuthorization() = repository.chatGptPlan.cancelAuthorization()
     fun chatGptBrowserUnavailable() = repository.chatGptPlan.browserUnavailable()
     fun acknowledgeChatGptPlan() {
-        viewModelScope.launch {
+        guardedScope.launch {
             try { withContext(Dispatchers.IO) { repository.chatGptPlan.acknowledgePlanNotice() } }
             catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
         }
     }
 
     fun selectChatGptProfile(id: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             try {
                 withContext(Dispatchers.IO) { repository.chatGptPlan.selectProfile(id) }
                 localState.value = localState.value.copy(providerModelFetchStates = localState.value.providerModelFetchStates - "chatgpt", message = null)
@@ -1996,18 +2008,18 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun signOutChatGpt(id: String) {
-        viewModelScope.launch {
-            try { repository.chatGptPlan.signOut(id) }
+        guardedScope.launch {
+            try { withContext(Dispatchers.IO) { repository.chatGptPlan.signOut(id) } }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
         }
     }
 
     fun deleteChatGptProfile(id: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             try {
                 val active = state.value.chatGptPlan.activeProfileId == id
-                repository.chatGptPlan.deleteProfile(id)
+                withContext(Dispatchers.IO) { repository.chatGptPlan.deleteProfile(id) }
                 localState.value = localState.value.copy(
                     providerModelFetchStates = if (active) localState.value.providerModelFetchStates - "chatgpt" else localState.value.providerModelFetchStates,
                     message = null,
@@ -2018,7 +2030,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun publishChatGptModels(session: app.inku.mobile.llm.ChatGptSessionRef, models: List<String>, purposes: Map<String, List<String>>) {
-        viewModelScope.launch {
+        guardedScope.launch {
             try {
                 val offered = state.value.chatGptPlan.models.orEmpty().map { it.id }.toSet()
                 val chosen = purposes.filterKeys { it in offered }
@@ -2194,7 +2206,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun openHistoryPresentation(item: HistoryListItem, filteredIds: List<String>) {
         val request = ++presentationNavigationSerial
         val sequence = filteredIds.distinct().takeIf { item.id in it } ?: listOf(item.id)
-        viewModelScope.launch {
+        guardedScope.launch {
             val work = repository.getHistoryById(item.id) ?: return@launch
             if (request != presentationNavigationSerial) return@launch
             localState.value = localState.value.copy(
@@ -2256,7 +2268,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setMaxSvgMiB(text: String) {
         val value = app.inku.mobile.render.SvgOutputLimit.parseMiB(text) ?: return
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching {
                 repository.saveSetting(app.inku.mobile.render.SvgOutputLimit.SETTING_KEY,
                     JSONObject().put("value", value * app.inku.mobile.render.SvgOutputLimit.BYTES_PER_MIB).toString())
@@ -2289,7 +2301,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun addExportTemplate() {
         val templates = state.value.exportTemplates
         val index = templates.size + 1
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.saveExportTemplate(
                 id = "png-custom-${System.currentTimeMillis()}",
                 name = "PNG Custom $index",
@@ -2301,13 +2313,13 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun updateExportTemplate(template: ExportTemplateEntity, name: String, description: String, heightPx: Int) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.saveExportTemplate(template.id, name, description, heightPx, template.sortOrder, template.isBuiltin)
         }
     }
 
     fun removeExportTemplate(id: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.deleteExportTemplate(id)
         }
     }
@@ -2330,7 +2342,7 @@ class InkuViewModel @JvmOverloads constructor(
     /** Enables or disables the bundled plugin package for new works. */
     fun setBundledPluginsEnabled(enabled: Boolean) {
         localState.value = localState.value.copy(bundledPluginsEnabled = enabled, message = null)
-        viewModelScope.launch { repository.setBundledPluginPackageEnabled(enabled) }
+        guardedScope.launch { repository.setBundledPluginPackageEnabled(enabled) }
     }
 
     /**
@@ -2497,7 +2509,7 @@ class InkuViewModel @JvmOverloads constructor(
             historyDescriptionLocked = null,
             historyAuthorityLoading = true,
         )
-        viewModelScope.launch {
+        guardedScope.launch {
             val managed = runCatching {
                 withContext(Dispatchers.IO) { repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id) }
             }
@@ -2551,7 +2563,7 @@ class InkuViewModel @JvmOverloads constructor(
     }.getOrNull()
 
     fun selectHistory(item: HistoryListItem) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.getHistoryById(item.id)?.let { selectHistory(it) }
         }
     }
@@ -2602,7 +2614,7 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         localState.value = localState.value.copy(lineageLoading = true)
-        lineageJob = viewModelScope.launch {
+        lineageJob = guardedScope.launch {
             val graph = repository.loadLineage(focus)
             // Re-read after the read suspended: the reader can have picked
             // another work meanwhile, and writing this graph over theirs would
@@ -2645,7 +2657,7 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         if (viewer.isRunning) return
-        viewModelScope.launch {
+        guardedScope.launch {
             val latest = historyItems.value.firstOrNull() ?: history.first().firstOrNull() ?: return@launch
             selectHistory(latest)
         }
@@ -2668,7 +2680,7 @@ class InkuViewModel @JvmOverloads constructor(
         // (`applyHistorySelection`). A swipe while a batch, the demo or a DDL
         // drawing is running would end it without a word.
         if (viewer.isRunning) return
-        viewModelScope.launch {
+        guardedScope.launch {
             val items = historyItems.value.ifEmpty { history.first() }
             if (items.isEmpty()) return@launch
             val current = localState.value.selectedHistory
@@ -2685,7 +2697,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     private fun showPresentationHistory(id: String) {
         val request = ++presentationNavigationSerial
-        viewModelScope.launch {
+        guardedScope.launch {
             val work = repository.getHistoryById(id) ?: return@launch
             val current = localState.value
             if (request != presentationNavigationSerial || !current.canvasPresentationMode || id !in current.presentationSequence) return@launch
@@ -2903,7 +2915,7 @@ class InkuViewModel @JvmOverloads constructor(
         val stage1CatalogId = current.selectedCatalogId
         val autoRepair = true
         val runId = beginDrawingRun(keepDescriptionParent = true)
-        drawingJob = viewModelScope.launch {
+        drawingJob = guardedScope.launch {
             // The selected work's authority was still being read. A DDL-led
             // work is not redrawn from its description unless a fork was asked for.
             if (current.historyAuthorityLoading && current.selectedHistory != null) {
@@ -3043,7 +3055,7 @@ class InkuViewModel @JvmOverloads constructor(
         val declared = ddlLineage(current)
         val runId = beginDrawingRun()
         localState.value = localState.value.copy(ddlEditorOpen = false, canvasFitQuestion = null)
-        drawingJob = viewModelScope.launch {
+        drawingJob = guardedScope.launch {
             // A candidate that cannot be kept leaves the declared parent: the
             // drawing is still the author's, and an uncaught failure here
             // would take the app down.
@@ -3145,7 +3157,7 @@ class InkuViewModel @JvmOverloads constructor(
         val current = localState.value
         val conditions = snapshot.conditions
         val runId = beginDrawingRun()
-        drawingJob = viewModelScope.launch {
+        drawingJob = guardedScope.launch {
             val startedAt = System.currentTimeMillis()
             var last: HistoryItemEntity? = if (retry) lastBatchSavedWork else null
             var success = if (retry) current.batchSuccess else 0
@@ -3286,7 +3298,7 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         val runId = beginDrawingRun()
-        drawingJob = viewModelScope.launch {
+        drawingJob = guardedScope.launch {
             localState.value = localState.value.copy(
                 isDrawing = true,
                 demoGeneratedPrompt = "",
@@ -3398,7 +3410,7 @@ class InkuViewModel @JvmOverloads constructor(
         drawingJob?.cancel()
         drawingJob = null
         val cancelled = localState.value.pipelineView?.takeIf { !it.terminal }?.also { view ->
-            viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
+            guardedScope.launch { runCatching { withContext(Dispatchers.IO) { repository.cancelPipeline(view.executionId) } } }
         }
         localState.value = localState.value.copy(
             isDrawing = false, demoWaitingSeconds = null, batchCanRetry = false, message = strings().statusStopped,
@@ -3613,7 +3625,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementCandidates = emptyList(), refinementPreviewId = null,
             refinementPlannedCount = 4,
         )
-        val run = viewModelScope.launch {
+        val run = guardedScope.launch {
             runCatching {
                 val options = withContext(Dispatchers.IO) { repository.toolChangeOptions(parent, current.toolChangeMode) }
                 for (option in options) {
@@ -3805,7 +3817,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementCanAbort = false,
             refinementStatus = null,
         )
-        val run = viewModelScope.launch {
+        val run = guardedScope.launch {
             // The stop appears three seconds in, not at once: a candidate that
             // is already done needs no stop button.
             val abortTimer = launch {
@@ -3935,7 +3947,7 @@ class InkuViewModel @JvmOverloads constructor(
         updateCandidate(candidateId) { it.copy(saveState = RefinementSaveState.Saving) }
         refinementSaving = true
         localState.value = localState.value.copy(refinementBusy = true)
-        refinementJob = viewModelScope.launch {
+        refinementJob = guardedScope.launch {
             try {
                 val item = withContext(NonCancellable + Dispatchers.IO) {
                     saveCandidateRow(candidate, parentItem, historyVisibility = null)
@@ -3975,7 +3987,7 @@ class InkuViewModel @JvmOverloads constructor(
         val parent = current.refinementParent ?: return
         refinementSaving = true
         localState.value = current.copy(refinementBusy = true)
-        refinementJob = viewModelScope.launch {
+        refinementJob = guardedScope.launch {
             try {
                 saveSelectedCandidatesNow(parent)
             } catch (error: Exception) {
@@ -4015,7 +4027,7 @@ class InkuViewModel @JvmOverloads constructor(
         closeRefinement()
         localState.value = localState.value.copy(autonomousOpen = true, autonomousParent = item,
             autonomousHeld = null, autonomousSettings = localState.value.autonomousSettings.copy(wildOverride = null))
-        viewModelScope.launch {
+        guardedScope.launch {
             try {
                 val source = withContext(Dispatchers.IO) { repository.getHistoryById(sourceId) } ?: return@launch
                 val run = withContext(Dispatchers.IO) { repository.autonomousRefinement.forHistory(sourceId) }
@@ -4047,20 +4059,20 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun reopenAutonomousRefinement() {
         val id = repository.autonomousRefinement.updates.value?.let(::JSONObject)?.optString("history_id") ?: return
-        viewModelScope.launch {
+        guardedScope.launch {
             withContext(Dispatchers.IO) { repository.getHistoryById(id) }?.let(::openAutonomousRefinement)
         }
     }
 
     fun stopAutonomousRefinement() {
         autonomousStartJob?.cancel()
-        viewModelScope.launch { repository.autonomousRefinement.stop() }
+        guardedScope.launch { repository.autonomousRefinement.stop() }
     }
 
     fun openLastAutonomousChild() {
         val id = localState.value.autonomousStatus.lastKeptHistoryId ?: return
         closeAutonomousRefinement()
-        viewModelScope.launch {
+        guardedScope.launch {
             withContext(Dispatchers.IO) { repository.getHistoryById(id) }?.let { selectHistory(it) }
         }
     }
@@ -4075,7 +4087,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (settings.allowedKinds.isEmpty() || original.displaySvg.isBlank() ||
             settings.modelId !in autonomousVisionModelIds(state.value)) return
         localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(busy = true))
-        autonomousStartJob = viewModelScope.launch {
+        autonomousStartJob = guardedScope.launch {
             try {
                 withContext(Dispatchers.IO) { repository.autonomousRefinement.start(original.id, settings, current.uiLanguage.code) }
             } catch (error: Exception) {
@@ -4140,7 +4152,7 @@ class InkuViewModel @JvmOverloads constructor(
         val texts = juxtaposeStrings(current.uiLanguage)
         val language = current.uiLanguage.code
         localState.value = current.copy(juxtaposition = dialog.copy(busy = true, startedAtMs = System.currentTimeMillis(), error = null))
-        juxtapositionJob = viewModelScope.launch {
+        juxtapositionJob = guardedScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
                     val inputs = repository.juxtapositionInputs(item)
@@ -4304,7 +4316,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun acceptModelLicense(modelId: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching {
                 repository.acceptModelLicense(modelId)
             }.onFailure { error ->
@@ -4314,7 +4326,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun refreshModelCatalog() {
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching {
                 repository.ensureDefaultModelAssets()
             }.onSuccess {
@@ -4334,7 +4346,7 @@ class InkuViewModel @JvmOverloads constructor(
             )
         }
         setFetchState(ProviderModelFetchState(strings().modelListFetching(providerId), loading = true))
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching {
                 repository.fetchProviderModels(providerId)
             }.onSuccess { models ->
@@ -4359,7 +4371,7 @@ class InkuViewModel @JvmOverloads constructor(
                 (providerId to ProviderModelFetchState(message, loading = loading, failed = failed)))
         }
         report(strings().modelAccessChecking, loading = true)
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching { repository.checkModelAccess(providerId, modelId) }
                 .onSuccess { report(when (it) { true -> strings().modelAccessAvailable; false -> strings().modelAccessUnavailable; null -> strings().modelAccessUnknown }) }
                 .onFailure { report(messageFor(it, strings(), strings().modelAccessUnknown), failed = true) }
@@ -4377,7 +4389,7 @@ class InkuViewModel @JvmOverloads constructor(
         // reason, so the screen that asked can stay open and say why.
         onResult: (String?) -> Unit,
     ) {
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching {
                 repository.saveProviderSetting(
                     providerId = providerId,
@@ -4399,7 +4411,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun clearProviderApiKey(providerId: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching {
                 repository.clearProviderApiKey(providerId)
             }.onSuccess {
@@ -4411,7 +4423,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun deleteProvider(providerId: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             runCatching {
                 repository.deleteProvider(providerId)
             }.onSuccess {
@@ -4437,7 +4449,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(message = strings().modelDownloadAlreadyRunning)
             return
         }
-        modelDownloadJob = viewModelScope.launch {
+        modelDownloadJob = guardedScope.launch {
             localState.value = localState.value.copy(
                 activeModelDownloadId = modelId,
                 message = if (force) strings().modelRedownloadStarting else strings().modelDownloadStarting,
@@ -4474,7 +4486,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun toggleStar(item: HistoryItemEntity) {
-        viewModelScope.launch {
+        guardedScope.launch {
             val nextStarred = !item.starred
             repository.setStarred(item.id, nextStarred)
             if (localState.value.selectedHistory?.id == item.id) {
@@ -4488,7 +4500,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun toggleStar(item: HistoryListItem) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.setStarred(item.id, !item.starred)
         }
     }
@@ -4514,14 +4526,14 @@ class InkuViewModel @JvmOverloads constructor(
      * says so.
      */
     fun trashWork(item: HistoryItemEntity) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.trash(item.id)
             afterTrashFlagChanged(item.id, trashed = true, notice = strings().workTrashed)
         }
     }
 
     fun restoreWork(id: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.restore(id)
             afterTrashFlagChanged(id, trashed = false, notice = strings().workRestored)
         }
@@ -4534,7 +4546,7 @@ class InkuViewModel @JvmOverloads constructor(
      * The lineage keeps a tombstone in the work's place.
      */
     fun deleteWorkForGood(id: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             val row = repository.getHistoryById(id) ?: return@launch
             if (!row.trashed) return@launch
             repository.deleteHistoryPermanently(id)
@@ -4695,7 +4707,7 @@ class InkuViewModel @JvmOverloads constructor(
         val targets = modelIds.distinct().filter { it.startsWith("local-litert-lm:") }
         if (targets.isEmpty()) return
         litertWarmupJob?.cancel()
-        litertWarmupJob = viewModelScope.launch(Dispatchers.IO) {
+        litertWarmupJob = guardedScope.launch(Dispatchers.IO) {
             targets.forEach { modelId ->
                 runCatching {
                     repository.warmupLocalModelIfReady(modelId)
@@ -4737,7 +4749,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun persistSetting(key: String, valueJson: String) {
-        viewModelScope.launch {
+        guardedScope.launch {
             repository.saveSetting(key, valueJson)
         }
     }

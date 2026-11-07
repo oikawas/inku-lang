@@ -206,9 +206,7 @@ class SharedPipelineHost(
      * drawing then took for a run waiting on the author.
      */
     suspend fun restore(ownerId: String, executionId: String): PipelineView =
-        withSession(ownerId, executionId) { session ->
-            if (session.mutex.withLock { session.drivers > 0 }) view(session) else driveWithCancellation(session)
-        }
+        withSession(ownerId, executionId) { session -> driveWithCancellation(session, onlyIfIdle = true) }
 
     private suspend fun loadSession(ownerId: String, executionId: String): Session {
         val stateBytes = executionStore.load(ownerId, executionId)
@@ -292,9 +290,18 @@ class SharedPipelineHost(
     }
 
     /** A drive whose caller is cancelled cancels the execution too, so it is not left busy. */
-    private suspend fun driveWithCancellation(session: Session, allowRefusedDrive: Boolean = false): PipelineView {
+    private suspend fun driveWithCancellation(
+        session: Session,
+        allowRefusedDrive: Boolean = false,
+        onlyIfIdle: Boolean = false,
+    ): PipelineView {
         if (!allowRefusedDrive && session.mutex.withLock { session.svgOutputFailure }) return view(session)
-        session.mutex.withLock { session.drivers += 1 }
+        // Checked and counted under one lock, so two restores cannot both
+        // find the execution idle and drive it at once.
+        val began = session.mutex.withLock {
+            if (onlyIfIdle && session.drivers > 0) false else { session.drivers += 1; true }
+        }
+        if (!began) return view(session)
         publishProgress(session)
         return try {
             drive(session, allowRefusedDrive).let { view -> if (view.phaseTag in STOPPED_PHASES) performSafely(session) ?: view else view }
@@ -492,8 +499,12 @@ class SharedPipelineHost(
                 true
             }
         } finally {
-            session.mutex.withLock {
-                if (session.providerActionInFlight == actionKey) session.providerActionInFlight = null
+            // Not skipped by a cancelled caller waiting on the lock: a claim
+            // left set keeps the run busy and refuses the next call.
+            withContext(NonCancellable) {
+                session.mutex.withLock {
+                    if (session.providerActionInFlight == actionKey) session.providerActionInFlight = null
+                }
             }
             // The call is over; until the next one starts nothing is waited on,
             // as web shows no attempt while no model call is pending.
@@ -654,19 +665,33 @@ class SharedPipelineHost(
         session.eventsJson = output.eventsJson
         session.svgOutputFailure = svgOutputFailure
         if (output.svgOutputFailure) session.svgOutputFailureLimitBytes = output.svgOutputFailureLimitBytes
-        val saved = executionStore.compareAndSet(
-            ownerId = session.ownerId,
-            executionId = next.requiredString("execution_id"),
-            expectedSequence = previousSequence,
-            nextSequence = next.requiredString("sequence"),
-            stateBytes = persistedState(session),
-        )
-        if (!saved) {
+        fun rollBack() {
             session.snapshotBytes = priorSnapshot
             session.renderedJson = priorRendered
             session.eventsJson = priorEvents
             session.svgOutputFailure = priorSvgOutputFailure
             session.svgOutputFailureLimitBytes = priorSvgOutputFailureLimitBytes
+        }
+        // The write finishes even when the caller is cancelled, so memory and
+        // the stored row never disagree on the sequence. A write that throws
+        // (an I/O error) rolls back too: kept one step ahead of the row, every
+        // later step would be refused as a conflict.
+        val saved = try {
+            withContext(NonCancellable) {
+                executionStore.compareAndSet(
+                    ownerId = session.ownerId,
+                    executionId = next.requiredString("execution_id"),
+                    expectedSequence = previousSequence,
+                    nextSequence = next.requiredString("sequence"),
+                    stateBytes = persistedState(session),
+                )
+            }
+        } catch (error: Throwable) {
+            rollBack()
+            throw error
+        }
+        if (!saved) {
+            rollBack()
             throw PipelineHostException("execution_snapshot_conflict")
         }
         publishProgress(session)

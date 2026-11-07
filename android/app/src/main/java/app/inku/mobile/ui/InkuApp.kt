@@ -859,28 +859,60 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     var completionStates by remember { mutableStateOf(emptyList<app.inku.mobile.pipeline.CompletionRangeState>()) }
     var pluginCalls by remember { mutableStateOf(emptyList<PluginEditorCall>()) }
     var pluginEntries by remember { mutableStateOf(emptyList<org.json.JSONObject>()) }
-    val pluginLanguage = InstructionLanguages.ofDdl(editorValue.text, state.selectedHistory?.normalizedDdl,
-        state.selectedHistory?.instructionLangResolved, LocalUiLanguage.current.code)
-    LaunchedEffect(editorValue.text, pluginLanguage, state.selectedHistory?.id, state.lineageDetached, state.bundledPluginsEnabled, state.importedPlugins, state.pipelineView?.executionId, state.pipelineView?.sequence) {
-        pluginCalls = emptyList()
-        pluginEntries = emptyList()
+    val uiLanguageCode = LocalUiLanguage.current.code
+    val pluginLanguage = remember(editorValue.text, state.selectedHistory?.normalizedDdl, state.selectedHistory?.instructionLangResolved, uiLanguageCode) {
+        InstructionLanguages.ofDdl(editorValue.text, state.selectedHistory?.normalizedDdl,
+            state.selectedHistory?.instructionLangResolved, uiLanguageCode)
+    }
+    // While typing, the last results stay until the new ones arrive (before,
+    // every keystroke cleared the error lines and the `{` buttons). They are
+    // cleared at once only when the work or the run they were read for changes.
+    val pluginContext = listOf(pluginLanguage, state.selectedHistory?.id, state.lineageDetached, state.bundledPluginsEnabled,
+        state.importedPlugins, state.pipelineView?.executionId, state.pipelineView?.sequence)
+    var pluginContextShown by remember { mutableStateOf<List<Any?>?>(null) }
+    LaunchedEffect(editorValue.text, pluginContext) {
+        if (pluginContextShown != pluginContext) {
+            pluginCalls = emptyList()
+            pluginEntries = emptyList()
+        }
         kotlinx.coroutines.delay(250)
-        val output = runCatching { viewModel.pluginEditorAnalysis(editorValue.text, pluginLanguage) }.getOrNull()
-        if (output?.optString("schema") == "inku.plugin-calls.v1" && !output.has("error")) {
+        // Read inside the guard: an answer missing a field shows nothing rather
+        // than ending the app from this effect.
+        val parsed = runCatching {
+            val output = viewModel.pluginEditorAnalysis(editorValue.text, pluginLanguage)
+            if (output?.optString("schema") != "inku.plugin-calls.v1" || output.has("error")) return@runCatching null
             val calls = output.optJSONArray("calls") ?: org.json.JSONArray()
-            pluginCalls = (0 until calls.length()).mapNotNull { calls.optJSONObject(it) }.map {
+            val readCalls = (0 until calls.length()).mapNotNull { calls.optJSONObject(it) }.map {
                 val candidates = it.optJSONArray("candidates") ?: org.json.JSONArray()
                 PluginEditorCall(it.getInt("start_utf16"), it.getInt("end_utf16"), it.optString("text"), it.optString("status"), it.optString("suggestion").takeIf(String::isNotEmpty),
                     (0 until candidates.length()).map { index -> candidates.getString(index) })
             }
             val entries = output.optJSONArray("entries") ?: org.json.JSONArray()
-            pluginEntries = (0 until entries.length()).mapNotNull { entries.optJSONObject(it) }
+            readCalls to (0 until entries.length()).mapNotNull { entries.optJSONObject(it) }
+        }.getOrElse { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            null
         }
+        pluginCalls = parsed?.first.orEmpty()
+        pluginEntries = parsed?.second.orEmpty()
+        pluginContextShown = pluginContext
     }
-    LaunchedEffect(editorValue.text, state.selectedHistory?.id, state.lineageDetached,
-        state.pipelineView?.executionId, state.pipelineView?.sequence) {
-        completionStates = emptyList()
-        completionStates = viewModel.completionRangeStates(editorValue.text)
+    val completionContext = listOf(state.selectedHistory?.id, state.lineageDetached,
+        state.pipelineView?.executionId, state.pipelineView?.sequence)
+    var completionContextShown by remember { mutableStateOf<List<Any?>?>(null) }
+    LaunchedEffect(editorValue.text, completionContext) {
+        // The range states read the work's saved config from the database; a
+        // short wait reads them once a burst of typing settles.
+        if (completionContextShown != completionContext) {
+            completionStates = emptyList()
+        } else {
+            kotlinx.coroutines.delay(150)
+        }
+        completionStates = runCatching { viewModel.completionRangeStates(editorValue.text) }.getOrElse { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            emptyList()
+        }
+        completionContextShown = completionContext
     }
     var vocabularyOpen by remember { mutableStateOf(false) }
     var vocabularyQuery by remember { mutableStateOf("") }
@@ -4518,8 +4550,10 @@ internal fun RefinementCandidateCard(
                     option.changes.forEach { change ->
                         val words = option.source.tools.associateBy { it.value }
                         val japanese = S === app.inku.mobile.ui.i18n.InkuStringsJa
-                        val from = words.getValue(change.from).label(japanese)
-                        val to = words.getValue(change.to).label(japanese)
+                        // A tool the source does not list shows its value rather
+                        // than throwing during composition.
+                        val from = words[change.from]?.label(japanese) ?: change.from
+                        val to = words[change.to]?.label(japanese) ?: change.to
                         Text("${change.index + 1}: $from → $to", style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -5013,37 +5047,59 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
     }
 }
 
+/** One bundled plugin word, read once off the main thread. */
+private class BundledPluginWordView(
+    val mainJa: String,
+    val mainEn: String,
+    val aliases: List<String>,
+    val kind: String,
+    val noteJa: String,
+    val noteEn: String,
+    val picture: ImageBitmap?,
+)
+
 @Composable
 private fun BundledPluginDetails(english: Boolean) {
-    val words by produceState<List<Pair<org.json.JSONObject, ImageBitmap?>>>(emptyList()) {
+    // Parsed in the IO block: a word without names or aliases is left out
+    // rather than throwing during composition.
+    val words by produceState<List<BundledPluginWordView>>(emptyList()) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val request = org.json.JSONObject().put("action", "bundled_nature")
                 val result = org.json.JSONObject(app.inku.mobile.pipeline.NativePipelineBridge.pluginPackage(request.toString().toByteArray()).decodeToString())
                 val packageWords = org.json.JSONObject(result.getString("text")).getJSONArray("words")
-                val pictures = result.getJSONObject("pictures")
-                (0 until packageWords.length()).map { i ->
-                    val word = packageWords.getJSONObject(i)
-                    val bytes = java.util.Base64.getDecoder().decode(pictures.getString(word.getString("preview")))
-                    word to BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                val pictures = result.optJSONObject("pictures") ?: org.json.JSONObject()
+                (0 until packageWords.length()).mapNotNull { i ->
+                    runCatching {
+                        val word = packageWords.getJSONObject(i)
+                        val definition = word.getJSONObject("definition")
+                        val names = definition.getJSONObject("names")
+                        val ja = names.getJSONArray("ja"); val en = names.getJSONArray("en")
+                        val picture = pictures.optString(word.optString("preview")).takeIf(String::isNotEmpty)?.let { encoded ->
+                            val bytes = java.util.Base64.getDecoder().decode(encoded)
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                        }
+                        BundledPluginWordView(
+                            mainJa = ja.getString(0), mainEn = en.getString(0),
+                            aliases = (1 until ja.length()).map { ja.getString(it) } + (1 until en.length()).map { en.getString(it) },
+                            kind = definition.optString("kind"),
+                            noteJa = word.optString("note_ja"), noteEn = word.optString("note_en"),
+                            picture = picture,
+                        )
+                    }.getOrNull()
                 }
             }.getOrDefault(emptyList())
         }
     }
-    words.forEach { (word, picture) ->
-        val definition = word.getJSONObject("definition")
-        val names = definition.getJSONObject("names")
-        val ja = names.getJSONArray("ja"); val en = names.getJSONArray("en")
-        val mainJa = ja.getString(0); val mainEn = en.getString(0)
-        val aliases = (1 until ja.length()).map { ja.getString(it) } + (1 until en.length()).map { en.getString(it) }
+    words.forEach { word ->
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-            picture?.let { Image(it, contentDescription = null, modifier = Modifier.size(Dimens.ddlEditorPreviewSize)) }
+            word.picture?.let { Image(it, contentDescription = null, modifier = Modifier.size(Dimens.ddlEditorPreviewSize)) }
             Column {
-                Text("｛$mainJa｝ / {$mainEn}", fontWeight = FontWeight.SemiBold)
-                if (aliases.isNotEmpty()) Text(aliases.joinToString(" / "), style = MaterialTheme.typography.bodySmall)
-                Text(pluginKindLabel(definition.optString("kind"), S), style = MaterialTheme.typography.bodySmall)
-                Text(word.optString(if (english) "note_en" else "note_ja"), style = MaterialTheme.typography.bodySmall)
-                Text(S.bundledPluginExample(if (english) mainEn else mainJa), style = MaterialTheme.typography.bodySmall)
+                Text("｛${word.mainJa}｝ / {${word.mainEn}}", fontWeight = FontWeight.SemiBold)
+                if (word.aliases.isNotEmpty()) Text(word.aliases.joinToString(" / "), style = MaterialTheme.typography.bodySmall)
+                Text(pluginKindLabel(word.kind, S), style = MaterialTheme.typography.bodySmall)
+                Text(if (english) word.noteEn else word.noteJa, style = MaterialTheme.typography.bodySmall)
+                Text(S.bundledPluginExample(if (english) word.mainEn else word.mainJa), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -5617,23 +5673,41 @@ private fun ProviderModelPickerDialog(
     var selected by remember(provider.providerId, provider.publishedModelsJson) { mutableStateOf(normalizedSelection) }
     val catalog = state.modelCatalog
     val observation = state.modelCatalogObservations[provider.providerId]
-    val candidateModels = (catalog.defaults(provider.providerId) + catalog.ids(provider.providerId) + candidateModelIds.orEmpty() + observation?.seen.orEmpty() + normalizedSelection)
-        .map { app.inku.mobile.data.ModelCatalog.rawId(provider.providerId, it) }.distinct()
-        .map { catalog.resolve(provider.providerId, it, candidateModelIds?.toSet(), observation?.access?.get(it)) }
+    // Resolved once per list, not on every keystroke in the search field.
+    val candidateModels = remember(catalog, provider.providerId, candidateModelIds, observation, normalizedSelection) {
+        (catalog.defaults(provider.providerId) + catalog.ids(provider.providerId) + candidateModelIds.orEmpty() + observation?.seen.orEmpty() + normalizedSelection)
+            .map { app.inku.mobile.data.ModelCatalog.rawId(provider.providerId, it) }.distinct()
+            .map { catalog.resolve(provider.providerId, it, candidateModelIds?.toSet(), observation?.access?.get(it)) }
+    }
     val offeredForSelection = if (provider.providerId == "chatgpt") candidateModelIds.orEmpty().toSet() else null
     val candidateIds = candidateModels.filter { it.publishable && (offeredForSelection == null || it.id in offeredForSelection) }.map { it.id }.toSet()
     // Server's picker starts each model at its saved purposes, or the catalog's.
     val savedPurposes = state.modelPurposes[provider.providerId].orEmpty()
-    val initialPurposes = candidateModels.associate { it.id to modelPurposes(it, savedPurposes[it.id]) }
-    var purposes by remember(provider.providerId, provider.publishedModelsJson, savedPurposes) { mutableStateOf(initialPurposes) }
+    val initialPurposes = remember(candidateModels, savedPurposes) {
+        candidateModels.associate { it.id to modelPurposes(it, savedPurposes[it.id]) }
+    }
+    // Only the author's own ticks are state. A fetched list changes the
+    // starting purposes; kept as a whole map, that read as a draft change the
+    // author never made and disabled the fetch button.
+    var purposeEdits by remember(provider.providerId, provider.publishedModelsJson, savedPurposes) {
+        mutableStateOf(emptyMap<String, List<String>>())
+    }
+    val purposes = initialPurposes + purposeEdits
     // Web: publishing everything never chooses a purpose the model did not answer,
     // so a model with none from the catalog is left out unless one was ticked.
     fun hasPurpose(model: app.inku.mobile.data.CatalogModel) = purposes[model.id].orEmpty().isNotEmpty() || modelPurposes(model).isNotEmpty()
-    val selectionChanged = selected != normalizedSelection || purposes != initialPurposes
+    val selectionChanged = selected != normalizedSelection || purposeEdits.any { (id, value) -> initialPurposes[id].orEmpty() != value }
     val fetching = fetchState?.loading == true
-    val filtered = candidateModels.filter { model ->
+    val english = S.code == "en"
+    val searchTexts = remember(candidateModels, candidateLabels, english) {
+        candidateModels.associate { model ->
+            model.id to listOf(model.id, candidateLabels[model.id] ?: model.name, model.record.toString())
+                .plus(model.labels.map { it.name(english) }).joinToString("\u0000").lowercase()
+        }
+    }
+    val filtered = remember(candidateModels, searchTexts, search) {
         val query = search.trim().lowercase()
-        query.isBlank() || model.id.lowercase().contains(query) || (candidateLabels[model.id] ?: model.name).lowercase().contains(query) || model.record.toString().lowercase().contains(query) || model.labels.any { it.name(S.code == "en").lowercase().contains(query) }
+        if (query.isBlank()) candidateModels else candidateModels.filter { searchTexts[it.id].orEmpty().contains(query) }
     }
     // Web's `model-picker-dialog`: nearly the whole screen, as the list is what
     // the dialog is for (the author, 2026-10-26: "もっと大きく").
@@ -5679,7 +5753,7 @@ private fun ProviderModelPickerDialog(
                         selected = if (checked) selected + id else selected - id
                         // Published with neither purpose, it would appear nowhere: take the catalog's back.
                         val model = candidateModels.firstOrNull { it.id == id }
-                        if (checked && model != null && purposes[id].isNullOrEmpty()) purposes = purposes + (id to modelPurposes(model))
+                        if (checked && model != null && purposes[id].isNullOrEmpty()) purposeEdits = purposeEdits + (id to modelPurposes(model))
                     },
                     modifier = Modifier.fillMaxWidth().weight(1f), enabled = !fetching, names = candidateLabels,
                     offeredForSelection = offeredForSelection,
@@ -5689,7 +5763,7 @@ private fun ProviderModelPickerDialog(
                         // Web `toggleModelPurpose`: a model with no purpose left is not published.
                         val current = purposes[id].orEmpty()
                         val next = if (purpose in current) current - purpose else listOf("llm", "vision").filter { it in current || it == purpose }
-                        purposes = purposes + (id to next)
+                        purposeEdits = purposeEdits + (id to next)
                         selected = if (next.isNotEmpty()) selected + id else selected - id
                     },
                     // A ChatGPT plan model's purposes are each person's own (Web `purposeLocked`).
@@ -6107,7 +6181,35 @@ private fun catalogModelFor(state: InkuUiState, providerId: String, modelId: Str
         observation?.access?.get(id), observation?.records?.get(id))
 }
 
-private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true): List<ModelChoice> {
+/**
+ * The inputs the model lists are built from. The lists are rebuilt only when
+ * one of them is a new object: building them makes a core call per published
+ * model, and the running row asked for a label every 100 ms.
+ */
+private fun modelListInputs(state: InkuUiState, vararg extra: Any?): List<Any?> = listOf(
+    state.modelAssets, state.providerSettings, state.providerModelCandidates, state.modelCatalog,
+    state.modelCatalogObservations, state.modelPurposes, state.chatGptPlan, state.uiLanguage, *extra,
+)
+
+private class ModelListMemo<T>(val inputs: List<Any?>, val value: T)
+
+private fun <T> remembered(slot: java.util.concurrent.atomic.AtomicReference<ModelListMemo<T>?>, inputs: List<Any?>, build: () -> T): T {
+    slot.get()?.let { memo ->
+        if (memo.inputs.size == inputs.size && memo.inputs.indices.all { memo.inputs[it] === inputs[it] }) return memo.value
+    }
+    return build().also { slot.set(ModelListMemo(inputs, it)) }
+}
+
+private val modelChoicesWithChatGpt = java.util.concurrent.atomic.AtomicReference<ModelListMemo<List<ModelChoice>>?>(null)
+private val modelChoicesWithoutChatGpt = java.util.concurrent.atomic.AtomicReference<ModelListMemo<List<ModelChoice>>?>(null)
+private val visionModelGroupsMemo = java.util.concurrent.atomic.AtomicReference<ModelListMemo<List<VisionModelGroup>>?>(null)
+
+private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true): List<ModelChoice> =
+    remembered(if (includeChatGpt) modelChoicesWithChatGpt else modelChoicesWithoutChatGpt, modelListInputs(state)) {
+        buildModelChoices(state, includeChatGpt)
+    }
+
+private fun buildModelChoices(state: InkuUiState, includeChatGpt: Boolean): List<ModelChoice> {
     val choices = mutableListOf<ModelChoice>()
     state.modelAssets.forEach { asset ->
         choices += ModelChoice(asset.modelId, "${asset.displayName} ${asset.qualityTier}", "LiteRT-LM")
@@ -6139,6 +6241,9 @@ private fun servedPurposes(state: InkuUiState, providerId: String, modelId: Stri
 
 /** [visionModelChoicesFor] grouped by connection, as Web's `vision_catalog` reaches `ModelCardPicker`. */
 private fun visionModelGroupsFor(state: InkuUiState): List<VisionModelGroup> =
+    remembered(visionModelGroupsMemo, modelListInputs(state)) { buildVisionModelGroups(state) }
+
+private fun buildVisionModelGroups(state: InkuUiState): List<VisionModelGroup> =
     visionModelChoicesFor(state).groupBy { providerOfModelId(it.id, state) }.map { (provider, choices) ->
         VisionModelGroup(provider, choices.first().providerName, choices.map {
             VisionModelOption(it.id, it.label, catalogModelFor(state, provider, it.id), servedPurposes(state, provider, it.id))
@@ -8316,7 +8421,9 @@ private fun Modifier.historySwipeNavigation(
     onSwipeLeft: () -> Unit,
 ): Modifier {
     if (!enabled) return this
-    return pointerInput(gestureKey, enabled) {
+    // The rotation is a key: in presentation the screen stays portrait and only
+    // the device turns, and the gesture must read movement in the new rotation.
+    return pointerInput(gestureKey, deviceRotation) {
         awaitPointerEventScope {
             while (true) {
                 var pressed = emptyList<PointerInputChange>()

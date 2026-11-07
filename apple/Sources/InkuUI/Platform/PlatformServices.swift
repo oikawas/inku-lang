@@ -97,6 +97,15 @@ enum InkuFileViewer {
     }
 }
 
+/// The data folder's name under Application Support (`InkuDatabase.applicationSupportURL`), one per application.
+enum InkuPlatform {
+    #if os(macOS)
+    static let hostIdentifier = "app.inku.macos"
+    #else
+    static let hostIdentifier = "app.inku.ios"
+    #endif
+}
+
 /// The system alert sound where a save or a viewer file fails.
 @MainActor
 enum InkuFeedback {

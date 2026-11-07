@@ -456,7 +456,7 @@ public final class AppModel {
         guard !initialized else { return }
         initialized = true
         do {
-            let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: "app.inku.macos")
+            let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: InkuPlatform.hostIdentifier)
             // Opening validates the existing database before allowing writes and can
             // take significant time. Keep that blocking work off the UI executor.
             let openDatabase = self.openDatabase

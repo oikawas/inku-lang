@@ -221,9 +221,7 @@ struct BatchPanelView: View {
                     }
                 }
             }.frame(width: 390, height: min(CGFloat(automation.batchPromptHistory.count) * 32 + 8, (windowSize?.height ?? 880) * 0.5))
-                #if os(macOS)
-                .onExitCommand { historyOpen = false }
-                #endif
+                .inkuOnEscape { historyOpen = false }
         }
     }
 

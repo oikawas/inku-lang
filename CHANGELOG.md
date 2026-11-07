@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: The minimum supported version is now macOS 15; the app cannot be installed on macOS 14. Shared packages require iOS 18. Image previews, copying, window operations and view modifiers use shared entry points, with the same appearance and behavior.
+
 - macOS: the third-party notices under About inku add libm and the 11 font crates used for PNG text (fontdb, harfrust, skrifa and others), and show kurbo and svgtypes as copies in core/vendor. The Web reference the app copies follows Build 1405 (DDL engine 78, render engine 101).
 
 - Core (render engine 101): compute the transcendental functions (sin, cos, tan, asin, atan2, hypot, powf, cbrt, exp, ln, tanh) with the pure-Rust libm (`inku_score::math`) instead of the host's C library, and vendor the kurbo and svgtypes the Compat clip uses so they do the same. Their last bits differed between macOS and the Linux of 5173, and the Compat SVG of works placed by relation differed slightly between hosts (I-733). Of 5173's 20,097 drawings, 249 (about 84 works) change their SVG: in some, where the gap in one mark's stroke falls; in others, the placement of free lines. Compilation changes the last bits of arc angles in 78 of 7,119 works, so the DDL engine becomes 78.

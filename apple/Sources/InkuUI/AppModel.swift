@@ -8,9 +8,6 @@ import InkuPersistence
 import InkuExport
 import Observation
 import UniformTypeIdentifiers
-#if os(macOS)
-import AppKit
-#endif
 
 /// Availability of the author-facing prompt journal, independent of whether a provider was called.
 public enum PromptAvailability: Sendable, Equatable {
@@ -2399,7 +2396,7 @@ public final class AppModel {
     }
 
     public func copyImage(work target: SavedWork? = nil) async {
-        #if os(macOS)
+        guard InkuPasteboard.supportsImages else { return }
         guard !isBusy, let work = target ?? displayedWork, !work.svg.isEmpty else { return }
         let executionID = currentExecutionID
         let height = min(4096, max(256, display.preferences.clipboardHeight))
@@ -2410,11 +2407,10 @@ public final class AppModel {
             let options = self.display.preferences.clipboardExportOptions(height: height)
             let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
             try Task.checkCancellation()
-            guard let data = artifacts.first?.data, let nativeImage = NSImage(data: data) else {
+            guard let data = artifacts.first?.data else {
                 throw HostError("clipboard_image_unavailable")
             }
-            NSPasteboard.general.clearContents()
-            guard NSPasteboard.general.writeObjects([nativeImage]) else { throw HostError("clipboard_write_failed") }
+            try InkuPasteboard.copy(image: data)
             self.status = "画像をコピーしました（Y軸 \(height)px）"
         }
         let key = copied ? "canvasCopiedToClipboard" : "clipboardCopyFailed"
@@ -2423,7 +2419,6 @@ public final class AppModel {
             try? await Task.sleep(for: .milliseconds(copied ? 2500 : 8000))
             if self?.clipboardMessageKey == key { self?.clipboardMessageKey = nil }
         }
-        #endif
     }
 
     private func reloadWorks() async throws {

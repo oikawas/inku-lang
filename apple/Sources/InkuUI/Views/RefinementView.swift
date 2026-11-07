@@ -33,7 +33,7 @@ public struct RefinementView: View {
                 Picker(model.display.localized("配置を変える"), selection: $refinement.recomposeMode) {
                     Text(model.display.localized("原理に沿う")).tag(Recomposition.Mode.principled)
                     Text(model.display.localized("偶然に委ねる")).tag(Recomposition.Mode.chance)
-                }.pickerStyle(.radioGroup).labelsHidden().disabled(controlsDisabled)
+                }.inkuChoicePickerStyle().labelsHidden().disabled(controlsDisabled)
                 HStack(spacing: 8) { generateButton(count: 1); generateButton(count: 4) }
                 Label(model.display.localized("高速（補完の穴があるときだけLLM）"), systemImage: "clock")
                     .inkuFont(11).foregroundStyle(.secondary)

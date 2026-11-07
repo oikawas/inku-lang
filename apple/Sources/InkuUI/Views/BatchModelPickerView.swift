@@ -111,11 +111,7 @@ struct BatchModelPickerView: View {
                     .disabled(!canConfirm)
             }.padding(.horizontal, 18).padding(.vertical, 14)
         }
-        #if os(macOS)
-        .frame(width: groups.isEmpty ? 440 : 800)
-        #else
-        .frame(maxWidth: 800)
-        #endif
+        .inkuDialogFrame(width: groups.isEmpty ? 440 : 800, iOSMaxWidth: 800)
         .overlayPreferenceValue(BatchModelCardBounds.self) { anchors in
             GeometryReader { geometry in
                 if let reference = inspectedReference, let anchor = anchors[reference],

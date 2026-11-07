@@ -1,26 +1,21 @@
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 @MainActor
 struct ColorCatalogView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.inkuWindowSize) private var windowSize
     @State private var draftCatalogID: String
     @State private var draftMode: String
-    #if os(macOS)
-    private let sheetSize: CGSize
-    #endif
+    private var sheetSize: CGSize {
+        let available = windowSize ?? CGSize(width: 1212, height: 868)
+        return CGSize(width: min(1180, max(640, available.width - 32)), height: min(820, max(440, available.height - 48)))
+    }
 
     init(model: AppModel) {
         self.model = model
         _draftCatalogID = State(initialValue: model.catalogID)
         _draftMode = State(initialValue: model.catalogMode == "auto" ? "auto" : "fixed")
-        #if os(macOS)
-        let available = NSApp.keyWindow?.contentView?.bounds.size ?? CGSize(width: 1212, height: 868)
-        sheetSize = CGSize(width: min(1180, max(640, available.width - 32)), height: min(820, max(440, available.height - 48)))
-        #endif
     }
 
     private var allowsDescriptionAuto: Bool { true }
@@ -59,9 +54,7 @@ struct ColorCatalogView: View {
                 .padding(.horizontal, 18).padding(.vertical, 12).background(.bar)
         }
         .background(.background)
-        #if os(macOS)
-        .frame(width: sheetSize.width, height: sheetSize.height)
-        #endif
+        .inkuDialogFrame(width: sheetSize.width, height: sheetSize.height)
     }
 
     private func confirm() {

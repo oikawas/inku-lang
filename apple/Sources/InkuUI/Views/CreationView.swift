@@ -69,8 +69,8 @@ struct CreationView: View {
     @State private var showImageModelPicker = false
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
+    @State private var imagePreview: CGImage?
     #if os(macOS)
-    @State private var imagePreview: NSImage?
     @State private var savedImageRecord: ExactJSON?
     #endif
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
@@ -202,8 +202,8 @@ struct CreationView: View {
             }
         }
         .onDisappear { batchWorkspace.invalidateReads() }
+        .onChange(of: model.imageInput?.jpeg, initial: true) { _, data in imagePreview = data.flatMap(PlatformImage.load(data:)) }
         #if os(macOS)
-        .onChange(of: model.imageInput?.jpeg, initial: true) { _, data in imagePreview = data.flatMap(NSImage.init(data:)) }
         .onChange(of: model.savedImageDDL, initial: true) { _, data in savedImageRecord = data.flatMap { try? ExactJSON(data: $0) } }
         #endif
         .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
@@ -414,7 +414,7 @@ struct CreationView: View {
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }
             if model.imageInput != nil, let preview = imagePreview {
-                Image(nsImage: preview).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 220)
+                Image(decorative: preview, scale: 1).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 220)
                 Text(model.imageFileName).inkuFont(12).foregroundStyle(.secondary)
             }
             if let record = savedImageRecord {

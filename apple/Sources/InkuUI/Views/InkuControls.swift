@@ -1,24 +1,4 @@
 import SwiftUI
-#if os(macOS)
-import AppKit
-#elseif os(iOS)
-import UIKit
-#endif
-
-/// Web color tokens (`+page.svelte` :root) mapped onto the system palette, so both themes keep the native contrast.
-enum InkuColor {
-    #if os(macOS)
-    static let bg = Color(nsColor: .windowBackgroundColor)
-    static let panel = Color(nsColor: .controlBackgroundColor)
-    #else
-    static let bg = Color(uiColor: .systemGroupedBackground)
-    static let panel = Color(uiColor: .secondarySystemGroupedBackground)
-    #endif
-    static let bg2 = Color.primary.opacity(0.045)
-    static let border = Color.primary.opacity(0.12)
-    static let border2 = Color.primary.opacity(0.2)
-    static let floating = panel.opacity(0.92)
-}
 
 extension DisplaySettings {
     /// Web label copy with a native fallback. Unlike `tooltip`, it stays visible when tooltips are off.

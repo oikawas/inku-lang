@@ -58,12 +58,10 @@ extension WorkspaceUIState {
 
     func enterCanvasFullScreen() {
         guard !canvasFullScreen else { return }
-        #if os(macOS)
-        let window = NSApp.keyWindow
+        let window = InkuWindow.key
         canvasFullScreenWindow = window
-        canvasFullScreenKeepsWindow = window?.styleMask.contains(.fullScreen) == true
-        if !canvasFullScreenKeepsWindow { window?.toggleFullScreen(nil) }
-        #endif
+        canvasFullScreenKeepsWindow = window?.isFullScreen == true
+        if !canvasFullScreenKeepsWindow { window?.toggleFullScreen() }
         canvasFullScreen = true
     }
 
@@ -71,12 +69,10 @@ extension WorkspaceUIState {
     func exitCanvasFullScreen() {
         guard canvasFullScreen else { return }
         canvasFullScreen = false
-        #if os(macOS)
-        if !canvasFullScreenKeepsWindow, let window = canvasFullScreenWindow, window.styleMask.contains(.fullScreen) {
-            window.toggleFullScreen(nil)
+        if !canvasFullScreenKeepsWindow, let window = canvasFullScreenWindow, window.isFullScreen {
+            window.toggleFullScreen()
         }
         canvasFullScreenWindow = nil
-        #endif
     }
 }
 

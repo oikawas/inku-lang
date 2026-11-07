@@ -68,11 +68,7 @@ struct CreationPaperPicker: View {
                 }.padding(6)
             }.frame(maxHeight: 520)
         }
-        #if os(macOS)
-        .frame(width: 390)
-        #else
-        .frame(maxWidth: 390)
-        #endif
+        .inkuDialogFrame(width: 390, iOSMaxWidth: 390)
     }
 
     private func tip(_ key: String) -> String {

@@ -26,11 +26,7 @@ public struct ToolChangeView: View {
                     Text(model.display.localized("すべての文を同じ筆記具にする")).tag(ToolChangeMode.uniform)
                     Text(model.display.localized("文ごとに違う筆記具にする")).tag(ToolChangeMode.perSentence)
                 }
-                #if os(macOS)
-                .pickerStyle(.radioGroup)
-                #else
-                .pickerStyle(.segmented)
-                #endif
+                .inkuChoicePickerStyle(segmentedOnIOS: true)
                 .disabled(change.running || model.isBusy)
                 Button(model.display.localized("4案を作る"), systemImage: "play.fill") { Task {
                     let before = change.committedWorks.count

@@ -1,9 +1,6 @@
 import InkuHost
 import InkuPersistence
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 @MainActor
 struct CreationWorkInfoView: View {
@@ -385,12 +382,7 @@ struct CreationWorkInfoView: View {
 
     private func copyButton(_ text: String, id: String) -> some View {
         Button {
-            #if os(macOS)
-            NSPasteboard.general.clearContents()
-            guard NSPasteboard.general.setString(text, forType: .string) else { return }
-            #else
-            return
-            #endif
+            guard InkuPasteboard.copy(text: text, includingIOS: false) else { return }
             let token = UUID()
             copyToken = token
             copied = id

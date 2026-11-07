@@ -51,7 +51,7 @@ struct SavedWorkExportMenu: View {
             if symbolOnly { Image(systemName: "square.and.arrow.down") }
             else { Text(title ?? model.display.localized("書き出す")) }
         }
-        .menuStyle(.borderlessButton).fixedSize()
+        .inkuBorderlessMenu(includingIOS: true).fixedSize()
         .accessibilityLabel(title ?? model.display.localized("書き出す"))
         .disabled(count == 0)
     }

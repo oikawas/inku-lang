@@ -154,7 +154,7 @@ struct ChatGPTModelsSheet: View {
                     }
                 }
             }
-            .toggleStyle(.checkbox)
+            .inkuCheckboxStyle()
             .disabled(!item.isSelectable && !selected.contains(item.id))
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) {

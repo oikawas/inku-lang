@@ -38,11 +38,9 @@ public struct WorkEditView: View {
             Divider()
             footer.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
         }
-        #if os(macOS)
-        .frame(minWidth: 560, idealWidth: 780,
+        .inkuDialogFrame(minWidth: 560, idealWidth: 780,
                minHeight: editor.mode == .description ? 380 : 260,
                idealHeight: editor.mode == .description ? 450 : 360)
-        #endif
         .task { await editor.initialize(app: model) }
         .interactiveDismissDisabled(editor.running || model.isBusy)
         .onDisappear { Task { await editor.stop(app: model) } }

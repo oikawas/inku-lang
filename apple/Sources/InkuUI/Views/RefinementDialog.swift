@@ -51,9 +51,7 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                 }
             }
         }.background(InkuColor.panel)
-        #if os(macOS)
-        .frame(minWidth: 700, idealWidth: 1200, minHeight: 520, idealHeight: 780)
-        #endif
+        .inkuDialogFrame(minWidth: 700, idealWidth: 1200, minHeight: 520, idealHeight: 780)
     }
 }
 

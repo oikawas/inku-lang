@@ -279,11 +279,7 @@ public enum LibraryGridPaging {
 enum LibraryChrome {
     static let border = Color.secondary.opacity(0.28)
     static var panel2: Color {
-        #if os(macOS)
-        Color(nsColor: .windowBackgroundColor)
-        #else
-        Color(uiColor: .secondarySystemBackground)
-        #endif
+        InkuColor.libraryBackground
     }
 }
 

@@ -44,9 +44,7 @@ public struct ReplayComparisonView: View {
             Divider()
             footer.padding(20).background(.bar)
         }
-        #if os(macOS)
-        .frame(minWidth: 520, idealWidth: 1000, minHeight: 600, idealHeight: 760)
-        #endif
+        .inkuDialogFrame(minWidth: 520, idealWidth: 1000, minHeight: 600, idealHeight: 760)
         .task { await comparison.compare(app: model) }
         .interactiveDismissDisabled(comparison.running || closing)
         .onDisappear { Task { await comparison.close(app: model) } }

@@ -5,11 +5,6 @@ import InkuHost
 import InkuPersistence
 import Observation
 import UniformTypeIdentifiers
-#if os(macOS)
-import AppKit
-#elseif os(iOS)
-import UIKit
-#endif
 
 public enum AuxiliaryMode: String, CaseIterable, Sendable { case advice, colophon }
 
@@ -238,11 +233,7 @@ public final class AuxiliaryModel {
     }
 
     public func copyDraft() {
-        #if os(macOS)
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(draftText, forType: .string)
-        #elseif os(iOS)
-        UIPasteboard.general.string = draftText
-        #endif
+        InkuPasteboard.copy(text: draftText)
         status = "草稿をコピーしました。"
     }
 

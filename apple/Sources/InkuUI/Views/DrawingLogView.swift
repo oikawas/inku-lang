@@ -71,9 +71,7 @@ struct DrawingLogView: View {
             Text(model.display.localized("直近100件の実行記録です。開いても描画や再送信は行いません。"))
                 .inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12)
         }
-        #if os(macOS)
-        .frame(minWidth: 760, idealWidth: 1040, minHeight: 480, idealHeight: 700)
-        #endif
+        .inkuDialogFrame(minWidth: 760, idealWidth: 1040, minHeight: 480, idealHeight: 700)
         .task { await load() }
     }
 

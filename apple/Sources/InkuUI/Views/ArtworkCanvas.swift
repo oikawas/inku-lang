@@ -500,11 +500,7 @@ private struct VerticalCaption: View {
                     CGPath(rect: CGRect(origin: .zero, size: size), transform: nil),
                     [kCTFrameProgressionAttributeName: CTFrameProgression.rightToLeft.rawValue] as CFDictionary)
                 cg.saveGState()
-                #if os(macOS)
-                cg.setFillColor(color.map { NSColor($0).cgColor } ?? NSColor.labelColor.cgColor)
-                #elseif os(iOS)
-                cg.setFillColor(color.map { UIColor($0).cgColor } ?? UIColor.label.cgColor)
-                #endif
+                cg.setFillColor((color ?? .primary).resolve(in: context.environment).cgColor)
                 cg.translateBy(x: 0, y: size.height); cg.scaleBy(x: 1, y: -1)
                 CTFrameDraw(frame, cg); cg.restoreGState()
             }

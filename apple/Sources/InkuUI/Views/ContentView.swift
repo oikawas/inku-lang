@@ -118,7 +118,13 @@ public struct ContentView: View {
             if ui.settingsOpen && !presentation { settingsOverlay }
             if presentation { presentationView }
         }
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { windowSize = $0 }
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { windowSize = geometry.size }
+                    .onChange(of: geometry.size) { _, size in windowSize = size }
+            }
+        }
         .environment(\.inkuWindowSize, windowSize)
         #if os(macOS)
         .ddlImportDropTarget(model: model,
@@ -171,11 +177,11 @@ public struct ContentView: View {
         .onChange(of: presentation) { _, _ in batchWorkspace.invalidateReads() }
         // The canvas full screen belongs to the 3D view; leaving 3D leaves it.
         .onChange(of: threeDimensionalShown) { _, shown in if !shown { ui.exitCanvasFullScreen() } }
-        #if os(macOS)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { note in
+        .onReceive(InkuWindow.didExitFullScreen) { note in
             // The window left full screen by itself (its button or the menu); the canvas area does too.
-            if ui.canvasFullScreen, (note.object as? NSWindow) === ui.canvasFullScreenWindow { ui.canvasFullScreen = false }
+            if ui.canvasFullScreen, ui.canvasFullScreenWindow?.matches(note) == true { ui.canvasFullScreen = false }
         }
+        #if os(macOS)
         .background {
             // Esc leaves the canvas full screen wherever the keyboard is (the viewer takes it first otherwise).
             if ui.canvasFullScreen && !ui.libraryOpen && !ui.settingsOpen {
@@ -450,9 +456,7 @@ public struct ContentView: View {
         showCreation(tab: "artwork")
     }
     private func openLibrary() {
-        #if os(macOS)
-        NSApp.keyWindow?.makeFirstResponder(nil)
-        #endif
+        InkuWindow.removeFocus()
         ui.settingsOpen = false
         ui.libraryOpen = true
         // Web `openManager()`: the library opens at the saved work shown in Create; an unsaved candidate is not one,
@@ -463,9 +467,7 @@ public struct ContentView: View {
     private func closeLibrary() { ui.libraryOpen = false }
     /// Web `openSettings()`: with no destination, the tab the author last chose (`settings_tab`), else the first.
     private func openSettings(_ destination: SettingsSection?) {
-        #if os(macOS)
-        NSApp.keyWindow?.makeFirstResponder(nil)
-        #endif
+        InkuWindow.removeFocus()
         ui.settingsSection = destination ?? savedSettingsSection ?? .display
         ui.settingsOpen = true
     }
@@ -812,16 +814,12 @@ public struct ContentView: View {
     }
     private func enterPresentation() {
         guard presentationWork?.svg.isEmpty == false else { return }
-        #if os(macOS)
-        presentationWasFullScreen = NSApp.keyWindow?.styleMask.contains(.fullScreen) == true
-        if !presentationWasFullScreen { NSApp.keyWindow?.toggleFullScreen(nil) }
-        #endif
+        presentationWasFullScreen = InkuWindow.key?.isFullScreen == true
+        if !presentationWasFullScreen { InkuWindow.key?.toggleFullScreen() }
         presentation = true
     }
     private func exitPresentation() {
-        #if os(macOS)
-        if !presentationWasFullScreen, NSApp.keyWindow?.styleMask.contains(.fullScreen) == true { NSApp.keyWindow?.toggleFullScreen(nil) }
-        #endif
+        if !presentationWasFullScreen, InkuWindow.key?.isFullScreen == true { InkuWindow.key?.toggleFullScreen() }
         presentation = false
     }
 }

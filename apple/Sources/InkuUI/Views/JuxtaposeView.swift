@@ -37,9 +37,7 @@ public struct JuxtaposeView: View {
             Divider()
             footer.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
         }
-        #if os(macOS)
-        .frame(minWidth: 560, idealWidth: 780, minHeight: 380, idealHeight: 560)
-        #endif
+        .inkuDialogFrame(minWidth: 560, idealWidth: 780, minHeight: 380, idealHeight: 560)
         .task { await juxtapose.initialize(app: model) }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: juxtapose.modelReference, immediateSelection: true,

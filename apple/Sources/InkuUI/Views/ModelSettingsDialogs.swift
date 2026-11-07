@@ -383,11 +383,7 @@ struct ProviderModelsSheet: View {
             get: { draft.isEnabled(modelID: item.id) },
             set: { draft.setEnabled(modelID: item.id, enabled: $0) }))
             .labelsHidden().disabled(!item.isPublishable)
-        #if os(macOS)
-        toggle.toggleStyle(.checkbox)
-        #else
-        toggle.toggleStyle(.switch).fixedSize()
-        #endif
+        toggle.inkuCheckboxStyle(switchOnIOS: true)
     }
 
     /// A purpose measured without a response can be pressed, framed in red as not recommended (the author, 2026-10-26).

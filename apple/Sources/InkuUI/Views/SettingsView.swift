@@ -361,9 +361,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(model.display.webCopy("settingsCaptionPositionLeft", "左（既定）")).tag("left")
                 Text(model.display.webCopy("settingsCaptionPositionRight", "右")).tag("right")
             }.labelsHidden()
-            #if os(macOS)
-            .pickerStyle(.radioGroup)
-            #endif
+            .inkuChoicePickerStyle()
         }
     }
 
@@ -381,9 +379,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     }.tag(mode.0)
                 }
             }.labelsHidden()
-            #if os(macOS)
-            .pickerStyle(.radioGroup)
-            #endif
+            .inkuChoicePickerStyle()
             if model.display.preferences.uiMode == "custom" {
                 customVisibilitySettings
                 Button(model.display.webCopy("uiModeResetSimple", "シンプルに戻す")) { model.display.preferences.uiMode = "simple" }
@@ -407,9 +403,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     if enabled { next.insert(feature.0) } else { next.remove(feature.0) }
                     model.display.preferences.customFeatures = next
                 }))
-                #if os(macOS)
-                .toggleStyle(.checkbox)
-                #endif
+                .inkuCheckboxStyle()
             }
         }
     }
@@ -423,9 +417,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                      ("engine", "historyStripFieldEngineVersion", "engineバージョン"), ("size", "historyStripFieldBytes", "ファイル容量")], id: \.0) { field in
                 Toggle(model.display.webCopy(field.1, field.2), isOn: membership(field.0, in: $display.preferences.historyFields, maximum: 3))
                     .disabled(!model.display.preferences.historyFields.contains(field.0) && model.display.preferences.historyFields.count >= 3)
-                    #if os(macOS)
-                    .toggleStyle(.checkbox)
-                    #endif
+                    .inkuCheckboxStyle()
             }
         }
     }
@@ -436,9 +428,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             Text(model.display.webCopy("generationInfoFollowDescription", "生成情報を開いたまま履歴帯で別の作品を選ぶと、その作品の生成情報に切り替わります。オフにすると、これまでどおり閉じます。"))
                 .inkuFont(13).foregroundStyle(.secondary)
             Toggle(model.display.webCopy("generationInfoFollowToggle", "履歴帯で作品を選んでも生成情報を開いたままにする"), isOn: $display.preferences.keepGenerationInfo)
-                #if os(macOS)
-                .toggleStyle(.checkbox)
-                #endif
+                .inkuCheckboxStyle()
         }
     }
 
@@ -449,9 +439,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(model.display.webCopy("settingsMascotIncu", "Incu（立方体）")).tag("incu")
                 Text(model.display.webCopy("settingsMascotYuragi", "Yuragi（蟹）")).tag("yuragi")
             }.labelsHidden()
-            #if os(macOS)
-            .pickerStyle(.radioGroup)
-            #endif
+            .inkuChoicePickerStyle()
         }
     }
 
@@ -666,9 +654,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(display.webCopy("clipboardFormatImage", "画像だけ")).tag("image")
                 Text(display.webCopy("clipboardFormatCard", "カード形式")).tag("card")
             }.labelsHidden()
-            #if os(macOS)
-            .pickerStyle(.radioGroup)
-            #endif
+            .inkuChoicePickerStyle()
             if display.preferences.clipboardFormat == "card" {
                 Text(display.webCopy("clipboardFormatCardNote", "カードの形と印は、「エクスポート」の共有カードの設定を使います。カード形式は保存した作品だけコピーできます。"))
                     .inkuFont(13).foregroundStyle(.secondary)

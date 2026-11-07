@@ -3,8 +3,6 @@ import InkuHost
 #if os(macOS)
 import AppKit
 import UniformTypeIdentifiers
-#else
-import UIKit
 #endif
 
 @MainActor
@@ -14,7 +12,7 @@ struct PluginSettingsView: View {
     @State private var confirmingDelete: String?
     #if os(macOS)
     @State private var checkPreviewData: [Int: Data] = [:]
-    @State private var checkPreviewImages: [Int: NSImage] = [:]
+    @State private var checkPreviewImages: [Int: CGImage] = [:]
     #endif
 
     var body: some View {
@@ -146,7 +144,7 @@ struct PluginSettingsView: View {
             ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                 HStack(alignment: .top, spacing: 8) {
                     if let image = checkPreviewImages[index] {
-                        Image(nsImage: image).resizable().scaledToFit().frame(width: 108, height: 46)
+                        Image(decorative: image, scale: 1).resizable().scaledToFit().frame(width: 108, height: 46)
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         let jaNames = (word["names"]["ja"].array ?? []).compactMap(\.string)
@@ -178,11 +176,11 @@ struct PluginSettingsView: View {
         }.padding(10).background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 6))
             .task(id: check.previewKeys + [check.pictures.text]) {
                 var data: [Int: Data] = [:]
-                var images: [Int: NSImage] = [:]
+                var images: [Int: CGImage] = [:]
                 for index in words.indices {
                     if let value = check.preview(at: index) {
                         data[index] = value
-                        images[index] = NSImage(data: value)
+                        images[index] = PlatformImage.load(data: value)
                     }
                 }
                 checkPreviewData = data; checkPreviewImages = images
@@ -196,28 +194,16 @@ private struct PluginCachedImage: View {
     let data: Data?
     let url: URL?
     private struct Key: Equatable { let data: Data?; let url: URL? }
-    #if os(macOS)
-    @State private var image: NSImage?
-    #else
-    @State private var image: UIImage?
-    #endif
+    @State private var image: CGImage?
 
     var body: some View {
         Group {
             if let image {
-                #if os(macOS)
-                Image(nsImage: image).resizable().scaledToFit()
-                #else
-                Image(uiImage: image).resizable().scaledToFit()
-                #endif
+                Image(decorative: image, scale: 1).resizable().scaledToFit()
             } else { Image(systemName: "leaf").foregroundStyle(.secondary) }
         }.task(id: Key(data: data, url: url)) {
             let bytes = data ?? url.flatMap { try? Data(contentsOf: $0) }
-            #if os(macOS)
-            image = bytes.flatMap(NSImage.init(data:))
-            #else
-            image = bytes.flatMap(UIImage.init(data:))
-            #endif
+            image = bytes.flatMap(PlatformImage.load(data:))
         }
     }
 }

@@ -112,7 +112,7 @@ struct LibraryPreviewPanel: View {
             Button(display.webCopy("savedWorkExportDdl", "DDL（プラグイン定義付き）")) { onWorkAction(work, "export-format:ddl") }
             Button(display.webCopy("savedWorkExportLayerAnimation", "行ごとのアニメーション")) { onWorkAction(work, "export-line-animation") }
         } label: { menuLabel(display.localized("書き出す")) }
-        .menuStyle(.borderlessButton).fixedSize().disabled(disabled || writingLocked)
+        .inkuBorderlessMenu(includingIOS: true).fixedSize().disabled(disabled || writingLocked)
     }
 
     private func menuLabel(_ title: String) -> some View {

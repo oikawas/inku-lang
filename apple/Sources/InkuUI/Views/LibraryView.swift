@@ -79,9 +79,7 @@ struct LibraryView: View {
         .task(id: visibleIDs) { await model.loadWorkActionStates(workIDs: visibleIDs) }
         .onAppear { applyGroupedPageSize() }
         .onChange(of: library.isGrouped) { _, _ in applyGroupedPageSize() }
-        #if os(macOS)
-        .onExitCommand { onClose?() }
-        #endif
+        .inkuOnEscape { onClose?() }
         .alert(item: $deletion) { request in
           if request.movesToTrash {
             return Alert(title: Text(display.localizedFormat("%ld件をごみ箱に移動しますか？", request.ids.count)),
@@ -243,7 +241,7 @@ struct LibraryView: View {
                 Button(display.localized("ごみ箱を空にする"), role: .destructive) { deletion = LibraryDeletion(ids: [], empty: true) }
                     .disabled(library.trashTotal == 0)
             } label: { Image(systemName: "ellipsis") }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .inkuBorderlessMenu(hideIndicator: true, includingIOS: true).fixedSize()
                 .accessibilityLabel(display.localized("ごみ箱の操作"))
                 .disabled(writingDisabled)
         } else {
@@ -530,7 +528,7 @@ struct LibraryView: View {
                             .disabled(library.mutating || writingDisabled)
                     }
                     Menu { workMenu(row.work) } label: { Image(systemName: "ellipsis") }
-                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                        .inkuBorderlessMenu(hideIndicator: true, includingIOS: true).fixedSize()
                         .inkuTooltip(tip("作品の操作"))
                 }
             }.width(min: 110, ideal: 120)
@@ -715,9 +713,7 @@ struct LibraryView: View {
                 LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
                 Spacer(minLength: 0)
                 Menu { workMenu(work) } label: { Image(systemName: "ellipsis") }
-                    #if os(macOS)
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                    #endif
+                    .inkuBorderlessMenu(hideIndicator: true)
                     .fixedSize().accessibilityLabel(display.localized("作品の操作"))
             }
             .inkuFont(12).buttonStyle(.borderless)
@@ -743,9 +739,7 @@ struct LibraryView: View {
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
             Menu { workMenu(work) } label: { Image(systemName: "ellipsis") }
-                #if os(macOS)
-                .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                #endif
+                .inkuBorderlessMenu(hideIndicator: true)
                 .fixedSize().accessibilityLabel(display.localized("作品の操作"))
         }
         .inkuFont(12)
@@ -1417,9 +1411,7 @@ private struct LibraryGridCard: View, Equatable {
             }
             Spacer(minLength: 0)
             Menu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: actions.menu) } label: { Image(systemName: "ellipsis") }
-                #if os(macOS)
-                .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                #endif
+                .inkuBorderlessMenu(hideIndicator: true)
                 .fixedSize().accessibilityLabel(strings.operations)
                 .inkuTooltip(strings.operationsTip)
         }

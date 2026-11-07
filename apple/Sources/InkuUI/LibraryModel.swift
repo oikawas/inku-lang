@@ -1,11 +1,6 @@
 import Foundation
 import InkuPersistence
 import Observation
-#if os(macOS)
-import AppKit
-#elseif os(iOS)
-import UIKit
-#endif
 
 public enum LibraryLayout: String, CaseIterable, Sendable {
     case grid, list
@@ -924,12 +919,7 @@ public final class LibraryModel {
 
     public func copyHash(_ hash: String?) {
         guard let hash, !hash.isEmpty else { return }
-        #if os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(SavedWorkFacts.hashDigest(hash), forType: .string)
-        #elseif os(iOS)
-        UIPasteboard.general.string = SavedWorkFacts.hashDigest(hash)
-        #endif
+        InkuPasteboard.copy(text: SavedWorkFacts.hashDigest(hash))
         status = "ハッシュをコピーしました"
         copiedHash = hash
         Task { @MainActor [weak self] in

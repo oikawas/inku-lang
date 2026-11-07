@@ -49,9 +49,7 @@ struct DdlEditorDialogLayout<Footer: View>: View {
         }
         .background(InkuColor.panel)
         .canvasFitConfirmation(model: model, presentation: .editor)
-        #if os(macOS)
-        .frame(minWidth: 620, idealWidth: 1360, minHeight: 480, idealHeight: 940)
-        #endif
+        .inkuDialogFrame(minWidth: 620, idealWidth: 1360, minHeight: 480, idealHeight: 940)
     }
 
     private var editor: some View {

@@ -1,8 +1,5 @@
 import CoreGraphics
 import Observation
-#if os(macOS)
-import AppKit
-#endif
 
 /// The workspace canvas's zoom and pan, kept while its view is rebuilt (Web `canvasViewport` lives on the page).
 /// `svgKey` names the picture it belongs to; another picture starts fitted.
@@ -29,10 +26,8 @@ final class WorkspaceUIState {
     var canvasFullScreen = false
     /// The window was full screen before, so leaving the canvas full screen keeps the window's.
     var canvasFullScreenKeepsWindow = false
-    #if os(macOS)
     /// The window the canvas full screen was entered in.
-    @ObservationIgnored weak var canvasFullScreenWindow: NSWindow?
-    #endif
+    @ObservationIgnored var canvasFullScreenWindow: InkuWindow?
     /// HistoryManager `active`: the library covers the whole window.
     var libraryOpen = false
     var settingsOpen = false

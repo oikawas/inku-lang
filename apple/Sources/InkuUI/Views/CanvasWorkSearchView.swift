@@ -25,19 +25,3 @@ struct CanvasWorkSearchView: View {
         .inkuTooltip(display.tooltipValue(display.webCopy("canvasSearchHint", "UUID、記述、描画・記述hashを検索します")))
     }
 }
-
-private struct InkuSearchFieldHeight: ViewModifier {
-    @Environment(\.inkuTextScale) private var scale
-    @ViewBuilder func body(content: Content) -> some View {
-        #if os(macOS)
-        content.frame(height: 26 * max(1, scale))
-        #else
-        content
-        #endif
-    }
-}
-
-extension View {
-    /// One control high: 26 points, taller with a larger text size.
-    func inkuSearchFieldHeight() -> some View { modifier(InkuSearchFieldHeight()) }
-}

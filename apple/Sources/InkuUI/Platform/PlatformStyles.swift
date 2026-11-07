@@ -1,6 +1,20 @@
 import SwiftUI
 
+private struct InkuSearchFieldHeight: ViewModifier {
+    @Environment(\.inkuTextScale) private var scale
+    @ViewBuilder func body(content: Content) -> some View {
+        #if os(macOS)
+        content.frame(height: 26 * max(1, scale))
+        #else
+        content
+        #endif
+    }
+}
+
 extension View {
+    /// One control high: 26 points, taller with a larger text size.
+    func inkuSearchFieldHeight() -> some View { modifier(InkuSearchFieldHeight()) }
+
     @ViewBuilder
     func inkuFocusSection() -> some View {
         #if os(macOS)

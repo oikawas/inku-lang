@@ -287,6 +287,78 @@ def test_progress_groups_retries_and_unreported_sends_by_action():
         assert sum(row[key] or 0 for row in progress["stage_tokens"].values()) == progress["total"][key]
 
 
+@pytest.mark.parametrize("mode", ["step", "restore", "old_wheel", "null"])
+def test_snapshot_reports_are_reused_but_host_progress_and_deadlines_stay_live(mode):
+    class Binding:
+        def __init__(self):
+            self.calls = {"provider_attempt": 0, "run_progress": 0}
+
+        def step(self, snapshot_bytes, _input):
+            sequence = str(int(json.loads(snapshot_bytes)["sequence"]) + 1) if snapshot_bytes else "0"
+            state = {
+                "execution_id": "execution-1", "variation_id": "variation-1", "sequence": sequence,
+                "authority": {"revision": "0"}, "document": None,
+                "phase": {"tag": "awaiting_llm"}, "delivery": None,
+                "action": {"tag": "generate_normalized_ddl", "identity": {"attempt": 1}},
+            }
+            payload = {"result": {"snapshot": state, "rendered": None, "events": []}}
+            if mode != "old_wheel":
+                payload.update(provider_attempt=self.attempt(), run_progress=self.progress(state))
+            return json.dumps({"kind": "output", "payload": payload}).encode()
+
+        def attempt(self):
+            return None if mode == "null" else {"attempt": 1, "delay_ms": "10", "timeout_ms": "1000"}
+
+        def progress(self, state):
+            return None if mode == "null" else {"sequence": state["sequence"]}
+
+        def provider_attempt(self, _state):
+            self.calls["provider_attempt"] += 1
+            return json.dumps({"provider_attempt": self.attempt()}).encode()
+
+        def run_progress(self, state):
+            self.calls["run_progress"] += 1
+            return json.dumps({"run_progress": self.progress(json.loads(state))}).encode()
+
+    binding = Binding()
+    run = CandidateExecution(binding, None, owner_id="fixture", config=_fixture_config(), provider=lambda _: None)
+    run.start_new({"tag": "description", "description": "fixture", "auto_catalog": False})
+    if mode == "restore":
+        snapshot = run.snapshot()
+        run = CandidateExecution(binding, None, owner_id="fixture", config=_fixture_config(), provider=lambda _: None)
+        run.restore(snapshot)
+    first = run.view()
+    expected_calls = 1 if mode in {"restore", "old_wheel"} else 0
+    assert binding.calls == {"provider_attempt": expected_calls, "run_progress": expected_calls}
+    if mode == "null":
+        assert "provider_attempt" not in first and "progress" not in first
+        assert run.view() == first
+    else:
+        assert "deadline_at" not in first["provider_attempt"]
+        run._attempt_began = (run.snapshot()["action"], 2000)
+        run.context["provider_receiving"] = {"bytes": 4096}
+        run.context["provider_sends"] = [{"action": "generate_normalized_ddl", "input_tokens": 7}]
+        run.context["provider_usage"] = {"stage1": {"input_tokens": 7, "output_tokens": 0, "unreported_sends": 0}}
+        second = run.view()
+        assert second["provider_attempt"]["deadline_at"] == 3010
+        assert second["progress"]["received_bytes"] == 4096
+        assert second["progress"]["stage_tokens"]["generate_normalized_ddl"]["input_tokens"] == 7
+        assert second["progress"]["total"]["input_tokens"] == 7
+        assert run.view() == second
+        assert "deadline_at" not in run._snapshot_reports["provider_attempt"]
+        run._attempt_began = None
+        assert "deadline_at" not in run.view()["provider_attempt"]
+    assert binding.calls == {"provider_attempt": expected_calls, "run_progress": expected_calls}
+    run.command({"tag": "cancel"})
+    latest = run.view()
+    if mode != "null":
+        assert latest["progress"]["run_progress"] == {"sequence": "1"}
+    if mode == "old_wheel":
+        assert binding.calls == {"provider_attempt": 2, "run_progress": 2}
+    else:
+        assert binding.calls == {"provider_attempt": expected_calls, "run_progress": expected_calls}
+
+
 def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):
     class FixtureBinding:
         def step(self, snapshot_bytes, _input_bytes):

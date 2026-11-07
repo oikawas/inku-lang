@@ -47,15 +47,20 @@ struct Ddl3DSurface: NSViewRepresentable {
     let registration: Ddl3DInstallation.Registered
     let title: String
     let onEscape: () -> Bool
+    @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
 
     func makeNSView(context: Context) -> Ddl3DWebView {
         let bridge = Ddl3DWebHost(registration: registration, title: title, controller: controller)
         bridge.webView.onEscape = onEscape
+        bridge.fileDialogs = fileDialogs
         controller.mount(page: bridge)
         return bridge.webView
     }
 
-    func updateNSView(_ view: Ddl3DWebView, context: Context) { view.onEscape = onEscape }
+    func updateNSView(_ view: Ddl3DWebView, context: Context) {
+        view.onEscape = onEscape
+        view.bridge?.fileDialogs = fileDialogs
+    }
 
     static func dismantleNSView(_ view: Ddl3DWebView, coordinator: ()) { view.bridge?.close() }
 }

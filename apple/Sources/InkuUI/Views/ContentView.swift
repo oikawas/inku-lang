@@ -103,6 +103,8 @@ public struct ContentView: View {
     @State private var presentationLoadID = UUID()
     @State private var presentationWasFullScreen = false
     @State private var windowSize = CGSize.zero
+    /// The window's file dialogs, which the menu's "open DDL" also asks.
+    @State private var fileDialogs = InkuFileDialogs()
     #if os(macOS)
     @State private var importer = DDLImportController()
     @Environment(\.openWindow) private var openWindow
@@ -182,6 +184,8 @@ public struct ContentView: View {
                 #if os(macOS)
                 .safeAreaInset(edge: .bottom, spacing: 0) { errorNotice }
                 #endif
+                // A sheet's own dialogs: the window's cannot present over it.
+                .inkuFileDialogs()
         }
         #if !os(macOS)
         .alert(model.display.localized("処理できませんでした"), isPresented: Binding(get: { model.errorText != nil }, set: { if !$0 { model.errorText = nil } })) {
@@ -190,6 +194,7 @@ public struct ContentView: View {
         #endif
         .focusedSceneValue(\.inkuCommandContext, commandContext)
         .canvasFitConfirmation(model: model, presentation: .workspace)
+        .inkuFileDialogs(fileDialogs)
     }
 
     /// The first part of `body`: the shell and its overlays, the environment, and the start-up task.
@@ -397,7 +402,7 @@ public struct ContentView: View {
         case .openDDL:
             #if os(macOS)
             showCreation(tab: nil)
-            importer.read(app: model, onImported: openImportedDDL)
+            importer.read(app: model, dialogs: fileDialogs, onImported: openImportedDDL)
             #endif
         case .settings: openSettings(nil)
         case .creation: showCreation(tab: "artwork")

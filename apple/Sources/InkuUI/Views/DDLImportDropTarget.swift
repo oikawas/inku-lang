@@ -1,5 +1,4 @@
 import SwiftUI
-#if os(macOS)
 
 @MainActor
 struct DDLImportDropTarget: ViewModifier {
@@ -29,7 +28,7 @@ struct DDLImportDropTarget: ViewModifier {
                 if isTargeted && acceptsDrop { dropHighlight.allowsHitTesting(false) }
             }
             .overlay(alignment: .topTrailing) {
-                if isMounted && importer.isReading { readingStatus.padding(16) }
+                if isMounted && importer.isReading && !importer.isChoosing { readingStatus.padding(16) }
             }
             .onAppear { isMounted = true; contextEnabled = enabled }
             .onChange(of: enabled) { _, value in
@@ -77,4 +76,3 @@ extension View {
         modifier(DDLImportDropTarget(model: model, enabled: enabled, onImported: onImported))
     }
 }
-#endif

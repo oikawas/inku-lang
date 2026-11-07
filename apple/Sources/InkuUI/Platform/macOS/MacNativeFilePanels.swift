@@ -21,14 +21,5 @@ enum NativeFilePanels {
         panel.nameFieldStringValue = "inku-backup.sqlite"
         return panel.runModal() == .OK ? panel.url : nil
     }
-
-    static func restore(language: String = "ja") -> URL? {
-        let panel = NSOpenPanel()
-        panel.title = InkuLocalization.string("復元するバックアップを選択", language: language)
-        panel.allowedContentTypes = [UTType(filenameExtension: "sqlite") ?? .data]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        return panel.runModal() == .OK ? panel.url : nil
-    }
 }
 #endif

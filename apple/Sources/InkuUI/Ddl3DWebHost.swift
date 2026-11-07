@@ -199,6 +199,8 @@ public final class Ddl3DWebHost: NSObject, Ddl3DPage, WKNavigationDelegate, WKUI
 
     /// The checks take the saved file here instead of the panel.
     public var onViewerFile: ((_ name: String, _ data: Data) -> Void)?
+    /// The dialogs of the window or sheet that shows this view (`inkuFileDialogs`).
+    weak var fileDialogs: InkuFileDialogs?
 
     /// host.js `download`: `{type: 'download', mountId, name, mimeType, dataUrl}` for the current mount, or
     /// `download-failed` when the blob could not be read.
@@ -212,6 +214,11 @@ public final class Ddl3DWebHost: NSObject, Ddl3DPage, WKNavigationDelegate, WKUI
         let suggested = (body["name"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
         let name = suggested.isEmpty ? "inku-3d" : suggested
         if let onViewerFile { return onViewerFile(name, data) }
+        // The data is already here, so SwiftUI's exporter writes it; a view outside the dialogs keeps the panel.
+        if let fileDialogs {
+            Task { _ = await fileDialogs.save(data, suggestedName: name) }
+            return
+        }
         InkuSaveDestination.choose(suggestedName: name, attachedTo: webView) { url in
             guard let url else { return }
             do { try data.write(to: url, options: .atomic) } catch { InkuFeedback.beep() }

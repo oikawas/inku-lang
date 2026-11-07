@@ -21,8 +21,6 @@ enum DDLImportErrorText {
         }
     }
 }
-#if os(macOS)
-import AppKit
 import UniformTypeIdentifiers
 
 @MainActor
@@ -30,30 +28,32 @@ import UniformTypeIdentifiers
 final class DDLImportController {
     private(set) var isReading = false
     private(set) var isCancelling = false
+    /// The file dialog is open (`isReading` holds too); the reading status waits for the file.
+    private(set) var isChoosing = false
     private(set) var message = ""
     private(set) var importedDocument: DDLPackageImport?
     @ObservationIgnored private var operation: Task<Void, Never>?
-    @ObservationIgnored private var openPanel: NSOpenPanel?
+    @ObservationIgnored private weak var openDialogs: InkuFileDialogs?
     @ObservationIgnored private var importedSource: String?
     @ObservationIgnored private var importedNames: [String] = []
     @ObservationIgnored private var appliedNames: Set<String> = []
 
-    func read(app model: AppModel, enabled: Bool = true, onImported: (@MainActor () -> Void)? = nil) {
+    /// The file dialog, then the same path as a drop. `isReading` holds from the dialog's opening, as the modal panel did.
+    func read(app model: AppModel, dialogs: InkuFileDialogs, enabled: Bool = true, onImported: (@MainActor () -> Void)? = nil) {
         guard enabled, !isReading, operation == nil, !model.isBusy else { return }
-        let panel = NSOpenPanel()
-        panel.title = model.display.localized("DDLファイルを読み込む")
-        panel.allowedContentTypes = [.json, .plainText, .text]
-        panel.allowsOtherFileTypes = true
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
         clearMessage()
-        openPanel = panel
+        openDialogs = dialogs
         isReading = true
-        let response = panel.runModal()
-        openPanel = nil
-        isReading = false
-        guard response == .OK, let url = panel.url else { return }
-        _ = read(url: url, app: model, enabled: enabled, onImported: onImported)
+        isChoosing = true
+        Task { @MainActor in
+            let url = await dialogs.choose(InkuFileRequest(types: [.json, .plainText, .text],
+                                                           message: model.display.localized("DDLファイルを読み込む")))
+            openDialogs = nil
+            isChoosing = false
+            isReading = false
+            guard let url else { return }
+            _ = read(url: url, app: model, enabled: enabled, onImported: onImported)
+        }
     }
 
     /// Both Finder drops and the file panel enter this bounded, all-or-nothing path.
@@ -106,7 +106,7 @@ final class DDLImportController {
     }
 
     func cancel() {
-        openPanel?.cancel(nil)
+        openDialogs?.cancel()
         guard let operation else { return }
         isCancelling = true
         operation.cancel()
@@ -146,5 +146,3 @@ final class DDLImportController {
         }
     }
 }
-
-#endif

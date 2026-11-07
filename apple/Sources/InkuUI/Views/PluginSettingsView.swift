@@ -10,6 +10,7 @@ struct PluginSettingsView: View {
     @Bindable var model: AppModel
     @State private var settings = PluginSettingsModel()
     @State private var confirmingDelete: String?
+    @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
     #if os(macOS)
     @State private var checkPreviewData: [Int: Data] = [:]
     @State private var checkPreviewImages: [Int: CGImage] = [:]
@@ -121,11 +122,10 @@ struct PluginSettingsView: View {
 
     #if os(macOS)
     private func chooseFile() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json, .zip]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { await settings.choose(url, model: model) }
+        Task {
+            guard let url = await fileDialogs?.choose(InkuFileRequest(types: [.json, .zip])) else { return }
+            await settings.choose(url, model: model)
+        }
     }
 
     private func reportView(_ check: PluginPackageCheck) -> some View {

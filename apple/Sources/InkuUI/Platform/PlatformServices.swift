@@ -41,6 +41,19 @@ enum InkuPasteboard {
     }
 }
 
+/// The default export folder the settings remember as a bookmark (security-scoped on macOS).
+enum InkuFolderBookmark {
+    static func resolve(_ bookmark: Data) throws -> (url: URL, stale: Bool) {
+        var stale = false
+        #if os(macOS)
+        let url = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+        #else
+        let url = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+        #endif
+        return (url, stale)
+    }
+}
+
 /// Finder's "show in folder"; iOS has no file viewer to open.
 @MainActor
 enum InkuFileViewer {

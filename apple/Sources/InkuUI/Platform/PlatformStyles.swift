@@ -1,0 +1,56 @@
+import SwiftUI
+
+extension View {
+    @ViewBuilder
+    func inkuChoicePickerStyle(segmentedOnIOS: Bool = false) -> some View {
+        #if os(macOS)
+        pickerStyle(.radioGroup)
+        #else
+        if segmentedOnIOS { pickerStyle(.segmented) } else { self }
+        #endif
+    }
+
+    @ViewBuilder
+    func inkuCheckboxStyle(switchOnIOS: Bool = false) -> some View {
+        #if os(macOS)
+        toggleStyle(.checkbox)
+        #else
+        if switchOnIOS { toggleStyle(.switch).fixedSize() } else { self }
+        #endif
+    }
+
+    @ViewBuilder
+    func inkuBorderlessMenu(hideIndicator: Bool = false, includingIOS: Bool = false) -> some View {
+        #if os(macOS)
+        if hideIndicator { menuStyle(.borderlessButton).menuIndicator(.hidden) }
+        else { menuStyle(.borderlessButton) }
+        #else
+        if includingIOS {
+            if hideIndicator { menuStyle(.borderlessButton).menuIndicator(.hidden) }
+            else { menuStyle(.borderlessButton) }
+        } else { self }
+        #endif
+    }
+
+    @ViewBuilder
+    func inkuOnEscape(_ action: @escaping () -> Void) -> some View {
+        #if os(macOS)
+        onExitCommand(perform: action)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func inkuDialogFrame(width: CGFloat? = nil, height: CGFloat? = nil,
+                         minWidth: CGFloat? = nil, idealWidth: CGFloat? = nil,
+                         minHeight: CGFloat? = nil, idealHeight: CGFloat? = nil,
+                         iOSMaxWidth: CGFloat? = nil) -> some View {
+        #if os(macOS)
+        if width != nil || height != nil { frame(width: width, height: height) }
+        else { frame(minWidth: minWidth, idealWidth: idealWidth, minHeight: minHeight, idealHeight: idealHeight) }
+        #else
+        if let iOSMaxWidth { frame(maxWidth: iOSMaxWidth) } else { self }
+        #endif
+    }
+}

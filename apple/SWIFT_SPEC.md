@@ -26,7 +26,9 @@ Options and replacements for Change the touches, Change the ground and Change th
 
 The Web tooltip parity table is rebuilt against the 189 sites in today's `web/src` (each `<Tooltip` and `title=` in a `.svelte` file). Its Web line numbers are today's instead of Build 1162's, and its markers point at the components that draw the tooltip (the work preview, the lineage details, the drawing-condition fields below the work). The check counts the Web's tooltips per component and compares them with the table, so it fails when the Web gains or loses one. `apple/scripts/list-web-tooltips.py` lists them (`--compare` compares the counts).
 
-20 sites are excluded. The newly excluded ones are parts macOS does not have (the batch progress tiles, the work menu's composition form, the Score ver. row in About Inku, the "Selected" field below the model choice, and the search fields' clear buttons), the not-recommended model, which macOS states inside the card, and the "no response when measured" tooltip on the ChatGPT model purpose buttons.
+19 sites are excluded. The newly excluded ones are parts macOS does not have (the batch progress tiles, the work menu's composition form, the Score ver. row in About Inku, the "Selected" field below the model choice, and the search fields' clear buttons) and the not-recommended model, which macOS states inside the card. The ChatGPT model purpose buttons gain the Web's "Not selectable: no response when measured" tooltip on a purpose measured without a response.
+
+After a copy, the lineage and library status line no longer says "Hash copied" (as on the Web, only the button's name or its tooltip says "Copied"). While the page number field is being edited, a press outside it leaves the field and goes to the typed page, even when the press falls on a place that takes no focus (the Web's `onblur`); the press still reaches what was pressed. Opening or closing the lineage overview leaves the focus nowhere.
 
 AppCheck `--display-only`'s work switch check (C5) first checks that the given work takes at least 0.5 s for the 4096 px whole and for the zoomed window, and with a lighter work stops, saying it cannot judge.
 

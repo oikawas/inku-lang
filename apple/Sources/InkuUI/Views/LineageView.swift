@@ -143,11 +143,13 @@ struct LineageView: View {
     var body: some View {
         panel(overview: false)
         .sheet(isPresented: Binding(get: { library.lineageBrowsing.overviewOpen }, set: { if !$0 { library.closeLineageOverview() } }), onDismiss: {
-            let action = afterOverview; afterOverview = nil; action?()
+            let action = afterOverview; afterOverview = nil
+            if let action { action() } else { Task { await Self.leaveNoFocus() } }
         }) {
             panel(overview: true)
                 .frame(width: max(640, (windowSize?.width ?? 1000) - 36), height: max(500, (windowSize?.height ?? 760) - 70))
                 .environment(\.inkuWindowSize, windowSize)
+                .task { await Self.leaveNoFocus() }
         }
         .task(id: initialWork?.id) {
             if let work = initialWork {
@@ -319,6 +321,17 @@ struct LineageView: View {
             if overview { library.lineageBrowsing.overviewScroll = position }
             else { library.lineageBrowsing.normalScroll = position }
         }
+    }
+
+    /// Web LineagePanel.svelte:519-530: opening or closing the overview moves no focus, and the button pressed is
+    /// replaced, so nothing has the focus. A sheet gives its first control the focus once it appears, and a closed
+    /// sheet hands it to the next control of the window (Build 81: the first card's checkbox wore the focus ring).
+    /// The focus is taken away on the next turn, and again once the sheet has settled.
+    private static func leaveNoFocus() async {
+        await Task.yield()
+        InkuWindow.removeFocus()
+        try? await Task.sleep(for: .milliseconds(200))
+        InkuWindow.removeFocus()
     }
 
     private func performAfterOverview(_ action: @escaping () -> Void) {

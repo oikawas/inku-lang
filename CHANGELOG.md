@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: Copying a work's hash or ID no longer leaves "Hash copied" in the lineage and library status line (as on the Web, only the button's name or its tooltip changes to "Copied"). After typing in the page number field of the library or the history strip, a press on an empty place outside the field now goes to the typed page. Opening or closing the lineage overview no longer puts a focus ring on the first card's checkbox or another control. On the ChatGPT plan's model purpose buttons, a purpose that cannot be chosen because it gave no response when measured shows the Web's tooltip.
+
 - macOS: The open dialogs (a DDL, an image, an image folder, a plugin, the export folder, the line animation's folder, the default export folder, and a backup to restore) and the 3D view's PNG and GLB saves are now SwiftUI dialogs. They open on the main window or the sheet; they show no title, and the former title or message appears as the line at the dialog's top. The export screen's Share opens from its button. The long third-party notices under About inku are drawn with SwiftUI, and a text selection stays within one paragraph. The library's page number field and the lineage map (keeping its scroll position, and dragging) are SwiftUI too. The save panels the app writes to itself (one work's export and the backup) are unchanged. InkuUI now compiles for the iOS simulator (there is no iPhone or iPad app yet).
 
 - macOS: Grouped Mac-specific view components under Platform. The screen remains unchanged.

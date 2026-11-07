@@ -160,6 +160,16 @@ mod tests {
         assert!(!result["scene"]["marks"].as_array().unwrap().is_empty());
     }
 
+    // Failure: a viewer built from an older core rejects the newest saved works
+    // as invalid_score_or_version (I-734: 0.24 against a 0.23 build).
+    #[test]
+    fn latest_score_edition_is_available_in_3d() {
+        let mut value: Value = serde_json::from_str(SOLIDS).unwrap();
+        value["score"]["version"] = json!(inku_score::ScoreEdition::LATEST.as_str());
+        let result = convert(&value.to_string()).unwrap();
+        assert!(!result["scene"]["marks"].as_array().unwrap().is_empty());
+    }
+
     // Failure: any presence field rejects the whole saved work, even kind:none.
     #[test]
     fn presence_retains_shared_paint_and_all_instruction_marks() {

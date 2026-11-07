@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- 3D view: Rebuilt the viewer with the current core, so works with Score 0.24 (saved since 2026-10-31) open in 3D too. The previous viewer read only up to 0.23 and said the work could not be shown in 3D. Web, macOS and Android use the same viewer.
+
 - macOS: The open dialogs (a DDL, an image, an image folder, a plugin, the export folder, the line animation's folder, the default export folder, and a backup to restore) and the 3D view's PNG and GLB saves are now SwiftUI dialogs. They open on the main window or the sheet; they show no title, and the former title or message appears as the line at the dialog's top. The export screen's Share opens from its button. The long third-party notices under About inku are drawn with SwiftUI, and a text selection stays within one paragraph. The library's page number field and the lineage map (keeping its scroll position, and dragging) are SwiftUI too. The save panels the app writes to itself (one work's export and the backup) are unchanged. InkuUI now compiles for the iOS simulator (there is no iPhone or iPad app yet).
 
 - macOS: Grouped Mac-specific view components under Platform. The screen remains unchanged.

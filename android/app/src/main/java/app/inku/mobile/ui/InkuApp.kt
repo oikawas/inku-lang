@@ -258,7 +258,6 @@ import app.inku.mobile.render.displayWindowInput
 import app.inku.mobile.render.displayedWindowFraction
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.security.MessageDigest
 import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -569,7 +568,8 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
         LocalCompositionRangeTable provides compositionRanges,
         LocalDdlRangePreview provides viewModel::previewDdlRange,
     ) {
-    MaterialTheme(colorScheme = InkuColors, typography = inkuTypography(state.uiTextScale)) {
+    val typography = remember(state.uiTextScale) { inkuTypography(state.uiTextScale) }
+    MaterialTheme(colorScheme = InkuColors, typography = typography) {
         if (state.chatGptPlan.showPlanNotice) {
             AlertDialog(
                 onDismissRequest = {},
@@ -3828,56 +3828,6 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
     }
 }
 
-@Composable
-private fun DemoSettingRow(
-    label: String,
-    value: String? = null,
-    sub: String? = null,
-    checked: Boolean? = null,
-    enabled: Boolean = true,
-    onCheckedChange: ((Boolean) -> Unit)? = null,
-    action: (@Composable () -> Unit)? = null,
-    last: Boolean = false,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (checked != null && onCheckedChange != null && enabled) {
-                    Modifier.clickable { onCheckedChange(!checked) }
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            sub?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        value?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (checked != null && onCheckedChange != null) {
-            Checkbox(checked = checked, onCheckedChange = if (enabled) onCheckedChange else null)
-        }
-        action?.invoke()
-    }
-    if (!last) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = Dimens.spaceL)
-                .height(Dimens.hairline)
-                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
-        )
-    }
-}
-
 internal fun historyGridStarSymbol(starred: Boolean): String = if (starred) "★" else "☆"
 
 @Composable
@@ -6166,25 +6116,6 @@ private val PublishedModelIdCache = object : LinkedHashMap<String, List<String>>
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<String>>?): Boolean = size > 64
 }
 
-private fun connectionKindOptions(): List<Pair<String, String>> {
-    return listOf(
-        "openai_compatible" to "OpenAI compatible",
-        "anthropic" to "Anthropic",
-        "gemini" to "Gemini",
-        "litert-lm" to "LiteRT-LM",
-    )
-}
-
-private fun connectionKindLabel(value: String): String {
-    return when (value) {
-        "openai_compatible", "openai-compatible" -> "OpenAI compatible"
-        "anthropic" -> "Anthropic"
-        "gemini" -> "Gemini"
-        "litert-lm" -> "LiteRT-LM"
-        else -> value.ifBlank { "OpenAI compatible" }
-    }
-}
-
 private fun catalogModelFor(state: InkuUiState, providerId: String, modelId: String): app.inku.mobile.data.CatalogModel {
     val id = app.inku.mobile.data.ModelCatalog.rawId(providerId, modelId)
     val observation = state.modelCatalogObservations[providerId]
@@ -6410,151 +6341,6 @@ private fun SettingsCard(title: String, sub: String, status: String, titleAction
 }
 
 @Composable
-private fun ModelAssetControls(
-    asset: app.inku.mobile.data.db.ModelAssetEntity,
-    onOpenLicenseDownload: () -> Unit,
-) {
-    val isReady = asset.downloadState == "ready"
-    val isBusy = asset.downloadState in setOf("queued", "connecting", "downloading", "verifying")
-    val progressValue = if (asset.bytesTotal != null && asset.bytesTotal > 0L) {
-        (asset.bytesDownloaded.toFloat() / asset.bytesTotal.toFloat()).coerceIn(0f, 1f)
-    } else {
-        null
-    }
-    val progress = if (asset.bytesTotal != null && asset.bytesTotal > 0L) {
-        val percent = (asset.bytesDownloaded * 100.0 / asset.bytesTotal).coerceIn(0.0, 100.0)
-        " ${"%.1f".format(percent)}%"
-    } else {
-        ""
-    }
-    val path = asset.localPath?.substringAfterLast("/") ?: "not stored"
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Dimens.radiusCard),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier
-                .border(Dimens.hairline, CardHairline, RoundedCornerShape(Dimens.radiusCard))
-                .padding(Dimens.spaceL),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-                Box(
-                    modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // The model's size, "E2" of "Gemma 4 E2B".
-                    Text(asset.displayName.substringAfterLast(' ').take(2), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                    Text(asset.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(asset.qualityTier, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                }
-                StatusPill(modelStatusLabel(asset.downloadState), modelStatusColor(asset.downloadState))
-            }
-
-            progressValue?.let {
-                LinearProgressIndicator(
-                    progress = { it },
-                    modifier = Modifier.fillMaxWidth().height(Dimens.spaceXs),
-                    color = if (isReady) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
-                    trackColor = ProgressTrack,
-                )
-            }
-            Text(
-                "${asset.downloadState}$progress · $path",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            PrimarySmallButton(
-                text = when {
-                    isReady -> S.licenseAndDownloaded
-                    isBusy -> S.downloadState
-                    asset.licenseAcceptedAt != null -> S.download
-                    else -> S.licenseAndDownload
-                },
-                onClick = onOpenLicenseDownload,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModelAssetLicenseDownloadDialog(
-    asset: app.inku.mobile.data.db.ModelAssetEntity,
-    onDismiss: () -> Unit,
-    onAccept: () -> Unit,
-    onDownload: () -> Unit,
-    onRedownload: () -> Unit,
-) {
-    val isReady = asset.downloadState == "ready"
-    val isBusy = asset.downloadState in setOf("queued", "connecting", "downloading", "verifying")
-    val progress = if (asset.bytesTotal != null && asset.bytesTotal > 0L) {
-        val percent = (asset.bytesDownloaded * 100.0 / asset.bytesTotal).coerceIn(0.0, 100.0)
-        " ${"%.1f".format(percent)}%"
-    } else {
-        ""
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(S.downloadOf(asset.displayName)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                Text(S.localModelNote)
-                Text(S.qualityTier(asset.qualityTier), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(S.downloadStateOf(modelStatusLabel(asset.downloadState), progress), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    if (asset.licenseAcceptedAt != null) {
-                        S.licenseAccepted
-                    } else {
-                        S.licenseBeforeDownload
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                asset.licenseUrl?.let {
-                    Text("License: $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                TextButton(
-                    onClick = onRedownload,
-                    enabled = asset.licenseAcceptedAt != null && !isBusy,
-                ) {
-                    Text(S.downloadAgain)
-                }
-                TextButton(
-                    onClick = onDownload,
-                    enabled = asset.licenseAcceptedAt != null && !isReady && !isBusy,
-                ) {
-                    Text(
-                        when {
-                            isReady -> S.downloaded
-                            isBusy -> S.downloading
-                            else -> S.download
-                        },
-                    )
-                }
-            }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                TextButton(onClick = onDismiss) { Text(S.close) }
-                TextButton(onClick = onAccept, enabled = asset.licenseAcceptedAt == null) {
-                    Text(if (asset.licenseAcceptedAt != null) S.accepted else S.licenseAccept)
-                }
-            }
-        },
-    )
-}
-
-@Composable
 private fun SettingsSectionHeader(label: String, title: String) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
@@ -6607,50 +6393,6 @@ private fun modelStatusColor(state: String?): Color = when {
 }
 
 @Composable
-private fun HorizontalChoiceRow(
-    values: List<Pair<String, String>>,
-    selectedValue: String,
-    onSelect: (String) -> Unit,
-) {
-    WrapRow {
-        values.forEach { (value, label) ->
-            if (value == selectedValue) {
-                PrimarySmallButton(text = label, onClick = { onSelect(value) })
-            } else {
-                SecondarySmallButton(text = label, onClick = { onSelect(value) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun ColorCatalogButtonRow(selectedValue: String, onSelect: (String) -> Unit) {
-    WrapRow {
-        ColorCatalogs.all.forEach { catalog ->
-            val selected = catalog.id == selectedValue
-            OutlinedButton(
-                onClick = { onSelect(catalog.id) },
-                modifier = Modifier.height(Dimens.buttonHeightLarge).fillMaxWidth(),
-                shape = RoundedCornerShape(Dimens.radiusCard),
-                colors = if (selected) {
-                    ButtonDefaults.outlinedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary,
-                        contentColor = InkOnSecondary,
-                    )
-                } else {
-                    ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                },
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                    SwatchStrip(catalog.swatches.take(4))
-                    Text(catalog.name, maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun SwatchStrip(colors: List<String>) {
     Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         colors.forEach { hex ->
@@ -6682,8 +6424,10 @@ private fun shortModelLabel(state: InkuUiState): String {
     return selectedModelLabel(state).compactLabel(14)
 }
 
+private val CompactLabelSpaces = Regex("\\s+")
+
 private fun String.compactLabel(maxChars: Int): String {
-    val clean = trim().replace(Regex("\\s+"), " ")
+    val clean = trim().replace(CompactLabelSpaces, " ")
     if (clean.length <= maxChars) return clean
     return clean.take(maxChars - 1).trimEnd() + "…"
 }
@@ -7322,11 +7066,6 @@ internal data class SharePayload(
     val chooserTitle: String,
 )
 
-private suspend fun shareHistoryJson(context: Context, item: HistoryItemEntity) {
-    val payload = withContext(Dispatchers.IO) { buildHistoryJsonPayload(context, item) }
-    launchShareIntent(context, payload)
-}
-
 /** `inku-<id>-<time>.inku-ddl.json`, the web's name for a DDL export. */
 private suspend fun shareHistoryDdl(context: Context, item: HistoryItemEntity, json: String) {
     val payload = withContext(Dispatchers.IO) {
@@ -7348,14 +7087,6 @@ private suspend fun shareHistorySvg(context: Context, item: HistoryItemEntity, p
 private suspend fun shareHistoryPng(context: Context, item: HistoryItemEntity, targetHeight: Int) {
     val payload = withContext(Dispatchers.IO) { buildHistoryPngPayload(context, item, targetHeight) }
     launchShareIntent(context, payload)
-}
-
-private fun buildHistoryJsonPayload(context: Context, item: HistoryItemEntity): SharePayload {
-    val exportDir = exportCacheDir(context)
-    val file = File(exportDir, "inku-${item.renderHashShort}.json")
-    file.writeText(historyExportJson(item).toString(2), Charsets.UTF_8)
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    return SharePayload(uri, "application/json", "inku ${item.renderHashShort}", file.name, "Export inku JSON")
 }
 
 private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, profile: String, svg: String): SharePayload {
@@ -7426,32 +7157,6 @@ internal fun launchShareIntent(context: Context, payload: SharePayload) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, payload.chooserTitle))
-}
-
-private fun historyExportJson(item: HistoryItemEntity): JSONObject {
-    return JSONObject().apply {
-        put("schema", "inku.history_item")
-        put("saijiki", "inku.saijiki.v3")
-        put("schema_version", "0.2.0")
-        put("id", item.id)
-        put("created_at", item.createdAt)
-        put("updated_at", item.updatedAt)
-        put("original_input", item.originalInput)
-        DdlSource.putJson(this, item.normalizedDdl, item.ddlSourceOrigin)
-        put("score_json", JSONObject(item.scoreJson))
-        put("display_svg", item.displaySvg)
-        put("stage1_model", item.stage1Model)
-        put("stage2_model", item.stage2Model)
-        put("render_metadata", JSONObject(item.renderMetadataJson))
-        put("render_hash", item.renderHash)
-        put("render_hash_short", item.renderHashShort)
-        put("color_catalog_id", item.colorCatalogId)
-        put("canvas_aspect", item.canvasAspect)
-        put("starred", item.starred)
-        put("trashed", item.trashed)
-        put("elapsed_ms", item.elapsedMs)
-        put("token_metadata", item.tokenMetadataJson?.let { JSONObject(it) })
-    }
 }
 
 private fun filterHistoryItems(history: List<HistoryListItem>, state: InkuUiState): List<HistoryListItem> {
@@ -8379,17 +8084,6 @@ private fun DrawingActionButton(
 }
 
 @Composable
-private fun PrimaryActionButton(text: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = Dimens.buttonHeightLarge),
-        shape = RoundedCornerShape(Dimens.radiusCard),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = InkOnPrimary),
-    ) { Text(text, maxLines = 1) }
-}
-
-@Composable
 private fun SecondaryActionButton(text: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
     OutlinedButton(
         onClick = onClick,
@@ -8771,91 +8465,6 @@ private fun ArtworkThumbnail(
     }
 }
 
-private fun resolvePreviewColor(name: String, colors: Map<String, String>, fallback: Color): Color {
-    val value = colors[name] ?: name.takeIf { it.startsWith("#") } ?: return fallback
-    return runCatching { parseColor(value) }.getOrDefault(fallback)
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPreviewLine(mark: JSONObject, color: Color, strokeWidth: Float, offsetX: Float, offsetY: Float, side: Float) {
-    val from = mark.optJSONArray("from")
-    val to = mark.optJSONArray("to")
-    drawLine(
-        color = color,
-        start = Offset(offsetX + ratio(from?.optDouble(0, 0.1) ?: 0.1) * side, offsetY + ratio(from?.optDouble(1, 0.5) ?: 0.5) * side),
-        end = Offset(offsetX + ratio(to?.optDouble(0, 0.9) ?: 0.9) * side, offsetY + ratio(to?.optDouble(1, 0.5) ?: 0.5) * side),
-        strokeWidth = strokeWidth,
-    )
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPreviewSquare(mark: JSONObject, color: Color, stroke: Stroke, offsetX: Float, offsetY: Float, side: Float) {
-    val position = mark.optJSONArray("position")
-    val markSize = mark.optJSONArray("size")
-    drawRect(
-        color = color,
-        topLeft = Offset(offsetX + ratio(position?.optDouble(0, 0.38) ?: 0.38) * side, offsetY + ratio(position?.optDouble(1, 0.38) ?: 0.38) * side),
-        size = Size(
-            ratio(markSize?.optDouble(0, 0.22) ?: 0.22) * side,
-            ratio(markSize?.optDouble(1, 0.22) ?: 0.22) * side,
-        ),
-        style = stroke,
-    )
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPreviewCircle(mark: JSONObject, color: Color, stroke: Stroke, offsetX: Float, offsetY: Float, side: Float) {
-    val center = mark.optJSONArray("center")
-    drawCircle(
-        color = color,
-        radius = ratio(mark.optDouble("radius", 0.12)) * side,
-        center = Offset(offsetX + ratio(center?.optDouble(0, 0.5) ?: 0.5) * side, offsetY + ratio(center?.optDouble(1, 0.5) ?: 0.5) * side),
-        style = stroke,
-    )
-}
-
-private fun expandPreview(instruction: JSONObject): List<JSONObject> {
-    val arrangement = instruction.optJSONObject("arrangement") ?: return listOf(instruction)
-    val count = arrangement.optInt("count", 1).coerceIn(1, 120)
-    val layout = arrangement.optString("layout", "horizontal")
-    val base = JSONObject(instruction.toString()).also { it.remove("arrangement") }
-    return (0 until count).map { index ->
-        val t = if (count == 1) 0.5 else index.toDouble() / (count - 1).toDouble()
-        val x: Double
-        val y: Double
-        when (layout) {
-            "vertical" -> {
-                x = 0.5
-                y = 0.12 + t * 0.76
-            }
-            "scatter" -> {
-                x = 0.12 + hash01(index, instruction.toString()) * 0.76
-                y = 0.12 + hash01(index + 1000, instruction.toString()) * 0.76
-            }
-            else -> {
-                x = 0.12 + t * 0.76
-                y = 0.5
-            }
-        }
-        shiftPreview(base, x, y)
-    }
-}
-
-private fun shiftPreview(base: JSONObject, x: Double, y: Double): JSONObject {
-    val copy = JSONObject(base.toString())
-    when (copy.optString("primitive", "line")) {
-        "square", "triangle" -> {
-            val markSize = copy.optJSONArray("size")
-            val w = markSize?.optDouble(0, 0.18) ?: 0.18
-            val h = markSize?.optDouble(1, 0.18) ?: 0.18
-            copy.put("position", org.json.JSONArray(listOf(x - w / 2.0, y - h / 2.0)))
-        }
-        "line", "free_line" -> {
-            copy.put("from", org.json.JSONArray(listOf(x - 0.08, y - 0.18)))
-            copy.put("to", org.json.JSONArray(listOf(x + 0.08, y + 0.18)))
-        }
-        else -> copy.put("center", org.json.JSONArray(listOf(x, y)))
-    }
-    return copy
-}
-
 private fun parseColor(value: String): Color {
     return Color(android.graphics.Color.parseColor(value))
 }
@@ -8886,8 +8495,6 @@ private fun firstSvgFillColor(svgText: String): Color? {
     return runCatching { parseColor(fill) }.getOrNull()
 }
 
-private fun ratio(value: Double): Float = value.coerceIn(0.0, 1.0).toFloat()
-
 private fun canvasAspectRatio(id: String): Float {
     return CanvasAspects.ratioFor(id).toFloat().takeIf { it > 0f } ?: 1f
 }
@@ -8917,12 +8524,6 @@ private fun svgIntrinsicWidth(svgText: String): Float? {
         if (width > 0f) return width
     }
     return SvgWidthRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()?.takeIf { it > 0f }
-}
-
-private fun hash01(index: Int, seed: String): Double {
-    val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$index".toByteArray())
-    val raw = ((digest[0].toInt() and 0xff) shl 24) or ((digest[1].toInt() and 0xff) shl 16) or ((digest[2].toInt() and 0xff) shl 8) or (digest[3].toInt() and 0xff)
-    return (raw.toLong() and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
 }
 
 /**

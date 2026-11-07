@@ -557,7 +557,6 @@ class InkuViewModel @JvmOverloads constructor(
         localState.update { it.copy(message = messageFor(error, strings(), strings().operationFailed)) }
     })
     private var authoringReturnState: InkuUiState? = null
-    private var pausedWorkState: InkuUiState? = null
     private val history = repository.history()
     private val modelAssets = repository.modelAssets()
     private val providerSettings = repository.providerSettings()
@@ -651,8 +650,10 @@ class InkuViewModel @JvmOverloads constructor(
             }
         }
         guardedScope.launch {
+            // Also normalizes the provider settings (it calls
+            // ensureDefaultProviderSettings first); calling that again here
+            // repeated the transaction and its reads at every start.
             repository.ensureDefaultModelAssets()
-            repository.ensureDefaultProviderSettings()
             repository.ensureDefaultExportTemplates()
             restorePersistedSettings()
             withContext(Dispatchers.IO) { repository.autonomousRefinement.recover() }
@@ -1859,13 +1860,7 @@ class InkuViewModel @JvmOverloads constructor(
             )
             else -> returnTo
         }
-        val paused = pausedWorkState?.takeIf { it.workContextId == item.id }
-        if (paused != null) {
-            localState.value = current.restoreAuthoring(paused)
-            pausedWorkState = null
-        } else {
-            applyHistorySelection(item, AppTab.Compose)
-        }
+        applyHistorySelection(item, AppTab.Compose)
         localState.value = localState.value.copy(
             workContextId = item.id,
             canvasPresentationMode = false,
@@ -1956,7 +1951,6 @@ class InkuViewModel @JvmOverloads constructor(
         lineageJob?.cancel()
         localState.value = localState.value.restoreAuthoring(source).copy(workActionsTarget = null, workSketchTarget = null)
         authoringReturnState = null
-        pausedWorkState = null
         if (source.tab == AppTab.Lineage) refreshLineage()
     }
 

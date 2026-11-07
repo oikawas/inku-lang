@@ -299,7 +299,9 @@ pub fn line_animation_bytes(input_bytes: &[u8]) -> Vec<u8> {
                 )?,
                 None => output.svg,
             };
-            frames.push(serde_json::json!({"instruction_count": index, "lines": selected, "svg": svg}));
+            frames.push(
+                serde_json::json!({"instruction_count": index, "lines": selected, "svg": svg}),
+            );
         }
         serde_json::to_vec(&serde_json::json!({"frames": frames, "matches_saved_svg": matches_saved, "font_files": input.font_files, "outcome": delivery.outcome, "upstream_diagnostics": delivery.upstream_diagnostics, "downstream_diagnostics": delivery.downstream_diagnostics, "resource_omissions": delivery.resource_omissions, "relation_omissions": delivery.relation_omissions})).map_err(|error| refusal("invalid_output", &error.to_string()))
     })
@@ -342,7 +344,11 @@ mod line_animation_tests {
         expected.extend_from_slice(b",\"rendered\":");
         expected.extend_from_slice(&two.json_bytes);
         expected.push(b'}');
-        assert!(two.svg.is_some(), "{}", String::from_utf8_lossy(&two.json_bytes));
+        assert!(
+            two.svg.is_some(),
+            "{}",
+            String::from_utf8_lossy(&two.json_bytes)
+        );
         assert_eq!(one.json_bytes, expected);
         assert_eq!(one.svg, two.svg);
         let result: serde_json::Value =
@@ -571,7 +577,10 @@ pub fn compile_and_render_svg_limited(
         };
         // Each part keeps the bytes its own call gives.
         let Ok(delivery_bytes) = serde_json::to_vec(&delivery) else {
-            return refused(refusal("invalid_compiled_delivery", "delivery serialization"));
+            return refused(refusal(
+                "invalid_compiled_delivery",
+                "delivery serialization",
+            ));
         };
         let joined = |rendered: &[u8]| -> Vec<u8> {
             let mut bytes = b"{\"delivery\":".to_vec();

@@ -323,7 +323,10 @@ mod tests {
             serde_json::from_slice(&provider_attempt_owned(&snapshot)).unwrap();
         assert!(progress.get("run_progress").is_some(), "{progress}");
         assert!(attempt.get("provider_attempt").is_some(), "{attempt}");
-        assert_eq!(envelope["payload"]["run_progress"], progress["run_progress"]);
+        assert_eq!(
+            envelope["payload"]["run_progress"],
+            progress["run_progress"]
+        );
         assert_eq!(
             envelope["payload"]["provider_attempt"],
             attempt["provider_attempt"]

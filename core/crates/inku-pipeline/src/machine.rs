@@ -1026,6 +1026,12 @@ impl PipelineSnapshot {
     /// Read progress only from this validated, sealed snapshot.
     pub fn run_progress(&self) -> Result<RunProgress, ProtocolError> {
         self.validate()?;
+        Ok(self.sealed_run_progress())
+    }
+
+    /// Progress of a snapshot `advance` has just sealed, without reading it
+    /// back: a step reports it with its output (I-732, 2026-11-07).
+    pub(crate) fn sealed_run_progress(&self) -> RunProgress {
         let current = match (&self.phase, &self.action) {
             (PipelinePhase::AwaitingLlm { stage, .. }, Some(action))
                 if action.tag == stage.action_name() =>
@@ -1045,10 +1051,10 @@ impl PipelineSnapshot {
             }),
             _ => None,
         };
-        Ok(RunProgress {
+        RunProgress {
             current,
             finished: self.run_finished.clone(),
-        })
+        }
     }
 
     fn record_progress(&mut self, previous: Option<(LlmStage, u32)>, events: &[PipelineEvent]) {
@@ -1758,7 +1764,13 @@ impl PipelineSnapshot {
     /// `timeout_ms` into a deadline from the time it started the attempt.
     pub fn provider_attempt(&self) -> Result<Option<ProviderAttempt>, ProtocolError> {
         self.validate()?;
-        Ok(match (&self.phase, &self.action) {
+        Ok(self.sealed_provider_attempt())
+    }
+
+    /// The attempt of a snapshot `advance` has just sealed, without reading it
+    /// back: a step reports it with its output (I-732, 2026-11-07).
+    pub(crate) fn sealed_provider_attempt(&self) -> Option<ProviderAttempt> {
+        match (&self.phase, &self.action) {
             (PipelinePhase::AwaitingLlm { stage, .. }, Some(action))
                 if action.tag == stage.action_name() =>
             {
@@ -1786,7 +1798,7 @@ impl PipelineSnapshot {
                 })
             }
             _ => None,
-        })
+        }
     }
 }
 

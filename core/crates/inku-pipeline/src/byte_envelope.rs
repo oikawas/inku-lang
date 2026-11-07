@@ -220,13 +220,6 @@ fn encode_output(
     limits: EnvelopeLimits,
     separate_svg: bool,
 ) -> Result<(Vec<u8>, Option<String>), ProtocolError> {
-    if serde_json::to_vec(&output.snapshot)
-        .map_err(|_| ProtocolError::InternalInvariant)?
-        .len()
-        > limits.max_snapshot_bytes
-    {
-        return Err(ProtocolError::SchemaViolation);
-    }
     let svg = if separate_svg {
         output
             .rendered
@@ -235,17 +228,47 @@ fn encode_output(
     } else {
         None
     };
+    // The host reads progress and the attempt from the step itself rather than
+    // reading the snapshot back through `run_progress` / `provider_attempt`
+    // (I-732, 2026-11-07); the separate calls stay for stored snapshots.
+    let run_progress = output.snapshot.sealed_run_progress();
+    let provider_attempt = output.snapshot.sealed_provider_attempt();
     let result = json!({
         "protocol": PROTOCOL_NAME, "version": PROTOCOL_VERSION, "kind": "output",
         "execution_id": output.snapshot.execution_id, "message_id": message_id,
         "sequence": output.snapshot.sequence,
-        "payload": { "tag": "step_result", "version": 1, "result": output },
+        "payload": {
+            "tag": "step_result", "version": 1, "result": output,
+            "run_progress": run_progress, "provider_attempt": provider_attempt,
+        },
     });
+    // The snapshot's size as the tree prints it, which is the size of the
+    // struct's bytes (only the order of keys differs), counted without
+    // allocating them a second time.
+    if serialized_len(&result["payload"]["result"]["snapshot"])? > limits.max_snapshot_bytes {
+        return Err(ProtocolError::SchemaViolation);
+    }
     let bytes = serde_json::to_vec(&result).map_err(|_| ProtocolError::InternalInvariant)?;
     if bytes.len() > limits.max_output_bytes {
         return Err(ProtocolError::SchemaViolation);
     }
     Ok((bytes, svg))
+}
+
+fn serialized_len(value: &serde_json::Value) -> Result<usize, ProtocolError> {
+    struct Count(usize);
+    impl std::io::Write for Count {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 += bytes.len();
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut count = Count(0);
+    serde_json::to_writer(&mut count, value).map_err(|_| ProtocolError::InternalInvariant)?;
+    Ok(count.0)
 }
 
 #[cfg(test)]
@@ -286,6 +309,25 @@ mod tests {
         let envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(envelope["kind"], "output", "{envelope}");
         serde_json::from_value(envelope["payload"]["result"].clone()).unwrap()
+    }
+
+    #[test]
+    fn a_step_reports_the_progress_and_attempt_its_snapshot_reads_back() {
+        let bytes = step_owned(&[], &start_input());
+        let envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(envelope["kind"], "output", "{envelope}");
+        let snapshot = serde_json::to_vec(&envelope["payload"]["result"]["snapshot"]).unwrap();
+        let progress: serde_json::Value =
+            serde_json::from_slice(&run_progress_owned(&snapshot)).unwrap();
+        let attempt: serde_json::Value =
+            serde_json::from_slice(&provider_attempt_owned(&snapshot)).unwrap();
+        assert!(progress.get("run_progress").is_some(), "{progress}");
+        assert!(attempt.get("provider_attempt").is_some(), "{attempt}");
+        assert_eq!(envelope["payload"]["run_progress"], progress["run_progress"]);
+        assert_eq!(
+            envelope["payload"]["provider_attempt"],
+            attempt["provider_attempt"]
+        );
     }
 
     #[test]

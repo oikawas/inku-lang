@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- Core：step の出力に、その step の進み（`run_progress`）と試行（`provider_attempt`）を入れる。host は snapshot を読み直す 2 つの呼び出しを省ける（古い 2 つの呼び出しは残す）。行ごとのアニメーションは検証・配色・digest を 1 回にし、読まれない `art_svg` を外す。配色の段は同じ入力の文脈（本物の描画 10 回）を process の中で使い回す。画素を写さずに読む `DisplayImage` を返すラスタの呼び出しと、compile と描画を 1 回で行う `compile_and_render_svg_limited` を足す。macOS・Android の PNG 化は、文字の既定の書体・大きさ・dpi を Server と同じにする（Server の PNG は変わらない）。描く画・DDL・送信文は変わらない。
+
 - macOS：描画中に別の作品を選ぶとその作品を表示し続け、描画は最後まで進んで履歴に保存される。デモ中は作品の選択を止める。
 
 - macOS：通常の build では実行中のアプリを止めず、`--install` の入れ替え直前にだけ停止する。

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: each step result carries that step's `run_progress` and `provider_attempt`, so a host can skip the two calls that read the snapshot back (they remain). The line animation checks, colors and digests its delivery once and drops the unread `art_svg`. The colors stage reuses, within the process, the context (ten real drawings) of an equal input. New raster calls return a `DisplayImage` read in place, and `compile_and_render_svg_limited` compiles and draws in one call. macOS and Android PNGs use the Server's default text family, size and dpi (Server PNGs do not change). Drawings, DDL and requests do not change.
+
 - macOS: choosing another work during drawing keeps it displayed while the drawing finishes and is saved to history. Work selection remains disabled during a demo.
 
 - macOS: leave the running app alone during ordinary builds and stop it only immediately before `--install` replaces it.

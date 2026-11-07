@@ -109,7 +109,7 @@ struct LineageView: View {
                                 }
                             }
                         }
-                        .focusSection()
+                        .inkuFocusSection()
                         .onChange(of: graph.focusNodeID, initial: true) { _, _ in
                             if !library.lineageBrowsing.overviewOpen { proxy.scrollTo(graph.focusNodeID, anchor: .center) }
                         }

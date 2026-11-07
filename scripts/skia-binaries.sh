@@ -44,7 +44,7 @@ digest() {
 
 for target in "$@"; do
     # The digest list owns each target's complete feature key, including Android's.
-    line="$(awk -v marker="-$target-" '!/^#/ && NF == 2 && index($2, marker) && $2 ~ /[.]tar[.]gz$/ { print }' "$LIST")"
+    line="$(awk -v marker="-$target-" '!/^#/ && NF == 2 && index($2, marker) && !index($2, marker "sim-") && $2 ~ /[.]tar[.]gz$/ { print }' "$LIST")"
     [[ -n "$line" && "$(printf '%s\n' "$line" | wc -l | tr -d ' ')" == 1 ]] || {
         printf 'no Skia binaries listed for %s in %s\n' "$target" "$LIST" >&2
         exit 2
@@ -84,7 +84,7 @@ for target in "$@"; do
             printf 'refusing %s: sha256 %s, expected %s (rebuilt? update %s)\n' "$file" "$actual" "$expected" "$LOCAL_LIST" >&2
             exit 1
         }
-    done < <(awk -v marker="-$target-" '!/^#/ && NF == 2 && index($2, marker) && $2 ~ /[.]tar[.]gz$/ { print }' "$LOCAL_LIST")
+    done < <(awk -v marker="-$target-" '!/^#/ && NF == 2 && index($2, marker) && !index($2, marker "sim-") && $2 ~ /[.]tar[.]gz$/ { print }' "$LOCAL_LIST")
 done
 
 # skia-bindings fills in {tag} (its version) and {key}; a file:// URL is read as a path.

@@ -103,6 +103,22 @@ enum CoreCheck {
         _ = try InkuCore.rasterize(svg: svg, targetWidth: 8)
         try require(owned.pixels == Data([255, 0, 0, 255, 255, 0, 0, 255]), "pixels lost ownership or byte order")
         try require(owned.stride == 8 && owned.pixelFormat == "rgba8-premultiplied", "wrong raster layout")
+        let cgPixels: Data = try {
+            let temporary = try InkuCore.rasterize(svg: redSVG, targetWidth: 2)
+            guard let image = temporary.makeCGImage(), let pixels = image.dataProvider?.data else {
+                throw CheckFailure(reason: "CGImage has no pixels")
+            }
+            return pixels as Data
+        }()
+        try require(cgPixels == Data([255, 0, 0, 255, 255, 0, 0, 255]), "CGImage pixels differ from baseline RGBA")
+        if let directory = ProcessInfo.processInfo.environment["INKU_I732_WRITE_BASELINE"] {
+            try cgPixels.write(to: URL(fileURLWithPath: directory).appendingPathComponent("q2-rgba.bin"))
+        }
+        if let directory = ProcessInfo.processInfo.environment["INKU_I732_BASELINE"] {
+            try require(cgPixels == Data(contentsOf: URL(fileURLWithPath: directory).appendingPathComponent("q2-rgba.bin")),
+                        "CGImage pixels changed from baseline")
+        }
+        print("I732 Q2 CGImage RGBA=\(cgPixels as NSData)")
         do {
             _ = try InkuCore.rasterize(svg: redSVG, targetWidth: 0)
             throw CheckFailure(reason: "zero raster width was accepted")

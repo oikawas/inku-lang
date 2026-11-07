@@ -1035,7 +1035,7 @@ restoreは生成中のUIから開始できず、hostの実行を停止してか�
 
 ### rasterとnative表示
 
-[共通raster crate](../core/crates/inku-svg-raster/Cargo.toml)でSVGを描画し、幅・高さ・stride・pixel formatを伴うowned premultiplied RGBA8をSwiftへ返す。SwiftはsRGBの`CGImage`へ機械変換し、pixelの所有をimageの生存期間まで保持する。表示経路でfilterや画材効果を省略しない。rasterは共通のSVGサイズ・寸法・pixel数制限に従い、外部networkやfilesystemからresourceを補わない。
+[共通raster crate](../core/crates/inku-svg-raster/Cargo.toml)でSVGを描画し、幅・高さ・stride・pixel formatを伴うpremultiplied RGBA8をcore所有の`DisplayImage`で返す。Swiftの`RasterImage.makeCGImage()`は画素をコピーせずsRGBの`CGImage`を作り、providerがcoreの画像を最後のimageの解放まで保持する。`byteCount`はコピーせずバイト数を返す。検査用の`pixels`は呼ばれた時にだけ`Data`へコピーし、製品の表示経路では使わない。表示経路でfilterや画材効果を省略しない。rasterは共通のSVGサイズ・寸法・pixel数制限に従い、外部networkやfilesystemからresourceを補わない。
 
 [ArtworkRenderer](Sources/InkuUI/ArtworkRenderer.swift) actorはSVG digest、raster API版、要求寸法と色空間をkeyとする上限付きcacheを持つ。歳時記のプレビューは必要な表示時にrasterを要求する。作品域は2026-10-06から`DisplayRenderer`（Skia）で描き、サムネイルは同日から焼いて持つPNGを読む（上の日付付きの節）。現行PNG書出しは保存SVGを高さ1024でraster化し、SVG書出しは保存canonical SVGをそのまま出力する。custom寸法・animated exportなどの全export仕様を実装済みとはしない。
 

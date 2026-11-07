@@ -1,21 +1,21 @@
 import Foundation
 import InkuCoreBindings
 
-/// Immutable, host-owned presentation pixels lifted by the generated binding.
+/// Immutable core-owned presentation pixels, shared with CoreGraphics without copying.
 public struct RasterImage: Sendable {
-    public let width: UInt32
-    public let height: UInt32
-    public let stride: UInt32
-    public let pixelFormat: String
-    public let pixels: Data
-
-    init(_ frame: InkuCoreBindings.RasterFrame) {
-        width = frame.width
-        height = frame.height
-        stride = frame.stride
-        pixelFormat = frame.pixelFormat
-        pixels = frame.pixels
+    let image: InkuCoreBindings.DisplayImage
+    public var width: UInt32 { image.width() }
+    public var height: UInt32 { image.height() }
+    public var stride: UInt32 { image.stride() }
+    public var pixelFormat: String { image.pixelFormat() }
+    public var byteCount: UInt64 { image.byteCount() }
+    /// An explicit copy for pixel inspection; presentation uses the image's retained allocation.
+    public var pixels: Data {
+        guard let address = UnsafeRawPointer(bitPattern: UInt(image.pixelBufferAddress())) else { return Data() }
+        return Data(bytes: address, count: Int(byteCount))
     }
+
+    init(_ image: InkuCoreBindings.DisplayImage) { self.image = image }
 }
 
 public enum CoreFailure: Error, Sendable {
@@ -37,12 +37,12 @@ public struct PreparedSVG: Sendable {
     public var intrinsicHeight: Double { scene.intrinsicHeight() }
 
     public func rasterize(targetWidth: UInt32? = nil, targetHeight: UInt32? = nil) throws -> RasterImage {
-        try lift { try scene.rasterize(targetWidth: targetWidth, targetHeight: targetHeight) }
+        try lift { try scene.rasterizeImage(targetWidth: targetWidth, targetHeight: targetHeight) }
     }
     public func region(fullWidth: UInt32, fullHeight: UInt32, x: UInt32, y: UInt32, width: UInt32, height: UInt32) throws -> RasterImage {
-        try lift { try scene.region(fullWidth: fullWidth, fullHeight: fullHeight, x: x, y: y, width: width, height: height) }
+        try lift { try scene.regionImage(fullWidth: fullWidth, fullHeight: fullHeight, x: x, y: y, width: width, height: height) }
     }
-    private func lift(_ body: () throws -> InkuCoreBindings.RasterFrame) throws -> RasterImage {
+    private func lift(_ body: () throws -> InkuCoreBindings.DisplayImage) throws -> RasterImage {
         do { return RasterImage(try body()) }
         catch InkuCoreBindings.RasterFailure.Refused(let code, let message) { throw CoreFailure.rasterRefused(code: code, message: message) }
         catch InkuCoreBindings.RasterFailure.InternalInvariant { throw CoreFailure.internalInvariant }
@@ -128,7 +128,7 @@ public struct PreparedDisplay: Sendable {
     }
 
     public func rasterize(targetWidth: UInt32? = nil, targetHeight: UInt32? = nil) throws -> RasterImage {
-        try lift { try scene.rasterize(targetWidth: targetWidth, targetHeight: targetHeight) }
+        try lift { try scene.rasterizeImage(targetWidth: targetWidth, targetHeight: targetHeight) }
     }
     /// The whole work fitted to the box, as a window to draw in tiles.
     public func whole(targetWidth: UInt32? = nil, targetHeight: UInt32? = nil) throws -> DisplayRegion {
@@ -136,14 +136,14 @@ public struct PreparedDisplay: Sendable {
         catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
     }
     public func region(_ region: DisplayRegion) throws -> RasterImage {
-        try lift { try scene.region(region: region.binding) }
+        try lift { try scene.regionImage(region: region.binding) }
     }
     /// One window joined in the core from tiles drawn on several threads.
     public func composite(window: DisplayRegion) throws -> DisplayComposite {
         do { return DisplayComposite(try scene.composite(window: window.binding)) }
         catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
     }
-    private func lift(_ body: () throws -> InkuCoreBindings.RasterFrame) throws -> RasterImage {
+    private func lift(_ body: () throws -> InkuCoreBindings.DisplayImage) throws -> RasterImage {
         do { return RasterImage(try body()) }
         catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
     }
@@ -385,7 +385,7 @@ public enum InkuCore {
         targetHeight: UInt32? = nil
     ) throws -> RasterImage {
         do {
-            return RasterImage(try InkuCoreBindings.rasterizeSvg(
+            return RasterImage(try InkuCoreBindings.rasterizeSvgImage(
                 svg: svg, targetWidth: targetWidth, targetHeight: targetHeight
             ))
         } catch InkuCoreBindings.RasterFailure.Refused(let code, let message) {

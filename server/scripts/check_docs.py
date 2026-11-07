@@ -5,8 +5,9 @@ Run it from ``server/``:
     uv run python scripts/check_docs.py
 
 The gate compares the Japanese originals with their English counterparts,
-checks that published links stay within published paths, and applies the
-English glossary. It reports source locations for actionable fixes.
+checks that published links stay within published paths, applies the English
+glossary, and checks that the macOS notices were written from today's locked
+inputs. It reports source locations for actionable fixes.
 
 **Declared exceptions are the point.** Where the two versions legitimately
 differ, say so in ``PAIRS`` with a reason. An undeclared difference fails. This
@@ -563,6 +564,42 @@ def _inside_tracked_dir(resolved: str, tracked: set[str]) -> bool:
     return any(name.startswith(prefix) for name in tracked)
 
 
+# The macOS About window's notices are a committed snapshot written from these
+# locked inputs; each records the SHA-256 of the file it was written from.
+MACOS_NOTICES = "apple/Sources/InkuUI/Resources/third-party-notices.json"
+
+
+def check_notice_inputs() -> list[str]:
+    """Report locked inputs that changed after the macOS notices were written.
+
+    A crate added to ``core/Cargo.lock`` reaches the macOS app, so its notices
+    must be written again: I-732 added eleven crates and I-733 added libm and
+    vendored kurbo and svgtypes, and the snapshot stayed behind both times
+    until the macOS release check. Writing it needs the Swift package checkouts
+    (``apple/scripts/build-macos-notices.py``); comparing the recorded digests
+    does not.
+    """
+    import hashlib
+    import json
+
+    path = REPO_ROOT / MACOS_NOTICES
+    if not path.is_file():
+        return []
+    inputs = json.loads(path.read_text(encoding="utf-8")).get("inputs", {})
+    problems = []
+    for name, recorded in sorted(inputs.items()):
+        source = REPO_ROOT / name
+        actual = hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else "missing"
+        if actual != recorded:
+            problems.append(
+                f"{MACOS_NOTICES}: written from another {name} "
+                f"(recorded {recorded[:12]}, now {actual[:12]}); write it again with "
+                "apple/scripts/build-macos-notices.py"
+            )
+    print(f"  locked inputs compared: {len(inputs)}")
+    return problems
+
+
 def main() -> int:
     print("checking that the two language versions have the same shape")
     parity = check_parity()
@@ -575,8 +612,10 @@ def main() -> int:
     prose = check_prose_references(tracked)
     print("checking that the English follows the glossary")
     terminology = check_terminology()
+    print("checking that the macOS notices were written from today's locked inputs")
+    notices = check_notice_inputs()
 
-    problems = parity + version_parity + links + prose + terminology
+    problems = parity + version_parity + links + prose + terminology + notices
     if not problems:
         print("documents are consistent.")
         return 0

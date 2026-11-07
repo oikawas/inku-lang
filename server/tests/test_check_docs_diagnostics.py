@@ -86,3 +86,28 @@ def test_relative_link_to_a_normal_parent_path_is_accepted(
     )
 
     assert module.check_links({"README.md", "docs/guide.md"}) == []
+
+
+def test_macos_notices_written_from_another_lock_are_reported(
+    tmp_path: pathlib.Path,
+) -> None:
+    import hashlib
+    import json
+
+    module = _check_docs()
+    module.REPO_ROOT = tmp_path
+    (tmp_path / "core").mkdir()
+    lock = tmp_path / "core/Cargo.lock"
+    lock.write_text("version = 4\n", encoding="utf-8")
+    notices = tmp_path / module.MACOS_NOTICES
+    notices.parent.mkdir(parents=True)
+    digest = hashlib.sha256(lock.read_bytes()).hexdigest()
+    notices.write_text(json.dumps({"inputs": {"core/Cargo.lock": digest}}), encoding="utf-8")
+
+    assert module.check_notice_inputs() == []
+
+    # I-733: a crate added to the lock left the snapshot behind.
+    lock.write_text("version = 4\n[[package]]\nname = \"libm\"\n", encoding="utf-8")
+    [problem] = module.check_notice_inputs()
+    assert problem.startswith(f"{module.MACOS_NOTICES}: written from another core/Cargo.lock")
+    assert "build-macos-notices.py" in problem

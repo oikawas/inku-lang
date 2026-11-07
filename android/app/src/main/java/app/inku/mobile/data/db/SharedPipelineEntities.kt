@@ -10,6 +10,8 @@ import androidx.room.Index
     indices = [
         Index(value = ["owner_id", "parent_legacy_history_id"]),
         Index(value = ["owner_id", "parent_variation_id"]),
+        // The description lock looks authorities up by variation alone.
+        Index("variation_id"),
     ],
 )
 data class VariationAuthorityEntity(
@@ -81,3 +83,6 @@ data class PipelineHistoryLinkEntity(
     @ColumnInfo(name = "fork_context_bytes", typeAffinity = ColumnInfo.BLOB) val forkContextBytes: ByteArray,
     @ColumnInfo(name = "fork_context_digest") val forkContextDigest: String,
 )
+
+/** One stored execution's id, and whether it was written before the process started. */
+data class StoredExecutionAge(val executionId: String, val writtenBefore: Boolean)

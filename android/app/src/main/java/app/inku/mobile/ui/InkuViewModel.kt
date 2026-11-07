@@ -672,6 +672,9 @@ class InkuViewModel @JvmOverloads constructor(
                     }
                 }
                 .onFailure { error -> localState.value = localState.value.copy(message = messageFor(error, strings(), strings().restoreDrawingFailed)) }
+            // After the restore, which reads the newest execution.
+            runCatching { withContext(Dispatchers.IO) { repository.pruneSettledExecutions() } }
+                .onFailure { error -> android.util.Log.w("InkuViewModel", "pruning ended executions failed", error) }
             withContext(Dispatchers.IO) {
                 var offset = 0
                 var refreshedInPass = 0

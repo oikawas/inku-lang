@@ -9,11 +9,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
-        HistoryItemEntity::class,
+        HistoryRowEntity::class,
+        HistoryPayloadEntity::class,
         AppSettingEntity::class,
         ModelAssetEntity::class,
         ProviderSettingEntity::class,
-        ColorCatalogEntity::class,
         PluginSettingEntity::class,
         ExportTemplateEntity::class,
         LineageNodeEntity::class,
@@ -31,18 +31,18 @@ abstract class InkuDatabase : RoomDatabase() {
     abstract fun settingsDao(): SettingsDao
     abstract fun modelAssetDao(): ModelAssetDao
     abstract fun providerSettingDao(): ProviderSettingDao
-    abstract fun colorCatalogDao(): ColorCatalogDao
     abstract fun pluginSettingDao(): PluginSettingDao
     abstract fun exportTemplateDao(): ExportTemplateDao
     abstract fun lineageDao(): LineageDao
     abstract fun sharedPipelineDao(): SharedPipelineDao
 
     companion object {
-        const val SCHEMA_VERSION = 14
+        const val SCHEMA_VERSION = 15
         private const val DB_NAME = "inku.sqlite"
 
         val MIGRATION_12_13: Migration = HistoryDdlNullableMigration
         val MIGRATION_13_14: Migration = HistoryDdlUnifiedMigration
+        val MIGRATION_14_15: Migration = HistoryPayloadsMigration
 
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -175,7 +175,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 InkuDatabase::class.java,
                 databaseName,
             ).openHelperFactory(LargeRowOpenHelperFactory())
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                 .addCallback(FRESH_SCHEMA_CALLBACK).build()
         }
     }

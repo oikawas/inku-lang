@@ -2,6 +2,7 @@ package app.inku.mobile.ui
 
 import app.inku.mobile.ui.i18n.InkuStringsJa
 import android.app.Application
+import app.inku.mobile.data.db.insert
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed

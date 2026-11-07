@@ -1,5 +1,7 @@
 package app.inku.mobile.data
 
+import app.inku.mobile.data.db.deletePermanently
+import app.inku.mobile.data.db.insert
 import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.DemoHistoryInputPrefix
@@ -68,6 +70,7 @@ import app.inku.mobile.pipeline.BUNDLED_PLUGIN_PACKAGE
 import app.inku.mobile.pipeline.ImportedPluginDefinition
 import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.pipeline.PipelineView
+import app.inku.mobile.pipeline.SharedPipelineHost
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.PreparedImageDdlInput
@@ -144,6 +147,8 @@ class InkuRepository(
     // reaches Stage 1, Stage 2 and the demo prompt alike.
     private val activeModelProvider: ModelProvider = modelProviderOverride ?: modelRouter
     private val sharedPipelineStore = RoomSharedPipelineStore(database)
+    /** When this repository (the process's) was made; see [pruneSettledExecutions]. */
+    private val processStartedAt = System.currentTimeMillis()
     private val providerAttemptState = MutableStateFlow<ProviderAttempt?>(null)
     private val runProgressState = MutableStateFlow<app.inku.mobile.pipeline.RunProgress?>(null)
     val runProgress: StateFlow<app.inku.mobile.pipeline.RunProgress?> = runProgressState.asStateFlow()
@@ -513,6 +518,31 @@ class InkuRepository(
             }
         }
         return view.takeIf { !it.terminal }
+    }
+
+    /**
+     * Drops stored executions that have ended (completed, failed or cancelled),
+     * keeping the newest one, which [restoreActivePipeline] reads. Nothing
+     * else removed them, so the table grew with every drawing. A run still
+     * going or waiting on the author (needs_user_edit among them) is kept. A
+     * saved work keeps its DDL, prompts and fork context in its own rows; only
+     * the status of its finished run is no longer shown (as for every work
+     * before the Saijiki v3 migration). Run once at start, after the restore.
+     * Only executions written before this process started are considered, so
+     * a refinement begun during start-up keeps the candidates it just finished.
+     */
+    suspend fun pruneSettledExecutions(): Int {
+        val dao = database.sharedPipelineDao()
+        val ids = dao.executionsNewestFirst(AndroidWorkPipeline.OWNER_ID, processStartedAt)
+            .drop(1).filter { it.writtenBefore }.map { it.executionId }
+        var removed = 0
+        for (id in ids) {
+            val state = runCatching { sharedPipelineStore.load(AndroidWorkPipeline.OWNER_ID, id) }.getOrNull() ?: continue
+            if (SharedPipelineHost.storedPhaseTag(state) !in SETTLED_EXECUTION_PHASES) continue
+            dao.deleteExecution(AndroidWorkPipeline.OWNER_ID, id)
+            removed++
+        }
+        return removed
     }
 
     // Named after the execution's step, so saving the same completed run again
@@ -1890,3 +1920,6 @@ internal fun staleThumbnailFiles(
 }
 
 private const val STALE_THUMBNAIL_AGE_MS = 10 * 60_000L
+
+/** Ended runs whose stored execution can go; `needs_user_edit` can still be continued. */
+private val SETTLED_EXECUTION_PHASES = setOf("completed", "failed", "cancelled")

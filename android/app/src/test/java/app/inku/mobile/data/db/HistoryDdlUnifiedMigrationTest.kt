@@ -14,7 +14,8 @@ class HistoryDdlUnifiedMigrationTest {
     fun actualV13MigrationKeepsProtectedValuesAndConstraintsAndAdmitsV13WithoutReset() {
         assertTrue(RoomV10ResetCoordinator.isNonDestructiveVersion(13))
         assertTrue(RoomV10ResetCoordinator.isNonDestructiveVersion(14))
-        assertFalse(RoomV10ResetCoordinator.isNonDestructiveVersion(15))
+        assertTrue(RoomV10ResetCoordinator.isNonDestructiveVersion(15))
+        assertFalse(RoomV10ResetCoordinator.isNonDestructiveVersion(16))
         HostSqlite().use { host ->
             val entities = host.createSchema(13)
             val history = entities.single { it.getString("tableName") == "history_items" }

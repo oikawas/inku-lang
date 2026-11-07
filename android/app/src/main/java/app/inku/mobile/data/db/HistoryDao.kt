@@ -7,9 +7,16 @@ import androidx.room.Query
 import app.inku.mobile.data.lineage.DescriptionLock
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * A whole work is its `history_items` row joined with its `history_payloads`
+ * row (schema 15); a query that needs only the small columns reads the first.
+ */
+private const val WHOLE_WORK = "SELECT history_items.*, history_payloads.score_json, history_payloads.display_svg, " +
+    "history_payloads.render_metadata_json FROM history_items JOIN history_payloads ON history_payloads.id = history_items.id"
+
 @Dao
 interface HistoryDao {
-    @Query("SELECT * FROM history_items WHERE trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+    @Query("$WHOLE_WORK WHERE trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listActive(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
     @Query(
@@ -20,11 +27,8 @@ interface HistoryDao {
     )
     fun listActiveSummaries(limit: Int, offset: Int): Flow<List<HistoryListItem>>
 
-    @Query("SELECT id, original_input, source_text, render_hash, render_metadata_json FROM history_items WHERE trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC, id ASC")
+    @Query("SELECT history_items.id, original_input, source_text, render_hash, history_payloads.render_metadata_json FROM history_items JOIN history_payloads ON history_payloads.id = history_items.id WHERE trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC, history_items.id ASC")
     suspend fun canvasSearchEntries(): List<CanvasSearchEntry>
-
-    @Query("SELECT * FROM history_items WHERE trashed = 1 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
-    fun listTrashed(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
     @Query(
         "SELECT id, created_at, updated_at, original_input, normalized_ddl, ddl_source_origin, stage1_model, stage2_model, " +
@@ -34,22 +38,16 @@ interface HistoryDao {
     )
     fun listTrashedSummaries(limit: Int, offset: Int): Flow<List<HistoryListItem>>
 
-    @Query("SELECT * FROM history_items WHERE starred = 1 AND trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
-    fun listStarred(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
-
-    @Query("SELECT * FROM history_items WHERE id = :id LIMIT 1")
+    @Query("$WHOLE_WORK WHERE history_items.id = :id LIMIT 1")
     suspend fun getById(id: String): HistoryItemEntity?
 
     /** Includes lineage-only children; their thumbnail can arrive after their save. */
-    @Query("SELECT * FROM history_items WHERE id = :id LIMIT 1")
+    @Query("$WHOLE_WORK WHERE history_items.id = :id LIMIT 1")
     fun observeById(id: String): Flow<HistoryItemEntity?>
 
-    @Query("SELECT * FROM history_items WHERE render_hash = :hash OR render_hash_short = :hash LIMIT 1")
-    suspend fun getByHash(hash: String): HistoryItemEntity?
-
     @Query(
-        "SELECT * FROM history_items WHERE thumbnail_path IS NULL OR thumbnail_path NOT LIKE :currentVersionPattern " +
-            "ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset",
+        "$WHOLE_WORK WHERE thumbnail_path IS NULL OR thumbnail_path NOT LIKE :currentVersionPattern " +
+            "ORDER BY created_at DESC, history_items.id DESC LIMIT :limit OFFSET :offset",
     )
     suspend fun listMissingThumbnails(currentVersionPattern: String, limit: Int, offset: Int): List<HistoryItemEntity>
 
@@ -57,8 +55,16 @@ interface HistoryDao {
     // The server re-raises the IntegrityError a colliding primary key produces
     // (`db.py:2990-2993`) unless the caller passed an idempotency_key, so a
     // silent REPLACE here would be a judgement the server does not make.
+    // Both halves of a work go in together: callers write inside a transaction
+    // and use [insert] below.
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    suspend fun insert(item: HistoryItemEntity)
+    suspend fun insertRow(row: HistoryRowEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPayload(payload: HistoryPayloadEntity)
+
+    @Query("DELETE FROM history_payloads WHERE id = :id")
+    suspend fun deletePayload(id: String)
 
     @Query("UPDATE history_items SET starred = :starred, updated_at = :updatedAt WHERE id = :id")
     suspend fun setStarred(id: String, starred: Boolean, updatedAt: Long)
@@ -85,9 +91,21 @@ interface HistoryDao {
     suspend fun countWithThumbnail(path: String): Int
 
     @Query("DELETE FROM history_items WHERE id = :id")
-    suspend fun deletePermanently(id: String)
+    suspend fun deleteRow(id: String)
 
     /** Each work's DDL and its origin, for the description lock's replay test. */
     @Query("SELECT id AS historyId, normalized_ddl AS ddl, ddl_source_origin AS ddlSourceOrigin FROM history_items WHERE id IN (:ids)")
     suspend fun lockDdlOfHistories(ids: Collection<String>): List<DescriptionLock.HistoryDdl>
+}
+
+/** Writes both halves of a work; call it inside the transaction that saves the work. */
+suspend fun HistoryDao.insert(item: HistoryItemEntity) {
+    insertRow(item.row())
+    insertPayload(item.payload())
+}
+
+/** Removes both halves of a work; call it inside the transaction that deletes it. */
+suspend fun HistoryDao.deletePermanently(id: String) {
+    deletePayload(id)
+    deleteRow(id)
 }

@@ -1,5 +1,9 @@
 # inku Android Implementation Notes
 
+## 2026-11-07 Room schema 15: a work's large columns in their own table
+
+A work's `score_json`, `display_svg` and `render_metadata_json` move to `history_payloads` (one row per `history_items` row, by id). Queries that read a whole work join the two tables; the list, star, trash and thumbnail queries read the small `history_items` alone. Saving and deleting a work write both tables in one transaction. The migration does not change any value. The single `starred` and `trashed` indexes (the head of the composite ones) and `render_hash`/`render_hash_short` (used only by a lookup nothing called) are dropped; the thumbnail path, lineage parent and variation id gain one each. The empty `color_catalogs` table is dropped. At start, the stored state of ended executions (completed, failed, cancelled) is removed, except the newest one and any written in this process; `needs_user_edit`, which can still be continued, is kept.
+
 ## 2026-11-02 Color catalog reading and choice
 
 Automatic selection from a description receives the drawing seed and records the reading and choice prompts separately. Work information shows the selection method, color reading, and items dropped because they were absent from the description. Fixed catalogs and image selection do not retain a description catalog seed, and a child does not inherit the reading record. The Room version is unchanged.

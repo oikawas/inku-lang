@@ -73,8 +73,11 @@ object RoomV10ResetCoordinator {
         }
     }
 
+    // Every version from 10 up to the current schema has a migration. A new
+    // schema version moves this bound with it: written as a fixed 10..13 next
+    // to the current one, schema 15 would have refused every schema 14 database.
     internal fun isNonDestructiveVersion(version: Int): Boolean =
-        version == InkuDatabase.SCHEMA_VERSION || version in 10..13
+        version in 10..InkuDatabase.SCHEMA_VERSION
 
     private fun readUserVersion(databaseFile: File): Int? = runCatching {
         SQLiteDatabase.openDatabase(

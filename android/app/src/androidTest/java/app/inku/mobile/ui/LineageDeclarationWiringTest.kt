@@ -1,6 +1,7 @@
 package app.inku.mobile.ui
 
 import android.app.Application
+import app.inku.mobile.data.db.insert
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore

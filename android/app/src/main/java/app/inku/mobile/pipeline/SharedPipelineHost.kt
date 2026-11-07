@@ -1008,10 +1008,21 @@ class SharedPipelineHost(
         val svgOutputFailureLimitBytes: Long = SvgOutputLimit.DEFAULT_BYTES,
     )
 
-    private companion object {
+    internal companion object {
         const val PROTOCOL = "inku.pipeline"
         const val VERSION = "1.0.0"
         const val STORED_STATE_SCHEMA = "inku.android-pipeline-execution.v1"
+
+        /**
+         * The phase a stored execution stopped in, read from its stored state
+         * without loading a session; null when the state cannot be read.
+         */
+        fun storedPhaseTag(stateBytes: ByteArray): String? = runCatching {
+            val state = JSONObject(stateBytes.toString(Charsets.UTF_8))
+            if (state.optString("schema") != STORED_STATE_SCHEMA) return@runCatching null
+            val snapshot = JSONObject(Base64.getDecoder().decode(state.getString("snapshot_base64")).toString(Charsets.UTF_8))
+            snapshot.getJSONObject("phase").getString("tag")
+        }.getOrNull()
         val TERMINAL_PHASES = setOf("completed", "needs_user_edit", "failed", "cancelled")
         /** The phases web reads as a stop with a reason (`attention.ts`). */
         val STOPPED_PHASES = setOf("needs_user_edit", "failed")

@@ -1,6 +1,7 @@
 package app.inku.mobile.ui
 
 import android.app.Application
+import app.inku.mobile.data.db.insert
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction

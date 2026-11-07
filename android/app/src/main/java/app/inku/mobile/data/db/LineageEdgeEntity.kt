@@ -9,6 +9,8 @@ import androidx.room.PrimaryKey
     tableName = "lineage_edges",
     indices = [
         Index(value = ["child_node_id"], unique = true, name = "uq_lineage_primary_parent"),
+        // Opening a lineage reads each generation's children by parent.
+        Index("parent_node_id"),
     ],
 )
 data class LineageEdgeEntity(

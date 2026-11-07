@@ -6,21 +6,17 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import org.json.JSONObject
 
-@Entity(
-    tableName = "history_items",
-    indices = [
-        Index("created_at"),
-        Index("render_hash"),
-        Index("render_hash_short"),
-        Index("starred"),
-        Index("trashed"),
-        Index(value = ["trashed", "created_at"]),
-        Index(value = ["starred", "trashed", "created_at"]),
-        Index(value = ["lineage_node_id"], unique = true),
-    ],
-)
+/**
+ * One saved work, read whole: the small columns of `history_items` joined with
+ * its large ones in `history_payloads` (schema 15). Every reader keeps this
+ * shape; only the tables under it are two.
+ *
+ * The large columns live apart so that the list, star, trash and thumbnail
+ * queries read small rows: in one row the columns after the SVG were reached
+ * through its overflow pages (the author's library read 4x faster split, a
+ * copy of the device database, 2026-11-07).
+ */
 data class HistoryItemEntity(
-    @PrimaryKey
     val id: String,
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
@@ -118,6 +114,84 @@ data class HistoryItemEntity(
     /** A retired-text transfer marker, never an authoring authority. */
     @ColumnInfo(name = "ddl_source_origin")
     val ddlSourceOrigin: String? = null,
+) {
+    /** The small columns, as `history_items` stores them. */
+    fun row(): HistoryRowEntity = HistoryRowEntity(
+        id = id, createdAt = createdAt, updatedAt = updatedAt, originalInput = originalInput,
+        normalizedDdl = normalizedDdl, stage1Model = stage1Model, stage2Model = stage2Model,
+        renderHash = renderHash, renderHashShort = renderHashShort, colorCatalogId = colorCatalogId,
+        catalogMode = catalogMode, canvasAspect = canvasAspect, starred = starred, trashed = trashed,
+        elapsedMs = elapsedMs, tokenMetadataJson = tokenMetadataJson, thumbnailPath = thumbnailPath,
+        thumbnailWidth = thumbnailWidth, thumbnailHeight = thumbnailHeight, renderWild = renderWild,
+        lineageNodeId = lineageNodeId, renderSeed = renderSeed, compositionSeed = compositionSeed,
+        interpretationSeed = interpretationSeed, variationAmplitude = variationAmplitude,
+        variationSeed = variationSeed, seedText = seedText, instructionLangRequested = instructionLangRequested,
+        instructionLangResolved = instructionLangResolved, sourceText = sourceText, sketchText = sketchText,
+        sketchGrain = sketchGrain, sketchState = sketchState, ddlSourceOrigin = ddlSourceOrigin,
+    )
+
+    /** The large columns, as `history_payloads` stores them. */
+    fun payload(): HistoryPayloadEntity = HistoryPayloadEntity(id, scoreJson, displaySvg, renderMetadataJson)
+}
+
+/** The small columns of a saved work (schema 15); the large ones are in [HistoryPayloadEntity]. */
+@Entity(
+    tableName = "history_items",
+    indices = [
+        Index("created_at"),
+        Index(value = ["trashed", "created_at"]),
+        Index(value = ["starred", "trashed", "created_at"]),
+        Index(value = ["lineage_node_id"], unique = true),
+        // A permanent delete counts the rows sharing a thumbnail file.
+        Index("thumbnail_path"),
+    ],
+)
+data class HistoryRowEntity(
+    @PrimaryKey
+    val id: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    @ColumnInfo(name = "original_input") val originalInput: String,
+    @ColumnInfo(name = "normalized_ddl") val normalizedDdl: String?,
+    @ColumnInfo(name = "stage1_model") val stage1Model: String?,
+    @ColumnInfo(name = "stage2_model") val stage2Model: String?,
+    @ColumnInfo(name = "render_hash") val renderHash: String,
+    @ColumnInfo(name = "render_hash_short") val renderHashShort: String,
+    @ColumnInfo(name = "color_catalog_id") val colorCatalogId: String,
+    @ColumnInfo(name = "catalog_mode") val catalogMode: String?,
+    @ColumnInfo(name = "canvas_aspect") val canvasAspect: String,
+    val starred: Boolean,
+    val trashed: Boolean,
+    @ColumnInfo(name = "elapsed_ms") val elapsedMs: Long?,
+    @ColumnInfo(name = "token_metadata_json") val tokenMetadataJson: String?,
+    @ColumnInfo(name = "thumbnail_path") val thumbnailPath: String?,
+    @ColumnInfo(name = "thumbnail_width") val thumbnailWidth: Int?,
+    @ColumnInfo(name = "thumbnail_height") val thumbnailHeight: Int?,
+    @ColumnInfo(name = "render_wild") val renderWild: Boolean?,
+    @ColumnInfo(name = "lineage_node_id") val lineageNodeId: String?,
+    @ColumnInfo(name = "render_seed") val renderSeed: String?,
+    @ColumnInfo(name = "composition_seed") val compositionSeed: String?,
+    @ColumnInfo(name = "interpretation_seed") val interpretationSeed: String?,
+    @ColumnInfo(name = "variation_amplitude") val variationAmplitude: String?,
+    @ColumnInfo(name = "variation_seed") val variationSeed: String?,
+    @ColumnInfo(name = "seed_text") val seedText: String?,
+    @ColumnInfo(name = "instruction_lang_requested") val instructionLangRequested: String?,
+    @ColumnInfo(name = "instruction_lang_resolved") val instructionLangResolved: String?,
+    @ColumnInfo(name = "source_text") val sourceText: String?,
+    @ColumnInfo(name = "sketch_text") val sketchText: String?,
+    @ColumnInfo(name = "sketch_grain") val sketchGrain: String?,
+    @ColumnInfo(name = "sketch_state") val sketchState: String?,
+    @ColumnInfo(name = "ddl_source_origin") val ddlSourceOrigin: String?,
+)
+
+/** The large columns of a saved work, one row per `history_items` row with the same id. */
+@Entity(tableName = "history_payloads")
+data class HistoryPayloadEntity(
+    @PrimaryKey
+    val id: String,
+    @ColumnInfo(name = "score_json") val scoreJson: String,
+    @ColumnInfo(name = "display_svg") val displaySvg: String,
+    @ColumnInfo(name = "render_metadata_json") val renderMetadataJson: String,
 )
 
 /**

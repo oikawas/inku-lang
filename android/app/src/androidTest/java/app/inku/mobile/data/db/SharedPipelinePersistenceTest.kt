@@ -65,6 +65,8 @@ class SharedPipelinePersistenceTest {
             InkuDatabase.MIGRATION_10_11,
             InkuDatabase.MIGRATION_11_12,
             InkuDatabase.MIGRATION_12_13,
+            InkuDatabase.MIGRATION_13_14,
+            InkuDatabase.MIGRATION_14_15,
         ).use { db ->
             db.query("SELECT original_input, catalog_mode FROM history_items WHERE id = 'legacy-history'").use { cursor ->
                 assertTrue(cursor.moveToFirst())

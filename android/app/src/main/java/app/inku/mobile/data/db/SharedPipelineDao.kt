@@ -95,6 +95,13 @@ interface SharedPipelineDao {
     )
     suspend fun latestExecution(ownerId: String): PipelineExecutionEntity?
 
+    /** Every execution of the owner, newest first, and whether it was written before [before]. */
+    @Query("SELECT execution_id AS executionId, updated_at < :before AS writtenBefore FROM pipeline_candidate_executions WHERE owner_id = :ownerId ORDER BY updated_at DESC, created_at DESC")
+    suspend fun executionsNewestFirst(ownerId: String, before: Long): List<StoredExecutionAge>
+
+    @Query("DELETE FROM pipeline_candidate_executions WHERE owner_id = :ownerId AND execution_id = :executionId")
+    suspend fun deleteExecution(ownerId: String, executionId: String)
+
     @Query(EXECUTION_STATE_CHUNK_SQL)
     suspend fun executionStateChunk(offset: Int, length: Int, ownerId: String, executionId: String, digest: String): ByteArray?
 

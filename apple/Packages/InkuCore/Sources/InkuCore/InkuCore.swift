@@ -345,8 +345,9 @@ public enum InkuCore {
         InkuCoreBindings.compileDocument(inputBytes: input)
     }
 
-    public static func renderCompiled(_ input: Data) -> Data {
-        InkuCoreBindings.renderCompiled(inputBytes: input)
+    public static func compileAndRenderSvgLimited(_ input: Data, maxSvgBytes: UInt64) -> (json: Data, svg: String?) {
+        let output = InkuCoreBindings.compileAndRenderSvgLimited(inputBytes: input, maxSvgBytes: maxSvgBytes)
+        return (output.jsonBytes, output.svg)
     }
 
     public static func renderSaved(_ input: Data) -> Data {

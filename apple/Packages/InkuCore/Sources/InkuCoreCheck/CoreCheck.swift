@@ -88,10 +88,16 @@ enum CoreCheck {
             "tolerance_pixels": 0.1, "max_nodes": "50000", "max_path_elements": "200000",
             "max_flattened_points": "200000", "max_work": "10000000", "max_output_vertices": "200000",
         ]
-        let rendered = try object(InkuCore.renderCompiled(try bytes([
-            "delivery": delivery, "options": options, "compiler": compiler, "clip": clip,
-        ])))
-        guard let svg = rendered["svg"] as? String else {
+        var combinedInput = try object(compileInput)
+        combinedInput["options"] = options; combinedInput["clip"] = clip
+        let output = InkuCore.compileAndRenderSvgLimited(try bytes(combinedInput), maxSvgBytes: 32 * 1_024 * 1_024)
+        let combined = try object(output.json)
+        guard let combinedDelivery = combined["delivery"] as? [String: Any],
+              let rendered = combined["rendered"] as? [String: Any] else {
+            throw CheckFailure(reason: "missing combined output")
+        }
+        try require(try bytes(combinedDelivery) == bytes(delivery), "combined compile changed delivery")
+        guard rendered["error"] == nil, let svg = output.svg else {
             throw CheckFailure(reason: "missing SVG")
         }
         let artwork = try InkuCore.rasterize(svg: svg, targetWidth: 64, targetHeight: 64)

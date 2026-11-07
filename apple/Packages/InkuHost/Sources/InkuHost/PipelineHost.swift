@@ -508,18 +508,20 @@ public actor PipelineHost {
         }
         let config = try ExactJSON(data: request.configuration)
         let compiler = try config.requiredObject("compiler")
-        let compileInput: ExactJSON = .object(["document": document, "definitions": config["definitions"], "compiler": compiler])
-        try Task.checkCancellation()
-        let delivery = try ExactJSON(data: InkuCore.compile(compileInput.data))
-        if let code = delivery["error"].string { throw HostError(code) }
-        guard delivery["score"].object != nil else { throw HostError("retained_source_requires_edit") }
         let options = try ExactJSON(data: request.renderOptions)
         let clip = try ExactJSON(data: request.clipPolicy)
-        let renderInput: ExactJSON = .object(["delivery": delivery, "options": options, "compiler": compiler, "clip": clip])
+        let input: ExactJSON = .object(["document": document, "definitions": config["definitions"], "compiler": compiler,
+            "options": options, "clip": clip])
         try Task.checkCancellation()
         let maximum = try await svgLimitBytes()
-        let output = InkuCore.renderCompiledSvgLimited(renderInput.data, maxSvgBytes: maximum)
-        let rendered = try await renderedLimited(output, maximum: maximum, description: request.description, models: request.models)
+        let output = InkuCore.compileAndRenderSvgLimited(input.data, maxSvgBytes: maximum)
+        let combined = try ExactJSON(data: output.json)
+        if let code = combined["error"].string { throw HostError(code) }
+        let delivery = try combined.requiredObject("delivery")
+        if let code = delivery["error"].string { throw HostError(code) }
+        guard delivery["score"].object != nil else { throw HostError("retained_source_requires_edit") }
+        let rendered = try await renderedLimited((json: combined["rendered"].data, svg: output.svg),
+            maximum: maximum, description: request.description, models: request.models)
         if let code = rendered["error"].string { throw HostError(code) }
         let executionID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         let nodeID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()

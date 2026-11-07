@@ -328,6 +328,23 @@ mod line_animation_tests {
             "options":{"resolved_color_map":map,"catalog_id":"default","canvas":{"width":1000.0,"height":1000.0},"canvas_aspect_id":"square","svg_profile":"display","render_seed":"5","composition_seed":"17","wild":false,"error_policy":"omit_and_continue"},
             "clip":{"tolerance_pixels":0.25,"max_nodes":"50000","max_path_elements":"200000","max_flattened_points":"200000","max_work":"10000000","max_output_vertices":"200000"},"saved_svg":"older","show_ddl":false,"font_family":"Noto Serif JP","font_files":[]
         });
+        // One call gives the bytes the two calls give (I-732).
+        let compile_input = serde_json::json!({"document": input["document"], "definitions": input["definitions"], "compiler": input["compiler"]});
+        let delivery = compile_document(serde_json::to_vec(&compile_input).unwrap());
+        let render_input = serde_json::json!({"delivery": serde_json::from_slice::<serde_json::Value>(&delivery).unwrap(), "options": input["options"], "compiler": input["compiler"], "clip": input["clip"]});
+        let two = render_compiled_svg_limited(serde_json::to_vec(&render_input).unwrap(), 32 << 20);
+        let mut one_input = compile_input.clone();
+        one_input["options"] = input["options"].clone();
+        one_input["clip"] = input["clip"].clone();
+        let one = compile_and_render_svg_limited(serde_json::to_vec(&one_input).unwrap(), 32 << 20);
+        let mut expected = b"{\"delivery\":".to_vec();
+        expected.extend_from_slice(&delivery);
+        expected.extend_from_slice(b",\"rendered\":");
+        expected.extend_from_slice(&two.json_bytes);
+        expected.push(b'}');
+        assert!(two.svg.is_some(), "{}", String::from_utf8_lossy(&two.json_bytes));
+        assert_eq!(one.json_bytes, expected);
+        assert_eq!(one.svg, two.svg);
         let result: serde_json::Value =
             serde_json::from_slice(&line_animation(serde_json::to_vec(&input).unwrap())).unwrap();
         assert!(result.get("error").is_none(), "{result}");
@@ -501,6 +518,95 @@ pub fn compile_document(input_bytes: Vec<u8>) -> Vec<u8> {
         serde_json::to_vec(&delivery)
             .map_err(|error| refusal("invalid_compiled_delivery", &error.to_string()))
     })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompileRenderInput {
+    document: VisibleDocument,
+    definitions: Vec<inku_ddl::MacroDefinition>,
+    compiler: CompilerOptions,
+    options: PipelineRenderOptions,
+    clip: ClipPolicy,
+}
+
+/// [`compile_document`] and then [`render_compiled_svg_limited`] in one call,
+/// so the host does not read the delivery and hand it back (I-732,
+/// 2026-11-07). The input is the compile input with the render `options` and
+/// `clip`. The answer is `{"delivery": <the compiled delivery>, "rendered":
+/// <render_compiled_svg_limited's JSON>}` with the SVG apart, `"rendered":
+/// null` for a delivery without a Score, or the refusal either call gives.
+#[uniffi::export]
+pub fn compile_and_render_svg_limited(
+    input_bytes: Vec<u8>,
+    max_svg_bytes: u64,
+) -> super::NativeSvgOutput {
+    let limit = match super::native_svg_limit(max_svg_bytes) {
+        Ok(limit) => limit,
+        Err(refusal) => return refusal,
+    };
+    catch_unwind(AssertUnwindSafe(|| {
+        let refused = |bytes: Vec<u8>| -> super::NativeSvgOutput { (bytes, None).into() };
+        let input: CompileRenderInput = match parse(&input_bytes, "invalid_compile_input") {
+            Ok(input) => input,
+            Err(bytes) => return refused(bytes),
+        };
+        let document = match input.document.document() {
+            Ok(document) => document,
+            Err(error) => {
+                let code = serde_json::to_value(error).expect("protocol error serializes");
+                return refused(refusal(
+                    code.as_str().expect("protocol error is a string"),
+                    &format!("{error:?}"),
+                ));
+            }
+        };
+        let delivery = match inku_pipeline::core_boundary::compile_committed(
+            document,
+            &input.definitions,
+            &input.compiler,
+        ) {
+            Ok(delivery) => delivery,
+            Err(error) => return refused(refusal("compile_refused", &error.to_string())),
+        };
+        // Each part keeps the bytes its own call gives.
+        let Ok(delivery_bytes) = serde_json::to_vec(&delivery) else {
+            return refused(refusal("invalid_compiled_delivery", "delivery serialization"));
+        };
+        let joined = |rendered: &[u8]| -> Vec<u8> {
+            let mut bytes = b"{\"delivery\":".to_vec();
+            bytes.extend_from_slice(&delivery_bytes);
+            bytes.extend_from_slice(b",\"rendered\":");
+            bytes.extend_from_slice(rendered);
+            bytes.push(b'}');
+            bytes
+        };
+        if delivery.score.is_none() {
+            return refused(joined(b"null"));
+        }
+        let output = match inku_pipeline::core_boundary::render_delivery_with_svg_limit(
+            &delivery,
+            input.options.into(),
+            &input.compiler,
+            input.clip,
+            limit,
+        ) {
+            Ok(output) => output,
+            Err(error) => {
+                return refused(refusal(
+                    super::saved_render_error_code(&error),
+                    &error.to_string(),
+                ));
+            }
+        };
+        let (rendered, svg) =
+            super::separated_saved_output(output, super::MAX_SAVED_RENDER_METADATA_BYTES);
+        let Some(svg) = svg else {
+            return refused(rendered);
+        };
+        (joined(&rendered), Some(svg)).into()
+    }))
+    .unwrap_or_else(|_| (refusal("internal_invariant", "the core panicked"), None).into())
 }
 
 /// Draw only a validated delivery with its independently supplied matching options.

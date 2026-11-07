@@ -77,7 +77,7 @@ public actor ArtworkRenderer {
         guard let image = raster.makeCGImage() else {
             throw ArtworkError.imageUnavailable
         }
-        let bytes = raster.pixels.count
+        let bytes = Int(raster.byteCount)
         if bytes <= byteLimit, imageCountLimit > 0 {
             while (retainedBytes + bytes > byteLimit || entries.count >= imageCountLimit),
                   let oldest = entries.min(by: { $0.value.use < $1.value.use }) {

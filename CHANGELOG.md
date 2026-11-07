@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: Read progress and attempt notifications from step output, and pass raster pixels from the core's `DisplayImage` to `CGImage` without copying. Redrawing a saved work compiles and renders in one core call. PNG text uses the Server's font, size and dpi when the SVG does not specify them (core FFI-16).
+
 - Android: Read progress and provider attempts from each step's output to reduce snapshot rereads. Resumed saved runs and outputs without these fields use the existing queries.
 
 - Core: each step result carries that step's `run_progress` and `provider_attempt`, so a host can skip the two calls that read the snapshot back (they remain). The line animation checks, colors and digests its delivery once and drops the unread `art_svg`. The colors stage reuses, within the process, the context (ten real drawings) of an equal input. New raster calls return a `DisplayImage` read in place, and `compile_and_render_svg_limited` compiles and draws in one call. macOS and Android PNGs use the Server's default text family, size and dpi (Server PNGs do not change). Drawings, DDL and requests do not change.

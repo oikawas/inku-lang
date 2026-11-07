@@ -508,18 +508,20 @@ public actor PipelineHost {
         }
         let config = try ExactJSON(data: request.configuration)
         let compiler = try config.requiredObject("compiler")
-        let compileInput: ExactJSON = .object(["document": document, "definitions": config["definitions"], "compiler": compiler])
-        try Task.checkCancellation()
-        let delivery = try ExactJSON(data: InkuCore.compile(compileInput.data))
-        if let code = delivery["error"].string { throw HostError(code) }
-        guard delivery["score"].object != nil else { throw HostError("retained_source_requires_edit") }
         let options = try ExactJSON(data: request.renderOptions)
         let clip = try ExactJSON(data: request.clipPolicy)
-        let renderInput: ExactJSON = .object(["delivery": delivery, "options": options, "compiler": compiler, "clip": clip])
+        let input: ExactJSON = .object(["document": document, "definitions": config["definitions"], "compiler": compiler,
+            "options": options, "clip": clip])
         try Task.checkCancellation()
         let maximum = try await svgLimitBytes()
-        let output = InkuCore.renderCompiledSvgLimited(renderInput.data, maxSvgBytes: maximum)
-        let rendered = try await renderedLimited(output, maximum: maximum, description: request.description, models: request.models)
+        let output = InkuCore.compileAndRenderSvgLimited(input.data, maxSvgBytes: maximum)
+        let combined = try ExactJSON(data: output.json)
+        if let code = combined["error"].string { throw HostError(code) }
+        let delivery = try combined.requiredObject("delivery")
+        if let code = delivery["error"].string { throw HostError(code) }
+        guard delivery["score"].object != nil else { throw HostError("retained_source_requires_edit") }
+        let rendered = try await renderedLimited((json: combined["rendered"].data, svg: output.svg),
+            maximum: maximum, description: request.description, models: request.models)
         if let code = rendered["error"].string { throw HostError(code) }
         let executionID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         let nodeID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
@@ -721,6 +723,9 @@ private actor ExecutionDriver {
     private var viewSVG: String?
     var databaseRevision: Int64?
     var snapshot: ExactJSON
+    // Only the live driver's last adopted step owns these reports; restored snapshots use the core readers.
+    private var stepRunProgress: Data?
+    private var stepProviderAttempt: Data?
     var initialRequest: GenerationRequest?
     var providerTask: Task<Data, Error>?
     var driving = false
@@ -908,7 +913,7 @@ private actor ExecutionDriver {
                 if action.object == nil {
                     do {
                         if snapshot["phase"]["tag"].string == "score_ready" {
-                            var report = try ExactJSON(data: InkuCore.runProgress(snapshot: state.snapshot))
+                            var report = try ExactJSON(data: runProgressReport())
                             report["run_progress"]["current"] = .object(["kind": .string("local"), "action": .string("render")])
                             progress(.runProgress(executionID: try executionID(), report: report.data))
                             try await advance(.object(["tag": .string("render"), "options": try renderOptionsForDelivery(), "clip": try ExactJSON(data: state.clipPolicy)]))
@@ -992,7 +997,7 @@ private actor ExecutionDriver {
                         let began = Date()
                         let delayMS = try canonicalUnsigned(action, key: "delay_ms")
                         let timeoutMS = try canonicalUnsigned(action, key: "timeout_ms")
-                        progress(.providerAttempt(executionID: try executionID(), report: InkuCore.providerAttempt(snapshot: state.snapshot), beganAt: began,
+                        progress(.providerAttempt(executionID: try executionID(), report: providerAttemptReport(), beganAt: began,
                                                   deadline: began.addingTimeInterval(Double(delayMS) / 1000 + Double(timeoutMS) / 1000)))
                         let bytes = sendAction.data; let models = state.models; let providers = state.providers
                         let personalSession = state.chatGPTSession
@@ -1148,7 +1153,12 @@ private actor ExecutionDriver {
         return total
     }
 
-    private struct NextState { let state: StoredExecution; let snapshot: ExactJSON }
+    private struct NextState {
+        let state: StoredExecution
+        let snapshot: ExactJSON
+        var runProgress: Data? = nil
+        var providerAttempt: Data? = nil
+    }
     private func coreStep(_ payload: ExactJSON, clearProvider: Bool = false) async throws -> NextState {
         var payload = payload; payload["version"] = .integer(1)
         let messageID = newID()
@@ -1207,14 +1217,26 @@ private actor ExecutionDriver {
                 next.readAndDrawElapsedMS = sum.overflow ? UInt64.max : sum.partialValue
             }
         }
-        return NextState(state: next, snapshot: nextSnapshot)
+        let payloadFields = output["payload"].object ?? [:]
+        return NextState(state: next, snapshot: nextSnapshot,
+            runProgress: payloadFields["run_progress"].map { ExactJSON.object(["run_progress": $0]).data },
+            providerAttempt: payloadFields["provider_attempt"].map { ExactJSON.object(["provider_attempt": $0]).data })
     }
     private func advance(_ payload: ExactJSON, clearProvider: Bool = false) async throws {
         let next = try await coreStep(payload, clearProvider: clearProvider)
         let record = try await database.compareAndSwapExecution(id: executionID(), expectedRevision: databaseRevision, snapshot: encoded(next.state))
         adopt(next, revision: record.revision)
     }
-    private func adopt(_ next: NextState, revision: Int64) { state = next.state; snapshot = next.snapshot; databaseRevision = revision }
+    private func adopt(_ next: NextState, revision: Int64) {
+        state = next.state; snapshot = next.snapshot; databaseRevision = revision
+        stepRunProgress = next.runProgress; stepProviderAttempt = next.providerAttempt
+    }
+    private func runProgressReport() -> Data {
+        stepRunProgress ?? InkuCore.runProgress(snapshot: state.snapshot)
+    }
+    private func providerAttemptReport() -> Data {
+        stepProviderAttempt ?? InkuCore.providerAttempt(snapshot: state.snapshot)
+    }
     private func encoded(_ value: StoredExecution) throws -> Data { let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]; return try encoder.encode(value) }
 
     private func commitVisibleDDL(_ action: ExactJSON) async throws {
@@ -1396,7 +1418,7 @@ private actor ExecutionDriver {
 
     private func emitProgress(_ progress: PipelineProgressHandler, view: PipelineView) throws {
         progress(.changed(view))
-        progress(.runProgress(executionID: view.executionID, report: InkuCore.runProgress(snapshot: state.snapshot)))
+        progress(.runProgress(executionID: view.executionID, report: runProgressReport()))
     }
 
     private func makeView() throws -> PipelineView {

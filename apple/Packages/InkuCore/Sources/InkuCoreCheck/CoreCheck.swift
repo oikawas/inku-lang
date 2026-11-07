@@ -88,10 +88,16 @@ enum CoreCheck {
             "tolerance_pixels": 0.1, "max_nodes": "50000", "max_path_elements": "200000",
             "max_flattened_points": "200000", "max_work": "10000000", "max_output_vertices": "200000",
         ]
-        let rendered = try object(InkuCore.renderCompiled(try bytes([
-            "delivery": delivery, "options": options, "compiler": compiler, "clip": clip,
-        ])))
-        guard let svg = rendered["svg"] as? String else {
+        var combinedInput = try object(compileInput)
+        combinedInput["options"] = options; combinedInput["clip"] = clip
+        let output = InkuCore.compileAndRenderSvgLimited(try bytes(combinedInput), maxSvgBytes: 32 * 1_024 * 1_024)
+        let combined = try object(output.json)
+        guard let combinedDelivery = combined["delivery"] as? [String: Any],
+              let rendered = combined["rendered"] as? [String: Any] else {
+            throw CheckFailure(reason: "missing combined output")
+        }
+        try require(try bytes(combinedDelivery) == bytes(delivery), "combined compile changed delivery")
+        guard rendered["error"] == nil, let svg = output.svg else {
             throw CheckFailure(reason: "missing SVG")
         }
         let artwork = try InkuCore.rasterize(svg: svg, targetWidth: 64, targetHeight: 64)
@@ -103,6 +109,22 @@ enum CoreCheck {
         _ = try InkuCore.rasterize(svg: svg, targetWidth: 8)
         try require(owned.pixels == Data([255, 0, 0, 255, 255, 0, 0, 255]), "pixels lost ownership or byte order")
         try require(owned.stride == 8 && owned.pixelFormat == "rgba8-premultiplied", "wrong raster layout")
+        let cgPixels: Data = try {
+            let temporary = try InkuCore.rasterize(svg: redSVG, targetWidth: 2)
+            guard let image = temporary.makeCGImage(), let pixels = image.dataProvider?.data else {
+                throw CheckFailure(reason: "CGImage has no pixels")
+            }
+            return pixels as Data
+        }()
+        try require(cgPixels == Data([255, 0, 0, 255, 255, 0, 0, 255]), "CGImage pixels differ from baseline RGBA")
+        if let directory = ProcessInfo.processInfo.environment["INKU_I732_WRITE_BASELINE"] {
+            try cgPixels.write(to: URL(fileURLWithPath: directory).appendingPathComponent("q2-rgba.bin"))
+        }
+        if let directory = ProcessInfo.processInfo.environment["INKU_I732_BASELINE"] {
+            try require(cgPixels == Data(contentsOf: URL(fileURLWithPath: directory).appendingPathComponent("q2-rgba.bin")),
+                        "CGImage pixels changed from baseline")
+        }
+        print("I732 Q2 CGImage RGBA=\(cgPixels as NSData)")
         do {
             _ = try InkuCore.rasterize(svg: redSVG, targetWidth: 0)
             throw CheckFailure(reason: "zero raster width was accepted")

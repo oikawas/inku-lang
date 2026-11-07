@@ -74,7 +74,7 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 
 ### macOS
 
-- Swift tools 6.1; the minimum OS is macOS 14/iOS 17. It uses SwiftUI and Observation, GRDB 7.11.1 with system SQLite, and URLSession and Keychain.
+- Swift tools 6.1; the minimum OS is macOS 15/iOS 18. It uses SwiftUI and Observation, GRDB 7.11.1 with system SQLite, and URLSession and Keychain.
 - The shared Rust is embedded as a UniFFI XCFramework (feature `display` includes the Skia display), and `inku-display-gpu` is built for arm64 and shipped in the app's `Contents/MacOS/`.
 - For description counts, Sudachi small, the reading settings, and CMUdict are hash-verified and copied into InkuHost's resources; the 3D viewer the Web registers is copied unchanged into InkuUI's resources and opened with WebKit.
 

@@ -12,7 +12,7 @@ let ddl3dCopied = FileManager.default.fileExists(atPath: Context.packageDirector
 let package = Package(
     name: "InkuApple",
     defaultLocalization: "ja",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .library(name: "InkuUI", targets: ["InkuUI"]),
         .executable(name: "InkuMac", targets: ["InkuMac"]),

@@ -26,7 +26,7 @@ macOSの版情報・概念説明・用語表・作者情報は、画面上部の
 shasum -a 256 Inku-macOS-1.0.0.dmg
 ```
 
-dmgを開き、Inkuを「アプリケーション」へドラッグします。macOS 14以降のApple SiliconとIntelで動くUniversalアプリで、Developer IDで署名し、Appleの公証を受けています。Intel実機とmacOS 14実機での動作は未確認です。
+dmgを開き、Inkuを「アプリケーション」へドラッグします。macOS 15以降のApple SiliconとIntelで動くUniversalアプリで、Developer IDで署名し、Appleの公証を受けています。Intel実機とmacOS 15実機での動作は未確認です。
 
 最初に、描画に使うモデルの接続先へAPIキーを入れてください。キーが無いと生成ボタンの上に案内が出て、「接続設定を開く」から設定できます。キーはログインキーチェーン（service `app.inku.provider-credentials`）に保存し、ファイルには書きません。
 
@@ -44,7 +44,7 @@ dmgを開き、Inkuを「アプリケーション」へドラッグします。m
 
 ## 対応OSとbuild環境
 
-最低OSはmacOS 14／iOS 17です。SDKの版は最低OSとは別です。確認した環境はXcode 27.0／Swift 6.4、Rust 1.99.1、XcodeGen 2.46.0です。Swift packageはtools 6.1、projectはXcodeGen 2.44.0以上を要求します。
+最低OSはmacOS 15／iOS 18です。SDKの版は最低OSとは別です。確認した環境はXcode 27.0／Swift 6.4、Rust 1.99.1、XcodeGen 2.46.0です。Swift packageはtools 6.1、projectはXcodeGen 2.44.0以上を要求します。
 
 buildにはmacOS、XcodeのCLI tools、XcodeGen、Python 3.11以上、Node.js 22.13以上、uv、公式rustupが必要です。Node.jsの[`stripTypeScriptTypes`](https://nodejs.org/download/release/v22.14.0/docs/api/module.html#modulestriptypescripttypescode-options)は明示したreference更新でWeb文言・用紙情報・歳時記previewを抽出します。通常buildはreview済み同梱snapshotを使い、Pythonとuvは固定辞書の準備にも使います。いずれのruntimeもアプリへ組み込みません。初回はCargo、SwiftPMとServerのuv.lock依存を取得するnetwork接続が必要です。
 

@@ -1,6 +1,6 @@
 # Portable persistence contract
 
-This directory defines the logical SQLite persistence boundary shared by the Server, Android, and the Apple client's Swift adapter. Each host owns its database file. The shared Swift package targets macOS 14 and iOS 17 and is used by the current macOS app; the iOS app itself is not implemented yet.
+This directory defines the logical SQLite persistence boundary shared by the Server, Android, and the Apple client's Swift adapter. Each host owns its database file. The shared Swift package targets macOS 15 and iOS 18 and is used by the current macOS app; the iOS app itself is not implemented yet.
 
 The authority order is:
 

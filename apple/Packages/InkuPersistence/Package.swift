@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "InkuPersistence",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
     products: [.library(name: "InkuPersistence", targets: ["InkuPersistence"])],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.11.1"),

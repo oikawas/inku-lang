@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "InkuCore",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .library(name: "InkuCore", targets: ["InkuCore"]),
         .executable(name: "InkuCoreCheck", targets: ["InkuCoreCheck"]),

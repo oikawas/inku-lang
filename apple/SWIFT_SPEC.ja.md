@@ -984,7 +984,7 @@ Rust 1.95のmacOS host proc-macro stripによるLINKEDIT alignment失敗は、re
 
 ### 対象と実装段階
 
-最低OSはmacOS 14／iOS 17とする。SDKの版と最低OSは別に管理する。macOSのarm64／x86_64 Universal appを先にフル機能へ進め、その後iPad／iPhoneへ展開する。現在はM1のSwift／Rust接続、M2のstandalone host／SQLite保存境界と初期macOS UIを実装した段階で、M3のフル機能UIは未完了である。
+最低OSはmacOS 15／iOS 18とする。SDKの版と最低OSは別に管理する。macOSのarm64／x86_64 Universal appを先にフル機能へ進め、その後iPad／iPhoneへ展開する。現在はM1のSwift／Rust接続、M2のstandalone host／SQLite保存境界と初期macOS UIを実装した段階で、M3のフル機能UIは未完了である。
 
 Appleクライアントは単一利用者のローカルappであり、Serverの認証・管理・複数利用者機能を持ち込まない。実行時にinku ServerやPython runtimeは不要である。cameraは今後のiOS側の機能とし、macOSには設けない。iOS appとcamera自体は未実装である。
 

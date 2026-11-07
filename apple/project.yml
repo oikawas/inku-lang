@@ -2,8 +2,8 @@ name: Inku
 options:
   minimumXcodeGenVersion: 2.44.0
   deploymentTarget:
-    macOS: "14.0"
-    iOS: "17.0"
+    macOS: "15.0"
+    iOS: "18.0"
 packages:
   InkuApple:
     path: .
@@ -18,7 +18,7 @@ targets:
   InkuMac:
     type: application
     platform: macOS
-    deploymentTarget: "14.0"
+    deploymentTarget: "15.0"
     sources:
       - path: Sources/InkuMac
       - path: Resources/AppIcon.icns
@@ -55,7 +55,7 @@ targets:
         PRODUCT_NAME: Inku
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Configuration/Info-Mac.plist
-        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
         ARCHS: arm64 x86_64
         ONLY_ACTIVE_ARCH: NO
 schemes:

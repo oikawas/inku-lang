@@ -74,7 +74,7 @@
 
 ### macOS
 
-- Swift tools 6.1、最低OSはmacOS 14／iOS 17。SwiftUIとObservation、GRDB 7.11.1とsystem SQLite、URLSessionとKeychainを使う。
+- Swift tools 6.1、最低OSはmacOS 15／iOS 18。SwiftUIとObservation、GRDB 7.11.1とsystem SQLite、URLSessionとKeychainを使う。
 - 共通RustはUniFFIのXCFramework（feature `display`でSkia表示を含む）として組み込み、`inku-display-gpu`はarm64で組んでアプリの`Contents/MacOS/`へ同梱する。
 - 記述の音数はSudachi small・読み設定・CMUdictをhash検証してInkuHostのresourceへ写し、Webが登録した3DビューアはそのままInkuUIのresourceへ写してWebKitで開く。
 

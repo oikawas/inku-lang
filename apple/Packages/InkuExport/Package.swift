@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "InkuExport",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
     products: [.library(name: "InkuExport", targets: ["InkuExport"])],
     dependencies: [.package(path: "../InkuCore"), .package(path: "../InkuHost"), .package(path: "../InkuPersistence")],
     targets: [

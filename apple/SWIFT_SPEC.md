@@ -984,7 +984,7 @@ The following records the initial implementation. The dated section above define
 
 ### Platforms and implementation stage
 
-The minimum operating systems are macOS 14 and iOS 17. SDK versions are managed separately from deployment targets. The arm64/x86_64 Universal macOS app will reach full functionality first, followed by iPad and iPhone. The current implementation covers the M1 Swift/Rust connection, M2 standalone host and SQLite persistence boundaries, and initial macOS UI. The full M3 UI remains incomplete.
+The minimum operating systems are macOS 15 and iOS 18. SDK versions are managed separately from deployment targets. The arm64/x86_64 Universal macOS app will reach full functionality first, followed by iPad and iPhone. The current implementation covers the M1 Swift/Rust connection, M2 standalone host and SQLite persistence boundaries, and initial macOS UI. The full M3 UI remains incomplete.
 
 The Apple client is a local app for one user. It does not inherit Server authentication, administration, or multi-user features. Neither inku Server nor a Python runtime is required at runtime. Camera support belongs to the future iOS client and will not be added to macOS. The iOS app and camera feature are not implemented.
 

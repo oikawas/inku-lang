@@ -349,7 +349,7 @@ Instead, the SVG that was output is saved as it is, so the original output can a
 |---|---|
 | **On a Mac, with your own ChatGPT plan** (single user) | [Start with Docker Desktop](docs/guide/docker-desktop.md) |
 | **Run the Docker image on a server** (API keys, multiple users) | [`deploy/README.md`](deploy/README.md) |
-| **macOS app** (no server, Universal, macOS 14 or later) | [apple/README.md](apple/README.md) |
+| **macOS app** (no server, Universal, macOS 15 or later) | [apple/README.md](apple/README.md) |
 | **Android app** (no server, Android 15 or later, arm64) | [Installing the APK](docs/guide/android-apk.md) |
 | **From source** | [SETUP.md](SETUP.md) |
 

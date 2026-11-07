@@ -1,6 +1,6 @@
 # 共通保存契約
 
-このディレクトリはServer、Android、AppleクライアントのSwift adapterが共有する論理SQLite保存境界を定義する。全hostが同じDBファイルを開くという意味ではない。Swiftの共通packageはmacOS 14／iOS 17向けで、現在のmacOS appが使用する。iOS app自体は未実装である。
+このディレクトリはServer、Android、AppleクライアントのSwift adapterが共有する論理SQLite保存境界を定義する。全hostが同じDBファイルを開くという意味ではない。Swiftの共通packageはmacOS 15／iOS 18向けで、現在のmacOS appが使用する。iOS app自体は未実装である。
 
 正本の優先順は、製品の意味を定義する`SPEC.ja.md`、論理項目・encoding・host mappingを定義する`contract.json`、制約を実行できる`reference/logical-projection-v2.sql`、小さい言語非依存の`fixtures/`、各hostの物理adapterである。v1のreference SQLは旧入力の歴史的定義として残す。
 

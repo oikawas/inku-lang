@@ -26,7 +26,7 @@ The distribution is `Inku-macOS-<version>.dmg` on [GitHub Releases](https://gith
 shasum -a 256 Inku-macOS-1.0.0.dmg
 ```
 
-Open the dmg and drag Inku to Applications. It is a Universal app for Apple silicon and Intel on macOS 14 or later, signed with Developer ID and notarized by Apple. It has not been run on Intel hardware or on macOS 14.
+Open the dmg and drag Inku to Applications. It is a Universal app for Apple silicon and Intel on macOS 15 or later, signed with Developer ID and notarized by Apple. It has not been run on Intel hardware or on macOS 15.
 
 First enter an API key for the provider of the drawing model. Without a key, a notice appears above the draw button with Open connection settings. Keys are stored in the login keychain (service `app.inku.provider-credentials`), never in files.
 
@@ -44,7 +44,7 @@ A log-read failure retains its cause. Try loading again retries the read; Dismis
 
 ## Operating systems and build environment
 
-Minimum deployment versions are macOS 14 and iOS 17. SDK versions are independent of deployment minimums. The checked environment uses Xcode 27.0/Swift 6.4, Rust 1.99.1, and XcodeGen 2.46.0. Swift packages require tools 6.1, and the project requires XcodeGen 2.44.0 or newer.
+Minimum deployment versions are macOS 15 and iOS 18. SDK versions are independent of deployment minimums. The checked environment uses Xcode 27.0/Swift 6.4, Rust 1.99.1, and XcodeGen 2.46.0. Swift packages require tools 6.1, and the project requires XcodeGen 2.44.0 or newer.
 
 Building requires macOS, Xcode command-line tools, XcodeGen, Python 3.11 or newer, Node.js 22.13 or newer, uv, and official rustup. Node.js [`stripTypeScriptTypes`](https://nodejs.org/download/release/v22.14.0/docs/api/module.html#modulestriptypescripttypescode-options) extracts Web text, canvas metadata, and Saijiki previews during explicit reference updates. Normal builds use reviewed bundled snapshots; Python/uv also prepare pinned dictionaries. None of these runtimes is embedded in the app. The first build needs network access for pinned Cargo, SwiftPM, and Server uv.lock dependencies.
 

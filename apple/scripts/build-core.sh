@@ -48,8 +48,8 @@ copy_if_changed() {
     fi
 }
 export CARGO_TARGET_DIR="$RUST_TARGET"
-export MACOSX_DEPLOYMENT_TARGET=14.0
-export IPHONEOS_DEPLOYMENT_TARGET=17.0
+export MACOSX_DEPLOYMENT_TARGET=15.0
+export IPHONEOS_DEPLOYMENT_TARGET=18.0
 PROFILE_ARGS=()
 if [[ "$PROFILE" == release ]]; then
     PROFILE_ARGS+=(--release)
@@ -151,8 +151,8 @@ identity = {
     "uniffi_generator": generator,
     "profile": profile,
     "mode": mode,
-    "minimum_macos": "14.0",
-    "minimum_ios": "17.0",
+    "minimum_macos": "15.0",
+    "minimum_ios": "18.0",
     "archives": {
         target: file_digest(rust_target / target / profile / "libinku_pipeline_uniffi.a")
         for target in targets
@@ -169,4 +169,4 @@ content = json.dumps(identity, indent=2, sort_keys=True) + "\n"
 if not manifest.is_file() or manifest.read_text() != content:
     manifest.write_text(content)
 __INKU_CORE_MANIFEST__
-printf 'Generated %s (%s, macOS 14 / iOS 17).\n' "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" "$MODE"
+printf 'Generated %s (%s, macOS 15 / iOS 18).\n' "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" "$MODE"

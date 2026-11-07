@@ -343,7 +343,7 @@ DDL の画材の語を一つ替えると、同じ形が別の描き方になり�
 |---|---|
 | **Mac で、自分の ChatGPT プランを使う**（シングルユーザー） | [Docker Desktop で始める](docs/guide/docker-desktop.ja.md) |
 | **Docker イメージをサーバーで動かす**（API キー、マルチユーザー） | [`deploy/README.md`](deploy/README.md) |
-| **macOS アプリ**（サーバー不要、Universal、macOS 14 以降） | [apple/README.ja.md](apple/README.ja.md) |
+| **macOS アプリ**（サーバー不要、Universal、macOS 15 以降） | [apple/README.ja.md](apple/README.ja.md) |
 | **Android アプリ**（サーバー不要、Android 15 以降・arm64） | [APK のインストール](docs/guide/android-apk.ja.md) |
 | **ソースから動かす** | [SETUP.ja.md](SETUP.ja.md) |
 

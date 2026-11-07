@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。v2.15.147（Web Build 1223）を基準にしています。
+この文書は管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。v2.15.329（Web Build 1405）を基準にしています。
 
 ## 1. 設定の優先境界
 
@@ -12,7 +12,7 @@
 
 API keyの環境変数は初期値です。管理UIでDBへ保存したprovider keyがある場合は暗号化して利用します。ホスト固有情報と秘密をGit追跡文書へ書かないでください。
 
-描画・履歴の再描画とユーザー管理では、入力の誤りや重複は 4xx、予期しない内部の失敗は 500 を返します。内部の例外の詳細はログで確認し、応答には含めません。
+描画・履歴の再描画とユーザー管理では、入力の誤りや重複は 4xx、予期しない内部の失敗は 500 を返します。内部の例外の詳細はログで確認し、応答には含めません。ただし`INKU_ENV=development`を明示したときは、`/api/paint`・デモ指示・取り合わせ・奥書の生成の失敗で、例外の型と内容が応答に付きます（スコア・SVGの描画、履歴の再描画、ユーザー・グループの作成と更新、プロフィールの更新は`development`でも伏せます）。`INKU_ENV`が未設定か`production`ならすべて伏せます。本番では`INKU_ENV=production`にしてください。
 
 **環境変数が種を与えるだけの設定があります。**描画の並列度と制限値は、初回起動時に環境変数から初期値を取り、以後はDBの設定が正本になります。環境変数を変えても、既に保存された設定は変わりません。制限値は管理UIか `inku-cli config update`、並列度は管理UIか§2.3のAPIで変更してください。
 
@@ -37,7 +37,8 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_CORS_ORIGINS` | 許可originのcomma区切り | localhostのみ |
 | `INKU_LISTEN_HOST` | uvicorn listen host | `0.0.0.0` |
 | `INKU_LISTEN_PORT` | uvicorn listen port | `INKU_SERVER_PORT`、無ければ`8100` |
-| `INKU_ENV` | 動作モードの表示と開発時分岐 | `development` |
+| `INKU_ENV` | 動作モードの表示と開発時分岐（`development`を明示したときだけ、一部の500に例外の詳細が付く） | 表示は`development`。未設定は`development`ではなく本番と同じ扱い |
+| `INKU_ANYIO_THREAD_TOKENS` | 同期処理に使うスレッド数の上限（**調整用**。重い描画の待ちで`/health`などが止まる時だけ上げる。1以上） | `100` |
 | `INKU_TIMEZONE` | DB backupの時刻判定などに使うtimezone | `Asia/Tokyo` |
 | `INKU_REDIS_URL` | 設定するとrate limitなどの共有状態をRedisへ置く | 未設定（プロセス内） |
 | `INKU_THUMBS_DB_URL` | サムネイルを置く派生DBのURL | `INKU_DB_URL`の隣の`thumbs.db` |
@@ -60,14 +61,14 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN` | 8文字未満のpasswordを許す。**本番で設定しない** |
 | `INKU_AUTH_LOCAL_ENABLED` | ユーザー名とpasswordによるログイン（既定 `true`） |
 | `INKU_AUTH_GOOGLE_ENABLED` | Googleによるログイン（既定 `false`） |
-| `INKU_SINGLE_USER` | 単独利用モード。利用者を1人に定めて自動的にログイン済みにする（**コードの既定 `0`／配布compose の既定 `1`**）。**管理者が1人も居ないDBでは働かない** |
+| `INKU_SINGLE_USER` | 単独利用モード。利用者を1人に定めて自動的にログイン済みにする（**コードの既定 `0`／ソースbuild用`compose.yaml`の既定 `1`／リリースイメージ用`deploy/compose.yaml`は渡さないのでログインが要る**）。**管理者が1人も居ないDBでは働かない** |
 
 passwordが設定され、DBにユーザーがいない場合だけ作成します。8文字未満は拒否されます。初回作成後は秘密を環境から除去します。
 
 空文字は未設定と同じ扱いです。env fileの空欄も、composeの `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` 補間が渡す空値も、起動を失敗させません。初回作成後に環境から除去する際は、行を削除しても空欄にしても同じ結果になります。
 
 inkuにはセルフサインアップがありません。アカウントを作れるのは、`admins`または`leaders`グループに属する認証済み利用者による `POST /api/users` だけです。したがって**単独利用モードを off にしたうえで空のDBをbootstrap adminなしで起動すると、誰もログインできないサーバーになります**（単独利用モードが on なら、サーバーが利用者を1人作って自動的にログイン済みにします）。復旧はpasswordを設定して再起動するだけです。bootstrap adminはユーザーが0件のときだけ作成を試みるため、既存アカウントのpasswordが上書きされることはありません。
-passwordを忘れた管理者が締め出されたままになることはありません。`inku-admin reset-password` が、サーバー自身の環境の中から1アカウントのpasswordを設定します（配布イメージでは `docker compose exec api inku-admin reset-password --username admin`、ソースからなら `uv run inku-admin reset-password`）。passwordは2度尋ねられ、コマンドラインには置きません。`--password-stdin` を付けると標準入力の1行目から読みます。アカウントを指定しない場合は`INKU_BOOTSTRAP_ADMIN_USERNAME`が作った管理者が対象で、無い名前を指定すると在るアカウントを印字します。**これは2つ目の入口ではありません** —— 実行にはコンテナかファイルが要り、どちらも既にDBを含んでいます。v2.13.41から使えます。
+passwordを忘れた管理者が締め出されたままになることはありません。`inku-admin reset-password` が、サーバー自身の環境の中から1アカウントのpasswordを設定します（配布イメージでは `docker compose exec api inku-admin reset-password --username admin`、ソースからなら `uv run inku-admin reset-password`）。passwordは2度尋ねられ、コマンドラインには置きません。`--password-stdin` を付けると標準入力の1行目から読みます。同じ名前のアカウントが2つあるときは`--user-id ID`で指定します（`--username`とは同時に使えません）。アカウントを指定しない場合は`INKU_BOOTSTRAP_ADMIN_USERNAME`が作った管理者が対象で、無い名前を指定すると在るアカウントを印字します。**これは2つ目の入口ではありません** —— 実行にはコンテナかファイルが要り、どちらも既にDBを含んでいます。v2.13.41から使えます。
 
 ### 2.3 artifactと同時実行
 
@@ -83,6 +84,9 @@ passwordを忘れた管理者が締め出されたままになることはあり
 | `INKU_DB_BACKUP_SCHEDULER` | `0` にすると定期backupのschedulerを起動しない | `1` |
 | `INKU_THUMBNAIL_WORKERS` | 保存後の焼き付けを受け持つworker数（**再作成の並列度とは別**。再作成は管理設定の`workers`で決まる）。**v2.13.37から実際に効きます**——それまでは同じプロセスの中で焼いており、ラスタライザが1コアを握るので何本立てても1枚ずつしか進みませんでした | `2` |
 | `INKU_THUMBNAIL_QUEUE_LIMIT` | サムネイル生成queue上限 | `64` |
+| `INKU_AUTONOMOUS_RUNS_DB_URL` | AI自動推敲の実行を置くSQLiteのURL | 正本DBの隣の`<正本DB名>-autonomous-runs.db` |
+| `INKU_IMAGE_DDL_MAX_TOKENS` | 画像から書く送信の出力トークン上限 | `8192` |
+| `INKU_DB_BACKUP_DIR` | DB backupの置き場 | `~/.local/share/inku/db-backups` |
 
 queue上限時も履歴DB保存を優先し、artifact保存だけをskipします。providerの無料queueによる遅延と、server worker不足を区別してください。
 
@@ -135,12 +139,10 @@ sudo editor /etc/inku/pipeline.json
 
 | 変数 | 目的 | 既定値 |
 |---|---|---|
-| `INKU_LLM_BACKEND` | LLMの接続系統 | `anthropic` |
 | `INKU_PLUGIN_PACKAGE_DIR` | 管理者がWebから追加したプラグイン（package）の置き場 | `~/.local/share/inku/plugin-packages`（Dockerは`/data/plugin-packages`） |
 | `INKU_OKUGAKI_MODEL` | 奥書の読み手モデルの既定 | vision対応モデル |
 | `INKU_OKUGAKI_CACHE_TTL_SECONDS` | 奥書cacheの保持秒数 | `1800` |
 | `INKU_OKUGAKI_CACHE_MAX_ENTRIES` | 奥書cacheの最大件数 | `256` |
-| `INKU_LEARNED_FILE` | 学習語の保存先 | `/tmp/inku-learned.json` |
 | `INKU_DEVELOPER_MODE` | 開発者向けの追加表示 | 未設定 |
 
 設定の`プラグイン`は、語彙プラグインを追加・削除し、有効・無効と語の一覧（名前・別名・表記・注釈・例・見本の絵）を見る画面です。
@@ -153,8 +155,6 @@ sudo editor /etc/inku/pipeline.json
 - 同梱の `Nature.leaves` は core が持つ v2 ファイルです。設定から無効にできますが、削除と絵の差し替えはできません。旧 v1 ファイルは拒否理由とともに一覧へ出ます。
 
 同梱の葉は `INKU_PLUGIN_PACKAGE_DIR` に依存しません。管理者が追加したファイルだけをこの置き場から読みます。
-
-`INKU_LEARNED_FILE`の既定は`/tmp`配下なので、再起動で消えます。永続化する場合は安定したパスを指定してください。
 
 ### 2.6 provider
 
@@ -169,11 +169,20 @@ sudo editor /etc/inku/pipeline.json
 
 providerのBase URL、key、公開モデルは管理UIからも設定できます。keyをDBへ保存する場合は`enc:v1:`形式で暗号化します。
 
+ChatGPTプランを使う自己ホストの構成では、次の変数を使います（使い方は[ChatGPTプランのガイド](../../docs/guide/chatgpt-plan.ja.md)）。
+
+| 変数 | 目的 | 既定値 |
+|---|---|---|
+| `INKU_CHATGPT_PLAN_ENABLED` | ChatGPTプランの接続を有効にする（`1`・`true`・`yes`・`on`で有効） | 空（無効） |
+| `INKU_CHATGPT_SELF_HOSTED` | 自己ホストのServerとして扱う（同じ値で有効） | 空（無効） |
+| `INKU_CHATGPT_AUTH_DIR` | ChatGPTの認証情報の置き場 | `~/.config/ddl-server/chatgpt`（コンテナは`/data/chatgpt`） |
+| `INKU_CHATGPT_HELPER_TARGET` | `container`にすると、接続開始の応答に`helper_target`（ヘルパーの接続先がコンテナ）を付ける | 未設定 |
+
 ## 3. DBとmigration
 
 ### 3.1 SQLite
 
-管理設定の DB では、明示的に整理を実行でき、実行中は書き込みを停止します。実行記録の保存期間は空欄なら無期限です。日数を保存すると古い完了済み記録だけを削除し、作品・系譜・リンク・実行中の記録は残します。
+DBの整理と実行記録の保存期間は[§3.4](#34-dbの整理と実行記録の保存期間)にあります。
 
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
@@ -210,6 +219,17 @@ DBは次を分離して保存します。
 
 系譜は明示的な制作操作だけで接続します。類似、同一記述、時刻からedgeを推測しません。通常履歴を完全削除しても、系譜の経路を保つためcontent-free tombstoneが残る場合があります。
 
+### 3.4 DBの整理と実行記録の保存期間
+
+管理者の`DB設定`の`データベースの管理`では、`データベースを整理`（SQLiteのVACUUM）を明示的に実行できます。確認のあと、実行中は書き込みを停止し、終わると`整理前 …、整理後 …`の容量を表示します。`実行の記録の保存期間（日）`は1〜36500の整数で、空欄なら無期限（既定）です。`保存期間を保存`で日数を保存すると、確認のあと、その場で1回、期間を過ぎた完了済みの実行・AI自動推敲・provider観測の記録だけを削除します。作品・系譜・リンク・実行中の記録は残します。
+
+APIは次のとおりです。
+
+| API | 内容 |
+|---|---|
+| `POST /api/settings/database/vacuum` | 整理を実行し、`before_bytes`・`after_bytes`を返す。別の復元・整理が走っていると400 |
+| `GET`／`PUT /api/settings/execution-retention` | 保存期間（`retention_days`は1〜36500、`null`で無期限）を読む・保存する。日数を保存した時にその場で1回削除する |
+
 ## 4. 認証、権限グループ、scope
 
 | 権限グループ | 権限 |
@@ -218,7 +238,7 @@ DBは次を分離して保存します。
 | `leaders` | 所属scope内のユーザー管理 |
 | `users` | 生成と自分の履歴・設定管理 |
 
-管理者は`設定`の`ユーザー管理`で利用者の作成、所属・権限グループと他の利用者のpasswordの変更を行えます。対象を選び、`ユーザー変更`の`新しいパスワード`へ入力して保存します（**現在のpasswordは要りません**）。`ユーザー管理`は`admins`と`leaders`に表示されます。`leaders`には自分の組織グループの通常利用者だけが現れ、その作成・編集・削除とpasswordの変更を行えます（権限グループと組織グループの選択、組織グループの管理は`admins`だけ）。利用者が自分で変えるときは`プロフィール`から現在と新しいpasswordの両方を入れます。**管理者が1人だけで、その人が忘れた場合はこの道が使えません** —— 戻り道は2.2の`inku-admin reset-password`です。
+管理者は`設定`の`ユーザー管理`で利用者の作成、所属・権限グループと他の利用者のpasswordの変更を行えます。対象を選び、`ユーザー変更`の`新しいパスワード`へ入力して保存します（**他の利用者を再設定するときは、現在のpasswordは要りません**）。管理者が自分自身のアカウントのpasswordを変えるときは`現在のパスワード`が要ります。`ユーザー管理`は`admins`と`leaders`に表示されます。`leaders`には自分の組織グループの通常利用者だけが現れ、その作成・編集・削除を行えます。passwordの変更には、対象の利用者の現在のpasswordが要ります（欄名は`対象ユーザーの現在のパスワード`。現在のpasswordを要らないのは、`admins`が自分以外の利用者を再設定するときだけです。欄は新しいパスワードを入力したときに現れます）（権限グループと組織グループの選択、組織グループの管理は`admins`だけ）。利用者が自分で変えるときは`プロフィール`から現在と新しいpasswordの両方を入れます。**管理者が1人だけで、その人が忘れた場合はこの道が使えません** —— 戻り道は2.2の`inku-admin reset-password`です。
 
 passwordを設定し直すと、そのアカウントのほかのsessionは終わります。管理者の再設定と`inku-admin reset-password`はすべてのsessionを、本人の変更は変更した画面のsessionを残してほかを終わらせます。
 
@@ -247,7 +267,7 @@ passwordを設定し直すと、そのアカウントのほかのsessionは終�
 | 分類 | 主な項目 | 保存範囲 |
 |---|---|---|
 | `表示と操作` | 文字サイズ、詞書きの表示位置、UIモード、履歴帯に添える情報 | 文字サイズとUIモード等は本人の設定。文字サイズは直ちに反映される |
-| `制作` | `描くときのデフォルト`、バッチの再試行回数、`デモ` | 描くときのデフォルトとバッチの再試行回数は本人の設定。`デモ`は制作分類内 |
+| `制作` | `描くときのデフォルト`、バッチの再試行回数、`デモ` | 描くときのデフォルトは本人の設定（アカウントに保存）。バッチの再試行回数はこのブラウザだけの設定。`デモ`は制作分類内 |
 | `エクスポート` | 保存先、PNG保存テンプレート、アニメーション、共有カード | 保存先は選んだブラウザだけ。PNG保存テンプレートは本人のPNGメニューへ適用 |
 | `接続と管理` | `モデル設定`、`ユーザー管理`、`DB設定`、`ログ保存`、詳細時の`その他（サーバー）`と`制限値` | `ユーザー管理`は`admins`と`leaders`（自分の組織グループの通常利用者だけ）、ほかは`admins`のみ |
 
@@ -356,6 +376,7 @@ APIのJSONの応答は、`render_seed`と`composition_seed`を10進の文字列�
 | 対象 | 理由 |
 |---|---|
 | DB | 履歴、系譜、ユーザー、設定の正本 |
+| `<DB名>-autonomous-runs.db`（`INKU_AUTONOMOUS_RUNS_DB_URL`） | AI自動推敲の実行の様子。作品の正本ではなく、無くなっても作品と系譜は残る。管理UIのbackupには入らない（`thumbs.db`も同様で、捨てても作り直せる） |
 | `INKU_SECRET_KEY_FILE` | provider key復号に必須 |
 | `/etc/inku/inku-api.env` | runtime設定 |
 | systemd／reverse proxy | service復旧 |
@@ -453,7 +474,7 @@ curl -sS -i --max-time 5 \
 現行版はローカルログインを止める要求を断りますが、それより前の版で止めた設定や、環境変数`INKU_AUTH_LOCAL_ENABLED=false`はログインを403にしたまま残ります。`inku-admin reset-password`では戻りません。次の手順で戻します。単独利用モードは最も古い管理者として動くので、管理者が1人は居る必要があります。
 
 1. `INKU_AUTH_LOCAL_ENABLED=false`を設定していれば外します。
-2. APIを`INKU_SINGLE_USER=1`で起動し直します（composeなら`.env`へ書いて`docker compose up -d`）。
+2. APIを`INKU_SINGLE_USER=1`で起動し直します（ソースbuild用`compose.yaml`なら`.env`へ書いて`docker compose up -d`。リリースイメージ用の`deploy/compose.yaml`は`INKU_SINGLE_USER`を渡さないので、この手順は効きません）。
 3. APIのportへ直接、ローカルログインを有効に戻す要求を送ります。
 
    ```sh

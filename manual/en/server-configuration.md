@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates, using v2.15.147 (Web Build 1223) as the baseline.
+This guide defines the administration baseline. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates, using v2.15.329 (Web Build 1405) as the baseline.
 
 ## 1. Configuration Boundaries
 
@@ -12,7 +12,7 @@ Settings belong to three boundaries.
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
-Rendering, history redraws, and account administration return 4xx for invalid input or conflicts and 500 for unexpected internal failures. Internal exception details are logged and omitted from the response.
+Rendering, history redraws, and account administration return 4xx for invalid input or conflicts and 500 for unexpected internal failures. Internal exception details are logged and omitted from the response. The exception: when `INKU_ENV=development` is set explicitly, failures of `/api/paint`, the demo instruction, Juxtaposition and the okugaki generation carry the exception type and text in the response (score and SVG rendering, history redraws, creating and updating users and groups, and profile updates stay hidden even then). With `INKU_ENV` unset or `production`, all of them are hidden. Set `INKU_ENV=production` in production.
 
 **Some settings are only seeded by the environment.** Painting concurrency and the limits take their initial values from environment variables at first start; after that the DB settings are canonical. Changing an environment variable does not change a setting already stored. For limits, use the admin UI or `inku-cli config update`; for concurrency, use the admin UI or the API in §2.3.
 
@@ -37,7 +37,8 @@ Rendering, history redraws, and account administration return 4xx for invalid in
 | `INKU_CORS_ORIGINS` | Comma-separated allowed origins | localhost only |
 | `INKU_LISTEN_HOST` | uvicorn listen host | `0.0.0.0` |
 | `INKU_LISTEN_PORT` | uvicorn listen port | `INKU_SERVER_PORT`, else `8100` |
-| `INKU_ENV` | Run mode, shown at start and branched on in development | `development` |
+| `INKU_ENV` | Run mode, shown at start; only an explicit `development` adds exception details to some 500 responses | Shown as `development`; unset is treated like production for error details |
+| `INKU_ANYIO_THREAD_TOKENS` | Ceiling on threads running synchronous endpoints (**for tuning**: raise it only if `/health` and the like stall while heavy renders wait; at least 1) | `100` |
 | `INKU_TIMEZONE` | Timezone used for DB backup scheduling and similar | `Asia/Tokyo` |
 | `INKU_REDIS_URL` | When set, shared state such as rate limiting moves to Redis | unset, in-process |
 | `INKU_THUMBS_DB_URL` | URL of the derived database that holds the thumbnails | `thumbs.db` beside `INKU_DB_URL` |
@@ -60,14 +61,14 @@ The distributed web image sets `BODY_SIZE_LIMIT`, the request limit of the proxy
 | `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN` | Permit a password shorter than eight characters. **Do not set this in production** |
 | `INKU_AUTH_LOCAL_ENABLED` | Sign-in with username and password (default `true`) |
 | `INKU_AUTH_GOOGLE_ENABLED` | Sign-in with Google (default `false`) |
-| `INKU_SINGLE_USER` | Single-user mode: settle on one person and sign them in automatically (**code default `0`, distributed compose default `1`**). **Does not engage on a database with no administrator** |
+| `INKU_SINGLE_USER` | Single-user mode: settle on one person and sign them in automatically (**code default `0`; default `1` in the source-build `compose.yaml`; the released-image `deploy/compose.yaml` does not pass it, so sign-in is required**). **Does not engage on a database with no administrator** |
 
 The account is created only when a password is set and the DB contains no users. Passwords shorter than eight characters are rejected. Remove the secret from the environment after initial creation.
 
 A blank value counts as unset. Neither an empty field in an environment file nor the empty value that Compose's `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` interpolation supplies will fail startup. When clearing the secret after initial creation, deleting the line and blanking it have the same effect.
 
 inku has no self-service registration. Accounts are created only through `POST /api/users`, by an authenticated member of the `admins` or `leaders` group. **Starting an empty database without a bootstrap administrator, with single-user mode off, therefore leaves a server nobody can sign in to.** With single-user mode on, the server creates one account and signs it in by itself. Recovery is simply to set the password and restart. The bootstrap administrator is attempted only while the DB has no users, so an existing account's password is never overwritten.
-An administrator who forgets the password is not shut out for good. `inku-admin reset-password` sets one account's password from inside the server's own environment (`docker compose exec api inku-admin reset-password --username admin` for the distributed image, `uv run inku-admin reset-password` from a source checkout). It asks for the password twice and never takes it on the command line; `--password-stdin` reads the first line of standard input for scripted use. Naming no account resets the one `INKU_BOOTSTRAP_ADMIN_USERNAME` created, and an unknown name prints the accounts that exist. **This is not a second way in**: running it needs the container or the files, and both already carry the database. Available from v2.13.41.
+An administrator who forgets the password is not shut out for good. `inku-admin reset-password` sets one account's password from inside the server's own environment (`docker compose exec api inku-admin reset-password --username admin` for the distributed image, `uv run inku-admin reset-password` from a source checkout). It asks for the password twice and never takes it on the command line; `--password-stdin` reads the first line of standard input for scripted use. When two accounts share a name, name the account with `--user-id ID` (it cannot be combined with `--username`). Naming no account resets the one `INKU_BOOTSTRAP_ADMIN_USERNAME` created, and an unknown name prints the accounts that exist. **This is not a second way in**: running it needs the container or the files, and both already carry the database. Available from v2.13.41.
 
 ### 2.3 Artifacts and Concurrency
 
@@ -83,6 +84,9 @@ An administrator who forgets the password is not shut out for good. `inku-admin 
 | `INKU_DB_BACKUP_SCHEDULER` | Set to `0` to leave the periodic backup scheduler unstarted | `1` |
 | `INKU_THUMBNAIL_WORKERS` | Workers that bake after a save (**separate from the rebuild**, whose parallelism comes from the stored `workers` setting). **It starts having an effect in v2.13.37** -- until then the bake ran inside the same process, and the rasterizer holds one core, so any number of workers finished one image at a time | `2` |
 | `INKU_THUMBNAIL_QUEUE_LIMIT` | Thumbnail baking queue ceiling | `64` |
+| `INKU_AUTONOMOUS_RUNS_DB_URL` | SQLite URL that holds AI autonomous-refinement runs | `<canonical DB name>-autonomous-runs.db` beside the canonical DB |
+| `INKU_IMAGE_DDL_MAX_TOKENS` | Output-token ceiling for the write-from-image request | `8192` |
+| `INKU_DB_BACKUP_DIR` | Where DB backups are kept | `~/.local/share/inku/db-backups` |
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
 
@@ -136,12 +140,10 @@ Explicitly set the additional structural limits in both `pipeline.compiler.hard_
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `INKU_LLM_BACKEND` | Which LLM backend family to use | `anthropic` |
 | `INKU_PLUGIN_PACKAGE_DIR` | Where plugins (packages) an administrator added from the Web live | `~/.local/share/inku/plugin-packages` (`/data/plugin-packages` in Docker) |
 | `INKU_OKUGAKI_MODEL` | Default reader model for the colophon | a vision-capable model |
 | `INKU_OKUGAKI_CACHE_TTL_SECONDS` | Colophon cache lifetime | `1800` |
 | `INKU_OKUGAKI_CACHE_MAX_ENTRIES` | Colophon cache size | `256` |
-| `INKU_LEARNED_FILE` | Where learned words are stored | `/tmp/inku-learned.json` |
 | `INKU_DEVELOPER_MODE` | Extra developer-facing output | unset |
 
 The `Plugins` settings add and delete vocabulary plugins and show whether each is on and its words (name, aliases, surfaces, notes, example, preview).
@@ -154,8 +156,6 @@ The `Plugins` settings add and delete vocabulary plugins and show whether each i
 - Bundled `Nature.leaves` is a v2 file in the core. It can be disabled but not deleted or given a replacement picture. Old v1 files appear as rejected with reasons.
 
 Bundled leaves do not depend on `INKU_PLUGIN_PACKAGE_DIR`; only administrator-installed files are read there.
-
-The default for `INKU_LEARNED_FILE` is under `/tmp`, so it does not survive a restart. Give it a stable path to persist it.
 
 ### 2.6 Providers
 
@@ -170,11 +170,20 @@ The default for `INKU_LEARNED_FILE` is under `/tmp`, so it does not survive a re
 
 Base URLs, keys, and published models can also be managed from the admin UI. Keys stored in the DB use the encrypted `enc:v1:` format.
 
+A self-hosted setup that uses a ChatGPT plan reads these variables (usage is in the [ChatGPT plan guide](../../docs/guide/chatgpt-plan.md)).
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `INKU_CHATGPT_PLAN_ENABLED` | Turn the ChatGPT plan connection on (`1`, `true`, `yes` or `on`) | empty (off) |
+| `INKU_CHATGPT_SELF_HOSTED` | Treat this as a self-hosted Server (same accepted values) | empty (off) |
+| `INKU_CHATGPT_AUTH_DIR` | Where the ChatGPT credentials are kept | `~/.config/ddl-server/chatgpt` (`/data/chatgpt` in the containers) |
+| `INKU_CHATGPT_HELPER_TARGET` | When `container`, the response that starts a connection carries `helper_target` (the helper reaches a container) | unset |
+
 ## 3. Database and Migrations
 
 ### 3.1 SQLite
 
-In the administrator's DB settings, compaction runs only when explicitly requested and stops writes while it runs. An empty execution-record retention period means indefinite retention. Saving a number removes only older finished records, keeping works, lineage, links, and busy executions.
+Database compaction and the execution-record retention period are in [§3.4](#34-db-compaction-and-execution-record-retention).
 
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
@@ -221,6 +230,15 @@ The DB keeps these identities separate.
 
 The canonical payload of `rh3` is the score, `render_seed`, `render_wild`, the render engine id and version, and the color catalog id. It does not include `composition_seed` or the build number. **The key names in that payload are identity material; never rename them for presentation reasons.** A rename recomputes the hash of every stored work.
 
+### 3.4 DB Compaction and Execution-Record Retention
+
+In the administrator's `DB settings`, `Database maintenance` offers `Compact database` (SQLite VACUUM), run only on request: after a confirmation, writes stop while it runs and the sizes are shown as `Before …, after …`. `Execution record retention (days)` takes a whole number from 1 to 36500; empty means indefinite retention (the default). `Save retention` asks for confirmation and then, once and immediately, deletes only finished execution, AI autonomous-refinement and provider-observation records older than that period. Works, lineage, links and busy records stay.
+
+| API | What it does |
+|---|---|
+| `POST /api/settings/database/vacuum` | Runs the compaction and returns `before_bytes` and `after_bytes`. 400 if another restore or maintenance is running |
+| `GET` / `PUT /api/settings/execution-retention` | Reads or saves the retention (`retention_days` is 1 to 36500, `null` for indefinite). Saving a number prunes once at that moment |
+
 Lineage connects only explicit creation operations. It is never inferred from similarity, identical descriptions, or timestamps. Permanent removal of a regular-history work may leave a content-free tombstone so the lineage path remains recorded.
 
 ## 4. Authentication, Permission Groups, and Scope
@@ -231,7 +249,7 @@ Lineage connects only explicit creation operations. It is never inferred from si
 | `leaders` | User administration within assigned scope |
 | `users` | Generation and management of own history and settings |
 
-An administrator uses `User management` in Settings to create users and change membership, permission groups, and another person's password. Choose the account, fill in `New password` in `Edit user`, and save (**the current password is not asked for**). `User management` is shown to `admins` and to `leaders`. A `leaders` member sees only the ordinary users of their own organisation group, and creates, edits, deletes, and sets passwords for them (choosing permission groups or organisation groups, and managing organisation groups, stay with `admins`). A person changing their own password does it from `Profile`, where both the current and the new one are required. **None of this is open to a lone administrator who has forgotten theirs** -- the way back is `inku-admin reset-password` in 2.2.
+An administrator uses `User management` in Settings to create users and change membership, permission groups, and another person's password. Choose the account, fill in `New password` in `Edit user`, and save (**when resetting another person's password, the current password is not asked for**). An administrator changing their own account's password does need `Current password`. `User management` is shown to `admins` and to `leaders`. A `leaders` member sees only the ordinary users of their own organisation group, and creates, edits, and deletes them. Changing a password needs the target person's current password (the field is `The user's current password`; only an `admins` member resetting someone else's password is exempt, and the field appears once a new password is typed) (choosing permission groups or organisation groups, and managing organisation groups, stay with `admins`). A person changing their own password does it from `Profile`, where both the current and the new one are required. **None of this is open to a lone administrator who has forgotten theirs** -- the way back is `inku-admin reset-password` in 2.2.
 
 Setting a password again ends the account's other sessions: a reset by an administrator or by `inku-admin reset-password` ends all of them, and a person's own change ends all but the one that made it.
 
@@ -260,7 +278,7 @@ Open `Settings` from the application rail. The top `Standard` / `Detailed` switc
 | Category | Main items | Scope |
 |---|---|---|
 | `Display and operation` | Text size, caption position, UI mode, and fields below history thumbnails | Text size, UI mode, and related choices belong to the member. Text size takes effect immediately. |
-| `Making` | `Drawing defaults`, batch retry count and `Demo` | The drawing defaults and the batch retry count belong to the member. `Demo` is in the Making category. |
+| `Making` | `Drawing defaults`, batch retry count and `Demo` | The drawing defaults belong to the member's account; the batch retry count is a setting of this browser only. `Demo` is in the Making category. |
 | `Export` | Save location, PNG templates, animation, and cards | The save location belongs only to the browser that chose it. PNG templates apply to that member's PNG menu. |
 | `Connections and administration` | `Models`, `User management`, `DB settings`, `Log retention`, and, in Detailed mode, `Other (server)` and `Limits` | `User management` is available to `admins` and to `leaders` (for the ordinary users of their own organisation group); the other items to `admins` only. |
 
@@ -369,6 +387,7 @@ Back up at least:
 | Target | Reason |
 |---|---|
 | DB | Source of truth for history, lineage, users, and settings |
+| `<DB name>-autonomous-runs.db` (`INKU_AUTONOMOUS_RUNS_DB_URL`) | State of AI autonomous-refinement runs. Not the source of truth for works; works and lineage survive without it. The Admin UI backup does not include it (nor `thumbs.db`, which can be rebuilt) |
 | `INKU_SECRET_KEY_FILE` | Required to decrypt provider keys |
 | `/etc/inku/inku-api.env` | Runtime configuration |
 | systemd and reverse proxy | Service recovery |
@@ -466,7 +485,7 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 This version refuses to turn local sign-in off, but a setting made by an earlier version, or `INKU_AUTH_LOCAL_ENABLED=false` in the environment, keeps sign-in answering 403, and `inku-admin reset-password` does not change that. Turn it back on as follows. Single-user mode acts as the oldest administrator, so at least one administrator must exist.
 
 1. Remove `INKU_AUTH_LOCAL_ENABLED=false` if you set it.
-2. Restart the API with `INKU_SINGLE_USER=1` (with Compose, put it in `.env` and run `docker compose up -d`).
+2. Restart the API with `INKU_SINGLE_USER=1` (with the source-build `compose.yaml`, put it in `.env` and run `docker compose up -d`; the released-image `deploy/compose.yaml` does not pass `INKU_SINGLE_USER`, so this step does not work there).
 3. Send the request that turns local sign-in back on straight to the API port.
 
    ```sh

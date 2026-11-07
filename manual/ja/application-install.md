@@ -1,6 +1,6 @@
 # アプリケーションインストール
 
-この文書はLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。§10と§12のWeb UI操作はv2.15.147（Web Build 1223）を基準にしています。
+この文書はLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。§10と§12のWeb UI操作はv2.15.329（Web Build 1405）を基準にしています。
 
 ## 1. 構成
 
@@ -128,7 +128,7 @@ NVIDIA_API_KEY=
 
 `INKU_BOOTSTRAP_ADMIN_PASSWORD`は8文字以上です。新規DBにユーザーがいない場合だけbootstrap adminを作成します。初回作成後は環境ファイルから削除するか、秘密管理システムへ移します。空文字は未設定と同じ扱いなので、行を削除しても空欄にしても構いません。
 
-**単独利用モード（`INKU_SINGLE_USER=1`。配布物の既定）ではこの初回設定は要りません。** サーバーが利用者を1人作って自動的にログイン済みにします。
+**単独利用モード（`INKU_SINGLE_USER=1`。ソースbuild用`compose.yaml`の既定。リリースイメージ用の`deploy/compose.yaml`は既定でonにしません）ではこの初回設定は要りません。** サーバーが利用者を1人作って自動的にログイン済みにします。
 
 **単独利用モードを off にするなら、この初回設定は省略できません。** inkuにはセルフサインアップがなく、アカウントを作れるのは`admins`または`leaders`グループに属する認証済み利用者だけです。bootstrap adminなしで空のDBを起動したサーバーには、ログインする手段がありません。設定を忘れた場合は、passwordを設定して再起動すれば作成されます（ユーザーが0件のときだけ作成を試みるため、既存アカウントには影響しません）。
 
@@ -195,8 +195,8 @@ systemctl status inku-server.service --no-pager
 ```sh
 cd /opt/inku/inku-lang/cli
 sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli --base-url http://127.0.0.1:8100 login -u admin
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli --base-url http://127.0.0.1:8100 me
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli login --base-url http://127.0.0.1:8100 -u admin
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli me --base-url http://127.0.0.1:8100
 ```
 
 ## 12. 受け入れ確認

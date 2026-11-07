@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment. The Web UI instructions in §§10 and 12 use v2.15.147 (Web Build 1223) as their baseline.
+This guide describes a standard new installation or upgrade on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment. The Web UI instructions in §§10 and 12 use v2.15.329 (Web Build 1405) as their baseline.
 
 ## 1. Components
 
@@ -128,7 +128,7 @@ NVIDIA_API_KEY=
 
 `INKU_BOOTSTRAP_ADMIN_PASSWORD` must be at least eight characters. A bootstrap admin is created only when the DB has no users. Remove the password from the environment after initial creation or move it to a secret manager; a blank value counts as unset, so deleting the line and blanking it are equivalent.
 
-**In single-user mode (`INKU_SINGLE_USER=1`, the distribution default) this first setting is not needed.** The server creates one account and signs it in by itself.
+**In single-user mode (`INKU_SINGLE_USER=1`, the default of the source-build `compose.yaml`; the released-image `deploy/compose.yaml` does not turn it on) this first setting is not needed.** The server creates one account and signs it in by itself.
 
 **If you turn single-user mode off, this first setting cannot be skipped.** inku has no self-service registration, and only an authenticated member of the `admins` or `leaders` group can create accounts. A server started against an empty DB without a bootstrap admin offers no way to sign in. If it was missed, set the password and restart: the account is created then, and because creation is attempted only while the DB has no users, existing accounts are unaffected.
 
@@ -195,8 +195,8 @@ Normal generation has no manual instruction-language selector. It detects the in
 ```sh
 cd /opt/inku/inku-lang/cli
 sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli --base-url http://127.0.0.1:8100 login -u admin
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli --base-url http://127.0.0.1:8100 me
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli login --base-url http://127.0.0.1:8100 -u admin
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli me --base-url http://127.0.0.1:8100
 ```
 
 ## 12. Acceptance Checks

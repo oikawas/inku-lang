@@ -2,7 +2,7 @@
 
 This document serves as a guideline for AI agents to operate the `inku-server` via command line and paint works autonomously, evaluate them visually, and refine them while tracking lineage nodes.
 
-It covers inku v2.15.241 (Web Build 1317). The full flag list lives in the `inku-cli Reference`.
+It covers inku v2.15.329 (Web Build 1405). The full flag list lives in the `inku-cli Reference`.
 
 Future tests and comparisons that call a real provider use these models (two routes: ChatGPT plan and Gemini API (Cloud)). Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation.
 

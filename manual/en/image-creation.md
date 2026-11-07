@@ -1,6 +1,6 @@
 # Creating Images
 
-The Web instructions in this guide use inku v2.15.147 (Build 1223) as their baseline. A description becomes visible instructions, passes through any needed completion and Rust compilation, and is performed from Score.
+The Web instructions in this guide use inku v2.15.329 (Build 1405) as their baseline. A description becomes visible instructions, passes through any needed completion and Rust compilation, and is performed from Score.
 
 Each route has the model pass these stages in order to make the instructions ([ ] marks a stage that a chip or setting decides):
 
@@ -139,12 +139,12 @@ Leading serial numbers and bracketed annotations belong to the writer, not to th
 
 ## 4. Sketch from Life
 
-`Sketch from life` keeps the original description and adds prose about place and light for interpretation. Choose it from `Sketch from life` in the button row of the describe tab.
+`Sketch from life` keeps the original description and adds prose about place and light for interpretation. Choose it with the chip `Sketch from life` under `Steps` in the next-work conditions of the Description and Batch tabs; lit means the sketch runs.
 
 | Choice | Contents |
 |---|---|
-| Off | Skip the sketch and send the description to interpretation (default) |
-| On | Add a supplement about place and light to the description |
+| Off (unlit) | Skip the sketch and send the description to interpretation |
+| On (lit) | Add a supplement about place and light to the description (lit by default as shipped; changeable under `Drawing defaults` in `Settings`; not used in the Image tab) |
 
 `Fine` and `Coarse` on older works record the sketch method used at the time. They are no longer current choices.
 
@@ -318,7 +318,7 @@ Coordinates stay normalized to 0.0–1.0 whatever the canvas. **A mark's size is
 
 **Drawn on a paper of another ratio than its declaration, the app asks before drawing**: from `Draw` in the DDL tab, from an instruction edit, and from a new DDL. `Fit it in` places the composition, keeping its ratio, in a frame in the middle of the paper, and the ground and background fill the margins; marks reaching out of the frame are drawn to the paper's edges. `Draw to this paper` spreads it to the paper's ratio as before. Cancelling draws nothing. An older work without a declaration is taken to have the ratio of the paper it was drawn on, and a work with no such record is not asked about. A work fitted without an edit is drawn from its saved Score in the frame and kept in the lineage as a `Fit` child.
 
-The conditions of the displayed work and the conditions for the next work are separate. `Conditions of the displayed work` (above the canvas, on the row of the Work and Lineage tabs) records how the work on screen was painted, in the top-to-bottom order of the next work's conditions on the left: model, color catalog, drawing, sketch, composition, laws and colors, stroke limit and canvas, then size and creation time. The lineage generation stands under the heading. A condition the work did not record (a work from before that record) reads `N/A`. A work drawn from a picture shows no drawing, sketch or composition row. While a drawing runs, the strip keeps showing the previous work whose picture stays on the canvas, and switches to the new work when it is done. Right after, until the new work's lineage generation is read, the lineage reads `…`.
+The conditions of the displayed work and the conditions for the next work are separate. `Conditions of the displayed work` (above the canvas, on the row of the Work and Lineage tabs) records how the work on screen was painted, in the top-to-bottom order of the next work's conditions on the left: model, color catalog, drawing, sketch, `Composition, laws and colors` (one item), stroke limit and canvas, then size and creation time. The lineage generation stands under the heading. A condition the work did not record (a work from before that record) reads `N/A`. A work drawn from a picture shows no drawing, sketch or composition row. While a drawing runs, the strip keeps showing the previous work whose picture stays on the canvas, and switches to the new work when it is done. Right after, until the new work's lineage generation is read, the lineage reads `…`.
 
 `Conditions for the next work` controls what comes next. Opening a work copies its record into the conditions of the tab it opens in (Describe or Image). An on/off choice the work did not record (sketch, composition, stroke limit) becomes off; any other (drawing, color catalog, canvas, model) becomes that tab's default. Opening a work while a description batch runs leaves the batch's conditions alone.
 
@@ -478,6 +478,10 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 - Double-click a lineage card to show that work large in the Work tab.
 - You may also select a work from the lineage and repaint it from its description or instructions.
 - A work painted from an image starts a lineage. A child drawn from its edited instructions, or from `Instructions before review` (§16), is an instruction-edit child and, like color and composition children, keeps the source note.
+- `Vertical` / `Horizontal` in the header's `View` group lays the lineage out either way, and `Map` shows the whole tree at once (zoom 40–140% with − / ＋; `Close map` returns).
+- A card with children carries `▸ N children`, which opens or closes the branch (not shown inside the map). `Details` on a card opens a dialog with the description, how it was derived, the AI move, the comment and the colophon.
+- Check cards (`Check for bulk actions`) to use `Export` and the bulk move-to-trash button under `Selected: N works`. `Export` under `Displayed work` and `Export` under `Origin to displayed: N works` are separate targets from the checked set (§15).
+- `Start a new root` does not rewrite the saved lineage. It releases the link to the displayed work and returns to the Work tab, so the next work you paint starts a new root instead of becoming a child of the current one.
 
 ## 13. Read the Colophon
 
@@ -503,7 +507,7 @@ A work painted from an image has no description, so the history strip, the Libra
 
 In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). A single click on an image opens its reading preview without changing the next-work conditions. Double-clicking opens and focuses that work in Work for `Timeline` or in Lineage for `By lineage`. You can also use `Open work`, `Open lineage`, or `Refine`.
 
-In the Web `Timeline`, use the arrow keys to move between works and change the preview in thumbnails or list view. At a page edge, navigation continues to the adjacent page.
+In the Web `Timeline`, use the arrow keys to move between works and change the preview in thumbnails or list view. At a page edge, navigation continues to the adjacent page. The arrow keys do nothing in the trash view, in the `By lineage` arrangement, with a modifier key held, or while loading.
 
 Combine `Thumbnails` with `By lineage` to show lineages with at least two works matching the current search and filters, arranged horizontally from the origin in generation order. A lineage with only one matching work is omitted, except for the work selected when opening the Library if it matches the conditions. The lineage `List` view has no such two-work minimum. Scroll vertically between lineage groups and horizontally through a long row of related works. The thumbnail of the work shown on the canvas carries the same `Current` badge as the history strip (at the picture's lower right in `Timeline`, and in place of the generation number at the upper right in `By lineage`).
 
@@ -515,7 +519,7 @@ Each lineage initially shows 200 works. `Show more` adds 200 at a time.
 - The `#` buttons copy the work's UUID (so does the `#` at the bottom right of the canvas). The `ID` row of the preview shows the UUID's first eight characters. To name a work to an AI or to inku-cli, pass this UUID rather than a hash: a hash can coincide with another work of the same drawing, and it is rewritten when the hash scheme changes
 - The `Starred`, `Revision`, and `Shared` filters. Used together, only works matching every one of them remain
 - Switching between ordinary history and trash
-- Thumbnail view and list view. The list compares ID (a UUID copy button), timestamp, model, elapsed time, and color catalog
+- Thumbnail view and list view. The list compares image, description, created time, model, color catalog, SVG size, ID (the `#` button copies the UUID), and actions (revision mark, share settings, move to trash). Elapsed seconds appear in the reading preview
 - Move to trash, restore, and permanent delete, singly or by multiple selection
 - `Select all` toggles selection of works on the current page; the adjacent `Clear selection` clears selections across all pages
 - Expanding and selecting a whole lineage at once
@@ -531,6 +535,8 @@ In multi-user mode, the share mark is a third one. Raise it with `Share with gro
 **Lowering the mark keeps the destination.** Marking the same work again returns it to the same recipients. **What this mark widens is reading only, never writing** — a work shared to you cannot be starred or moved to trash by you. Lineage nodes follow the mark, but **the colophon does not**.
 
 Both the history strip and `Library` carry a `Shared` filter, so the marked works can be listed on their own.
+
+The sharing dialog has two parts. `Group sharing` is the mark above and lets the destination group view only. `Individual sharing` lets you pick a `Member` or a `Group` as the guest (members of your own organisation group are chosen by name; if the list cannot be fetched, type `their ID`), choose `Can view` (read only) or `Can edit` (star, trash and delete as well), and press `Share`. Guests are listed and removed with `Remove`. In the Library list view, the `Share settings` button on the row of one of your own works (not one shared with you by another member) opens it too. The “reading only” above is about the group-sharing mark.
 
 In single-user mode, group-sharing buttons, the sharing dialog, sharing filters such as `Shared`, and sharing-status marks are hidden. Group and permission administration remain available.
 
@@ -554,16 +560,18 @@ Only a saved work is exported. A picture that is not saved (one drawn by the dem
 
 `Editable`, `Compat`, and `Live` are drawn again from the Score, and **a redraw uses the performance that was saved** (both the render seed and the composition seed the saved work carries). **The only difference from the stored SVG is how far the drawing engine has moved on** -- inku keeps no past version, so a redraw after the engine advances is never byte-identical.
 
+`DDL (with plugin definitions)` in `Export` (shown when one work is the target) saves the work's DDL, with the definitions and notes selected by its saved locks, as `inku.ddl-export.v2` JSON (`inku-ddl.json`), for carrying it to another environment (the same form as the CLI's `ddl-export`).
+
 Set the download folder under `Settings` → `Export`, page `File saving` → `Save location`. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
 
 ### 15.1 Contact Sheets
 
-Works selected in Library are laid out on a single PNG.
+Works selected in Library are laid out on a single PNG. `Review contact sheet` and `AI contact sheet` appear in the `Export` menu only when several checked works are its target.
 
 | Kind | Contents |
 |---|---|
-| Contact sheet for people | 7×4 works per sheet. The remainder goes to further files |
-| Contact sheet for AI | 3×4 works per sheet, 1568px on the long edge, captions numbered only. A companion md holding the numbers, descriptions, DDL, and provenance is saved alongside |
+| Review contact sheet | 7×4 works per sheet. The remainder goes to further files |
+| AI contact sheet | 3×4 works per sheet, 1568px on the long edge, captions numbered only. A companion md holding the numbers, descriptions, DDL, and provenance is saved alongside |
 
 ### 15.2 Shareable Card
 
@@ -596,21 +604,25 @@ One saved work and several selected works export differently. For the displayed 
 | Setting | Choices |
 |---|---|
 | Format | PNG animation (APNG, lossless), GIF animation (256 colors) |
-| Transition | Cut, crossfade, fade through white, horizontal slide |
-| Hold | Seconds each work is shown |
-| Resolution (Y axis) | 150 px, 300 px, 500 px, 1K (1080 px), 4K (2160 px), 8K (4320 px), custom |
+| Transition pattern | Cut, crossfade, fade through white, horizontal slide |
+| Display hold | Seconds each work is shown |
+| Resolution (y-axis) | 150 px, 300 px, 500 px, 1K (1080 px), 4K (2160 px), 8K (4320 px), custom |
 
 For one work, the finished picture appears first, then the animation returns to the ground and adds DDL instructions one by one. DDL appears on the left and the picture on the right, with the current line highlighted. Turn off `Show DDL` to show only the picture. `Line interval` sets the seconds per frame. A notice appears when the current engine's drawing differs from the saved picture or some instructions could not be drawn.
 
 | Replay | Motion |
 |---|---|
-| Restart from ground | Return to the ground after completion and build up again |
+| Restart | Return to the ground after completion and build up again |
 | Play back and forth | Reverse from the finished work to the ground, then repeat forwards |
 | Play once and hold | Build up once and stop at the finished work |
 
-For several works, choose the transition pattern and display hold for each work. Format, resolution, and destination are common to both types. When you start an export, its chosen format, motion, and other settings are saved per user in this browser for the next export. You can also change them under animation in `Settings`. A destination chosen in the dialog applies only to that export. In supported browsers, `Choose save path` chooses a folder; other browsers use their download settings.
+For several works, choose the transition pattern and display hold for each work. Format, resolution, and destination are common to both types. When you start an export, its chosen format, motion, and other settings are saved per user in this browser for the next export. You can also change them under animation in `Settings`. A destination chosen in the dialog applies only to that export. In supported browsers, `Choose save location` chooses a folder; other browsers use their download settings.
 
 From Library the order is oldest to newest; from the lineage it runs from the origin to the selected work.
+
+### 15.4 Copy to the Clipboard
+
+`Copy to clipboard` on the Work tab's canvas copies the displayed work as an image. Under `Settings` → `Export` → `Clipboard`, choose `Format` (`Picture only` / `Card`) and `Picture height (px)` (256 to 4096, default 1080); this is kept in this browser. `Card` uses the page shape and seal set for the share card under `Export` and can copy saved works only. A notice appears when the browser does not allow image copying over a non-https connection.
 
 ## 16. Paint from an Image
 
@@ -663,11 +675,11 @@ While it runs, the current line, progress, elapsed time, token counts, and the i
 
 Descriptions used before can be restored from `Batch description history`. The last fifty are kept (v2.13.21; twenty before that). The list reaches half the window height at most and scrolls when it does not fit. Clicking outside it or pressing `Esc` closes it.
 
-A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It restores the original text and drawing conditions, checks saved works, and draws only unfinished lines with their original line numbers. After a reload, a registered interrupted or expired run can be offered for resumption even if no work was saved yet. Resume is not offered while a drawing is active or its state is uncertain. Older unregistered runs are offered only when history and text establish the unfinished lines. Pressing `New` while the resume panel is shown asks first; once it is removed, this browser no longer continues that batch (the works it drew stay). Without the panel, the draw button reads `Paint batch`.
+A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It restores the original text and drawing conditions, checks saved works, and draws only unfinished lines with their original line numbers. After a reload, a registered interrupted or expired run can be offered for resumption even if no work was saved yet. A run that reached the end with failed lines also appears after a reload as a `Draw the lines that failed` card; `Draw failed lines` draws only those lines with their original line numbers and conditions (while the failure report of the same run is still on screen, `Retry failed works` in the report does this instead). On resume, a stroke-limit or composition choice with no record keeps the batch's current choice (it is reset neither to the default nor to off). Resume is not offered while a drawing is active or its state is uncertain. Older unregistered runs are offered only when history and text establish the unfinished lines. Pressing `New` while the resume panel is shown asks first; once it is removed, this browser no longer continues that batch (the works it drew stay). Without the panel, the draw button reads `Paint batch`.
 
 When a stopped batch or one that reached the end still has failed lines, `Retry failed works` appears. It redraws only the failed lines, with their original text, line numbers and drawing conditions, leaving out lines that succeeded, were interrupted or never ran. Lines that succeed leave the error list, and the remaining errors can be tried again. When the previous batch's full text cannot be confirmed, the button is unavailable and says so.
 
-Set `Batch retry` in the settings to one or more and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
+Set `Retry rounds` under `Batch retry` in the settings to 1–5 (this count is kept in this browser, not in the account) and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 
 ### 17.1 A folder of pictures
 
@@ -757,7 +769,7 @@ uv run inku-cli batch -f prompts.txt -o out --png --continue-on-error
 uv run inku-cli history --limit 20
 ```
 
-Flags you omit fall back to the server defaults. Sketch from life defaults to off in both the server and Web UI. See the `inku-cli Reference` for all flags and compatibility with older sketch values.
+Flags you omit fall back to the server defaults. In the Web UI the Description tab starts with the sketch on as shipped (changeable under `Drawing defaults` in `Settings`); CLI and server requests default to off. See the `inku-cli Reference` for all flags and compatibility with older sketch values.
 
 ## 21. When a Work Does Not Come Out
 

@@ -2,6 +2,18 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-07 — Align operation and administration guidance with the source
+
+Treating the source as authoritative, the operation and administration documents were brought in line with the current implementation. The target version is now v2.15.329 (Web Build 1405).
+
+- "Creating Images": the sketch-from-life choice and default (off when omitted by the Server and CLI; the Web starts from its shipped default), the order of `Conditions of the displayed work`, the Library list columns, the name of the review contact sheet, the DDL (with plugin definitions) export item, the English animation setting names, the batch card for drawing failed rows and the conditions an old batch record lacks, where the batch retry count is kept (this browser), the lineage tab operations, individual sharing, copying to the clipboard, and when arrow-key navigation does not apply were corrected to the screen wording.
+- "Server Configuration": single-user mode is on by default in the source-build `compose.yaml` but the released-image `deploy/compose.yaml` uses sign-in. `INKU_LEARNED_FILE` and `INKU_LLM_BACKEND`, which the source does not read, left the tables; `INKU_ANYIO_THREAD_TOKENS`, `INKU_AUTONOMOUS_RUNS_DB_URL`, `INKU_IMAGE_DDL_MAX_TOKENS`, `INKU_DB_BACKUP_DIR` and the four ChatGPT plan variables were added. Also corrected or added: which 500 responses hide exception details, when a current password is required to change a password, `inku-admin reset-password --user-id`, DB compaction and execution-record retention (§3.4), and the autonomous-refinement run DB among the backup targets.
+- "Application Install": the single-user default is now stated as that of the source-build `compose.yaml`, and `--base-url` of `inku-cli` now follows the subcommand. "Server Configuration" also says that the batch retry count under `Making` in Settings is a setting of this browser only, and the same source-build / released-image distinction is applied to the steps for restoring local sign-in and to the security baseline for single-user mode.
+- "CLI Reference": the operations `plugin` has (list, validate, preview), the config file and environment variables, and when `user update --password` works.
+- Templates: removed the nonexistent `INKU_LEARNED_FILE`.
+
+This allocates no new version and makes no deployment claim.
+
 ## 2026-11-05 — Order and place of the displayed work's conditions
 
 - Section 7 of "Creating Images" now places `Conditions of the displayed work` on the row of the Work and Lineage tabs, in the top-to-bottom order of the next work's conditions on the left.

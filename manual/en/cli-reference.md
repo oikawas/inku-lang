@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.15.147 (Web Build 1223).
+It covers inku v2.15.329 (Web Build 1405).
 
 ## Basics
 
@@ -35,7 +35,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | rasterize | Burn a folder of SVGs to PNG, one child process per file; `--workers` sets how many run at once |
 | measure-raster | Count the raster measurements of a folder of PNGs (pixel count, ground color, the share of faint and strong marks, mean distance from the ground, saturated marks). **It counts the image it was handed, at the width it was handed, and declares no width or scale flag.** To read a record at another width, burn at that width with `rasterize --width` and count the result. It never contacts a server |
 | vision-review | Run the configured vision model as a read-only mirror |
-| plugin | List, validate, and reload declarative DDL plugins |
+| plugin | List and validate declarative DDL plugins, and draw a plugin file's words without installing it (preview) |
 | reference | Dump the implementation vocabulary and constant tables, read-only |
 | user / group | Manage user accounts and groups |
 | config | Show and update the server's system settings |
@@ -44,6 +44,8 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | version | Show CLI and server version and build information |
 
 Commands that call the server accept `--base-url` (default http://127.0.0.1:8100) and `--timeout-seconds` (HTTP timeout in seconds, default 600).
+
+Settings live in `~/.config/inku-cli/config.json` (`INKU_CLI_CONFIG` names another path; `XDG_CONFIG_HOME` moves the directory) and hold the base URL, the login token, the default models and color catalog, and the timeout. When the file does not exist, `INKU_BASE_URL`, `INKU_CLI_TIMEOUT_SECONDS` and `INKU_COLOR_CATALOG` are read (when it exists, only `INKU_BASE_URL` is read, and only if the file holds no base URL). To keep separate Servers apart, point `INKU_CLI_CONFIG` at a different file for each (the token in the file is sent whatever `--base-url` names).
 
 `inku-cli activity` returns JSON. Batches include planned and completed counts, state and the last heartbeat. An expired lease does not prove the client stopped. Drawings are limited to the responding Server process; unregistered older batches and drawings in other processes are outside that observation. Autonomous refinement comes from the run database and includes intervals between moves; child drawings are linked only when tracked by the responding process. If an older Server omits the autonomous refinement field, its state is unknown.
 
@@ -298,7 +300,7 @@ The colophon is neither an evaluation nor a selection command. It must not be co
 | `user create --group-id ID` | Put the new account into a user group |
 | `user update --username` | Change the user name |
 | `user update --email` | Change the email address |
-| `user update --password` | Change the password |
+| `user update --password` | Change the password. This works only when an `admins` member resets another account; every other change needs the current password, which this command cannot send, so use `api PATCH /api/users/ID --data '{"password":…,"current_password":…}'` |
 | `user update --group-id ID` | Change the user group the account belongs to |
 | `user delete --cascade` | Also delete the account's generation history. Without it, an account that has history is not deleted, and the server answers 409 |
 

@@ -44,7 +44,7 @@ The reference implementation currently includes:
   token/time display, and cancellable `/api/compose` replay
 - shared-Rust `inku-ddl` compiler foundation that preserves visible normalized DDL with source
   spans and reaches a typed semantic document, generic macro locking/binding/finite expansion,
-  ownership conservation, and fail-closed diagnostics; accepted, but not connected to product runtime
+  ownership conservation, and fail-closed diagnostics; the Server and Android product runtimes use it in production through the shared core pipeline
 - scene-tone color strategy, richer fallback Scores, sensory visibility
   safeguards, and broader primitive use within the current schema
 - renderer material effects, wobble, rotation, arrangement paths, density/fade,
@@ -52,9 +52,10 @@ The reference implementation currently includes:
 
 The Android app is a Kotlin + Jetpack Compose native package with Room/SQLite
 as its local data layer.  It is a single-user application package rather than a
-multi-user server client.  Server/web remains the development master for DDL
-interpretation, Stage 1.5 expansion, Score repair, SVG rendering, history
-metadata, canvas aspect values, and render hash semantics.  Android-specific UI
+multi-user server client.  The shared Rust core is the source of truth for DDL
+interpretation, Score resolution, SVG rendering, and render hash semantics; the
+Server, Web, and Android call it.  Server/web remains the development master for
+host-layer matters such as history metadata and canvas aspect values.  Android-specific UI
 decisions are allowed only when they are explicit mobile equivalents or
 documented omissions.
 
@@ -66,7 +67,7 @@ stored in Room.  The LiteRT-LM GPU backend is required; CPU fallback is not part
 of the Android behavior.
 
 Android simplifies model selection to one drawing model for instruction
-generation, Stage 1, and Stage 2, while preserving server-compatible
+generation, instruction writing, and completion, while preserving server-compatible
 `stage1_model` and `stage2_model` fields in settings, JSON display, exported
 JSON, history records, and render metadata.  The Model Settings page exposes
 provider panels for adding services, editing service names and base URLs,
@@ -83,14 +84,14 @@ rendered image background.  White-background images use the dark app
 background; black-background images use a light background.
 
 The Android history view intentionally differs from the server/web UI.  It uses
-a three-column thumbnail grid and omits trash, list view, bulk selection, user
+an adaptive thumbnail grid (the column count follows the width, with a 152dp minimum cell width; two columns on a Pixel 9 held upright) and omits trash, list view, bulk selection, user
 management, DB administration, plugin administration, and server log controls
 because the Android package is single-user and mobile-first.
 
 Android SVG/PNG export follows the server/web `CanvasPanel` intent.  SVG export
 is a menu with display, editable, compatibility, and live profiles.  PNG export is a
-menu backed by Room `export_templates`, with `1080px`, `2160px`, and `4320px`
-Y-axis defaults.  Android opens the platform share sheet instead of browser
+menu backed by Room `export_templates`, with `1080px` and `2160px` Y-axis
+defaults (Android caps the height at 2160px and has no `4320px`; the author's decision of 2026-10-06).  Android opens the platform share sheet instead of browser
 downloads.
 
 Android render metadata includes `render_canvas_aspect_id` and
@@ -104,10 +105,10 @@ Android versioning is independent of the web build number.  `android/VERSION`
 is the source for Android `versionName`, and `android/BUILD_NUMBER` is the
 source for Android `versionCode`.  For the v1.48 generation, the Android values
 start at `1.48.0-android.1` and `148001`.  The Android Settings menu exposes
-version details including version name, version code, build type, application
-id, source spec generation, and render engine version.
+version details including version name, version code, build number, build type, application
+id, and render engine version.
 
-History records carry a server-side `render_hash`. New records use the `rh2:<sha256>` edition-id semantics from the render metadata section: saved Score plus explicit render conditions, not SVG text. Legacy 64-character hashes remain display-compatible. History APIs, paint/compose responses, the JSON tab, and saved artifact JSON expose both `render_hash` and the four-character uppercase `render_hash_short` for human reference.  The
+History records carry a server-side `render_hash`. New records use the `rh3:<sha256>` edition-id semantics from the render metadata section: saved Score plus explicit render conditions, not SVG text. Saved `rh2:` values and legacy 64-character hashes remain display-compatible as legacy. History APIs, paint/compose responses, the JSON tab, and saved artifact JSON expose both `render_hash` and the four-character uppercase `render_hash_short` for human reference.  The
 history manager shows the short hash without changing the thumbnail layout;
 clicking it copies the full hash.  The status bar also shows the current
 render's short hash beside the star action and copies the full hash when
@@ -156,7 +157,7 @@ engine's contract version.  These fields are included in the canonical
 `render_hash` payload so two works rendered with different engines remain
 traceable even when their input Score is otherwise similar.
 The settings dialog includes an admin-only Model Settings tab.  It stores the
-default Stage 1 / Stage 2 provider and model plus per-provider base URL and API
+default provider and model of the drawing model (shared by instruction writing and completion) plus per-provider base URL and API
 key settings in server app settings.  The supported connection targets are
 OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama's
 OpenAI-compatible API, and Ollama Cloud. Admin users can
@@ -168,7 +169,7 @@ pressed, so service panels do not include a redundant whole-panel save button.
 Model lists are fetched later through each service's model-list fetch action
 instead of being typed manually when the service is created.
 The service ID is the stable internal key used for DB connection settings,
-Stage 1 / Stage 2 provider references, API provider dispatch, and duplicate
+drawing-model provider references, API provider dispatch, and duplicate
 protection, so it is not editable after creation. The user-facing service name
 can be edited later.
 Each service panel can fetch its model list through the server. The server uses
@@ -205,8 +206,8 @@ after it had stopped serving models. That provider, Intel OVMS, was withdrawn
 altogether on 2026-07-30; a withdrawn provider is dropped from stored settings on
 read, is offered nowhere, and raises rather than accepting a connection, while its
 model ids stay readable so works made on it are still named.
-Wherever a model is named on screen — the running indicator, the work's Stage 1
-and Stage 2 lines, the history table, the lineage node details — it is named as
+Wherever a model is named on screen — the running indicator, the work's
+instruction-model and completion-model lines, the history table, the lineage node details — it is named as
 `<provider> / <model>`, because a model id alone does not say where it runs and,
 with `gpt-oss:20b` served by two providers, is not even unique. The model picker
 is the exception: its cards already sit under a provider heading.
@@ -219,11 +220,11 @@ OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Ollama
 Cloud. Ollama Cloud declares its own concurrency ceiling, which the
 server enforces per provider rather than exposing as a setting.
 LLM server connection settings are global admin-managed settings.  Each user's
-choice of one drawing model shared by Stage 1/2 and a separate Vision model is
+choice of one drawing model shared by instruction writing and completion and a separate Vision model is
 stored in `user_accounts.model_settings`, saved from the model selection dialog's
-`Stage 1/2` and `Vision` tabs through `/api/auth/me/settings`, and restored on login.
-Settings normalization aligns Stage 2's provider and model with Stage 1.
-Both drawing stages use the request's `stage1_model`, otherwise `stage2_model`,
+`LLM` and `Vision` tabs through `/api/auth/me/settings`, and restored on login.
+Settings normalization aligns the `stage2_model` provider and model with `stage1_model`.
+Both instruction writing and completion use the request's `stage1_model`, otherwise `stage2_model`,
 otherwise the user's drawing model. Compatibility keys and old works' model
 records remain. Admin users can also toggle
 which models are visible to users for each provider. Published-model selection

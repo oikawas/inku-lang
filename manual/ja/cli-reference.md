@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.15.147（Web Build 1223）です。
+対象はinku v2.15.329（Web Build 1405）です。
 
 ## 基本操作
 
@@ -35,7 +35,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | rasterize | SVGのフォルダをPNGへ焼く。1ファイル1子プロセスで、`--workers` で同時に走らせる本数を決める |
 | measure-raster | PNGのフォルダの判定量（画素数・地の色・薄い痕と濃い痕の割合・地からの平均距離・彩度のある痕）を数える。**渡された画像をその幅のまま数え、幅や尺度の旗を持たない。**別の幅で読み直したいときは`rasterize --width`でその幅に焼いてから数える。サーバーには繋がない |
 | vision-review | 設定済みvision modelによる読み取り専用評価 |
-| plugin | 宣言的DDLプラグインの一覧、検証、再読込 |
+| plugin | 宣言的DDLプラグインの一覧、検証、導入せずに描いて確かめる（preview） |
 | reference | 実装内の語彙・定数テーブルの読み取り専用ダンプ |
 | user / group | ユーザーアカウントとグループの管理 |
 | config | サーバーのシステム設定の表示と更新 |
@@ -44,6 +44,8 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | version | CLIと接続先serverのversion/build表示 |
 
 サーバーへ接続するコマンドは共通に `--base-url`（既定 http://127.0.0.1:8100）と `--timeout-seconds`（HTTP のタイムアウト秒。既定 600）を受け付けます。
+
+設定は`~/.config/inku-cli/config.json`（`INKU_CLI_CONFIG`で別のパス、`XDG_CONFIG_HOME`で場所を変更）に、接続先、ログインのtoken、既定のモデル・色カタログ、タイムアウトを保存します。ファイルが無い時は`INKU_BASE_URL`・`INKU_CLI_TIMEOUT_SECONDS`・`INKU_COLOR_CATALOG`を読みます（ファイルがあるときに読むのは、ファイルに接続先が無い場合の`INKU_BASE_URL`だけです）。接続先のServerごとに設定を分けたい時は`INKU_CLI_CONFIG`を変えてください（tokenは接続先の`--base-url`に関わらず設定ファイルのものが送られます）。
 
 `inku-cli activity` は実行状態をJSONで返します。バッチには予定数・完了数・状態・最後の生存通知を示します。実行権の期限切れはクライアントが停止した証明ではありません。描画の一覧は応答したServer process内に限り、未登録の古いバッチや他processの描画は分かりません。自動推敲は手の合間も含む実行DBの状態で、子の描画との対応は応答processが把握するものに限ります。古いServerで自動推敲の欄が無い場合は状態不明です。
 
@@ -297,7 +299,7 @@ uv run inku-cli replay WORK_ID --save-child
 | `user create --group-id ID` | 作成時にユーザーグループへ入れます |
 | `user update --username` | ユーザー名を変えます |
 | `user update --email` | メールアドレスを変えます |
-| `user update --password` | パスワードを変えます |
+| `user update --password` | パスワードを変えます。`admins`が自分以外の利用者を再設定するときだけ使えます（それ以外は現在のパスワードが要り、このコマンドにはその旗が無いので、`api PATCH /api/users/ID --data '{"password":…,"current_password":…}'`を使います） |
 | `user update --group-id ID` | 所属するユーザーグループを変えます |
 | `user delete --cascade` | 生成履歴も一緒に削除します。省略時は、履歴が残っている利用者を削除せず409を返します |
 

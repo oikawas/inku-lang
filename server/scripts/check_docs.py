@@ -6,8 +6,9 @@ Run it from ``server/``:
 
 The gate compares the Japanese originals with their English counterparts,
 checks that published links stay within published paths, applies the English
-glossary, and checks that the macOS notices were written from today's locked
-inputs. It reports source locations for actionable fixes.
+glossary, checks that the macOS notices were written from today's locked
+inputs, and checks that the registered 3D viewer reads today's newest Score. It
+reports source locations for actionable fixes.
 
 **Declared exceptions are the point.** Where the two versions legitimately
 differ, say so in ``PAIRS`` with a reason. An undeclared difference fails. This
@@ -600,6 +601,79 @@ def check_notice_inputs() -> list[str]:
     return problems
 
 
+# The Web, macOS and Android 3D views all load the viewer registered here; its
+# provenance names the core commit its WASM was built from.
+DDL_3D_REGISTRATION = "web/src/lib/features/experimental-3d/installation.json"
+DDL_3D_BUILDS = "web/static/experimental/ddl-3d"
+SCORE_EDITIONS = "core/crates/inku-score/src/types.rs"
+_EDITION = re.compile(r'Self::V\d+_\d+ => "(\d+)\.(\d+)\.(\d+)"')
+_VIEWER_URL = re.compile(r"^/experimental/ddl-3d/([A-Za-z0-9][A-Za-z0-9._-]{0,63})/index\.html$")
+
+
+def newest_score_edition(types_source: str) -> tuple[int, int, int] | None:
+    """Return the newest edition named in ``ScoreEdition::as_str``."""
+    editions = [tuple(map(int, match)) for match in _EDITION.findall(types_source)]
+    return max(editions) if editions else None
+
+
+def _file_at_commit(commit: str, path: str) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "show", f"{commit}:{path}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def check_3d_viewer_edition() -> list[str]:
+    """Report a registered 3D viewer that cannot read today's newest Score.
+
+    I-734: Score 0.24 arrived on 2026-10-31 while the registered viewer stayed
+    on a core that knew 0.23, so every newer work failed in 3D on all three
+    hosts with ``invalid_score_or_version``. Its own tests still passed because
+    they build against today's core; only the committed WASM lagged.
+    """
+    import json
+
+    registration = REPO_ROOT / DDL_3D_REGISTRATION
+    if not registration.is_file():
+        return []
+    url = json.loads(registration.read_text(encoding="utf-8")).get("viewerUrl", "")
+    if not url:
+        print("  3D viewer registered: none")
+        return []
+    match = _VIEWER_URL.match(url)
+    if not match:
+        return [f"{DDL_3D_REGISTRATION}: viewerUrl {url!r} is not a registered build path"]
+    build = match.group(1)
+    provenance_path = REPO_ROOT / DDL_3D_BUILDS / build / "wasm/provenance.json"
+    if not provenance_path.is_file():
+        return [f"{DDL_3D_BUILDS}/{build}: wasm/provenance.json is missing"]
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    commit = provenance.get("coreBaseSha", "")
+    problems = []
+    if provenance.get("coreHasLocalChanges"):
+        problems.append(f"{DDL_3D_BUILDS}/{build}: built from a core with local changes")
+    built_source = _file_at_commit(commit, SCORE_EDITIONS) if commit else None
+    if built_source is None:
+        return problems + [
+            f"{DDL_3D_BUILDS}/{build}: cannot read {SCORE_EDITIONS} at core {commit[:12] or '(none)'}"
+        ]
+    current = REPO_ROOT / SCORE_EDITIONS
+    today = newest_score_edition(current.read_text(encoding="utf-8")) if current.is_file() else None
+    built = newest_score_edition(built_source)
+    print(f"  3D viewer {build}: core {commit[:9]}")
+    if today is not None and (built is None or built < today):
+        shown = ".".join(map(str, built)) if built else "none"
+        problems.append(
+            f"{DDL_3D_BUILDS}/{build}: reads Score up to {shown} but core writes "
+            f"{'.'.join(map(str, today))}; rebuild and register the viewer "
+            "(experiments/ddl-3d/README.md, Web connection and distribution)"
+        )
+    return problems
+
+
 def main() -> int:
     print("checking that the two language versions have the same shape")
     parity = check_parity()
@@ -614,8 +688,10 @@ def main() -> int:
     terminology = check_terminology()
     print("checking that the macOS notices were written from today's locked inputs")
     notices = check_notice_inputs()
+    print("checking that the registered 3D viewer reads today's newest Score")
+    viewer = check_3d_viewer_edition()
 
-    problems = parity + version_parity + links + prose + terminology + notices
+    problems = parity + version_parity + links + prose + terminology + notices + viewer
     if not problems:
         print("documents are consistent.")
         return 0

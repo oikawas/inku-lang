@@ -111,3 +111,47 @@ def test_macos_notices_written_from_another_lock_are_reported(
     [problem] = module.check_notice_inputs()
     assert problem.startswith(f"{module.MACOS_NOTICES}: written from another core/Cargo.lock")
     assert "build-macos-notices.py" in problem
+
+
+def _editions(newest: int) -> str:
+    return "".join(f'            Self::V0_{n} => "0.{n}.0",\n' for n in range(1, newest + 1))
+
+
+def test_3d_viewer_built_before_the_newest_score_edition_is_reported(
+    tmp_path: pathlib.Path,
+) -> None:
+    import json
+
+    module = _check_docs()
+    module.REPO_ROOT = tmp_path
+    registration = tmp_path / module.DDL_3D_REGISTRATION
+    registration.parent.mkdir(parents=True)
+    registration.write_text(
+        json.dumps({"viewerUrl": "/experimental/ddl-3d/b1/index.html"}), encoding="utf-8"
+    )
+    provenance = tmp_path / module.DDL_3D_BUILDS / "b1/wasm/provenance.json"
+    provenance.parent.mkdir(parents=True)
+    provenance.write_text(
+        json.dumps({"coreBaseSha": "a" * 40, "coreHasLocalChanges": False}), encoding="utf-8"
+    )
+    types_rs = tmp_path / module.SCORE_EDITIONS
+    types_rs.parent.mkdir(parents=True)
+    types_rs.write_text(_editions(24), encoding="utf-8")
+    built = {"source": _editions(24)}
+    module._file_at_commit = lambda commit, path: built["source"]
+
+    assert module.check_3d_viewer_edition() == []
+
+    # I-734: the registered build's core knew Score only up to 0.23.
+    built["source"] = _editions(23)
+    [problem] = module.check_3d_viewer_edition()
+    assert problem.startswith(f"{module.DDL_3D_BUILDS}/b1: reads Score up to 0.23.0 but core writes 0.24.0")
+
+    # A core commit this checkout cannot read is reported, not passed.
+    built["source"] = None
+    [problem] = module.check_3d_viewer_edition()
+    assert "cannot read" in problem
+
+    # An empty registration hides 3D and needs no viewer.
+    registration.write_text(json.dumps({"viewerUrl": ""}), encoding="utf-8")
+    assert module.check_3d_viewer_edition() == []

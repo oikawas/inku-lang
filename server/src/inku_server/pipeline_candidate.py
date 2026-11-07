@@ -69,12 +69,15 @@ def _bytes(value: dict) -> bytes:
     return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
 
 
-def progress_projection(binding, state: dict, context: dict) -> dict | None:
+_UNREAD = object()
+
+
+def progress_projection(binding, state: dict, context: dict, *, run_progress=_UNREAD) -> dict | None:
     """The same progress payload for a pipeline view and a paint stream."""
-    report = getattr(binding, "run_progress", None)
-    if report is None:
-        return None
-    progress = json.loads(report(_bytes(state))).get("run_progress")
+    if run_progress is _UNREAD:
+        report = getattr(binding, "run_progress", None)
+        run_progress = json.loads(report(_bytes(state))).get("run_progress") if report is not None else None
+    progress = run_progress
     if progress is None:
         return None
     from .pipeline_product import usage_result
@@ -295,6 +298,7 @@ class CandidateExecution:
         self.on_render_refusal = on_render_refusal
         self._rendered: dict | None = None
         self._snapshot: dict | None = None
+        self._snapshot_reports: dict = {}
         self._pending_host_failure: str | None = None
         self._lock = threading.RLock()
         self._changed = threading.Condition(self._lock)
@@ -362,6 +366,7 @@ class CandidateExecution:
             if self._snapshot is not None:
                 raise CandidateHostError("execution_already_started")
             self._snapshot = json.loads(_bytes(snapshot))
+            self._snapshot_reports = {}
             self._rendered = rendered
             self._fresh = snapshot["authority"]["revision"] == "0"
 
@@ -502,7 +507,10 @@ class CandidateExecution:
             attempt = self._provider_attempt(state)
             if attempt is not None:
                 result["provider_attempt"] = attempt
-            progress = progress_projection(self.binding, state, self.context)
+            progress = progress_projection(
+                self.binding, state, self.context,
+                run_progress=self._snapshot_report("run_progress", state),
+            )
             if progress is not None:
                 result["progress"] = progress
             if self.context.get("hole_completion_check") is not None:
@@ -511,19 +519,26 @@ class CandidateExecution:
                 result["provider_capture_requested"] = True
             return json.loads(_bytes(result))
 
+    def _snapshot_report(self, name: str, state: dict):
+        """Keep core-derived values paired with the resident snapshot, including null."""
+        if name not in self._snapshot_reports:
+            report = getattr(self.binding, name, None)
+            self._snapshot_reports[name] = json.loads(report(_bytes(state))).get(name) if report is not None else None
+        return self._snapshot_reports[name]
+
     def _provider_attempt(self, state: dict) -> dict | None:
         """The provider attempt in flight, numbered and budgeted by the core.
 
         The core keeps no clock, so the deadline counts from when this host
         began the attempt; an attempt it has not begun has none.
         """
-        report = getattr(self.binding, "provider_attempt", None)
         action = state["action"]
-        if report is None or action is None or action["tag"] not in _ACTION_STAGES:
+        if action is None or action["tag"] not in _ACTION_STAGES:
             return None
-        attempt = json.loads(report(_bytes(state))).get("provider_attempt")
+        attempt = self._snapshot_report("provider_attempt", state)
         if attempt is None:
             return None
+        attempt = dict(attempt)
         began = self._attempt_began
         if began is not None and began[0] == action:
             attempt["deadline_at"] = began[1] + int(attempt["delay_ms"]) + int(attempt["timeout_ms"])
@@ -666,6 +681,10 @@ class CandidateExecution:
         if self.save_snapshot is not None:
             self.save_snapshot(state, next_snapshot, self.context, rendered)
         self._snapshot = next_snapshot
+        self._snapshot_reports = {
+            key: output["payload"][key] for key in ("run_progress", "provider_attempt")
+            if key in output["payload"]
+        }
         self._rendered = rendered
         with self._changed:
             self._changed.notify_all()

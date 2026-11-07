@@ -57,6 +57,7 @@ def _expected_list_items(
     include_svg: bool = True,
     canvas_search: bool = False,
     actor: dict | None = None,
+    batch_run_id: str | None = None,
 ) -> tuple[list[dict], int]:
     raise NotImplementedError
 

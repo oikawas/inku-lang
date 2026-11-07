@@ -18,8 +18,11 @@ def _effects(monkeypatch):
         resolve_palette=lambda _request: json.dumps({"schema": "fixture-palette"}).encode(),
     )
     manifest = default_manifest(binding)
-    monkeypatch.setattr(db, "get_user", lambda _owner: {"id": "author"})
-    monkeypatch.setattr(db, "get_model_settings", lambda: {})
+    # prepare() passes the settings it already read (2026-11-06, D11).
+    monkeypatch.setattr(db, "get_user", lambda _owner, **_settings: {"id": "author"})
+    # The store always answers normalized settings, and prepare() reuses them as such.
+    from inku_server.model_settings import normalize_model_settings
+    monkeypatch.setattr(db, "get_model_settings", lambda: normalize_model_settings({}))
     monkeypatch.setattr(common, "_model_offered_to", lambda *_args, **_kwargs: True)
     enabled_now = {
         "definitions": [{"namespace": "Sky", "id": "enabled"}],

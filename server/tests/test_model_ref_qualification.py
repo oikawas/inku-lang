@@ -192,7 +192,8 @@ def prepare_drawing_with_ambiguous_catalog(monkeypatch):
     actor = {"id": "author", "permission_groups": ["admins"], "model_settings":
              normalize_user_model_settings({"stage1_provider": "ollama-cloud", "stage1_model": "another-model",
                                             "stage2_provider": "nvidia"})}
-    monkeypatch.setattr(db, "get_user", lambda _owner: actor)
+    # prepare() passes the settings it already read (2026-11-06, D11).
+    monkeypatch.setattr(db, "get_user", lambda _owner, **_settings: actor)
     monkeypatch.setattr(db, "get_model_settings", lambda: catalog)
     binding = PipelineBinding()
     manifest = default_manifest(binding)

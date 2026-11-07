@@ -74,8 +74,11 @@ def test_prepare_drops_only_retired_execution_options_and_preserves_saved_config
         "metadata": {"variation_seed": "7", "variation_amplitude": "large", "focus": "upper_right"},
     }
     before = deepcopy(work)
-    monkeypatch.setattr(db, "get_user", lambda _owner: {"id": "author"})
-    monkeypatch.setattr(db, "get_model_settings", lambda: {})
+    # prepare() passes the settings it already read (2026-11-06, D11).
+    monkeypatch.setattr(db, "get_user", lambda _owner, **_settings: {"id": "author"})
+    # The store always answers normalized settings, and prepare() reuses them as such.
+    from inku_server.model_settings import normalize_model_settings
+    monkeypatch.setattr(db, "get_model_settings", lambda: normalize_model_settings({}))
     monkeypatch.setattr(common, "_model_offered_to", lambda *_args, **_kwargs: True)
     effects = ProductPipelineEffects(binding, manifest)
     config, context = effects.prepare("author", "direct_ddl", "one circle", {

@@ -27,6 +27,7 @@ def test_history_item_position_reader_owns_the_exact_query_and_db_is_thin_facade
             inspect.Parameter("for_share", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=False, annotation="bool"),
             inspect.Parameter("query_text", inspect.Parameter.POSITIONAL_OR_KEYWORD, default="", annotation="str"),
             inspect.Parameter("actor", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=None, annotation="dict | None"),
+            inspect.Parameter("batch_run_id", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=None, annotation="str | None"),
         ],
         return_annotation="int | None",
     )
@@ -137,6 +138,8 @@ def test_history_router_keeps_anchor_page_delegation(monkeypatch) -> None:
         for_share=False,
         q="",
         canvas_search=False,
+        # Called as a function, a Query default would arrive as the Query itself.
+        batch_run_id=None,
         actor={"id": "actor"},
     )
     assert calls == [(("actor", "anchor"), {"trashed": False, "starred": False, "for_revision": False, "for_share": False, "actor": {"id": "actor"}})]

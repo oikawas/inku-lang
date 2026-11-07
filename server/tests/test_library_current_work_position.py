@@ -31,7 +31,7 @@ def test_library_positions_respect_search_marks_access_and_selected_singleton(mo
         return history.api_history_get(**{
             "offset": 0, "limit": 1, "trashed": False, "starred": False,
             "for_revision": False, "for_share": False, "q": "", "canvas_search": False,
-            "anchor_id": "c", "include_svg": False, "actor": owner, **kwargs,
+            "anchor_id": "c", "include_svg": False, "batch_run_id": None, "actor": owner, **kwargs,
         })
 
     def grouped(**kwargs):

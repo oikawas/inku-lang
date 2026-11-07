@@ -355,9 +355,7 @@ struct LibraryView: View {
             }
             // A page holds only complete rows; an always-on scroller would also take width from the columns.
             .scrollIndicators(.hidden)
-            #if os(macOS)
-            .focusSection()
-            #endif
+            .inkuFocusSection()
             .background { focusFollower(scroll: nil) }
             .onAppear { reportPageSize(viewport: geometry.size) }
             .onChange(of: geometry.size) { _, size in reportPageSize(viewport: size) }
@@ -583,9 +581,7 @@ struct LibraryView: View {
                 }
                 .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
             }
-            #if os(macOS)
-            .focusSection()
-            #endif
+            .inkuFocusSection()
             .background { focusFollower(scroll: proxy) }
         }
     }

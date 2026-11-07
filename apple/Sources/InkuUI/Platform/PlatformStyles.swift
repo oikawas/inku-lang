@@ -2,6 +2,15 @@ import SwiftUI
 
 extension View {
     @ViewBuilder
+    func inkuFocusSection() -> some View {
+        #if os(macOS)
+        focusSection()
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
     func inkuChoicePickerStyle(segmentedOnIOS: Bool = false) -> some View {
         #if os(macOS)
         pickerStyle(.radioGroup)

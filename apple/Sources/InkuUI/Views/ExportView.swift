@@ -1,14 +1,13 @@
 import InkuExport
 import InkuPersistence
 import SwiftUI
-#if os(macOS)
-import AppKit
 import UniformTypeIdentifiers
 
 @MainActor
 struct ExportView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
     @State private var candidates: [SavedWork]
     @State private var selectedIDs: Set<String>
     @State private var options = ExportOptions()
@@ -185,9 +184,7 @@ struct ExportView: View {
                     Text(animationDestination?.lastPathComponent ?? model.display.preferences.exportDefaults.destinationName ?? copy("settingsDownloadFolderNone", "書き出すときに選択"))
                         .foregroundStyle(.secondary)
                     Button(copy("animationExportChoosePath", "保存先を選択")) {
-                        let panel = NSOpenPanel()
-                        panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true
-                        if panel.runModal() == .OK { animationDestination = panel.url }
+                        Task { if let url = await fileDialogs?.choose(.folder()) { animationDestination = url } }
                     }.disabled(isBusy)
                 }
             }
@@ -196,8 +193,10 @@ struct ExportView: View {
             HStack {
                 if isBusy { ProgressView().controlSize(.small); Button(model.display.localized("中止")) { operation?.cancel(); status = "中止しています…" } }
                 if !exportedURLs.isEmpty {
-                    Button(model.display.localized("Finderで表示")) { NSWorkspace.shared.activateFileViewerSelecting(exportedURLs) }
-                    Button(model.display.localized("共有")) { share() }
+                    if InkuFileViewer.available {
+                        Button(model.display.localized("Finderで表示")) { InkuFileViewer.reveal(exportedURLs) }
+                    }
+                    ShareLink(items: exportedURLs) { Text(model.display.localized("共有")) }
                 }
                 Spacer()
                 Button(model.display.localized("閉じる")) { dismiss() }.disabled(isBusy).keyboardShortcut(.cancelAction)
@@ -275,7 +274,7 @@ struct ExportView: View {
                 try ExportService.validate(sources: sources, options: capturedOptions)
                 let names = ExportService.artifactNames(sources: sources, options: capturedOptions)
                 try Task.checkCancellation()
-                guard let destination = try destination(names: names, format: capturedOptions.format, configuration: capturedDestination) else {
+                guard let destination = try await destination(names: names, format: capturedOptions.format, configuration: capturedDestination) else {
                     status = "保存を取り消しました。"
                     if directFormat { model.reportExportStatus(status); dismiss() }
                     return
@@ -299,25 +298,19 @@ struct ExportView: View {
         }
     }
 
-    private func destination(names: [String], format: SavedExportFormat, configuration: ExportConfiguration) throws -> URL? {
+    private func destination(names: [String], format: SavedExportFormat, configuration: ExportConfiguration) async throws -> URL? {
         if lineAnimation, let animationDestination { return animationDestination }
         if !directFormat, let bookmark = configuration.destinationBookmark {
-            var stale = false
-            let folder = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+            let (folder, stale) = try InkuFolderBookmark.resolve(bookmark)
             guard !stale else { throw ExportFailure("保存先のアクセス権を更新するため、設定でフォルダーを選び直してください。") }
             // A fresh child folder avoids silently replacing earlier exports.
             return folder
         }
         if names.count == 1 {
-            let panel = NSSavePanel(); panel.title = model.display.localized("作品を書き出す")
-            panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .data]
-            panel.nameFieldStringValue = names[0]
-            return panel.runModal() == .OK ? panel.url : nil
+            return NativeFilePanels.exportFile(title: model.display.localized("作品を書き出す"),
+                                               type: UTType(filenameExtension: format.fileExtension) ?? .data, name: names[0])
         }
-        let panel = NSOpenPanel(); panel.title = model.display.localized("書き出しフォルダーを選択")
-        panel.message = model.display.localized("選択した場所に新しい書き出しフォルダーを作ります。")
-        panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true
-        return panel.runModal() == .OK ? panel.url : nil
+        return await fileDialogs?.choose(.folder(message: model.display.localized("選択した場所に新しい書き出しフォルダーを作ります。")))
     }
 
     private func save(sources: [ExportSource], options: ExportOptions, names: [String], destination: URL) async throws -> (urls: [URL], matches: Bool?, outcome: String?) {
@@ -347,10 +340,4 @@ struct ExportView: View {
         }
         return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
     }
-
-    private func share() {
-        guard let view = NSApp.keyWindow?.contentView else { return }
-        NSSharingServicePicker(items: exportedURLs).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
-    }
 }
-#endif

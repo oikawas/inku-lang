@@ -41,6 +41,72 @@ enum InkuPasteboard {
     }
 }
 
+/// The application's own events.
+@MainActor
+enum InkuApplication {
+    /// The app is about to quit (iOS: no such event yet; it is decided with the iOS app's life cycle).
+    static var willTerminate: AnyPublisher<Notification, Never> {
+        #if os(macOS)
+        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification).eraseToAnyPublisher()
+        #else
+        Empty().eraseToAnyPublisher()
+        #endif
+    }
+}
+
+/// Text widths a layout sizes itself by, with the platform's own font.
+enum InkuTextMetrics {
+    /// One digit of the monospaced-digit system font, for a field `n` digits wide (Web `ch`).
+    static func monospacedDigitWidth(size: CGFloat) -> CGFloat {
+        #if os(macOS)
+        ("0" as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)]).width
+        #else
+        ("0" as NSString).size(withAttributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)]).width
+        #endif
+    }
+}
+
+/// The default export folder the settings remember as a bookmark (security-scoped on macOS).
+enum InkuFolderBookmark {
+    static func resolve(_ bookmark: Data) throws -> (url: URL, stale: Bool) {
+        var stale = false
+        #if os(macOS)
+        let url = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+        #else
+        let url = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+        #endif
+        return (url, stale)
+    }
+}
+
+/// Finder's "show in folder"; iOS has no file viewer to open.
+@MainActor
+enum InkuFileViewer {
+    static var available: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    static func reveal(_ urls: [URL]) {
+        #if os(macOS)
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
+        #endif
+    }
+}
+
+/// The system alert sound where a save or a viewer file fails.
+@MainActor
+enum InkuFeedback {
+    static func beep() {
+        #if os(macOS)
+        NSSound.beep()
+        #endif
+    }
+}
+
 /// Web color tokens mapped onto each system palette with the existing native colors.
 enum InkuColor {
     #if os(macOS)

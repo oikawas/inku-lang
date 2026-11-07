@@ -1,8 +1,5 @@
 import InkuExport
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 extension DisplayPreferences {
     var exportDefaults: ExportConfiguration {
@@ -24,6 +21,7 @@ extension DisplayPreferences {
 @MainActor
 struct ExportSettingsView: View {
     @Bindable var model: AppModel
+    @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
     @State private var configuration: ExportConfiguration
     @State private var animationConfiguration: ExportConfiguration
     @State private var templates: [ExportTemplate]
@@ -234,15 +232,14 @@ struct ExportSettingsView: View {
 
     #if os(macOS)
     private func chooseDestination() {
-        let panel = NSOpenPanel()
-        panel.title = model.display.localized("書き出し先フォルダーを選択")
-        panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            configuration.destinationBookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-            configuration.destinationName = url.lastPathComponent
-            templateError = nil
-        } catch { templateError = "保存先を記録できませんでした: \(error.localizedDescription)" }
+        Task {
+            guard let url = await fileDialogs?.choose(.folder(message: model.display.localized("書き出し先フォルダーを選択"))) else { return }
+            do {
+                configuration.destinationBookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                configuration.destinationName = url.lastPathComponent
+                templateError = nil
+            } catch { templateError = "保存先を記録できませんでした: \(error.localizedDescription)" }
+        }
     }
     #endif
 }

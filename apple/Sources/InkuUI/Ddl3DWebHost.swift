@@ -1,5 +1,3 @@
-#if os(macOS)
-import AppKit
 import SwiftUI
 import WebKit
 
@@ -119,7 +117,7 @@ public final class Ddl3DWebHost: NSObject, Ddl3DPage, WKNavigationDelegate, WKUI
         webView.navigationDelegate = self
         webView.uiDelegate = self
         // Transparent until the viewer paints, over the canvas area's own background.
-        webView.setValue(false, forKey: "drawsBackground")
+        webView.drawsNoBackground()
     }
 
     /// The canvas area keeps the keyboard where it was (the off-screen checks use this too).
@@ -201,6 +199,8 @@ public final class Ddl3DWebHost: NSObject, Ddl3DPage, WKNavigationDelegate, WKUI
 
     /// The checks take the saved file here instead of the panel.
     public var onViewerFile: ((_ name: String, _ data: Data) -> Void)?
+    /// The dialogs of the window or sheet that shows this view (`inkuFileDialogs`).
+    weak var fileDialogs: InkuFileDialogs?
 
     /// host.js `download`: `{type: 'download', mountId, name, mimeType, dataUrl}` for the current mount, or
     /// `download-failed` when the blob could not be read.
@@ -209,34 +209,29 @@ public final class Ddl3DWebHost: NSObject, Ddl3DPage, WKNavigationDelegate, WKUI
         guard body["type"] as? String == "download", let dataURL = body["dataUrl"] as? String,
               let comma = dataURL.firstIndex(of: ","), dataURL[..<comma].hasSuffix(";base64"),
               let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])) else {
-            NSSound.beep(); return
+            InkuFeedback.beep(); return
         }
         let suggested = (body["name"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
         let name = suggested.isEmpty ? "inku-3d" : suggested
         if let onViewerFile { return onViewerFile(name, data) }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = name
-        panel.canCreateDirectories = true
-        let finish: (NSApplication.ModalResponse) -> Void = { result in
-            guard result == .OK, let url = panel.url else { return }
-            do { try data.write(to: url, options: .atomic) } catch { NSSound.beep() }
+        // The data is already here, so SwiftUI's exporter writes it; a view outside the dialogs keeps the panel.
+        if let fileDialogs {
+            Task { _ = await fileDialogs.save(data, suggestedName: name) }
+            return
         }
-        if let window = webView.window { panel.beginSheetModal(for: window, completionHandler: finish) } else { panel.begin(completionHandler: finish) }
+        InkuSaveDestination.choose(suggestedName: name, attachedTo: webView) { url in
+            guard let url else { return }
+            do { try data.write(to: url, options: .atomic) } catch { InkuFeedback.beep() }
+        }
     }
 
     public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String,
                          completionHandler: @escaping @MainActor (URL?) -> Void) {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = suggestedFilename
-        panel.canCreateDirectories = true
-        let finish: (NSApplication.ModalResponse) -> Void = { result in
-            guard result == .OK, let url = panel.url else { return completionHandler(nil) }
+        InkuSaveDestination.choose(suggestedName: suggestedFilename, attachedTo: webView) { url in
+            guard let url else { return completionHandler(nil) }
             // The panel already confirmed replacing it; a download does not overwrite.
             try? FileManager.default.removeItem(at: url)
             completionHandler(url)
         }
-        if let window = webView.window { panel.beginSheetModal(for: window, completionHandler: finish) } else { panel.begin(completionHandler: finish) }
     }
 }
-
-#endif

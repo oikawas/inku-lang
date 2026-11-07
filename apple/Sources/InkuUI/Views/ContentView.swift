@@ -2,9 +2,6 @@ import InkuPersistence
 import InkuHost
 import InkuExport
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 extension Notification.Name {
     static let inkuOpenSection = Notification.Name("inku.open-section")
@@ -103,6 +100,8 @@ public struct ContentView: View {
     @State private var presentationLoadID = UUID()
     @State private var presentationWasFullScreen = false
     @State private var windowSize = CGSize.zero
+    /// The window's file dialogs, which the menu's "open DDL" also asks.
+    @State private var fileDialogs = InkuFileDialogs()
     #if os(macOS)
     @State private var importer = DDLImportController()
     @Environment(\.openWindow) private var openWindow
@@ -111,62 +110,8 @@ public struct ContentView: View {
     public init(model: AppModel) { self.model = model }
 
     public var body: some View {
-        ZStack {
-            mainShell
-                .modifier(InkuCoveredView(covered: presentation || ui.libraryOpen || ui.settingsOpen, hidden: presentation))
-            if ui.libraryOpen && !presentation { libraryOverlay.modifier(InkuCoveredView(covered: ui.settingsOpen)) }
-            if ui.settingsOpen && !presentation { settingsOverlay }
-            if presentation { presentationView }
-        }
-        .background {
-            GeometryReader { geometry in
-                Color.clear
-                    .onAppear { windowSize = geometry.size }
-                    .onChange(of: geometry.size) { _, size in windowSize = size }
-            }
-        }
-        .environment(\.inkuWindowSize, windowSize)
-        #if os(macOS)
-        .ddlImportDropTarget(model: model,
-                             enabled: !model.isBusy && !automation.isOccupied && dialog == nil && !presentation && !ui.settingsOpen,
-                             onImported: openImportedDDL)
-        .environment(importer)
-        .onDisappear { importer.cancel(); automation.flushDemoPreferences() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            automation.flushDemoPreferences()
-            Task { await model.shutdownPersonalPlan() }
-        }
-        #endif
-        .environment(model.display)
-        .confirmationDialog(model.display.webCopy("batchClearResumeConfirm", "中断したバッチを再開できなくなります。"),
-                            isPresented: $confirmNewBatch, titleVisibility: .visible) {
-            Button(model.display.webCopy("clearInputBtn", "新規作成"), role: .destructive) { completeNewWork() }
-            Button(model.display.localized("キャンセル"), role: .cancel) {}
-        }
-        .environment(\.locale, Locale(identifier: model.display.preferences.language))
-        .preferredColorScheme(model.display.colorScheme)
-        .font(.system(size: 13 * model.display.preferences.textScale))
-        .environment(\.inkuTextScale, model.display.preferences.textScale)
-        .task {
-            await model.initialize()
-            await automation.connect(app: model)
-            await history.connect(app: model)
-            maintenance.connect(app: model)
-            restoreScreenChoices()
-            await refreshDrawingKeyState()
-            model.onSavedWork = { [weak model = model, weak maintenance = maintenance] work in
-                guard let model, let maintenance else { return }
-                await maintenance.log(work: work, enabled: model.display.preferences.saveResultLog)
-            }
-            model.onDrawingLog = { [weak model = model, weak maintenance = maintenance] record in
-                guard let model, let maintenance else { return }
-                await maintenance.log(execution: record, enabled: model.display.preferences.saveResultLog)
-            }
-            while !Task.isCancelled {
-                await maintenance.checkBackup(app: model, automationRunning: automation.isOccupied || dialog != nil)
-                do { try await Task.sleep(for: .seconds(60)) } catch { return }
-            }
-        }
+        // In two parts, in the same modifier order: one chain is more than the iOS type checker finishes in time.
+        startedShell
         .onChange(of: model.selectedWorkID) { _, _ in
             batchWorkspace.showHistory()
             Task { await history.locate(app: model) }
@@ -223,19 +168,7 @@ public struct ContentView: View {
         .onChange(of: ui.settingsOpen) { _, open in if !open { Task { await refreshDrawingKeyState() } } }
         .onChange(of: model.providerSettingsRevision) { _, _ in Task { await refreshDrawingKeyState() } }
         .onChange(of: model.errorText) { _, error in if error != nil { Task { await refreshDrawingKeyState() } } }
-        .onReceive(NotificationCenter.default.publisher(for: .inkuOpenSection)) { message in
-            guard let raw = message.object as? String, let target = AppSection(rawValue: raw), canNavigateSections else { return }
-            let opensWork = message.userInfo?["workID"] is String
-            if (target == .create || target == .lineage), opensWork { batchWorkspace.showHistory() }
-            switch target {
-            case .create: showCreation(tab: opensWork ? "artwork" : nil)
-            case .lineage: showCreation(tab: "lineage")
-            case .library: openLibrary()
-            case .automation: openSettings(.demo)
-            case .settings:
-                openSettings((message.userInfo?["settingsSection"] as? String).flatMap(SettingsSection.init(rawValue:)))
-            }
-        }
+        .onReceive(NotificationCenter.default.publisher(for: .inkuOpenSection)) { message in openSection(message) }
         #if os(macOS)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if sheetDialog.wrappedValue == nil { errorNotice }
@@ -248,6 +181,8 @@ public struct ContentView: View {
                 #if os(macOS)
                 .safeAreaInset(edge: .bottom, spacing: 0) { errorNotice }
                 #endif
+                // A sheet's own dialogs: the window's cannot present over it.
+                .inkuFileDialogs()
         }
         #if !os(macOS)
         .alert(model.display.localized("処理できませんでした"), isPresented: Binding(get: { model.errorText != nil }, set: { if !$0 { model.errorText = nil } })) {
@@ -256,6 +191,67 @@ public struct ContentView: View {
         #endif
         .focusedSceneValue(\.inkuCommandContext, commandContext)
         .canvasFitConfirmation(model: model, presentation: .workspace)
+        .inkuFileDialogs(fileDialogs)
+    }
+
+    /// The first part of `body`: the shell and its overlays, the environment, and the start-up task.
+    private var startedShell: some View {
+        ZStack {
+            mainShell
+                .modifier(InkuCoveredView(covered: presentation || ui.libraryOpen || ui.settingsOpen, hidden: presentation))
+            if ui.libraryOpen && !presentation { libraryOverlay.modifier(InkuCoveredView(covered: ui.settingsOpen)) }
+            if ui.settingsOpen && !presentation { settingsOverlay }
+            if presentation { presentationView }
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { windowSize = geometry.size }
+                    .onChange(of: geometry.size) { _, size in windowSize = size }
+            }
+        }
+        .environment(\.inkuWindowSize, windowSize)
+        #if os(macOS)
+        .ddlImportDropTarget(model: model,
+                             enabled: !model.isBusy && !automation.isOccupied && dialog == nil && !presentation && !ui.settingsOpen,
+                             onImported: openImportedDDL)
+        .environment(importer)
+        .onDisappear { importer.cancel(); automation.flushDemoPreferences() }
+        .onReceive(InkuApplication.willTerminate) { _ in
+            automation.flushDemoPreferences()
+            Task { await model.shutdownPersonalPlan() }
+        }
+        #endif
+        .environment(model.display)
+        .confirmationDialog(model.display.webCopy("batchClearResumeConfirm", "中断したバッチを再開できなくなります。"),
+                            isPresented: $confirmNewBatch, titleVisibility: .visible) {
+            Button(model.display.webCopy("clearInputBtn", "新規作成"), role: .destructive) { completeNewWork() }
+            Button(model.display.localized("キャンセル"), role: .cancel) {}
+        }
+        .environment(\.locale, Locale(identifier: model.display.preferences.language))
+        .preferredColorScheme(model.display.colorScheme)
+        .font(.system(size: 13 * model.display.preferences.textScale))
+        .environment(\.inkuTextScale, model.display.preferences.textScale)
+        .task {
+            await model.initialize()
+            await automation.connect(app: model)
+            await history.connect(app: model)
+            maintenance.connect(app: model)
+            restoreScreenChoices()
+            await refreshDrawingKeyState()
+            model.onSavedWork = { [weak model = model, weak maintenance = maintenance] work in
+                guard let model, let maintenance else { return }
+                await maintenance.log(work: work, enabled: model.display.preferences.saveResultLog)
+            }
+            model.onDrawingLog = { [weak model = model, weak maintenance = maintenance] record in
+                guard let model, let maintenance else { return }
+                await maintenance.log(execution: record, enabled: model.display.preferences.saveResultLog)
+            }
+            while !Task.isCancelled {
+                await maintenance.checkBackup(app: model, automationRunning: automation.isOccupied || dialog != nil)
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
+            }
+        }
     }
 
     /// Web `.root`: the rail, then the main shell (input panel, canvas panel and history strip).
@@ -403,7 +399,7 @@ public struct ContentView: View {
         case .openDDL:
             #if os(macOS)
             showCreation(tab: nil)
-            importer.read(app: model, onImported: openImportedDDL)
+            importer.read(app: model, dialogs: fileDialogs, onImported: openImportedDDL)
             #endif
         case .settings: openSettings(nil)
         case .creation: showCreation(tab: "artwork")
@@ -455,6 +451,21 @@ public struct ContentView: View {
         ui.leftPanelCollapsed = false
         showCreation(tab: "artwork")
     }
+    /// `.inkuOpenSection`: the section it names, with the work or settings tab its user info names.
+    private func openSection(_ message: Notification) {
+        guard let raw = message.object as? String, let target = AppSection(rawValue: raw), canNavigateSections else { return }
+        let opensWork = message.userInfo?["workID"] is String
+        if (target == .create || target == .lineage), opensWork { batchWorkspace.showHistory() }
+        switch target {
+        case .create: showCreation(tab: opensWork ? "artwork" : nil)
+        case .lineage: showCreation(tab: "lineage")
+        case .library: openLibrary()
+        case .automation: openSettings(.demo)
+        case .settings:
+            openSettings((message.userInfo?["settingsSection"] as? String).flatMap(SettingsSection.init(rawValue:)))
+        }
+    }
+
     private func openLibrary() {
         InkuWindow.removeFocus()
         ui.settingsOpen = false

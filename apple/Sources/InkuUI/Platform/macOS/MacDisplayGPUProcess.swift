@@ -1,3 +1,4 @@
+#if os(macOS)
 import CoreGraphics
 import Darwin
 import Foundation
@@ -297,3 +298,4 @@ final class DisplayGPUProcess: @unchecked Sendable {
         (0..<8).reduce(UInt64(0)) { $0 | UInt64(bytes[at + $1]) << (8 * UInt64($1)) }
     }
 }
+#endif

@@ -2,7 +2,6 @@ import InkuPersistence
 import InkuHost
 import SwiftUI
 #if os(macOS)
-import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 #endif
@@ -88,6 +87,7 @@ struct CreationView: View {
     @State private var ddl3d = Ddl3DController()
     @Environment(\.inkuWindowSize) private var windowSize
     @Environment(\.inkuTooltipsCovered) private var covered
+    @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var isImage: Bool { automation.workspaceInputMode == "image" }
     private var workspaceCovered: Bool { ui.settingsOpen || ui.libraryOpen }
@@ -358,9 +358,8 @@ struct CreationView: View {
                 imageBatch.newWork(app: model); batchWorkspace.showHistory()
             }.disabled(controlsDisabled || imageBatch.selecting)
             Button(display.localized("画像フォルダを選ぶ")) {
-                let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
-                guard panel.runModal() == .OK, let url = panel.url else { return }
                 Task {
+                    guard let url = await fileDialogs?.choose(.folder()) else { return }
                     do { try await imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
                 }
             }.disabled(controlsDisabled || imageBatch.selecting)
@@ -471,11 +470,10 @@ struct CreationView: View {
     }
 
     private func chooseImage() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.jpeg, .png, .gif, .tiff]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        loadImage(url)
+        Task {
+            guard let url = await fileDialogs?.choose(InkuFileRequest(types: [.jpeg, .png, .gif, .tiff])) else { return }
+            loadImage(url)
+        }
     }
 
     private func loadImage(_ url: URL) {

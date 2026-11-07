@@ -52,11 +52,11 @@ final class LibraryClickTests: XCTestCase {
         XCTAssertFalse(anchor.bounds.contains(anchor.convert(outside, from: nil)))
     }
 
-    /// The lineage left under the library keeps no pan monitor, so library presses over its canvas reach the cards.
+    /// The lineage left under the library does not pan, so library presses over its canvas reach the cards.
     func testCoveredLineageDoesNotPan() {
-        XCTAssertTrue(LineageScrollBridge.pans(isEnabled: true, covered: false))
-        XCTAssertFalse(LineageScrollBridge.pans(isEnabled: true, covered: true))
-        XCTAssertFalse(LineageScrollBridge.pans(isEnabled: false, covered: false))
+        XCTAssertTrue(LineageScrolling.pans(isEnabled: true, covered: false))
+        XCTAssertFalse(LineageScrolling.pans(isEnabled: true, covered: true))
+        XCTAssertFalse(LineageScrolling.pans(isEnabled: false, covered: false))
     }
     #endif
 }

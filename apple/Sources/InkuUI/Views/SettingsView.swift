@@ -1,5 +1,6 @@
 import InkuHost
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case display, making, drawDefaults, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, other, native
@@ -46,6 +47,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @Binding var section: SettingsSection
     @FocusState private var closeFocused: Bool
     @State private var confirmRestore = false
+    /// The confirmation chose "select a backup": the file dialog opens once the confirmation has closed.
+    @State private var restoreRequested = false
+    @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
     @State private var backupDeleteName: String?
     @State private var backupRestoreName: String?
     @State private var backupRestoreFinal = false
@@ -90,11 +94,21 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             #if os(macOS)
             Button(model.display.localized("復元するバックアップを選択…"), role: .destructive) {
                 guard !model.isBusy, !automation.isOccupied else { return }
-                if let url = NativeFilePanels.restore(language: model.display.preferences.language) { Task { await model.restore(from: url) } }
+                restoreRequested = true
             }.disabled(model.isBusy || automation.isOccupied)
             #endif
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
+        .onChange(of: confirmRestore) { _, shown in
+            guard !shown, restoreRequested else { return }
+            restoreRequested = false
+            Task {
+                let request = InkuFileRequest(types: [UTType(filenameExtension: "sqlite") ?? .data],
+                                              message: model.display.localized("復元するバックアップを選択"))
+                guard let url = await fileDialogs?.choose(request), !model.isBusy, !automation.isOccupied else { return }
+                await model.restore(from: url)
+            }
+        }
         .alert(model.display.webCopyFormat("settingsDbBackupDeleteConfirm", "%@ のバックアップを削除します。", backupLabel(backupDeleteName)), isPresented: Binding(get: { backupDeleteName != nil }, set: { if !$0 { backupDeleteName = nil } })) {
             Button(model.display.webCopy("settingsDbBackupDelete", "削除"), role: .destructive) {
                 if let name = backupDeleteName { Task { await maintenance.deleteRetainedBackup(name: name, display: model.display) } }

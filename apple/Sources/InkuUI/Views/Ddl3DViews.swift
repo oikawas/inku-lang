@@ -1,8 +1,5 @@
 import InkuPersistence
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 extension Ddl3DInstallation {
     /// The 3D switch shows only with a registered viewer on a platform that hosts it (the macOS web view).
@@ -76,7 +73,6 @@ extension WorkspaceUIState {
     }
 }
 
-#if os(macOS)
 /// Web `Ddl3DHost.svelte`'s markup over the viewer: the preparing note at the top left with a way back, and the
 /// failure covering the view with retry, return to 2D and the reason under a details disclosure.
 struct Ddl3DCanvas: View {
@@ -147,16 +143,3 @@ struct Ddl3DCanvas: View {
         .accessibilityElement(children: .contain)
     }
 }
-
-/// InkuAppCheck `--ddl3d-only`: the work tab's 3D view alone in a hosting view, built as CreationView builds it, over
-/// the copy of the viewer the check names (the build's copy in the source tree).
-@MainActor
-public enum Ddl3DProbe {
-    public static func hostingView(registration: Ddl3DInstallation.Registered, work: SavedWork, controller: Ddl3DController,
-                                   display: DisplaySettings, initialView: Ddl3DInitialView, onReturn: @escaping () -> Void) -> NSView {
-        NSHostingView(rootView: Ddl3DCanvas(controller: controller, registration: registration, work: work,
-                                            initialView: initialView, onReturn: onReturn, onEscape: { false })
-            .environment(display))
-    }
-}
-#endif

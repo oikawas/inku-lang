@@ -1,9 +1,6 @@
 import InkuHost
 import InkuPersistence
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 @MainActor
 struct LibrarySelectionPresentation {
@@ -1011,118 +1008,89 @@ struct LibraryPageField: View {
         }
     }
 
-    @ViewBuilder private func input(label: String) -> some View {
-        #if os(macOS)
+    private func input(label: String) -> some View {
         let size = fontSize * scale
         // Web `width: (digits + 1.5)ch`, at least 3ch, and the bezel.
-        let digit = ("0" as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)]).width
-        LibraryPageNumberInput(current: position.current, label: label, fontSize: size, onJump: onJump)
+        let digit = InkuTextMetrics.monospacedDigitWidth(size: size)
+        return LibraryPageNumberInput(current: position.current, label: label, fontSize: size, onJump: onJump)
             .frame(width: (max(3, Double(String(position.total).count) + 1.5) * digit + 10).rounded(.up))
-        #else
-        LibraryPageNumberInput(current: position.current, label: label, onJump: onJump)
-        #endif
     }
 }
 
-#if os(macOS)
-/// The AppKit field under `LibraryPageField`: it selects its number when it takes the focus (Web `begin`) and takes
-/// Return and Escape before the library does, which closes on Escape.
+/// The field under `LibraryPageField`: it selects its number when it takes the focus (Web `begin`) and takes
+/// Return and Escape before the library does, which closes on Escape (PLAN §7: the field's `onKeyPress` comes first).
 @MainActor
-private struct LibraryPageNumberInput: NSViewRepresentable {
+private struct LibraryPageNumberInput: View {
     let current: Int
     let label: String
     let fontSize: CGFloat
     let onJump: (String) -> Void
+    @State private var text = ""
+    /// The number this field last wrote itself; typing makes the text differ (Web `editing`).
+    @State private var shown = ""
+    @State private var selection: TextSelection?
+    @FocusState private var focused: Bool
 
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    func makeNSView(context: Context) -> NSTextField {
-        let field = LibraryPageNumberTextField(string: String(current))
-        field.delegate = context.coordinator
-        field.bezelStyle = .roundedBezel
-        field.alignment = .right
-        field.usesSingleLineMode = true
-        field.lineBreakMode = .byClipping
-        field.cell?.isScrollable = true
-        return field
-    }
-
-    func updateNSView(_ field: NSTextField, context: Context) {
-        context.coordinator.parent = self
-        if field.font?.pointSize != fontSize { field.font = .monospacedDigitSystemFont(ofSize: fontSize, weight: .regular) }
-        field.isEnabled = context.environment.isEnabled
-        field.isEditable = context.environment.isEnabled && !context.environment.inkuTooltipsCovered
-        field.setAccessibilityLabel(label)
-        // Web `shown`: the page shown, except while the reader is typing.
-        if field.currentEditor() == nil, field.stringValue != String(current) { field.stringValue = String(current) }
-    }
-
-    @MainActor final class Coordinator: NSObject, NSTextFieldDelegate {
-        var parent: LibraryPageNumberInput
-        /// Web `editing`: from the first typed character until Return, Escape or leaving the field.
-        private var editing = false
-        init(_ parent: LibraryPageNumberInput) { self.parent = parent }
-
-        func controlTextDidBeginEditing(_ notification: Notification) { editing = true }
-
-        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-            guard let field = control as? NSTextField else { return false }
-            switch selector {
-            case #selector(NSResponder.insertNewline(_:)):
-                let typed = editing ? field.stringValue : nil
-                finish(field)
-                if let typed { parent.onJump(typed) }
-            case #selector(NSResponder.cancelOperation(_:)):
-                // Escape only puts the number back: the library stays open.
-                finish(field)
-            default:
-                return false
-            }
-            return true
-        }
-
-        /// Web `onblur={commit}`: leaving the field goes to the typed page.
-        func controlTextDidEndEditing(_ notification: Notification) {
-            guard editing, let field = notification.object as? NSTextField else { return }
-            editing = false
-            let typed = field.stringValue
-            field.stringValue = String(parent.current)
-            parent.onJump(typed)
-        }
-
-        /// Web `restore` (c69ede09f): leave the field and write the page shown back into it, whatever was typed.
-        private func finish(_ field: NSTextField) {
-            editing = false
-            field.window?.makeFirstResponder(nil)
-            field.stringValue = String(parent.current)
-        }
-    }
-}
-
-/// Web `begin`: the number is selected when the field takes the focus, by a click as by Tab.
-private final class LibraryPageNumberTextField: NSTextField {
-    override func becomeFirstResponder() -> Bool {
-        guard super.becomeFirstResponder() else { return false }
-        // After the click that focused the field has placed the caret.
-        DispatchQueue.main.async { [weak self] in self?.currentEditor()?.selectAll(nil) }
-        return true
-    }
-}
-#else
-private struct LibraryPageNumberInput: View {
-    let current: Int
-    let label: String
-    let onJump: (String) -> Void
-    @State private var draft = ""
+    private var editing: Bool { text != shown }
 
     var body: some View {
-        TextField(String(current), text: $draft)
-            .multilineTextAlignment(.trailing).monospacedDigit().frame(width: 56)
+        TextField("", text: $text, selection: $selection)
+            .textFieldStyle(.roundedBorder)
+            .multilineTextAlignment(.trailing)
+            .font(.system(size: fontSize).monospacedDigit())
+            .lineLimit(1)
+            .focused($focused)
             .accessibilityLabel(label)
-            .onSubmit { let typed = draft; draft = ""; onJump(typed) }
+            .onAppear { show(current) }
+            // Web `shown`: the page shown, except while the reader is in the field.
+            .onChange(of: current) { _, page in if !focused { show(page) } }
+            .onChange(of: focused) { _, now in
+                if now {
+                    selectAll()
+                } else if editing {
+                    // Web `onblur={commit}`: leaving the field goes to the typed page.
+                    let typed = text
+                    show(current)
+                    onJump(typed)
+                }
+            }
+            .onSubmit {
+                let typed = editing ? text : nil
+                finish()
+                if let typed { onJump(typed) }
+            }
+            .onKeyPress(.escape) {
+                // Escape only puts the number back: the library stays open.
+                finish()
+                return .handled
+            }
+    }
+
+    private func show(_ page: Int) {
+        shown = String(page)
+        text = shown
+    }
+
+    /// Web `begin`, by a click as by Tab. The click that focused the field places the caret after the focus arrives
+    /// (Build 81: typing 0.5 s after the click added to the number), so the number is selected again once the click
+    /// has ended, as the AppKit field did on the next turn of the run loop. Nothing is selected over typed text.
+    private func selectAll() {
+        let select = { if focused && !editing { selection = TextSelection(range: text.startIndex..<text.endIndex) } }
+        select()
+        Task { @MainActor in
+            await Task.yield()
+            select()
+            try? await Task.sleep(for: .milliseconds(200))
+            select()
+        }
+    }
+
+    /// Web `restore` (c69ede09f): write the page shown back, whatever was typed, and leave the field.
+    private func finish() {
+        show(current)
+        focused = false
     }
 }
-#endif
 
 /// Web `focusWork` (HistoryManager.svelte:328-344): once the page that holds the opened work is read and shown, its
 /// grid card takes the keyboard focus (a lineage view scrolls its card into view), and a preview already open follows

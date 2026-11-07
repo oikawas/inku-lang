@@ -2,9 +2,6 @@ import InkuPersistence
 import InkuHost
 import InkuExport
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 extension Notification.Name {
     static let inkuOpenSection = Notification.Name("inku.open-section")
@@ -220,7 +217,7 @@ public struct ContentView: View {
                              onImported: openImportedDDL)
         .environment(importer)
         .onDisappear { importer.cancel(); automation.flushDemoPreferences() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+        .onReceive(InkuApplication.willTerminate) { _ in
             automation.flushDemoPreferences()
             Task { await model.shutdownPersonalPlan() }
         }

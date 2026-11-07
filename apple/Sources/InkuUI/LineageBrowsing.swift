@@ -1,11 +1,6 @@
 import Foundation
 import InkuPersistence
 import SwiftUI
-#if os(macOS)
-import AppKit
-#elseif os(iOS)
-import UIKit
-#endif
 
 public struct LineageScrollPosition: Sendable, Equatable {
     public var x: Double
@@ -61,177 +56,104 @@ struct DatabaseLineageReader: LineageReading {
     }
 }
 
-/// Native offsets preserve both axes when entering and leaving the map on macOS 14/iOS 17.
+/// The scroll position is kept per tree, map and layout; a change of any of them puts its own position back.
 struct LineageViewportKey: Equatable {
     let treeID: String?
     let overview: Bool
     let vertical: Bool
 }
 
-#if os(macOS)
-private final class LineageScrollObserver {
-    private let token: NSObjectProtocol
-    init(_ token: NSObjectProtocol) { self.token = token }
-    deinit { NotificationCenter.default.removeObserver(token) }
+/// The cards' frames in the lineage's scroll content, where a drag does not pan.
+struct LineageCardRects: PreferenceKey {
+    static let defaultValue: [CGRect] = []
+    static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) { value += nextValue() }
 }
 
-private final class LineagePanMonitor {
-    let token: Any
-    init(_ token: Any) { self.token = token }
-    deinit { NSEvent.removeMonitor(token) }
-}
-
-struct LineageScrollBridge: NSViewRepresentable {
+/// The lineage's scroll view: both axes of its position are kept and put back (`position` for `revision`), and a
+/// drag that starts on the empty canvas pans it (PLAN §7). The drag is measured in the scroll view's own space, which
+/// the drag does not move; and the offsets the scroll view reports before the put-back position arrives are not
+/// kept, or the first report (the top left) would replace the kept position.
+struct LineageScrolling: ViewModifier {
     let revision: LineageViewportKey
     let position: LineageScrollPosition
-    var cards: [CGRect] = []
     let onScroll: (LineageScrollPosition) -> Void
-    func makeNSView(context: Context) -> Probe { Probe() }
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.inkuTooltipsCovered) private var covered
+    @State private var scroll = ScrollPosition()
+    @State private var geometry: ScrollGeometry?
+    @State private var cards: [CGRect] = []
+    @State private var applied: LineageViewportKey?
+    /// The put-back offset, until the scroll view reports it.
+    @State private var expected: CGPoint?
+    /// The offset when a pan began; nil while no pan runs (no drag, or one that began on a card).
+    @State private var panStart: CGPoint?
+    @State private var panDecided = false
+    private static let space = "inku.lineage.viewport"
 
-    /// The pan monitor runs only for a lineage the pointer can reach. The library, settings and a presentation cover
-    /// the shell without disabling it, so a covered lineage stops panning as a disabled one does; otherwise its
-    /// monitor takes presses on the library cards above its canvas (2026-11-06).
+    /// The library, settings and a presentation cover the shell without disabling it; a covered lineage does not pan,
+    /// as a disabled one does not (2026-11-06).
     static func pans(isEnabled: Bool, covered: Bool) -> Bool { isEnabled && !covered }
 
-    func updateNSView(_ view: Probe, context: Context) {
-        view.panEnabled = Self.pans(isEnabled: context.environment.isEnabled,
-                                    covered: context.environment.inkuTooltipsCovered)
-        view.onScroll = onScroll
-        view.cards = cards
-        view.request(revision: revision, position: position)
+    func body(content: Content) -> some View {
+        content
+            .scrollPosition($scroll)
+            .coordinateSpace(.named(Self.space))
+            .onPreferenceChange(LineageCardRects.self) { cards = $0 }
+            .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { _, now in reported(now) }
+            .onChange(of: revision, initial: true) { _, _ in putBack() }
+            .simultaneousGesture(pan, including: Self.pans(isEnabled: isEnabled, covered: covered) ? .all : .subviews)
     }
 
-    final class Probe: NSView {
-        var onScroll: ((LineageScrollPosition) -> Void)?
-        var cards: [CGRect] = []
-        var panEnabled = true {
-            didSet { if panEnabled != oldValue { updatePanMonitor() } }
-        }
-        override var isFlipped: Bool { true }
-        private var panMonitor: LineagePanMonitor?
-        private var panStart: (point: CGPoint, origin: CGPoint)?
-        private var appliedRevision: LineageViewportKey?
-        private var pendingRevision: LineageViewportKey?
-        private var pendingPosition = LineageScrollPosition()
-        private weak var scroll: NSScrollView?
-        private var observation: LineageScrollObserver?
-        private var restoring = false
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            updatePanMonitor()
-            DispatchQueue.main.async { [weak self] in self?.attach() }
-        }
-        private func updatePanMonitor() {
-            // Local event monitors outlive SwiftUI hit testing and opacity. Covered or
-            // disabled lineage views must not consume clicks meant for another screen.
-            if !panEnabled || window == nil { panMonitor = nil; panStart = nil }
-            else if panMonitor == nil {
-                let token = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
-                    let consumed = MainActor.assumeIsolated {
-                        guard let self else { return false }
-                        return self.pan(event) == nil
-                    }
-                    return consumed ? nil : event
+    private var pan: some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.space))
+            .onChanged { value in
+                if !panDecided {
+                    panDecided = true
+                    let origin = geometry?.contentOffset ?? .zero
+                    let start = CGPoint(x: value.startLocation.x + origin.x, y: value.startLocation.y + origin.y)
+                    panStart = cards.contains(where: { $0.contains(start) }) ? nil : origin
                 }
-                if let token { panMonitor = LineagePanMonitor(token) }
+                guard let start = panStart else { return }
+                scroll.scrollTo(point: clamped(CGPoint(x: start.x - value.translation.width, y: start.y - value.translation.height)))
             }
+            .onEnded { _ in panStart = nil; panDecided = false }
+    }
+
+    private func reported(_ now: ScrollGeometry) {
+        geometry = now
+        if applied != revision { return putBack() }
+        if let target = expected {
+            guard abs(now.contentOffset.x - target.x) < 1, abs(now.contentOffset.y - target.y) < 1 else { return }
+            expected = nil
         }
-        private func pan(_ event: NSEvent) -> NSEvent? {
-            guard panEnabled, !isHiddenOrHasHiddenAncestor, event.window === window, let scroll else {
-                panStart = nil
-                return event
-            }
-            let point = convert(event.locationInWindow, from: nil)
-            if event.type == .leftMouseDown {
-                guard visibleRect.contains(point), !cards.contains(where: { $0.contains(point) }) else { return event }
-                panStart = (event.locationInWindow, scroll.contentView.bounds.origin)
-                return nil
-            }
-            guard let start = panStart else { return event }
-            if event.type == .leftMouseUp { panStart = nil; return nil }
-            let document = scroll.documentView?.frame.size ?? .zero
-            let clip = scroll.contentView
-            let x = start.origin.x - (event.locationInWindow.x - start.point.x)
-            let y = start.origin.y + (event.locationInWindow.y - start.point.y)
-            clip.scroll(to: CGPoint(x: min(max(0, x), max(0, document.width - clip.bounds.width)),
-                                   y: min(max(0, y), max(0, document.height - clip.bounds.height))))
-            scroll.reflectScrolledClipView(clip)
-            return nil
+        onScroll(LineageScrollPosition(x: now.contentOffset.x, y: now.contentOffset.y))
+    }
+
+    /// Puts this revision's kept position back once the content's size is known.
+    private func putBack() {
+        guard applied != revision, geometry != nil else { return }
+        let target = clamped(CGPoint(x: position.x, y: position.y))
+        applied = revision
+        expected = target
+        scroll.scrollTo(point: target)
+        // A position the scroll view cannot reach exactly (the content changed meanwhile) stops waiting.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            if expected == target { expected = nil }
         }
-        func request(revision: LineageViewportKey, position: LineageScrollPosition) {
-            pendingRevision = revision; pendingPosition = position
-            DispatchQueue.main.async { [weak self] in self?.attach() }
-        }
-        private func attach() {
-            guard let target = enclosingScrollView else { return }
-            if scroll !== target {
-                scroll = target; appliedRevision = nil; target.contentView.postsBoundsChangedNotifications = true
-                observation = LineageScrollObserver(NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
-                    object: target.contentView, queue: .main) { [weak self] _ in
-                        MainActor.assumeIsolated { self?.changed() }
-                    })
-            }
-            guard appliedRevision != pendingRevision else { return }
-            restoring = true
-            let clip = target.contentView
-            let document = target.documentView?.frame.size ?? .zero
-            let origin = CGPoint(x: min(max(0, pendingPosition.x), max(0, document.width - clip.bounds.width)),
-                                 y: min(max(0, pendingPosition.y), max(0, document.height - clip.bounds.height)))
-            clip.scroll(to: origin); target.reflectScrolledClipView(clip)
-            appliedRevision = pendingRevision; restoring = false
-        }
-        private func changed() {
-            guard !restoring, appliedRevision == pendingRevision, let origin = scroll?.contentView.bounds.origin else { return }
-            onScroll?(LineageScrollPosition(x: origin.x, y: origin.y))
-        }
+    }
+
+    private func clamped(_ point: CGPoint) -> CGPoint {
+        guard let geometry else { return point }
+        let limit = CGSize(width: max(0, geometry.contentSize.width - geometry.containerSize.width),
+                           height: max(0, geometry.contentSize.height - geometry.containerSize.height))
+        return CGPoint(x: min(max(0, point.x), limit.width), y: min(max(0, point.y), limit.height))
     }
 }
-#elseif os(iOS)
-struct LineageScrollBridge: UIViewRepresentable {
-    let revision: LineageViewportKey
-    let position: LineageScrollPosition
-    var cards: [CGRect] = []
-    let onScroll: (LineageScrollPosition) -> Void
-    func makeUIView(context: Context) -> Probe { Probe() }
-    func updateUIView(_ view: Probe, context: Context) {
-        view.onScroll = onScroll; view.request(revision: revision, position: position)
-    }
-    final class Probe: UIView {
-        var onScroll: ((LineageScrollPosition) -> Void)?
-        private var appliedRevision: LineageViewportKey?
-        private var pendingRevision: LineageViewportKey?
-        private var pendingPosition = LineageScrollPosition()
-        private weak var scroll: UIScrollView?
-        private var observation: NSKeyValueObservation?
-        private var restoring = false
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
-            DispatchQueue.main.async { [weak self] in self?.attach() }
-        }
-        func request(revision: LineageViewportKey, position: LineageScrollPosition) {
-            pendingRevision = revision; pendingPosition = position
-            DispatchQueue.main.async { [weak self] in self?.attach() }
-        }
-        private func attach() {
-            var ancestor = superview
-            while ancestor != nil, !(ancestor is UIScrollView) { ancestor = ancestor?.superview }
-            guard let target = ancestor as? UIScrollView else { return }
-            if scroll !== target {
-                scroll = target; appliedRevision = nil
-                observation = target.observe(\.contentOffset, options: [.new]) { [weak self] _, _ in
-                    MainActor.assumeIsolated { self?.changed() }
-                }
-            }
-            guard appliedRevision != pendingRevision else { return }
-            restoring = true
-            target.setContentOffset(CGPoint(x: min(max(0, pendingPosition.x), max(0, target.contentSize.width - target.bounds.width)),
-                                            y: min(max(0, pendingPosition.y), max(0, target.contentSize.height - target.bounds.height))), animated: false)
-            appliedRevision = pendingRevision; restoring = false
-        }
-        private func changed() {
-            guard !restoring, appliedRevision == pendingRevision, let origin = scroll?.contentOffset else { return }
-            onScroll?(LineageScrollPosition(x: origin.x, y: origin.y))
-        }
+
+extension View {
+    func lineageScrolling(revision: LineageViewportKey, position: LineageScrollPosition,
+                          onScroll: @escaping (LineageScrollPosition) -> Void) -> some View {
+        modifier(LineageScrolling(revision: revision, position: position, onScroll: onScroll))
     }
 }
-#endif

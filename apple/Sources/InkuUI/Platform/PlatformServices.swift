@@ -41,6 +41,31 @@ enum InkuPasteboard {
     }
 }
 
+/// The application's own events.
+@MainActor
+enum InkuApplication {
+    /// The app is about to quit (iOS: no such event yet; it is decided with the iOS app's life cycle).
+    static var willTerminate: AnyPublisher<Notification, Never> {
+        #if os(macOS)
+        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification).eraseToAnyPublisher()
+        #else
+        Empty().eraseToAnyPublisher()
+        #endif
+    }
+}
+
+/// Text widths a layout sizes itself by, with the platform's own font.
+enum InkuTextMetrics {
+    /// One digit of the monospaced-digit system font, for a field `n` digits wide (Web `ch`).
+    static func monospacedDigitWidth(size: CGFloat) -> CGFloat {
+        #if os(macOS)
+        ("0" as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)]).width
+        #else
+        ("0" as NSString).size(withAttributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)]).width
+        #endif
+    }
+}
+
 /// The default export folder the settings remember as a bookmark (security-scoped on macOS).
 enum InkuFolderBookmark {
     static func resolve(_ bookmark: Data) throws -> (url: URL, stale: Bool) {

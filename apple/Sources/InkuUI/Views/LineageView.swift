@@ -105,10 +105,11 @@ struct LineageView: View {
                             .padding(24)
                             .backgroundPreferenceValue(LineageCardBounds.self) { anchors in
                                 GeometryReader { geometry in
-                                    scrollBridge(overview: overview, cards: anchors.values.map { geometry[$0] })
+                                    Color.clear.preference(key: LineageCardRects.self, value: anchors.values.map { geometry[$0] })
                                 }
                             }
                         }
+                        .modifier(lineageScrolling(overview: overview))
                         .inkuFocusSection()
                         .onChange(of: graph.focusNodeID, initial: true) { _, _ in
                             if !library.lineageBrowsing.overviewOpen { proxy.scrollTo(graph.focusNodeID, anchor: .center) }
@@ -310,10 +311,10 @@ struct LineageView: View {
         library.lineageBrowsing.setOverviewScale(value)
     }
 
-    private func scrollBridge(overview: Bool, cards: [CGRect]) -> some View {
+    private func lineageScrolling(overview: Bool) -> LineageScrolling {
         // The covered normal view must reapply its own offset when the map closes.
         let key = LineageViewportKey(treeID: library.lineageBrowsing.treeID, overview: library.lineageBrowsing.overviewOpen, vertical: library.lineageVertical)
-        return LineageScrollBridge(revision: key, position: library.lineageBrowsing.scroll, cards: cards) { position in
+        return LineageScrolling(revision: key, position: library.lineageBrowsing.scroll) { position in
             guard overview == library.lineageBrowsing.overviewOpen else { return }
             if overview { library.lineageBrowsing.overviewScroll = position }
             else { library.lineageBrowsing.normalScroll = position }

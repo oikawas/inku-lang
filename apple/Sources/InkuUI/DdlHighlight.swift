@@ -1,8 +1,6 @@
+import CoreGraphics
 import Foundation
 import InkuHost
-#if os(macOS)
-import AppKit
-#endif
 
 /// Web `highlight.ts` token classes: a saijiki word by its category, an emotion word, or a plugin name.
 enum DdlTokenClass: String, Sendable, Equatable {
@@ -168,46 +166,17 @@ public enum DdlHighlightProbe {
     }
 }
 
-#if os(macOS)
+/// The editor marks' colours as values (light and dark, `0xRRGGBB`); each platform makes its own colours from them
+/// (Platform/macOS/MacDdlHighlightAttributes.swift for the macOS text view).
 extension InkuEditorMark.Style {
-    /// Web `.label-muted` (fg3 at 22%), the `.ddl-token-*` palette in both themes, and the amber unknown name.
-    var attributes: [NSAttributedString.Key: Any] {
-        switch self {
-        case .muted:
-            return [.backgroundColor: NSColor.systemGray.withAlphaComponent(0.22)]
-        case .completion(let state):
-            let color: NSColor = switch state { case .completed: .systemBlue; case .numbersChanged: .systemGreen; case .wordsChanged: .systemOrange }
-            return [.underlineStyle: NSUnderlineStyle.thick.rawValue | NSUnderlineStyle.patternDot.rawValue, .underlineColor: color]
-        case .unknownName:
-            return [.foregroundColor: Self.dynamic(0x8a5a12, 0xf0c368),
-                    .backgroundColor: Self.dynamic(0xbf8820, 0xbf8820, lightAlpha: 0.12, darkAlpha: 0.26),
-                    .underlineStyle: NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue,
-                    .underlineColor: Self.dynamic(0xbf8820, 0xf0c368, lightAlpha: 0.42, darkAlpha: 0.48)]
-        case .title:
-            // Web `.ddl-title` (weight 600 in that colour). Temporary attributes cannot change the font, so the
-            // heading is the colour with a line under it.
-            return [.foregroundColor: Self.dynamic(0x3d4650, 0xd6dde4),
-                    .underlineStyle: NSUnderlineStyle.single.rawValue,
-                    .underlineColor: Self.dynamic(0x3d4650, 0xd6dde4, lightAlpha: 0.45, darkAlpha: 0.45)]
-        case .token(let token):
-            let palette = Self.palette[token] ?? Self.palette[.word]!
-            var attributes: [NSAttributedString.Key: Any] = [.foregroundColor: Self.dynamic(palette.light, palette.dark)]
-            if let background = palette.background {
-                attributes[.backgroundColor] = Self.dynamic(background.light, background.dark,
-                                                            lightAlpha: background.lightAlpha, darkAlpha: background.darkAlpha)
-            }
-            return attributes
-        }
-    }
-
-    private struct Palette {
+    struct Palette {
         let light: Int
         let dark: Int
         let background: (light: Int, dark: Int, lightAlpha: CGFloat, darkAlpha: CGFloat)?
     }
 
     // `+page.svelte:3658-3690`.
-    private static let palette: [DdlTokenClass: Palette] = [
+    static let palette: [DdlTokenClass: Palette] = [
         .shape: Palette(light: 0x2c5fb8, dark: 0x9cc4ff, background: (0x2c5fb8, 0x5c8fdc, 0.08, 0.26)),
         .touch: Palette(light: 0x7a5b2f, dark: 0xe2bf82, background: (0x7a5b2f, 0xbc8b3e, 0.10, 0.24)),
         .line: Palette(light: 0x53606b, dark: 0xc4ccd5, background: (0x53606b, 0x93a0b0, 0.10, 0.22)),
@@ -221,14 +190,4 @@ extension InkuEditorMark.Style {
         .word: Palette(light: 0x2c3e91, dark: 0xb8c7ff, background: (0x2c3e91, 0x5c6fcd, 0.08, 0.26)),
         .emotion: Palette(light: 0x9b7a66, dark: 0xd8b8a6, background: nil),
     ]
-
-    private static func dynamic(_ light: Int, _ dark: Int, lightAlpha: CGFloat = 1, darkAlpha: CGFloat = 1) -> NSColor {
-        NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            let value = isDark ? dark : light
-            return NSColor(srgbRed: CGFloat((value >> 16) & 0xff) / 255, green: CGFloat((value >> 8) & 0xff) / 255,
-                           blue: CGFloat(value & 0xff) / 255, alpha: isDark ? darkAlpha : lightAlpha)
-        }
-    }
 }
-#endif

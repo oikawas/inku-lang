@@ -1,9 +1,6 @@
 import SwiftUI
 import InkuHost
-#if os(macOS)
-import AppKit
 import UniformTypeIdentifiers
-#endif
 
 @MainActor
 struct PluginSettingsView: View {

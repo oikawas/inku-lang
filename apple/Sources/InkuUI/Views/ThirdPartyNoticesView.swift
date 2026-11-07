@@ -1,8 +1,5 @@
 import Foundation
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 /// The reviewed snapshot that apple/scripts/build-macos-notices.py writes from the locked inputs, followed by the
 /// bundled 3D viewer's own notices file, read from the app's copy (`Ddl3DViewerNotices`; never in the snapshot).
@@ -150,36 +147,27 @@ struct ThirdPartyNoticesView: View {
     }
 }
 
-#if os(macOS)
-/// Some notices (the Rust standard library's) are hundreds of kilobytes; a text view lays them out lazily.
-private struct NoticeTextView: NSViewRepresentable {
-    let text: String
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let view = NSTextView.scrollableTextView()
-        guard let textView = view.documentView as? NSTextView else { return view }
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        textView.textContainerInset = NSSize(width: 10, height: 10)
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        textView.defaultParagraphStyle = paragraph
-        view.borderType = .lineBorder
-        return view
-    }
-
-    func updateNSView(_ view: NSScrollView, context: Context) {
-        guard let textView = view.documentView as? NSTextView, textView.string != text else { return }
-        textView.string = text
-        textView.scrollToBeginningOfDocument(nil)
-    }
-}
-#else
+/// Some notices (the Rust standard library's, 1.4 MB) are long: a lazy stack lays out only the paragraphs on screen
+/// (PLAN §7: 0.08 s to show, where the text view took 0.01 s). A selection stays inside one paragraph.
 private struct NoticeTextView: View {
     let text: String
+    @State private var paragraphs: [String] = []
+
     var body: some View {
-        ScrollView { Text(text).font(.system(size: 11, design: .monospaced)).frame(maxWidth: .infinity, alignment: .leading) }
+        ScrollView {
+            // About one line between paragraphs, where the text had an empty line.
+            LazyVStack(alignment: .leading, spacing: 15) {
+                ForEach(paragraphs.indices, id: \.self) { index in
+                    Text(paragraphs[index]).font(.system(size: 11, design: .monospaced)).lineSpacing(4)
+                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(10)
+        }
+        // Another component's notices start at the top.
+        .id(text)
+        .background(.background)
+        .border(Color.secondary.opacity(0.5))
+        .onChange(of: text, initial: true) { _, now in paragraphs = now.components(separatedBy: "\n\n") }
     }
 }
-#endif

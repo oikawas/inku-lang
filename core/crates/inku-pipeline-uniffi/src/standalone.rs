@@ -232,8 +232,13 @@ fn composed_frame(
 /// Compile a saved visible document and return a frame for each Score instruction.
 #[uniffi::export]
 pub fn line_animation(input_bytes: Vec<u8>) -> Vec<u8> {
+    line_animation_bytes(&input_bytes)
+}
+
+/// [`line_animation`] over borrowed bytes, for a binding that need not copy them.
+pub fn line_animation_bytes(input_bytes: &[u8]) -> Vec<u8> {
     owned_call(|| {
-        let input: AnimationInput = parse(&input_bytes, "invalid_animation_input")?;
+        let input: AnimationInput = parse(input_bytes, "invalid_animation_input")?;
         let document = input
             .document
             .document()

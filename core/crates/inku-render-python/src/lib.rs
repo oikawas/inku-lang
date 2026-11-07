@@ -195,8 +195,8 @@ fn pipeline_line_animation<'py>(
 ) -> PyResult<Bound<'py, PyBytes>> {
     catch_python_panic(|| {
         Ok({
-            let input = input_bytes.as_bytes().to_vec();
-            let output = py.detach(|| inku_pipeline_uniffi::line_animation(input));
+            let input = input_bytes.as_bytes();
+            let output = py.detach(|| inku_pipeline_uniffi::line_animation_bytes(input));
             PyBytes::new(py, &output)
         })
     })
@@ -217,9 +217,9 @@ fn pipeline_step<'py>(
 ) -> PyResult<Bound<'py, PyBytes>> {
     catch_python_panic(|| {
         Ok({
-            let snapshot = snapshot_bytes.as_bytes().to_vec();
-            let input_envelope = input_envelope_bytes.as_bytes().to_vec();
-            let output = py.detach(|| inku_pipeline_uniffi::step(snapshot, input_envelope));
+            let snapshot = snapshot_bytes.as_bytes();
+            let input_envelope = input_envelope_bytes.as_bytes();
+            let output = py.detach(|| inku_pipeline_uniffi::step_bytes(snapshot, input_envelope));
             PyBytes::new(py, &output)
         })
     })
@@ -235,8 +235,8 @@ fn pipeline_step_with_svg_limit<'py>(
 ) -> PyResult<(Bound<'py, PyBytes>, Option<String>)> {
     catch_python_panic(|| {
         Ok({
-            let snapshot = snapshot_bytes.as_bytes().to_vec();
-            let input = input_bytes.as_bytes().to_vec();
+            let snapshot = snapshot_bytes.as_bytes();
+            let input = input_bytes.as_bytes();
             let (output, svg) = py.detach(|| {
                 inku_pipeline_uniffi::step_with_svg_limit(snapshot, input, max_svg_bytes)
             });
@@ -253,8 +253,8 @@ fn pipeline_provider_attempt<'py>(
 ) -> PyResult<Bound<'py, PyBytes>> {
     catch_python_panic(|| {
         Ok({
-            let snapshot = snapshot_bytes.as_bytes().to_vec();
-            let output = py.detach(|| inku_pipeline_uniffi::provider_attempt(snapshot));
+            let snapshot = snapshot_bytes.as_bytes();
+            let output = py.detach(|| inku_pipeline_uniffi::provider_attempt_bytes(snapshot));
             PyBytes::new(py, &output)
         })
     })
@@ -268,8 +268,8 @@ fn pipeline_run_progress<'py>(
 ) -> PyResult<Bound<'py, PyBytes>> {
     catch_python_panic(|| {
         Ok({
-            let snapshot = snapshot_bytes.as_bytes().to_vec();
-            let output = py.detach(|| inku_pipeline_uniffi::run_progress(snapshot));
+            let snapshot = snapshot_bytes.as_bytes();
+            let output = py.detach(|| inku_pipeline_uniffi::run_progress_bytes(snapshot));
             PyBytes::new(py, &output)
         })
     })
@@ -602,9 +602,10 @@ fn pipeline_image_review_svg<'py>(
 ) -> PyResult<Bound<'py, PyBytes>> {
     catch_python_panic(|| {
         Ok({
-            let snapshot = snapshot_bytes.as_bytes().to_vec();
-            let request = request_bytes.as_bytes().to_vec();
-            let output = py.detach(|| inku_pipeline_uniffi::image_review_svg(snapshot, request));
+            let snapshot = snapshot_bytes.as_bytes();
+            let request = request_bytes.as_bytes();
+            let output =
+                py.detach(|| inku_pipeline_uniffi::image_review_svg_bytes(snapshot, request));
             PyBytes::new(py, &output)
         })
     })

@@ -41,7 +41,8 @@ pub use raster::{
 };
 pub use saijiki_migration::{migrate_saijiki_v1, migrate_saijiki_v2};
 pub use standalone::{
-    compile_document, line_animation, render_compiled, render_compiled_svg_limited,
+    compile_document, line_animation, line_animation_bytes, render_compiled,
+    render_compiled_svg_limited,
 };
 
 const BINDING_VERSION: &str = "1.1.0";
@@ -70,22 +71,27 @@ fn guarded_core_call<T>(operation: impl FnOnce() -> T) -> Result<T, CoreCallFail
 /// Advance one pipeline execution using only owned byte envelopes.
 #[uniffi::export]
 pub fn step(snapshot_bytes: Vec<u8>, input_envelope_bytes: Vec<u8>) -> Vec<u8> {
+    step_bytes(&snapshot_bytes, &input_envelope_bytes)
+}
+
+/// [`step`] over borrowed bytes, for a binding that need not copy them.
+pub fn step_bytes(snapshot_bytes: &[u8], input_envelope_bytes: &[u8]) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {
-        inku_pipeline::byte_envelope::step_owned(&snapshot_bytes, &input_envelope_bytes)
+        inku_pipeline::byte_envelope::step_owned(snapshot_bytes, input_envelope_bytes)
     }))
     .unwrap_or_else(|_| error_bytes(ProtocolError::InternalInvariant))
 }
 
 /// Rust helper for the Server's CPython binding; existing UniFFI/JNI calls stay unchanged.
 pub fn step_with_svg_limit(
-    snapshot_bytes: Vec<u8>,
-    input_envelope_bytes: Vec<u8>,
+    snapshot_bytes: &[u8],
+    input_envelope_bytes: &[u8],
     max_svg_bytes: usize,
 ) -> (Vec<u8>, Option<String>) {
     catch_unwind(AssertUnwindSafe(|| {
         inku_pipeline::byte_envelope::step_owned_with_svg_limit(
-            &snapshot_bytes,
-            &input_envelope_bytes,
+            snapshot_bytes,
+            input_envelope_bytes,
             max_svg_bytes,
         )
     }))
@@ -126,7 +132,7 @@ pub fn step_svg_limited(
     max_svg_bytes: u64,
 ) -> NativeSvgOutput {
     match native_svg_limit(max_svg_bytes) {
-        Ok(limit) => step_with_svg_limit(snapshot_bytes, input_envelope_bytes, limit).into(),
+        Ok(limit) => step_with_svg_limit(&snapshot_bytes, &input_envelope_bytes, limit).into(),
         Err(refusal) => refusal,
     }
 }
@@ -135,8 +141,13 @@ pub fn step_svg_limited(
 /// show retry progress. The binding version is unchanged: this only adds a call.
 #[uniffi::export]
 pub fn provider_attempt(snapshot_bytes: Vec<u8>) -> Vec<u8> {
+    provider_attempt_bytes(&snapshot_bytes)
+}
+
+/// [`provider_attempt`] over borrowed bytes, for a binding that need not copy them.
+pub fn provider_attempt_bytes(snapshot_bytes: &[u8]) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {
-        inku_pipeline::byte_envelope::provider_attempt_owned(&snapshot_bytes)
+        inku_pipeline::byte_envelope::provider_attempt_owned(snapshot_bytes)
     }))
     .unwrap_or_else(|_| br#"{"error":"invalid_snapshot"}"#.to_vec())
 }
@@ -144,8 +155,13 @@ pub fn provider_attempt(snapshot_bytes: Vec<u8>) -> Vec<u8> {
 /// Read structured run progress from the sealed snapshot.
 #[uniffi::export]
 pub fn run_progress(snapshot_bytes: Vec<u8>) -> Vec<u8> {
+    run_progress_bytes(&snapshot_bytes)
+}
+
+/// [`run_progress`] over borrowed bytes, for a binding that need not copy them.
+pub fn run_progress_bytes(snapshot_bytes: &[u8]) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {
-        inku_pipeline::byte_envelope::run_progress_owned(&snapshot_bytes)
+        inku_pipeline::byte_envelope::run_progress_owned(snapshot_bytes)
     }))
     .unwrap_or_else(|_| br#"{"error":"invalid_snapshot"}"#.to_vec())
 }
@@ -318,8 +334,13 @@ pub fn image_canvas(input_bytes: Vec<u8>) -> Vec<u8> {
 /// "internal_invariant"}`. Called as [`image_input_policy`] is.
 #[uniffi::export]
 pub fn image_review_svg(snapshot_bytes: Vec<u8>, request_bytes: Vec<u8>) -> Vec<u8> {
+    image_review_svg_bytes(&snapshot_bytes, &request_bytes)
+}
+
+/// [`image_review_svg`] over borrowed bytes, for a binding that need not copy them.
+pub fn image_review_svg_bytes(snapshot_bytes: &[u8], request_bytes: &[u8]) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {
-        inku_pipeline::byte_envelope::image_review_svg_owned(&snapshot_bytes, &request_bytes)
+        inku_pipeline::byte_envelope::image_review_svg_owned(snapshot_bytes, request_bytes)
     }))
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }

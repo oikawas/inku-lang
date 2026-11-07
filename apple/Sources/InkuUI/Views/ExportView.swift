@@ -196,8 +196,10 @@ struct ExportView: View {
             HStack {
                 if isBusy { ProgressView().controlSize(.small); Button(model.display.localized("中止")) { operation?.cancel(); status = "中止しています…" } }
                 if !exportedURLs.isEmpty {
-                    Button(model.display.localized("Finderで表示")) { NSWorkspace.shared.activateFileViewerSelecting(exportedURLs) }
-                    Button(model.display.localized("共有")) { share() }
+                    if InkuFileViewer.available {
+                        Button(model.display.localized("Finderで表示")) { InkuFileViewer.reveal(exportedURLs) }
+                    }
+                    ShareLink(items: exportedURLs) { Text(model.display.localized("共有")) }
                 }
                 Spacer()
                 Button(model.display.localized("閉じる")) { dismiss() }.disabled(isBusy).keyboardShortcut(.cancelAction)
@@ -309,10 +311,8 @@ struct ExportView: View {
             return folder
         }
         if names.count == 1 {
-            let panel = NSSavePanel(); panel.title = model.display.localized("作品を書き出す")
-            panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .data]
-            panel.nameFieldStringValue = names[0]
-            return panel.runModal() == .OK ? panel.url : nil
+            return NativeFilePanels.exportFile(title: model.display.localized("作品を書き出す"),
+                                               type: UTType(filenameExtension: format.fileExtension) ?? .data, name: names[0])
         }
         let panel = NSOpenPanel(); panel.title = model.display.localized("書き出しフォルダーを選択")
         panel.message = model.display.localized("選択した場所に新しい書き出しフォルダーを作ります。")
@@ -346,11 +346,6 @@ struct ExportView: View {
             }
         }
         return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
-    }
-
-    private func share() {
-        guard let view = NSApp.keyWindow?.contentView else { return }
-        NSSharingServicePicker(items: exportedURLs).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
     }
 }
 #endif

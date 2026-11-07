@@ -41,6 +41,34 @@ enum InkuPasteboard {
     }
 }
 
+/// Finder's "show in folder"; iOS has no file viewer to open.
+@MainActor
+enum InkuFileViewer {
+    static var available: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    static func reveal(_ urls: [URL]) {
+        #if os(macOS)
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
+        #endif
+    }
+}
+
+/// The system alert sound where a save or a viewer file fails.
+@MainActor
+enum InkuFeedback {
+    static func beep() {
+        #if os(macOS)
+        NSSound.beep()
+        #endif
+    }
+}
+
 /// Web color tokens mapped onto each system palette with the existing native colors.
 enum InkuColor {
     #if os(macOS)

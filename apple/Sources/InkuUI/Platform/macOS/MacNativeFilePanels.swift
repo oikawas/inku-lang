@@ -2,21 +2,15 @@
 import AppKit
 import UniformTypeIdentifiers
 
-enum ExportKind { case svg, png }
-
+/// Save panels whose chosen URL the app's own code writes to (the export writes there, the backup copies a 2.6 GB
+/// database there), so SwiftUI's `fileExporter`, which writes a document it is handed, does not fit.
 @MainActor
 enum NativeFilePanels {
-    static func export(kind: ExportKind, language: String = "ja") -> URL? {
-        let panel = NSSavePanel()
-        panel.title = InkuLocalization.string("作品を書き出す", language: language)
-        switch kind {
-        case .svg:
-            panel.allowedContentTypes = [.svg]
-            panel.nameFieldStringValue = "inku-作品.svg"
-        case .png:
-            panel.allowedContentTypes = [.png]
-            panel.nameFieldStringValue = "inku-作品.png"
-        }
+    /// One work's export file.
+    static func exportFile(title: String, type: UTType, name: String) -> URL? {
+        let panel = NSSavePanel(); panel.title = title
+        panel.allowedContentTypes = [type]
+        panel.nameFieldStringValue = name
         return panel.runModal() == .OK ? panel.url : nil
     }
 

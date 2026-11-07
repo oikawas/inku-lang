@@ -1,5 +1,6 @@
 #if os(macOS)
 import AppKit
+import InkuPersistence
 import SwiftUI
 import WebKit
 
@@ -22,6 +23,22 @@ public final class Ddl3DWebView: WKWebView {
         takesFocusInWindow = false
         window.makeFirstResponder(self)
     }
+
+    func drawsNoBackground() { setValue(false, forKey: "drawsBackground") }
+}
+
+/// Where the viewer's PNG or GLB goes: the save panel, on the web view's window when it has one.
+@MainActor
+enum InkuSaveDestination {
+    static func choose(suggestedName: String, attachedTo view: NSView, completion: @escaping @MainActor (URL?) -> Void) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = suggestedName
+        panel.canCreateDirectories = true
+        let finish: (NSApplication.ModalResponse) -> Void = { result in
+            completion(result == .OK ? panel.url : nil)
+        }
+        if let window = view.window { panel.beginSheetModal(for: window, completionHandler: finish) } else { panel.begin(completionHandler: finish) }
+    }
 }
 
 /// The 3D view in the canvas area. Each appearance mounts a new viewer; leaving disposes it.
@@ -41,5 +58,17 @@ struct Ddl3DSurface: NSViewRepresentable {
     func updateNSView(_ view: Ddl3DWebView, context: Context) { view.onEscape = onEscape }
 
     static func dismantleNSView(_ view: Ddl3DWebView, coordinator: ()) { view.bridge?.close() }
+}
+
+/// InkuAppCheck `--ddl3d-only`: the work tab's 3D view alone in a hosting view, built as CreationView builds it, over
+/// the copy of the viewer the check names (the build's copy in the source tree).
+@MainActor
+public enum Ddl3DProbe {
+    public static func hostingView(registration: Ddl3DInstallation.Registered, work: SavedWork, controller: Ddl3DController,
+                                   display: DisplaySettings, initialView: Ddl3DInitialView, onReturn: @escaping () -> Void) -> NSView {
+        NSHostingView(rootView: Ddl3DCanvas(controller: controller, registration: registration, work: work,
+                                            initialView: initialView, onReturn: onReturn, onEscape: { false })
+            .environment(display))
+    }
 }
 #endif

@@ -54,7 +54,7 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     // The export menus' SVG/PNG items are menu items too; InkuTooltip's one is the iOS stand-in, which has no bubble.
     guard helps == ["SavedWorkActionState.swift": 4, "LineageView.swift": 3, "LibraryView.swift": 3,
-                    "LibraryPreviewPanel.swift": 2, "SavedWorkExportMenu.swift": 1, "InkuTooltip.swift": 1] else {
+                    "LibraryPreviewPanel.swift": 2, "SavedWorkExportMenu.swift": 1, "IOSInkuTooltipModifier.swift": 1] else {
         throw CheckFailure.message("`.help` outside menu items: \(helps)")
     }
 

@@ -6,20 +6,96 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PACKAGE="$ROOT/apple/Packages/InkuCore"
 BUILD="$ROOT/apple/scripts/.build/core"
 RUST_TARGET="$BUILD/rust"
+CHECK_CURRENT=false
+if [[ "${1:-}" == --check-current ]]; then
+    CHECK_CURRENT=true
+    shift
+fi
 MODE="${1:-macos}"
 PROFILE="${INKU_APPLE_PROFILE:-release}"
 
 usage() {
-    printf 'usage: apple/scripts/build-core.sh [macos|all]\n' >&2
+    printf 'usage: apple/scripts/build-core.sh [--check-current] [macos|all]\n' >&2
     printf 'macos: arm64 + x86_64; all: additionally iOS device + Universal simulator\n' >&2
     printf 'Set INKU_APPLE_PROFILE=debug for a development artifact.\n' >&2
+    printf 'With --check-current, build nothing: exit 0 when the artifact covers the mode with this profile\n' >&2
+    printf 'from the current core sources and toolchain, 1 (naming the reason) when it needs a rebuild.\n' >&2
 }
 
 [[ $# -le 1 && ( "$MODE" == macos || "$MODE" == all ) ]] || { usage; exit 2; }
 [[ "$PROFILE" == release || "$PROFILE" == debug ]] || { usage; exit 2; }
 [[ "$(uname -s)" == Darwin ]] || { printf 'Apple builds require macOS and Xcode.\n' >&2; exit 2; }
 
+# The fingerprint of every tracked or unignored file under core/ (name and SHA-256), recorded in
+# the manifest as core_source_sha256 and compared by --check-current.
+core_source_sha256() {
+    python3 - "$ROOT" <<'__INKU_CORE_SOURCE__'
+import hashlib
+from pathlib import Path
+import subprocess
+import sys
+
+root = Path(sys.argv[1])
+paths = subprocess.check_output(["git", "-C", str(root), "ls-files", "-c", "-o", "--exclude-standard", "core"]).decode().strip().splitlines()
+source = hashlib.sha256()
+for name in sorted(set(paths)):
+    path = root / name
+    if path.is_file():
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        source.update(name.encode() + b"\0")
+        source.update(digest.digest())
+print(source.hexdigest())
+__INKU_CORE_SOURCE__
+}
+
 CHANNEL="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' "$ROOT/core/rust-toolchain.toml")"
+if [[ "$CHECK_CURRENT" == true ]]; then
+    # An `all` artifact also covers `macos`; `all` needs the iOS device and simulator slices.
+    SOURCE_SHA256="$(core_source_sha256)"
+    exec python3 - "$PACKAGE" "$PROFILE" "$MODE" "$CHANNEL" "$SOURCE_SHA256" <<'__INKU_CORE_CURRENT__'
+import hashlib
+import json
+from pathlib import Path
+import plistlib
+import sys
+
+package = Path(sys.argv[1])
+profile, mode, channel, source = sys.argv[2:6]
+manifest = package / "Artifacts/build-manifest.json"
+framework = package / "Artifacts/InkuCoreFFI.xcframework"
+binding = package / "Sources/InkuCoreBindings/InkuCoreBindings.swift"
+
+def stale(reason):
+    print(f"Rust core artifact needs a rebuild ({mode}, {profile}): {reason}")
+    raise SystemExit(1)
+
+if not manifest.is_file():
+    stale(f"no {manifest}")
+identity = json.loads(manifest.read_text())
+if identity.get("mode") not in ({"all"} if mode == "all" else {"macos", "all"}):
+    stale(f"the artifact was built for mode {identity.get('mode')!r}")
+if identity.get("profile") != profile:
+    stale(f"the artifact was built with profile {identity.get('profile')!r}")
+if identity.get("rust_toolchain") != channel:
+    stale(f"the artifact was built with Rust {identity.get('rust_toolchain')!r}, the checkout pins {channel}")
+if identity.get("core_source_sha256") != source:
+    stale("the core sources differ from those the artifact was built from")
+if not binding.is_file() or hashlib.sha256(binding.read_bytes()).hexdigest() != identity.get("swift_binding_sha256"):
+    stale(f"{binding.name} is missing or differs from the manifest")
+info = framework / "Info.plist"
+if not info.is_file():
+    stale(f"no {framework}")
+platforms = {(library.get("SupportedPlatform"), library.get("SupportedPlatformVariant"))
+             for library in plistlib.loads(info.read_bytes()).get("AvailableLibraries", [])}
+wanted = {("macos", None)} | ({("ios", None), ("ios", "simulator")} if mode == "all" else set())
+if not wanted <= platforms:
+    stale(f"{framework.name} lacks {sorted(map(str, wanted - platforms))}")
+print(f"Rust core artifact is current ({identity['mode']}, {profile}, core {source[:12]})")
+__INKU_CORE_CURRENT__
+fi
 RUSTUP_BIN="${INKU_RUSTUP_BIN:-${CARGO_HOME:-$HOME/.cargo}/bin/rustup}"
 TARGETS=(aarch64-apple-darwin x86_64-apple-darwin)
 if [[ "$MODE" == all ]]; then
@@ -108,7 +184,8 @@ if [[ ! -d "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" ]] || ! diff -qr "$OUTPU
     [[ ! -d "$PACKAGE/Artifacts/InkuCoreFFI.xcframework" ]] || rm -rf "$PACKAGE/Artifacts/InkuCoreFFI.xcframework"
     cp -R "$OUTPUT" "$PACKAGE/Artifacts/InkuCoreFFI.xcframework"
 fi
-python3 - "$ROOT" "$PACKAGE" "$RUST_TARGET" "$PROFILE" "$CHANNEL" "$MODE" "${TARGETS[@]}" <<'__INKU_CORE_MANIFEST__'
+SOURCE_SHA256="$(core_source_sha256)"
+python3 - "$ROOT" "$PACKAGE" "$RUST_TARGET" "$PROFILE" "$CHANNEL" "$MODE" "$SOURCE_SHA256" "${TARGETS[@]}" <<'__INKU_CORE_MANIFEST__'
 import hashlib
 import json
 from pathlib import Path
@@ -117,8 +194,8 @@ import sys
 import tomllib
 
 root, package, rust_target = map(Path, sys.argv[1:4])
-profile, channel, mode = sys.argv[4:7]
-targets = sys.argv[7:]
+profile, channel, mode, source_sha256 = sys.argv[4:8]
+targets = sys.argv[8:]
 
 def git(*args):
     return subprocess.check_output(["git", "-C", str(root), *args]).decode().strip()
@@ -130,13 +207,6 @@ def file_digest(path):
             digest.update(chunk)
     return digest.hexdigest()
 
-source = hashlib.sha256()
-paths = git("ls-files", "-c", "-o", "--exclude-standard", "core").splitlines()
-for name in sorted(set(paths)):
-    path = root / name
-    if path.is_file():
-        source.update(name.encode() + b"\0")
-        source.update(bytes.fromhex(file_digest(path)))
 lock = tomllib.loads((root / "core/Cargo.lock").read_text())
 generator = next(item["version"] for item in lock["package"] if item["name"] == "uniffi_bindgen")
 if generator != "0.32.0":
@@ -145,7 +215,7 @@ identity = {
     "schema": "inku.apple-rust-artifact.v1",
     "product_commit": git("rev-parse", "HEAD"),
     "core_dirty": bool(git("status", "--porcelain", "--", "core")),
-    "core_source_sha256": source.hexdigest(),
+    "core_source_sha256": source_sha256,
     "rust_toolchain": channel,
     "features": ["display"],
     "uniffi_generator": generator,

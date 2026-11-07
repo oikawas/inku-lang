@@ -10,7 +10,7 @@ M1のSwift／Rust基盤、M2のstandalone host／SQLite保存境界に続き、m
 
 限定した確認で、DDL→Score／SVG→SQLite保存→アプリモデルの再作成後の読出し、native CGImage生成、保存canonical SVGの書出しが成立しています。Swift／Rust境界ではowned pixel buffer、入力エラーとUInt64のseed保持を確認しています。macOSのarm64／x86_64 Rust sliceとx86_64 Swift executableのlink、iOS device／simulatorのRust artifact生成も確認しています。Intel実機での性能・起動、実providerへのLLM送信、作者による通常画面操作の受入は別の確認です。
 
-更新したUniversal appの隔離DBで、DDL生成→編集child→libraryのcomment／star→trash／復元→restart、日英切替と系譜表示、複数選択2作品のPNG2160保存を確認しています。機能のsource接続、限定したoffline確認、native操作、作者の通常利用の受入は別に記録します。旧Server／Android物理DBのimport、その他の実provider／OAuth経路、他exportのnative・性能、Intel／macOS14実機は未完了です。廃止済みhistory.json移行utilityの配列は現行Webの復元形式ではありません。iOSは共通packageと初期Rust artifactまでで、最新APIのartifact再生成、iPad／iPhone app、camera、shareと実機受入は未完了です。
+更新したUniversal appの隔離DBで、DDL生成→編集child→libraryのcomment／star→trash／復元→restart、日英切替と系譜表示、複数選択2作品のPNG2160保存を確認しています。機能のsource接続、限定したoffline確認、native操作、作者の通常利用の受入は別に記録します。旧Server／Android物理DBのimport、その他の実provider／OAuth経路、他exportのnative・性能、Intel／macOS14実機は未完了です。廃止済みhistory.json移行utilityの配列は現行Webの復元形式ではありません。iOSはiPadのアプリをiOSシミュレータでbuildして起動するところまでです（下の「iPadのアプリ」）。iPhoneの画面、実機への導入と実機での受入、camera、share、iPadでまだ出ない機能は未完了です。
 
 Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを用途別に選びます。通常のAPI key接続とは別で、初期状態は無効です。接続には本人の同意が必要です。認証では発行されたclient IDを使用し、利用者が事前に入力する必要はありません。作者はmacOSアプリでChatGPTプランを利用できていると確認しています（2026-11-04）。コード上は記述、写生、自動配色、構図の読み、DDL補完に加え、Vision用途で公開したmodelによるVision推敲・奥書を接続しています。画像とテキストをResponsesへ送る実装の各用途の受入は別に確認します。デモの記述生成は対象外です。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
 
@@ -238,3 +238,19 @@ UI差分の限定確認は`--library-browsing-only`、`--lineage-presentation-on
 送信予算の限定確認は`swift test --package-path apple/Packages/InkuHost --filter ProviderRateLimitChecks/testDurableAdmissionDeadlineAndRetryAccounting`です。一時SQLite、模擬HTTPと時計で同時接続の予約、期限・日次・入力上限、旧記録の取込とbackup／restoreを扱い、実provider、認証情報、通常作品DBを使いません。
 
 限定したCLI確認は、artifactと固定辞書の準備後の`apple/scripts/check-core.sh`と`swift run --package-path apple InkuAppCheck`です。具体差分に必要なものだけを選びます。`--model-selection-only`は保存default・開始時snapshotの分離、`--work-edit-only`は保存親の編集・写生・DDL authority・取消し、`--replay-comparison-only`はprovider不要の再現比較の保存／表示不変を扱います。`--shared-autonomous-refine-only <cases>`は共有の`server/tests/data/autonomous-refine-cases.json`をUniFFIに通して照合し、`--auxiliary-provenance-only`は偽providerで法則・取り合わせの手、辺の記録、可視差、履歴への昇格、停止・再起動を確かめます。ほかに`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--raster-only <SVG path>`があります。旧`--refinement-only`の無変更variation確認は過去実装の確認であり、新variationを退役した現行の受入証拠へ流用しません。native画面、実providerと実機の受入は別です。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。
+
+### iPadのアプリ
+
+iPadのアプリ（target `InkuIOS`、bundle ID `app.inku.ios`、iOS 18以降）は、Macと同じ画面とメニューを1枚の窓で全画面に出します。iPhoneにはまだ入れられません。product repository rootから次を実行すると、署名せずにiOSシミュレータ向けにbuildします。Apple account、Team、証明書は使いません。先に上の`rustup target add`でiOSのtargetを入れておいてください。
+
+```sh
+apple/scripts/build-ios.sh Release
+apple/scripts/build-ios.sh Debug --run
+apple/scripts/build-ios.sh Release --run "iPad Pro 11-inch (M5)"
+```
+
+最初の引数は`Debug`か`Release`です。iOSのRust artifactが無いときと、今のsourceより古いときだけ、先に`build-core.sh all`を実行します。`build-macos.sh`は毎回artifactをMacだけのものに作り直すので、Macをbuildした後にiOSをbuildすると、artifactをもう一度作り直します。バージョンとBuild番号はMacと同じく、buildのたびに割り当てます。この割り当てが無いので、Xcodeから`InkuIOS`を直接buildすると止まります。
+
+`--run`はSimulator.appを開かずにシミュレータの機器を起動し、buildしたアプリを入れて起動し、10秒後にアプリが動き続けているかを確かめます。機器の既定は`iPad Pro 11-inch (M5)`で、名前を続けて書くと別の機器を使います。iPadの実機に入れる手順はまだありません。
+
+作品と設定は、アプリのApplication Supportの下の`app.inku.ios/`に保存します（Macは今までどおり`app.inku.macos/`）。iOSのアプリは別のプログラムを起動できないので、拡大の窓はCPUで区画に分けて描きます（IntelのMacと同じ）。Macの画面と振る舞いは変わりません。画像タブ、DDLの取り込み、書き出しの画面、プラグインの追加、バックアップの復元、3Dは、まだiPadで出ません。iPadで出ない物とMacとの違いは、[Swift仕様](SWIFT_SPEC.ja.md)の「2026-11-07 iOS（iPad）のアプリ」の節にあります。

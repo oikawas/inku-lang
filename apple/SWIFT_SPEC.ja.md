@@ -6,7 +6,7 @@ macOS の履歴帯は矢印キーでページをまたいで移動し、キャ�
 
 キャンバス上部は作品・系譜のタブの横に表示中作品の条件を入力欄の順に示し、狭い幅では帯を下へ折り返す。記録の無い値は N/A とし、画像作品には描き方・写生・構図を出さない。推敲メニューは作品の右上に重ねる。
 
-最終更新: 2026-11-05。
+最終更新: 2026-11-07。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版とBuild番号は`apple/VERSION`・`apple/BUILD_NUMBER`を下限としてServer／Webとは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -21,6 +21,23 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-11-07 iOS（iPad）のアプリ
+
+iPadのアプリを足す。範囲はiOSシミュレータでbuildして起動するところまでで、iPhoneの画面と実機は後のstepで作る。
+
+- target：`apple/project.yml`の`InkuIOS`（bundle ID `app.inku.ios`、最低iOS 18、対象の機器はiPadだけ）。入口は`apple/Sources/InkuIOS/InkuIOSApp.swift`で、1つのアプリモデルの上に窓を1枚だけ開き、Macと同じ`ContentView`と`InkuCommands`を使う。2枚目の窓は同じモデルを2回出すことになるので作らない。
+- 窓：`apple/Configuration/Info-iOS.plist`で全画面だけにし（`UIRequiresFullScreen`）、窓を複数持たない。Macの配置は画面全体を要るので、狭い画面ができるまで画面の分割に入れない。手元のネットワークのLLMへの接続の許し（`NSAllowsLocalNetworking`と説明の文）はMacと同じ。
+- アイコン：`docs/assets/incu-icon-512.png`を1024 pxに広げたもの（`apple/Resources/iOS/Assets.xcassets`）。
+- build：`apple/scripts/build-ios.sh [Debug|Release] [--run [DEVICE_NAME]]`が、署名せずにiOSシミュレータ向けにbuildする。iOSのcoreの成果物が無いときと古いときだけ`build-core.sh all`を回す。`build-macos.sh`はcoreの成果物を毎回Macだけのものに作り直すので、Macのbuildの後にiOSをbuildするとcoreを作り直す。バージョンとBuild番号はMacと同じく`apple/VERSION`・`apple/BUILD_NUMBER`を下限にbuildのたびに割り当て、割り当ての無いbuild（Xcodeから直接）は止まる。`--run`はSimulator.appを開かずにシミュレータの機器（既定は`iPad Pro 11-inch (M5)`）を起動し、アプリを入れて起動し、10秒後に動き続けているかを確かめる。実機に入れる道は後のstep。
+- DBの場所：アプリのApplication Supportの下の、アプリごとのフォルダ。Macは今までどおり`app.inku.macos`、iOSは`app.inku.ios`。
+- Mac・Webと違う所：
+  - 拡大の窓：iOSのアプリは別のプログラムを起動できないので、`inku-display-gpu`を使わず、CPUで区画に分けて描く（IntelのMacと同じ道）。Apple siliconのMacは今までどおりGPUで描く（2026-10-11の節）。
+  - 窓は1枚で、いつも全画面に出す。
+  - 入れられる機器はiPadだけで、iPhoneには入れられない。
+- Macの画面と振る舞いは変わらない。
+- まだiPadで出ない物（後のstep）：画像タブ、DDLの取り込み、書き出しの画面、プラグインの追加、バックアップの復元、3D（ファイルの許可の作りが要る）。ピンチでの拡大、2回押しで開く操作、記述・DDLの入力欄の色付けと補完、アプリが裏に回った時の扱い、ChatGPTプランの接続、カメラ、iPhoneの画面も後のstep。
+- 2026-10-18の3Dの節の「iOSのアプリのターゲットは無く、今のcoreの成果物もmacOSだけで、iOS向けのbuildは確かめていない」と、2026-10-02の節の「iOS appとcamera自体は未実装である」は、その時の記録である。今はiPadのアプリがあり（cameraは未実装のまま）、iOSのcoreの成果物は`build-ios.sh`が用意する。iOSで3Dを出さないことは変わらない。
 
 ## 2026-11-07 吹き出しの照合を今の Web に合わせる
 

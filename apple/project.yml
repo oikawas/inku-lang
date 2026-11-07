@@ -58,8 +58,50 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "15.0"
         ARCHS: arm64 x86_64
         ONLY_ACTIVE_ARCH: NO
+  InkuIOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/InkuIOS
+      - path: Resources/iOS/Assets.xcassets
+    dependencies:
+      - package: InkuApple
+        product: InkuUI
+    preBuildScripts:
+      # The build script supplies a freshly allocated version and build number, as for the Mac.
+      - name: Check bundle version
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/VERSION
+          - $(SRCROOT)/BUILD_NUMBER
+        script: |
+          version="$(tr -d '[:space:]' < "$SRCROOT/VERSION")"
+          build="$(tr -d '[:space:]' < "$SRCROOT/BUILD_NUMBER")"
+          if [ -z "$INKU_ALLOCATED_VERSION" ] || [ "$MARKETING_VERSION" != "$INKU_ALLOCATED_VERSION" ] || \
+             ! python3 "$SRCROOT/scripts/allocate-build-number.py" --version-floor "$version" --check-version "$MARKETING_VERSION" || \
+             [ -z "$INKU_ALLOCATED_BUILD_NUMBER" ] || \
+             [ "$CURRENT_PROJECT_VERSION" != "$INKU_ALLOCATED_BUILD_NUMBER" ] || \
+             ! [ "$CURRENT_PROJECT_VERSION" -gt "$build" ] 2>/dev/null; then
+              echo "error: use apple/scripts/build-ios.sh to allocate a fresh version and build number"
+              exit 1
+          fi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.inku.ios
+        PRODUCT_NAME: Inku
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Configuration/Info-iOS.plist
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        # iPad only until the iPhone screens (ios-app plan step 7).
+        TARGETED_DEVICE_FAMILY: "2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 schemes:
   InkuMac:
     build:
       targets:
         InkuMac: all
+  InkuIOS:
+    build:
+      targets:
+        InkuIOS: all

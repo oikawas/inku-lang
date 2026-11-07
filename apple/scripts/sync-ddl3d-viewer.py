@@ -15,6 +15,7 @@ without any copy (a plain `swift build`) declares no 3D resource and its app sho
   sync-ddl3d-viewer.py              replace the copy with the Web's registered build, then compare it
   sync-ddl3d-viewer.py --check      compare the registration and every file of the copy with the Web's build
   sync-ddl3d-viewer.py --check --app PATH/Inku.app   the same, then for the copy inside a built application
+                                                    (a macOS bundle with Contents/, or a flat iOS bundle)
 
 The check prints how many files it compared. Only `.DS_Store` is ignored, on both sides.
 """
@@ -37,6 +38,8 @@ SHARED_HOST = ROOT / "experiments/ddl-3d/host"
 HOST = "host"
 APP_COPY = ROOT / "apple/Sources/InkuUI/Resources/ddl3d"
 BUNDLED = Path("Contents/Resources/InkuApple_InkuUI.bundle/Contents/Resources/ddl3d")
+# An iOS application and its resource bundle are flat (no Contents/).
+BUNDLED_IOS = Path("InkuApple_InkuUI.bundle/ddl3d")
 # Web configuredViewer (web/src/lib/features/experimental-3d/input.ts) and the app's Ddl3DInstallation.
 VIEWER_URL = re.compile(r"^/experimental/ddl-3d/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/index\.html$")
 IGNORED = {".DS_Store"}
@@ -151,7 +154,8 @@ def main() -> int:
             sync()
         compare(APP_COPY, str(APP_COPY.relative_to(ROOT)))
         if arguments.app:
-            compare(arguments.app / BUNDLED, str(arguments.app / BUNDLED))
+            bundled = arguments.app / (BUNDLED if (arguments.app / "Contents").is_dir() else BUNDLED_IOS)
+            compare(bundled, str(bundled))
     except (SyncError, OSError, ValueError, KeyError) as error:
         print(f"3D viewer copy check failed: {error}", file=sys.stderr)
         return 1

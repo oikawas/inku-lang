@@ -31,10 +31,10 @@ public final class DisplayRenderer: Sendable {
         /// `environment` is added to the program's own, for checks.
         case gpu(helper: URL?, environment: [String: String] = [:])
 
-        /// Apple silicon: the program next to the app (`INKU_DISPLAY_GPU_HELPER` names another, for
-        /// runs outside the app bundle). Intel, and Rosetta: the CPU.
+        /// Apple silicon Macs: the program next to the app (`INKU_DISPLAY_GPU_HELPER` names another, for
+        /// runs outside the app bundle). Intel, Rosetta and iOS: the CPU (an iOS app cannot start a program).
         public static var standard: WindowPainter {
-            #if arch(arm64)
+            #if os(macOS) && arch(arm64)
             if let path = ProcessInfo.processInfo.environment["INKU_DISPLAY_GPU_HELPER"], !path.isEmpty {
                 return .gpu(helper: URL(fileURLWithPath: path))
             }

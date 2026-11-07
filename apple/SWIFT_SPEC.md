@@ -6,7 +6,7 @@ This directory contains the native SwiftUI client, developed for macOS first, an
 
 Above the canvas, the displayed work's conditions follow input order alongside the Work and Lineage tabs, wrapping below them at narrow widths. Missing recorded values are N/A; image works omit route, sketch and composition. The refinement menu overlays the work at the upper right.
 
-Last updated: 2026-11-05.
+Last updated: 2026-11-07.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app allocates its version and build number separately from Server and Web, with `apple/VERSION` and `apple/BUILD_NUMBER` as floors (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -21,6 +21,23 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-11-07 The iOS (iPad) app
+
+An iPad app is added. Its scope ends at building and starting it in the iOS Simulator; the iPhone screens and physical devices come in later steps.
+
+- Target: `InkuIOS` in `apple/project.yml` (bundle ID `app.inku.ios`, minimum iOS 18, iPad as the only device family). The entry point, `apple/Sources/InkuIOS/InkuIOSApp.swift`, opens a single window over one app model and uses the same `ContentView` and `InkuCommands` as the Mac. There is no second window, because it would show the same model twice.
+- Window: `apple/Configuration/Info-iOS.plist` allows full screen only (`UIRequiresFullScreen`) and no multiple windows. The Mac layout needs the whole screen, so the app does not take part in split screen until the narrow screens exist. The permission to connect to LLMs on the local network (`NSAllowsLocalNetworking` and its description) is the same as on the Mac.
+- Icon: `docs/assets/incu-icon-512.png` enlarged to 1024 px (`apple/Resources/iOS/Assets.xcassets`).
+- Build: `apple/scripts/build-ios.sh [Debug|Release] [--run [DEVICE_NAME]]` builds for the iOS Simulator without signing. It runs `build-core.sh all` only when the iOS core artifact is missing or stale. `build-macos.sh` rebuilds the core artifact as a Mac-only one every time, so building iOS after a Mac build rebuilds the core. As on the Mac, a version and build number are allocated for every build with `apple/VERSION` and `apple/BUILD_NUMBER` as floors, and a build without that allocation (directly from Xcode) stops. `--run` starts a simulator device (by default `iPad Pro 11-inch (M5)`) without opening Simulator.app, installs and launches the app, and checks after 10 seconds that it is still running. Installing on a physical device comes in a later step.
+- Database location: a per-app folder under the app's Application Support. The Mac keeps `app.inku.macos`; iOS uses `app.inku.ios`.
+- Differences from the Mac and the Web:
+  - Zoomed windows: an iOS app cannot start another program, so iOS does not use `inku-display-gpu` and draws them on the CPU in tiles (the same path as Intel Macs). Apple silicon Macs keep drawing them on the GPU (see the 2026-10-11 section).
+  - There is one window, always shown full screen.
+  - The app installs on iPad only, not on iPhone.
+- The Mac's screens and behavior are unchanged.
+- Not shown on iPad yet (later steps): the Image tab, DDL import, the export screen, adding plugins, restoring a backup, and 3D (these need file permission handling). Pinch zoom, opening with a double tap, coloring and completion in the description and DDL fields, handling the app moving to the background, connecting a ChatGPT plan, the camera, and the iPhone screens also come later.
+- The 2026-10-18 3D section's "there is no iOS app target, the current core artifacts are macOS-only, and no iOS build was checked" and the 2026-10-02 section's "The iOS app and camera feature are not implemented" are records of their time. There is now an iPad app (the camera is still not implemented), and `build-ios.sh` prepares the iOS core artifact. iOS still does not show 3D.
 
 ## 2026-11-07 Tooltip parity with today's Web
 

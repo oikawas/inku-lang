@@ -173,6 +173,35 @@ pub fn prepare_fonts(font_files: &[String]) -> Result<PreparedFonts, RasterError
     })
 }
 
+/// The parse settings every SVG-to-pixel path shares: the Server's PNG and
+/// the apps' rasters read text alike (FFI-16, I-732, 2026-11-07; the author
+/// chose the Server's settings). They matter only for what an SVG leaves
+/// unsaid: the font family and size of text that names none, physical units
+/// (`dpi`), the size of a root without one (`default_size`, which the Server
+/// sets from the requested size), and languages and style sheets.
+#[must_use]
+pub fn svg_options(
+    fontdb: Arc<usvg::fontdb::Database>,
+    default_size: usvg::Size,
+) -> usvg::Options<'static> {
+    usvg::Options {
+        resources_dir: None,
+        dpi: 0.0,
+        font_family: "Liberation Serif".to_owned(),
+        font_size: 16.0,
+        languages: Vec::new(),
+        default_size,
+        fontdb,
+        style_sheet: Some(String::new()),
+        ..usvg::Options::default()
+    }
+}
+
+/// The size [`svg_options`] gives a root without one when no size is asked.
+fn unsized_default() -> usvg::Size {
+    usvg::Size::from_wh(100.0, 100.0).expect("a positive size")
+}
+
 /// Prepare an SVG using only fonts supplied by the host.
 pub fn prepare_scene_with_fonts(
     svg: &str,
@@ -181,11 +210,7 @@ pub fn prepare_scene_with_fonts(
     validate_svg(svg)?;
     let tree = usvg::Tree::from_str(
         svg,
-        &usvg::Options {
-            resources_dir: None,
-            fontdb: Arc::clone(&fonts.fontdb),
-            ..usvg::Options::default()
-        },
+        &svg_options(Arc::clone(&fonts.fontdb), unsized_default()),
     )
     .map_err(|error| RasterError::Parse(error.to_string()))?;
     Ok(prepared_scene(svg, tree))
@@ -219,10 +244,7 @@ fn parse_tree(svg: &str) -> Result<usvg::Tree, RasterError> {
     validate_svg(svg)?;
     usvg::Tree::from_str(
         svg,
-        &usvg::Options {
-            resources_dir: None,
-            ..usvg::Options::default()
-        },
+        &svg_options(Arc::new(usvg::fontdb::Database::new()), unsized_default()),
     )
     .map_err(|error| RasterError::Parse(error.to_string()))
 }

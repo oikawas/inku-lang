@@ -847,17 +847,12 @@ fn png_of(
         (None, None) => (FitTo::Original, (100.0, 100.0)),
     };
     let fonts = font_database(font_files)?;
-    let options = usvg::Options {
-        dpi: 0.0,
-        font_family: "Liberation Serif".to_owned(),
-        font_size: 16.0,
-        languages: Vec::new(),
-        default_size: usvg::Size::from_wh(default_size.0, default_size.1)
+    // The settings the apps' rasters share (FFI-16, I-732).
+    let options = inku_svg_raster::svg_options(
+        fonts,
+        usvg::Size::from_wh(default_size.0, default_size.1)
             .ok_or_else(|| "invalid size".to_owned())?,
-        fontdb: fonts,
-        style_sheet: Some(String::new()),
-        ..usvg::Options::default()
-    };
+    );
     let tree =
         usvg::Tree::from_str(svg, &options).map_err(|error| format!("invalid SVG: {error}"))?;
     let size = fit

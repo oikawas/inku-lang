@@ -3,7 +3,7 @@ import InkuHost
 import InkuPersistence
 import InkuUI
 
-/// The tooltip port against the Build1162 Web with the 8273b3ef touch and 074bc00a reading removals, and the leftover UI items, each against the failure it prevents.
+/// The tooltip port against every tooltip site in today's web/src (the table was first made from Build1162), and the leftover UI items, each against the failure it prevents.
 /// Offline: temporary SQLite, offline provider mocks, and the Swift sources read as text.
 @MainActor
 func runTooltipAndLeftoverChecks() async throws {
@@ -36,8 +36,28 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     let equal = counts.values.map(\.equal).reduce(0, +)
     let excluded = counts.values.map(\.excluded).reduce(0, +)
-    guard tooltipParityTable.count == 168, missing.isEmpty, excluded == 10, equal == 158 else {
+    guard tooltipParityTable.count == 189, missing.isEmpty, excluded == 20, equal == 169 else {
         throw CheckFailure.message("Tooltip parity: \(tooltipParityTable.count) sites, \(equal) equal, \(excluded) excluded, missing \(missing)")
+    }
+    // Failure (T2b): the Web gained or lost a tooltip and the table did not follow (10-15 to 11-06 it fell 21 behind
+    // unseen). Count the Web's sites per component the way the table's header names them.
+    let webSources = sources.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("web/src", isDirectory: true)
+    let site = try NSRegularExpression(pattern: #"<Tooltip\b|\btitle="#)
+    var webCounts: [String: Int] = [:]
+    let walker = FileManager.default.enumerator(at: webSources, includingPropertiesForKeys: nil)
+    while let file = walker?.nextObject() as? URL {
+        guard file.pathExtension == "svelte" else { continue }
+        let text = try String(contentsOf: file, encoding: .utf8)
+        let found = site.numberOfMatches(in: text, range: NSRange(text.startIndex..., in: text))
+        if found > 0 { webCounts[file.deletingPathExtension().lastPathComponent, default: 0] += found }
+    }
+    let tableCounts = Dictionary(grouping: tooltipParityTable, by: \.component).mapValues(\.count)
+    let drift = Set(webCounts.keys).union(tableCounts.keys).sorted()
+        .filter { webCounts[$0, default: 0] != tableCounts[$0, default: 0] }
+        .map { "\($0): table \(tableCounts[$0, default: 0]), web \(webCounts[$0, default: 0])" }
+    guard !webCounts.isEmpty, drift.isEmpty else {
+        throw CheckFailure.message("Tooltip parity: the table no longer matches web/src (list the sites with apple/scripts/list-web-tooltips.py): \(webCounts.isEmpty ? "no web/src sites read" : drift.joined(separator: "; "))")
     }
 
     // Failure (T1): a `.help` (about 1 s, no focus, none on a disabled control) is left where the Web shows a bubble.
@@ -97,6 +117,8 @@ func runTooltipAndLeftoverChecks() async throws {
     let failing = AppModel(databaseURL: folder.appendingPathComponent("failing.sqlite"), transport: LeftoverFailingProvider())
     await failing.initialize()
     try await failing.updateHostSettings(settings)
+    // Since ace4debbb (11-05) the next drawing's model is the tab's choice, not the settings' default.
+    failing.selectNextDrawingModel("check:pinned")
     failing.display.preferences.language = "ja"
     failing.inputMode = "description"; failing.descriptionText = "A red circle above black dots scattered at the bottom"
     failing.seedText = "42"; failing.sketchMode = "off"; failing.catalogMode = "fixed"; failing.catalogID = "default"
@@ -136,6 +158,7 @@ func runTooltipAndLeftoverChecks() async throws {
     let batchApp = AppModel(databaseURL: batchFolder.appendingPathComponent("inku.sqlite"), transport: LeftoverFailingProvider())
     await batchApp.initialize()
     try await batchApp.updateHostSettings(settings)
+    batchApp.selectNextDrawingModel("check:pinned")
     batchApp.seedText = "42"; batchApp.catalogMode = "fixed"; batchApp.catalogID = "default"
     let automation = AutomationModel()
     await automation.connect(app: batchApp)
@@ -155,6 +178,7 @@ func runTooltipAndLeftoverChecks() async throws {
     let app = AppModel(databaseURL: forkURL, transport: provider)
     await app.initialize()
     try await app.updateHostSettings(settings)
+    app.selectNextDrawingModel("check:pinned")
     app.inputMode = "description"; app.descriptionText = "a red circle in an open field"
     app.seedText = "42"; app.sketchMode = "off"; app.catalogMode = "fixed"; app.catalogID = "default"
     await app.generate()

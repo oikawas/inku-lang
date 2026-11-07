@@ -22,6 +22,14 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-07 Tooltip parity with today's Web
+
+The Web tooltip parity table is rebuilt against the 189 sites in today's `web/src` (each `<Tooltip` and `title=` in a `.svelte` file). Its Web line numbers are today's instead of Build 1162's, and its markers point at the components that draw the tooltip (the work preview, the lineage details, the drawing-condition fields below the work). The check counts the Web's tooltips per component and compares them with the table, so it fails when the Web gains or loses one. `apple/scripts/list-web-tooltips.py` lists them (`--compare` compares the counts).
+
+20 sites are excluded. The newly excluded ones are parts macOS does not have (the batch progress tiles, the work menu's composition form, the Score ver. row in About Inku, the "Selected" field below the model choice, and the search fields' clear buttons), the not-recommended model, which macOS states inside the card, and the "no response when measured" tooltip on the ChatGPT model purpose buttons.
+
+AppCheck `--display-only`'s work switch check (C5) first checks that the given work takes at least 0.5 s for the 4096 px whole and for the zoomed window, and with a lighter work stops, saying it cannot judge.
+
 ## 2026-11-02 Drawing progress
 
 Automatic catalog selection for descriptions passes the run seed and saves the core color reading and choice, showing the reading and choice separately in work information and prompts.

@@ -55,6 +55,18 @@ extension View {
         #endif
     }
 
+    /// Web `onblur`: while `isActive`, a press outside this view calls `end`, and the press still reaches what was
+    /// pressed. A browser blurs a focused field on any press outside it; macOS keeps editing when the press falls on a
+    /// place that takes no focus. On iOS a tap outside does not end editing either; nothing is decided there yet.
+    @ViewBuilder
+    func inkuEndsEditingOnOutsidePress(isActive: Bool, end: @escaping () -> Void) -> some View {
+        #if os(macOS)
+        background(MacOutsidePressWatcher(isActive: isActive, end: end))
+        #else
+        self
+        #endif
+    }
+
     @ViewBuilder
     func inkuOnEscape(_ action: @escaping () -> Void) -> some View {
         #if os(macOS)

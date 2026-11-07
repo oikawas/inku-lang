@@ -204,7 +204,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "Ddl3DHost.svelte:62", swift: "Views/Ddl3DViews.swift", marker: "title: display.webCopy(\"ddl3dTitle\""),
     .init(web: "Ddl3DModeSwitch.svelte:8", swift: "Views/Ddl3DViews.swift", marker: "serverKey: \"ddl3dReturn\") : display.tooltip(\"3D表示（実験）\", serverKey: \"ddl3dTitle\")"),
     .init(web: "DatabaseAdministrationSettings.svelte:202", swift: "Views/SettingsView.swift", marker: "serverKey: \"settingsDbBackupEstimatedDiskHint\""),
-    .init(web: "ModelAdministrationSettings.svelte:643", excluded: "macOS の ChatGPT のモデルの用途の押し（ChatGPTModelsSheet.swift）は、計測で応答が無かった用途の印（赤い枠と吹き出し）を持たない（step 2 で足す。tool-fixes-20261107）"),
+    .init(web: "ModelAdministrationSettings.svelte:643", swift: "Views/ChatGPTModelsSheet.swift", marker: "inkuTooltip(locked ? note : \"\")"),
     .init(web: "ModelAdministrationSettings.svelte:686", swift: "Views/ModelSettingsDialogs.swift", marker: "serverKey: \"settingsModelFetchDisabledWhileDirty\""),
     .init(web: "ModelSelectionSettings.svelte:92", excluded: "macOS のモデルのカードは推奨しない旨を吹き出しでなくカードの中の赤い文で出す（BatchModelPickerView.swift の notRecommended）"),
     .init(web: "ModelSelectionSettings.svelte:120", excluded: "macOS のモデル選択の下に「選択中 …」の欄が無い（選んだカードはチェックの印で示す）"),

@@ -920,7 +920,7 @@ public final class LibraryModel {
     public func copyHash(_ hash: String?) {
         guard let hash, !hash.isEmpty else { return }
         InkuPasteboard.copy(text: SavedWorkFacts.hashDigest(hash))
-        status = "ハッシュをコピーしました"
+        // Web says "Copied" only on the button or its tooltip, never in the status line (HistoryManager.svelte, LineagePanel.svelte).
         copiedHash = hash
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(1200))

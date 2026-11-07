@@ -1040,6 +1040,8 @@ private struct LibraryPageNumberInput: View {
             .font(.system(size: fontSize).monospacedDigit())
             .lineLimit(1)
             .focused($focused)
+            // Web `onblur={commit}`: a press outside the field, even on a place that takes no focus, leaves it.
+            .inkuEndsEditingOnOutsidePress(isActive: focused) { focused = false }
             .accessibilityLabel(label)
             .onAppear { show(current) }
             // Web `shown`: the page shown, except while the reader is in the field.

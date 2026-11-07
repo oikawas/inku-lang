@@ -465,19 +465,24 @@ class SharedPipelineHost(
         return try {
             val delayMs = action.requiredCanonicalUnsigned("delay_ms")
             if (delayMs > 0L) delay(delayMs)
+            // Read once: the streamed callbacks below run per received KB, and
+            // each used to parse the whole snapshot twice to find the id.
+            val executionId = session.snapshot().requiredString("execution_id")
             val tracker = progressTracker(session)
+            val actionTag = action.requiredString("tag")
+            fun publishTracked() { runCatching { onRunProgress(executionId, tracker.value()) } }
             var lastKb = -1L
             val resultJson = providerEffect.performObserved(actionKey, session.models,
                 onUsage = { input, output ->
-                    tracker.usage(action.requiredString("tag"), input, output)
-                    publishProgress(session, refresh = false)
+                    tracker.usage(actionTag, input, output)
+                    publishTracked()
                 },
                 onReceived = { bytes ->
                     val kb = bytes?.div(1024)
                     if (kb == null || kb != lastKb) {
                         lastKb = kb ?: -1L
                         tracker.received(bytes)
-                        publishProgress(session, refresh = false)
+                        publishTracked()
                     }
                 })
             session.mutex.withLock {

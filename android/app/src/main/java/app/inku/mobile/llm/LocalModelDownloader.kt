@@ -46,7 +46,10 @@ class LocalModelDownloader(
             return@withContext
         }
 
-        if (partFile.exists() && verifySha256(partFile, spec.expectedSha256)) {
+        // Only a .part as long as the whole file can already be complete. Before,
+        // every resume hashed the partial file (up to 2.6 GB) just to learn that.
+        val partMayBeComplete = asset.bytesTotal?.let { partFile.length() == it } ?: false
+        if (partFile.exists() && partMayBeComplete && verifySha256(partFile, spec.expectedSha256)) {
             if (finalFile.exists()) {
                 finalFile.delete()
             }
@@ -165,8 +168,9 @@ class LocalModelDownloader(
     private fun verifySha256(file: File, expected: String?): Boolean {
         if (expected.isNullOrBlank()) return true
         val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        file.inputStream().use { input ->
+            // Read in 1 MiB pieces: the file is gigabytes.
+            val buffer = ByteArray(1 shl 20)
             while (true) {
                 val read = input.read(buffer)
                 if (read < 0) break

@@ -25,6 +25,9 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
+/** How often the session and publication are checked again while an answer streams. */
+private const val STREAM_CHECK_INTERVAL_NANOS = 1_000_000_000L
+
 /** One locally hosted Android user. Profiles remain separate by verified sub and client ID. */
 class ChatGptPlanManager internal constructor(
     private val store: ChatGptCredentialStore,
@@ -443,12 +446,24 @@ class ChatGptPlanManager internal constructor(
                             .put("model", slug).put("purpose", purpose)).getBoolean("offered")) throw ChatGptException("chatgpt_model_not_offered")
                 }
                 check()
+                // The transport asks before and after every read of the stream;
+                // each full check reads the encrypted store and calls the core
+                // four times. During the stream it runs at most once a second;
+                // the checks before the request and after the answer stay whole,
+                // and a session change cancels the connection on its own.
+                var lastCheck = System.nanoTime()
+                fun streamCheck() {
+                    val now = System.nanoTime()
+                    if (now - lastCheck < STREAM_CHECK_INTERVAL_NANOS) return
+                    check()
+                    lastCheck = now
+                }
                 val token = accessToken(ref)
                 // Refinement advice reads Server's Vision text stream; drawing
                 // effects still require their completed namespace function.
                 val stream = ChatGptStream(built, request.onReceivedBytes)
                 val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, built.body, timeoutMs = request.timeoutMs ?: 60_000,
-                    check = ::check, onChunk = stream::feed)
+                    check = ::streamCheck, onChunk = stream::feed)
                 if (response.status !in 200..299) throw chatGptResponseError(runCatching { JSONObject(response.body) }.getOrDefault(JSONObject()), response.status)
                 val text = stream.finish(); check()
                 ModelResponse(text, request.modelId, stream.usage?.optInt("input_tokens")?.takeIf { it > 0 },

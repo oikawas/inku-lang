@@ -606,7 +606,9 @@ class InkuViewModel @JvmOverloads constructor(
         Triple(providers, personalCandidates, plan) to observations
     }
 
-    val state: StateFlow<InkuUiState> = combine(localState, history, modelAssets, providerConfig, exportTemplates) { state, items, assets, providerPair, templates ->
+    // The history list is not an input: the state never read it, and as one
+    // the list was queried twice for every write to the works table.
+    val state: StateFlow<InkuUiState> = combine(localState, modelAssets, providerConfig, exportTemplates) { state, assets, providerPair, templates ->
         val (providers, candidates, plan) = providerPair.first
         val selectedModel = assets.firstOrNull { it.modelId == state.selectedModelId }
         val modelState = selectedModel?.let { modelStatusText(it) } ?: "model catalog initializing"
@@ -1732,11 +1734,20 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun openCanvasSearch() {
         if (state.value.isRunning) return
+        // A fresh read for each opening: works saved since the last search count.
+        canvasSearchIndex = null
         localState.value = localState.value.copy(canvasSearchOpen = true)
         setCanvasSearchQuery(localState.value.canvasSearchQuery)
     }
 
+    /**
+     * The works the open search reads, with each one's description hash, read
+     * once when the search opens rather than on every keystroke.
+     */
+    @Volatile private var canvasSearchIndex: List<Pair<app.inku.mobile.data.db.CanvasSearchEntry, String>>? = null
+
     fun closeCanvasSearch() {
+        canvasSearchIndex = null
         canvasSearchSerial++
         canvasSearchJob?.cancel()
         localState.value = localState.value.copy(canvasSearchOpen = false, canvasSearchBusy = false)
@@ -1750,7 +1761,11 @@ class InkuViewModel @JvmOverloads constructor(
         canvasSearchJob = guardedScope.launch {
             delay(250)
             runCatching {
-                withContext(Dispatchers.IO) { repository.canvasSearchEntries().filter { it.matches(query) }.map { it.id } }
+                withContext(Dispatchers.IO) {
+                    val index = canvasSearchIndex ?: repository.canvasSearchEntries()
+                        .map { it to it.descriptionHash() }.also { canvasSearchIndex = it }
+                    index.filter { (entry, hash) -> entry.matches(query, hash) }.map { (entry, _) -> entry.id }
+                }
             }.onSuccess { ids ->
                 if (serial == canvasSearchSerial && localState.value.canvasSearchOpen) {
                     localState.value = localState.value.copy(canvasSearchBusy = false, canvasSearchResultIds = ids)
@@ -2615,7 +2630,16 @@ class InkuViewModel @JvmOverloads constructor(
         }
         localState.value = localState.value.copy(lineageLoading = true)
         lineageJob = guardedScope.launch {
-            val graph = repository.loadLineage(focus)
+            // Built off the main thread; a failed read clears the spinner and
+            // says so instead of ending the app.
+            val graph = runCatching { withContext(Dispatchers.IO) { repository.loadLineage(focus) } }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                if (localState.value.selectedHistory?.lineageNodeId == focus) {
+                    localState.value = localState.value.copy(lineageLoading = false,
+                        message = messageFor(error, strings(), strings().operationFailed))
+                }
+                return@launch
+            }
             // Re-read after the read suspended: the reader can have picked
             // another work meanwhile, and writing this graph over theirs would
             // leave the screen describing a work it is not showing.

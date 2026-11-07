@@ -275,6 +275,9 @@ private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
 /** How often the running row redraws its elapsed time. */
 private const val RUN_STATUS_TICK_MS = 100L
 
+/** How long zoom and pan stay still before the presentation detail is drawn. */
+private const val DETAIL_SETTLE_MS = 120L
+
 /** How long a copy or export note stays under the canvas. */
 private const val CANVAS_MESSAGE_MS = 5_000L
 
@@ -2901,7 +2904,11 @@ private fun CanvasHeroCard(
         mutableStateOf(if (state.presentationHistory != null) false else presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
     }
     var presentationChromeVisible by remember(state.canvasPresentationMode) { mutableStateOf(true) }
-    var previewStatus by remember(item?.id, item?.renderHash, item?.displaySvg, state.canvasPresentationMode) { mutableStateOf(ArtworkPreviewStatus()) }
+    // Keyed on the SVG's hash, not the SVG: a re-emitted row brings an equal
+    // but new string, and comparing multi-MB strings ran on every recomposition.
+    // String caches its hash, so each new string is hashed once.
+    val svgKey = item?.displaySvg?.hashCode()
+    var previewStatus by remember(item?.id, item?.renderHash, svgKey, state.canvasPresentationMode) { mutableStateOf(ArtworkPreviewStatus()) }
     val presentation = state.canvasPresentationMode
     val historyItems by viewModel.historyItems.collectAsState()
     val canvasBoundsModifier = if (presentation && state.displaySafeMarginsEnabled) {
@@ -2912,7 +2919,7 @@ private fun CanvasHeroCard(
     BoxWithConstraints(modifier = canvasBoundsModifier) {
         val screenWidth = maxWidth
         val screenHeight = maxHeight
-        val ratio = remember(item?.id, item?.displaySvg, canvasAspectId) {
+        val ratio = remember(item?.id, svgKey, canvasAspectId) {
             item?.displaySvg?.let(::svgAspectRatio) ?: canvasAspectRatio(canvasAspectId)
         }
         val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(maxPreviewHeight)
@@ -2928,7 +2935,7 @@ private fun CanvasHeroCard(
             presentationCanvasHeight = maxHeight
             presentationCanvasWidth = maxHeight * presentationRatio
         }
-        val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
+        val presentationBackground = remember(item?.id, svgKey, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
         }
         // Where the double tap goes: the work at its own size. The fitted canvas
@@ -2937,7 +2944,7 @@ private fun CanvasHeroCard(
         // above its size would be *shrunk* by 1:1, so that case magnifies instead
         // -- a double tap that appears to do nothing reads as a broken gesture.
         val fittedWidthPx = with(LocalDensity.current) { presentationCanvasWidth.toPx() }
-        val intrinsicWidthPx = remember(item?.id, item?.displaySvg) { item?.displaySvg?.let(::svgIntrinsicWidth) }
+        val intrinsicWidthPx = remember(item?.id, svgKey) { item?.displaySvg?.let(::svgIntrinsicWidth) }
         val oneToOneZoom = remember(intrinsicWidthPx, fittedWidthPx) {
             val natural = if (intrinsicWidthPx != null && fittedWidthPx > 0f) intrinsicWidthPx / fittedWidthPx else 0f
             if (natural > CANVAS_FIT_ZOOM + CANVAS_ZOOM_EPSILON) natural else PRESENTATION_FALLBACK_ZOOM
@@ -3281,14 +3288,18 @@ private fun CanvasHeroCard(
         canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
     }
     if (!presentation && showControls) item?.let {
-        renderTabCopyText(
-            state.renderTab,
-            promptText = sentPrompts?.let { prompts ->
-                renderSentPrompts(prompts, savedWorkParityStrings(state.uiLanguage), catalogReadingPromptsExpected(it))
+        // Only the open tab's text is built, once per work: before, the JSON
+        // text (two parses and a pretty print) was built and thrown away on
+        // every recomposition of the default Artwork tab.
+        when (state.renderTab) {
+            RenderTab.Artwork -> null
+            RenderTab.Prompt -> remember(sentPrompts, it.id, it.renderMetadataJson, state.uiLanguage) {
+                sentPrompts?.let { prompts ->
+                    renderSentPrompts(prompts, savedWorkParityStrings(state.uiLanguage), catalogReadingPromptsExpected(it))
+                } ?: savedWorkParityStrings(state.uiLanguage).sentPromptLoading
             }
-                ?: savedWorkParityStrings(state.uiLanguage).sentPromptLoading,
-            jsonText = renderJsonText(it),
-        )?.let { text ->
+            RenderTab.Json -> remember(it.id, it.renderMetadataJson, it.scoreJson) { renderJsonText(it) }
+        }?.let { text ->
             CopyableRenderTextView(
                 text,
                 Modifier.fillMaxWidth().height(Dimens.renderTextViewHeight),
@@ -4589,7 +4600,7 @@ internal fun recompositionLines(info: RecompositionInfo?, strings: InkuStrings):
 @Composable
 internal fun RefinementCandidateImage(renderHash: String, svg: String, modifier: Modifier = Modifier,
     rangeBounds: DdlRangeBounds? = null) {
-    val source = remember(renderHash, svg) { Any() }
+    val source = remember(renderHash, svg.hashCode()) { Any() }
     val state by produceState<ArtworkDisplayState>(initialValue = ArtworkDisplayState(), source) {
         val request = Any()
         value = ArtworkDisplayState(source, request, loading = true)
@@ -7034,7 +7045,9 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, viewModel: InkuViewMode
                     }
                 }
             }
-            generationInfoSections(item).forEach { section ->
+            // Four parses of the metadata; built once per work, not per recomposition.
+            val sections = remember(item.id, item.renderMetadataJson) { generationInfoSections(item) }
+            sections.forEach { section ->
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     CompactLabel(generationInfoSectionLabel(section.id))
                     section.rows.forEach { row ->
@@ -8536,7 +8549,8 @@ internal fun ArtworkPreview(
     onStatus: ((ArtworkPreviewStatus) -> Unit)? = null,
 ) {
     var pixelSize by remember { mutableStateOf(IntSize.Zero) }
-    val source = remember(item.id, item.renderHash, item.displaySvg) { Any() }
+    // The SVG's cached hash, not the multi-MB string, is compared on recomposition.
+    val source = remember(item.id, item.renderHash, item.displaySvg.hashCode()) { Any() }
     val whole by produceState<ArtworkDisplayState>(initialValue = ArtworkDisplayState(), source, pixelSize, rotationDegrees) {
         val request = Any()
         value = ArtworkDisplayState(source, request, loading = true)
@@ -8566,6 +8580,10 @@ internal fun ArtworkPreview(
                 zoom.toDouble(), panX.toDouble(), panY.toDouble(), rotationDegrees,
             ) else null
             if (input == null) { value = value.copy(frame = null); return@produceState }
+            // Zoom and pan change on every frame of a gesture, and each change
+            // restarts this producer. The detail is drawn once the view has
+            // settled; meanwhile the previous detail stays on screen.
+            kotlinx.coroutines.delay(DETAIL_SETTLE_MS)
             value = value.copy(loading = true)
             val region = ArtworkBitmapCache.renderer.detailRegion(input.zoomed, input.visible)
             if (region == null) { value = value.copy(frame = null); return@produceState }
@@ -8585,7 +8603,8 @@ internal fun ArtworkPreview(
     val status = ArtworkPreviewStatus(currentWhole?.loading == true || currentDetail?.loading == true,
         currentWhole?.failed == true, currentDetail?.failed == true)
     LaunchedEffect(status, source) { onStatus?.invoke(status) }
-    val bitmap = currentWhole?.frame?.bitmap?.asImageBitmap()
+    val wholeFrame = currentWhole?.frame
+    val bitmap = remember(wholeFrame) { wholeFrame?.bitmap?.asImageBitmap() }
     Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         Box(
             modifier = Modifier
@@ -8605,7 +8624,7 @@ internal fun ArtworkPreview(
                 currentDetail?.frame?.let { frame ->
                     frame.region?.let { region ->
                         val unit = displayedWindowFraction(region, rotationDegrees)
-                        val tileImage = frame.bitmap.asImageBitmap()
+                        val tileImage = remember(frame) { frame.bitmap.asImageBitmap() }
                         Canvas(Modifier.fillMaxSize()) {
                             drawImage(tileImage,
                                 dstOffset = IntOffset((unit.x * size.width).roundToInt(), (unit.y * size.height).roundToInt()),

@@ -270,13 +270,9 @@ struct LibraryView: View {
         let placeholder = display.webCopy("historySearchPlaceholder", "記述・ハッシュ・作品ID")
         let label = display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）")
         return Group {
-            #if os(macOS)
             InkuSearchField(value: $library.query, placeholder: placeholder, label: label, borderless: true, onCancel: onClose,
                             onSearch: { library.query = $0 })
                 .inkuSearchFieldHeight()
-            #else
-            TextField(placeholder, text: $library.query).accessibilityLabel(label)
-            #endif
         }
         // Web `.history-search`: flex 0 1 22rem, at least 10rem.
         .frame(minWidth: 130, idealWidth: 286, maxWidth: 286)

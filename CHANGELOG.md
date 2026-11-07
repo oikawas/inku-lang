@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: Grouped Mac-specific view components under Platform. The screen remains unchanged.
+
 - macOS: The minimum supported version is now macOS 15; the app cannot be installed on macOS 14. Shared packages require iOS 18. Image previews, copying, window operations and view modifiers use shared entry points, with the same appearance and behavior.
 
 - macOS: the third-party notices under About inku add libm and the 11 font crates used for PNG text (fontdb, harfrust, skrifa and others), and show kurbo and svgtypes as copies in core/vendor. The Web reference the app copies follows Build 1405 (DDL engine 78, render engine 101).

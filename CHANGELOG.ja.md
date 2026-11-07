@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- macOS：Mac固有の画面部品をPlatformにまとめました。画面は変わりません。
+
 - macOS：最低の対応をmacOS 15に上げました（macOS 14ではインストールできません）。共通パッケージの最低の対応はiOS 18です。画像の見本・コピー・窓の操作・画面の修飾子の入口を共通化し、画面の見た目と振る舞いは変えません。
 
 - macOS：「inku について」のサードパーティの表示に、libm と、PNG の文字に使う書体まわりの crate（fontdb・harfrust・skrifa など 11 個）を足し、kurbo と svgtypes を core/vendor のコピーとして示す。アプリが写す Web の参照を Build 1405（DDL エンジン 78・描画エンジン 101）に合わせた。

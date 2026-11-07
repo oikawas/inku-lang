@@ -3,11 +3,6 @@ import CoreText
 import InkuCore
 import InkuPersistence
 import SwiftUI
-#if os(macOS)
-import AppKit
-#elseif os(iOS)
-import UIKit
-#endif
 
 /// Web CanvasArtworkWorkspace `artworkContent` and `zoomControls`: another view of the same work in the picture's
 /// place. The caption and the zoom capsule stay over it, and the capsule steps the replacement's own zoom.
@@ -182,11 +177,7 @@ struct ArtworkCanvas: View {
     }
 
     @ViewBuilder private func interactiveCanvas(size: CGSize, box: CGSize?) -> some View {
-        #if os(macOS)
         CanvasWheelSurface(onScroll: applyWheel) { canvasContent(size: size, box: box) }
-        #else
-        canvasContent(size: size, box: box)
-        #endif
     }
 
     @ViewBuilder private func fitted(_ image: CGImage, box: CGSize?) -> some View {
@@ -454,33 +445,6 @@ public final class CanvasPicture {
     }
 }
 
-#if os(macOS)
-@MainActor private struct CanvasWheelSurface<Content: View>: NSViewRepresentable {
-    let onScroll: (CGFloat) -> Bool
-    let content: Content
-    init(onScroll: @escaping (CGFloat) -> Bool, @ViewBuilder content: () -> Content) {
-        self.onScroll = onScroll; self.content = content()
-    }
-    func makeNSView(context: Context) -> CanvasWheelHostingView {
-        let view = CanvasWheelHostingView(rootView: AnyView(content.environment(\.self, context.environment)))
-        view.sizingOptions = []
-        view.onScroll = onScroll
-        return view
-    }
-    func updateNSView(_ view: CanvasWheelHostingView, context: Context) {
-        view.rootView = AnyView(content.environment(\.self, context.environment))
-        view.onScroll = onScroll
-    }
-    static func dismantleNSView(_ view: CanvasWheelHostingView, coordinator: ()) { view.onScroll = nil }
-}
-
-@MainActor private final class CanvasWheelHostingView: NSHostingView<AnyView> {
-    var onScroll: ((CGFloat) -> Bool)?
-    override func scrollWheel(with event: NSEvent) {
-        if onScroll?(event.scrollingDeltaY) != true { super.scrollWheel(with: event) }
-    }
-}
-#endif
 
 private struct VerticalCaption: View {
     let text: String

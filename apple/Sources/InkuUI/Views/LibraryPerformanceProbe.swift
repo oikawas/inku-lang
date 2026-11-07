@@ -1,7 +1,4 @@
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 /// Counts read by InkuAppCheck's library paging measurement (`--library-paging-perf-only`). Nothing is counted
 /// until that check sets `counting`; the app never does, so each call site costs one untaken branch.
@@ -16,7 +13,7 @@ public enum LibraryPerformanceProbe {
     /// Times a lineage node card built its view tree (the lineage view stays beneath the library).
     public private(set) static var lineageNodeBodies = 0
     /// Layout passes of the probe's hosting view, each a SwiftUI update of the whole window.
-    public private(set) static var hostingLayouts = 0
+    public internal(set) static var hostingLayouts = 0
     /// Times a library work menu (context menu or ⋯) built its items.
     public private(set) static var menuBodies = 0
     public private(set) static var actionSummaryReads = 0
@@ -36,47 +33,4 @@ public enum LibraryPerformanceProbe {
     static func actionSummaryRead() { if counting { actionSummaryReads += 1 } }
     static func previewRead() { if counting { previewReads += 1 } }
 
-    #if os(macOS)
-    /// The library overlay over a hidden lineage view, as `ContentView` keeps the shell beneath the library.
-    public static func hostingView(model: AppModel, preview: LibraryPreviewModel) -> NSView {
-        CountingHostingView(rootView: ProbeRoot(model: model, preview: preview))
-    }
-
-    public static func historyHostingView(model: AppModel, history: HistoryModel, width: CGFloat) -> NSView {
-        NSHostingView(rootView: HistoryStripView(model: model, history: history, windowWidth: width)
-            .environment(model.display))
-    }
-
-    public static func lineageHostingView(model: AppModel) -> NSView {
-        NSHostingView(rootView: LineageView(model: model, onWorkAction: { _, _ in }, onExport: { _ in })
-            .environment(model.display))
-    }
-
-    private final class CountingHostingView: NSHostingView<ProbeRoot> {
-        override func layout() {
-            if LibraryPerformanceProbe.counting { LibraryPerformanceProbe.hostingLayouts += 1 }
-            super.layout()
-        }
-    }
-
-    private struct ProbeRoot: View {
-        @Bindable var model: AppModel
-        let preview: LibraryPreviewModel
-
-        var body: some View {
-            ZStack {
-                LineageView(model: model, onWorkAction: { _, _ in }, onExport: { _ in })
-                    .modifier(InkuCoveredView(covered: true, hidden: true))
-                LibraryView(model: model, preview: preview, onEditWork: { _, _ in }, onAdjustWork: { _ in },
-                            onReplayWork: { _ in }, onWorkAction: { _, _ in }, onClose: {})
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(InkuColor.bg)
-            }
-            .environment(model.display)
-            .environment(\.locale, Locale(identifier: model.display.preferences.language))
-            .font(.system(size: 13 * model.display.preferences.textScale))
-            .environment(\.inkuTextScale, model.display.preferences.textScale)
-        }
-    }
-    #endif
 }

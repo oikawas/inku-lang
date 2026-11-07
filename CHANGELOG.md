@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server: unexpected failures now omit exception types, contents and tracebacks from responses in every run mode; check the logs for details. Removed the unread `INKU_LLM_BACKEND`, `OPENAI_MODEL` and `OPENAI_MODEL_STAGE1` from Compose and the environment example. The released-image Compose file now passes `INKU_SINGLE_USER` (default `0`), allowing `.env` to set `1` while recovering local sign-in.
-
-- 3D view: Rebuilt the viewer with the current core, so works with Score 0.24 (saved since 2026-10-31) open in 3D too. The previous viewer read only up to 0.23 and said the work could not be shown in 3D. Web, macOS and Android use the same viewer.
-
 - macOS: The open dialogs (a DDL, an image, an image folder, a plugin, the export folder, the line animation's folder, the default export folder, and a backup to restore) and the 3D view's PNG and GLB saves are now SwiftUI dialogs. They open on the main window or the sheet; they show no title, and the former title or message appears as the line at the dialog's top. The export screen's Share opens from its button. The long third-party notices under About inku are drawn with SwiftUI, and a text selection stays within one paragraph. The library's page number field and the lineage map (keeping its scroll position, and dragging) are SwiftUI too. The save panels the app writes to itself (one work's export and the backup) are unchanged. InkuUI now compiles for the iOS simulator (there is no iPhone or iPad app yet).
 
 - macOS: Grouped Mac-specific view components under Platform. The screen remains unchanged.
@@ -20,21 +16,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - macOS: the third-party notices under About inku add libm and the 11 font crates used for PNG text (fontdb, harfrust, skrifa and others), and show kurbo and svgtypes as copies in core/vendor. The Web reference the app copies follows Build 1405 (DDL engine 78, render engine 101).
 
-- Core (render engine 101): compute the transcendental functions (sin, cos, tan, asin, atan2, hypot, powf, cbrt, exp, ln, tanh) with the pure-Rust libm (`inku_score::math`) instead of the host's C library, and vendor the kurbo and svgtypes the Compat clip uses so they do the same. Their last bits differed between macOS and the Linux of 5173, and the Compat SVG of works placed by relation differed slightly between hosts (I-733). Of 5173's 20,097 drawings, 249 (about 84 works) change their SVG: in some, where the gap in one mark's stroke falls; in others, the placement of free lines. Compilation changes the last bits of arc angles in 78 of 7,119 works, so the DDL engine becomes 78.
-
-- Core: requests asked again (correction, hole completion, background color) and the color-catalog selection send their fields in the order of the first request: the description stays first and added fields follow. Before, passing through a JSON value sorted them by name and moved the description back (I-733).
-
-- Core: a model answer the host delivers is read while the run's total budget holds, even when the time the host measured is a little past the attempt's `timeout_ms`. Before, a correct answer arriving just at the deadline was discarded and asked again (I-733).
-
-- Core: freeze the bytes a surface seeds from in a dedicated type, so a field added to Instruction does not silently change its texture. Drawings do not change (render engine stays 100, I-733).
-
-- Core: remove the UniFFI exports that lost their callers: `rasterize` and `region` of `RasterScene` and `DisplayScene` and `rasterize_svg`, which copied pixels through `RasterFrame` (macOS now takes the `DisplayImage` calls), and the uncalled `rasterize_svg_region`, `prepare_raster_scene_with_fonts` and `render_compiled`. `DisplayScene.rasterize` and `RasterFrame`, which Android's Rust uses, stay as Rust functions outside the binding.
-
 - macOS: Read progress and attempt notifications from step output, and pass raster pixels from the core's `DisplayImage` to `CGImage` without copying. Redrawing a saved work compiles and renders in one core call. PNG text uses the Server's font, size and dpi when the SVG does not specify them (core FFI-16).
 
 - Android: Read progress and provider attempts from each step's output to reduce snapshot rereads. Resumed saved runs and outputs without these fields use the existing queries.
-
-- Core: each step result carries that step's `run_progress` and `provider_attempt`, so a host can skip the two calls that read the snapshot back (they remain). The line animation checks, colors and digests its delivery once and drops the unread `art_svg`. The colors stage reuses, within the process, the context (ten real drawings) of an equal input. New raster calls return a `DisplayImage` read in place, and `compile_and_render_svg_limited` compiles and draws in one call. macOS and Android PNGs use the Server's default text family, size and dpi (Server PNGs do not change). Drawings, DDL and requests do not change.
 
 - macOS: choosing another work during drawing keeps it displayed while the drawing finishes and is saved to history. Work selection remains disabled during a demo.
 
@@ -676,6 +660,24 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.330 (2026-11-07 / Build 1406)
+
+- Server: unexpected failures now omit exception types, contents and tracebacks from responses in every run mode; check the logs for details. Removed the unread `INKU_LLM_BACKEND`, `OPENAI_MODEL` and `OPENAI_MODEL_STAGE1` from Compose and the environment example. The released-image Compose file now passes `INKU_SINGLE_USER` (default `0`), allowing `.env` to set `1` while recovering local sign-in.
+
+- 3D view: Rebuilt the viewer with the current core, so works with Score 0.24 (saved since 2026-10-31) open in 3D too. The previous viewer read only up to 0.23 and said the work could not be shown in 3D. Web, macOS and Android use the same viewer.
+
+- Core (render engine 101): compute the transcendental functions (sin, cos, tan, asin, atan2, hypot, powf, cbrt, exp, ln, tanh) with the pure-Rust libm (`inku_score::math`) instead of the host's C library, and vendor the kurbo and svgtypes the Compat clip uses so they do the same. Their last bits differed between macOS and the Linux of 5173, and the Compat SVG of works placed by relation differed slightly between hosts (I-733). Of 5173's 20,097 drawings, 249 (about 84 works) change their SVG: in some, where the gap in one mark's stroke falls; in others, the placement of free lines. Compilation changes the last bits of arc angles in 78 of 7,119 works, so the DDL engine becomes 78.
+
+- Core: requests asked again (correction, hole completion, background color) and the color-catalog selection send their fields in the order of the first request: the description stays first and added fields follow. Before, passing through a JSON value sorted them by name and moved the description back (I-733).
+
+- Core: a model answer the host delivers is read while the run's total budget holds, even when the time the host measured is a little past the attempt's `timeout_ms`. Before, a correct answer arriving just at the deadline was discarded and asked again (I-733).
+
+- Core: freeze the bytes a surface seeds from in a dedicated type, so a field added to Instruction does not silently change its texture. Drawings do not change (render engine stays 100, I-733).
+
+- Core: remove the UniFFI exports that lost their callers: `rasterize` and `region` of `RasterScene` and `DisplayScene` and `rasterize_svg`, which copied pixels through `RasterFrame` (macOS now takes the `DisplayImage` calls), and the uncalled `rasterize_svg_region`, `prepare_raster_scene_with_fonts` and `render_compiled`. `DisplayScene.rasterize` and `RasterFrame`, which Android's Rust uses, stay as Rust functions outside the binding.
+
+- Core: each step result carries that step's `run_progress` and `provider_attempt`, so a host can skip the two calls that read the snapshot back (they remain). The line animation checks, colors and digests its delivery once and drops the unread `art_svg`. The colors stage reuses, within the process, the context (ten real drawings) of an equal input. New raster calls return a `DisplayImage` read in place, and `compile_and_render_svg_limited` compiles and draws in one call. macOS and Android PNGs use the Server's default text family, size and dpi (Server PNGs do not change). Drawings, DDL and requests do not change.
 
 ## v2.15.329 (2026-11-06 / Build 1405)
 

@@ -8,10 +8,6 @@
 
 ## 未リリース
 
-- Server：予期しない失敗の応答から、動作モードに関わらず例外の型・内容・tracebackを外し、ログで確かめる形に揃えました。composeと環境変数の例から、読まれない`INKU_LLM_BACKEND`・`OPENAI_MODEL`・`OPENAI_MODEL_STAGE1`を外しました。リリースイメージ用のcomposeにも`INKU_SINGLE_USER`（既定`0`）を渡し、ローカルログインの回復時に`.env`で`1`にできるようにしました。
-
-- 3D表示：ビューアを今のcoreで作り直し、楽譜0.24の作品（2026-10-31以降に保存した作品）も3Dで表示できるようにしました。これまでのビューアは0.23までしか読めず、「この作品を3Dで表示できません」と出ていました。Web・macOS・Androidは同じビューアを使います。
-
 - macOS：ファイルを開く窓（DDL・画像・画像フォルダ・プラグイン・書き出しフォルダ・行ごとのアニメーションの保存先・既定の書き出し先・復元するバックアップ）と、3DのPNG・GLBの保存を、SwiftUIの窓にしました。窓は主の窓かシートに付いて出ます。窓の題は出なくなり、これまでの題か説明が窓の上の文に出ます。書き出しの「共有」は押したボタンから出ます。「inku について」のサードパーティの長い文書はSwiftUIで描き、文字の選択は段落の中だけになります。ライブラリのページ番号の欄と系譜の地図（スクロールの位置の保ち方・ドラッグ）もSwiftUIにしました。こちらで書く保存の窓（1作品の書き出し・バックアップ）は今の窓のままです。InkuUIはiOSシミュレータ向けにcompileできるようになりました（iPhone・iPadのアプリはまだありません）。
 
 - macOS：Mac固有の画面部品をPlatformにまとめました。画面は変わりません。
@@ -20,21 +16,9 @@
 
 - macOS：「inku について」のサードパーティの表示に、libm と、PNG の文字に使う書体まわりの crate（fontdb・harfrust・skrifa など 11 個）を足し、kurbo と svgtypes を core/vendor のコピーとして示す。アプリが写す Web の参照を Build 1405（DDL エンジン 78・描画エンジン 101）に合わせた。
 
-- Core（描画エンジン 101）：超越関数（sin・cos・tan・asin・atan2・hypot・powf・cbrt・exp・ln・tanh）を、host の C ライブラリでなく純 Rust の libm（`inku_score::math`）で計算する。Compat の切り抜きが使う kurbo と svgtypes も vendor にして同じにした。macOS と 5173 の Linux で答えの末尾のビットが違い、関係で置いた作品の Compat の SVG が host ごとに少し違っていた（I-733）。5173 の描画 20,097 件のうち SVG が変わるのは 249 件（約 84 作品）で、痕の 1 本の線の切れ目の位置が変わる作品や、自由線の置き方が変わる作品がある。compile では 7,119 件のうち 78 件で弧の角度の末尾のビットが変わるので、DDL エンジンを 78 にした。
-
-- Core：言い直し・穴の補完・地の色の再送信と色カタログを選ぶ送信で、送信文の欄を最初の送信と同じ順に送る（記述が先頭のまま、足した欄は後ろ）。これまでは JSON の値を通して名前の順に並び替わり、記述が後ろに回っていた（I-733）。
-
-- Core：host が届けた model の答えは、host の測った時間が試行の `timeout_ms` を少し超えていても、実行の総予算の中なら読む。これまでは締切の直前に届いた正しい答えを捨てて送り直していた（I-733）。
-
-- Core：surface の seed を作るバイトを専用の型で今のまま固め、Instruction に欄が増えたときに模様が黙って変わらないようにする。画は変わらない（描画エンジン 100 のまま、I-733）。
-
-- Core：呼び手の無くなった UniFFI の export を消す。画素を `RasterFrame` で写す `RasterScene`・`DisplayScene` の `rasterize`・`region` と `rasterize_svg`（macOS は `DisplayImage` を返す道に移った）、呼び手の無い `rasterize_svg_region`・`prepare_raster_scene_with_fonts`・`render_compiled`。Android の Rust が使う `DisplayScene.rasterize` と `RasterFrame` は、binding の外に Rust の関数として残す。
-
 - macOS：進みと試行の通知をstepの出力から読み、ラスタの画素はcoreの`DisplayImage`からコピーせず`CGImage`へ渡す。保存作品の再描画はcompileと描画を1回のcore呼び出しで行う。PNGの文字は、SVGが指定しない書体・大きさ・dpiをServerと揃える（core FFI-16）。
 
 - Android：step ごとの進みと試行を step の出力から読み、snapshot の読み直しを減らす。保存した実行の再開や欄の無い出力では従来の呼び出しを使う。
-
-- Core：step の出力に、その step の進み（`run_progress`）と試行（`provider_attempt`）を入れる。host は snapshot を読み直す 2 つの呼び出しを省ける（古い 2 つの呼び出しは残す）。行ごとのアニメーションは検証・配色・digest を 1 回にし、読まれない `art_svg` を外す。配色の段は同じ入力の文脈（本物の描画 10 回）を process の中で使い回す。画素を写さずに読む `DisplayImage` を返すラスタの呼び出しと、compile と描画を 1 回で行う `compile_and_render_svg_limited` を足す。macOS・Android の PNG 化は、文字の既定の書体・大きさ・dpi を Server と同じにする（Server の PNG は変わらない）。描く画・DDL・送信文は変わらない。
 
 - macOS：描画中に別の作品を選ぶとその作品を表示し続け、描画は最後まで進んで履歴に保存される。デモ中は作品の選択を止める。
 
@@ -676,6 +660,24 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.330（2026-11-07 / Build 1406）
+
+- Server：予期しない失敗の応答から、動作モードに関わらず例外の型・内容・tracebackを外し、ログで確かめる形に揃えました。composeと環境変数の例から、読まれない`INKU_LLM_BACKEND`・`OPENAI_MODEL`・`OPENAI_MODEL_STAGE1`を外しました。リリースイメージ用のcomposeにも`INKU_SINGLE_USER`（既定`0`）を渡し、ローカルログインの回復時に`.env`で`1`にできるようにしました。
+
+- 3D表示：ビューアを今のcoreで作り直し、楽譜0.24の作品（2026-10-31以降に保存した作品）も3Dで表示できるようにしました。これまでのビューアは0.23までしか読めず、「この作品を3Dで表示できません」と出ていました。Web・macOS・Androidは同じビューアを使います。
+
+- Core（描画エンジン 101）：超越関数（sin・cos・tan・asin・atan2・hypot・powf・cbrt・exp・ln・tanh）を、host の C ライブラリでなく純 Rust の libm（`inku_score::math`）で計算する。Compat の切り抜きが使う kurbo と svgtypes も vendor にして同じにした。macOS と 5173 の Linux で答えの末尾のビットが違い、関係で置いた作品の Compat の SVG が host ごとに少し違っていた（I-733）。5173 の描画 20,097 件のうち SVG が変わるのは 249 件（約 84 作品）で、痕の 1 本の線の切れ目の位置が変わる作品や、自由線の置き方が変わる作品がある。compile では 7,119 件のうち 78 件で弧の角度の末尾のビットが変わるので、DDL エンジンを 78 にした。
+
+- Core：言い直し・穴の補完・地の色の再送信と色カタログを選ぶ送信で、送信文の欄を最初の送信と同じ順に送る（記述が先頭のまま、足した欄は後ろ）。これまでは JSON の値を通して名前の順に並び替わり、記述が後ろに回っていた（I-733）。
+
+- Core：host が届けた model の答えは、host の測った時間が試行の `timeout_ms` を少し超えていても、実行の総予算の中なら読む。これまでは締切の直前に届いた正しい答えを捨てて送り直していた（I-733）。
+
+- Core：surface の seed を作るバイトを専用の型で今のまま固め、Instruction に欄が増えたときに模様が黙って変わらないようにする。画は変わらない（描画エンジン 100 のまま、I-733）。
+
+- Core：呼び手の無くなった UniFFI の export を消す。画素を `RasterFrame` で写す `RasterScene`・`DisplayScene` の `rasterize`・`region` と `rasterize_svg`（macOS は `DisplayImage` を返す道に移った）、呼び手の無い `rasterize_svg_region`・`prepare_raster_scene_with_fonts`・`render_compiled`。Android の Rust が使う `DisplayScene.rasterize` と `RasterFrame` は、binding の外に Rust の関数として残す。
+
+- Core：step の出力に、その step の進み（`run_progress`）と試行（`provider_attempt`）を入れる。host は snapshot を読み直す 2 つの呼び出しを省ける（古い 2 つの呼び出しは残す）。行ごとのアニメーションは検証・配色・digest を 1 回にし、読まれない `art_svg` を外す。配色の段は同じ入力の文脈（本物の描画 10 回）を process の中で使い回す。画素を写さずに読む `DisplayImage` を返すラスタの呼び出しと、compile と描画を 1 回で行う `compile_and_render_svg_limited` を足す。macOS・Android の PNG 化は、文字の既定の書体・大きさ・dpi を Server と同じにする（Server の PNG は変わらない）。描く画・DDL・送信文は変わらない。
 
 ## v2.15.329（2026-11-06 / Build 1405）
 

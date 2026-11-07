@@ -165,22 +165,6 @@ impl DisplayScene {
         }
     }
 
-    pub fn rasterize(
-        &self,
-        target_width: Option<u32>,
-        target_height: Option<u32>,
-    ) -> Result<RasterFrame, DisplayFailure> {
-        guarded(|| {
-            self.scene
-                .rasterize(RasterOptions {
-                    target_width,
-                    target_height,
-                })
-                .map(frame)
-                .map_err(refused)
-        })
-    }
-
     /// The whole work fitted to the box, as a window to draw in tiles.
     pub fn whole(
         &self,
@@ -198,11 +182,7 @@ impl DisplayScene {
         })
     }
 
-    pub fn region(&self, region: DisplayRegion) -> Result<RasterFrame, DisplayFailure> {
-        guarded(|| self.scene.region(region.into()).map(frame).map_err(refused))
-    }
-
-    /// [`Self::rasterize`] as an image the host reads in place, without
+    /// The whole work as an image the host reads in place, without
     /// copying the pixels through a Record (I-732, 2026-11-07).
     pub fn rasterize_image(
         &self,
@@ -220,7 +200,7 @@ impl DisplayScene {
         })
     }
 
-    /// [`Self::region`] as an image the host reads in place.
+    /// One window of the work as an image the host reads in place.
     pub fn region_image(&self, region: DisplayRegion) -> Result<Arc<DisplayImage>, DisplayFailure> {
         guarded(|| {
             self.scene
@@ -237,6 +217,26 @@ impl DisplayScene {
         guarded(|| {
             inku_display::DisplayComposite::new(Arc::clone(&self.scene), window.into())
                 .map(|composite| Arc::new(DisplayComposite { composite }))
+                .map_err(refused)
+        })
+    }
+}
+
+/// The copied frame Android's Rust bridge turns into a Bitmap; the binding
+/// gives the apps [`DisplayScene::rasterize_image`] instead (I-732, 2026-11-07).
+impl DisplayScene {
+    pub fn rasterize(
+        &self,
+        target_width: Option<u32>,
+        target_height: Option<u32>,
+    ) -> Result<RasterFrame, DisplayFailure> {
+        guarded(|| {
+            self.scene
+                .rasterize(RasterOptions {
+                    target_width,
+                    target_height,
+                })
+                .map(frame)
                 .map_err(refused)
         })
     }

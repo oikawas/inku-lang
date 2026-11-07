@@ -36,12 +36,11 @@ pub use plugin_name_migration::migrate_plugin_names;
 pub use plugin_package::plugin_package;
 pub use raster::{
     RasterFailure, RasterFonts, RasterFrame, RasterScene, prepare_raster_fonts,
-    prepare_raster_scene, prepare_raster_scene_with_fonts, raster_api_version, rasterize_svg,
-    rasterize_svg_region,
+    prepare_raster_scene, raster_api_version, rasterize_svg,
 };
 pub use saijiki_migration::{migrate_saijiki_v1, migrate_saijiki_v2};
 pub use standalone::{
-    compile_document, line_animation, line_animation_bytes, render_compiled,
+    compile_and_render_svg_limited, compile_document, line_animation, line_animation_bytes,
     render_compiled_svg_limited,
 };
 

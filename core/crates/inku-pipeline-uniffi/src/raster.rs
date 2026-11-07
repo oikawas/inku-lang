@@ -9,8 +9,9 @@ use inku_svg_raster::{RasterError, RasterOptions};
 #[cfg(feature = "display")]
 use crate::display::DisplayImage;
 
-/// One independent premultiplied RGBA8 buffer, owned by the calling host.
-#[derive(uniffi::Record)]
+/// One independent premultiplied RGBA8 buffer. Android's Rust bridge copies it
+/// into a Bitmap; it is no longer a binding Record, since the apps read
+/// [`DisplayImage`] in place (I-732, 2026-11-07).
 pub struct RasterFrame {
     pub width: u32,
     pub height: u32,
@@ -61,15 +62,6 @@ pub fn prepare_raster_fonts(font_files: Vec<String>) -> Result<Arc<RasterFonts>,
     .unwrap_or(Err(RasterFailure::InternalInvariant))
 }
 
-/// Prepare one scene with explicitly supplied font files.
-#[uniffi::export]
-pub fn prepare_raster_scene_with_fonts(
-    svg: String,
-    font_files: Vec<String>,
-) -> Result<Arc<RasterScene>, RasterFailure> {
-    prepare_raster_fonts(font_files)?.prepare_scene(svg)
-}
-
 #[uniffi::export]
 impl RasterScene {
     pub fn source_byte_count(&self) -> u64 {
@@ -84,7 +76,11 @@ impl RasterScene {
     pub fn intrinsic_height(&self) -> f64 {
         self.scene.intrinsic_height()
     }
+}
 
+/// The copied frames, for Rust callers and the tests; the apps take the
+/// images below (I-732, 2026-11-07).
+impl RasterScene {
     pub fn rasterize(
         &self,
         target_width: Option<u32>,
@@ -259,8 +255,8 @@ pub fn raster_api_version() -> String {
     inku_svg_raster::raster_api_version().to_owned()
 }
 
-/// Reuse the host-neutral renderer and contain unwinding at the FFI boundary.
-#[uniffi::export]
+/// Reuse the host-neutral renderer and contain unwinding, as a copied frame for
+/// Rust callers and the tests; the apps take [`rasterize_svg_image`].
 pub fn rasterize_svg(
     svg: String,
     target_width: Option<u32>,
@@ -272,40 +268,6 @@ pub fn rasterize_svg(
             RasterOptions {
                 target_width,
                 target_height,
-            },
-        )?;
-        Ok(RasterFrame {
-            width: output.width,
-            height: output.height,
-            stride: output.stride,
-            pixel_format: output.pixel_format.to_owned(),
-            pixels: output.pixels,
-        })
-    }))
-    .unwrap_or(Err(RasterFailure::InternalInvariant))
-}
-
-/// Export tiles reuse the original SVG tree with an explicit canvas transform.
-#[uniffi::export]
-pub fn rasterize_svg_region(
-    svg: String,
-    full_width: u32,
-    full_height: u32,
-    x: u32,
-    y: u32,
-    width: u32,
-    height: u32,
-) -> Result<RasterFrame, RasterFailure> {
-    catch_unwind(AssertUnwindSafe(|| {
-        let output = inku_svg_raster::rasterize_region(
-            &svg,
-            inku_svg_raster::RasterRegionOptions {
-                full_width,
-                full_height,
-                x,
-                y,
-                width,
-                height,
             },
         )?;
         Ok(RasterFrame {
@@ -382,6 +344,15 @@ pub(crate) fn measure_visible_difference(input: &[u8]) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod font_tests {
     use super::*;
+
+    /// Fonts loaded for one scene; the export of this shorthand had no
+    /// caller and is gone (I-732).
+    fn prepare_raster_scene_with_fonts(
+        svg: String,
+        font_files: Vec<String>,
+    ) -> Result<Arc<RasterScene>, RasterFailure> {
+        prepare_raster_fonts(font_files)?.prepare_scene(svg)
+    }
 
     fn noto_serif() -> String {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -618,23 +618,6 @@ pub fn compile_and_render_svg_limited(
     .unwrap_or_else(|_| (refusal("internal_invariant", "the core panicked"), None).into())
 }
 
-/// Draw only a validated delivery with its independently supplied matching options.
-#[uniffi::export]
-pub fn render_compiled(input_bytes: Vec<u8>) -> Vec<u8> {
-    owned_call(|| {
-        let input: RenderInput = parse(&input_bytes, "invalid_render_input")?;
-        let output = inku_pipeline::core_boundary::render_delivery(
-            &input.delivery,
-            input.options.into(),
-            &input.compiler,
-            input.clip,
-        )
-        .map_err(|error| refusal(super::saved_render_error_code(&error), &error.to_string()))?;
-        serde_json::to_vec(&output)
-            .map_err(|error| refusal("invalid_render_output", &error.to_string()))
-    })
-}
-
 /// Native replay keeps raw SVG outside the bounded metadata envelope.
 #[uniffi::export]
 pub fn render_compiled_svg_limited(

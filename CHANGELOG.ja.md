@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- Core：呼び手の無くなった UniFFI の export を消す。画素を `RasterFrame` で写す `RasterScene`・`DisplayScene` の `rasterize`・`region` と `rasterize_svg`（macOS は `DisplayImage` を返す道に移った）、呼び手の無い `rasterize_svg_region`・`prepare_raster_scene_with_fonts`・`render_compiled`。Android の Rust が使う `DisplayScene.rasterize` と `RasterFrame` は、binding の外に Rust の関数として残す。
+
 - macOS：進みと試行の通知をstepの出力から読み、ラスタの画素はcoreの`DisplayImage`からコピーせず`CGImage`へ渡す。保存作品の再描画はcompileと描画を1回のcore呼び出しで行う。PNGの文字は、SVGが指定しない書体・大きさ・dpiをServerと揃える（core FFI-16）。
 
 - Android：step ごとの進みと試行を step の出力から読み、snapshot の読み直しを減らす。保存した実行の再開や欄の無い出力では従来の呼び出しを使う。

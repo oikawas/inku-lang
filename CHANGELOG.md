@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: requests asked again (correction, hole completion, background color) and the color-catalog selection send their fields in the order of the first request: the description stays first and added fields follow. Before, passing through a JSON value sorted them by name and moved the description back (I-733).
+
+- Core: a model answer the host delivers is read while the run's total budget holds, even when the time the host measured is a little past the attempt's `timeout_ms`. Before, a correct answer arriving just at the deadline was discarded and asked again (I-733).
+
+- Core: freeze the bytes a surface seeds from in a dedicated type, so a field added to Instruction does not silently change its texture. Drawings do not change (render engine stays 100, I-733).
+
 - Core: remove the UniFFI exports that lost their callers: `rasterize` and `region` of `RasterScene` and `DisplayScene` and `rasterize_svg`, which copied pixels through `RasterFrame` (macOS now takes the `DisplayImage` calls), and the uncalled `rasterize_svg_region`, `prepare_raster_scene_with_fonts` and `render_compiled`. `DisplayScene.rasterize` and `RasterFrame`, which Android's Rust uses, stay as Rust functions outside the binding.
 
 - macOS: Read progress and attempt notifications from step output, and pass raster pixels from the core's `DisplayImage` to `CGImage` without copying. Redrawing a saved work compiles and renders in one core call. PNG text uses the Server's font, size and dpi when the SVG does not specify them (core FFI-16).

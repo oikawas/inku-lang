@@ -18,9 +18,11 @@ use crate::surface_geometry::{
 };
 use crate::svg::{Element, Node, format_number};
 use crate::types::{
-    Instruction, Point, Primitive, Seed, SurfaceDirection, SurfaceIntensity,
-    SurfaceSpacingGradient, SurfaceTexture, SvgProfile, Weight,
+    ArcForm, Arrangement, AtRegion, CarveDepth, Color, InkSpread, Instruction, InstructionMode,
+    LineStyle, Point, Primitive, Relation, Seed, SurfaceDirection, SurfaceIntensity,
+    SurfaceSpacingGradient, SurfaceSpec, SurfaceTexture, SvgProfile, Thinness, Variation, Weight,
 };
+use serde::Serialize;
 
 /// Stipple and aquatint marks follow a shape's area up to eight times the
 /// reference area, at most 400 (render engine 88; 90 and 1.8 before).
@@ -120,11 +122,13 @@ fn surface_seed(instruction: &Instruction, context: MarkContext<'_>, grain: bool
             .expect("surface cloned above")
             .texture = SurfaceTexture::Sweep;
     }
-    let mut key = serde_json::to_vec(&stable).expect("surface seed payload is serializable");
+    let mut key = surface_seed_payload(stable);
     key.extend_from_slice(
         format!(
-            ":surface:{}:{}:{:?}",
-            context.instruction_index, context.mark_index, context.render_seed
+            ":surface:{}:{}:{}",
+            context.instruction_index,
+            context.mark_index,
+            seed_debug_text(context.render_seed)
         )
         .as_bytes(),
     );
@@ -132,6 +136,123 @@ fn surface_seed(instruction: &Instruction, context: MarkContext<'_>, grain: bool
     i128::from(u64::from_le_bytes(
         digest[..8].try_into().expect("eight digest bytes"),
     ))
+}
+
+/// The bytes a surface seeds from, frozen as the Instruction serialized them
+/// at render engine 100 (I-733 RND-9): the same field names, order and
+/// omissions. Every field is named, so a field added to Instruction stops the
+/// build here until it is decided whether it turns the surface.
+fn surface_seed_payload(stable: Instruction) -> Vec<u8> {
+    let Instruction {
+        primitive,
+        note,
+        from_,
+        to,
+        center,
+        radius,
+        sides,
+        position,
+        size,
+        angle_start,
+        angle_end,
+        rotation,
+        arc_form,
+        filled,
+        style,
+        weight,
+        mode_,
+        carve_depth,
+        color,
+        color_hint,
+        variation,
+        ink_spread,
+        arrangement,
+        at,
+        relation,
+        surface_intensity,
+        thinness,
+        surface,
+    } = stable;
+    serde_json::to_vec(&SurfaceSeedPayload {
+        primitive,
+        note,
+        from_,
+        to,
+        center,
+        radius,
+        sides,
+        position,
+        size,
+        angle_start,
+        angle_end,
+        rotation,
+        arc_form,
+        filled,
+        style,
+        weight,
+        mode_,
+        carve_depth,
+        color,
+        color_hint,
+        variation,
+        ink_spread,
+        arrangement,
+        at,
+        relation,
+        surface_intensity,
+        thinness,
+        surface,
+    })
+    .expect("surface seed payload is serializable")
+}
+
+/// `{:?}` of an `Option<Seed>` as the seeds were made with it.
+fn seed_debug_text(seed: Option<Seed>) -> String {
+    match seed {
+        Some(seed) => format!("Some({seed})"),
+        None => "None".to_owned(),
+    }
+}
+
+fn intensity_is_normal(intensity: &SurfaceIntensity) -> bool {
+    *intensity == SurfaceIntensity::Normal
+}
+
+#[derive(Serialize)]
+struct SurfaceSeedPayload {
+    primitive: Primitive,
+    note: Option<String>,
+    #[serde(rename = "from")]
+    from_: Option<Point>,
+    to: Option<Point>,
+    center: Option<Point>,
+    radius: Option<f64>,
+    sides: Option<u8>,
+    position: Option<Point>,
+    size: Option<Point>,
+    angle_start: Option<f64>,
+    angle_end: Option<f64>,
+    rotation: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    arc_form: Option<ArcForm>,
+    filled: bool,
+    style: LineStyle,
+    weight: Weight,
+    #[serde(rename = "mode")]
+    mode_: InstructionMode,
+    carve_depth: Option<CarveDepth>,
+    color: Color,
+    color_hint: Option<String>,
+    variation: Option<Variation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ink_spread: Option<InkSpread>,
+    arrangement: Option<Arrangement>,
+    at: Option<AtRegion>,
+    relation: Option<Relation>,
+    #[serde(skip_serializing_if = "intensity_is_normal")]
+    surface_intensity: SurfaceIntensity,
+    thinness: Option<Thinness>,
+    surface: Option<SurfaceSpec>,
 }
 
 fn salted_seed(seed: Seed, label: &str, index: i64) -> Seed {
@@ -1218,6 +1339,43 @@ mod tests {
             oil_fill_pass_limit: crate::fills::MAX_OIL_FILL_PASSES,
             effects: crate::effects::MarkEffects::default(),
         }
+    }
+
+    #[test]
+    fn a_surface_seeds_from_the_bytes_frozen_at_render_engine_100() {
+        // I-733 RND-9: the payload and the seed of a mark with every optional
+        // field the Instruction writes, so a drift in a field's form is found.
+        let instruction: Instruction = serde_json::from_str(
+            r#"{"primitive":"circle","note":"月","center":[0.25,0.5],"radius":0.125,
+            "arc_form":"crescent","filled":true,"style":"dashed","weight":"pencil",
+            "mode":"carve","carve_depth":"half","color":"red","color_hint":"朱",
+            "ink_spread":"bleed","surface_intensity":"dense","thinness":"fine",
+            "surface":{"texture":"hatch","density":0.75,"scale":0.25,"opacity":0.5,
+            "bleed":0.125,"tone_steps":3}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(surface_seed_payload(instruction.clone())).unwrap(),
+            concat!(
+                r#"{"primitive":"circle","note":"月","from":null,"to":null,"#,
+                r#""center":[0.25,0.5],"radius":0.125,"sides":null,"position":null,"#,
+                r#""size":null,"angle_start":null,"angle_end":null,"rotation":null,"#,
+                r#""arc_form":"crescent","filled":true,"style":"dashed","weight":"pencil","#,
+                r#""mode":"carve","carve_depth":"half","color":"red","color_hint":"朱","#,
+                r#""variation":null,"ink_spread":"bleed","arrangement":null,"at":null,"#,
+                r#""relation":null,"surface_intensity":"dense","thinness":"fine","#,
+                r#""surface":{"texture":"hatch","density":0.75,"scale":0.25,"opacity":0.5,"#,
+                r#""bleed":0.125,"direction":"none","spacing_gradient":"none","tone_steps":3,"#,
+                r#""seed":null}}"#
+            )
+        );
+        let colors = BTreeMap::new();
+        assert_eq!(
+            surface_seed(&instruction, context(&colors), false),
+            3_805_096_259_888_174_028
+        );
+        assert_eq!(seed_debug_text(Some(-7)), "Some(-7)");
+        assert_eq!(seed_debug_text(None), "None");
     }
 
     #[test]

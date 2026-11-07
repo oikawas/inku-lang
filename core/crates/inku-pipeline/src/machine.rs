@@ -1761,7 +1761,9 @@ impl PipelineSnapshot {
     /// The provider attempt in flight, or `None` while no provider effect runs.
     ///
     /// The core keeps no wall clock, so a host turns `delay_ms` and
-    /// `timeout_ms` into a deadline from the time it started the attempt.
+    /// `timeout_ms` into a deadline from the time it started the attempt. An
+    /// answer the host delivers is read while the run's total budget holds,
+    /// even when its measured time is a little past `timeout_ms` (I-733).
     pub fn provider_attempt(&self) -> Result<Option<ProviderAttempt>, ProtocolError> {
         self.validate()?;
         Ok(self.sealed_provider_attempt())
@@ -4128,15 +4130,13 @@ impl PipelineSnapshot {
             .get()
             .checked_add(spent_ms)
             .ok_or(ProtocolError::InvalidPolicy)?;
-        if spent_ms
-            > self
-                .action
-                .as_ref()
-                .ok_or(ProtocolError::InvalidState)?
-                .timeout_ms
-                .get()
-            || total > self.retry_policy(stage).total_timeout_ms.get()
-        {
+        // The attempt's `timeout_ms` is the host's deadline. An answer that
+        // arrived is read while the run's total budget holds, even when the
+        // host measured a little past that deadline (I-733 PIPE-T1).
+        if self.action.is_none() {
+            return Err(ProtocolError::InvalidState);
+        }
+        if total > self.retry_policy(stage).total_timeout_ms.get() {
             return self.failure(ProviderFailure::TransportTimeout, spent_ms, events);
         }
         match stage {

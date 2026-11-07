@@ -8,6 +8,12 @@
 
 ## 未リリース
 
+- Core：言い直し・穴の補完・地の色の再送信と色カタログを選ぶ送信で、送信文の欄を最初の送信と同じ順に送る（記述が先頭のまま、足した欄は後ろ）。これまでは JSON の値を通して名前の順に並び替わり、記述が後ろに回っていた（I-733）。
+
+- Core：host が届けた model の答えは、host の測った時間が試行の `timeout_ms` を少し超えていても、実行の総予算の中なら読む。これまでは締切の直前に届いた正しい答えを捨てて送り直していた（I-733）。
+
+- Core：surface の seed を作るバイトを専用の型で今のまま固め、Instruction に欄が増えたときに模様が黙って変わらないようにする。画は変わらない（描画エンジン 100 のまま、I-733）。
+
 - Core：呼び手の無くなった UniFFI の export を消す。画素を `RasterFrame` で写す `RasterScene`・`DisplayScene` の `rasterize`・`region` と `rasterize_svg`（macOS は `DisplayImage` を返す道に移った）、呼び手の無い `rasterize_svg_region`・`prepare_raster_scene_with_fonts`・`render_compiled`。Android の Rust が使う `DisplayScene.rasterize` と `RasterFrame` は、binding の外に Rust の関数として残す。
 
 - macOS：進みと試行の通知をstepの出力から読み、ラスタの画素はcoreの`DisplayImage`からコピーせず`CGImage`へ渡す。保存作品の再描画はcompileと描画を1回のcore呼び出しで行う。PNGの文字は、SVGが指定しない書体・大きさ・dpiをServerと揃える（core FFI-16）。

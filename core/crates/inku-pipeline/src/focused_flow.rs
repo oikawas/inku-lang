@@ -708,6 +708,65 @@ fn a_retrying_stage1_reports_its_attempt_and_budget() {
 }
 
 #[test]
+fn an_answer_measured_past_the_attempt_deadline_is_read_within_the_total_budget() {
+    // I-733 PIPE-T1: a host enforces `timeout_ms` itself, so an answer that
+    // arrived a little past it was discarded and asked again.
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "late-answer".into(),
+            authoring_nonce: "late-answer-1".into(),
+            config: Box::new(config()),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "One red square".into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
+            },
+        },
+    );
+    let state = run(None, &start).snapshot;
+    let answer = |elapsed_ms| {
+        envelope(
+            Some(&state),
+            PipelineInput::EffectResult {
+                result: EffectResult::NormalizedDdlGenerated {
+                    identity: state.action.as_ref().unwrap().identity.clone(),
+                    response: json!({"normalized_ddl": "place one red square at center."})
+                        .to_string(),
+                    elapsed_ms: DecimalU64::new(elapsed_ms),
+                },
+            },
+        )
+    };
+    // 1,050 ms against the attempt's 1,000 ms: read, not asked again.
+    let late = run(Some(&state), &answer(1050)).snapshot;
+    assert_ne!(
+        late.action.as_ref().map(|action| action.tag.as_str()),
+        Some("generate_normalized_ddl")
+    );
+    // Past the run's total 3,000 ms it is a timeout, as before.
+    let over = run(Some(&state), &answer(3050)).snapshot;
+    let timed_out = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::ProviderFailed {
+                identity: state.action.as_ref().unwrap().identity.clone(),
+                failure: ProviderFailure::TransportTimeout,
+                elapsed_ms: DecimalU64::new(3050),
+            },
+        },
+    );
+    assert_eq!(
+        serde_json::to_value(&over).unwrap(),
+        serde_json::to_value(run(Some(&state), &timed_out).snapshot).unwrap()
+    );
+}
+
+#[test]
 fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
     let source = "mystery. place one red square at center.";
     let mut pipeline_config = config();

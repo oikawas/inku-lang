@@ -810,7 +810,7 @@ def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | 
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("score render", 500, redact=True) from e
+        raise _unexpected_http_error("score render", 500) from e
     return RenderScoreResponse(
         score=score,
         svg=svg,
@@ -854,7 +854,7 @@ def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) 
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("svg render", 500, redact=True) from e
+        raise _unexpected_http_error("svg render", 500) from e
     # The body of this endpoint is the SVG itself, so the things a caller cannot
     # read off it -- whether it got the work's own colors, and whether it got the
     # work's own limits -- ride here.

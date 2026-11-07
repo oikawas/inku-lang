@@ -47,15 +47,9 @@ _APP_VERSION = _app_version()
 _RELEASE_VERSION = _release_version()
 
 
-def _unexpected_http_error(operation: str, status_code: int, *, redact: bool = False) -> HTTPException:
+def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:
     _logger.exception("%s failed", operation)
     detail = f"{operation} failed"
-    if not redact and os.getenv("INKU_ENV") == "development":
-        import sys
-        import traceback
-        exc_type, exc_value, _ = sys.exc_info()
-        if exc_value:
-            detail = f"{operation} failed: {exc_type.__name__}: {exc_value}\n{traceback.format_exc()}"
     return HTTPException(status_code=status_code, detail=detail)
 
 

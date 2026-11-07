@@ -11,6 +11,8 @@ Treating the source as authoritative, the operation and administration documents
 - "Application Install": the single-user default is now stated as that of the source-build `compose.yaml`, and `--base-url` of `inku-cli` now follows the subcommand. "Server Configuration" also says that the batch retry count under `Making` in Settings is a setting of this browser only, and the same source-build / released-image distinction is applied to the steps for restoring local sign-in and to the security baseline for single-user mode.
 - "CLI Reference": the operations `plugin` has (list, validate, preview), the config file and environment variables, and when `user update --password` works.
 - Templates: removed the nonexistent `INKU_LEARNED_FILE`.
+- "Server Configuration": unexpected failures now omit exception details from responses regardless of `INKU_ENV`; check the logs for details.
+- The released-image Compose file now passes `INKU_SINGLE_USER` (default `0`); the local sign-in recovery instructions set `1` in `.env` temporarily and restore it afterward.
 
 This allocates no new version and makes no deployment claim.
 

@@ -128,7 +128,7 @@ NVIDIA_API_KEY=
 
 `INKU_BOOTSTRAP_ADMIN_PASSWORD` must be at least eight characters. A bootstrap admin is created only when the DB has no users. Remove the password from the environment after initial creation or move it to a secret manager; a blank value counts as unset, so deleting the line and blanking it are equivalent.
 
-**In single-user mode (`INKU_SINGLE_USER=1`, the default of the source-build `compose.yaml`; the released-image `deploy/compose.yaml` does not turn it on) this first setting is not needed.** The server creates one account and signs it in by itself.
+**In single-user mode (`INKU_SINGLE_USER=1`, the default of the source-build `compose.yaml`; the released-image `deploy/compose.yaml` defaults to `0` and requires sign-in, but `.env` can set `1` while recovering local sign-in) this first setting is not needed.** The server creates one account and signs it in by itself.
 
 **If you turn single-user mode off, this first setting cannot be skipped.** inku has no self-service registration, and only an authenticated member of the `admins` or `leaders` group can create accounts. A server started against an empty DB without a bootstrap admin offers no way to sign in. If it was missed, set the password and restart: the account is created then, and because creation is attempted only while the DB has no users, existing accounts are unaffected.
 

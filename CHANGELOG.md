@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server: unexpected failures now omit exception types, contents and tracebacks from responses in every run mode; check the logs for details. Removed the unread `INKU_LLM_BACKEND`, `OPENAI_MODEL` and `OPENAI_MODEL_STAGE1` from Compose and the environment example. The released-image Compose file now passes `INKU_SINGLE_USER` (default `0`), allowing `.env` to set `1` while recovering local sign-in.
+
 - macOS: The open dialogs (a DDL, an image, an image folder, a plugin, the export folder, the line animation's folder, the default export folder, and a backup to restore) and the 3D view's PNG and GLB saves are now SwiftUI dialogs. They open on the main window or the sheet; they show no title, and the former title or message appears as the line at the dialog's top. The export screen's Share opens from its button. The long third-party notices under About inku are drawn with SwiftUI, and a text selection stays within one paragraph. The library's page number field and the lineage map (keeping its scroll position, and dragging) are SwiftUI too. The save panels the app writes to itself (one work's export and the backup) are unchanged. InkuUI now compiles for the iOS simulator (there is no iPhone or iPad app yet).
 
 - macOS: Grouped Mac-specific view components under Platform. The screen remains unchanged.

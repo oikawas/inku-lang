@@ -112,15 +112,18 @@ SQLite backup covers all ten tables, including works, lineage, execution snapsho
 
 ## Manual Server migration
 
-A fresh database has registry v5 `image_input_provenance`. Startup makes a verified
-snapshot of an existing v4 `single_history_ddl` database at
-`migration-backups/<stem>-pre-v5-<ns>.db`, then adds nullable TEXT columns
-`image_provenance` and `image_ddl` and the v5 registry row in one transaction.
-Existing rows remain NULL. Failure rolls back the columns and registry while
-keeping the snapshot. Subsequent starts verify only.
+A fresh database has registry v7 `draw_options_history`. Startup makes a verified
+snapshot of an existing v4 `single_history_ddl`, v5 `image_input_provenance`, or
+v6 `all_works_in_history` database at `migration-backups/<stem>-pre-v7-<ns>.db`.
+It adds nullable TEXT columns `image_provenance` and `image_ddl` (v4 only) and
+nullable `draw_route`, `sketch_requested`, and `composition_requested` columns,
+and advances the registry to v7. For v5 and earlier, `lineage_only` works and
+nodes become `normal` and `active`. These changes share one transaction, and
+the added columns remain NULL for existing rows. Failure rolls back the changes
+while keeping the snapshot. Subsequent starts verify only.
 
 Manual migration from the old two-text v3 schema retains the v3 row and appends
-v4; the next ordinary startup advances to v5. `server/scripts/migrate_history_ddl.py` starts no API
+v4; the next ordinary startup advances to v7. `server/scripts/migrate_history_ddl.py` starts no API
 and operates only on the explicitly selected, canonical existing database.
 SQLite 3.35 or newer with `DROP COLUMN` is required. Known source fingerprints
 and registry/checksums are checked; unknown and partial states are refused.

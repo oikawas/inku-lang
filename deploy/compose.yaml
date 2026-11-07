@@ -14,7 +14,9 @@ services:
     environment:
       INKU_DEVELOPER_MODE: ${INKU_DEVELOPER_MODE:-0}
       INKU_ENV: production
-      # Account sign-in stays enabled; no developer mode is required.
+      # Set to 1 in .env only while recovering local sign-in.
+      INKU_SINGLE_USER: ${INKU_SINGLE_USER:-0}
+      # ChatGPT plan connections do not require developer mode.
       INKU_CHATGPT_PLAN_ENABLED: ${INKU_CHATGPT_PLAN_ENABLED:-0}
       INKU_CHATGPT_SELF_HOSTED: ${INKU_CHATGPT_SELF_HOSTED:-0}
       INKU_CHATGPT_AUTH_DIR: /data/chatgpt
@@ -27,8 +29,6 @@ services:
       INKU_BOOTSTRAP_ADMIN_USERNAME: ${INKU_BOOTSTRAP_ADMIN_USERNAME:-admin}
       INKU_BOOTSTRAP_ADMIN_EMAIL: ${INKU_BOOTSTRAP_ADMIN_EMAIL:-admin@localhost}
       INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:?set INKU_BOOTSTRAP_ADMIN_PASSWORD in .env (8 characters or more)}
-      # LLM backend. Pick one provider and fill in its key; see .env.example.
-      INKU_LLM_BACKEND: ${INKU_LLM_BACKEND:-}
       INKU_LLM_REQUEST_TIMEOUT_SECONDS: ${INKU_LLM_REQUEST_TIMEOUT_SECONDS:-120}
       INKU_LLM_RETRY_ATTEMPTS: ${INKU_LLM_RETRY_ATTEMPTS:-4}
       INKU_LLM_RETRY_BASE_DELAY: ${INKU_LLM_RETRY_BASE_DELAY:-2}

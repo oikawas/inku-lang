@@ -123,8 +123,30 @@ fn wrapped_ddl(source: &str, capacity: f64) -> Vec<(usize, String)> {
     rows
 }
 
+/// The DDL panel of a line animation: the same for every frame, so it is laid
+/// out once (I-732, 2026-11-07).
+struct DdlPanel {
+    panel_width: f64,
+    rows: Vec<(usize, String)>,
+}
+
+impl DdlPanel {
+    fn new(source: &str, height: f64) -> Self {
+        let font_size = height / 22.0 * 0.77;
+        let margin = height * 0.03;
+        let widest_token = source
+            .lines()
+            .flat_map(ddl_tokens)
+            .map(|token| text_units(&token))
+            .fold(0.0_f64, f64::max);
+        let panel_width = (height * 0.90).max(widest_token * font_size + 2.0 * margin);
+        let rows = wrapped_ddl(source, (panel_width - 2.0 * margin) / font_size);
+        Self { panel_width, rows }
+    }
+}
+
 fn composed_frame(
-    source: &str,
+    panel: &DdlPanel,
     svg: &str,
     family: &str,
     ranges: &[Vec<(usize, usize)>],
@@ -141,13 +163,8 @@ fn composed_frame(
     let line_height = height / 22.0;
     let font_size = line_height * 0.77;
     let margin = height * 0.03;
-    let widest_token = source
-        .lines()
-        .flat_map(ddl_tokens)
-        .map(|token| text_units(&token))
-        .fold(0.0_f64, f64::max);
-    let panel_width = (height * 0.90).max(widest_token * font_size + 2.0 * margin);
-    let rows = wrapped_ddl(source, (panel_width - 2.0 * margin) / font_size);
+    let panel_width = panel.panel_width;
+    let rows = &panel.rows;
     let visible_rows = 21_usize;
     let focus = if frame == 0 {
         0
@@ -227,25 +244,27 @@ pub fn line_animation(input_bytes: Vec<u8>) -> Vec<u8> {
             &input.compiler,
         )
         .map_err(|error| refusal("compile_refused", &error.to_string()))?;
+        // The delivery is checked once and each frame draws its prefix; a
+        // frame carries only the SVG a host reads (I-732, 2026-11-07).
+        let checked = inku_pipeline::core_boundary::CheckedDeliveryRender::new(
+            &delivery,
+            input.options.clone().into(),
+            &input.compiler,
+            input.clip,
+        )
+        .map_err(|error| refusal("render_refused", &error.to_string()))?;
+        let panel = input
+            .show_ddl
+            .then(|| DdlPanel::new(&input.document.source, input.options.canvas.height));
         let mut frames = Vec::with_capacity(ranges.len() + 1);
+        let mut matches_saved = false;
         for index in 0..=ranges.len() {
-            let output = if index == ranges.len() {
-                inku_pipeline::core_boundary::render_delivery(
-                    &delivery,
-                    input.options.clone().into(),
-                    &input.compiler,
-                    input.clip,
-                )
-            } else {
-                inku_pipeline::core_boundary::render_delivery_instruction_prefix(
-                    &delivery,
-                    input.options.clone().into(),
-                    &input.compiler,
-                    input.clip,
-                    index,
-                )
+            let output = checked
+                .render((index < ranges.len()).then_some(index))
+                .map_err(|error| refusal("render_refused", &error.to_string()))?;
+            if index == ranges.len() {
+                matches_saved = output.svg == input.saved_svg;
             }
-            .map_err(|error| refusal("render_refused", &error.to_string()))?;
             let selected = if index == 0 {
                 (1..=input.document.source.split('\n').count())
                     .filter(|line| {
@@ -263,23 +282,20 @@ pub fn line_animation(input_bytes: Vec<u8>) -> Vec<u8> {
                     .filter(|range| !ranges[index..].iter().any(|later| later.contains(range)))
                     .collect::<Vec<_>>()
             };
-            let svg = if input.show_ddl {
-                composed_frame(
-                    &input.document.source,
+            let svg = match &panel {
+                Some(panel) => composed_frame(
+                    panel,
                     &output.svg,
                     &input.font_family,
                     &ranges,
                     index,
                     input.options.canvas.width,
                     input.options.canvas.height,
-                )?
-            } else {
-                output.svg.clone()
+                )?,
+                None => output.svg,
             };
-            frames.push(serde_json::json!({"instruction_count": index, "lines": selected, "svg": svg, "art_svg": output.svg}));
+            frames.push(serde_json::json!({"instruction_count": index, "lines": selected, "svg": svg}));
         }
-        let matches_saved = frames.last().and_then(|frame| frame["art_svg"].as_str())
-            == Some(input.saved_svg.as_str());
         serde_json::to_vec(&serde_json::json!({"frames": frames, "matches_saved_svg": matches_saved, "font_files": input.font_files, "outcome": delivery.outcome, "upstream_diagnostics": delivery.upstream_diagnostics, "downstream_diagnostics": delivery.downstream_diagnostics, "resource_omissions": delivery.resource_omissions, "relation_omissions": delivery.relation_omissions})).map_err(|error| refusal("invalid_output", &error.to_string()))
     })
 }
@@ -325,19 +341,52 @@ mod line_animation_tests {
                 .contains(&serde_json::json!([2, 2]))
         );
         assert_eq!(result["matches_saved_svg"], false);
-        input["saved_svg"] = frames[2]["art_svg"].clone();
+        assert!(frames.iter().all(|frame| frame.get("art_svg").is_none()));
+        input["saved_svg"] = frames[2]["svg"].clone();
         let same: serde_json::Value =
             serde_json::from_slice(&line_animation(serde_json::to_vec(&input).unwrap())).unwrap();
         assert_eq!(same["matches_saved_svg"], true);
-        assert_eq!(same["frames"][2]["svg"], same["frames"][2]["art_svg"]);
+        // Each frame is the drawing the delivery's own prefix makes, checked
+        // once rather than per frame (I-732).
+        let parsed: AnimationInput = serde_json::from_value(input.clone()).unwrap();
+        let (delivery, ranges) = inku_pipeline::core_boundary::compile_committed_with_line_ranges(
+            parsed.document.document().unwrap(),
+            &parsed.definitions,
+            &parsed.compiler,
+        )
+        .unwrap();
+        for index in 0..=ranges.len() {
+            let expected = if index == ranges.len() {
+                inku_pipeline::core_boundary::render_delivery(
+                    &delivery,
+                    parsed.options.clone().into(),
+                    &parsed.compiler,
+                    parsed.clip,
+                )
+            } else {
+                inku_pipeline::core_boundary::render_delivery_instruction_prefix(
+                    &delivery,
+                    parsed.options.clone().into(),
+                    &parsed.compiler,
+                    parsed.clip,
+                    index,
+                )
+            }
+            .unwrap();
+            assert_eq!(same["frames"][index]["svg"], expected.svg.as_str());
+        }
         input["show_ddl"] = true.into();
         let composed: serde_json::Value =
             serde_json::from_slice(&line_animation(serde_json::to_vec(&input).unwrap())).unwrap();
         assert_eq!(composed["matches_saved_svg"], same["matches_saved_svg"]);
         for index in 0..3 {
-            assert_eq!(
-                composed["frames"][index]["art_svg"],
-                same["frames"][index]["art_svg"]
+            let art = same["frames"][index]["svg"].as_str().unwrap();
+            let body = &art[art.find('>').unwrap() + 1..art.rfind("</svg>").unwrap()];
+            assert!(
+                composed["frames"][index]["svg"]
+                    .as_str()
+                    .unwrap()
+                    .contains(body)
             );
             assert_eq!(
                 composed["frames"][index]["lines"],
@@ -355,8 +404,9 @@ mod line_animation_tests {
         let svg =
             "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"10\" height=\"20\"/></svg>";
         let ranges = vec![vec![(30, 30)]];
-        let first = composed_frame(&source, svg, "Font & Family", &ranges, 0, 10.0, 20.0).unwrap();
-        let middle = composed_frame(&source, svg, "Font & Family", &ranges, 1, 10.0, 20.0).unwrap();
+        let panel = DdlPanel::new(&source, 20.0);
+        let first = composed_frame(&panel, svg, "Font & Family", &ranges, 0, 10.0, 20.0).unwrap();
+        let middle = composed_frame(&panel, svg, "Font & Family", &ranges, 1, 10.0, 20.0).unwrap();
         assert!(first.contains("行01") && !first.contains("行45"));
         assert!(middle.contains("行30") && !middle.contains("行01"));
         assert_eq!(first.matches("font-size=").count(), 21);
@@ -365,7 +415,7 @@ mod line_animation_tests {
         assert!(middle.contains("width=\"28\" height=\"20\""));
         assert!(middle.contains("translate(18 0)"));
         let last = composed_frame(
-            &source,
+            &panel,
             svg,
             "Font & Family",
             &[vec![(45, 45)]],
@@ -380,7 +430,7 @@ mod line_animation_tests {
             .unwrap();
         assert!(last_line.contains("y=\"10\""), "{last_line}");
         let distant = composed_frame(
-            &source,
+            &panel,
             svg,
             "Font & Family",
             &[vec![(1, 1), (45, 45)]],

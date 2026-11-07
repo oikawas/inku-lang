@@ -926,6 +926,59 @@ fn render_delivery_impl(
     max_svg_bytes: Option<usize>,
     instruction_limit: Option<usize>,
 ) -> Result<RenderOutput, BoundaryError> {
+    let request = checked_delivery_request(delivery, options, compiler)?;
+    render_saved_score_impl(
+        request,
+        &compiler.hard_resource_policy,
+        compiler.operational_resource_budget,
+        clip,
+        max_svg_bytes,
+        instruction_limit,
+    )
+}
+
+/// A delivery checked once against its compiler and render options, then drawn
+/// as many times as a caller needs: the line animation draws every prefix of
+/// one delivery (I-732, 2026-11-07). Each drawing is the one
+/// [`render_delivery`] or [`render_delivery_instruction_prefix`] makes.
+pub struct CheckedDeliveryRender<'a> {
+    request: RenderRequest,
+    compiler: &'a CompilerOptions,
+    clip: ClipPolicy,
+}
+
+impl<'a> CheckedDeliveryRender<'a> {
+    pub fn new(
+        delivery: &CompiledDelivery,
+        options: RenderOptions,
+        compiler: &'a CompilerOptions,
+        clip: ClipPolicy,
+    ) -> Result<Self, BoundaryError> {
+        Ok(Self {
+            request: checked_delivery_request(delivery, options, compiler)?,
+            compiler,
+            clip,
+        })
+    }
+
+    /// The first `limit` instructions, or the whole Score for `None`.
+    pub fn render(&self, limit: Option<usize>) -> Result<RenderOutput, BoundaryError> {
+        render_saved_score_impl(
+            self.request.clone(),
+            &self.compiler.hard_resource_policy,
+            self.compiler.operational_resource_budget,
+            self.clip,
+            None,
+            limit,
+        )
+    }
+}
+
+fn checked_delivery_request(
+    delivery: &CompiledDelivery,
+    options: RenderOptions,
+    compiler: &CompilerOptions,
+) -> Result<RenderRequest, BoundaryError> {
     compiler.validate()?;
     delivery.validate()?;
     if &delivery.compiler_options != compiler {
@@ -978,15 +1031,7 @@ fn render_delivery_impl(
     if delivery.score_digest.as_deref() != Some(actual_score_digest.as_str()) {
         return Err(BoundaryError::ScoreIdentityMismatch);
     }
-
-    render_saved_score_impl(
-        RenderRequest { score, options },
-        &compiler.hard_resource_policy,
-        compiler.operational_resource_budget,
-        clip,
-        max_svg_bytes,
-        instruction_limit,
-    )
+    Ok(RenderRequest { score, options })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

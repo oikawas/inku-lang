@@ -3,6 +3,12 @@ package app.inku.mobile.llm
 import android.util.Log
 import java.io.InputStream
 import java.net.HttpURLConnection
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONObject
 
 interface ModelProvider {
@@ -117,6 +123,29 @@ internal data class ProviderHttpBody(
     val body: String,
     val retryAfter: String?,
 )
+
+/**
+ * Runs a blocking exchange on [connection] so that cancelling the caller (a
+ * stopped drawing, or the per-call `withTimeout`) disconnects the socket and
+ * ends the blocked read, as `ChatGptHttp` does. Before, a stop waited for the
+ * provider's answer or the read timeout. The read under a disconnected socket
+ * throws an IOException; the caller's cancellation is reported instead.
+ */
+internal suspend fun <T> disconnectingOnCancel(connection: HttpURLConnection, block: () -> T): T = coroutineScope {
+    val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
+        suspendCancellableCoroutine<Unit> { continuation ->
+            continuation.invokeOnCancellation { connection.disconnect() }
+        }
+    }
+    try {
+        block()
+    } catch (error: Throwable) {
+        currentCoroutineContext().ensureActive()
+        throw error
+    } finally {
+        watcher.cancel()
+    }
+}
 
 /** HTTP framing and bounded I/O stay in the host; the core judges the response. */
 internal fun readProviderHttpBody(connection: HttpURLConnection, successLimit: Int = MAX_PROVIDER_RESPONSE_BYTES): ProviderHttpBody {

@@ -1046,8 +1046,7 @@ private struct LibraryPageNumberInput: View {
             .onChange(of: current) { _, page in if !focused { show(page) } }
             .onChange(of: focused) { _, now in
                 if now {
-                    // Web `begin`: by a click as by Tab.
-                    selection = TextSelection(range: text.startIndex..<text.endIndex)
+                    selectAll()
                 } else if editing {
                     // Web `onblur={commit}`: leaving the field goes to the typed page.
                     let typed = text
@@ -1070,6 +1069,20 @@ private struct LibraryPageNumberInput: View {
     private func show(_ page: Int) {
         shown = String(page)
         text = shown
+    }
+
+    /// Web `begin`, by a click as by Tab. The click that focused the field places the caret after the focus arrives
+    /// (Build 81: typing 0.5 s after the click added to the number), so the number is selected again once the click
+    /// has ended, as the AppKit field did on the next turn of the run loop. Nothing is selected over typed text.
+    private func selectAll() {
+        let select = { if focused && !editing { selection = TextSelection(range: text.startIndex..<text.endIndex) } }
+        select()
+        Task { @MainActor in
+            await Task.yield()
+            select()
+            try? await Task.sleep(for: .milliseconds(200))
+            select()
+        }
     }
 
     /// Web `restore` (c69ede09f): write the page shown back, whatever was typed, and leave the field.

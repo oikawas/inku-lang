@@ -5,6 +5,51 @@ import InkuPersistence
 @testable import InkuHost
 
 final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
+    // Failure: reading step payloads changes the exact progress/attempt messages.
+    func testI732StepReportsMatchBaselineBytes() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-i732-progress-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let transport = ImmediateProvider()
+        let host = PipelineHost(database: db, transport: transport, credentials: EmptyCredentials())
+        let capture = I732ReportCapture()
+        let view = try await host.generate(fixture(.description("a red circle", autoCatalog: false))) { capture.receive($0) }
+        XCTAssertEqual(view.phase, "completed")
+        let calls = await transport.calls
+        XCTAssertEqual(calls, 1)
+        let reports = capture.reports
+        XCTAssertFalse(reports.isEmpty)
+        XCTAssertEqual(reports.filter { $0["provider_attempt"] != .null }.count, 1)
+        XCTAssertEqual(reports.last?["run_progress"]["current"], .null)
+        try i732CompareBaseline("q1-reports.json", bytes: ExactJSON.array(reports).data)
+        print("I732 Q1 reports=\(reports.count) bytes=\(ExactJSON.array(reports).data.count)")
+    }
+
+    // Failure: joining compile/render changes a retained child's saved SVG, Score or metadata.
+    func testI732RetainedOutputMatchesBaselineBytes() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-i732-retained-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let host = PipelineHost(database: db, transport: ImmediateProvider(), credentials: EmptyCredentials())
+        let parent = try await host.generate(fixture(.directDDL("place one red circle at center.")))
+        let parentID = try XCTUnwrap(parent.savedWorkID)
+        let context = try await host.savedAuthoringContext(workID: parentID)
+        var request = try fixture(.directDDL("place one red circle at center."))
+        request.parentWorkID = parentID; request.derivationKind = "catalog_change"
+        request.retainedDocument = context.document; request.retainedAuthority = context.authorityJSON
+        let child = try await host.generate(request)
+        XCTAssertEqual(child.phase, "completed")
+        let work = try await host.restoreSavedWork(workID: XCTUnwrap(child.savedWorkID))
+        let rendered = try ExactJSON(data: XCTUnwrap(child.renderedJSON))
+        let svg = Data(work.svg.utf8), score = Data(try XCTUnwrap(work.score).utf8)
+        let metadata = rendered["metadata"].data
+        XCTAssertFalse(svg.isEmpty); XCTAssertFalse(score.isEmpty); XCTAssertNotEqual(rendered["metadata"], .null)
+        try i732CompareBaseline("q3-svg.txt", bytes: svg)
+        try i732CompareBaseline("q3-score.json", bytes: score)
+        try i732CompareBaseline("q3-metadata.json", bytes: metadata)
+        print("I732 Q3 svg=\(svg.count) score=\(score.count) metadata=\(metadata.count)")
+    }
+
     func testExactJSONStringAndNumberRoundTripTable() throws {
         let samples = ["plain / ASCII", "quote \" slash \\", "絵と😀", "\u{0000}\n\t", "\u{2028}"]
         let encoder = JSONEncoder(); encoder.outputFormatting = [.withoutEscapingSlashes]
@@ -442,6 +487,34 @@ private actor CancelledObservationProvider: ObservedProviderTransport {
 
 private struct EmptyCredentials: CredentialStore {
     func key(for credentialID: String) async throws -> String? { nil }
+}
+
+private final class I732ReportCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [ExactJSON] = []
+    var reports: [ExactJSON] { lock.withLock { values } }
+    func receive(_ progress: PipelineProgress) {
+        let bytes: Data
+        switch progress {
+        case .runProgress(_, let report), .providerAttempt(_, let report, _, _): bytes = report
+        default: return
+        }
+        // Keep each message's original bytes, including member order, for the baseline comparison.
+        if let value = try? ExactJSON(data: bytes) {
+            lock.withLock { values.append(.object(["bytes": .string(bytes.base64EncodedString()),
+                "run_progress": value["run_progress"], "provider_attempt": value["provider_attempt"]])) }
+        }
+    }
+}
+
+private func i732CompareBaseline(_ name: String, bytes: Data) throws {
+    let environment = ProcessInfo.processInfo.environment
+    if let directory = environment["INKU_I732_WRITE_BASELINE"] {
+        try bytes.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name))
+    }
+    if let directory = environment["INKU_I732_BASELINE"] {
+        XCTAssertEqual(bytes, try Data(contentsOf: URL(fileURLWithPath: directory).appendingPathComponent(name)), name)
+    }
 }
 private actor ImmediateProvider: ProviderTransport {
     var calls = 0

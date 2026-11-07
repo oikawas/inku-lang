@@ -1,12 +1,14 @@
 //! Deterministic contact geometry between a tool outline and the support.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::value_noise_1d;
 use crate::types::{Point, Seed};
 
 pub const CONTACT_LENGTH_QUANTUM: u32 = 6;
 
 fn distance(a: Point, b: Point) -> f64 {
-    (b.x - a.x).hypot(b.y - a.y)
+    (b.x - a.x).dhypot(b.y - a.y)
 }
 
 fn contact_field(t: f64, seed: Seed) -> f64 {

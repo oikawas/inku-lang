@@ -6,6 +6,8 @@
 //! member-to-member hand. Every choice is bound to the placement seed and reads
 //! only Score fields; nothing depends on source words or subjects.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::hash01;
 use crate::effects::{FadeEffect, FadeKind};
 use crate::placement::rhythm_parameter;
@@ -51,8 +53,8 @@ pub(crate) fn shape_centers(
         for (index, center) in centers.iter_mut().enumerate() {
             let angle = hash01(index as i64, seed, "place-bundle-angle") * std::f64::consts::TAU;
             let distance = radius * hash01(index as i64, seed, "place-bundle-distance").sqrt();
-            center.x += distance * angle.cos();
-            center.y += distance * angle.sin();
+            center.x += distance * angle.dcos();
+            center.y += distance * angle.dsin();
         }
     }
     if is_line_recipe(recipe) && arrangement.rhythm_spacing != RhythmSpacing::None {
@@ -196,10 +198,10 @@ mod tests {
         );
         assert_eq!(first, again);
         for (index, a) in first.iter().enumerate() {
-            assert!(a.x.hypot(a.y) > 0.0);
-            assert!((a.x - 0.5).hypot(a.y - 0.5) <= 0.18 + 1.0e-12);
+            assert!(a.x.dhypot(a.y) > 0.0);
+            assert!((a.x - 0.5).dhypot(a.y - 0.5) <= 0.18 + 1.0e-12);
             for b in &first[index + 1..] {
-                assert!((a.x - b.x).hypot(a.y - b.y) > 1.0e-9);
+                assert!((a.x - b.x).dhypot(a.y - b.y) > 1.0e-9);
             }
         }
     }
@@ -222,7 +224,7 @@ mod tests {
                 .skip(clusters)
                 .map(|(index, point)| {
                     let seed = centers[index % clusters];
-                    (point.x - seed.x).hypot(point.y - seed.y)
+                    (point.x - seed.x).dhypot(point.y - seed.y)
                 })
                 .sum::<f64>()
         };

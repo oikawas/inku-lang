@@ -39,6 +39,7 @@ use inku_ddl::work_plan::{
     ComposedRange, NumericPlace, NumericSize, NumericWriting, WorkPlan, WorkPlanPlugin,
     WorkPlanSlot, print_work_plan_with_numbers,
 };
+use inku_score::math::DetFloat;
 use inku_score::{
     Amplitude, Color, Frequency, Instruction, Primitive, ResolvedPlacementAnchor,
     ResolvedPlacementRecipe, RhythmSpacing, Score, ScoreSourceOwner, lookup_canvas_format,
@@ -1072,10 +1073,10 @@ fn spiral_points(count: usize, radius: f64, units: Units) -> Vec<[f64; 2]> {
             #[allow(clippy::cast_precision_loss)]
             let m = m as f64;
             let angle = (200.0 + 90.0 * m).to_radians();
-            let r = radius / PHI.powf(m / 1.5);
+            let r = radius / PHI.dpowf(m / 1.5);
             [
-                clamp_between(0.5 + r * angle.cos() / units.x, 0.06, 0.94),
-                clamp_between(0.5 + r * angle.sin() / units.y, 0.06, 0.94),
+                clamp_between(0.5 + r * angle.dcos() / units.x, 0.06, 0.94),
+                clamp_between(0.5 + r * angle.dsin() / units.y, 0.06, 0.94),
             ]
         })
         .collect()
@@ -1490,7 +1491,7 @@ pub(crate) fn lch_of([r, g, b]: [u8; 3]) -> (f64, f64, f64) {
         if c <= 0.04045 {
             c / 12.92
         } else {
-            ((c + 0.055) / 1.055).powf(2.4)
+            ((c + 0.055) / 1.055).dpowf(2.4)
         }
     };
     let lin = [linear(r), linear(g), linear(b)];
@@ -1499,7 +1500,7 @@ pub(crate) fn lch_of([r, g, b]: [u8; 3]) -> (f64, f64, f64) {
     let z = (0.0193 * lin[0] + 0.1192 * lin[1] + 0.9505 * lin[2]) / 1.08883;
     let f = |t: f64| {
         if t > 0.008856 {
-            t.powf(1.0 / 3.0)
+            t.dpowf(1.0 / 3.0)
         } else {
             7.787 * t + 16.0 / 116.0
         }
@@ -1508,7 +1509,7 @@ pub(crate) fn lch_of([r, g, b]: [u8; 3]) -> (f64, f64, f64) {
     (
         (116.0 * f(y) - 16.0) / 100.0,
         hypot(a, b),
-        b.atan2(a).to_degrees().rem_euclid(360.0),
+        b.datan2(a).to_degrees().rem_euclid(360.0),
     )
 }
 
@@ -4145,7 +4146,7 @@ impl Compiler<'_> {
                 let ts: Vec<f64> = (0..count)
                     .map(|k| f64::from(k) / f64::from(count - 1))
                     .collect();
-                let scales = ts.iter().map(|t| ratio.powf(*t)).collect();
+                let scales = ts.iter().map(|t| ratio.dpowf(*t)).collect();
                 (ts, scales)
             } else {
                 if count < 3 {
@@ -4157,11 +4158,11 @@ impl Compiler<'_> {
                         ),
                     ));
                 }
-                let q = ratio.powf(1.0 / f64::from(count - 2));
+                let q = ratio.dpowf(1.0 / f64::from(count - 2));
                 let mut ts = vec![0.0];
                 for k in 0..count - 1 {
                     let last = ts[ts.len() - 1];
-                    ts.push(last + q.powf(f64::from(k)));
+                    ts.push(last + q.dpowf(f64::from(k)));
                 }
                 let end = ts[ts.len() - 1];
                 (
@@ -5548,7 +5549,7 @@ pub(crate) fn line_ends(instruction: &Instruction, units: Units) -> Option<Numer
     let (mx, my) = ((from.x + to.x) / 2.0, (from.y + to.y) / 2.0);
     let [cx, cy] = center_of(instruction);
     let turn = instruction.rotation.unwrap_or(0.0).to_radians();
-    let (c, s) = (turn.cos(), turn.sin());
+    let (c, s) = (turn.dcos(), turn.dsin());
     // The prototype's order of operations: `cx + dx * c - dy * s`.
     let end = |x: f64, y: f64| {
         let (dx, dy) = ((x - mx) * units.x, (y - my) * units.y);
@@ -5650,8 +5651,8 @@ pub(crate) fn numeric_size(instruction: &Instruction, units: Units) -> Option<Nu
             let radius = instruction.radius?;
             let half = ((instruction.angle_start? - instruction.angle_end?) / 2.0).to_radians();
             NumericSize::ChordSagitta {
-                chord: 2.0 * radius * half.sin(),
-                sagitta: radius * (1.0 - half.cos()),
+                chord: 2.0 * radius * half.dsin(),
+                sagitta: radius * (1.0 - half.dcos()),
             }
         }
         Primitive::Line | Primitive::FreeLine => {

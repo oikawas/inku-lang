@@ -8,6 +8,7 @@
 //! the support under it, and its ink and opacity follow from that support's lightness, so a
 //! texture stays visible on a dark background.
 
+use inku_score::math::DetFloat;
 use inku_score::{shown_support, srgb_channels};
 
 use crate::determinism::SaltedStream;
@@ -103,13 +104,13 @@ impl Rgb {
             if channel <= 0.04045 {
                 channel / 12.92
             } else {
-                ((channel + 0.055) / 1.055).powf(2.4)
+                ((channel + 0.055) / 1.055).dpowf(2.4)
             }
         });
         let y = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
         let edge = 6.0_f64 / 29.0;
         let f = if y > edge.powi(3) {
-            y.cbrt()
+            y.dcbrt()
         } else {
             y / (3.0 * edge * edge) + 4.0 / 29.0
         };
@@ -586,8 +587,8 @@ fn paper(
                 2,
                 random.uniform(0.0, side),
                 random.uniform(0.0, side),
-                angle.cos() * length,
-                angle.sin() * length,
+                angle.dcos() * length,
+                angle.dsin() * length,
             );
         }
         layers.extend(tile.finish(shade));
@@ -647,12 +648,12 @@ fn washi(seed: Seed, shade: Shade, broad: &mut Broad, canvas: CanvasSize) -> Vec
             let length = mm(random.uniform(5.0, 16.0));
             let angle = random.uniform(0.0, std::f64::consts::PI);
             let bow = random.uniform(-0.16, 0.16) * length;
-            let (dx, dy) = (angle.cos() * length, angle.sin() * length);
+            let (dx, dy) = (angle.dcos() * length, angle.dsin() * length);
             tile.curve(
                 kind,
                 random.uniform(0.0, side),
                 random.uniform(0.0, side),
-                (dx / 2.0 - angle.sin() * bow, dy / 2.0 + angle.cos() * bow),
+                (dx / 2.0 - angle.dsin() * bow, dy / 2.0 + angle.dcos() * bow),
                 (dx, dy),
             );
         }
@@ -705,13 +706,13 @@ fn ink_wash(seed: Seed, shade: Shade, broad: &mut Broad, canvas: CanvasSize) -> 
                 let angle = std::f64::consts::TAU * corner as f64 / 14.0;
                 let swell: f64 = waves
                     .iter()
-                    .map(|(count, depth, phase)| depth * (count * angle + phase).sin())
+                    .map(|(count, depth, phase)| depth * (count * angle + phase).dsin())
                     .sum();
                 let reach = radius * (1.0 + swell);
-                let (x, y) = (angle.cos() * reach, angle.sin() * reach * squash);
+                let (x, y) = (angle.dcos() * reach, angle.dsin() * reach * squash);
                 (
-                    cx + x * turn.cos() - y * turn.sin(),
-                    cy + x * turn.sin() + y * turn.cos(),
+                    cx + x * turn.dcos() - y * turn.dsin(),
+                    cy + x * turn.dsin() + y * turn.dcos(),
                 )
             })
             .collect::<Vec<_>>();

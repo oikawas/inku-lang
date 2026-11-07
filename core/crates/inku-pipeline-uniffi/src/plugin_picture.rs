@@ -1,5 +1,6 @@
 //! Saijiki picture decoding, cropping and fitting.
 use base64::{Engine, engine::general_purpose::STANDARD};
+use inku_score::math::DetFloat;
 use serde_json::{Value, json};
 use std::io::Cursor;
 
@@ -74,7 +75,7 @@ fn kernel(x: f64) -> f64 {
         0.0
     } else {
         let p = std::f64::consts::PI * x;
-        (p.sin() / p) * ((p / 3.0).sin() / (p / 3.0))
+        (p.dsin() / p) * ((p / 3.0).dsin() / (p / 3.0))
     }
 }
 

@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::{hash_to_unit, periodic_value_noise_1d, value_noise_1d, wave_phase};
 use crate::types::{
     CRESCENT_REFERENCE_CUBICS, CanvasSize, Dimension, Frequency, Point, Quality, Seed, Variation,
@@ -28,7 +30,7 @@ pub(crate) fn frequency_cycles(frequency: Frequency) -> f64 {
 }
 
 fn distance(a: Point, b: Point) -> f64 {
-    (b.x - a.x).hypot(b.y - a.y)
+    (b.x - a.x).dhypot(b.y - a.y)
 }
 
 /// Ramanujan's second approximation of an ellipse perimeter.
@@ -77,7 +79,7 @@ pub fn sample_offset(
     let frequency = frequency_cycles(variation.frequency);
     match variation.quality {
         Quality::Wave => {
-            (t * std::f64::consts::TAU * frequency + wave_phase(seed)).sin() * amplitude
+            (t * std::f64::consts::TAU * frequency + wave_phase(seed)).dsin() * amplitude
         }
         Quality::Perlin => value_noise_1d(t * frequency, seed) * amplitude,
         Quality::Pink => {
@@ -103,7 +105,7 @@ fn settle(t: f64, span: f64) -> f64 {
     if edge >= span {
         1.0
     } else {
-        0.5 * (1.0 - (std::f64::consts::PI * edge / span).cos())
+        0.5 * (1.0 - (std::f64::consts::PI * edge / span).dcos())
     }
 }
 
@@ -180,7 +182,7 @@ pub fn open_path_with_variation(
                 points[index + 1].x - points[index - 1].x,
                 points[index + 1].y - points[index - 1].y,
             );
-            let length = tangent.x.hypot(tangent.y);
+            let length = tangent.x.dhypot(tangent.y);
             if length < 1.0e-12 {
                 point
             } else {
@@ -206,7 +208,7 @@ fn varied_line(
 ) -> Vec<Point> {
     let dx = end.x - start.x;
     let dy = end.y - start.y;
-    let length = dx.hypot(dy);
+    let length = dx.dhypot(dy);
     if length < 1.0e-6 {
         return vec![start, end];
     }
@@ -248,7 +250,7 @@ pub fn sample_offset_periodic(
     let frequency = frequency_cycles(variation.frequency);
     match variation.quality {
         Quality::Wave => {
-            (t * std::f64::consts::TAU * frequency + wave_phase(seed)).sin() * amplitude
+            (t * std::f64::consts::TAU * frequency + wave_phase(seed)).dsin() * amplitude
         }
         Quality::Perlin => {
             let period = frequency.round_ties_even().max(1.0) as i64;
@@ -275,7 +277,7 @@ pub fn offset_contour_point(
     }
     let dx = point.x - center.x;
     let dy = point.y - center.y;
-    let norm = dx.hypot(dy);
+    let norm = dx.dhypot(dy);
     if norm <= 1.0e-6 {
         return point;
     }
@@ -404,7 +406,7 @@ pub fn circle_points(center: Point, rx: f64, ry: f64, count: usize) -> Vec<Point
     (0..count)
         .map(|index| {
             let angle = index as f64 * std::f64::consts::TAU / count as f64;
-            Point::new(center.x + angle.cos() * rx, center.y + angle.sin() * ry)
+            Point::new(center.x + angle.dcos() * rx, center.y + angle.dsin() * ry)
         })
         .collect()
 }
@@ -452,8 +454,8 @@ pub fn arc_points(
         .map(|index| {
             let angle = start + (end - start) * index as f64 / (count - 1) as f64;
             Point::new(
-                center.x + angle.cos() * radius,
-                center.y - angle.sin() * radius,
+                center.x + angle.dcos() * radius,
+                center.y - angle.dsin() * radius,
             )
         })
         .collect()
@@ -472,8 +474,8 @@ pub fn polygon_points(
         .map(|index| {
             let angle = start + std::f64::consts::TAU * index as f64 / sides as f64;
             Point::new(
-                center.x + angle.cos() * radius,
-                center.y + angle.sin() * radius,
+                center.x + angle.dcos() * radius,
+                center.y + angle.dsin() * radius,
             )
         })
         .collect()
@@ -499,7 +501,7 @@ pub fn centerline_normals(points: &[Point], closed: bool) -> Vec<Point> {
             };
             let dx = after.x - before.x;
             let dy = after.y - before.y;
-            let length = dx.hypot(dy).max(1.0e-6);
+            let length = dx.dhypot(dy).max(1.0e-6);
             Point::new(-dy / length, dx / length)
         })
         .collect()

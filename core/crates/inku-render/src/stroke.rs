@@ -2,6 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::{SaltedStream, seed_salt_index_digest};
 use crate::geometry::{IRREGULARITY_REFERENCE_SAMPLES, centerline_normals};
 use crate::support::{Support, support_response};
@@ -391,9 +393,9 @@ fn edge_window(t: f64) -> f64 {
     if t <= 0.0 || t >= 1.0 {
         0.0
     } else if t < EDGE {
-        0.5 * (1.0 - (std::f64::consts::PI * t / EDGE).cos())
+        0.5 * (1.0 - (std::f64::consts::PI * t / EDGE).dcos())
     } else if t > 1.0 - EDGE {
-        0.5 * (1.0 - (std::f64::consts::PI * (1.0 - t) / EDGE).cos())
+        0.5 * (1.0 - (std::f64::consts::PI * (1.0 - t) / EDGE).dcos())
     } else {
         1.0
     }
@@ -413,15 +415,16 @@ pub fn grid_point(value: f64, step: f64) -> f64 {
 }
 
 fn machine_energy(t: f64) -> f64 {
-    0.72 * (t * std::f64::consts::TAU * 5.0).sin() + 0.28 * (t * std::f64::consts::TAU * 10.0).sin()
+    0.72 * (t * std::f64::consts::TAU * 5.0).dsin()
+        + 0.28 * (t * std::f64::consts::TAU * 10.0).dsin()
 }
 
 fn machine_swell(t: f64) -> f64 {
-    0.45 + 0.55 * (std::f64::consts::PI * t).sin()
+    0.45 + 0.55 * (std::f64::consts::PI * t).dsin()
 }
 
 fn machine_gesture(t: f64) -> f64 {
-    (t * std::f64::consts::TAU * 2.0).sin()
+    (t * std::f64::consts::TAU * 2.0).dsin()
 }
 
 fn loaded_profile(t: f64) -> f64 {
@@ -429,7 +432,7 @@ fn loaded_profile(t: f64) -> f64 {
     const SETTLE: f64 = 0.10;
     const LIFT_AT: f64 = 0.94;
     const LIFT_TO: f64 = 0.55;
-    let landing = 1.0 + LANDING * (-t / SETTLE).exp();
+    let landing = 1.0 + LANDING * (-t / SETTLE).dexp();
     if t < LIFT_AT {
         landing
     } else {
@@ -491,13 +494,13 @@ fn arc_length_parameters(points: &[Point], closed: bool) -> Vec<f64> {
     running.push(0.0);
     let mut total = 0.0;
     for pair in points.windows(2) {
-        total += (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
+        total += (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y);
         running.push(total);
     }
     if closed && points.len() > 1 {
         let first = points[0];
         let last = points[points.len() - 1];
-        total += (first.x - last.x).hypot(first.y - last.y);
+        total += (first.x - last.x).dhypot(first.y - last.y);
     }
     if total <= 1.0e-9 {
         vec![0.0; points.len()]
@@ -593,7 +596,7 @@ pub fn synthesize_stroke_by(request: StrokeRequest, hand: BandHand) -> StrokeRes
     assert!(sample_count >= 2, "a stroke requires at least two samples");
     let grammar = grammar(weight);
     let delta = Point::new(end.x - start.x, end.y - start.y);
-    let length = delta.x.hypot(delta.y).max(1.0e-6);
+    let length = delta.x.dhypot(delta.y).max(1.0e-6);
     let direction = Point::new(delta.x / length, delta.y / length);
     let normal = Point::new(-direction.y, direction.x);
     let events = event_map(seed, grammar.event_rate, sample_count);
@@ -677,7 +680,7 @@ pub fn synthesize_stroke_by(request: StrokeRequest, hand: BandHand) -> StrokeRes
         let mut residual = 0.0;
         if grid_step > 0.0 {
             let quantized = Point::new(quantize(point.x, grid_step), quantize(point.y, grid_step));
-            residual = (point.x - quantized.x).hypot(point.y - quantized.y);
+            residual = (point.x - quantized.x).dhypot(point.y - quantized.y);
             point = quantized;
         }
         if grammar.width_steps > 0 {
@@ -837,7 +840,7 @@ pub fn synthesize_contour_by(
     let noise_scale = if terminal == StrokeTerminal::Loaded && weight == Weight::OilPaint {
         let length = centerline
             .windows(2)
-            .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
+            .map(|pair| (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y))
             .sum::<f64>();
         (length / (OIL_FILL_NOISE_SPAN * base_width)).min(1.0)
     } else {
@@ -847,7 +850,7 @@ pub fn synthesize_contour_by(
     if wild && !grammar.periodic {
         let total_length = centerline
             .windows(2)
-            .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
+            .map(|pair| (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y))
             .sum::<f64>()
             .max(1.0e-6);
         let size = if closed {
@@ -952,7 +955,7 @@ pub fn synthesize_contour_by(
         let mut residual = 0.0;
         if grid_step > 0.0 {
             let quantized = Point::new(quantize(point.x, grid_step), quantize(point.y, grid_step));
-            residual = (point.x - quantized.x).hypot(point.y - quantized.y);
+            residual = (point.x - quantized.x).dhypot(point.y - quantized.y);
             point = quantized;
         }
         if grammar.width_steps > 0 {

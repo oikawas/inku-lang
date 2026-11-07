@@ -28,6 +28,7 @@ use inku_ddl::work_plan::{
     print_work_plan_with_numbers,
 };
 use inku_ddl::{FadeDirection, ResolvedInstructionLanguage};
+use inku_score::math::DetFloat;
 use inku_score::{Color, Fade, Instruction, Primitive, Score, SurfaceIntensity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -332,14 +333,14 @@ fn oklch(rgb: [u8; 3]) -> (f64, f64, f64) {
         if c <= 0.04045 {
             c / 12.92
         } else {
-            ((c + 0.055) / 1.055).powf(2.4)
+            ((c + 0.055) / 1.055).dpowf(2.4)
         }
     };
     let lin = rgb.map(linear);
     let l = 0.412_221_470_8 * lin[0] + 0.536_332_536_3 * lin[1] + 0.051_445_992_9 * lin[2];
     let m = 0.211_903_498_2 * lin[0] + 0.680_699_545_1 * lin[1] + 0.107_396_956_6 * lin[2];
     let s = 0.088_302_461_9 * lin[0] + 0.281_718_837_6 * lin[1] + 0.629_978_700_5 * lin[2];
-    let cube = |v: f64| v.abs().powf(1.0 / 3.0).copysign(v);
+    let cube = |v: f64| v.abs().dpowf(1.0 / 3.0).copysign(v);
     let (l, m, s) = (cube(l), cube(m), cube(s));
     let big_l = 0.210_454_255_3 * l + 0.793_617_785 * m - 0.004_072_046_8 * s;
     let a = 1.977_998_495_1 * l - 2.428_592_205 * m + 0.450_593_709_9 * s;
@@ -347,7 +348,7 @@ fn oklch(rgb: [u8; 3]) -> (f64, f64, f64) {
     (
         big_l,
         crate::composition::hypot(a, b),
-        b.atan2(a).to_degrees().rem_euclid(360.0),
+        b.datan2(a).to_degrees().rem_euclid(360.0),
     )
 }
 
@@ -715,7 +716,7 @@ fn lch([l, a, b]: [f64; 3]) -> (f64, f64, f64) {
     (
         l,
         crate::composition::hypot(a, b),
-        b.atan2(a).to_degrees().rem_euclid(360.0),
+        b.datan2(a).to_degrees().rem_euclid(360.0),
     )
 }
 
@@ -723,18 +724,18 @@ fn deltas(one: [f64; 3], two: [f64; 3]) -> (f64, f64, f64, f64, f64, f64, f64, f
     let (l1, c1, h1) = lch(one);
     let (l2, c2, h2) = lch(two);
     let dh = ((h2 - h1 + 180.0).rem_euclid(360.0) - 180.0).to_radians();
-    let big_dh = 2.0 * (c1 * c2).sqrt() * (dh / 2.0).sin();
+    let big_dh = 2.0 * (c1 * c2).sqrt() * (dh / 2.0).dsin();
     (l1, c1, h1, l2, c2, h2, big_dh, c1 - c2)
 }
 
 fn h_sy(big_l: f64, chroma: f64, hue: f64) -> f64 {
-    let e_c = 0.5 + 0.5 * (-2.0 + 0.5 * chroma).tanh();
+    let e_c = 0.5 + 0.5 * (-2.0 + 0.5 * chroma).dtanh();
     let h_s = -0.08
-        - 0.14 * (hue + 50.0).to_radians().sin()
-        - 0.07 * (2.0 * hue + 90.0).to_radians().sin();
+        - 0.14 * (hue + 50.0).to_radians().dsin()
+        - 0.07 * (2.0 * hue + 90.0).to_radians().dsin();
     let x = (90.0 - hue) / 10.0;
     let e_y = if x < 50.0 {
-        ((0.22 * big_l - 12.8) / 10.0) * (x - x.exp()).exp()
+        ((0.22 * big_l - 12.8) / 10.0) * (x - x.dexp()).dexp()
     } else {
         0.0
     };
@@ -745,16 +746,16 @@ fn h_sy(big_l: f64, chroma: f64, hue: f64) -> f64 {
 fn touching_harmony(one: [f64; 3], two: [f64; 3]) -> f64 {
     let (l1, c1, h1, l2, c2, h2, big_dh, dc) = deltas(one, two);
     let d = crate::composition::hypot(big_dh, dc / 1.46);
-    let h_c = 0.04 + 0.53 * (0.8 - 0.045 * d).tanh();
-    let h_lsum = 0.3 + 0.5 * (-4.0 + 0.029 * (l1 + l2)).tanh();
-    let h_dl = 0.14 + 0.15 * (-2.0 + 0.2 * (l1 - l2).abs()).tanh();
+    let h_c = 0.04 + 0.53 * (0.8 - 0.045 * d).dtanh();
+    let h_lsum = 0.3 + 0.5 * (-4.0 + 0.029 * (l1 + l2)).dtanh();
+    let h_dl = 0.14 + 0.15 * (-2.0 + 0.2 * (l1 - l2).abs()).dtanh();
     h_c + h_lsum + h_dl + h_sy(l1, c1, h1) + h_sy(l2, c2, h2)
 }
 
 /// The harmony of two colors apart.
 fn apart_harmony(one: [f64; 3], two: [f64; 3]) -> f64 {
     let (.., big_dh, dc) = deltas(one, two);
-    0.2 + 0.65 * (1.7 - 0.045 * crate::composition::hypot(big_dh, dc / 1.30)).tanh()
+    0.2 + 0.65 * (1.7 - 0.045 * crate::composition::hypot(big_dh, dc / 1.30)).dtanh()
 }
 
 /// A picture's harmony: the mean over the ground with each layer and over

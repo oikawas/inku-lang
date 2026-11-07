@@ -16,6 +16,7 @@ use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
 use inku_render::planning::{instruction_anchor, resolve_at_region};
 use inku_render::types::CanvasSize;
+use inku_score::math::DetFloat;
 
 #[test]
 fn unsupported_layout_direction_is_locally_omitted_from_place() {
@@ -231,7 +232,7 @@ fn width_extent_measures_each_primitive_reference_contour() {
                         .map(|i| {
                             (-std::f64::consts::FRAC_PI_2
                                 + std::f64::consts::TAU * f64::from(i) / f64::from(sides))
-                            .cos()
+                            .dcos()
                         })
                         .collect::<Vec<_>>();
                     (xs.iter().copied().fold(f64::NEG_INFINITY, f64::max)
@@ -243,7 +244,7 @@ fn width_extent_measures_each_primitive_reference_contour() {
                         * ((instruction.angle_start.unwrap() - instruction.angle_end.unwrap())
                             / 2.0)
                             .to_radians()
-                            .sin()
+                            .dsin()
                 }
                 _ => instruction.size.unwrap().x,
             };

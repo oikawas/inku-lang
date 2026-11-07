@@ -1,5 +1,7 @@
 //! Support properties and deterministic interaction between tools and paper.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::SaltedStream;
 use crate::geometry::IRREGULARITY_REFERENCE_SAMPLES;
 use crate::stroke::{stream_unit, unit};
@@ -138,7 +140,7 @@ fn support_envelope(
             let index = centre as isize + offset;
             if (0..count as isize).contains(&index) {
                 let window =
-                    0.5 * (1.0 + (std::f64::consts::PI * offset as f64 / span as f64).cos());
+                    0.5 * (1.0 + (std::f64::consts::PI * offset as f64 / span as f64).dcos());
                 envelope[index as usize] = envelope[index as usize].max(size * window);
             }
         }

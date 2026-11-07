@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- Core（描画エンジン 101）：超越関数（sin・cos・tan・asin・atan2・hypot・powf・cbrt・exp・ln・tanh）を、host の C ライブラリでなく純 Rust の libm（`inku_score::math`）で計算する。Compat の切り抜きが使う kurbo と svgtypes も vendor にして同じにした。macOS と 5173 の Linux で答えの末尾のビットが違い、関係で置いた作品の Compat の SVG が host ごとに少し違っていた（I-733）。画は座標の末尾の数字が変わる程度に動く。
+
 - Core：言い直し・穴の補完・地の色の再送信と色カタログを選ぶ送信で、送信文の欄を最初の送信と同じ順に送る（記述が先頭のまま、足した欄は後ろ）。これまでは JSON の値を通して名前の順に並び替わり、記述が後ろに回っていた（I-733）。
 
 - Core：host が届けた model の答えは、host の測った時間が試行の `timeout_ms` を少し超えていても、実行の総予算の中なら読む。これまでは締切の直前に届いた正しい答えを捨てて送り直していた（I-733）。

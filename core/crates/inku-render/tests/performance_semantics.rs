@@ -6,6 +6,7 @@ use inku_render::types::Point;
 use inku_render::types::{
     CanvasSize, Score, ScoreErrorPolicy, ScoreExecutionDisposition, ScoreExecutionReason,
 };
+use inku_score::math::DetFloat;
 
 fn score(json: &str) -> Score {
     serde_json::from_str(json).unwrap()
@@ -126,7 +127,7 @@ fn affine_groups_connect_whole_geometry_and_keep_fixed_omission_indices() {
     let follow_start = endpoint_geometry(&result.score.instructions[3], None)
         .unwrap()
         .0;
-    assert!((follow_start.x - point.x).hypot(follow_start.y - point.y) < 1e-9);
+    assert!((follow_start.x - point.x).dhypot(follow_start.y - point.y) < 1e-9);
     assert_eq!(result.instruction_transforms().len(), 4);
     let mut legacy = input.clone();
     let relation = legacy.instructions[3].relation.as_mut().unwrap();
@@ -260,9 +261,9 @@ fn typed_along_derives_only_an_omitted_line_direction_and_preserves_fixed_positi
             < 1.0e-9
     );
     assert!(
-        ((along.1.x - along.0.x).hypot(along.1.y - along.0.y)
+        ((along.1.x - along.0.x).dhypot(along.1.y - along.0.y)
             - (original_along.1.x - original_along.0.x)
-                .hypot(original_along.1.y - original_along.0.y))
+                .dhypot(original_along.1.y - original_along.0.y))
         .abs()
             < 1.0e-9
     );
@@ -347,8 +348,9 @@ fn typed_along_derives_only_an_omitted_line_direction_and_preserves_fixed_positi
     .expect("named Along keeps its line length at the edge");
     let edge_line = endpoint_geometry(&edge.score.instructions[1], None).unwrap();
     assert!(
-        ((edge_line.1.x - edge_line.0.x).hypot(edge_line.1.y - edge_line.0.y)
-            - (edge_original.1.x - edge_original.0.x).hypot(edge_original.1.y - edge_original.0.y))
+        ((edge_line.1.x - edge_line.0.x).dhypot(edge_line.1.y - edge_line.0.y)
+            - (edge_original.1.x - edge_original.0.x)
+                .dhypot(edge_original.1.y - edge_original.0.y))
         .abs()
             < 1.0e-9
     );
@@ -464,7 +466,7 @@ fn typed_cutting_keeps_line_length_while_legacy_cutting_keeps_its_raw_recipe() {
         ]}"#,
     );
     let original = endpoint_geometry(&input.instructions[1], None).unwrap();
-    let original_length = (original.1.x - original.0.x).hypot(original.1.y - original.0.y);
+    let original_length = (original.1.x - original.0.x).dhypot(original.1.y - original.0.y);
     let result = resolve_checked_performance(
         PerformanceRequest {
             score: &input,
@@ -476,7 +478,7 @@ fn typed_cutting_keeps_line_length_while_legacy_cutting_keeps_its_raw_recipe() {
     )
     .expect("typed Cutting performs");
     let cut = endpoint_geometry(&result.score.instructions[1], None).unwrap();
-    let cut_length = (cut.1.x - cut.0.x).hypot(cut.1.y - cut.0.y);
+    let cut_length = (cut.1.x - cut.0.x).dhypot(cut.1.y - cut.0.y);
     assert!((cut_length - original_length).abs() < 1.0e-9);
     assert!(
         (cut.0.y - 0.5) * (cut.1.y - 0.5) <= 1.0e-9,
@@ -581,7 +583,7 @@ fn composite_square_members_keep_their_physical_offset_on_a_wide_canvas() {
         let circle_center = circle.center.unwrap();
         let offset_x = circle_center.x * canvas.width - square_center_x;
         let offset_y = circle_center.y * canvas.height - square_center_y;
-        let physical_offset = offset_x.hypot(offset_y);
+        let physical_offset = offset_x.dhypot(offset_y);
         assert!(
             (physical_offset - 50.0).abs() < 1.0e-5,
             "physical offset was {physical_offset}"
@@ -710,7 +712,7 @@ fn connected_chain_uses_one_endpoint_consumer_for_all_five_required_pairs() {
         .iter()
         .map(|instruction| {
             endpoint_geometry(instruction, Some(canvas))
-                .map(|(start, end, _, _)| (end.x - start.x).hypot(end.y - start.y))
+                .map(|(start, end, _, _)| (end.x - start.x).dhypot(end.y - start.y))
         })
         .collect::<Vec<_>>();
 
@@ -740,7 +742,7 @@ fn connected_chain_uses_one_endpoint_consumer_for_all_five_required_pairs() {
             input.instructions[index].rotation
         );
         if let Some(original_length) = original_lengths[index] {
-            let current_length = (current.1.x - current.0.x).hypot(current.1.y - current.0.y);
+            let current_length = (current.1.x - current.0.x).dhypot(current.1.y - current.0.y);
             assert!(
                 (original_length - current_length).abs() < 1.0e-9,
                 "pair {index} length"
@@ -924,8 +926,8 @@ fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloud
     for (index, angle) in [(4, 90.0_f64), (5, 121.0), (6, 121.0)] {
         assert_eq!(result.score.instructions[index].rotation, None);
         let transform = result.instruction_transforms()[index];
-        assert!((transform.a - angle.to_radians().cos()).abs() < 1e-9);
-        assert!((transform.b - angle.to_radians().sin()).abs() < 1e-9);
+        assert!((transform.a - angle.to_radians().dcos()).abs() < 1e-9);
+        assert!((transform.b - angle.to_radians().dsin()).abs() < 1e-9);
     }
     assert_eq!(result.instruction_indices()[6], 6);
     assert_eq!(
@@ -1052,7 +1054,7 @@ fn external_connected_moves_its_whole_group_and_fixed_member_conflicts_preserve_
         moved.instruction_transforms()[1].apply(member.0),
         moved.instruction_transforms()[1].apply(member.1),
     );
-    assert!((prior.1.x - member.0.x).hypot(prior.1.y - member.0.y) < 1.0e-9);
+    assert!((prior.1.x - member.0.x).dhypot(prior.1.y - member.0.y) < 1.0e-9);
     let center =
         moved.instruction_transforms()[2].apply(moved.score.instructions[2].center.unwrap());
     assert!((center.x - 0.20).abs() < 1.0e-9);

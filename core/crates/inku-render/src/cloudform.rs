@@ -1,5 +1,6 @@
 //! Deterministic, bounded cloudform contour synthesis.
 
+use inku_score::math::DetFloat;
 use sha2::{Digest, Sha256};
 
 use crate::stroke::{grammar, unit};
@@ -71,7 +72,7 @@ impl HarmonicSignal {
         let mut terms = Vec::new();
         let mut normalizer = 0.0;
         for harmonic in frequencies {
-            let amplitude = 1.0 / f64::from(harmonic).powf(power);
+            let amplitude = 1.0 / f64::from(harmonic).dpowf(power);
             let phase = std::f64::consts::TAU * unit(seed, &phase_label, harmonic.into());
             let sign = if unit(seed, &sign_label, harmonic.into()) < 0.5 {
                 -1.0
@@ -92,7 +93,7 @@ impl HarmonicSignal {
     fn at(&self, theta: f64) -> f64 {
         let mut total = 0.0;
         for term in &self.terms {
-            total += term.sign * term.amplitude * (term.harmonic * theta + term.phase).cos();
+            total += term.sign * term.amplitude * (term.harmonic * theta + term.phase).dcos();
         }
         total / self.normalizer.max(1.0e-9)
     }
@@ -129,7 +130,7 @@ impl BaseRadius {
 }
 
 fn distance(first: Point, second: Point) -> f64 {
-    (second.x - first.x).hypot(second.y - first.y)
+    (second.x - first.x).dhypot(second.y - first.y)
 }
 
 fn curvature_radius(before: Point, point: Point, after: Point) -> f64 {
@@ -175,8 +176,8 @@ pub fn generate_cloudform_contour(request: CloudformRequest<'_>) -> Vec<Point> {
         .map(|theta| {
             let radius = base_radius.at(*theta);
             Point::new(
-                request.center.x + radius_x * radius * theta.cos(),
-                request.center.y + radius_y * radius * theta.sin(),
+                request.center.x + radius_x * radius * theta.dcos(),
+                request.center.y + radius_y * radius * theta.dsin(),
             )
         })
         .collect();
@@ -202,7 +203,7 @@ pub fn generate_cloudform_contour(request: CloudformRequest<'_>) -> Vec<Point> {
             let before = base_points[(index + point_count - 1) % point_count];
             let after = base_points[(index + 1) % point_count];
             let tangent = Point::new(after.x - before.x, after.y - before.y);
-            let tangent_length = tangent.x.hypot(tangent.y).max(1.0e-9);
+            let tangent_length = tangent.x.dhypot(tangent.y).max(1.0e-9);
             let mut normal = Point::new(-tangent.y / tangent_length, tangent.x / tangent_length);
             let toward_center = Point::new(request.center.x - point.x, request.center.y - point.y);
             if normal.x * toward_center.x + normal.y * toward_center.y < 0.0 {

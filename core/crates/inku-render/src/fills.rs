@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use inku_score::math::DetFloat;
 use sha2::{Digest, Sha256};
 
 use crate::determinism::{hash01, seed_salt_index_digest};
@@ -41,7 +42,7 @@ fn scanline_segments(
     seed: Seed,
     jitter: f64,
 ) -> Vec<(usize, Point, Point)> {
-    let direction = Point::new(angle.cos(), angle.sin());
+    let direction = Point::new(angle.dcos(), angle.dsin());
     let normal = Point::new(-direction.y, direction.x);
     let projections = contour
         .iter()
@@ -312,7 +313,7 @@ fn oil_paint_fill(
     let accepted = style.fill && crate::accepted_fills::solid_fill(instruction);
     let seed = context.seed_for(instruction);
     let angle = hash01(0, seed, "oil-fill-angle") * std::f64::consts::PI;
-    let normal = Point::new(-angle.sin(), angle.cos());
+    let normal = Point::new(-angle.dsin(), angle.dcos());
     let (low, high) = contour
         .iter()
         .fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), p| {
@@ -342,7 +343,7 @@ fn oil_paint_fill(
         .into_iter()
         .enumerate()
     {
-        let length = (end.x - start.x).hypot(end.y - start.y);
+        let length = (end.x - start.x).dhypot(end.y - start.y);
         if length <= width {
             continue;
         }
@@ -409,10 +410,10 @@ fn oil_paint_fill(
         && accepted
         && strokes.iter().any(|(_, _, _, visible)| *visible)
         && xx + yy > 0.0
-        && (xx - yy).hypot(2.0 * xy) >= 0.9 * (xx + yy)
+        && (xx - yy).dhypot(2.0 * xy) >= 0.9 * (xx + yy)
     {
-        let tangent = (2.0 * xy).atan2(xx - yy) * 0.5;
-        Some(Point::new(-tangent.sin(), tangent.cos()))
+        let tangent = (2.0 * xy).datan2(xx - yy) * 0.5;
+        Some(Point::new(-tangent.dsin(), tangent.dcos()))
     } else {
         None
     };
@@ -594,7 +595,7 @@ pub(crate) fn render_interior_fill(
     let mut strokes = Element::new("g").attr("class", "fill-stroke-v1");
     let mut count = 0_usize;
     for (order, (row, mut start, mut end)) in segments.into_iter().enumerate() {
-        let length = (end.x - start.x).hypot(end.y - start.y);
+        let length = (end.x - start.x).dhypot(end.y - start.y);
         if length <= style.width * 1.2 {
             continue;
         }

@@ -1,5 +1,7 @@
 //! Physical geometry used by group pivots, endpoint relations and final bounds.
 
+use inku_score::math::DetFloat;
+
 use crate::affine::AffineTransform;
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour};
 use crate::geometry::{point_to_short_side_units, polygon_points};
@@ -190,8 +192,8 @@ pub(crate) fn bounds(
     };
     let ellipse_bounds = |center: Point, rx: f64, ry: f64| {
         let center = transform.apply(center);
-        let dx = (transform.a * rx).hypot(transform.c * ry);
-        let dy = (transform.b * rx).hypot(transform.d * ry);
+        let dx = (transform.a * rx).dhypot(transform.c * ry);
+        let dy = (transform.b * rx).dhypot(transform.d * ry);
         point_bounds([
             Point::new(center.x - dx, center.y - dy),
             Point::new(center.x + dx, center.y + dy),
@@ -250,8 +252,8 @@ pub(crate) fn bounds(
             let mut angles = vec![start, end];
             // For x=A*cos(t)-C*sin(t), extrema occur at atan2(-C,A) modulo pi.
             for angle in [
-                (-transform.c).atan2(transform.a).to_degrees(),
-                (-transform.d).atan2(transform.b).to_degrees(),
+                (-transform.c).datan2(transform.a).to_degrees(),
+                (-transform.d).datan2(transform.b).to_degrees(),
             ] {
                 let lower = start.min(end);
                 let upper = start.max(end);

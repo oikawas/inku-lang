@@ -12,6 +12,7 @@
 
 use crate::planning::Bounds;
 use crate::types::{Point, Seed};
+use inku_score::math::DetFloat;
 use inku_score::{Primitive, RelationType};
 
 /// The share of the current shape's bounds that must overlap the previous one.
@@ -249,7 +250,7 @@ pub(crate) fn preferred(
                 OVERLAP_CHOSEN.0 + draw("overlap-share") * (OVERLAP_CHOSEN.1 - OVERLAP_CHOSEN.0);
             let toward = |turn: f64| {
                 let angle = std::f64::consts::TAU * (draw("overlap-angle") + turn);
-                let direction = Point::new(angle.cos(), angle.sin());
+                let direction = Point::new(angle.dcos(), angle.dsin());
                 let at = |distance: f64| {
                     let point = Point::new(
                         prior.center().x + direction.x * distance,
@@ -371,7 +372,7 @@ pub(crate) fn nearest_on_outline(outline: &[Point], from: Point) -> Option<Point
                 .clamp(0.0, 1.0)
         };
         let point = Point::new(start.x + segment.x * t, start.y + segment.y * t);
-        let distance = (point.x - from.x).hypot(point.y - from.y);
+        let distance = (point.x - from.x).dhypot(point.y - from.y);
         if best.is_none_or(|(nearest, _)| distance < nearest) {
             best = Some((distance, point));
         }

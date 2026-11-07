@@ -1,5 +1,6 @@
 //! Optional read-only geometry boundary. The normal SVG path does not call it.
 
+use inku_score::math::DetFloat;
 use serde::Serialize;
 
 use crate::affine::AffineTransform;
@@ -747,7 +748,7 @@ pub fn export_geometry(
         if first.len() < 2 || second_points.len() < 2 {
             return Err("invalid_closed_arc_pair".into());
         }
-        let distance = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+        let distance = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).dhypot(a[1] - b[1]);
         let same = distance(first[0], second_points[0])
             + distance(*first.last().unwrap(), *second_points.last().unwrap());
         let opposite = distance(first[0], *second_points.last().unwrap())

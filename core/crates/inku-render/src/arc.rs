@@ -1,5 +1,7 @@
 //! Shared minor-arc geometry for planning and rendering.
 
+use inku_score::math::DetFloat;
+
 use crate::types::Point;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -26,8 +28,8 @@ pub fn minor_arc_delta(angle_start: f64, angle_end: f64) -> f64 {
 pub fn arc_point(center: Point, radius: f64, angle_degrees: f64) -> Point {
     let angle = angle_degrees.to_radians();
     Point::new(
-        center.x + radius * angle.cos(),
-        center.y - radius * angle.sin(),
+        center.x + radius * angle.dcos(),
+        center.y - radius * angle.dsin(),
     )
 }
 
@@ -37,7 +39,7 @@ pub fn arc_from_endpoints_and_sagitta(
     sagitta: f64,
 ) -> Result<MinorArc, ArcError> {
     let delta = Point::new(end.x - start.x, end.y - start.y);
-    let chord = delta.x.hypot(delta.y);
+    let chord = delta.x.dhypot(delta.y);
     let height = sagitta.abs();
     if chord <= 1.0e-12 {
         return Err(ArcError::ZeroChord);
@@ -55,7 +57,7 @@ pub fn arc_from_endpoints_and_sagitta(
     );
     let angle = |point: Point| {
         (-(point.y - center.y))
-            .atan2(point.x - center.x)
+            .datan2(point.x - center.x)
             .to_degrees()
     };
     let angle_start = angle(start);
@@ -77,7 +79,7 @@ pub fn signed_arc_sagitta(arc: MinorArc) -> Result<f64, ArcError> {
     let end = arc_point(arc.center, arc.radius, arc.angle_start + delta);
     let apex = arc_point(arc.center, arc.radius, arc.angle_start + delta / 2.0);
     let chord = Point::new(end.x - start.x, end.y - start.y);
-    let length = chord.x.hypot(chord.y);
+    let length = chord.x.dhypot(chord.y);
     if length <= 1.0e-12 {
         return Err(ArcError::ZeroChord);
     }

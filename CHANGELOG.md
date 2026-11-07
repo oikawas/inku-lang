@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core (render engine 101): compute the transcendental functions (sin, cos, tan, asin, atan2, hypot, powf, cbrt, exp, ln, tanh) with the pure-Rust libm (`inku_score::math`) instead of the host's C library, and vendor the kurbo and svgtypes the Compat clip uses so they do the same. Their last bits differed between macOS and the Linux of 5173, and the Compat SVG of works placed by relation differed slightly between hosts (I-733). Drawings move by about their coordinates' last digits.
+
 - Core: requests asked again (correction, hole completion, background color) and the color-catalog selection send their fields in the order of the first request: the description stays first and added fields follow. Before, passing through a JSON value sorted them by name and moved the description back (I-733).
 
 - Core: a model answer the host delivers is read while the run's total budget holds, even when the time the host measured is a little past the attempt's `timeout_ms`. Before, a correct answer arriving just at the deadline was discarded and asked again (I-733).

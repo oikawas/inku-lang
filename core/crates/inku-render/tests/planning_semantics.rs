@@ -5,6 +5,7 @@ use inku_render::planning::{
     resolve_relation_on_canvas,
 };
 use inku_render::types::{CanvasSize, Instruction, Point, Score};
+use inku_score::math::DetFloat;
 
 fn instruction(json: &str) -> Instruction {
     let score: Score = serde_json::from_str(&format!(r#"{{"instructions":[{json}]}}"#)).unwrap();
@@ -87,7 +88,7 @@ fn wide_canvas_relation_uses_physical_square_bounds() {
         current_bounds.center().x - prior_bounds.center().x,
         current_bounds.center().y - prior_bounds.center().y,
     );
-    let distance = delta.x.hypot(delta.y);
+    let distance = delta.x.dhypot(delta.y);
     assert!(distance > prior_bounds.radius() + current_bounds.radius());
     assert_eq!(
         point_to_short_side_units(result.instruction.center.unwrap(), Some(canvas)),

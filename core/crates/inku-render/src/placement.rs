@@ -1,5 +1,7 @@
 //! Deterministic normalized placement for repeated marks.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::{hash01, seed_salt_index_digest};
 pub use crate::geometry::short_side_scales;
 use crate::types::{ArrangementPath, CanvasSize, Density, Point, RhythmSpacing, Seed};
@@ -90,14 +92,14 @@ pub fn rhythm_parameter(index: usize, count: usize, seed: Seed, spacing: RhythmS
     }
     let base = index as f64 / (count - 1) as f64;
     match spacing {
-        RhythmSpacing::Accelerando => base.powf(1.35),
+        RhythmSpacing::Accelerando => base.dpowf(1.35),
         RhythmSpacing::Loose => {
             let jitter = (hash01(index as i64, seed, "rhythm-loose") - 0.5) * 0.16;
             clamp01(base + jitter)
         }
         RhythmSpacing::Syncopated => {
             let beat = if index % 2 == 1 { 0.09 } else { -0.045 };
-            clamp01(base + beat * (base * std::f64::consts::PI).sin())
+            clamp01(base + beat * (base * std::f64::consts::PI).dsin())
         }
         RhythmSpacing::None => base,
     }
@@ -126,7 +128,7 @@ pub fn path_position(
         ArrangementPath::Wave => Point::new(
             clamp01(margin + t * span),
             clamp01(
-                0.5 + ((t * std::f64::consts::TAU).sin() * PATH_WAVE_AMPLITUDE
+                0.5 + ((t * std::f64::consts::TAU).dsin() * PATH_WAVE_AMPLITUDE
                     + jitter_b * PATH_JITTER)
                     * scale.y,
             ),
@@ -204,7 +206,7 @@ pub fn clustered_position(request: ClusterPlacement) -> Point {
             hash01(cluster_index as i64, request.seed, "cluster-axis") * std::f64::consts::TAU
         }
     };
-    let tangent = Point::new(angle.cos(), angle.sin());
+    let tangent = Point::new(angle.dcos(), angle.dsin());
     let normal = Point::new(-tangent.y, tangent.x);
     let mut local_t = (local_index as f64 + 0.5) / local_total as f64;
     if request.rhythm_spacing != RhythmSpacing::None && local_total > 1 {
@@ -226,7 +228,7 @@ pub fn clustered_position(request: ClusterPlacement) -> Point {
     let cross = (hash01(request.index as i64, request.seed, "cluster-cross-jitter") - 0.5)
         * cross_span
         * (1.25 - 0.45 * centered.abs());
-    let bend = (local_t * std::f64::consts::PI).sin()
+    let bend = (local_t * std::f64::consts::PI).dsin()
         * (hash01(cluster_index as i64, request.seed, "cluster-bend") - 0.5)
         * radius
         * 0.55;

@@ -1,5 +1,7 @@
 //! Expansion and placement of canonical arrangements.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::instruction_seed;
 use crate::effects::{FadeEffect, FadeKind, MarkEffects};
 use crate::group::finish_group_on_canvas;
@@ -362,8 +364,8 @@ pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<ArrangedCopy> 
                                 rhythm_parameter(index, count, seed, arrangement.rhythm_spacing)
                                     * std::f64::consts::TAU;
                             Point::new(
-                                center.x + radius * scale.x * angle.cos(),
-                                center.y - radius * scale.y * angle.sin(),
+                                center.x + radius * scale.x * angle.dcos(),
+                                center.y - radius * scale.y * angle.dsin(),
                             )
                         })
                         .collect(),

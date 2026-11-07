@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use inku_score::math::DetFloat;
 use inku_score::{AnchorPoint, CanvasFormat};
 
 use crate::ScoreFieldGap;
@@ -52,7 +53,7 @@ impl Footprint {
             (self.centers[0] + self.centers[2]) / 2.0,
             (self.centers[1] + self.centers[3]) / 2.0,
         ];
-        let (sin, cos) = group.rotation_degrees.to_radians().sin_cos();
+        let (sin, cos) = group.rotation_degrees.to_radians().dsin_cos();
         let mut result: Option<Self> = None;
         for x in [self.centers[0], self.centers[2]] {
             for y in [self.centers[1], self.centers[3]] {

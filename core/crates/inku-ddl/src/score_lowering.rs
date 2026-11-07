@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 
+use inku_score::math::DetFloat;
 use inku_score::{
     AnchorPoint, AtRegion, Canvas, CanvasFit, CanvasFormat, CanvasGroundSpec, CanvasRatio,
     CanvasSpec, Color, ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode,
@@ -6373,7 +6374,7 @@ fn fill_shape_reference_area(
             .mul(finite_geometry_ratio(3.0_f64.sqrt() / 4.0)?)?,
         ResolvedGeometryDimensions::Polygon { radius, sides } => {
             radius.mul(radius)?.mul(finite_geometry_ratio(
-                f64::from(sides) * (std::f64::consts::TAU / f64::from(sides)).sin() / 2.0,
+                f64::from(sides) * (std::f64::consts::TAU / f64::from(sides)).dsin() / 2.0,
             )?)?
         }
         ResolvedGeometryDimensions::Bbox { width, height }
@@ -7626,8 +7627,8 @@ pub(crate) fn reference_extent(
             for vertex in 0..sides {
                 let angle = -std::f64::consts::FRAC_PI_2
                     + std::f64::consts::TAU * f64::from(vertex) / f64::from(sides);
-                minimum = minimum.min(angle.cos());
-                maximum = maximum.max(angle.cos());
+                minimum = minimum.min(angle.dcos());
+                maximum = maximum.max(angle.dcos());
             }
             radius.mul(finite_geometry_ratio(maximum - minimum)?)
         }
@@ -8331,14 +8332,14 @@ fn ensure_rotated_centered_extent(
     }
 
     let radians = normalized.to_radians();
-    let cosine = radians.cos().abs();
-    let sine = radians.sin().abs();
+    let cosine = radians.dcos().abs();
+    let sine = radians.dsin().abs();
     let half_width = width.to_f64()? * f64::from(short_units) / 2.0;
     let half_height = height.to_f64()? * f64::from(short_units) / 2.0;
     let (physical_extent_x, physical_extent_y) = match primitive {
         Primitive::Ellipse => (
-            (half_width * cosine).hypot(half_height * sine),
-            (half_width * sine).hypot(half_height * cosine),
+            (half_width * cosine).dhypot(half_height * sine),
+            (half_width * sine).dhypot(half_height * cosine),
         ),
         Primitive::Line | Primitive::Cloudform | Primitive::Square | Primitive::Arc => (
             cosine * half_width + sine * half_height,
@@ -8380,7 +8381,7 @@ fn lower_vertex_geometry(
     let cx = x.to_f64()? * f64::from(cw) / short;
     let cy = y.to_f64()? * f64::from(ch) / short;
     let radians = rotation.unwrap_or(0.0).to_radians();
-    let (sine, cosine) = radians.sin_cos();
+    let (sine, cosine) = radians.dsin_cos();
     let check = |dx: f64, dy: f64| -> Result<(), ScoreFieldGap> {
         let px = (cx + dx * cosine - dy * sine) * short / f64::from(cw);
         let py = (cy + dx * sine + dy * cosine) * short / f64::from(ch);
@@ -8397,7 +8398,7 @@ fn lower_vertex_geometry(
         for vertex in 0..sides {
             let angle = -std::f64::consts::FRAC_PI_2
                 + std::f64::consts::TAU * f64::from(vertex) / f64::from(sides);
-            check(radius * angle.cos(), radius * angle.sin())?;
+            check(radius * angle.dcos(), radius * angle.dsin())?;
         }
     } else if primitive == Primitive::Triangle {
         for (dx, dy) in [
@@ -8508,7 +8509,7 @@ fn arc_parameters(
     if !ratio.is_finite() || !(0.0..=1.0).contains(&ratio) {
         return Err(ScoreFieldGap::GeometryRepresentationLimit);
     }
-    let half_angle = ratio.asin().to_degrees();
+    let half_angle = ratio.dasin().to_degrees();
     Ok((radius, 90.0 + half_angle, 90.0 - half_angle))
 }
 
@@ -8527,17 +8528,17 @@ fn ensure_arc_extent(
     let anchor_x = x.to_f64()? * f64::from(width_units);
     let anchor_y = y.to_f64()? * f64::from(height_units);
     let radius = radius.to_f64()? * f64::from(short_units);
-    let center_y = anchor_y + radius * start.to_radians().sin();
+    let center_y = anchor_y + radius * start.to_radians().dsin();
     let rotation = rotation.unwrap_or(0.0).to_radians();
     for step in 0..=64 {
         let t = f64::from(step) / 64.0;
         let angle = (start + (end - start) * t).to_radians();
-        let point_x = anchor_x + radius * angle.cos();
-        let point_y = center_y - radius * angle.sin();
+        let point_x = anchor_x + radius * angle.dcos();
+        let point_y = center_y - radius * angle.dsin();
         let delta_x = point_x - anchor_x;
         let delta_y = point_y - anchor_y;
-        let rotated_x = anchor_x + delta_x * rotation.cos() - delta_y * rotation.sin();
-        let rotated_y = anchor_y + delta_x * rotation.sin() + delta_y * rotation.cos();
+        let rotated_x = anchor_x + delta_x * rotation.dcos() - delta_y * rotation.dsin();
+        let rotated_y = anchor_y + delta_x * rotation.dsin() + delta_y * rotation.dcos();
         if !rotated_x.is_finite()
             || !rotated_y.is_finite()
             || !(0.0..=f64::from(width_units)).contains(&rotated_x)

@@ -9,6 +9,7 @@ use inku_ddl::{
 };
 use inku_render::checked_performance::resolve_checked_performance;
 use inku_render::performance::PerformanceRequest;
+use inku_score::math::DetFloat;
 use inku_score::{
     Canvas, Color, GroundMaterial, Primitive, RelationType, ScoreExecutionDiagnostic,
     ScoreExecutionDisposition, ScoreExecutionReason, ScoreExecutionSummary, canonical_score_digest,
@@ -341,8 +342,8 @@ fn touching_bilingual_targets_reach_performed_both_ends_and_reject_wrong_nouns()
         let endpoints = endpoint_geometry(&plan.score.instructions[0], canvas).unwrap();
         for instruction in &plan.score.instructions[1..] {
             let actual = endpoint_geometry(instruction, canvas).unwrap();
-            assert!((actual.0.x - endpoints.0.x).hypot(actual.0.y - endpoints.0.y) < 1e-9);
-            assert!((actual.1.x - endpoints.1.x).hypot(actual.1.y - endpoints.1.y) < 1e-9);
+            assert!((actual.0.x - endpoints.0.x).dhypot(actual.0.y - endpoints.0.y) < 1e-9);
+            assert!((actual.1.x - endpoints.1.x).dhypot(actual.1.y - endpoints.1.y) < 1e-9);
         }
         let independent = inku_render::performance::resolve_performance(PerformanceRequest {
             score,

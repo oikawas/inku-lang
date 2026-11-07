@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use inku_score::math::DetFloat;
 use sha2::{Digest, Sha256};
 
 use crate::determinism::{hash_to_unit, hash01, seed_salt_index_digest};
@@ -398,7 +399,7 @@ fn relative_luminance(color: &str) -> Option<f64> {
         if value <= 0.04045 {
             value / 12.92
         } else {
-            ((value + 0.055) / 1.055).powf(2.4)
+            ((value + 0.055) / 1.055).dpowf(2.4)
         }
     };
     let [r, g, b] = hex_rgb(color)?;
@@ -428,9 +429,9 @@ fn toward_white(color: &str, share: f64) -> String {
 fn texture_count_ratio(density: f64) -> f64 {
     let delta = density - SURFACE_DEFAULT_DENSITY;
     if delta >= 0.0 {
-        4_f64.powf(delta / 0.5)
+        4_f64.dpowf(delta / 0.5)
     } else {
-        4_f64.powf(delta / 0.30)
+        4_f64.dpowf(delta / 0.30)
     }
 }
 
@@ -440,9 +441,9 @@ fn texture_count_ratio(density: f64) -> f64 {
 fn texture_size_factor(scale: f64) -> f64 {
     let delta = scale - SURFACE_DEFAULT_SCALE;
     if delta >= 0.0 {
-        2_f64.powf(delta / 0.55)
+        2_f64.dpowf(delta / 0.55)
     } else {
-        2_f64.powf(delta / 0.30)
+        2_f64.dpowf(delta / 0.30)
     }
 }
 
@@ -464,7 +465,7 @@ fn dab(
     }
     let angle = hash01(spec.index, spec.seed, "surface-dab-angle") * std::f64::consts::PI;
     let length = spec.radius * (1.9 + hash01(spec.index, spec.seed, "surface-dab-length") * 1.6);
-    let axis = Point::new(angle.cos() * length / 2.0, angle.sin() * length / 2.0);
+    let axis = Point::new(angle.dcos() * length / 2.0, angle.dsin() * length / 2.0);
     let centerline = (0..SURFACE_DAB_SAMPLES)
         .map(|sample| {
             let t = sample as f64 / (SURFACE_DAB_SAMPLES - 1) as f64;
@@ -539,7 +540,7 @@ fn sweep(
     index: i64,
     class_name: &str,
 ) -> Option<Element> {
-    let length = (end.x - start.x).hypot(end.y - start.y);
+    let length = (end.x - start.x).dhypot(end.y - start.y);
     if length <= 0.0 {
         return None;
     }
@@ -641,7 +642,7 @@ fn sweep_parts(
     index: i64,
     class_name: &str,
 ) -> Option<(Vec<Node>, Vec<Node>)> {
-    let length = (end.x - start.x).hypot(end.y - start.y);
+    let length = (end.x - start.x).dhypot(end.y - start.y);
     if length <= 0.0 {
         return None;
     }
@@ -1020,7 +1021,7 @@ fn render_vectors(
                 / count_ratio)
                 .max(line_width * 2.2);
             let center = Point::new(x + width / 2.0, y + height / 2.0);
-            let count = ((width.hypot(height) * 1.3 / spacing) as i64)
+            let count = ((width.dhypot(height) * 1.3 / spacing) as i64)
                 .clamp(3, (80.0 * (count_ratio / size).max(1.0)) as i64);
             let mut angles = vec![base_angle];
             if surface.texture == SurfaceTexture::Crosshatch {
@@ -1028,7 +1029,7 @@ fn render_vectors(
                     .push(base_angle + (60.0 + hash01(8, seed, "cross-angle") * 30.0).to_radians());
             }
             for (layer, angle) in angles.into_iter().enumerate() {
-                let direction = Point::new(angle.cos(), angle.sin());
+                let direction = Point::new(angle.dcos(), angle.dsin());
                 let normal = Point::new(-direction.y, direction.x);
                 for row in -count / 2..=count / 2 {
                     let progress = (row as f64 + count as f64 / 2.0) / count.max(1) as f64;

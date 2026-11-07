@@ -2060,7 +2060,7 @@ Canonical meaningでは、記述に明示された個数をlosslessなsymbolic i
 
 **Renderer:**
 
-JSON Scoreを受け取り、`variation`情報から実際の揺らぎ関数（Perlin、Fine振幅、Medium周波数、既存の線に直交する演奏）を選んでSVGを生成する。同じScoreと同じrender seedは同じ演奏になる。複数本の命令も、現行shared compilerのresource-awareなcompact recipeを通って反復materializationへ届く（§12.11）。
+JSON Scoreを受け取り、`variation`情報から実際の揺らぎ関数（Perlin、Fine振幅、Medium周波数、既存の線に直交する演奏）を選んでSVGを生成する。同じScoreと同じrender seedは、どのhostでも同じ演奏になる。render engine 101（2026-11-07、I-733）から、coreは正弦・余弦・正接・逆正弦・逆正接・斜辺・累乗・立方根・指数・対数・双曲線正接を、hostのCライブラリ（macOSとLinuxで答えの末尾のビットが違った）でなく純Rustのlibm（`inku_score::math`）で計算する。Compatの切り抜きが使うvendorのkurboとsvgtypesも同じである。複数本の命令も、現行shared compilerのresource-awareなcompact recipeを通って反復materializationへ届く（§12.11）。
 
 v1.99 で揺らぎの演奏対象を線に加えて弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した。発火条件は quality ∈ {perlin, wave, white} かつ dimensions が position_x / position_y / radius のいずれかを含む場合（line と対称、radius は図形の自然軸）。閉図形は継ぎ目が連続する周期ノイズで輪郭を演奏し、多角形系は辺ごとに演奏して角を固定、弧は両端点を完全固定して touching の接点契約を維持する。pink（滲み）と quality=none の経路は不変。この変更で同一 Score + 同一 seed の演奏結果が変わるため、render engine version を 5 へ更新した（過去作品の再演奏は見た目が変わりうるが、保存済み SVG は不変）。
 

@@ -3257,7 +3257,7 @@ The description:
 
 It takes the JSON Score and selects Perlin, Fine amplitude, Medium frequency, and the
 existing perpendicular line performance from `variation` to generate SVG. The same Score
-and render seed reproduce the same performance. Multiple-line commands also reach repetition materialization through the current shared compiler's resource-aware compact recipes (§12.11).
+and render seed reproduce the same performance, on every host: from render engine 101 (2026-11-07, I-733) the core computes sine, cosine, tangent, arcsine, arctangent, hypotenuse, powers, cube roots, exponentials, logarithms and hyperbolic tangents with the pure-Rust libm (`inku_score::math`), and the vendored kurbo and svgtypes the Compat clip uses do the same, instead of the host's C library, whose last bits differed between macOS and Linux. Multiple-line commands also reach repetition materialization through the current shared compiler's resource-aware compact recipes (§12.11).
 
 The engine bumps that changed this performance are recorded in the [render engine
 version history](docs/spec/render-engine-history.md); the prose below states the

@@ -198,7 +198,7 @@ fn union_bounds(union: Option<Bounds>, bounds: Bounds) -> Bounds {
 }
 
 fn distance(point: Point) -> f64 {
-    point.x.hypot(point.y)
+    point.x.dhypot(point.y)
 }
 
 fn centerline_point(points: &[Point], position: f64) -> Option<Point> {
@@ -399,8 +399,8 @@ fn mirror_ideal_frame(
             let radius = instruction.radius?;
             (
                 physical(instruction.center?),
-                Point::new(radius * angle.cos(), -radius * angle.sin()),
-                Point::new(-radius * angle.sin(), -radius * angle.cos()),
+                Point::new(radius * angle.dcos(), -radius * angle.dsin()),
+                Point::new(-radius * angle.dsin(), -radius * angle.dcos()),
             )
         }
         Primitive::Circle | Primitive::Point | Primitive::Polygon => {
@@ -452,7 +452,7 @@ fn mirror_direction(
         return Some(Point::new(to.x - from.x, to.y - from.y));
     }
     let angle = instruction.rotation.unwrap_or(0.0).to_radians();
-    Some(Point::new(angle.cos(), angle.sin()))
+    Some(Point::new(angle.dcos(), angle.dsin()))
 }
 
 fn copy_mirror_geometry(
@@ -756,7 +756,7 @@ impl Execution<'_> {
         }
         if let Some(direction) = relation.follower_facts.direction_degrees {
             let angle = direction.to_radians();
-            let expected = Point::new(angle.cos(), angle.sin());
+            let expected = Point::new(angle.dcos(), angle.dsin());
             let actual = if single {
                 let index = follower.instruction_indices[0];
                 let vector =
@@ -1717,8 +1717,8 @@ impl Execution<'_> {
                 * crate::determinism::hash01(ordinal as i64, seed, "not-touching-angle");
             let target = clamp_short_side_point(
                 Point::new(
-                    prior.center().x + angle.cos() * (radius + gap),
-                    prior.center().y + angle.sin() * (radius + gap),
+                    prior.center().x + angle.dcos() * (radius + gap),
+                    prior.center().y + angle.dsin() * (radius + gap),
                 ),
                 self.request.canvas,
             );

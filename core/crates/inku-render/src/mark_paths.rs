@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::{needs_contour_variation, needs_path_variation};
 use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element, sweeps_flat};
 use crate::geometry::{
@@ -184,7 +186,7 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
                 |(start, end)| {
                     let start = point_to_pixels(start, canvas);
                     let end = point_to_pixels(end, canvas);
-                    (end.x - start.x).hypot(end.y - start.y)
+                    (end.x - start.x).dhypot(end.y - start.y)
                 },
             ),
         }
@@ -265,7 +267,7 @@ pub(crate) fn connected_line_centerline(
             instruction_anchor_on_canvas(instruction, Some(canvas)),
             canvas,
         );
-        let (sin, cos) = degrees.to_radians().sin_cos();
+        let (sin, cos) = degrees.to_radians().dsin_cos();
         for point in &mut centerline {
             let dx = point.x - pivot.x;
             let dy = point.y - pivot.y;
@@ -342,7 +344,7 @@ pub(crate) fn connected_arc_centerline(
             instruction_anchor_on_canvas(instruction, Some(canvas)),
             canvas,
         );
-        let (sin, cos) = degrees.to_radians().sin_cos();
+        let (sin, cos) = degrees.to_radians().dsin_cos();
         for point in &mut centerline {
             let dx = point.x - pivot.x;
             let dy = point.y - pivot.y;
@@ -395,7 +397,7 @@ fn centerline_cells(points: &[Point], count: usize, step: f64) -> Vec<(Point, f6
     let mut lengths = vec![0.0];
     let mut total = 0.0;
     for pair in points.windows(2) {
-        total += (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
+        total += (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y);
         lengths.push(total);
     }
     let mut segment = 0;
@@ -417,7 +419,7 @@ fn centerline_cells(points: &[Point], count: usize, step: f64) -> Vec<(Point, f6
                 return (point, 0.0);
             }
             let rounded = Point::new(lattice(point.x, step), lattice(point.y, step));
-            (rounded, (point.x - rounded.x).hypot(point.y - rounded.y))
+            (rounded, (point.x - rounded.x).dhypot(point.y - rounded.y))
         })
         .collect()
 }
@@ -441,7 +443,7 @@ fn computer_cells(points: &[(Point, f64)], step: f64, color: &str, closed: bool)
             let moved = if residual > 0.0 {
                 residual
             } else {
-                (point.x - rounded.x).hypot(point.y - rounded.y)
+                (point.x - rounded.x).dhypot(point.y - rounded.y)
             };
             let tone =
                 (COMPUTER_CELL_OPACITY * (moved / half).min(1.0)).max(COMPUTER_CELL_OPACITY_FLOOR);
@@ -525,7 +527,7 @@ pub(crate) fn hand_line(
         .and_then(|points| points.first().copied().zip(points.last().copied()))
         .unwrap_or((start, end));
     let sample_count =
-        stroke_sample_count((end.x - start.x).hypot(end.y - start.y), context.canvas);
+        stroke_sample_count((end.x - start.x).dhypot(end.y - start.y), context.canvas);
     let support = instruction_support(instruction, context.support);
     let centerline = connected_centerline.or_else(|| {
         instruction
@@ -945,7 +947,7 @@ mod tests {
             .map(|index| {
                 let x = 100.0 + 5.0 * f64::from(index);
                 let phase = std::f64::consts::TAU * (x - 100.0) / 300.0;
-                Point::new(x, 500.0 + 40.0 * phase.sin())
+                Point::new(x, 500.0 + 40.0 * phase.dsin())
             })
             .collect::<Vec<_>>();
         let distance = |point: Point| {
@@ -955,7 +957,7 @@ mod tests {
                     let (dx, dy) = (b.x - a.x, b.y - a.y);
                     let t = (((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy))
                         .clamp(0.0, 1.0);
-                    (point.x - a.x - t * dx).hypot(point.y - a.y - t * dy)
+                    (point.x - a.x - t * dx).dhypot(point.y - a.y - t * dy)
                 })
                 .fold(f64::INFINITY, f64::min)
         };

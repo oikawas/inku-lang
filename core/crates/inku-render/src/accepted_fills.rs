@@ -1,5 +1,6 @@
 //! Tool-specific solid surfaces, built directly from portable SVG elements.
 
+use inku_score::math::DetFloat;
 use sha2::{Digest, Sha256};
 
 use crate::geometry::{point_to_pixels, size_to_pixels};
@@ -310,7 +311,7 @@ fn darkening_for(color: &str) -> f64 {
         if value <= 0.04045 {
             value / 12.92
         } else {
-            ((value + 0.055) / 1.055).powf(2.4)
+            ((value + 0.055) / 1.055).dpowf(2.4)
         }
     };
     let luminance =
@@ -749,7 +750,7 @@ fn engraving(
         let center = 500.0 + 180.0 * (sample(2) - 0.5);
         let slope = ((if dry { 0.7_f64 } else { 0.25_f64 }) * (2.0 * sample(3) - 1.0))
             .to_radians()
-            .tan();
+            .dtan();
         let sx = length / lengths[shape];
         let matrix = [
             sx,

@@ -3,6 +3,7 @@
 //! from it, and the pipeline finds the marks it hides, so all three read one
 //! table and one color space (DDL engine 61).
 
+use crate::math::DetFloat;
 use crate::types::GroundMaterial;
 
 /// How much ink the ink wash lays over the paper. The author found 0.16 too dark and chose
@@ -64,16 +65,16 @@ pub fn oklab_from_srgb(channels: [f64; 3]) -> [f64; 3] {
         if channel <= 0.04045 {
             channel / 12.92
         } else {
-            ((channel + 0.055) / 1.055).powf(2.4)
+            ((channel + 0.055) / 1.055).dpowf(2.4)
         }
     });
     let light_channel = 0.412_221_470_8 * red + 0.536_332_536_3 * green + 0.051_445_992_9 * blue;
     let medium_channel = 0.211_903_498_2 * red + 0.680_699_545_1 * green + 0.107_396_956_6 * blue;
     let short_channel = 0.088_302_461_9 * red + 0.281_718_837_6 * green + 0.629_978_700_5 * blue;
     let (light_root, medium_root, short_root) = (
-        light_channel.cbrt(),
-        medium_channel.cbrt(),
-        short_channel.cbrt(),
+        light_channel.dcbrt(),
+        medium_channel.dcbrt(),
+        short_channel.dcbrt(),
     );
     [
         0.210_454_255_3 * light_root + 0.793_617_785 * medium_root - 0.004_072_046_8 * short_root,

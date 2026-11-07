@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use inku_score::math::DetFloat;
 use sha2::{Digest, Sha256};
 
 use crate::determinism::hash01;
@@ -165,12 +166,12 @@ pub fn render_presence_layer(
                 let angle = phase + std::f64::consts::TAU * index as f64 / 6.0;
                 layer.push(line(
                     (
-                        center_x + angle.cos() * radius_x * 0.28,
-                        center_y + angle.sin() * radius_x * 0.28,
+                        center_x + angle.dcos() * radius_x * 0.28,
+                        center_y + angle.dsin() * radius_x * 0.28,
                     ),
                     (
-                        center_x + angle.cos() * radius_x * 0.86,
-                        center_y + angle.sin() * radius_x * 0.86,
+                        center_x + angle.dcos() * radius_x * 0.86,
+                        center_y + angle.dsin() * radius_x * 0.86,
                     ),
                     &color,
                     stroke,
@@ -187,11 +188,11 @@ pub fn render_presence_layer(
             let angle = phase + side * (0.34 + 0.08 * index as f64);
             layer.push(line(
                 (
-                    center_x + angle.cos() * radius_x * (1.05 + 0.18 * (index % 2) as f64),
-                    center_y + angle.sin() * radius_y * (0.72 + 0.08 * index as f64),
+                    center_x + angle.dcos() * radius_x * (1.05 + 0.18 * (index % 2) as f64),
+                    center_y + angle.dsin() * radius_y * (0.72 + 0.08 * index as f64),
                 ),
                 (
-                    center_x + (angle + std::f64::consts::PI).cos() * radius_x * 0.12,
+                    center_x + (angle + std::f64::consts::PI).dcos() * radius_x * 0.12,
                     center_y + (t - 0.5) * radius_y * 0.16,
                 ),
                 &dark,
@@ -202,13 +203,13 @@ pub fn render_presence_layer(
     }
 
     let flow_angle = phase * 0.35 + tilt;
-    let (tangent_x, tangent_y) = (flow_angle.cos(), flow_angle.sin());
+    let (tangent_x, tangent_y) = (flow_angle.dcos(), flow_angle.dsin());
     let (normal_x, normal_y) = (-tangent_y, tangent_x);
     for index in 0..contour_count {
         let t = (index as f64 + 0.5) / contour_count as f64;
         let along =
             (t - 0.5) * radius_x * (1.18 + 0.18 * hash01(index as i64, seed, "presence-flow-span"));
-        let cross = (t * std::f64::consts::PI * 1.7 + phase).sin() * radius_y * 0.32
+        let cross = (t * std::f64::consts::PI * 1.7 + phase).dsin() * radius_y * 0.32
             + (hash01(index as i64, seed, "presence-flow-cross") - 0.5) * radius_y * 0.28;
         let point_x = center_x + tangent_x * along + normal_x * cross;
         let point_y = center_y + tangent_y * along + normal_y * cross;

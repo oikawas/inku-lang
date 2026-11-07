@@ -12,6 +12,8 @@ use std::{
 use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Serialize};
 
+use crate::math::DetFloat;
+
 /// Integer seed domain accepted at the canonical JSON boundary.
 ///
 /// `i128` covers serde_json's signed and unsigned integer range while leaving
@@ -194,8 +196,8 @@ pub fn crescent_transform_point(
     );
     let angle = rotation_degrees.to_radians();
     Point::new(
-        center.x + local.x * angle.cos() - local.y * angle.sin(),
-        center.y + local.x * angle.sin() + local.y * angle.cos(),
+        center.x + local.x * angle.dcos() - local.y * angle.dsin(),
+        center.y + local.x * angle.dsin() + local.y * angle.dcos(),
     )
 }
 

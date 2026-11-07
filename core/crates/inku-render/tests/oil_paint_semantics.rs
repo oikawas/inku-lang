@@ -9,6 +9,7 @@ use inku_render::support::DEFAULT_SUPPORT;
 use inku_render::types::{
     CanvasSize, Point, RenderOptions, RenderRequest, SurfaceIntensity, SvgProfile, Weight,
 };
+use inku_score::math::DetFloat;
 
 #[test]
 fn oil_retains_loaded_ends_and_a_seeded_body_distinct_from_ink_brush() {
@@ -295,18 +296,18 @@ fn oklch(color: &str) -> (f64, f64, f64) {
         if channel <= 0.04045 {
             channel / 12.92
         } else {
-            ((channel + 0.055) / 1.055).powf(2.4)
+            ((channel + 0.055) / 1.055).dpowf(2.4)
         }
     });
-    let l = (0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b).cbrt();
-    let m = (0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b).cbrt();
-    let s = (0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b).cbrt();
+    let l = (0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b).dcbrt();
+    let m = (0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b).dcbrt();
+    let s = (0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b).dcbrt();
     let lightness = 0.210_454_255_3 * l + 0.793_617_785_0 * m - 0.004_072_046_8 * s;
     let a = 1.977_998_495_1 * l - 2.428_592_205_0 * m + 0.450_593_709_9 * s;
     let b = 0.025_904_037_1 * l + 0.782_771_766_2 * m - 0.808_675_766_0 * s;
     (
         lightness,
-        a.hypot(b),
-        b.atan2(a).to_degrees().rem_euclid(360.0),
+        a.dhypot(b),
+        b.datan2(a).to_degrees().rem_euclid(360.0),
     )
 }

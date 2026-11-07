@@ -1,5 +1,6 @@
 //! Checked pre-draw endpoint relations while legacy relations keep their warnings.
 
+use inku_score::math::DetFloat;
 use inku_score::{
     Canvas, ConnectedPositionAuthority, Instruction, Layout, Primitive, RelationGap, RelationType,
     Score, ScoreErrorPolicy, ScoreExecutionDiagnostic, ScoreExecutionDisposition,
@@ -43,7 +44,7 @@ fn checked_touching_candidate(
     let (start, end, _, _) = endpoints(instruction)?;
     let (candidate_start, candidate_end, _, _) = endpoints(&candidate)?;
     let direction = |a: crate::types::Point, b: crate::types::Point| {
-        let length = (b.x - a.x).hypot(b.y - a.y);
+        let length = (b.x - a.x).dhypot(b.y - a.y);
         (length, (b.x - a.x) / length, (b.y - a.y) / length)
     };
     let (length, dx, dy) = direction(start, end);
@@ -66,7 +67,7 @@ fn checked_touching_candidate(
             return Err(ScoreExecutionReason::TouchingGeometryConflict);
         }
     }
-    if facts.direction_fixed && (dx - candidate_dx).hypot(dy - candidate_dy) > GEOMETRY_EPSILON {
+    if facts.direction_fixed && (dx - candidate_dx).dhypot(dy - candidate_dy) > GEOMETRY_EPSILON {
         return Err(ScoreExecutionReason::TouchingDirectionConflict);
     }
     if authority == ConnectedPositionAuthority::NumericFixed {
@@ -78,7 +79,8 @@ fn checked_touching_candidate(
             instruction_anchor_on_canvas(&candidate, canvas),
             canvas,
         );
-        if (anchor.x - candidate_anchor.x).hypot(anchor.y - candidate_anchor.y) > GEOMETRY_EPSILON {
+        if (anchor.x - candidate_anchor.x).dhypot(anchor.y - candidate_anchor.y) > GEOMETRY_EPSILON
+        {
             return Err(ScoreExecutionReason::NumericTouchingPositionConflict);
         }
         let bounds = performed_instruction_bounds_on_canvas(&candidate, None, 0, canvas)
@@ -166,8 +168,8 @@ fn line_with_center_and_direction(
     canvas: Option<crate::types::CanvasSize>,
 ) -> Option<Instruction> {
     let (start, end, _, _) = endpoint_geometry(instruction, canvas)?;
-    let length = (end.x - start.x).hypot(end.y - start.y);
-    let direction_length = direction.x.hypot(direction.y);
+    let length = (end.x - start.x).dhypot(end.y - start.y);
+    let direction_length = direction.x.dhypot(direction.y);
     if !length.is_finite()
         || !direction_length.is_finite()
         || length <= GEOMETRY_EPSILON
@@ -270,7 +272,7 @@ fn along_band_contains(
         RelationGap::Wide => (0.15, 0.30),
     };
     let nearest = closest_point_on_segment(point, prior_start, prior_end);
-    let distance = (point.x - nearest.x).hypot(point.y - nearest.y);
+    let distance = (point.x - nearest.x).dhypot(point.y - nearest.y);
     distance + GEOMETRY_EPSILON >= lower && distance <= upper + GEOMETRY_EPSILON
 }
 
@@ -313,7 +315,7 @@ fn typed_along_target(
     canvas: Option<crate::types::CanvasSize>,
 ) -> Option<crate::types::Point> {
     let delta = crate::types::Point::new(prior_end.x - prior_start.x, prior_end.y - prior_start.y);
-    let length = delta.x.hypot(delta.y);
+    let length = delta.x.dhypot(delta.y);
     if !length.is_finite() || length <= GEOMETRY_EPSILON {
         return None;
     }
@@ -415,7 +417,7 @@ fn checked_cutting_candidate(
     let (start, end, _, _) = endpoint_geometry(instruction, canvas)
         .ok_or(ScoreExecutionReason::UnsupportedCuttingPrimitive)?;
     let center = crate::types::Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0);
-    let length = (end.x - start.x).hypot(end.y - start.y);
+    let length = (end.x - start.x).dhypot(end.y - start.y);
     if !length.is_finite() || length <= GEOMETRY_EPSILON {
         return Err(ScoreExecutionReason::UnsupportedCuttingPrimitive);
     }
@@ -431,10 +433,10 @@ fn checked_cutting_candidate(
         }
         let target = closest_interior_point_on_segment(center, prior_start, prior_end);
         let direction = crate::types::Point::new(target.x - center.x, target.y - center.y);
-        if direction.x.hypot(direction.y) > length / 2.0 + GEOMETRY_EPSILON {
+        if direction.x.dhypot(direction.y) > length / 2.0 + GEOMETRY_EPSILON {
             return Err(ScoreExecutionReason::NumericCuttingPositionConflict);
         }
-        let direction = if direction.x.hypot(direction.y) <= GEOMETRY_EPSILON {
+        let direction = if direction.x.dhypot(direction.y) <= GEOMETRY_EPSILON {
             crate::types::Point::new(-(prior_end.y - prior_start.y), prior_end.x - prior_start.x)
         } else {
             direction
@@ -470,7 +472,7 @@ fn checked_cutting_candidate(
     let candidate = line_with_center_and_direction(
         instruction,
         target,
-        crate::types::Point::new(angle.cos(), angle.sin()),
+        crate::types::Point::new(angle.dcos(), angle.dsin()),
         canvas,
     )
     .ok_or(ScoreExecutionReason::UnsupportedCuttingPrimitive)?;

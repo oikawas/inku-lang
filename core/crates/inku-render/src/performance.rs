@@ -1,5 +1,7 @@
 //! Score-level performance planning and composite-group expansion.
 
+use inku_score::math::DetFloat;
+
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
 use crate::effects::MarkEffects;
 use crate::geometry::{point_from_short_side_units, point_to_short_side_units};
@@ -168,10 +170,10 @@ fn instruction_extent(instruction: &Instruction) -> f64 {
         return radius.abs().max(1.0e-9);
     }
     if let Some(size) = instruction.size {
-        return size.x.hypot(size.y).max(1.0e-9);
+        return size.x.dhypot(size.y).max(1.0e-9);
     }
     if let (Some(start), Some(end)) = (instruction.from_, instruction.to) {
-        return (end.x - start.x).hypot(end.y - start.y).max(1.0e-9);
+        return (end.x - start.x).dhypot(end.y - start.y).max(1.0e-9);
     }
     1.0
 }
@@ -195,8 +197,8 @@ fn composite_member_copy(
     );
     let radians = rotation_delta.to_radians();
     let rotated = Point::new(
-        delta.x * radians.cos() - delta.y * radians.sin(),
-        delta.x * radians.sin() + delta.y * radians.cos(),
+        delta.x * radians.dcos() - delta.y * radians.dsin(),
+        delta.x * radians.dsin() + delta.y * radians.dcos(),
     );
     let target_anchor =
         point_to_short_side_units(instruction_anchor_on_canvas(target_head, canvas), canvas);

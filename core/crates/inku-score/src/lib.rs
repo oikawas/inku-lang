@@ -8,6 +8,7 @@ pub mod compatibility;
 pub mod error_policy;
 pub mod execution_diagnostics;
 pub mod ground_body;
+pub mod math;
 pub mod resource;
 pub mod schema;
 pub mod score_resources;

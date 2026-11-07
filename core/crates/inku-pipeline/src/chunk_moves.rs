@@ -43,6 +43,7 @@ use inku_ddl::{
     split_ddl_titles,
 };
 use inku_score::CanvasRatio;
+use inku_score::math::DetFloat;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -298,7 +299,7 @@ impl Paper<'_> {
                 let v = &numbers.values;
                 let (cx, cy) = (f64::midpoint(v[0], v[2]), f64::midpoint(v[1], v[3]));
                 let turn = angle.to_radians();
-                let (sin, cos) = (turn.sin(), turn.cos());
+                let (sin, cos) = (turn.dsin(), turn.dcos());
                 let point = |x: f64, y: f64| {
                     [
                         cx + (x - cx) * cos - (y - cy) * sin + dx,
@@ -859,7 +860,7 @@ fn check_rewrite(
         });
     };
     let (oc, nc) = (center(old), center(new));
-    let shift = ((oc[0] - nc[0]) * paper.units[0]).hypot((oc[1] - nc[1]) * paper.units[1]);
+    let shift = ((oc[0] - nc[0]) * paper.units[0]).dhypot((oc[1] - nc[1]) * paper.units[1]);
     if shift > CENTER_SHIFT {
         return Err(paper.say(
             "描き直した文の中心が、元の箱の中心から 0.1 より離れた",

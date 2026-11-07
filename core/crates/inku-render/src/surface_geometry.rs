@@ -1,5 +1,7 @@
 //! Pure contour and scan geometry used by surface painting.
 
+use inku_score::math::DetFloat;
+
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
 use crate::determinism::{SaltedStream, hash01};
 use crate::geometry::{
@@ -142,8 +144,8 @@ pub(crate) fn mark_extent_bbox(
     let point = |degrees: f64| {
         let angle = degrees.to_radians();
         Point::new(
-            center.x + angle.cos() * radius,
-            center.y - angle.sin() * radius,
+            center.x + angle.dcos() * radius,
+            center.y - angle.dsin() * radius,
         )
     };
     let lo = arc.start.min(arc.end);
@@ -292,7 +294,7 @@ pub(crate) fn scanline_segments(
     spacing: f64,
     seed: Seed,
 ) -> Vec<(usize, Point, Point)> {
-    let direction = Point::new(angle.cos(), angle.sin());
+    let direction = Point::new(angle.dcos(), angle.dsin());
     let normal = Point::new(-direction.y, direction.x);
     let projections = contour
         .iter()
@@ -386,19 +388,19 @@ pub(crate) fn scatter(contour: &[Point], count: usize, seed: Seed) -> Vec<Point>
         .iter()
         .map(|point| point.y)
         .fold(f64::NEG_INFINITY, f64::max);
-    let diagonal = (max_x - min_x).hypot(max_y - min_y).max(1.0e-6);
+    let diagonal = (max_x - min_x).dhypot(max_y - min_y).max(1.0e-6);
     let rows = ((count as f64 * 1.6).sqrt().round_ties_even() as usize).max(2);
     let spacing = diagonal / rows as f64;
     let segments = scanline_segments(contour, angle, spacing, seed);
     let lengths = segments
         .iter()
-        .map(|(_, start, end)| (end.x - start.x).hypot(end.y - start.y))
+        .map(|(_, start, end)| (end.x - start.x).dhypot(end.y - start.y))
         .collect::<Vec<_>>();
     let total = lengths.iter().sum::<f64>();
     if total <= 0.0 {
         return Vec::new();
     }
-    let normal = Point::new(-angle.sin(), angle.cos());
+    let normal = Point::new(-angle.dsin(), angle.dcos());
     let mut points = Vec::new();
     let share_stream = SaltedStream::new(seed, "surface-share");
     let u_stream = SaltedStream::new(seed, "surface-u");

@@ -3,6 +3,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use inku_score::math::DetFloat;
+
 use crate::accepted_fills;
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
 use crate::determinism::{instruction_seed, needs_contour_variation, needs_path_variation};
@@ -47,8 +49,8 @@ fn rotated_instruction_point(
         let dx = point.x - pivot.x;
         let dy = point.y - pivot.y;
         Point::new(
-            pivot.x + dx * radians.cos() - dy * radians.sin(),
-            pivot.y + dx * radians.sin() + dy * radians.cos(),
+            pivot.x + dx * radians.dcos() - dy * radians.dsin(),
+            pivot.y + dx * radians.dsin() + dy * radians.dcos(),
         )
     })
 }
@@ -657,12 +659,12 @@ fn has_closed_area(points: &[Point]) -> bool {
 fn contour_length(points: &[Point], closed: bool) -> f64 {
     let segments = points
         .windows(2)
-        .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y));
+        .map(|pair| (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y));
     let closing = closed
         .then(|| points.first().zip(points.last()))
         .flatten()
         .map_or(0.0, |(first, last)| {
-            (first.x - last.x).hypot(first.y - last.y)
+            (first.x - last.x).dhypot(first.y - last.y)
         });
     segments.sum::<f64>() + closing
 }
@@ -814,7 +816,7 @@ pub(crate) fn render_closed_arc_pair_fill(
     if first_points.len() < 2 || follower_points.len() < 2 {
         return Ok(None);
     }
-    let distance = |left: Point, right: Point| (right.x - left.x).hypot(right.y - left.y);
+    let distance = |left: Point, right: Point| (right.x - left.x).dhypot(right.y - left.y);
     let same_direction = distance(first_points[0], follower_points[0])
         + distance(
             *first_points.last().expect("non-empty Arc"),
@@ -1061,7 +1063,7 @@ fn render_affine_instruction(
             let start = geometry_point(instruction, context, point_to_pixels(from, canvas));
             let end = geometry_point(instruction, context, point_to_pixels(to, canvas));
             if uses_hand_stroke(instruction.weight) {
-                if (end.x - start.x).hypot(end.y - start.y) <= 1.0e-9 {
+                if (end.x - start.x).dhypot(end.y - start.y) <= 1.0e-9 {
                     apply_style(line_element(start, end), style, false)
                 } else {
                     hand_line(
@@ -1142,7 +1144,7 @@ fn render_affine_instruction(
             if uses_hand_stroke(instruction.weight)
                 && centerline
                     .windows(2)
-                    .any(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y) > 1.0e-9)
+                    .any(|pair| (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y) > 1.0e-9)
             {
                 hand_contour(
                     instruction,
@@ -1285,12 +1287,12 @@ fn render_arc(
     let start_radians = start.to_radians();
     let end_radians = end.to_radians();
     let start_point = Point::new(
-        center.x + radius * start_radians.cos(),
-        center.y - radius * start_radians.sin(),
+        center.x + radius * start_radians.dcos(),
+        center.y - radius * start_radians.dsin(),
     );
     let end_point = Point::new(
-        center.x + radius * end_radians.cos(),
-        center.y - radius * end_radians.sin(),
+        center.x + radius * end_radians.dcos(),
+        center.y - radius * end_radians.dsin(),
     );
     let large = usize::from((end - start).abs() > 180.0);
     let sweep = usize::from(end - start <= 0.0);
@@ -1630,7 +1632,7 @@ fn render_free_line(
     let (points, corners) = free_line_centerline(instruction, from, to, context, obstacles);
     let drawn = points
         .windows(2)
-        .any(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y) > 1.0e-9);
+        .any(|pair| (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y) > 1.0e-9);
     if !drawn || !uses_hand_stroke(instruction.weight) {
         return apply_style(
             Element::new("path").attr("d", open_path(&points)),
@@ -1777,7 +1779,7 @@ mod tests {
             .unwrap()
         };
         // -23 degrees about the chord's midpoint (500, 500).
-        let (sin, cos) = (-23.0_f64).to_radians().sin_cos();
+        let (sin, cos) = (-23.0_f64).to_radians().dsin_cos();
         let turned = |x: f64| Point::new(500.0 + (x - 500.0) * cos, 500.0 + (x - 500.0) * sin);
         let (start, end) = (turned(225.0), turned(775.0));
         for extra in [

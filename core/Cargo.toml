@@ -12,7 +12,14 @@ members = [
     "crates/inku-svg-raster",
 ]
 resolver = "2"
-exclude = ["vendor/resvg"]
+exclude = ["vendor/kurbo", "vendor/resvg", "vendor/svgtypes"]
+
+# kurbo and svgtypes compute with libm in every build, so a stroke, an ellipse
+# or a rotation the Compat clip builds has the same bits on every host (I-733,
+# 2026-11-07; vendor/kurbo/INKU_PATCHES.md).
+[patch.crates-io]
+kurbo = { path = "vendor/kurbo" }
+svgtypes = { path = "vendor/svgtypes" }
 
 [workspace.package]
 version = "0.1.0"
@@ -28,6 +35,7 @@ inku-score = { path = "crates/inku-score" }
 inku-render = { path = "crates/inku-render" }
 inku-svg-raster = { path = "crates/inku-svg-raster" }
 jni = "=0.21.1"
+libm = { version = "=0.2.16", default-features = false }
 pyo3 = { version = "=0.29.2", features = ["abi3-py312", "extension-module"] }
 resvg = { version = "=0.48.1", path = "vendor/resvg", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }

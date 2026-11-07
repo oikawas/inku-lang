@@ -6,6 +6,8 @@
 //! The band follows the same performed centerline the round stroke did; only
 //! its shape and the streaks inside it are the flat brush's own.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::hash01;
 use crate::geometry::centerline_normals;
 use crate::materials::bristle_tone;
@@ -263,7 +265,7 @@ pub(crate) fn flat_band(request: FlatBandRequest<'_>) -> Option<FlatBand> {
     let mut running = vec![0.0; count];
     for index in 1..count {
         let (a, b) = (centerline[index - 1], centerline[index]);
-        running[index] = running[index - 1] + (b.x - a.x).hypot(b.y - a.y);
+        running[index] = running[index - 1] + (b.x - a.x).dhypot(b.y - a.y);
     }
     let total = running[count - 1];
     if !total.is_finite() || total <= 1.0e-6 {
@@ -288,7 +290,7 @@ pub(crate) fn flat_band(request: FlatBandRequest<'_>) -> Option<FlatBand> {
         centerline[count - 1].x - centerline[0].x,
         centerline[count - 1].y - centerline[0].y,
     );
-    let chord_length = chord.x.hypot(chord.y);
+    let chord_length = chord.x.dhypot(chord.y);
     let normals = if hold == FlatHold::Fixed && chord_length > 1.0e-6 {
         vec![Point::new(-chord.y / chord_length, chord.x / chord_length); count]
     } else {
@@ -458,9 +460,9 @@ fn lay_fine_streaks(
             .into_iter()
             .map(|t| {
                 let (l, r) = banks.at(t);
-                let across_px = (r.x - l.x).hypot(r.y - l.y).max(1.0e-9);
+                let across_px = (r.x - l.x).dhypot(r.y - l.y).max(1.0e-9);
                 let wander =
-                    FINE_WANDER * scale * (t * std::f64::consts::TAU * cycles + phase).sin()
+                    FINE_WANDER * scale * (t * std::f64::consts::TAU * cycles + phase).dsin()
                         / across_px;
                 hundredths(across(l, r, (place + wander).clamp(0.0, 1.0)))
             })
@@ -659,7 +661,7 @@ mod tests {
     }
 
     fn width((left, right): &(Point, Point)) -> f64 {
-        (left.x - right.x).hypot(left.y - right.y)
+        (left.x - right.x).dhypot(left.y - right.y)
     }
 
     /// How far from a straight line's end the band starts to dry: from its last
@@ -784,7 +786,7 @@ mod tests {
         let centerline = (0..=40)
             .map(|index| {
                 let angle = std::f64::consts::FRAC_PI_2 * f64::from(index) / 40.0;
-                Point::new(200.0 * angle.cos(), 200.0 * angle.sin())
+                Point::new(200.0 * angle.dcos(), 200.0 * angle.dsin())
             })
             .collect::<Vec<_>>();
         let normals = centerline_normals(&centerline, false);
@@ -802,7 +804,7 @@ mod tests {
         for (index, (left, right)) in pairs.iter().enumerate().take(34) {
             let across = Point::new(left.x - right.x, left.y - right.y);
             assert!((across.x * normals[index].y - across.y * normals[index].x).abs() < 1e-5);
-            assert!((across.x.hypot(across.y) - 24.0).abs() < 1e-5);
+            assert!((across.x.dhypot(across.y) - 24.0).abs() < 1e-5);
         }
         // Narrowed where it ends, its tip is still square to the travel there.
         // The drying pairs keep hundredths of a pixel.

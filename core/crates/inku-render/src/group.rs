@@ -1,5 +1,7 @@
 //! Per-member variation and fade semantics for expanded groups.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::hash01;
 use crate::planning::{instruction_anchor, scale_instruction_on_canvas};
 use crate::stroke::grammar;
@@ -137,7 +139,7 @@ pub fn fade_levels(
         });
         let distances: Vec<f64> = anchors
             .iter()
-            .map(|point| (point.x - center.x).hypot(point.y - center.y))
+            .map(|point| (point.x - center.x).dhypot(point.y - center.y))
             .collect();
         let nearest = distances.iter().copied().fold(f64::INFINITY, f64::min);
         let farthest = distances.iter().copied().fold(f64::NEG_INFINITY, f64::max);

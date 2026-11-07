@@ -1,5 +1,7 @@
 //! Pure transformation of canonical instructions into performed instructions.
 
+use inku_score::math::DetFloat;
+
 use crate::arc::{arc_from_endpoints_and_sagitta, arc_point, minor_arc_delta};
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour};
 use crate::determinism::{hash01, instruction_seed};
@@ -29,7 +31,7 @@ impl Bounds {
 
     #[must_use]
     pub fn radius(self) -> f64 {
-        ((self.max.x - self.min.x).hypot(self.max.y - self.min.y) / 2.0).max(0.015)
+        ((self.max.x - self.min.x).dhypot(self.max.y - self.min.y) / 2.0).max(0.015)
     }
 }
 
@@ -202,8 +204,8 @@ pub(crate) fn rotate_point(point: Point, center: Point, degrees: f64) -> Point {
     let angle = degrees.to_radians();
     let delta = Point::new(point.x - center.x, point.y - center.y);
     Point::new(
-        center.x + delta.x * angle.cos() - delta.y * angle.sin(),
-        center.y + delta.x * angle.sin() + delta.y * angle.cos(),
+        center.x + delta.x * angle.dcos() - delta.y * angle.dsin(),
+        center.y + delta.x * angle.dsin() + delta.y * angle.dcos(),
     )
 }
 
@@ -243,8 +245,8 @@ fn group_arc_sweep_points(
 fn rotate_vector(vector: Point, degrees: f64) -> Point {
     let angle = degrees.to_radians();
     Point::new(
-        vector.x * angle.cos() - vector.y * angle.sin(),
-        vector.x * angle.sin() + vector.y * angle.cos(),
+        vector.x * angle.dcos() - vector.y * angle.dsin(),
+        vector.x * angle.dsin() + vector.y * angle.dcos(),
     )
 }
 
@@ -428,8 +430,8 @@ fn performed_instruction_bounds_with_options(
             let size = instruction.size?;
             let angle = rotation.to_radians();
             let half = Point::new(size.x / 2.0, size.y / 2.0);
-            let width = (half.x * angle.cos()).hypot(half.y * angle.sin());
-            let height = (half.x * angle.sin()).hypot(half.y * angle.cos());
+            let width = (half.x * angle.dcos()).dhypot(half.y * angle.dsin());
+            let height = (half.x * angle.dsin()).dhypot(half.y * angle.dcos());
             Some(Bounds {
                 min: Point::new(center.x - width, center.y - height),
                 max: Point::new(center.x + width, center.y + height),
@@ -509,7 +511,7 @@ pub fn endpoint_geometry(
                 rotation,
             );
             let tangent = Point::new(end.x - start.x, end.y - start.y);
-            (tangent.x.hypot(tangent.y) >= 1.0e-9).then_some((start, end, tangent, tangent))
+            (tangent.x.dhypot(tangent.y) >= 1.0e-9).then_some((start, end, tangent, tangent))
         }
         Primitive::Arc => {
             let center = point_to_short_side_units(instruction.center?, canvas);
@@ -528,15 +530,15 @@ pub fn endpoint_geometry(
                 rotate_point(arc_point(center, radius, end_angle), anchor, rotation),
                 rotate_vector(
                     Point::new(
-                        -start_radians.sin() * direction,
-                        -start_radians.cos() * direction,
+                        -start_radians.dsin() * direction,
+                        -start_radians.dcos() * direction,
                     ),
                     rotation,
                 ),
                 rotate_vector(
                     Point::new(
-                        -end_radians.sin() * direction,
-                        -end_radians.cos() * direction,
+                        -end_radians.dsin() * direction,
+                        -end_radians.dcos() * direction,
                     ),
                     rotation,
                 ),
@@ -617,7 +619,7 @@ pub(crate) fn performed_arc_sagitta(
         instruction.rotation.unwrap_or(0.0),
     );
     let chord = Point::new(end.x - start.x, end.y - start.y);
-    let length = chord.x.hypot(chord.y);
+    let length = chord.x.dhypot(chord.y);
     if length <= 1.0e-12 {
         return None;
     }
@@ -658,7 +660,7 @@ fn relation_gap(seed: Seed, index: usize, gap: RelationGap) -> f64 {
 
 fn line_perpendicular(start: Point, end: Point, amount: f64) -> Point {
     let delta = Point::new(end.x - start.x, end.y - start.y);
-    let length = delta.x.hypot(delta.y);
+    let length = delta.x.dhypot(delta.y);
     if length < 1.0e-6 {
         Point::new(0.0, 0.0)
     } else {
@@ -878,7 +880,7 @@ pub fn resolve_relation_on_canvas(
                 let point =
                     rotate_point(contour[point_index], center, prior.rotation.unwrap_or(0.0));
                 let delta = Point::new(point.x - prior_center.x, point.y - prior_center.y);
-                let distance = delta.x.hypot(delta.y).max(1.0e-9);
+                let distance = delta.x.dhypot(delta.y).max(1.0e-9);
                 clamp_short_side_point(
                     Point::new(
                         point.x + delta.x / distance * gap,
@@ -890,8 +892,8 @@ pub fn resolve_relation_on_canvas(
                 let angle = std::f64::consts::TAU * hash01(index as i64, seed, "along-angle");
                 clamp_short_side_point(
                     Point::new(
-                        prior_center.x + angle.cos() * (prior_bounds.radius() + gap),
-                        prior_center.y + angle.sin() * (prior_bounds.radius() + gap),
+                        prior_center.x + angle.dcos() * (prior_bounds.radius() + gap),
+                        prior_center.y + angle.dsin() * (prior_bounds.radius() + gap),
                     ),
                     canvas,
                 )
@@ -905,8 +907,8 @@ pub fn resolve_relation_on_canvas(
                 resolved.from_ = Some(point_from_short_side_units(
                     clamp_short_side_point(
                         Point::new(
-                            prior_center.x - angle.cos() * length / 2.0,
-                            prior_center.y - angle.sin() * length / 2.0,
+                            prior_center.x - angle.dcos() * length / 2.0,
+                            prior_center.y - angle.dsin() * length / 2.0,
                         ),
                         canvas,
                     ),
@@ -915,8 +917,8 @@ pub fn resolve_relation_on_canvas(
                 resolved.to = Some(point_from_short_side_units(
                     clamp_short_side_point(
                         Point::new(
-                            prior_center.x + angle.cos() * length / 2.0,
-                            prior_center.y + angle.sin() * length / 2.0,
+                            prior_center.x + angle.dcos() * length / 2.0,
+                            prior_center.y + angle.dsin() * length / 2.0,
                         ),
                         canvas,
                     ),
@@ -937,8 +939,8 @@ pub fn resolve_relation_on_canvas(
             let angle = std::f64::consts::TAU * hash01(index as i64, seed, "not-touching-angle");
             clamp_short_side_point(
                 Point::new(
-                    prior_center.x + angle.cos() * distance,
-                    prior_center.y + angle.sin() * distance,
+                    prior_center.x + angle.dcos() * distance,
+                    prior_center.y + angle.dsin() * distance,
                 ),
                 canvas,
             )

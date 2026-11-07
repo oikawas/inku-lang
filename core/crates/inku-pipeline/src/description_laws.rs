@@ -21,6 +21,7 @@ use inku_ddl::{
     SemanticInstruction, SourceSpan, compile_typed_ddl,
 };
 use inku_score::Score;
+use inku_score::math::DetFloat;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -374,8 +375,8 @@ pub(crate) fn sentence_box(numbers: &Numbers, units: [f64; 2]) -> [f64; 4] {
         PlaceKind::Point => {
             let (width, height) = size.unwrap_or((0.0, 0.0));
             let turn = numbers.rotation.to_radians();
-            let hx = (width / 2.0 * turn.cos()).abs() + (height / 2.0 * turn.sin()).abs();
-            let hy = (width / 2.0 * turn.sin()).abs() + (height / 2.0 * turn.cos()).abs();
+            let hx = (width / 2.0 * turn.dcos()).abs() + (height / 2.0 * turn.dsin()).abs();
+            let hy = (width / 2.0 * turn.dsin()).abs() + (height / 2.0 * turn.dcos()).abs();
             [
                 values[0] - hx / ux,
                 values[1] - hy / uy,
@@ -592,7 +593,7 @@ impl ThingDocument {
                 let (ca, cb) = (center(boxes[a]), center(boxes[b]));
                 if holds(boxes[a], cb)
                     || holds(boxes[b], ca)
-                    || (ca[0] - cb[0]).hypot(ca[1] - cb[1]) < 0.015
+                    || (ca[0] - cb[0]).dhypot(ca[1] - cb[1]) < 0.015
                 {
                     let (ra, rb) = (root(&mut parent, a), root(&mut parent, b));
                     parent[rb] = ra;
@@ -651,7 +652,7 @@ impl ThingDocument {
 
     /// A step's length in short-edge units.
     fn length(&self, dx: f64, dy: f64) -> f64 {
-        (dx * self.units[0]).hypot(dy * self.units[1])
+        (dx * self.units[0]).dhypot(dy * self.units[1])
     }
 }
 
@@ -773,7 +774,7 @@ fn translate_thing(doc: &mut ThingDocument, thing: u64, dx: f64, dy: f64) -> Fit
     if !doc.move_by(&members, kept.0, kept.1, 1.0, [0.0, 0.0]) {
         return Fit::Refused;
     }
-    if (kept.0 - dx).hypot(kept.1 - dy) > 1e-9 {
+    if (kept.0 - dx).dhypot(kept.1 - dy) > 1e-9 {
         Fit::Clamped
     } else {
         Fit::Done
@@ -1089,7 +1090,7 @@ pub fn measure(doc: &mut ThingDocument, answer: &CompositionAnswer, fit: bool) -
             (Some(pb), Some(tb)) => {
                 let ca = center(pb);
                 let d = [ca[0] - 0.5, ca[1] - 0.5];
-                if d[0].hypot(d[1]) < 0.05 {
+                if d[0].dhypot(d[1]) < 0.05 {
                     m.unmeasurable("B7", thing, "the partner is at the center");
                 } else {
                     let goal = [
@@ -1387,7 +1388,7 @@ fn measure_row(m: &mut Measurer<'_>, law: &str, target: &Value) {
             .as_str()
             .and_then(|ratio| ratio.parse().ok())
             .unwrap_or(GOLDEN.1);
-        let q = ratio.powf(1.0 / (count - 1.0));
+        let q = ratio.dpowf(1.0 / (count - 1.0));
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
         let goals: Vec<f64> = (0..n).map(|i| sizes[0] * q.powi(i as i32)).collect();
         let deviation = sizes
@@ -1427,7 +1428,7 @@ fn measure_row(m: &mut Measurer<'_>, law: &str, target: &Value) {
                 .as_str()
                 .and_then(|ratio| ratio.parse().ok())
                 .unwrap_or(GOLDEN.1);
-            let q = ratio.powf(1.0 / (count - 2.0));
+            let q = ratio.dpowf(1.0 / (count - 2.0));
             #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
             let gaps: Vec<f64> = (0..n - 1).map(|i| q.powi(i as i32)).collect();
             let total: f64 = gaps.iter().sum();

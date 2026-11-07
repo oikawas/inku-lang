@@ -55,6 +55,8 @@
 
 use std::cell::RefCell;
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::hash01;
 use crate::materials::bristle_tone;
 use crate::svg::{Element, format_number};
@@ -184,14 +186,14 @@ fn mix(a: &str, b: &str, t: f64) -> String {
         if c <= 0.04045 {
             c / 12.92
         } else {
-            ((c + 0.055) / 1.055).powf(2.4)
+            ((c + 0.055) / 1.055).dpowf(2.4)
         }
     };
     let encoded = |c: f64| {
         if c <= 0.003_130_8 {
             c * 12.92
         } else {
-            1.055 * c.powf(1.0 / 2.4) - 0.055
+            1.055 * c.dpowf(1.0 / 2.4) - 0.055
         }
     };
     let channel = |i: usize| {
@@ -274,7 +276,7 @@ fn mean_width(left: &[Point], right: &[Point]) -> f64 {
     let count = left.len().min(right.len()).max(1);
     left.iter()
         .zip(right)
-        .map(|(l, r)| (l.x - r.x).hypot(l.y - r.y))
+        .map(|(l, r)| (l.x - r.x).dhypot(l.y - r.y))
         .sum::<f64>()
         / count as f64
 }
@@ -624,7 +626,7 @@ fn blur_filter(id: &str, deviation: f64, region: Region) -> Element {
 
 /// Straight segments of `contour` along lines at `angle`, `spacing` apart.
 fn scan_segments(contour: &[Point], angle: f64, spacing: f64, phase: f64) -> Vec<(Point, Point)> {
-    let (sin, cos) = angle.sin_cos();
+    let (sin, cos) = angle.dsin_cos();
     let direction = Point::new(cos, sin);
     let normal = Point::new(-sin, cos);
     let along = |p: &Point| p.x * direction.x + p.y * direction.y;
@@ -1019,7 +1021,7 @@ fn knife_pull(
     }
     let mut lengths = vec![0.0];
     for pair in spine.windows(2) {
-        let step = (pair[1].0.x - pair[0].0.x).hypot(pair[1].0.y - pair[0].0.y);
+        let step = (pair[1].0.x - pair[0].0.x).dhypot(pair[1].0.y - pair[0].0.y);
         lengths.push(lengths.last().copied().unwrap_or(0.0) + step);
     }
     let length = lengths.last().copied().unwrap_or(0.0).max(1e-9);
@@ -1034,7 +1036,7 @@ fn knife_pull(
         let span = (lengths[i] - lengths[i - 1]).max(1e-9);
         let f = ((s - lengths[i - 1]) / span).clamp(0.0, 1.0);
         let (dx, dy) = (b.0.x - a.0.x, b.0.y - a.0.y);
-        let d = dx.hypot(dy).max(1e-9);
+        let d = dx.dhypot(dy).max(1e-9);
         (
             Point::new(a.0.x + dx * f, a.0.y + dy * f),
             a.1 + (b.1 - a.1) * f,
@@ -1086,7 +1088,7 @@ fn knife_pull(
     // would otherwise make a joint); a lifted end narrows a little over its
     // last fifth, where the paint ran out.
     let bulge = if whole { 0.13 } else { 0.06 };
-    let swell = |t: f64| 1.0 + bulge * (-((t - head * 0.45) / (head * 0.7)).powi(2)).exp();
+    let swell = |t: f64| 1.0 + bulge * (-((t - head * 0.45) / (head * 0.7)).powi(2)).dexp();
     let thin = |t: f64| {
         if !dry && t > 0.78 {
             1.0 - (t - 0.78) / 0.22 * 0.12
@@ -1139,7 +1141,7 @@ fn knife_pull(
     for k in 1..6 {
         let angle = -std::f64::consts::FRAC_PI_2 + std::f64::consts::PI * f64::from(k) / 6.0;
         let depth = 0.24 * half0 * (0.6 + 0.8 * h(i64::from(k), "pk-back"));
-        outline.push(at(0.0, angle.sin() * swell(0.0), -angle.cos() * depth));
+        outline.push(at(0.0, angle.dsin() * swell(0.0), -angle.dcos() * depth));
     }
     // The paint thins from the pile to the end.
     let thinning = fresh("pk-thin");
@@ -1249,8 +1251,8 @@ fn knife_pull(
                     let depth = 0.24 * half0 * (0.6 + 0.8 * h(i64::from(k), "pk-back"));
                     at(
                         0.0,
-                        angle.sin() * swell(0.0) * 0.9,
-                        -angle.cos() * depth * 0.7,
+                        angle.dsin() * swell(0.0) * 0.9,
+                        -angle.dcos() * depth * 0.7,
                     )
                 })
                 .collect::<Vec<_>>();
@@ -1413,7 +1415,7 @@ fn knife_stroke(
         .map(|(l, r)| {
             (
                 Point::new((l.x + r.x) * 0.5, (l.y + r.y) * 0.5),
-                (l.x - r.x).hypot(l.y - r.y),
+                (l.x - r.x).dhypot(l.y - r.y),
             )
         })
         .collect::<Vec<_>>();
@@ -1423,7 +1425,7 @@ fn knife_stroke(
     }
     let mut cumulative = vec![0.0];
     for pair in centre.windows(2) {
-        let step = (pair[1].0.x - pair[0].0.x).hypot(pair[1].0.y - pair[0].0.y);
+        let step = (pair[1].0.x - pair[0].0.x).dhypot(pair[1].0.y - pair[0].0.y);
         cumulative.push(cumulative.last().copied().unwrap_or(0.0) + step);
     }
     let total = cumulative.last().copied().unwrap_or(0.0);
@@ -1433,8 +1435,8 @@ fn knife_stroke(
     let turning = centre
         .windows(3)
         .map(|w| {
-            let a = (w[1].0.y - w[0].0.y).atan2(w[1].0.x - w[0].0.x);
-            let b = (w[2].0.y - w[1].0.y).atan2(w[2].0.x - w[1].0.x);
+            let a = (w[1].0.y - w[0].0.y).datan2(w[1].0.x - w[0].0.x);
+            let b = (w[2].0.y - w[1].0.y).datan2(w[2].0.x - w[1].0.x);
             let mut turn = (b - a).abs();
             if turn > std::f64::consts::PI {
                 turn = 2.0 * std::f64::consts::PI - turn;
@@ -1476,7 +1478,7 @@ fn knife_stroke(
         let (p0, _) = at(start);
         let (p1, _) = at(end);
         let (dx, dy) = (p1.x - p0.x, p1.y - p0.y);
-        let len = dx.hypot(dy).max(1e-9);
+        let len = dx.dhypot(dy).max(1e-9);
         let shift = (hash01(order, seed, "knife-shift") - 0.5) * 0.25 * width;
         let (w0, w1) = (
             0.92 + 0.16 * hash01(order, seed, "knife-w0"),
@@ -1603,7 +1605,7 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
         let perimeter = contour
             .iter()
             .zip(contour.iter().cycle().skip(1))
-            .map(|(a, b)| (b.x - a.x).hypot(b.y - a.y))
+            .map(|(a, b)| (b.x - a.x).dhypot(b.y - a.y))
             .sum::<f64>();
         let part = (share * 1.5).min(0.6);
         let runs = [0_i64, 1, 2].map(|k| 0.4 + hash01(k, seed, "wc-mix-run"));
@@ -1758,12 +1760,12 @@ fn oil_pastel_fill(
             let i = row * 10_000 + column;
             let cx = x0 + (column as f64 + 0.5 + (hash01(i, seed, "op-jx") - 0.5) * 0.9) * spacing;
             let cy = y0 + (row as f64 + 0.5 + (hash01(i, seed, "op-jy") - 0.5) * 0.9) * spacing;
-            let field = 0.55 * ((cx - x0) / size * 2.4 + phase_x).sin()
-                + 0.45 * ((cy - y0) / size * 2.1 + phase_y).cos();
+            let field = 0.55 * ((cx - x0) / size * 2.4 + phase_x).dsin()
+                + 0.45 * ((cy - y0) / size * 2.1 + phase_y).dcos();
             let angle = base + field * 0.7 + (hash01(i, seed, "op-ja") - 0.5) * 0.35;
             let length = width * (2.2 + 2.0 * hash01(i, seed, "op-len"));
             let bend = (hash01(i, seed, "op-bend") - 0.5) * 0.5 * length;
-            let (sin, cos) = angle.sin_cos();
+            let (sin, cos) = angle.dsin_cos();
             let a = Point::new(cx - cos * length * 0.5, cy - sin * length * 0.5);
             let b = Point::new(cx + cos * length * 0.5, cy + sin * length * 0.5);
             let control = Point::new(cx - sin * bend, cy + cos * bend);
@@ -1877,14 +1879,14 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
                 x0 + (column as f64 + 0.5 + (hash01(i, seed, "pk-jx") - 0.5) * 0.8) * spacing,
                 y0 + (row as f64 + 0.5 + (hash01(i, seed, "pk-jy") - 0.5) * 0.8) * spacing,
             );
-            let field = 0.6 * ((centre.x - x0) / size * 2.2 + phase_x).sin()
-                + 0.4 * ((centre.y - y0) / size * 1.9 + phase_y).cos();
+            let field = 0.6 * ((centre.x - x0) / size * 2.2 + phase_x).dsin()
+                + 0.4 * ((centre.y - y0) / size * 1.9 + phase_y).dcos();
             let angle = base + field * 0.8 + (hash01(i, seed, "pk-angle") - 0.5) * 0.5;
             let scale = 0.8 + 0.45 * hash01(i, seed, "pk-scale");
             let breadth = cell * (0.55 + 0.25 * hash01(i, seed, "pk-breadth")) * scale;
             let length = breadth * (2.4 + 1.2 * hash01(i, seed, "pk-len"));
             let bend = (hash01(i, seed, "pk-bend") - 0.5) * 0.18 * length;
-            let (sin, cos) = angle.sin_cos();
+            let (sin, cos) = angle.dsin_cos();
             let p0 = Point::new(centre.x - cos * length * 0.5, centre.y - sin * length * 0.5);
             let p1 = Point::new(centre.x + cos * length * 0.5, centre.y + sin * length * 0.5);
             let control = Point::new(centre.x - sin * bend * 2.0, centre.y + cos * bend * 2.0);
@@ -2003,7 +2005,7 @@ fn etching_stroke(
     let (mut walked, mut next, mut order) = (0.0, gap(0, "et-pit-first"), 0_i64);
     for pair in centre.windows(2) {
         let (a, b) = (pair[0], pair[1]);
-        let step = (b.x - a.x).hypot(b.y - a.y).max(1e-9);
+        let step = (b.x - a.x).dhypot(b.y - a.y).max(1e-9);
         while walked + step >= next {
             let t = (next - walked) / step;
             if hash01(order, seed, "et-pit") < 0.45 {
@@ -2118,7 +2120,7 @@ fn etching_fill_varied(
             let depth = 0.85 + 0.3 * hash01(i, seed, "et-line-depth");
             let lean = (hash01(i, seed, "et-lean") - 0.5) * line * 1.2;
             let (dx, dy) = (b.x - a.x, b.y - a.y);
-            let len = dx.hypot(dy).max(1e-9);
+            let len = dx.dhypot(dy).max(1e-9);
             let (nx, ny) = (-dy / len, dx / len);
             let count = ((len / (line * 8.0)).ceil() as usize).clamp(2, 24);
             let (mut near, mut far) =
@@ -2129,7 +2131,7 @@ fn etching_fill_varied(
                 let bow = lean * 4.0 * f * (1.0 - f);
                 let p = Point::new(a.x + dx * f + nx * bow, a.y + dy * f + ny * bow);
                 let s = weight(p);
-                let mut half = 0.5 * line * depth * (0.45 + s.powf(1.2));
+                let mut half = 0.5 * line * depth * (0.45 + s.dpowf(1.2));
                 if *crossing {
                     let t = ((s - 0.5) / 0.4).clamp(0.0, 1.0);
                     half *= t * t * (3.0 - 2.0 * t);

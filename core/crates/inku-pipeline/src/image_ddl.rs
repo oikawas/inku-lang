@@ -15,6 +15,7 @@ use inku_ddl::{
     CanvasRatioWriting, MacroDefinition, NormalizedDdlDocument, ResolvedInstructionLanguage,
     ScoreDiagnosticOwner, SourceSpan, declare_canvas_ratio, saijiki_asset, saijiki_tool_guidance,
 };
+use inku_score::math::DetFloat;
 use inku_score::{
     CANVAS_FORMAT_REGISTRY, CanvasFormat, CanvasRatio, Color, DEFAULT_CANVAS_FORMAT_ID,
     ResourceDemand, lookup_canvas_format,
@@ -177,8 +178,8 @@ fn lowest_terms((width, height): (u32, u32)) -> Option<CanvasRatio> {
 /// first registered wins a tie (A4 before B4).
 #[must_use]
 pub fn nearest_canvas_format(ratio: CanvasRatio) -> &'static str {
-    let wanted = (f64::from(ratio.width_units) / f64::from(ratio.height_units)).ln();
-    let distance = |format: &&CanvasFormat| (format.ratio_f64().ln() - wanted).abs();
+    let wanted = (f64::from(ratio.width_units) / f64::from(ratio.height_units)).dln();
+    let distance = |format: &&CanvasFormat| (format.ratio_f64().dln() - wanted).abs();
     CANVAS_FORMAT_REGISTRY
         .iter()
         .min_by(|left, right| distance(left).total_cmp(&distance(right)))

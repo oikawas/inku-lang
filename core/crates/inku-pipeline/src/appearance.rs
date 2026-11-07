@@ -25,6 +25,7 @@ use inku_render::compat_clip::ClipLimits;
 use inku_render::performance::PerformanceRequest;
 use inku_render::render::{CompatFillClipPolicy, render, render_with_resources};
 use inku_render::types::{CanvasSize, RenderOptions, RenderRequest, SvgProfile};
+use inku_score::math::DetFloat;
 use inku_score::{Color, Primitive, Score, ScoreErrorPolicy, lookup_canvas_format};
 
 use crate::laws::{layer_of, round3};
@@ -270,7 +271,7 @@ fn lab_of_unit(rgb: [f64; 3]) -> [f64; 3] {
         if c <= 0.04045 {
             c / 12.92
         } else {
-            ((c + 0.055) / 1.055).powf(2.4)
+            ((c + 0.055) / 1.055).dpowf(2.4)
         }
     };
     let lin = rgb.map(linear);
@@ -279,7 +280,7 @@ fn lab_of_unit(rgb: [f64; 3]) -> [f64; 3] {
     let z = (0.0193 * lin[0] + 0.1192 * lin[1] + 0.9505 * lin[2]) / 1.08883;
     let f = |t: f64| {
         if t > 0.008856 {
-            t.powf(1.0 / 3.0)
+            t.dpowf(1.0 / 3.0)
         } else {
             7.787 * t + 16.0 / 116.0
         }
@@ -372,7 +373,7 @@ impl Shares {
                 let mut counts: BTreeMap<i64, u64> = BTreeMap::new();
                 for angle_step in 0..10 {
                     let angle = (f64::from(angle_step) * 4.5).to_radians();
-                    let (nx, ny) = (-angle.sin(), angle.cos());
+                    let (nx, ny) = (-angle.dsin(), angle.dcos());
                     for offset_step in 0..10 {
                         let offset = f64::from(offset_step) / 10.0;
                         #[allow(clippy::cast_possible_truncation)]
@@ -625,14 +626,14 @@ fn normal_quantile(p: f64) -> f64 {
             / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0)
     };
     if p < 0.024_25 {
-        tail((-2.0 * p.ln()).sqrt())
+        tail((-2.0 * p.dln()).sqrt())
     } else if p <= 1.0 - 0.024_25 {
         let q = p - 0.5;
         let r = q * q;
         (((((A[0] * r + A[1]) * r + A[2]) * r + A[3]) * r + A[4]) * r + A[5]) * q
             / (((((B[0] * r + B[1]) * r + B[2]) * r + B[3]) * r + B[4]) * r + 1.0)
     } else {
-        -tail((-2.0 * (1.0 - p).ln()).sqrt())
+        -tail((-2.0 * (1.0 - p).dln()).sqrt())
     }
 }
 
@@ -724,7 +725,7 @@ impl Affine {
 }
 
 fn rotation(degrees: f64) -> Affine {
-    let (sin, cos) = degrees.to_radians().sin_cos();
+    let (sin, cos) = degrees.to_radians().dsin_cos();
     Affine([cos, sin, -sin, cos, 0.0, 0.0])
 }
 
@@ -969,7 +970,7 @@ fn filled_area(rings: &[Vec<[f64; 2]>]) -> f64 {
 fn ellipse_ring(cx: f64, cy: f64, rx: f64, ry: f64) -> Vec<[f64; 2]> {
     (0..32)
         .map(|k| {
-            let (sin, cos) = (f64::from(k) * std::f64::consts::TAU / 32.0).sin_cos();
+            let (sin, cos) = (f64::from(k) * std::f64::consts::TAU / 32.0).dsin_cos();
             [cx + rx * cos, cy + ry * sin]
         })
         .collect()
@@ -1557,7 +1558,7 @@ fn layer_look(
         return Look {
             lab: Some(lab),
             contrast: (lab[0] - ground_lab[0]).abs() / 100.0,
-            chroma: lab[1].hypot(lab[2]),
+            chroma: lab[1].dhypot(lab[2]),
             ink: (filled / canvas_area).min(1.0),
             read: false,
             opacity: 1.0,
@@ -1631,7 +1632,7 @@ fn layer_look(
         Some((lab, _)) => Look {
             lab: Some(lab),
             contrast: (lab[0] - ground_lab[0]).abs() / 100.0,
-            chroma: lab[1].hypot(lab[2]),
+            chroma: lab[1].dhypot(lab[2]),
             ink,
             read: true,
             opacity,

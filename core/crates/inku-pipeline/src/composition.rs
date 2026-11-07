@@ -22,6 +22,7 @@ use std::sync::OnceLock;
 use inku_ddl::work_plan::{
     ComposedRange, WorkPlan, WorkPlanLayer, WorkPlanSlot, work_plan_capabilities,
 };
+use inku_score::math::DetFloat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -321,7 +322,7 @@ fn count_weight(count: u32) -> f64 {
     COUNT_WEIGHT
         .get(count as usize - 1)
         .copied()
-        .unwrap_or_else(|| f64::from(count).powf(0.7))
+        .unwrap_or_else(|| f64::from(count).dpowf(0.7))
 }
 
 // ---------------------------------------------------------------------------

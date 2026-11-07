@@ -6,6 +6,7 @@ use inku_render::planning::{Bounds, endpoint_geometry, performed_instruction_bou
 use inku_render::types::{
     Point, Score, ScoreErrorPolicy, ScoreExecutionDisposition, ScoreExecutionReason,
 };
+use inku_score::math::DetFloat;
 use serde_json::{Value, json};
 
 const SEEDS: [i128; 3] = [1, 7, 42];
@@ -228,7 +229,7 @@ fn distance_to_segments(points: &[Point], at: Point) -> f64 {
             let (a, b) = (points[index], points[(index + 1) % points.len()]);
             let (dx, dy) = (b.x - a.x, b.y - a.y);
             let t = (((at.x - a.x) * dx + (at.y - a.y) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
-            (a.x + dx * t - at.x).hypot(a.y + dy * t - at.y)
+            (a.x + dx * t - at.x).dhypot(a.y + dy * t - at.y)
         })
         .fold(f64::INFINITY, f64::min)
 }
@@ -252,7 +253,7 @@ fn a_connection_starts_on_the_outline_of_a_closed_previous_shape() {
         let (start, _, _, _) = endpoint_geometry(&resolved.score.instructions[1], None).unwrap();
         let start = resolved.instruction_transforms()[1].apply(start);
         let distance = match prior["primitive"].as_str().unwrap() {
-            "circle" => ((start.x - 0.5).hypot(start.y - 0.5) - 0.15).abs(),
+            "circle" => ((start.x - 0.5).dhypot(start.y - 0.5) - 0.15).abs(),
             "ellipse" => {
                 let value = ((start.x - 0.5) / 0.15).powi(2) + ((start.y - 0.5) / 0.08).powi(2);
                 // A point within 0.002 of the outline keeps the normalized radius near 1.

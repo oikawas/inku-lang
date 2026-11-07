@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+use inku_score::math::DetFloat;
 use inku_score::oklab_from_srgb;
 use sha2::{Digest, Sha256};
 
@@ -117,8 +118,8 @@ fn oklch_from_hex(value: &str) -> Option<(f64, f64, f64)> {
         oklab_from_srgb([red, green, blue].map(|component| f64::from(component) / 255.0));
     Some((
         lightness,
-        a.hypot(b),
-        b.atan2(a).to_degrees().rem_euclid(360.0),
+        a.dhypot(b),
+        b.datan2(a).to_degrees().rem_euclid(360.0),
     ))
 }
 

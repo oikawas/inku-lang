@@ -1,5 +1,7 @@
 //! Display-profile material filters kept outside portable mark geometry.
 
+use inku_score::math::DetFloat;
+
 use crate::determinism::hash01;
 use crate::svg::{Element, format_number};
 use crate::types::{CanvasSize, Point, Seed, SurfaceIntensity, Weight};
@@ -176,7 +178,7 @@ fn srgb_to_linear(channel: f64) -> f64 {
     if channel <= 0.04045 {
         channel / 12.92
     } else {
-        ((channel + 0.055) / 1.055).powf(2.4)
+        ((channel + 0.055) / 1.055).dpowf(2.4)
     }
 }
 
@@ -184,7 +186,7 @@ fn linear_to_srgb(channel: f64) -> f64 {
     if channel <= 0.003_130_8 {
         channel * 12.92
     } else {
-        1.055 * channel.powf(1.0 / 2.4) - 0.055
+        1.055 * channel.dpowf(1.0 / 2.4) - 0.055
     }
 }
 
@@ -200,9 +202,9 @@ fn parse_pigment(color: &str) -> Option<[f64; 3]> {
 }
 
 fn oklab([r, g, b]: [f64; 3]) -> [f64; 3] {
-    let l = (0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b).cbrt();
-    let m = (0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b).cbrt();
-    let s = (0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b).cbrt();
+    let l = (0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b).dcbrt();
+    let m = (0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b).dcbrt();
+    let s = (0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b).dcbrt();
     [
         0.210_454_255_3 * l + 0.793_617_785_0 * m - 0.004_072_046_8 * s,
         1.977_998_495_1 * l - 2.428_592_205_0 * m + 0.450_593_709_9 * s,
@@ -230,11 +232,11 @@ fn adjust_pigment(color: &str, change: impl Fn(f64, f64, f64) -> (f64, f64, f64)
     let [lightness, a, b] = oklab(rgb);
     let (lightness, chroma, hue) = change(
         lightness,
-        a.hypot(b),
-        b.atan2(a).to_degrees().rem_euclid(360.0),
+        a.dhypot(b),
+        b.datan2(a).to_degrees().rem_euclid(360.0),
     );
     let lightness = lightness.clamp(0.0, 1.0);
-    let (sin, cos) = hue.to_radians().sin_cos();
+    let (sin, cos) = hue.to_radians().dsin_cos();
     let at = |chroma: f64| linear_from_oklab([lightness, chroma * cos, chroma * sin]);
     let fits = |rgb: [f64; 3]| {
         rgb.iter()
@@ -311,7 +313,7 @@ mod computer_palette_tests {
         let colors = computer_palette("#2468ac", SurfaceIntensity::Normal);
         let values = colors.map(|color| {
             let [l, a, b] = oklab(parse_pigment(&color).unwrap());
-            (l, a.hypot(b), b.atan2(a).to_degrees().rem_euclid(360.0))
+            (l, a.dhypot(b), b.datan2(a).to_degrees().rem_euclid(360.0))
         });
         assert_eq!(
             computer_palette("#2468ac", SurfaceIntensity::Normal)[2],
@@ -377,7 +379,7 @@ fn segment_distance(point: Point, start: Point, end: Point) -> f64 {
         ((point.x - start.x) * dx + (point.y - start.y) * dy) / length
     }
     .clamp(0.0, 1.0);
-    (point.x - start.x - t * dx).hypot(point.y - start.y - t * dy)
+    (point.x - start.x - t * dx).dhypot(point.y - start.y - t * dy)
 }
 
 /// Select the same vertices on both banks, preserving loaded shoulders and width.
@@ -398,8 +400,8 @@ fn simplify_oil_ridge(left: &mut Vec<Point>, right: &mut Vec<Point>, closed: boo
         let widest = (0..=last)
             .max_by(|&a, &b| {
                 (left[a].x - right[a].x)
-                    .hypot(left[a].y - right[a].y)
-                    .total_cmp(&(left[b].x - right[b].x).hypot(left[b].y - right[b].y))
+                    .dhypot(left[a].y - right[a].y)
+                    .total_cmp(&(left[b].x - right[b].x).dhypot(left[b].y - right[b].y))
                     .then_with(|| (2 * b).abs_diff(last).cmp(&(2 * a).abs_diff(last)))
             })
             .unwrap();
@@ -475,7 +477,7 @@ pub(crate) fn oil_paint_stroke(
     let widths = left
         .iter()
         .zip(right)
-        .map(|(a, b)| (b.x - a.x).hypot(b.y - a.y))
+        .map(|(a, b)| (b.x - a.x).dhypot(b.y - a.y))
         .collect::<Vec<_>>();
     let mut sorted = widths.clone();
     sorted.sort_by(f64::total_cmp);
@@ -542,7 +544,7 @@ pub(crate) fn oil_paint_stroke(
                     (t * 12.0).min((1.0 - t) * 12.0).min(1.0)
                 };
                 let neck = ((widths[sample] / median - 0.35) / 0.15).clamp(0.0, 1.0);
-                let wave = (t * std::f64::consts::TAU * 2.0 + phase).sin() * 0.018;
+                let wave = (t * std::f64::consts::TAU * 2.0 + phase).dsin() * 0.018;
                 let at = |fraction: f64| {
                     Point::new(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction)
                 };

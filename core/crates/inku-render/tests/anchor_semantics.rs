@@ -6,6 +6,7 @@ use inku_render::types::{
     CanvasSize, Point, RenderOptions, RenderRequest, Score, ScoreErrorPolicy, ScoreExecutionReason,
     SvgProfile,
 };
+use inku_score::math::DetFloat;
 
 fn score(json: &str) -> Score {
     serde_json::from_str(json).expect("valid Anchor score")
@@ -53,7 +54,7 @@ fn near_point(actual: Point, expected: Point) {
 
 fn near(actual: Point, x: f64, y: f64) {
     assert!(
-        (actual.x - x).hypot(actual.y - y) < 1.0e-9,
+        (actual.x - x).dhypot(actual.y - y) < 1.0e-9,
         "{actual:?} != ({x}, {y})"
     );
 }
@@ -585,7 +586,7 @@ fn selected_line_and_arc_endpoints_keep_identity_through_outer_reflection_and_ro
     let arc = endpoints(&performed, 3, Some(canvas));
     near_point(endpoints(&performed, 4, Some(canvas)).0, arc.0);
     near_point(endpoints(&performed, 5, Some(canvas)).0, arc.1);
-    assert!((arc.0.x - arc.1.x).hypot(arc.0.y - arc.1.y) > 0.1);
+    assert!((arc.0.x - arc.1.x).dhypot(arc.0.y - arc.1.y) > 0.1);
 }
 
 #[test]

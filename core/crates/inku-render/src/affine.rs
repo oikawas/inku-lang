@@ -1,5 +1,7 @@
 //! Geometry-only affine transforms. Material dimensions remain in canvas units.
 
+use inku_score::math::DetFloat;
+
 use crate::types::Point;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -76,7 +78,7 @@ impl AffineTransform {
 
     /// Scale around the pivot, rotate around it, then translate.
     pub fn around(pivot: Point, scale_x: f64, scale_y: f64, degrees: f64, delta: Point) -> Self {
-        let (sin, cos) = degrees.to_radians().sin_cos();
+        let (sin, cos) = degrees.to_radians().dsin_cos();
         let mut result = Self {
             a: cos * scale_x,
             b: sin * scale_x,

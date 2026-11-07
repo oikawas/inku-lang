@@ -1693,6 +1693,7 @@ pub(crate) fn resolve_with_digest(
 
 #[cfg(test)]
 mod tests {
+    use inku_score::math::DetFloat;
     use inku_score::{
         HardResourcePolicy, OperationalResourceBudget, ResourceBudget, ResourceDemand,
         ScoreErrorPolicy, ScoreResourcePolicy,
@@ -2632,11 +2633,11 @@ mod tests {
             1,
             baseline.score.instructions[1].position.unwrap(),
         );
-        assert!((anchor.x - original.x).hypot(anchor.y - original.y) < 1.0e-12);
+        assert!((anchor.x - original.x).dhypot(anchor.y - original.y) < 1.0e-12);
         for fraction in [0.0, 0.5, 1.0] {
             let target = arc_ideal_point(&mirrored, 0, fraction);
             let follower = arc_ideal_point(&mirrored, 1, fraction);
-            assert!((follower.x - (1.0 - target.x)).hypot(follower.y - target.y) < 1.0e-12);
+            assert!((follower.x - (1.0 - target.x)).dhypot(follower.y - target.y) < 1.0e-12);
         }
         // Candidate size changes must not leak when the explicit pose fails.
         score.mirror_relations[0].follower_facts.direction_degrees = Some(35.0);
@@ -2700,7 +2701,7 @@ mod tests {
             };
             let target = ideal_endpoint(target_index);
             let follower = ideal_endpoint(follower_index);
-            assert!((follower.x - (1.0 - target.x)).hypot(follower.y - target.y) < 1.0e-12);
+            assert!((follower.x - (1.0 - target.x)).dhypot(follower.y - target.y) < 1.0e-12);
         }
         // Identical leaf centers and raw sizes are insufficient: the second
         // leaf's internal pose must also correspond under that same reflection.

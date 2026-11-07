@@ -4,6 +4,7 @@ use inku_render::planning::endpoint_geometry;
 use inku_render::types::{
     CanvasSize, Point, Score, ScoreErrorPolicy, ScoreExecutionDisposition, ScoreExecutionReason,
 };
+use inku_score::math::DetFloat;
 use serde_json::{Value, json};
 
 fn plan(value: Value, canvas: Option<CanvasSize>, policy: ScoreErrorPolicy) -> PerformancePlan {
@@ -30,7 +31,7 @@ fn endpoints(plan: &PerformancePlan, index: usize, canvas: Option<CanvasSize>) -
 
 fn near(left: Point, right: Point) {
     assert!(
-        (left.x - right.x).hypot(left.y - right.y) < 1e-9,
+        (left.x - right.x).dhypot(left.y - right.y) < 1e-9,
         "{left:?} != {right:?}"
     );
 }
@@ -279,8 +280,8 @@ fn not_touching_uses_final_bounds_and_keeps_already_separated_numeric_groups() {
     common_translation(&before, &after, 1..3, canvas);
     let (a, b) = endpoints(&after, 0, canvas);
     let (c, d) = endpoints(&after, 1, canvas);
-    let distance = ((a.x + b.x - c.x - d.x) / 2.0).hypot((a.y + b.y - c.y - d.y) / 2.0);
-    let radii = (a.x - b.x).hypot(a.y - b.y) / 2.0 + (c.x - d.x).hypot(c.y - d.y) / 2.0;
+    let distance = ((a.x + b.x - c.x - d.x) / 2.0).dhypot((a.y + b.y - c.y - d.y) / 2.0);
+    let radii = (a.x - b.x).dhypot(a.y - b.y) / 2.0 + (c.x - d.x).dhypot(c.y - d.y) / 2.0;
     assert!(distance >= radii + 0.06 - 1e-9);
 
     input["instructions"][1]["relation"]["position_authority"] = json!("numeric_fixed");

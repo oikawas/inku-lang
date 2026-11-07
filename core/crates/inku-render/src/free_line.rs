@@ -17,6 +17,7 @@
 
 use std::collections::BTreeSet;
 
+use inku_score::math::DetFloat;
 use sha2::{Digest, Sha256};
 
 use crate::stroke::unit;
@@ -331,8 +332,8 @@ fn trace(phrase: &Phrase, segments: &[usize]) -> (Vec<Point>, BTreeSet<usize>) {
                 let middle = start_heading + heading_within(part, (fraction + next) / 2.0);
                 let ds = part.length * (next - fraction);
                 position = Point::new(
-                    position.x + ds * middle.cos(),
-                    position.y + ds * middle.sin(),
+                    position.x + ds * middle.dcos(),
+                    position.y + ds * middle.dsin(),
                 );
             }
             points.push(position);
@@ -343,7 +344,7 @@ fn trace(phrase: &Phrase, segments: &[usize]) -> (Vec<Point>, BTreeSet<usize>) {
 }
 
 fn distance(a: Point, b: Point) -> f64 {
-    (b.x - a.x).hypot(b.y - a.y)
+    (b.x - a.x).dhypot(b.y - a.y)
 }
 
 fn path_length(points: &[Point]) -> f64 {
@@ -540,7 +541,7 @@ pub(crate) type Obstacle = [f64; 4];
 fn box_distance(point: Point, obstacle: &Obstacle) -> f64 {
     let dx = (obstacle[0] - point.x).max(0.0).max(point.x - obstacle[2]);
     let dy = (obstacle[1] - point.y).max(0.0).max(point.y - obstacle[3]);
-    dx.hypot(dy)
+    dx.dhypot(dy)
 }
 
 /// The weighted mean room along a path in pixels, and the share of its 64

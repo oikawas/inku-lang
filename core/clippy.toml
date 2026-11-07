@@ -1,0 +1,26 @@
+# I-733 (2026-11-07): these call the host's C library, whose last bits differ
+# between macOS, Android and Linux. Use `inku_score::math::DetFloat`.
+disallowed-methods = [
+    { path = "f64::sin", reason = "host libm; use DetFloat::dsin" },
+    { path = "f64::cos", reason = "host libm; use DetFloat::dcos" },
+    { path = "f64::tan", reason = "host libm; use DetFloat::dtan" },
+    { path = "f64::sin_cos", reason = "host libm; use DetFloat::dsin_cos" },
+    { path = "f64::asin", reason = "host libm; use DetFloat::dasin" },
+    { path = "f64::acos", reason = "host libm; add it to DetFloat" },
+    { path = "f64::atan", reason = "host libm; add it to DetFloat" },
+    { path = "f64::atan2", reason = "host libm; use DetFloat::datan2" },
+    { path = "f64::hypot", reason = "host libm; use DetFloat::dhypot" },
+    { path = "f64::powf", reason = "host libm; use DetFloat::dpowf" },
+    { path = "f64::cbrt", reason = "host libm; use DetFloat::dcbrt" },
+    { path = "f64::exp", reason = "host libm; use DetFloat::dexp" },
+    { path = "f64::exp2", reason = "host libm; add it to DetFloat" },
+    { path = "f64::exp_m1", reason = "host libm; add it to DetFloat" },
+    { path = "f64::ln", reason = "host libm; use DetFloat::dln" },
+    { path = "f64::ln_1p", reason = "host libm; add it to DetFloat" },
+    { path = "f64::log", reason = "host libm; add it to DetFloat" },
+    { path = "f64::log2", reason = "host libm; add it to DetFloat" },
+    { path = "f64::log10", reason = "host libm; add it to DetFloat" },
+    { path = "f64::sinh", reason = "host libm; add it to DetFloat" },
+    { path = "f64::cosh", reason = "host libm; add it to DetFloat" },
+    { path = "f64::tanh", reason = "host libm; use DetFloat::dtanh" },
+]

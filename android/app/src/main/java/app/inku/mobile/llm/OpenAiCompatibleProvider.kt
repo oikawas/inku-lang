@@ -67,7 +67,7 @@ internal object ProviderWireTransport {
             if (answer.optString("decision") == "need_count") {
                 val count = built.getJSONObject("count_tokens")
                 val connection = openConnection(URL(count.getString("url")))
-                val result = try {
+                val result = try { disconnectingOnCancel(connection) {
                     configureRemoteConnection(connection, "POST", null, request.timeoutMs)
                     val headers = built.getJSONObject("headers")
                     headers.keys().forEach { connection.setRequestProperty(it, headers.getString(it)) }
@@ -78,7 +78,7 @@ internal object ProviderWireTransport {
                     connection.doOutput = true
                     connection.outputStream.writer(Charsets.UTF_8).use { it.write(count.getString("body")) }
                     readProviderHttpBody(connection, MAX_PROVIDER_ERROR_BYTES)
-                } finally { connection.disconnect() }
+                } } finally { connection.disconnect() }
                 if (result.status !in 200..299) throw ModelProviderHttpException(result.status,
                     "HTTP ${result.status} from provider", retryAfter = result.retryAfter, retryBody = result.body)
                 // Embed the original response so JSON integer/float distinctions survive.
@@ -160,7 +160,7 @@ internal object ProviderWireTransport {
             val built = build(kind, providerId, baseUrl, request)
             val url = URL(built.getString("url"))
             val connection = openConnection(url)
-            val http = try {
+            val http = try { disconnectingOnCancel(connection) {
                 configureRemoteConnection(connection, "POST", apiKey = null, timeoutMs = request.timeoutMs)
                 val headers = built.getJSONObject("headers")
                 for (name in headers.keys()) connection.setRequestProperty(name, headers.getString(name))
@@ -170,7 +170,7 @@ internal object ProviderWireTransport {
                 connection.doOutput = true
                 connection.outputStream.writer(Charsets.UTF_8).use { it.write(built.getString("body")) }
                 readProviderHttpBody(connection)
-            } finally {
+            } } finally {
                 connection.disconnect()
             }
             val response = SharedProviderWire.call(JSONObject()

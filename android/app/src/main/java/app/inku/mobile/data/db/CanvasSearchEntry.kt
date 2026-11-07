@@ -11,12 +11,17 @@ data class CanvasSearchEntry(
     @ColumnInfo(name = "render_hash") val renderHash: String,
     @ColumnInfo(name = "render_metadata_json") val renderMetadataJson: String,
 ) {
-    fun matches(raw: String): Boolean {
+    /** The description's hash in the render metadata; parse it once per entry, not per query. */
+    fun descriptionHash(): String =
+        runCatching { JSONObject(renderMetadataJson).optString("description_hash") }.getOrDefault("")
+
+    fun matches(raw: String): Boolean = matches(raw, descriptionHash())
+
+    fun matches(raw: String, descriptionHash: String): Boolean {
         val query = raw.trim().lowercase()
         if (query.isEmpty()) return true
         if (UUID.matches(query)) return id.equals(query, ignoreCase = true)
         if ((sourceText ?: originalInput).contains(query, ignoreCase = true)) return true
-        val descriptionHash = runCatching { JSONObject(renderMetadataJson).optString("description_hash") }.getOrDefault("")
         return listOf(renderHash, descriptionHash).any { stored ->
             val hash = stored.lowercase()
             hash.startsWith(query) || hash.endsWith(query) ||

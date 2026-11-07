@@ -171,6 +171,8 @@ interface InkuStrings {
     val statusSaved: (String) -> String
     val statusSaveFailed: String
     val restoreDrawingFailed: String
+    /** An unexpected failure (a database or file error) in an action that names none of its own. */
+    val operationFailed: String
     val pipelineDeclineFailed: String
     val drawingContextUnreadable: String
     val drawingContextMissing: String

@@ -159,6 +159,7 @@ object InkuStringsEn : InkuStrings {
     override val statusSaved: (String) -> String = { hash -> "Saved $hash" }
     override val statusSaveFailed = "Saving failed."
     override val restoreDrawingFailed = "Could not restore the last drawing."
+    override val operationFailed = "The operation could not be completed."
     override val pipelineDeclineFailed = "Could not decline the DDL changes."
     override val drawingContextUnreadable = "Could not read the drawing context."
     override val drawingContextMissing = "The drawing context is missing."

@@ -30,9 +30,36 @@ object SvgOutputLimit {
 
     fun requireSvg(svg: String, maxBytes: Long, generatedWork: Boolean = true) {
         require(maxBytes in BYTES_PER_MIB..CONSUMER_BYTES) { "invalid SVG output allowance" }
-        if (svg.toByteArray(Charsets.UTF_8).size.toLong() > maxBytes) {
+        if (utf8LengthExceeds(svg, maxBytes)) {
             if (!generatedWork) throw InkuFailure { it.savedRenderRefused("output_too_large") }
             throw InkuFailure("svg_output_too_large") { it.svgOutputTooLarge((maxBytes / BYTES_PER_MIB).toInt()) }
         }
+    }
+
+    /**
+     * Whether [text] is longer than [maxBytes] in UTF-8, counted without the
+     * copy `toByteArray` made of an SVG of up to 64 MiB. A lone surrogate counts
+     * one byte, as the encoder writes it as `?`.
+     */
+    internal fun utf8LengthExceeds(text: CharSequence, maxBytes: Long): Boolean {
+        var bytes = 0L
+        var index = 0
+        val length = text.length
+        while (index < length) {
+            val char = text[index]
+            bytes += when {
+                char.code < 0x80 -> 1
+                char.code < 0x800 -> 2
+                Character.isHighSurrogate(char) && index + 1 < length && Character.isLowSurrogate(text[index + 1]) -> {
+                    index++
+                    4
+                }
+                Character.isSurrogate(char) -> 1
+                else -> 3
+            }
+            if (bytes > maxBytes) return true
+            index++
+        }
+        return false
     }
 }

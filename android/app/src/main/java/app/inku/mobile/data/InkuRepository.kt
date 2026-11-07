@@ -503,7 +503,14 @@ class InkuRepository(
         }
         if (view.phaseReason == "svg_output_too_large") return view
         if (view.phaseTag == "completed") {
-            return view.takeIf { database.historyDao().getById(pipelineHistoryId(view)) == null }
+            // A work the author deleted for good leaves its link behind: the
+            // run was saved once, so it is not brought back (and saving it
+            // again would collide with that link).
+            val historyId = pipelineHistoryId(view)
+            return view.takeIf {
+                database.historyDao().getById(historyId) == null &&
+                    database.sharedPipelineDao().getAnyHistoryLink(historyId) == null
+            }
         }
         return view.takeIf { !it.terminal }
     }
@@ -728,6 +735,10 @@ class InkuRepository(
         ensureDefaultProviderSettings()
         removeWithdrawnModelAssets()
         DefaultModelDownloads.all.forEach { spec ->
+            // A download running in this process owns its row: refreshing the
+            // catalog or accepting another licence must not mark it interrupted
+            // or put back its old progress.
+            if (spec.modelId in activeDownloads) return@forEach
             val existing = database.modelAssetDao().getByModelId(spec.modelId)
             val downloadState = when (existing?.downloadState) {
                 "queued", "connecting", "downloading", "verifying" -> "interrupted"
@@ -974,10 +985,17 @@ class InkuRepository(
         database.modelAssetDao().acceptLicense(modelId, System.currentTimeMillis(), "ready_to_download", System.currentTimeMillis())
     }
 
+    private val activeDownloads: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     suspend fun downloadModel(modelId: String, force: Boolean = false) {
         ensureDefaultModelAssets()
         val spec = modelSpec(modelId)
-        modelDownloader.download(spec, force = force)
+        if (!activeDownloads.add(spec.modelId)) return
+        try {
+            modelDownloader.download(spec, force = force)
+        } finally {
+            activeDownloads.remove(spec.modelId)
+        }
     }
 
     suspend fun warmupLocalModelIfReady(modelId: String) {

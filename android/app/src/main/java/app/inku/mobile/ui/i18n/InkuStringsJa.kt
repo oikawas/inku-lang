@@ -154,6 +154,7 @@ object InkuStringsJa : InkuStrings {
     override val statusSaved: (String) -> String = { hash -> "保存しました $hash" }
     override val statusSaveFailed = "保存に失敗しました。"
     override val restoreDrawingFailed = "前回の描画を復元できませんでした。"
+    override val operationFailed = "操作を完了できませんでした。"
     override val pipelineDeclineFailed = "DDLの変更案を断れませんでした。"
     override val drawingContextUnreadable = "描画の状態を読めませんでした。"
     override val drawingContextMissing = "描画の状態が見つかりません。"

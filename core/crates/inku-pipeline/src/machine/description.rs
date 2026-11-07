@@ -1718,26 +1718,29 @@ mod tests {
                 .map(|byte| format!("{byte:02x}"))
                 .collect::<String>()
         };
+        // The prompts' bytes are as before. The snapshot's changed with libm
+        // (I-733): the palette's OKLab lightness differs in its last bit, and
+        // with it the execution, action and snapshot digests.
         let expected = [
             [
                 "4f8e171a429eb87c7f59a03344ed51672c3f3000c903fd651fdc2d776ae6a603",
                 "98b75c87f921452e3c2e5ae22e0a49e4d3b31a876f67744c1bd016d7d75789af",
-                "73ba5928cb248d50694a7dd183f273c1f878bcc7018a034a16888c068048ed53",
+                "16dd48f3c003eecc648132d4bad2651575bacfd22dab74c9da89a4a2dd5d7749",
             ],
             [
                 "f1ca35ac50e85c49fd9318a5c07cd68caf27beb539d2aab554943db7251da09a",
                 "50b52d6b19f33a7f20ce1a119eb67744bbcaddc80f9b3d9d76277c3aae319afc",
-                "d54256be1ed17ac9c3dab3c80e06845c51ca8e2dbc80d6c7bf9ac4e55e01fde1",
+                "c54e003fd631c857ca87ee349d5b7d4314326ac7448363dcbb7433997aa45c9e",
             ],
             [
                 "9890fe4284ca16533bd5045b353105bca1c22ef042c31e7be11bfddb3b2278a0",
                 "8c698e36a4323515d5f4f70227a8c7c5f84fc404d30efd0e60c5f31a970cc2a5",
-                "4921a59d2c012a8aaebfc206b9e2c8712c8c848201cc89cc710b6472a6ae3934",
+                "752023aa211315f26567e4e49826590bb49ca151dc929d056b0a098ad2bd9785",
             ],
             [
                 "dbb30ee5952bb3cae5f36fdde7092ab8a201040d237f0b4ec6d73994757f641d",
                 "332401119613fd6bd84bf793aea2eb9cd53f598bcfbc964ab46f556cafce8feb",
-                "12ef15c07e0c2e6beeff4c980cf9bca9f9082d090de77e99e33309009971d2db",
+                "3d75055d39899210a91eec0f124d431d56e2a377d6c36142bb8f0e1d9a22ccaf",
             ],
         ];
         let mut index = 0;

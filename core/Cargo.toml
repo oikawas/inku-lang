@@ -35,6 +35,14 @@ serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
 sha2 = "=0.11.0"
 uniffi = { version = "=0.32.0", default-features = false }
 
+# Cross-crate inlining for the drawing and raster loops (I-732 FFI-11,
+# 2026-11-07): 1,073 drawings of 5173 works took 7.55 s instead of 9.51 s with
+# the same SVG, and the drawing crate's release build 32 s instead of 20 s.
+# `panic` stays `unwind`: the bindings catch panics.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
 # The raster tests draw full-size images; unoptimized, the drawing dependencies
 # took half a minute of the Linux test run. They are optimized in test builds
 # only. `resvg` names both the vendored renderer and the pinned upstream one.

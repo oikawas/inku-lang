@@ -383,17 +383,24 @@ mod object_tests {
             "a primary-color object accepts B15: {changed:?}"
         );
         let printed = crate::colors::PrintedPlan::composed(&plan);
-        let colors = crate::colors::ColorsContext::new(crate::colors::ColorsInput {
+        let handoff = crate::colors::LawsHandoff::default();
+        let input = crate::colors::ColorsInput {
             score: &score,
             printed: &printed,
-            handoff: &crate::colors::LawsHandoff::default(),
+            handoff: &handoff,
             palette: &palette,
             canvas_format_id: config.compiler.host.canvas_format_id(),
             seeds: crate::appearance::Seeds::default(),
             error_policy: config.compiler.error_policy,
             description: "舟",
             plugins: &plugins,
-        });
+        };
+        let colors = crate::colors::ColorsContext::new(input);
+        // The kept context is the one a fresh build makes (I-732).
+        assert_eq!(
+            format!("{:?}", crate::colors::ColorsContext::new(input)),
+            format!("{:?}", crate::colors::ColorsContext::build_for_test(input))
+        );
         let colors = colors.expect("object color context");
         let prompt = crate::colors::build_colors_prompt(
             "舟",

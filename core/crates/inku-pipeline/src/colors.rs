@@ -975,6 +975,58 @@ fn touching(layers: &[usize], colorable: &[usize], now: &Drawing) -> Vec<(usize,
     pairs
 }
 
+/// How many colors contexts a process keeps: one stage at a time per run, and
+/// a Server runs a few at once.
+const KEPT_COLORS_CONTEXTS: usize = 4;
+
+/// The whole input a colors context was built from, owned.
+struct ColorsKey {
+    score: Score,
+    printed: PrintedPlan,
+    handoff: LawsHandoff,
+    palette: ResolvedPaletteDto,
+    canvas_format_id: String,
+    seeds: Seeds,
+    error_policy: inku_score::ScoreErrorPolicy,
+    description: String,
+    plugins: Vec<WorkPlanPlugin>,
+}
+
+impl ColorsKey {
+    fn of(input: &ColorsInput<'_>) -> Self {
+        Self {
+            score: input.score.clone(),
+            printed: input.printed.clone(),
+            handoff: input.handoff.clone(),
+            palette: input.palette.clone(),
+            canvas_format_id: input.canvas_format_id.to_owned(),
+            seeds: input.seeds,
+            error_policy: input.error_policy,
+            description: input.description.to_owned(),
+            plugins: input.plugins.to_vec(),
+        }
+    }
+
+    fn is(&self, input: &ColorsInput<'_>) -> bool {
+        self.seeds == input.seeds
+            && self.error_policy == input.error_policy
+            && self.canvas_format_id == input.canvas_format_id
+            && self.description == input.description
+            && self.plugins == input.plugins
+            && self.palette == *input.palette
+            && self.handoff == *input.handoff
+            && self.printed == *input.printed
+            && self.score == *input.score
+    }
+}
+
+type KeptColorsContexts = std::sync::Mutex<Vec<(ColorsKey, Option<ColorsContext>)>>;
+
+fn colors_contexts() -> &'static KeptColorsContexts {
+    static KEPT: std::sync::OnceLock<KeptColorsContexts> = std::sync::OnceLock::new();
+    KEPT.get_or_init(|| std::sync::Mutex::new(Vec::new()))
+}
+
 /// What the color stage reads to build its context.
 #[derive(Clone, Copy, Debug)]
 pub struct ColorsInput<'a> {
@@ -1004,8 +1056,40 @@ impl ColorsContext {
     /// The context of the document the laws stage left. `None` when its
     /// Score does not have one layer per printed sentence, the palette does
     /// not observe the nine colors, or the renderer does not draw it.
+    ///
+    /// A context is the same for the same input, and the request, the reply
+    /// and each asking again of one colors stage build it from the same
+    /// input; the last few are kept in the process so that the ten drawings
+    /// are made once a stage (I-732, 2026-11-07).
     #[must_use]
     pub fn new(input: ColorsInput<'_>) -> Option<Self> {
+        let cache = colors_contexts();
+        if let Some(found) = cache
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .find(|(key, _)| key.is(&input))
+            .map(|(_, context)| context.clone())
+        {
+            return found;
+        }
+        let context = Self::build(input);
+        let mut kept = cache
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if kept.len() >= KEPT_COLORS_CONTEXTS {
+            kept.remove(0);
+        }
+        kept.push((ColorsKey::of(&input), context.clone()));
+        context
+    }
+
+    #[cfg(test)]
+    pub(crate) fn build_for_test(input: ColorsInput<'_>) -> Option<Self> {
+        Self::build(input)
+    }
+
+    fn build(input: ColorsInput<'_>) -> Option<Self> {
         let units = Units::of(input.canvas_format_id)?;
         let observations = input.palette.observations?;
         let names = input.palette.paints.as_ref();

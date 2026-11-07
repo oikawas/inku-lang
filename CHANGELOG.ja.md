@@ -8,7 +8,7 @@
 
 ## 未リリース
 
-- Core（描画エンジン 101）：超越関数（sin・cos・tan・asin・atan2・hypot・powf・cbrt・exp・ln・tanh）を、host の C ライブラリでなく純 Rust の libm（`inku_score::math`）で計算する。Compat の切り抜きが使う kurbo と svgtypes も vendor にして同じにした。macOS と 5173 の Linux で答えの末尾のビットが違い、関係で置いた作品の Compat の SVG が host ごとに少し違っていた（I-733）。画は座標の末尾の数字が変わる程度に動く。
+- Core（描画エンジン 101）：超越関数（sin・cos・tan・asin・atan2・hypot・powf・cbrt・exp・ln・tanh）を、host の C ライブラリでなく純 Rust の libm（`inku_score::math`）で計算する。Compat の切り抜きが使う kurbo と svgtypes も vendor にして同じにした。macOS と 5173 の Linux で答えの末尾のビットが違い、関係で置いた作品の Compat の SVG が host ごとに少し違っていた（I-733）。5173 の描画 20,097 件のうち SVG が変わるのは 249 件（約 84 作品）で、多くは痕の 1 本の揺れや切れ目の位置の違い、自由線の置き方が変わる作品もある。compile では 7,119 件のうち 78 件で弧の角度の末尾のビットが変わるので、DDL エンジンを 78 にした。
 
 - Core：言い直し・穴の補完・地の色の再送信と色カタログを選ぶ送信で、送信文の欄を最初の送信と同じ順に送る（記述が先頭のまま、足した欄は後ろ）。これまでは JSON の値を通して名前の順に並び替わり、記述が後ろに回っていた（I-733）。
 

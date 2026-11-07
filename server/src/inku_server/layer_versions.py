@@ -441,7 +441,10 @@
 # 77: Clamp a sagitta exceeding half its chord by at most 1/1,000,000 to
 # that half; four of 7,017 works saved on 5173 regain an arc when redrawn
 # (2026-11-04 census).
-DDL_ENGINE_VERSION = "77"
+# 78: The compiler computes its sines, cosines and arcsines with the core's
+# pure-Rust libm instead of the host's C library (I-733); 78 of 7,119 works
+# saved on 5173 compile arc angles differing in their last bits (2026-11-07).
+DDL_ENGINE_VERSION = "78"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

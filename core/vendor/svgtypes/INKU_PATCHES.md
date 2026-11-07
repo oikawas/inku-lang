@@ -2,8 +2,9 @@
 
 This directory vendors the published `svgtypes 0.16.1` crate from
 <https://crates.io/crates/svgtypes/0.16.1>. The upstream MIT and Apache-2.0
-licenses are included unchanged. Cargo registry metadata, `Cargo.toml.orig`
-and the upstream crate's standalone lockfile are omitted; `core/Cargo.lock`
+licenses are included unchanged. Cargo registry metadata, `Cargo.toml.orig`,
+the upstream `CHANGELOG.md` (its bare date links fail the repository's docs
+gate) and the upstream crate's standalone lockfile are omitted; `core/Cargo.lock`
 pins dependencies. `core/Cargo.toml` puts it in place of the crates.io
 svgtypes with `[patch.crates-io]`.
 

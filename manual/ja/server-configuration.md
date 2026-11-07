@@ -12,7 +12,7 @@
 
 API keyの環境変数は初期値です。管理UIでDBへ保存したprovider keyがある場合は暗号化して利用します。ホスト固有情報と秘密をGit追跡文書へ書かないでください。
 
-描画・履歴の再描画とユーザー管理では、入力の誤りや重複は 4xx、予期しない内部の失敗は 500 を返します。内部の例外の詳細はログで確認し、応答には含めません。ただし`INKU_ENV=development`を明示したときは、`/api/paint`・デモ指示・取り合わせ・奥書の生成の失敗で、例外の型と内容が応答に付きます（スコア・SVGの描画、履歴の再描画、ユーザー・グループの作成と更新、プロフィールの更新は`development`でも伏せます）。`INKU_ENV`が未設定か`production`ならすべて伏せます。本番では`INKU_ENV=production`にしてください。
+描画・履歴の再描画とユーザー管理では、入力の誤りや重複は 4xx、予期しない内部の失敗は 500（モデル呼び出しなどでは 502）を返します。例外の型・内容・traceback は応答に含めず、ログで確かめます。これは`INKU_ENV`の値に関わりません。
 
 **環境変数が種を与えるだけの設定があります。**描画の並列度と制限値は、初回起動時に環境変数から初期値を取り、以後はDBの設定が正本になります。環境変数を変えても、既に保存された設定は変わりません。制限値は管理UIか `inku-cli config update`、並列度は管理UIか§2.3のAPIで変更してください。
 
@@ -37,7 +37,7 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_CORS_ORIGINS` | 許可originのcomma区切り | localhostのみ |
 | `INKU_LISTEN_HOST` | uvicorn listen host | `0.0.0.0` |
 | `INKU_LISTEN_PORT` | uvicorn listen port | `INKU_SERVER_PORT`、無ければ`8100` |
-| `INKU_ENV` | 動作モードの表示と開発時分岐（`development`を明示したときだけ、一部の500に例外の詳細が付く） | 表示は`development`。未設定は`development`ではなく本番と同じ扱い |
+| `INKU_ENV` | 起動時に表示する動作モード | `ENVIRONMENT`の値、未設定なら`development` |
 | `INKU_ANYIO_THREAD_TOKENS` | 同期処理に使うスレッド数の上限（**調整用**。重い描画の待ちで`/health`などが止まる時だけ上げる。1以上） | `100` |
 | `INKU_TIMEZONE` | DB backupの時刻判定などに使うtimezone | `Asia/Tokyo` |
 | `INKU_REDIS_URL` | 設定するとrate limitなどの共有状態をRedisへ置く | 未設定（プロセス内） |
@@ -61,7 +61,7 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN` | 8文字未満のpasswordを許す。**本番で設定しない** |
 | `INKU_AUTH_LOCAL_ENABLED` | ユーザー名とpasswordによるログイン（既定 `true`） |
 | `INKU_AUTH_GOOGLE_ENABLED` | Googleによるログイン（既定 `false`） |
-| `INKU_SINGLE_USER` | 単独利用モード。利用者を1人に定めて自動的にログイン済みにする（**コードの既定 `0`／ソースbuild用`compose.yaml`の既定 `1`／リリースイメージ用`deploy/compose.yaml`は渡さないのでログインが要る**）。**管理者が1人も居ないDBでは働かない** |
+| `INKU_SINGLE_USER` | 単独利用モード。利用者を1人に定めて自動的にログイン済みにする（**コードの既定 `0`／ソースbuild用`compose.yaml`の既定 `1`／リリースイメージ用`deploy/compose.yaml`の既定 `0`（ログインが要る）**）。**管理者が1人も居ないDBでは働かない** |
 
 passwordが設定され、DBにユーザーがいない場合だけ作成します。8文字未満は拒否されます。初回作成後は秘密を環境から除去します。
 
@@ -474,7 +474,7 @@ curl -sS -i --max-time 5 \
 現行版はローカルログインを止める要求を断りますが、それより前の版で止めた設定や、環境変数`INKU_AUTH_LOCAL_ENABLED=false`はログインを403にしたまま残ります。`inku-admin reset-password`では戻りません。次の手順で戻します。単独利用モードは最も古い管理者として動くので、管理者が1人は居る必要があります。
 
 1. `INKU_AUTH_LOCAL_ENABLED=false`を設定していれば外します。
-2. APIを`INKU_SINGLE_USER=1`で起動し直します（ソースbuild用`compose.yaml`なら`.env`へ書いて`docker compose up -d`。リリースイメージ用の`deploy/compose.yaml`は`INKU_SINGLE_USER`を渡さないので、この手順は効きません）。
+2. APIを`INKU_SINGLE_USER=1`で起動し直します（`.env`に`INKU_SINGLE_USER=1`を書いて`docker compose up -d`。ソースbuild用・リリースイメージ用のどちらのcomposeでも同じです）。
 3. APIのportへ直接、ローカルログインを有効に戻す要求を送ります。
 
    ```sh
@@ -485,7 +485,7 @@ curl -sS -i --max-time 5 \
      -d '{"google_enabled": false, "local_enabled": true}'
    ```
 
-4. `INKU_SINGLE_USER`を元に戻して再起動し、ログインできることを確かめます。
+4. `INKU_SINGLE_USER`を元に戻して再起動し、ログインできることを確かめます。リリースイメージ用では`0`に戻すか、`.env`からその行を消します。
 
 ## 14. セキュリティ基準
 

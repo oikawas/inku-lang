@@ -92,9 +92,9 @@ def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_use
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
         if _unique_conflict(e): raise HTTPException(status_code=409, detail="group already exists") from e
-        raise _unexpected_http_error("group create", 500, redact=True) from e
+        raise _unexpected_http_error("group create", 500) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("group create", 500, redact=True) from e
+        raise _unexpected_http_error("group create", 500) from e
 
 
 @router.patch("/api/user-groups/{group_id}", response_model=UserGroupItem, summary="Rename a user group", responses={500: {"description": "Unexpected server failure"}})
@@ -116,9 +116,9 @@ def api_user_groups_update(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
         if _unique_conflict(e): raise HTTPException(status_code=409, detail="group already exists") from e
-        raise _unexpected_http_error("group update", 500, redact=True) from e
+        raise _unexpected_http_error("group update", 500) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("group update", 500, redact=True) from e
+        raise _unexpected_http_error("group update", 500) from e
     if not group:
         raise HTTPException(status_code=404, detail="group not found")
     return UserGroupItem(**group)
@@ -178,9 +178,9 @@ def api_users_create(body: UserAccountCreateBody, actor: dict = Depends(_user_ma
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
         if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
-        raise _unexpected_http_error("user create", 500, redact=True) from e
+        raise _unexpected_http_error("user create", 500) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("user create", 500, redact=True) from e
+        raise _unexpected_http_error("user create", 500) from e
     return UserAccountItem(**user)
 
 
@@ -215,9 +215,9 @@ def api_users_update(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
         if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
-        raise _unexpected_http_error("user update", 500, redact=True) from e
+        raise _unexpected_http_error("user update", 500) from e
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("user update", 500, redact=True) from e
+        raise _unexpected_http_error("user update", 500) from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)

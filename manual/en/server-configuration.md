@@ -12,7 +12,7 @@ Settings belong to three boundaries.
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
-Rendering, history redraws, and account administration return 4xx for invalid input or conflicts and 500 for unexpected internal failures. Internal exception details are logged and omitted from the response. The exception: when `INKU_ENV=development` is set explicitly, failures of `/api/paint`, the demo instruction, Juxtaposition and the okugaki generation carry the exception type and text in the response (score and SVG rendering, history redraws, creating and updating users and groups, and profile updates stay hidden even then). With `INKU_ENV` unset or `production`, all of them are hidden. Set `INKU_ENV=production` in production.
+Rendering, history redraws, and account administration return 4xx for invalid input or conflicts and 500 for unexpected internal failures (502 for model calls and similar operations). Exception types, contents and tracebacks are omitted from responses and checked in the logs, regardless of `INKU_ENV`.
 
 **Some settings are only seeded by the environment.** Painting concurrency and the limits take their initial values from environment variables at first start; after that the DB settings are canonical. Changing an environment variable does not change a setting already stored. For limits, use the admin UI or `inku-cli config update`; for concurrency, use the admin UI or the API in §2.3.
 
@@ -37,7 +37,7 @@ Rendering, history redraws, and account administration return 4xx for invalid in
 | `INKU_CORS_ORIGINS` | Comma-separated allowed origins | localhost only |
 | `INKU_LISTEN_HOST` | uvicorn listen host | `0.0.0.0` |
 | `INKU_LISTEN_PORT` | uvicorn listen port | `INKU_SERVER_PORT`, else `8100` |
-| `INKU_ENV` | Run mode, shown at start; only an explicit `development` adds exception details to some 500 responses | Shown as `development`; unset is treated like production for error details |
+| `INKU_ENV` | Run mode displayed at startup | The value of `ENVIRONMENT`, or `development` if unset |
 | `INKU_ANYIO_THREAD_TOKENS` | Ceiling on threads running synchronous endpoints (**for tuning**: raise it only if `/health` and the like stall while heavy renders wait; at least 1) | `100` |
 | `INKU_TIMEZONE` | Timezone used for DB backup scheduling and similar | `Asia/Tokyo` |
 | `INKU_REDIS_URL` | When set, shared state such as rate limiting moves to Redis | unset, in-process |
@@ -61,7 +61,7 @@ The distributed web image sets `BODY_SIZE_LIMIT`, the request limit of the proxy
 | `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN` | Permit a password shorter than eight characters. **Do not set this in production** |
 | `INKU_AUTH_LOCAL_ENABLED` | Sign-in with username and password (default `true`) |
 | `INKU_AUTH_GOOGLE_ENABLED` | Sign-in with Google (default `false`) |
-| `INKU_SINGLE_USER` | Single-user mode: settle on one person and sign them in automatically (**code default `0`; default `1` in the source-build `compose.yaml`; the released-image `deploy/compose.yaml` does not pass it, so sign-in is required**). **Does not engage on a database with no administrator** |
+| `INKU_SINGLE_USER` | Single-user mode: settle on one person and sign them in automatically (**code default `0`; default `1` in the source-build `compose.yaml`; default `0` in the released-image `deploy/compose.yaml` (sign-in required)**). **Does not engage on a database with no administrator** |
 
 The account is created only when a password is set and the DB contains no users. Passwords shorter than eight characters are rejected. Remove the secret from the environment after initial creation.
 
@@ -485,7 +485,7 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 This version refuses to turn local sign-in off, but a setting made by an earlier version, or `INKU_AUTH_LOCAL_ENABLED=false` in the environment, keeps sign-in answering 403, and `inku-admin reset-password` does not change that. Turn it back on as follows. Single-user mode acts as the oldest administrator, so at least one administrator must exist.
 
 1. Remove `INKU_AUTH_LOCAL_ENABLED=false` if you set it.
-2. Restart the API with `INKU_SINGLE_USER=1` (with the source-build `compose.yaml`, put it in `.env` and run `docker compose up -d`; the released-image `deploy/compose.yaml` does not pass `INKU_SINGLE_USER`, so this step does not work there).
+2. Restart the API with `INKU_SINGLE_USER=1` (put `INKU_SINGLE_USER=1` in `.env` and run `docker compose up -d`; this is the same for both the source-build and released-image Compose files).
 3. Send the request that turns local sign-in back on straight to the API port.
 
    ```sh
@@ -496,7 +496,7 @@ This version refuses to turn local sign-in off, but a setting made by an earlier
      -d '{"google_enabled": false, "local_enabled": true}'
    ```
 
-4. Put `INKU_SINGLE_USER` back, restart, and confirm that you can sign in.
+4. Put `INKU_SINGLE_USER` back, restart, and confirm that you can sign in. For released images, restore `0` or remove the line from `.env`.
 
 ## 14. Security Baseline
 

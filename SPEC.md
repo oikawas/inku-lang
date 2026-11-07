@@ -2304,7 +2304,7 @@ Description-batch resumption checks the registered original plan and settings ag
 
 With `batch_run_id`, `GET /api/history` returns only the caller's own works from that batch. Without it, the readable scope is unchanged.
 
-Rendering, history redraws, and account administration retain their 4xx responses for invalid input or conflicts. Unexpected internal failures are logged and return 500 without the internal exception text for Score and SVG rendering, history SVG and Score redraws, user and group creation and update, and profile update. With `INKU_ENV=development` (it must be set explicitly), some other failures (for example `/api/paint`, the demo instruction, juxtaposition and the lineage colophon) still carry the exception text and traceback; production runs with `INKU_ENV=production` or unset, where all are omitted.
+Rendering, history redraws, and account administration retain their 4xx responses for invalid input or conflicts. Unexpected internal failures return 500 (or 502 for model calls and similar operations). Exception types, contents and tracebacks are omitted from responses and checked in the logs, regardless of `INKU_ENV`.
 
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
@@ -4660,7 +4660,7 @@ ceremony a shared server needs is too much.  A server started with
 **The multi-user machinery is not removed; only the default moves** — the code
 defaults to off, so a deployment that merely takes a new version does not lose
 its authentication, while the source-build compose file (the root `compose.yaml`) defaults to on (the
-released-image `deploy/compose.yaml` does not pass it and uses sign-in), so bringing the
+released-image `deploy/compose.yaml` defaults to off and uses sign-in; only while recovering local sign-in can `.env` set `INKU_SINGLE_USER=1`), so bringing the
 server up and opening a browser is enough to start writing.  The single user is
 resolved once, as the oldest administrator, and that result is recorded by the
 account's id.  **The id rather than the name is recorded so that renaming does

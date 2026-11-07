@@ -547,7 +547,7 @@ def api_history_svg(
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
         except Exception as e:  # noqa: BLE001
-            raise _unexpected_http_error("history svg render", 500, redact=True) from e
+            raise _unexpected_http_error("history svg render", 500) from e
     headers = {}
     if svg_profile == "display" and item.get("render_hash"):
         headers = {"ETag": f'"{item["render_hash"]}-display"', "Cache-Control": _THUMB_CACHE_CONTROL}
@@ -860,7 +860,7 @@ def api_history_post(
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
         except Exception as e:  # noqa: BLE001
-            raise _unexpected_http_error("history score render", 500, redact=True) from e
+            raise _unexpected_http_error("history score render", 500) from e
     def persist_managed(item):
         store, linked = replay_link
         with _db.SessionLocal.begin() as session:

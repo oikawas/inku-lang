@@ -28,9 +28,6 @@ services:
       INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      # LLM backend wiring for release Compose verification. Values come from the
-      # pentala-local --env-file (never committed).
-      INKU_LLM_BACKEND: ${INKU_LLM_BACKEND:-}
       INKU_LLM_REQUEST_TIMEOUT_SECONDS: ${INKU_LLM_REQUEST_TIMEOUT_SECONDS:-120}
       INKU_LLM_RETRY_ATTEMPTS: ${INKU_LLM_RETRY_ATTEMPTS:-4}
       INKU_LLM_RETRY_BASE_DELAY: ${INKU_LLM_RETRY_BASE_DELAY:-2}

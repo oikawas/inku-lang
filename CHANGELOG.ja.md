@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- macOS：「inku について」のサードパーティの表示に、libm と、PNG の文字に使う書体まわりの crate（fontdb・harfrust・skrifa など 11 個）を足し、kurbo と svgtypes を core/vendor のコピーとして示す。アプリが写す Web の参照を Build 1405（DDL エンジン 78・描画エンジン 101）に合わせた。
+
 - Core（描画エンジン 101）：超越関数（sin・cos・tan・asin・atan2・hypot・powf・cbrt・exp・ln・tanh）を、host の C ライブラリでなく純 Rust の libm（`inku_score::math`）で計算する。Compat の切り抜きが使う kurbo と svgtypes も vendor にして同じにした。macOS と 5173 の Linux で答えの末尾のビットが違い、関係で置いた作品の Compat の SVG が host ごとに少し違っていた（I-733）。5173 の描画 20,097 件のうち SVG が変わるのは 249 件（約 84 作品）で、痕の 1 本の線の切れ目の位置が変わる作品や、自由線の置き方が変わる作品がある。compile では 7,119 件のうち 78 件で弧の角度の末尾のビットが変わるので、DDL エンジンを 78 にした。
 
 - Core：言い直し・穴の補完・地の色の再送信と色カタログを選ぶ送信で、送信文の欄を最初の送信と同じ順に送る（記述が先頭のまま、足した欄は後ろ）。これまでは JSON の値を通して名前の順に並び替わり、記述が後ろに回っていた（I-733）。

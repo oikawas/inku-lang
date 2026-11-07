@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.323",
-  "build": "1399",
-  "buildDate": "2026-11-05T10:44:13.049Z",
+  "version": "v2.15.329",
+  "build": "1405",
+  "buildDate": "2026-11-07T06:14:47.591Z",
   "versions": {
     "ddlSpec": "30",
-    "ddlEngine": "77",
-    "renderEngine": "100"
+    "ddlEngine": "78",
+    "renderEngine": "101"
   },
   "canvasMetadata": {
     "square": {
@@ -79,6 +79,16 @@
   "copy": {
     "ja": {
       "texts": {
+        "settingsDbMaintenance": "データベースの管理",
+        "settingsDbRetention": "実行の記録の保存期間（日）",
+        "settingsDbRetentionHint": "空欄は無期限です。日数を保存すると、期間を過ぎた完了済みの実行記録を削除します。作品と系譜は消しません。",
+        "settingsDbRetentionInvalid": "1〜36500日を入力するか、空欄にしてください。",
+        "settingsDbRetentionConfirm": "期間を過ぎた完了済みの実行記録を削除します。よろしいですか？",
+        "settingsDbRetentionSave": "保存期間を保存",
+        "settingsDbRetentionSaved": "保存期間を保存しました。",
+        "settingsDbVacuum": "データベースを整理",
+        "settingsDbVacuumConfirm": "データベースを整理します。実行中は書き込みを停止します。よろしいですか？",
+        "settingsDbMaintenanceError": "データベースの管理操作に失敗しました。",
         "imageTab": "画像",
         "imageTabHint": "画像を見て、日本語の指示書を書き、描きます。",
         "imageProvenanceLabel": "来歴",
@@ -431,7 +441,6 @@
         "ddlNewDialogSubtitle": "指示書を直接書いて、独立した作品として描画します。",
         "ddlEditDialogSubtitle": "描画すると、選択した作品の子として系譜へ保存します。",
         "ddlSyntaxGuide": "指示書（DDL）簡易ガイド\n指示書は、絵そのものではなく、絵を生成するための短い視覚指示です。自然文を、色・かたち・場所・動き・てざわりに分解した「演奏用の記述」として扱います。これらの文法を、DDL (Drawing Description Language)として定義しています。\n1行に1つの視覚指示を書くと安定します。\n基本形: 色 + 大きさ + かたち + 数 + 場所 + 動き。\n例: 背景を白で埋める。\n例: 赤い小さな円を右上に三個置く。\n例: 青い細い線を左下から右上へ引く。\n場所は「上端」「右半分」「左下から右上へ」のように具体化します。\n動きや質感は「波打つ」「細かく揺れる」「水彩」「鉛筆」のように短く添えます。",
-        "ddlDialogDrawingModel": "描画モデル",
         "ddlUnknownNameTitle": "プラグインの名前",
         "ddlUnknownNameUnregistered": "この名前は登録されていません",
         "ddlPluginWarningsTitle": "プラグインからの警告",
@@ -1296,6 +1305,7 @@
         "historyLineageEmpty": "該当する系譜はありません。",
         "historyCurrentLineage": "表示中作品の系譜",
         "historyLineageExpand": "作品を表示",
+        "historyLineageShowMore": "もっと見る",
         "historyLineageCollapse": "閉じる",
         "historySelectLineage": "この系譜をすべて選択",
         "historySelectAll": "すべて選択",
@@ -1568,6 +1578,7 @@
         "limitWeightFormat": "この本数なら 1 枚およそ %@〜%@ MB（細い筆致〜太い筆致）"
       },
       "dynamicTexts": {
+        "settingsDbVacuumResult": "整理前 %@、整理後 %@",
         "imageFolderSummary": "%@：%@ 枚（描き終えた %@ 枚）",
         "imageFolderRun": "描く（%@ 枚）",
         "imageFolderResume": "続きから描く（残り %@ 枚）",
@@ -1702,6 +1713,7 @@
         "ddlImportMigrated.one": "旧い歳時記から %@ 箇所を書き換えました。"
       },
       "dynamicKeys": [
+        "settingsDbVacuumResult",
         "imageFolderSummary",
         "imageFolderRun",
         "imageFolderResume",
@@ -1937,6 +1949,16 @@
     },
     "en": {
       "texts": {
+        "settingsDbMaintenance": "Database maintenance",
+        "settingsDbRetention": "Execution record retention (days)",
+        "settingsDbRetentionHint": "Leave blank to keep records indefinitely. Saving a number deletes older finished execution records; works and lineage remain.",
+        "settingsDbRetentionInvalid": "Enter 1–36500 days or leave the field blank.",
+        "settingsDbRetentionConfirm": "Delete finished execution records older than this period?",
+        "settingsDbRetentionSave": "Save retention",
+        "settingsDbRetentionSaved": "Retention saved.",
+        "settingsDbVacuum": "Compact database",
+        "settingsDbVacuumConfirm": "Compact the database? Writes are stopped while this runs.",
+        "settingsDbMaintenanceError": "The database maintenance operation failed.",
         "imageTab": "Image",
         "imageTabHint": "Read an image and paint from instructions written in Japanese.",
         "imageProvenanceLabel": "Source note",
@@ -2289,7 +2311,6 @@
         "ddlNewDialogSubtitle": "Write the instructions directly and perform them as a standalone work.",
         "ddlEditDialogSubtitle": "Drawing saves a new child of the chosen work.",
         "ddlSyntaxGuide": "Instructions (DDL) quick guide\nThe instructions are not the picture itself. They are a compact visual instruction from which the picture is performed. They turn natural language into a performable description made of color, shape, place, motion, and material. This grammar is defined as DDL (Drawing Description Language).\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, watercolor, or pencil.",
-        "ddlDialogDrawingModel": "Drawing model",
         "ddlUnknownNameTitle": "Plugin names",
         "ddlUnknownNameUnregistered": "This name is not registered",
         "ddlPluginWarningsTitle": "Plugin warnings",
@@ -3154,6 +3175,7 @@
         "historyLineageEmpty": "No matching lineages.",
         "historyCurrentLineage": "Lineage of the displayed work",
         "historyLineageExpand": "Show works",
+        "historyLineageShowMore": "Show more",
         "historyLineageCollapse": "Collapse",
         "historySelectLineage": "Select this lineage",
         "historySelectAll": "Select all",
@@ -3426,6 +3448,7 @@
         "limitWeightFormat": "About %@-%@ MB per work at this count (thin to thick tool)"
       },
       "dynamicTexts": {
+        "settingsDbVacuumResult": "Before %@, after %@",
         "imageFolderSummary": "%@: %@ pictures (%@ painted)",
         "imageFolderRun": "Paint (%@)",
         "imageFolderResume": "Continue (%@ left)",
@@ -3560,6 +3583,7 @@
         "ddlImportMigrated.one": "Migrated %@ change from the older Saijiki."
       },
       "dynamicKeys": [
+        "settingsDbVacuumResult",
         "imageFolderSummary",
         "imageFolderRun",
         "imageFolderResume",
@@ -4476,18 +4500,18 @@
     }
   },
   "source": {
-    "commit": "bcd299efacd9b2460cd82e1ac8389dab3ea43967",
+    "commit": "7a50e467097e6718da763a5401191f9cb6173609",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "32cd661706837eb10fe8ae784e12e5af5cd3611aa494b90ce9946fbfd546bbe6",
+      "web/src/routes/+page.svelte": "b1bc854bc259eb370758f65e1b84cbd59886dfd9983b72bbdea22524ca639a4f",
       "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
       "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
-      "web/APP_VERSION": "57d06ae37c667dea50e0697f73d3af9af937ea1b992e6698d89c0f3340e8262d",
-      "web/BUILD_NUMBER": "7b630f5f160efb69c5d6a27aa24158f62550209b0ad62d4e70622eb5f0de0fbe",
-      "server/src/inku_server/layer_versions.py": "5150e587bdbc653726005571c7bbddbdd34d6936ab159bf5a7a32006ca060e69",
-      "core/crates/inku-render/src/lib.rs": "d8a7a0e786555f40fc9b535a8d53892ba81fcf1620c50a264932901fae1affc0",
-      "web/src/lib/i18n/ja.ts": "c04226b63a870db7e45fda472c2c3a137a5e83619fcb6951b7e2acaa2688330d",
-      "web/src/lib/i18n/en.ts": "e5f854b59a04172c218506ef150ba1713dfe78e9cfed032df7c933404f11b64c"
+      "web/APP_VERSION": "fc846bb11f8d678947256a910f8080c182d92262dc770400c61b6cd441ac481e",
+      "web/BUILD_NUMBER": "95203d34940cc692a350d0df31bff44b2314f0630ea6e50b5636cf9feff21555",
+      "server/src/inku_server/layer_versions.py": "07ac2c29547d1921adf33eb4f8536a2ad45dfdd12a29d1b975b38e2ba2a143a2",
+      "core/crates/inku-render/src/lib.rs": "2c07f89ffefefb7dcbda467ae788e2394bb4cd0a28e05c3e2ee10b53ce6cf75b",
+      "web/src/lib/i18n/ja.ts": "d0145c78c7620d358bd8e6bac0118e80f2ee78501cb05e7a6c1b8d030e5cb5e0",
+      "web/src/lib/i18n/en.ts": "b8c55a4490c17f5a70b19450d89144d277b416771f04073c683f81c9e4f92b3d"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

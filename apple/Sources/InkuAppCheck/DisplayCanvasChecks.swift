@@ -59,6 +59,12 @@ func runDisplayCanvasChecks(svg: String) async throws {
     await alone.load(svg: svg, width: large, height: large, renderer: DisplayRenderer(windows: .cpu))
     let largeAlone = ContinuousClock.now - started
     guard alone.painter == .skia, !alone.loading else { throw fail("The large whole did not finish on its own") }
+    // A switch costs about 0.13 s whatever the work (the coarse whole, tiles in flight, preparation). With a light
+    // work the large whole alone is no longer than that, and "less than half of it" cannot be judged (11-07).
+    guard largeAlone >= .milliseconds(500) else {
+        throw fail("The work is too light to judge C5: the large whole alone takes \(largeAlone) (at least 0.5 s is needed). "
+            + "Pass a work like the README's core/crates/inku-display/tests/data/public/p07.svg")
+    }
 
     let next = ##"<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#2e6b3f"/></svg>"##
     let shared = DisplayRenderer(windows: .cpu)
@@ -126,6 +132,10 @@ func runDisplayCanvasChecks(svg: String) async throws {
     let windowStarted = ContinuousClock.now
     for try await _ in DisplayRenderer(windows: .cpu).window(svg: svg, region: deep) {}
     let windowAlone = ContinuousClock.now - windowStarted
+    guard windowAlone >= .milliseconds(500) else {
+        throw fail("The work is too light to judge C5 (zoom): the window alone takes \(windowAlone) (at least 0.5 s is needed). "
+            + "Pass a work like the README's core/crates/inku-display/tests/data/public/p07.svg")
+    }
     let zoomed = CanvasPicture()
     let zoomRenderer = DisplayRenderer(windows: .cpu)
     await zoomed.load(svg: svg, width: 1000, height: 1000, renderer: zoomRenderer)

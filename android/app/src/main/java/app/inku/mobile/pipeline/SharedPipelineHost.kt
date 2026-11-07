@@ -117,6 +117,7 @@ class SharedPipelineHost(
         val session = Session(
             ownerId = request.ownerId,
             snapshotBytes = output.snapshotBytes,
+            stepResult = output,
             models = request.models,
             context = request.context,
             hostContextJson = JSONObject(request.hostContextJson)
@@ -594,7 +595,8 @@ class SharedPipelineHost(
     private fun providerAttemptOf(session: Session): ProviderAttempt? = runCatching {
         ProviderAttempt.fromReport(
             executionId = session.snapshot().requiredString("execution_id"),
-            report = binding.providerAttempt(session.snapshotBytes),
+            report = session.currentStepResult()?.providerAttemptReport
+                ?: binding.providerAttempt(session.snapshotBytes),
         )
     }.getOrNull()
 
@@ -606,7 +608,9 @@ class SharedPipelineHost(
     private fun publishProgress(session: Session, refresh: Boolean = true) {
         val id = runCatching { session.snapshot().requiredString("execution_id") }.getOrNull() ?: return
         val tracker = progressTracker(session)
-        if (refresh) runCatching { tracker.update(binding.runProgress(session.snapshotBytes)) }
+        if (refresh) runCatching {
+            tracker.update(session.currentStepResult()?.runProgressReport ?: binding.runProgress(session.snapshotBytes))
+        }
             .onFailure { tracker.unavailable() }
         runCatching { onRunProgress(id, tracker.value()) }
     }
@@ -645,6 +649,7 @@ class SharedPipelineHost(
         val priorSvgOutputFailure = session.svgOutputFailure
         val priorSvgOutputFailureLimitBytes = session.svgOutputFailureLimitBytes
         session.snapshotBytes = output.snapshotBytes
+        session.stepResult = output
         session.renderedJson = rendered
         session.eventsJson = output.eventsJson
         session.svgOutputFailure = svgOutputFailure
@@ -706,10 +711,16 @@ class SharedPipelineHost(
             renderedJson = result.optJSONObject("rendered")?.toString(),
             eventsJson = result.optJSONArray("events")?.toString()
                 ?: throw PipelineHostException("pipeline_schema_violation"),
+            runProgressReport = stepReport(payload, "run_progress"),
+            providerAttemptReport = stepReport(payload, "provider_attempt"),
             svgOutputFailure = svgOutputFailure,
             svgOutputFailureLimitBytes = maxSvgBytes,
         )
     }
+
+    /** Missing fields use the legacy query; explicit null remains a step answer. */
+    private fun stepReport(payload: JSONObject, name: String): ByteArray? =
+        if (payload.has(name)) JSONObject().put(name, payload.get(name)).toString().encodeToByteArray() else null
 
     private suspend fun view(session: Session): PipelineView = session.mutex.withLock {
         val snapshot = session.snapshot()
@@ -921,6 +932,7 @@ class SharedPipelineHost(
     private data class Session(
         val ownerId: String,
         var snapshotBytes: ByteArray,
+        var stepResult: StepResult? = null,
         val models: PipelineModelSelection,
         var context: AuthoringContext,
         var hostContextJson: String,
@@ -940,6 +952,9 @@ class SharedPipelineHost(
         var drivers: Int = 0,
         val mutex: Mutex = Mutex(),
     ) {
+        // Restored or rolled-back snapshots cannot reuse a different step's reports.
+        fun currentStepResult(): StepResult? = stepResult?.takeIf { it.snapshotBytes === snapshotBytes }
+
         fun snapshot(): JSONObject = try {
             JSONObject(snapshotBytes.toString(Charsets.UTF_8))
         } catch (error: Exception) {
@@ -957,6 +972,8 @@ class SharedPipelineHost(
         val snapshotBytes: ByteArray,
         val renderedJson: String?,
         val eventsJson: String,
+        val runProgressReport: ByteArray?,
+        val providerAttemptReport: ByteArray?,
         val svgOutputFailure: Boolean = false,
         val svgOutputFailureLimitBytes: Long = SvgOutputLimit.DEFAULT_BYTES,
     )

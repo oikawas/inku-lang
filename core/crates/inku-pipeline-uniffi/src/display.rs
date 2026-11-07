@@ -104,6 +104,11 @@ impl DisplayImage {
 }
 
 impl DisplayImage {
+    /// The image of one raster output, shared by the display and raster paths.
+    pub(crate) fn of(raster: RasterOutput) -> Arc<Self> {
+        Arc::new(Self { raster })
+    }
+
     /// Borrow the same allocation for Android's NDK Bitmap writer; no binding
     /// serialization and no intermediate Vec or Java byte array.
     pub fn raster(&self) -> &RasterOutput {
@@ -195,6 +200,34 @@ impl DisplayScene {
 
     pub fn region(&self, region: DisplayRegion) -> Result<RasterFrame, DisplayFailure> {
         guarded(|| self.scene.region(region.into()).map(frame).map_err(refused))
+    }
+
+    /// [`Self::rasterize`] as an image the host reads in place, without
+    /// copying the pixels through a Record (I-732, 2026-11-07).
+    pub fn rasterize_image(
+        &self,
+        target_width: Option<u32>,
+        target_height: Option<u32>,
+    ) -> Result<Arc<DisplayImage>, DisplayFailure> {
+        guarded(|| {
+            self.scene
+                .rasterize(RasterOptions {
+                    target_width,
+                    target_height,
+                })
+                .map(DisplayImage::of)
+                .map_err(refused)
+        })
+    }
+
+    /// [`Self::region`] as an image the host reads in place.
+    pub fn region_image(&self, region: DisplayRegion) -> Result<Arc<DisplayImage>, DisplayFailure> {
+        guarded(|| {
+            self.scene
+                .region(region.into())
+                .map(DisplayImage::of)
+                .map_err(refused)
+        })
     }
 
     pub fn composite(

@@ -6,6 +6,9 @@ use std::sync::Arc;
 
 use inku_svg_raster::{RasterError, RasterOptions};
 
+#[cfg(feature = "display")]
+use crate::display::DisplayImage;
+
 /// One independent premultiplied RGBA8 buffer, owned by the calling host.
 #[derive(uniffi::Record)]
 pub struct RasterFrame {
@@ -123,6 +126,78 @@ impl RasterScene {
         }))
         .unwrap_or(Err(RasterFailure::InternalInvariant))
     }
+}
+
+/// The raster scene's images, which the display feature's image carries.
+#[cfg(feature = "display")]
+#[uniffi::export]
+impl RasterScene {
+    /// [`Self::rasterize`] as an image the host reads in place, without
+    /// copying the pixels through a Record (I-732, 2026-11-07).
+    pub fn rasterize_image(
+        &self,
+        target_width: Option<u32>,
+        target_height: Option<u32>,
+    ) -> Result<Arc<DisplayImage>, RasterFailure> {
+        catch_unwind(AssertUnwindSafe(|| {
+            self.scene
+                .rasterize(RasterOptions {
+                    target_width,
+                    target_height,
+                })
+                .map(DisplayImage::of)
+                .map_err(Into::into)
+        }))
+        .unwrap_or(Err(RasterFailure::InternalInvariant))
+    }
+
+    /// [`Self::region`] as an image the host reads in place.
+    pub fn region_image(
+        &self,
+        full_width: u32,
+        full_height: u32,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    ) -> Result<Arc<DisplayImage>, RasterFailure> {
+        catch_unwind(AssertUnwindSafe(|| {
+            self.scene
+                .region(inku_svg_raster::RasterRegionOptions {
+                    full_width,
+                    full_height,
+                    x,
+                    y,
+                    width,
+                    height,
+                })
+                .map(DisplayImage::of)
+                .map_err(Into::into)
+        }))
+        .unwrap_or(Err(RasterFailure::InternalInvariant))
+    }
+}
+
+/// [`rasterize_svg`] as an image the host reads in place (I-732, 2026-11-07).
+#[cfg(feature = "display")]
+#[uniffi::export]
+pub fn rasterize_svg_image(
+    svg: String,
+    target_width: Option<u32>,
+    target_height: Option<u32>,
+) -> Result<Arc<DisplayImage>, RasterFailure> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_svg_raster::rasterize(
+            &svg,
+            RasterOptions {
+                target_width,
+                target_height,
+            },
+        )
+        .map(DisplayImage::of)
+        .map_err(Into::into)
+    }))
+    .unwrap_or(Err(RasterFailure::InternalInvariant))
 }
 
 #[uniffi::export]
@@ -391,5 +466,28 @@ mod font_tests {
                 .unwrap()
                 .pixels
         );
+    }
+
+    /// The images hold the very pixels the frames copy (I-732).
+    #[cfg(feature = "display")]
+    #[test]
+    fn images_hold_the_frames_pixels() {
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><rect width="12" height="10" fill="#123456"/></svg>"##;
+        let scene = prepare_raster_scene(svg.to_owned()).unwrap();
+        let frame = scene.rasterize(Some(40), None).unwrap();
+        for image in [
+            scene.rasterize_image(Some(40), None).unwrap(),
+            rasterize_svg_image(svg.to_owned(), Some(40), None).unwrap(),
+        ] {
+            assert_eq!(
+                (image.width(), image.height(), image.stride()),
+                (frame.width, frame.height, frame.stride)
+            );
+            assert_eq!(image.pixel_format(), frame.pixel_format);
+            assert_eq!(image.raster().pixels, frame.pixels);
+        }
+        let region = scene.region(40, 20, 8, 4, 16, 8).unwrap();
+        let image = scene.region_image(40, 20, 8, 4, 16, 8).unwrap();
+        assert_eq!(image.raster().pixels, region.pixels);
     }
 }

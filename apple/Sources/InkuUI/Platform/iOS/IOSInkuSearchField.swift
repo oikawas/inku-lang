@@ -38,9 +38,18 @@ struct InkuSearchField: UIViewRepresentable {
         field.placeholder = placeholder
         field.accessibilityLabel = label
         field.isEnabled = context.environment.isEnabled
-        field.borderStyle = borderless ? .none : .roundedRect
-        field.backgroundColor = borderless ? .clear : nil
+        if borderless {
+            field.borderStyle = .none
+            field.backgroundColor = .clear
+        }
         if !field.isFirstResponder, field.text != value { field.text = value }
+    }
+    /// The field's own one-line height and the offered width. Without it SwiftUI gives a UIKit view all the height on
+    /// offer, which stretched the library's and the strip's top rows and drew the field's rounded background as a
+    /// large circle (step 3 screen check, 2026-11-08).
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView field: EscapeSearchTextField, context: Context) -> CGSize? {
+        let natural = field.intrinsicContentSize
+        return CGSize(width: proposal.width ?? natural.width, height: natural.height)
     }
     static func dismantleUIView(_ field: EscapeSearchTextField, coordinator: Coordinator) { coordinator.pending?.cancel() }
 

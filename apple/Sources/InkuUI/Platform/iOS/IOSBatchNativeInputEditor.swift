@@ -73,6 +73,9 @@ struct BatchNativeInputEditor: UIViewRepresentable {
         /// Set by the author's own typing; a chosen word, a followed name or a restored text offers nothing.
         private var typedInsertion = false
         private var programmaticEdit = false
+        /// Whether the IME held marked text at the last change. Committing it is the author's typing, though iOS
+        /// sends no `shouldChangeTextIn` for the commit (step 4 screen check: no list after converting 「ガッ」).
+        private var wasComposing = false
         private var completionValues: [String: String] = [:]
         private var completionLanguage: (source: Data, key: String, value: String)?
         private var completionMatchRange: NSRange?
@@ -90,7 +93,7 @@ struct BatchNativeInputEditor: UIViewRepresentable {
             editor.delegate = self
             editor.layoutManager.delegate = self
             editor.onCompositionEnded = { [weak self] in
-                DispatchQueue.main.async { [weak self] in self?.applyDeferredUpdates() }
+                DispatchQueue.main.async { [weak self] in self?.compositionEnded() }
             }
             editor.onFocusChanged = { [weak self] in
                 self?.refreshRanges()
@@ -194,8 +197,20 @@ struct BatchNativeInputEditor: UIViewRepresentable {
             textChanged()
         }
 
+        /// The IME committed its marked text without changing it: offer completions as for typed text.
+        private func compositionEnded() {
+            applyDeferredUpdates()
+            guard wasComposing, let editor, editor.markedTextRange == nil else { return }
+            wasComposing = false
+            typedInsertion = true
+            updateCompletions()
+        }
+
         private func textChanged() {
             guard !replacingText, let editor else { return }
+            let composing = editor.markedTextRange != nil
+            if wasComposing && !composing && !programmaticEdit { typedInsertion = true }
+            wasComposing = composing
             paintedNames = nil
             editor.refreshGutter()
             refreshRanges()

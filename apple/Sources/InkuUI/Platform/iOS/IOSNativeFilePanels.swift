@@ -16,15 +16,18 @@ enum NativeFilePanels {
         temporaryFile(named: "inku-backup.sqlite")
     }
 
-    /// Moves files written to `exportFile` or `backup` where the author chooses, then removes their temporary
-    /// folder; nil when the author cancels or nothing was written. Other URLs (a chosen folder, the default
-    /// destination) are returned as is.
-    static func handOff(_ urls: [URL], dialogs: InkuFileDialogs?) async -> [URL]? {
+    /// Hands files written to `exportFile` or `backup` on, then removes their temporary folder: with `share`, through
+    /// the share sheet (an export: Photos, Files, AirDrop); otherwise moved where the author chooses (a backup). Nil
+    /// when the author cancels or nothing was written. Other URLs (a chosen folder, the default destination) are
+    /// returned as is.
+    static func handOff(_ urls: [URL], dialogs: InkuFileDialogs?, share: Bool = false) async -> [URL]? {
         let folders = Set(urls.map { $0.deletingLastPathComponent().standardizedFileURL }.filter(isTemporaryFolder))
         guard !folders.isEmpty else { return urls }
         defer { for folder in folders { try? FileManager.default.removeItem(at: folder) } }
         let written = urls.filter { FileManager.default.fileExists(atPath: $0.path) }
-        guard let dialogs, !written.isEmpty else { return nil }
+        guard !written.isEmpty else { return nil }
+        if share { return await InkuShareSheet.present(written) ? written : nil }
+        guard let dialogs else { return nil }
         return await dialogs.move(written)
     }
 

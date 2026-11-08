@@ -281,7 +281,7 @@ struct ExportView: View {
                 }
                 status = "\(capturedWorks.count)作品を描画・エンコードしています…"
                 let saved = try await save(sources: sources, options: capturedOptions, names: names, destination: destination)
-                guard let urls = await NativeFilePanels.handOff(saved.urls, dialogs: fileDialogs) else {
+                guard let urls = await NativeFilePanels.handOff(saved.urls, dialogs: fileDialogs, share: true) else {
                     status = "保存を取り消しました。"
                     if directFormat { model.reportExportStatus(status); dismiss() }
                     return

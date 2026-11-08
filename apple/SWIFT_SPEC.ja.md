@@ -6,7 +6,7 @@ macOS の履歴帯は矢印キーでページをまたいで移動し、キャ�
 
 キャンバス上部は作品・系譜のタブの横に表示中作品の条件を入力欄の順に示し、狭い幅では帯を下へ折り返す。記録の無い値は N/A とし、画像作品には描き方・写生・構図を出さない。推敲メニューは作品の右上に重ねる。
 
-最終更新: 2026-11-07。
+最終更新: 2026-11-08。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版とBuild番号は`apple/VERSION`・`apple/BUILD_NUMBER`を下限としてServer／Webとは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -38,6 +38,20 @@ iPadのアプリを足す。範囲はiOSシミュレータでbuildして起動�
 - Macの画面と振る舞いは変わらない。
 - まだiPadで出ない物（後のstep）：画像タブ、DDLの取り込み、書き出しの画面、プラグインの追加、バックアップの復元、3D（ファイルの許可の作りが要る）。ピンチでの拡大、2回押しで開く操作、記述・DDLの入力欄の色付けと補完、アプリが裏に回った時の扱い、ChatGPTプランの接続、カメラ、iPhoneの画面も後のstep。
 - 2026-10-18の3Dの節の「iOSのアプリのターゲットは無く、今のcoreの成果物もmacOSだけで、iOS向けのbuildは確かめていない」と、2026-10-02の節の「iOS appとcamera自体は未実装である」は、その時の記録である。今はiPadのアプリがあり（cameraは未実装のまま）、iOSのcoreの成果物は`build-ios.sh`が用意する。iOSで3Dを出さないことは変わらない。
+
+step 2（2026-11-08）では、ファイルの許可と、こちらが書くファイルの保存の道を作り、上の「まだiPadで出ない物」のうち画像タブ、DDLの読み込み、書き出しの画面、プラグインの追加、バックアップの復元、3Dを出す。上の項と、3Dを出さないと書いた前の項は、step 1の時の記録である。
+
+- 出す物：画像タブ（画像1枚、画像のドロップ、設定の「画像」の節）、画像フォルダのバッチ、DDLの読み込み（⌘Oと窓への落とし）、書き出しの画面、既定の保存先、プラグインの追加と削除、DB設定の保存データ・バックアップの保存と復元・自動バックアップ、3D（`Ddl3DInstallation.available`はビューアが登録されていれば真）。
+- ファイルの許可：iOSでは、作者が選んだアプリの外のファイルは許可を開けている間だけ読める。`Platform/SecurityScope.swift`の`InkuSecurityScope`が、許可を開けて閉じる（`access`）、ファイル全体を読む（`read`）、読み手が自分で開く前に落とす（`download`）を受け持つ。iOSでは`read`と`download`が`NSFileCoordinator`の読みを通すので、iCloud Driveのまだ落ちていないファイルも落としてから読む。使う所は画像1枚、プラグイン（`read`）、DDLの読み込みと指示書のシートの読み込み、復元するバックアップ（`download`）。Macはsandboxを使わないので、開けても閉じても何も起きず、今までどおりに読む。
+- 画像フォルダのバッチ：`ImageFolderBatch`は、選んだフォルダの許可を、別のフォルダを選ぶか選びを消す（新規）まで開けたままにする。走りながら1枚ずつ読むため。中断の後に続ける時は、今までどおりフォルダを選び直す。
+- 既定の保存先：bookmarkは`InkuFolderBookmark.make`で作る。Macは今までどおり`.withSecurityScope`、iOSは許可を開けた間に`options: []`で作る。
+- こちらが書く保存：iOSにはアプリが書くファイルの保存の窓が無いので、`Platform/iOS/IOSNativeFilePanels.swift`の`NativeFilePanels.exportFile`と`backup`は、新しい一時のフォルダ（`tmp/inku-export-<UUID>/`）の中のURLを返す。1作品の書き出しとバックアップは、そこへ書いた後に`NativeFilePanels.handOff`が`Platform/FileDialogs.swift`の`InkuFileDialogs.move`（SwiftUIの`fileMover`）で「ファイル」の移す先の窓を出し、作者が置き場を選ぶ。移した後も取り消した後も一時のフォルダは消し、取り消した時は「保存を取り消しました。」と出す。一時のフォルダでないURL（選んだフォルダ、既定の保存先）は、`handOff`がそのまま返す。複数作品の書き出しと行ごとのアニメーションは、今までどおりフォルダを選んで直に書く。Macの`handOff`は受けたURLをそのまま返し、保存の窓（NSSavePanel）は変わらない。
+- 写真：画像タブの画像ファイルを選ぶボタンの隣に「写真から選ぶ」（`Platform/iOS/IOSPhotoPicker.swift`の`InkuPhotoPickerButton`。`PhotosPicker`で画像1枚、HEICは`.compatible`でJPEGにして受ける）を置く。システムの選び手はアプリの外で動くので、写真のライブラリの許可（`NSPhotoLibraryUsageDescription`）は求めない。選んだ写真は、ファイルと同じ画像の道へ`Data`で渡す。来歴は`ImageProvenance.text(data:fileName:…)`で同じ項目を読み、写真には名が無いのでファイル名は入れない（画面の名は「写真」）。Macにはこのボタンが無い。
+- 「ファイル」アプリ：`Info-iOS.plist`の`UIFileSharingEnabled`と`LSSupportsOpeningDocumentsInPlace`で、アプリの「書類」のフォルダが「この iPad 内」に出る。書類の型は足さない。
+- 自動バックアップの既定：入り切りの既定は、どの端末でも今までどおり切。保存世代の既定は`InkuPlatform.defaultBackupGenerations`で、iOSはストレージが貴重なので1、MacはWebと同じ4のまま。作者は設定で世代を変えられる。
+- 設定の名：`InkuPlatform.nativeSettingsTitle`で、「macOS補助」（英語 "Additional macOS settings"）をiOSでは「iOS補助」（"Additional iOS settings"）と出す。中身は変わらない。
+- まだiPadで出ない物：ライブラリの表の形（後のstepで、2回押しで開く操作と一緒に作る）。「Finderで表示」はiOSにFinderが無いので出さない。
+- Macの画面と振る舞いは変わらない。
 
 ## 2026-11-07 吹き出しの照合を今の Web に合わせる
 

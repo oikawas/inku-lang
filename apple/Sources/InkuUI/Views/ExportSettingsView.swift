@@ -48,7 +48,6 @@ struct ExportSettingsView: View {
                                      selection: $page)
             }
             if page == "destination" {
-            #if os(macOS)
             Section(model.display.localized("保存先")) {
                 Text(configuration.destinationName.map { model.display.localizedFormat("保存先: %@", $0) } ?? model.display.localized("書き出すときに保存先を選択します。"))
                     .foregroundStyle(.secondary)
@@ -59,11 +58,6 @@ struct ExportSettingsView: View {
                     }
                 }
             }
-            #else
-            Section(model.display.localized("保存先")) {
-                Text(model.display.localized("書き出すときに保存先を選択します。"))
-            }
-            #endif
             }
             if page == "png" {
             Section(model.display.webCopy("settingsExportTemplatesTitle", "PNG保存テンプレート")) {
@@ -230,16 +224,14 @@ struct ExportSettingsView: View {
         templateError = nil
     }
 
-    #if os(macOS)
     private func chooseDestination() {
         Task {
             guard let url = await fileDialogs?.choose(.folder(message: model.display.localized("書き出し先フォルダーを選択"))) else { return }
             do {
-                configuration.destinationBookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                configuration.destinationBookmark = try InkuFolderBookmark.make(url)
                 configuration.destinationName = url.lastPathComponent
                 templateError = nil
             } catch { templateError = "保存先を記録できませんでした: \(error.localizedDescription)" }
         }
     }
-    #endif
 }

@@ -68,6 +68,15 @@ enum InkuTextMetrics {
 
 /// The default export folder the settings remember as a bookmark (security-scoped on macOS).
 enum InkuFolderBookmark {
+    /// iOS has no security-scoped bookmark option: a bookmark made while the chosen folder is open carries the access.
+    static func make(_ url: URL) throws -> Data {
+        #if os(macOS)
+        try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        #else
+        try InkuSecurityScope.access(url) { try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) }
+        #endif
+    }
+
     static func resolve(_ bookmark: Data) throws -> (url: URL, stale: Bool) {
         var stale = false
         #if os(macOS)
@@ -103,6 +112,20 @@ enum InkuPlatform {
     static let hostIdentifier = "app.inku.macos"
     #else
     static let hostIdentifier = "app.inku.ios"
+    #endif
+
+    /// Automatic backups kept by default: the Web's 4 on macOS; 1 on iOS, where storage is scarce (author, 2026-11-08).
+    #if os(macOS)
+    static let defaultBackupGenerations = 4
+    #else
+    static let defaultBackupGenerations = 1
+    #endif
+
+    /// The settings page of this system's own extras (appearance, local records), named after the system.
+    #if os(macOS)
+    static let nativeSettingsTitle = (ja: "macOS補助", en: "Additional macOS settings")
+    #else
+    static let nativeSettingsTitle = (ja: "iOS補助", en: "Additional iOS settings")
     #endif
 }
 

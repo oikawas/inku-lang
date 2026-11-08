@@ -35,8 +35,18 @@ private struct ImageFolderJournal: Codable, Sendable {
     private var stopRequested = false
     var hasJournal: Bool { journal != nil }
 
+    /// The chosen folder, opened from its choice until another choice or a new work (iOS plan §3 #5): the run reads
+    /// its images one by one, long after the dialog. Reopening a stopped run chooses the folder again, as before.
+    private var openedFolder: URL?
+
+    private func closeFolder() {
+        openedFolder?.stopAccessingSecurityScopedResource()
+        openedFolder = nil
+    }
+
     func clearSelection() {
         guard !running, !selecting else { return }
+        closeFolder()
         journal = nil; journalURL = nil; folder = ""; total = 0; completed = 0
         failed = 0; uncertain = 0; failures = []; status = ""; error = nil
     }
@@ -53,10 +63,15 @@ private struct ImageFolderJournal: Codable, Sendable {
         guard !running, !selecting, let root = app.localDataDirectory() else { throw HostError("batch_journal_unavailable") }
         selecting = true
         defer { selecting = false }
-        let (loaded, journalURL) = try await Task.detached(priority: .userInitiated) {
-            try Self.scan(url, root: root)
-        }.value
-        try Task.checkCancellation()
+        closeFolder()
+        if url.startAccessingSecurityScopedResource() { openedFolder = url }
+        let (loaded, journalURL): (ImageFolderJournal, URL)
+        do {
+            (loaded, journalURL) = try await Task.detached(priority: .userInitiated) {
+                try Self.scan(url, root: root)
+            }.value
+            try Task.checkCancellation()
+        } catch { closeFolder(); throw error }
         self.journalURL = journalURL
         journal = loaded
         self.folder = loaded.folder; error = nil; refresh()

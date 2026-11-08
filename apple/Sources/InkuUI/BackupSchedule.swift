@@ -2,7 +2,7 @@ import Foundation
 
 public struct BackupSchedule: Codable, Sendable, Equatable {
     public var intervalDays = 7
-    public var maxGenerations = 4
+    public var maxGenerations = InkuPlatform.defaultBackupGenerations
     public var hour = 3
     public var minute = 0
     public init() {}

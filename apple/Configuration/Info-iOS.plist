@@ -25,6 +25,9 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    <!-- The app's Documents folder shows in the Files app ("On My iPad › Inku"), for images, DDL and exports (ios-app step 2). -->
+    <key>UIFileSharingEnabled</key><true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key><true/>
     <key>NSLocalNetworkUsageDescription</key>
     <string>設定したローカルLLMに接続して作品の記述を生成します。</string>
     <key>NSAppTransportSecurity</key>

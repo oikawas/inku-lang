@@ -74,7 +74,8 @@ final class DDLImportController {
             do {
                 // The existing reader owns the security-scoped access and checks cancellation
                 // between bounded chunks, before adopting any source or definitions.
-                let worker = Task.detached(priority: .userInitiated) { try DDLPackageImport.read(url: url) }
+                // An iCloud file is downloaded first on iOS (nothing on macOS).
+                let worker = Task.detached(priority: .userInitiated) { try InkuSecurityScope.download(url); return try DDLPackageImport.read(url: url) }
                 let imported = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 try Task.checkCancellation()
                 guard context == ImportContext(app: model) else { throw HostError("ddl_import_context_changed") }

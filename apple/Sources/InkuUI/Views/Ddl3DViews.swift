@@ -2,14 +2,8 @@ import InkuPersistence
 import SwiftUI
 
 extension Ddl3DInstallation {
-    /// The 3D switch shows only with a registered viewer on a platform that hosts it (the macOS web view).
-    static var available: Bool {
-        #if os(macOS)
-        registered != nil
-        #else
-        false
-        #endif
-    }
+    /// The 3D switch shows only with a registered viewer (the app bundles it on macOS and iOS).
+    static var available: Bool { registered != nil }
 }
 
 /// Web `Ddl3DModeSwitch.svelte`: immediately left of the hash button, it names where it goes, 3D in 2D and 2D in 3D.

@@ -10,6 +10,9 @@ struct AppRailView: View {
     let onOpenSettings: () -> Void
     let onOpenDrawingLogs: () -> Void
     let onOpenAbout: () -> Void
+    /// False below the Mac window's minimum width (an iPad in portrait): the rail keeps its icon width and offers no
+    /// toggle, so the canvas keeps room for its tools. The stored choice is kept for the wider window.
+    var canExpand = true
     @Environment(\.colorScheme) private var colorScheme
     @State private var uiModeOpen = false
 
@@ -66,6 +69,7 @@ struct AppRailView: View {
 
     private var brand: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if canExpand {
             Button { expanded.toggle() } label: {
                 Text(expanded ? "‹" : "›").inkuFont(18)
                     .frame(width: 30, height: 30)
@@ -78,6 +82,7 @@ struct AppRailView: View {
             .accessibilityLabel(display.webCopy(expanded ? "railCollapseLabel" : "railExpandLabel",
                                                 expanded ? "サイドバーを格納する" : "サイドバーを伸ばす"))
             .inkuTooltip(display.tooltip("サイドバーを展開 / 折りたたむ", serverKey: "tooltipAppRailToggle"), placement: .right)
+            }
             // macOS opens About inku only from the app menu; the rail logo stays on iOS.
             #if !os(macOS)
             if showAuxiliary {

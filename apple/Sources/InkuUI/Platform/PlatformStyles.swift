@@ -67,12 +67,24 @@ extension View {
         #endif
     }
 
+    /// Escape: the Mac's cancel command, or Escape on an iOS hardware keyboard while the view holds the focus.
     @ViewBuilder
     func inkuOnEscape(_ action: @escaping () -> Void) -> some View {
         #if os(macOS)
         onExitCommand(perform: action)
         #else
+        onKeyPress(.escape) { action(); return .handled }
+        #endif
+    }
+
+    /// A sheet whose content has a fixed size from the Web formula. An iPad sheet is form-sized (about 700 points)
+    /// unless asked otherwise, which cuts a larger dialog; it takes the content's size instead (iOS 18).
+    @ViewBuilder
+    func inkuFittedSheet() -> some View {
+        #if os(macOS)
         self
+        #else
+        presentationSizing(.fitted)
         #endif
     }
 

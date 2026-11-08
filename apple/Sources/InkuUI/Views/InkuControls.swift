@@ -66,7 +66,7 @@ private struct InkuDialogFrame: ViewModifier {
     func body(content: Content) -> some View {
         if let window, window.width > 0 {
             let box = size.resolved(in: window)
-            content.frame(width: box.width, height: box.height)
+            content.frame(width: box.width, height: box.height).inkuFittedSheet()
         } else {
             content
         }

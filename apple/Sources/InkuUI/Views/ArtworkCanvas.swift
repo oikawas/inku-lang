@@ -226,6 +226,8 @@ struct ArtworkCanvas: View {
                     ContentUnavailableView(display.localized("作品を表示できません"), systemImage: "exclamationmark.triangle", description: Text(error))
                 } else {
                     ContentUnavailableView(display.localized("作品"), systemImage: "paintpalette", description: Text(display.localized("生成した作品や保存作品をここに表示します。")))
+                        // The workspace's history arrows (38pt circles, 14pt from each edge) stay clear of the text.
+                        .padding(.horizontal, box == nil ? 0 : 56)
                 }
                 if picture.image != nil, display.preferences.captionVisible, !caption.isEmpty {
                     if box == nil { captionOverlay(size: size) } else { workspaceCaption(size: size) }

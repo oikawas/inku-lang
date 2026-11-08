@@ -25,18 +25,22 @@ enum InkuPasteboard {
     }
 
     static var supportsImages: Bool {
-        #if os(macOS)
+        #if os(macOS) || os(iOS)
         true
         #else
         false
         #endif
     }
 
+    /// `data` is the PNG the clipboard export made.
     static func copy(image data: Data) throws {
         #if os(macOS)
         guard let image = NSImage(data: data) else { throw HostError("clipboard_image_unavailable") }
         NSPasteboard.general.clearContents()
         guard NSPasteboard.general.writeObjects([image]) else { throw HostError("clipboard_write_failed") }
+        #elseif os(iOS)
+        guard UIImage(data: data) != nil else { throw HostError("clipboard_image_unavailable") }
+        UIPasteboard.general.setData(data, forPasteboardType: "public.png")
         #endif
     }
 }
@@ -126,6 +130,13 @@ enum InkuPlatform {
     static let nativeSettingsTitle = (ja: "macOS補助", en: "Additional macOS settings")
     #else
     static let nativeSettingsTitle = (ja: "iOS補助", en: "Additional iOS settings")
+    #endif
+
+    /// The preview's hint for opening the work with a finger; nil keeps the Web's double-click hint.
+    #if os(macOS)
+    static let touchOpenHint: String? = nil
+    #else
+    static let touchOpenHint: String? = "ダブルタップで作品を開く"
     #endif
 }
 

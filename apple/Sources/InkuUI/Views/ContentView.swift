@@ -254,15 +254,18 @@ public struct ContentView: View {
         }
     }
 
+    /// The expanded rail fits from the Mac window's minimum width (1000) up; only an iPad in portrait is narrower.
+    private var railFits: Bool { windowSize.width == 0 || windowSize.width >= 1000 }
+
     /// Web `.root`: the rail, then the main shell (input panel, canvas panel and history strip).
     private var mainShell: some View {
         HStack(spacing: 0) {
             if !ui.canvasFullScreen {
-                AppRailView(model: model, expanded: $ui.railExpanded, settingsOpen: ui.settingsOpen,
+                AppRailView(model: model, expanded: railFits ? $ui.railExpanded : .constant(false), settingsOpen: ui.settingsOpen,
                             drawingLogsDisabled: dialog != nil || importing,
                             onOpenSettings: { openSettings(nil) },
                             onOpenDrawingLogs: { if dialog == nil, !importing { dialog = .drawingLogs } },
-                            onOpenAbout: openAbout)
+                            onOpenAbout: openAbout, canExpand: railFits)
                     .disabled(!canNavigateSections && !ui.settingsOpen)
             }
             CreationView(model: model, history: history, automation: automation, maintenance: maintenance, ui: ui,

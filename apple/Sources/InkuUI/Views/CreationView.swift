@@ -939,6 +939,16 @@ struct CreationView: View {
         .clipped()
     }
 
+    private func canvasControls(_ corner: CreationCanvasControls.Corner) -> some View {
+        CreationCanvasControls(model: model, corner: corner, work: workspaceWork, saved: hasSavedWorkspaceWork,
+                               disabled: controlsDisabled, browsingDisabled: browsingDisabled,
+                               canInsertSaijikiWord: corner == .right && canInsertIntoBox,
+                               generationInfoOpen: ui.generationInfoOpen,
+                               threeDimensional: corner == .right && workspaceWork != nil && Ddl3DInstallation.available
+                                   ? $ui.canvasThreeDimensional : nil,
+                               onReplayWork: onReplayWork, onWorkAction: onWorkAction, onShowSaijiki: { ui.saijikiOpen.toggle() })
+    }
+
     private var artwork: some View {
         ZStack {
             ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.displayRenderer,
@@ -949,20 +959,21 @@ struct CreationView: View {
                           aspectRatio: workspaceWork?.renderCanvasAspectRatio, viewport: $ui.canvasViewport,
                           rangePreview: usesBatchWork ? nil : model.rangePreview,
                           replacement: threeDimensionalReplacement)
-            CreationCanvasControls(model: model, corner: .left, work: workspaceWork, saved: hasSavedWorkspaceWork,
-                                   disabled: controlsDisabled, browsingDisabled: browsingDisabled,
-                                   generationInfoOpen: ui.generationInfoOpen,
-                                   onReplayWork: onReplayWork, onWorkAction: onWorkAction, onShowSaijiki: { ui.saijikiOpen.toggle() })
-                .padding(.leading, 18).padding(.bottom, 14)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            CreationCanvasControls(model: model, corner: .right, work: workspaceWork, saved: hasSavedWorkspaceWork,
-                                   disabled: controlsDisabled, browsingDisabled: browsingDisabled,
-                                   canInsertSaijikiWord: canInsertIntoBox,
-                                   generationInfoOpen: ui.generationInfoOpen,
-                                   threeDimensional: workspaceWork != nil && Ddl3DInstallation.available ? $ui.canvasThreeDimensional : nil,
-                                   onReplayWork: onReplayWork, onWorkAction: onWorkAction, onShowSaijiki: { ui.saijikiOpen.toggle() })
-                .padding(.trailing, 18).padding(.bottom, 14)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            // The two corner rows side by side; where they would meet (an iPad in portrait), the right row goes
+            // above the left one.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .bottom, spacing: 0) {
+                    canvasControls(.left)
+                    Spacer(minLength: 12)
+                    canvasControls(.right)
+                }
+                VStack(alignment: .trailing, spacing: 8) {
+                    canvasControls(.right)
+                    canvasControls(.left).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+                .padding(.horizontal, 18).padding(.bottom, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
             VStack(alignment: .trailing, spacing: 6) {
                 workActionMenu

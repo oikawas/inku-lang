@@ -466,7 +466,6 @@ struct LibraryView: View {
     // MARK: List (Web .history-table)
 
     @ViewBuilder private var alignedList: some View {
-        #if os(macOS)
         Table(library.works.map { LibraryTableRow(work: $0) }, selection: Binding<String?>(
             get: { preview.work?.id },
             set: { id in if let work = library.works.first(where: { $0.id == id }) { openWork(work) } }
@@ -474,8 +473,11 @@ struct LibraryView: View {
             TableColumn("") { row in selectionCheck(row.work) }.width(32)
             TableColumn(display.webCopy("historyImageHeader", fallback: "画像")) { row in
                 HStack(spacing: 6) {
-                    ArtworkThumbnail(work: row.work, thumbnails: model.thumbnails).frame(width: 48, height: 36)
-                        .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
+                    LibraryTableThumbnail(locked: model.isBrowsingLocked, preview: { openWork(row.work) },
+                                          open: { openThumbnail(row.work) }) {
+                        ArtworkThumbnail(work: row.work, thumbnails: model.thumbnails).frame(width: 48, height: 36)
+                    }
+                    .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
                     LibraryWorkMarks(model: model, work: row.work, showRevision: false).disabled(writingDisabled)
                 }
             }.width(88)
@@ -526,21 +528,14 @@ struct LibraryView: View {
                 }
             }.width(min: 110, ideal: 120)
         }
-        .contextMenu(forSelectionType: String.self) { ids in
+        .inkuTableMenu(forSelectionType: String.self) { ids in
             if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { workMenu(work) }
         } primaryAction: { ids in
             // HistoryManager.svelte:1268: a double click on a row opens the work (Return as well, as macOS tables do).
+            // An iOS tap would run it at once, so iOS opens from the picture's double tap instead.
             if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { openThumbnail(work) }
         }
         .background { focusFollower(scroll: nil) }
-        #else
-        ScrollView {
-            LazyVStack(spacing: 8) {
-                ForEach(Array(library.works.enumerated()), id: \.element.id) { slot, work in gridCard(work, slot: slot, columns: 1) }
-            }.padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
-        }
-        .background { focusFollower(scroll: nil) }
-        #endif
     }
 
     private var emptyLibrary: some View {
@@ -1303,9 +1298,7 @@ private struct LibraryGridCard: View, Equatable {
         return VStack(alignment: .leading, spacing: 5) {
             // HistoryManager.svelte:1202: the click previews, a double click opens the work.
             LibraryClickButton(preview: {
-                #if os(macOS)
                 focus.wrappedValue = slot
-                #endif
                 actions.open(work)
             }, open: { actions.openThumbnail(work) }) {
                 ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
@@ -1347,12 +1340,10 @@ private struct LibraryGridCard: View, Equatable {
         }
         .contextMenu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: actions.menu) }
         .focusable().focused(focus, equals: slot)
-        #if os(macOS)
         .onKeyPress(.leftArrow) { actions.move(slot, .left, columns) }
         .onKeyPress(.rightArrow) { actions.move(slot, .right, columns) }
         .onKeyPress(.upArrow) { actions.move(slot, .up, columns) }
         .onKeyPress(.downArrow) { actions.move(slot, .down, columns) }
-        #endif
         .onKeyPress(.return) {
             guard focus.wrappedValue == slot, !model.isBrowsingLocked else { return .ignored }
             actions.open(work); return .handled

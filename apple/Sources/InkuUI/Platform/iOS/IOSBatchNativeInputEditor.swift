@@ -606,12 +606,15 @@ final class BatchIOSTextView: UITextView {
 }
 
 /// The completion list at the caret: no item is chosen until the author taps one or moves with the arrow keys.
+/// Plain rows in a scroll view with its insets fixed at zero: a `UITableView` inside the text view added its own
+/// content inset and pushed the only row out of the 30-point frame (step 4 screen check 2, an empty frame).
 @MainActor
-final class IOSCompletionList: UIView, UITableViewDataSource, UITableViewDelegate {
+final class IOSCompletionList: UIView {
     var onPick: ((String) -> Void)?
     private(set) var selectedIndex: Int?
     private var labels: [String] = []
-    private let table = UITableView(frame: .zero, style: .plain)
+    private var rows: [UILabel] = []
+    private let scroll = UIScrollView()
     private let rowHeight: CGFloat = 30
     private let font = UIFont.systemFont(ofSize: 14)
 
@@ -625,28 +628,44 @@ final class IOSCompletionList: UIView, UITableViewDataSource, UITableViewDelegat
         layer.shadowOpacity = 0.18
         layer.shadowRadius = 8
         layer.shadowOffset = CGSize(width: 0, height: 3)
-        table.dataSource = self
-        table.delegate = self
-        table.rowHeight = rowHeight
-        table.backgroundColor = .clear
-        table.separatorStyle = .none
-        table.layer.cornerRadius = 6
-        table.clipsToBounds = true
-        table.register(UITableViewCell.self, forCellReuseIdentifier: "item")
-        addSubview(table)
+        scroll.contentInsetAdjustmentBehavior = .never
+        scroll.contentInset = .zero
+        scroll.layer.cornerRadius = 6
+        scroll.clipsToBounds = true
+        scroll.showsHorizontalScrollIndicator = false
+        addSubview(scroll)
+        scroll.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped(_:))))
     }
     required init?(coder: NSCoder) { return nil }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        table.frame = bounds
+        scroll.frame = bounds
+        for (index, row) in rows.enumerated() {
+            row.frame = CGRect(x: 0, y: CGFloat(index) * rowHeight, width: bounds.width, height: rowHeight)
+        }
+        scroll.contentSize = CGSize(width: bounds.width, height: CGFloat(rows.count) * rowHeight)
     }
 
     func show(_ labels: [String]) {
-        if labels != self.labels { selectedIndex = nil }
-        self.labels = labels
-        table.reloadData()
+        if labels != self.labels {
+            selectedIndex = nil
+            self.labels = labels
+            rows.forEach { $0.removeFromSuperview() }
+            rows = labels.map { text in
+                let row = UILabel()
+                row.text = "  " + text
+                row.font = font
+                row.textColor = .label
+                row.lineBreakMode = .byTruncatingTail
+                scroll.addSubview(row)
+                return row
+            }
+            scroll.contentOffset = .zero
+        }
+        paintSelection()
         isHidden = false
+        setNeedsLayout()
     }
 
     func dismiss() {
@@ -654,20 +673,22 @@ final class IOSCompletionList: UIView, UITableViewDataSource, UITableViewDelegat
         isHidden = true
         selectedIndex = nil
         labels = []
+        rows.forEach { $0.removeFromSuperview() }
+        rows = []
     }
 
     /// Up to eight rows, as wide as the widest label up to `maxWidth`.
     func preferredSize(maxWidth: CGFloat) -> CGSize {
-        let widest = labels.prefix(50).map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
-        return CGSize(width: min(maxWidth, max(160, ceil(widest) + 32)), height: CGFloat(min(8, labels.count)) * rowHeight)
+        let widest = labels.prefix(50).map { ("  " + $0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return CGSize(width: min(maxWidth, max(160, ceil(widest) + 24)), height: CGFloat(min(8, labels.count)) * rowHeight)
     }
 
     func move(by delta: Int) {
         guard !labels.isEmpty else { return }
         let next = selectedIndex.map { min(labels.count - 1, max(0, $0 + delta)) } ?? (delta > 0 ? 0 : labels.count - 1)
         selectedIndex = next
-        table.reloadData()
-        table.scrollToRow(at: IndexPath(row: next, section: 0), at: .none, animated: false)
+        paintSelection()
+        scroll.scrollRectToVisible(CGRect(x: 0, y: CGFloat(next) * rowHeight, width: 1, height: rowHeight), animated: false)
     }
 
     func pickSelected() {
@@ -675,21 +696,16 @@ final class IOSCompletionList: UIView, UITableViewDataSource, UITableViewDelegat
         onPick?(labels[selectedIndex])
     }
 
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { labels.count }
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "item", for: indexPath)
-        var content = cell.defaultContentConfiguration()
-        content.text = labels[indexPath.row]
-        content.textProperties.font = font
-        content.textProperties.numberOfLines = 1
-        cell.contentConfiguration = content
-        cell.backgroundColor = indexPath.row == selectedIndex ? UIColor.tintColor.withAlphaComponent(0.22) : .clear
-        return cell
+    private func paintSelection() {
+        for (index, row) in rows.enumerated() {
+            row.backgroundColor = index == selectedIndex ? UIColor.tintColor.withAlphaComponent(0.22) : .clear
+        }
     }
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: false)
-        guard labels.indices.contains(indexPath.row) else { return }
-        onPick?(labels[indexPath.row])
+
+    @objc private func tapped(_ gesture: UITapGestureRecognizer) {
+        let index = Int(gesture.location(in: scroll).y / rowHeight)
+        guard labels.indices.contains(index) else { return }
+        onPick?(labels[index])
     }
 }
 

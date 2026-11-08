@@ -6,7 +6,7 @@ import InkuCore
 import InkuHost
 
 enum AnimationEncoder {
-    static var fontURL: URL? { Bundle.module.url(forResource: "NotoSerifJP-Variable", withExtension: "ttf", subdirectory: "Resources") }
+    static var fontURL: URL? { Bundle.module.url(forResource: "NotoSerifJP-Variable", withExtension: "ttf") }
     static func order(frameCount: Int, replay: String) -> [Int] {
         guard frameCount > 0 else { return [] }
         let forward = [frameCount - 1] + Array(0..<frameCount)

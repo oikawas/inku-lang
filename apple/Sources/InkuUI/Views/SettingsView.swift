@@ -4,9 +4,7 @@ import UniformTypeIdentifiers
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case display, making, drawDefaults, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, other, native
-    #if os(macOS)
     case image
-    #endif
     #if !os(macOS)
     case about
     #endif
@@ -21,16 +19,14 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .display: "表示と操作"; case .making: "バッチの再試行"; case .drawDefaults: "描くときのデフォルト"; case .models: "モデル設定"
         case .demo: "デモ"
-        #if os(macOS)
         case .image: "画像"
-        #endif
         case .personalPlan: "ChatGPTプラン"
         case .database: "DB設定"; case .clipboard: "クリップボード"; case .plugins: "プラグイン"
         case .export: "エクスポート"
         case .unread: "未読語台帳"
         case .limits: "制限値"
         case .other: "その他"
-        case .native: "macOS補助"
+        case .native: InkuPlatform.nativeSettingsTitle.ja
         #if !os(macOS)
         case .about: "inkuについて"
         #endif
@@ -91,12 +87,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             Text(model.display.localized(settings.error ?? ""))
         }
         .confirmationDialog(model.display.localized("現在の保存データを置き換えます"), isPresented: $confirmRestore, titleVisibility: .visible) {
-            #if os(macOS)
             Button(model.display.localized("復元するバックアップを選択…"), role: .destructive) {
                 guard !model.isBusy, !automation.isOccupied else { return }
                 restoreRequested = true
             }.disabled(model.isBusy || automation.isOccupied)
-            #endif
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
         .onChange(of: confirmRestore) { _, shown in
@@ -106,6 +100,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 let request = InkuFileRequest(types: [UTType(filenameExtension: "sqlite") ?? .data],
                                               message: model.display.localized("復元するバックアップを選択"))
                 guard let url = await fileDialogs?.choose(request), !model.isBusy, !automation.isOccupied else { return }
+                // An iCloud backup may still be in the cloud; bring it onto the device first (nothing on macOS).
+                do { try await Task.detached { try InkuSecurityScope.download(url) }.value }
+                catch { model.errorText = error.localizedDescription; return }
                 await model.restore(from: url)
             }
         }
@@ -168,9 +165,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             (model.display.webCopy("settingsTabExport", "エクスポート"), [.export, .clipboard]),
             (model.display.webCopy("settingsCategoryAdministration", "接続と管理"), [.models, .database] + (detailed ? [.limits] : [])),
         ]
-        #if os(macOS)
         result.insert(("", [.image]), at: 2)
-        #endif
         if detailed { result.append((model.display.webCopy("settingsCategoryExtensions", "拡張と詳細"), [.plugins, .unread])) }
         result.append((model.display.label("この端末", "This device"), [.other, .native]))
         #if !os(macOS)
@@ -243,7 +238,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .export: model.display.webCopy("settingsTabFileSaving", "ファイル保存")
         case .plugins: model.display.webCopy("settingsTabPlugins", item.title)
         case .other: model.display.label("その他", "Other")
-        case .native: model.display.label("macOS補助", "Additional macOS settings")
+        case .native: model.display.label(InkuPlatform.nativeSettingsTitle.ja, InkuPlatform.nativeSettingsTitle.en)
         default: model.display.localized(item.title)
         }
     }
@@ -253,9 +248,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: model.display.webCopy("settingsDisplayHint", "")
         case .making: model.display.webCopy("settingsMakingHint", "")
         case .drawDefaults: model.display.webCopy("drawDefaultsHint", "")
-        #if os(macOS)
         case .image: ""
-        #endif
         case .demo: model.display.webCopy("tooltipInputTabDemo", "")
         case .models: model.display.webCopy("settingsModelsHint", "")
         case .personalPlan: model.display.webCopy("chatgptPlanNotice", "")
@@ -298,7 +291,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 case .display: appearance
                 case .making: making
                 case .drawDefaults: DrawDefaultsSettingsView(model: model)
-                #if os(macOS)
                 case .image:
                     Toggle(model.display.localized("ファイル名を来歴に入れる"), isOn: Binding(
                         get: { model.display.preferences.imageIncludeFileName ?? true },
@@ -306,7 +298,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     Toggle(model.display.localized("Exifを来歴に入れる"), isOn: Binding(
                         get: { model.display.preferences.imageIncludeExif ?? true },
                         set: { model.display.preferences.imageIncludeExif = $0 }))
-                #endif
                 case .other: localOther
                 case .native: nativeSettings
                 case .demo: EmptyView()
@@ -564,10 +555,17 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     private var database: some View {
         @Bindable var display = model.display
         return Group {
-            #if os(macOS)
             Section(model.display.localized("保存データ")) {
                 if let directory = model.localDataDirectory() { Text(directory.path).inkuFont(12).textSelection(.enabled) }
-                Button(model.display.localized("バックアップを保存…")) { if let url = NativeFilePanels.backup(language: model.display.preferences.language) { Task { await model.backup(to: url) } } }
+                Button(model.display.localized("バックアップを保存…")) {
+                    guard let url = NativeFilePanels.backup(language: model.display.preferences.language) else { return }
+                    Task {
+                        let written = await model.backup(to: url)
+                        // iOS wrote it to a temporary folder; the author moves it out (or the folder is removed).
+                        let placed = await NativeFilePanels.handOff([url], dialogs: fileDialogs)
+                        if written, placed == nil { model.reportExportStatus("保存を取り消しました。") }
+                    }
+                }
                 Button(model.display.localized("バックアップから復元…")) { confirmRestore = true }
                 Text(model.display.localized("作品・系譜・作業状態をSQLiteへ保存します。接続設定とKeychainのAPIキーは別です。"))
                     .inkuFont(13).foregroundStyle(.secondary)
@@ -612,7 +610,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 }
                 backupInformation
             }
-            #endif
         }.onAppear { backupDraft = display.preferences.backupSchedule; backupConfigurationError = nil }
     }
     private var backupInformation: some View {

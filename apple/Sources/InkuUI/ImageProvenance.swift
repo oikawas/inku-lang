@@ -4,10 +4,21 @@ import ImageIO
 /// Only the named camera fields are read; GPS is never requested or copied.
 public enum ImageProvenance {
     public static func text(url: URL, includeFileName: Bool, includeExif: Bool, language: String) -> String {
+        text(fileName: url.lastPathComponent, source: includeExif ? CGImageSourceCreateWithURL(url as CFURL, nil) : nil,
+             includeFileName: includeFileName, includeExif: includeExif, language: language)
+    }
+
+    /// The same text from bytes already read: a chosen file (`fileName`), or a photo, which has no file name.
+    public static func text(data: Data, fileName: String?, includeFileName: Bool, includeExif: Bool, language: String) -> String {
+        text(fileName: fileName, source: includeExif ? CGImageSourceCreateWithData(data as CFData, nil) : nil,
+             includeFileName: includeFileName, includeExif: includeExif, language: language)
+    }
+
+    private static func text(fileName: String?, source: CGImageSource?, includeFileName: Bool, includeExif: Bool, language: String) -> String {
         let en = language == "en"
         var lines: [String] = []
-        if includeFileName { lines.append("\(en ? "File name" : "ファイル名"): \(url.lastPathComponent)") }
-        guard includeExif, let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+        if includeFileName, let fileName { lines.append("\(en ? "File name" : "ファイル名"): \(fileName)") }
+        guard includeExif, let source,
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return lines.joined(separator: "\n") }
         let tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any] ?? [:]
         let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]

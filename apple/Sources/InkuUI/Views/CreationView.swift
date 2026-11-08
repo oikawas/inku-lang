@@ -1,10 +1,8 @@
 import InkuPersistence
 import InkuHost
 import SwiftUI
-#if os(macOS)
 import ImageIO
 import UniformTypeIdentifiers
-#endif
 
 struct BatchWorkspaceSelection {
     private enum Display { case history, latest, row(SavedWork, String) }
@@ -69,9 +67,7 @@ struct CreationView: View {
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
     @State private var imagePreview: CGImage?
-    #if os(macOS)
     @State private var savedImageRecord: ExactJSON?
-    #endif
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
     @State private var batchKind = "description"
     @State private var pendingImageBatchRestart: Bool?
@@ -100,9 +96,7 @@ struct CreationView: View {
         !isBatch && hasSavedWorkspaceWork && !controlsDisabled && !model.isBusy && workspaceWork?.ddl != nil && display.visible("ddl_tools")
     }
     private var display: DisplaySettings { model.display }
-    #if os(macOS)
     @Environment(DDLImportController.self) private var importer
-    #endif
 
     /// `+page.svelte:3738-3779`: 440pt, and `min(400px, 42vw)` at 1180 or narrower.
     private var compactWindow: Bool { (windowSize?.width ?? 1320) <= 1180 }
@@ -157,14 +151,10 @@ struct CreationView: View {
         .alert(display.webCopy("imageTab", "画像"), isPresented: $showImageNotice) {
             Button(display.webCopy("imageUploadNoticeContinue", "了解して描画する")) {
                 model.imageWarningAcknowledged = true
-                #if os(macOS)
                 if let restart = pendingImageBatchRestart {
                     pendingImageBatchRestart = nil
                     Task { await imageBatch.run(app: model, restart: restart, provenance: imageProvenance) }
                 } else { Task { await model.generate() } }
-                #else
-                Task { await model.generate() }
-                #endif
             }
             Button(display.localized("キャンセル"), role: .cancel) { pendingImageBatchRestart = nil }
         } message: {
@@ -203,9 +193,7 @@ struct CreationView: View {
         }
         .onDisappear { batchWorkspace.invalidateReads() }
         .onChange(of: model.imageInput?.jpeg, initial: true) { _, data in imagePreview = data.flatMap(PlatformImage.load(data:)) }
-        #if os(macOS)
         .onChange(of: model.savedImageDDL, initial: true) { _, data in savedImageRecord = data.flatMap { try? ExactJSON(data: $0) } }
-        #endif
         .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
         .task(id: workspaceWork?.lineageNodeID) {
             workspaceGeneration = nil
@@ -275,12 +263,10 @@ struct CreationView: View {
                 automation.selectInputTab("description", app: model)
             }
             .inkuTooltip(display.tooltip("自由な自然言語で記述を入力して1枚ずつ描画します", serverKey: "tooltipInputTabSingle"))
-            #if os(macOS)
             InkuPanelTab(title: display.webCopy("imageTab", "画像"), selected: isImage,
                          running: automation.inputTabRunning("image", app: model)) {
                 automation.selectInputTab("image", app: model)
             }
-            #endif
             InkuPanelTab(title: display.webCopy("modeBatch", "バッチ"), selected: isBatch,
                          running: automation.inputTabRunning("batch", app: model), progress: batchProgress) {
                 automation.selectInputTab("batch", app: model)
@@ -315,7 +301,6 @@ struct CreationView: View {
     private var inputContents: some View {
         VStack(alignment: .leading, spacing: 6) {
             if isBatch {
-                #if os(macOS)
                 Picker(display.localized("入力"), selection: $batchKind) {
                     Text(display.webCopy("modeSingle", "記述")).tag("description")
                     Text(display.webCopy("imageTab", "画像")).tag("image")
@@ -328,30 +313,16 @@ struct CreationView: View {
                                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
                                    onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
                 }
-                #else
-                BatchPanelView(model: model, automation: automation,
-                    onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
-                    followsLatestWork: batchWorkspace.followsLatest,
-                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
-                    onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
-                #endif
             } else {
-                #if os(macOS)
                 if isImage { imageInputPanel } else {
                     input
                     if display.visible("drawing_settings") { nextConditions }
                     generationAction.padding(.top, 8)
                 }
-                #else
-                input
-                if display.visible("drawing_settings") { nextConditions }
-                generationAction.padding(.top, 8)
-                #endif
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    #if os(macOS)
     private var imageFolderPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button(display.webCopy("clearInputBtn", "新規作成")) {
@@ -409,6 +380,9 @@ struct CreationView: View {
             HStack {
                 Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
                 Spacer()
+                InkuPhotoPickerButton(title: display.localized("写真から選ぶ"), disabled: controlsDisabled) { data in
+                    loadImage(data: data, fileName: nil)
+                }
                 Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }
@@ -477,9 +451,18 @@ struct CreationView: View {
     }
 
     private func loadImage(_ url: URL) {
+        do { loadImage(data: try InkuSecurityScope.read(url), fileName: url.lastPathComponent) }
+        catch { imageLoadError = model.failureMessage(error) }
+    }
+
+    /// A chosen file (`fileName`) or a photo, which has no file name and shows as one.
+    private func loadImage(data: Data, fileName: String?) {
         do {
-            let image = try ImageInput.prepare(Data(contentsOf: url))
-            model.setImageInput(image, fileName: url.lastPathComponent, automaticProvenance: imageProvenance(url: url))
+            let image = try ImageInput.prepare(data)
+            let provenance = ImageProvenance.text(data: data, fileName: fileName,
+                                                  includeFileName: display.preferences.imageIncludeFileName ?? true,
+                                                  includeExif: display.preferences.imageIncludeExif ?? true, language: display.preferences.language)
+            model.setImageInput(image, fileName: fileName ?? display.localized("写真"), automaticProvenance: provenance)
             imageLoadError = nil
         } catch { imageLoadError = model.failureMessage(error) }
     }
@@ -488,7 +471,6 @@ struct CreationView: View {
         ImageProvenance.text(url: url, includeFileName: display.preferences.imageIncludeFileName ?? true,
                              includeExif: display.preferences.imageIncludeExif ?? true, language: display.preferences.language)
     }
-    #endif
 
     private var descriptionLocked: Bool { model.sourceLocked && model.selectedWork != nil }
 
@@ -508,9 +490,7 @@ struct CreationView: View {
                 Spacer(minLength: 0)
                 Button(display.webCopy("clearInputBtn", "新規")) {
                     batchWorkspace.showHistory()
-                    #if os(macOS)
                     importer.clearMessage()
-                    #endif
                     model.newWork()
                 }
                 .buttonStyle(InkuGhostButtonStyle())
@@ -996,7 +976,6 @@ struct CreationView: View {
     /// CanvasPanel `threeDimensionalContent`: the viewer in the picture's place while 3D is chosen and a work is shown.
     /// Its first front view matches the picture where it stands (Web `initialView`).
     private var threeDimensionalReplacement: ArtworkReplacement? {
-        #if os(macOS)
         guard !covered, ui.workspaceTab != "lineage", ui.canvasThreeDimensional, let work = workspaceWork, let registration = Ddl3DInstallation.registered else { return nil }
         let controller = ddl3d, ui = ui
         return ArtworkReplacement(zoom: controller.displayZoom, available: controller.ready && controller.failure == nil,
@@ -1011,9 +990,6 @@ struct CreationView: View {
                                     ui.exitCanvasFullScreen(); return true
                                 }))
         }
-        #else
-        return nil
-        #endif
     }
 
     /// Web `.unsaved-refinement-badge` at the top centre, with the native save and close actions.

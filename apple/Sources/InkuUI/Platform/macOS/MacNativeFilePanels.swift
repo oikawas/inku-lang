@@ -21,5 +21,8 @@ enum NativeFilePanels {
         panel.nameFieldStringValue = "inku-backup.sqlite"
         return panel.runModal() == .OK ? panel.url : nil
     }
+
+    /// The panels above already chose the final place (iOS writes to a temporary folder and moves it from there).
+    static func handOff(_ urls: [URL], dialogs: InkuFileDialogs?, share: Bool = false) async -> [URL]? { urls }
 }
 #endif

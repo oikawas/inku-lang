@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Build an unsigned iOS Simulator application (iPad) from this product checkout.
+# Build an iOS Simulator application (iPad) from this product checkout, signed as Xcode's "Sign to Run Locally"
+# (ad hoc, no team): the Simulator's Keychain and the Files app's view of the app's Documents need the signed app and
+# its application identifier (ios-app step 2, 2026-11-08).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -14,7 +16,7 @@ LAUNCH_SETTLE_SECONDS=10
 
 usage() {
     printf 'usage: apple/scripts/build-ios.sh [Debug|Release] [--run [DEVICE_NAME]]\n' >&2
-    printf 'Default: Release application and release Rust archives, for the iOS Simulator, unsigned.\n' >&2
+    printf 'Default: Release application and release Rust archives, for the iOS Simulator, signed to run locally.\n' >&2
     printf 'Set INKU_APPLE_PROFILE=debug to explicitly select debug Rust archives.\n' >&2
     printf 'With --run, boot the simulator device (default: %s) without opening Simulator.app,\n' "$DEVICE_NAME" >&2
     printf 'install and launch %s, and fail unless it is still running %s seconds later.\n' "$BUNDLE_ID" "$LAUNCH_SETTLE_SECONDS" >&2
@@ -95,9 +97,9 @@ xcodebuild \
     "CURRENT_PROJECT_VERSION=$BUILD_NUMBER" \
     "INKU_ALLOCATED_BUILD_NUMBER=$BUILD_NUMBER" \
     "INKU_ALLOCATED_VERSION=$MARKETING_VERSION" \
-    CODE_SIGNING_ALLOWED=NO \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGN_IDENTITY= \
+    CODE_SIGN_STYLE=Manual \
+    CODE_SIGN_IDENTITY=- \
+    DEVELOPMENT_TEAM= \
     build
 
 APP="$BUILD/DerivedData/Build/Products/$CONFIGURATION-iphonesimulator/Inku.app"
@@ -139,4 +141,4 @@ if matches:
     fi
     printf '%s is running on %s (%s): %s\n' "$BUNDLE_ID" "$DEVICE_NAME" "$DEVICE_UDID" "$job"
 fi
-printf 'Built unsigned iOS Simulator application %s (%s): %s\n' "$MARKETING_VERSION" "$BUILD_NUMBER" "$APP"
+printf 'Built iOS Simulator application %s (%s), signed to run locally: %s\n' "$MARKETING_VERSION" "$BUILD_NUMBER" "$APP"

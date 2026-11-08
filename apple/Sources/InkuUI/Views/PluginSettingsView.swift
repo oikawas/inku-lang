@@ -8,22 +8,18 @@ struct PluginSettingsView: View {
     @State private var settings = PluginSettingsModel()
     @State private var confirmingDelete: String?
     @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
-    #if os(macOS)
     @State private var checkPreviewData: [Int: Data] = [:]
     @State private var checkPreviewImages: [Int: CGImage] = [:]
-    #endif
 
     var body: some View {
         Group {
             Section(model.display.localized("語彙プラグイン")) {
                 Text(model.display.localized("有効なプラグインを次に作る作品で使います。保存作品は保存時の定義と版を使います。"))
                     .inkuFont(13).foregroundStyle(.secondary)
-                #if os(macOS)
                 Button(model.display.webCopy("settingsUserPluginsAddTitle", "プラグインを追加")) { chooseFile() }
                 Text(model.display.webCopy("settingsUserPluginsAddDescription", "JSON または zip を選ぶと検査します。"))
                     .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let check = settings.check { reportView(check) }
-                #endif
                 ForEach(settings.packages) { package in
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
@@ -52,7 +48,6 @@ struct PluginSettingsView: View {
                             Text(model.display.preferences.language == "en" ? "Could not load this package" : "このパッケージを読み込めません").foregroundStyle(.red)
                             ForEach(Array(package.rejectedProblems.enumerated()), id: \.offset) { _, problem in problemView(problem) }
                         }
-                        #if os(macOS)
                         if package.installed {
                             if confirmingDelete == package.id {
                                 Text(model.display.webCopy("settingsPluginPackageDeleteHint", "保存済みの作品は、保存した定義でそのまま描けます。"))
@@ -67,7 +62,6 @@ struct PluginSettingsView: View {
                                 Button(model.display.webCopy("settingsPluginDelete", "削除"), role: .destructive) { confirmingDelete = package.id }
                             }
                         }
-                        #endif
                         ForEach(package.sourceFiles, id: \.self) { source in
                             Text(source).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
                         }
@@ -117,7 +111,6 @@ struct PluginSettingsView: View {
             .inkuFont(12).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
     }
 
-    #if os(macOS)
     private func chooseFile() {
         Task {
             guard let url = await fileDialogs?.choose(InkuFileRequest(types: [.json, .zip])) else { return }
@@ -183,7 +176,6 @@ struct PluginSettingsView: View {
                 checkPreviewData = data; checkPreviewImages = images
             }
     }
-    #endif
 
 }
 

@@ -57,7 +57,7 @@ final class PluginSettingsModel {
         isBusy = true; defer { isBusy = false }
         check = nil; pendingData = nil; error = nil; status = ""
         do {
-            let data = try Data(contentsOf: url)
+            let data = try InkuSecurityScope.read(url)
             let archive = url.pathExtension.lowercased() == "zip"
             let result = try await model.checkPluginPackage(data: data, isArchive: archive)
             pendingData = data; pendingArchive = archive; fileName = url.lastPathComponent; check = result

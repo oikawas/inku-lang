@@ -170,7 +170,7 @@ enum ExportSheets {
     }
 
     private static func cardFont(size: Double) throws -> CTFont {
-        guard let url = Bundle.module.url(forResource: "NotoSerifJP-Variable", withExtension: "ttf", subdirectory: "Resources"),
+        guard let url = Bundle.module.url(forResource: "NotoSerifJP-Variable", withExtension: "ttf"),
               let provider = CGDataProvider(url: url as CFURL), let graphics = CGFont(provider) else { throw ExportFailure("共有カードの同梱フォントを読み込めませんでした。") }
         let font = CTFontCreateWithGraphicsFont(graphics, size, nil, nil)
         let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontVariationAttribute: [NSNumber(value: 0x77676874): NSNumber(value: 400)]] as CFDictionary)

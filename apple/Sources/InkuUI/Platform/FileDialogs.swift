@@ -54,12 +54,40 @@ final class InkuFileDialogs {
         }
     }
 
+    #if os(iOS)
+    fileprivate var moving = false
+    fileprivate private(set) var movedFiles: [URL] = []
+    @ObservationIgnored private var moved: CheckedContinuation<[URL]?, Never>?
+
+    /// Moves files the app made in its temporary folder to where the author chooses (iOS plan §3 #6); the new
+    /// places, or nil when it is cancelled, fails, or this window already shows a dialog.
+    func move(_ urls: [URL]) async -> [URL]? {
+        guard chosen == nil, saved == nil, moved == nil, !urls.isEmpty else { return nil }
+        return await withCheckedContinuation { continuation in
+            moved = continuation
+            movedFiles = urls
+            moving = true
+        }
+    }
+
+    fileprivate func finishMoving(_ urls: [URL]?) {
+        guard let moved else { return }
+        self.moved = nil
+        movedFiles = []
+        moved.resume(returning: urls)
+    }
+    #endif
+
     /// Closes the open dialog as cancelled (the DDL import's cancel, the view leaving).
     func cancel() {
         importing = false
         exporting = false
         finishChoosing(nil)
         finishSaving(false)
+        #if os(iOS)
+        moving = false
+        finishMoving(nil)
+        #endif
     }
 
     fileprivate func finishChoosing(_ url: URL?) {
@@ -83,8 +111,24 @@ private struct InkuFileDialogsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let dialogs = given ?? own
+        #if os(iOS)
         @Bindable var bound = dialogs
-        content
+        dialogContent(content, dialogs: dialogs)
+            .fileMover(isPresented: $bound.moving, files: dialogs.movedFiles) { result in
+                if case .failure = result { InkuFeedback.beep() }
+                dialogs.finishMoving(try? result.get())
+            } onCancellation: {
+                // The mover reports a cancel itself, so closing does not race its result.
+                dialogs.finishMoving(nil)
+            }
+        #else
+        dialogContent(content, dialogs: dialogs)
+        #endif
+    }
+
+    private func dialogContent(_ content: Content, dialogs: InkuFileDialogs) -> some View {
+        @Bindable var bound = dialogs
+        return content
             .environment(dialogs)
             .fileImporter(isPresented: $bound.importing, allowedContentTypes: dialogs.request?.types ?? [.item]) { result in
                 dialogs.finishChoosing(try? result.get())

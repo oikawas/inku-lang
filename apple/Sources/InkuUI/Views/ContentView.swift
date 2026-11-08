@@ -102,8 +102,8 @@ public struct ContentView: View {
     @State private var windowSize = CGSize.zero
     /// The window's file dialogs, which the menu's "open DDL" also asks.
     @State private var fileDialogs = InkuFileDialogs()
-    #if os(macOS)
     @State private var importer = DDLImportController()
+    #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
 
@@ -211,12 +211,12 @@ public struct ContentView: View {
             }
         }
         .environment(\.inkuWindowSize, windowSize)
-        #if os(macOS)
         .ddlImportDropTarget(model: model,
                              enabled: !model.isBusy && !automation.isOccupied && dialog == nil && !presentation && !ui.settingsOpen,
                              onImported: openImportedDDL)
         .environment(importer)
         .onDisappear { importer.cancel(); automation.flushDemoPreferences() }
+        #if os(macOS)
         .onReceive(InkuApplication.willTerminate) { _ in
             automation.flushDemoPreferences()
             Task { await model.shutdownPersonalPlan() }
@@ -344,13 +344,7 @@ public struct ContentView: View {
         $dialog
     }
 
-    private var importing: Bool {
-        #if os(macOS)
-        importer.isReading
-        #else
-        false
-        #endif
-    }
+    private var importing: Bool { importer.isReading }
     private var canNavigateSections: Bool { !importing && dialog == nil && !presentation }
     private var canReadWork: Bool { !model.isBrowsingLocked && !importing && dialog == nil && !presentation }
     private var canUseWork: Bool { !model.isBusy && !automation.isOccupied && !importing && dialog == nil && !presentation }
@@ -381,9 +375,7 @@ public struct ContentView: View {
         }
         if canUseWork {
             enabled.insert(.newWork)
-            #if os(macOS)
             enabled.insert(.openDDL)
-            #endif
         }
         if canExport { enabled.insert(.export) }
         if canCopyImage { enabled.insert(.copyImage) }
@@ -397,10 +389,8 @@ public struct ContentView: View {
             if model.activeDrawTab == "batch_text" && automation.canResume { confirmNewBatch = true }
             else { completeNewWork() }
         case .openDDL:
-            #if os(macOS)
             showCreation(tab: nil)
             importer.read(app: model, dialogs: fileDialogs, onImported: openImportedDDL)
-            #endif
         case .settings: openSettings(nil)
         case .creation: showCreation(tab: "artwork")
         case .library: openLibrary()
@@ -420,14 +410,12 @@ public struct ContentView: View {
                 batchWorkspace.showHistory(); showCreation(tab: "artwork")
             }
         } else {
-            #if os(macOS)
             if model.activeDrawTab == "batch_image" {
                 automation.imageFolderBatch.newWork(app: model)
                 importer.clearMessage(); batchWorkspace.showHistory(); showCreation(tab: "artwork")
                 return
             }
             importer.clearMessage()
-            #endif
             model.newWork(); batchWorkspace.showHistory(); showCreation(tab: "artwork")
         }
     }
@@ -522,14 +510,10 @@ public struct ContentView: View {
     @ViewBuilder private func dialogView(_ item: WorkDialog) -> some View {
         switch item {
         case .export(let session):
-            #if os(macOS)
             ExportView(model: model, works: session.works, preserveOrder: session.preserveOrder, directCard: session.directCard, initialFormat: session.initialFormat,
                        initialSVGProfile: session.initialSVGProfile, initialPixelHeight: session.initialPixelHeight, lineAnimation: session.lineAnimation)
                 .id(session.id)
                 .environment(model.display)
-            #else
-            Text(model.display.localized("書き出し")).padding()
-            #endif
         case .juxtapose(let session):
             JuxtaposeView(model: model, work: session.work, onCommitted: { closeLibrary() })
                 .id(session.id)
@@ -580,12 +564,10 @@ public struct ContentView: View {
         }
     }
 
-    #if os(macOS)
     private func openImportedDDL() {
         guard let imported = importer.importedDocument, dialog == nil else { return }
         dialog = .newDDL(NewDdlSession(imported: imported))
     }
-    #endif
 
     private func openWorkEdit(_ work: SavedWork, _ mode: WorkEditMode) {
         guard canUseWork, !work.trashed else { return }

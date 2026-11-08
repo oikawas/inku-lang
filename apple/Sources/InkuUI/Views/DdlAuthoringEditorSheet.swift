@@ -167,7 +167,7 @@ struct NewDdlAuthoringSheet: View {
         importTask = Task {
             defer { importing = false; importTask = nil }
             do {
-                let worker = Task.detached(priority: .userInitiated) { try DDLPackageImport.read(url: url) }
+                let worker = Task.detached(priority: .userInitiated) { try InkuSecurityScope.download(url); return try DDLPackageImport.read(url: url) }
                 let document = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 try Task.checkCancellation()
                 importedDocument = document

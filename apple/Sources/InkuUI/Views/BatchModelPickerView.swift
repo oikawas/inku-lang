@@ -246,6 +246,8 @@ struct BatchModelPickerView: View {
             if inside { hoveredReference = reference }
             else if hoveredReference == reference { hoveredReference = nil }
         }
+        // A finger has no hover: pressing a card inspects it, as the pointer already does when it presses one.
+        .simultaneousGesture(TapGesture().onEnded { hoveredReference = reference })
         .accessibilityElement(children: .combine)
         .accessibilityValue(selected ? model.display.localized("選択中") : "")
         .accessibilityHint(metadataText(entry, provider: provider))

@@ -30,7 +30,7 @@ struct LibraryPreviewPanel: View {
                 .accessibilityLabel(display.webCopy("historyPreviewOpenArtwork", "作品で開く"))
                 .accessibilityAction { open() }
                 .inkuTooltip(display.tooltip("ダブルクリックで作品を開く", serverKey: "historyPreviewOpenHint"))
-            Text(display.webCopy("historyPreviewOpenHint", "ダブルクリックで作品を開く"))
+            Text(InkuPlatform.touchOpenHint.map(display.localized) ?? display.webCopy("historyPreviewOpenHint", "ダブルクリックで作品を開く"))
                 .inkuFont(10).foregroundStyle(.tertiary).frame(maxWidth: .infinity, alignment: .trailing)
             Text(work.effectiveSourceText).inkuFont(14).lineSpacing(6).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)

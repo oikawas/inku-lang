@@ -141,9 +141,11 @@ final class IOSBackgroundRunKeeper {
 
     static func progress(model: AppModel, state: inout ContinuedRunProgress, now: Date = Date()) -> (done: Int64, total: Int64, subtitle: String) {
         let rows = model.runStops.rows.flatMap { $0.total > 0 ? $0 : nil } ?? (done: 0, total: 1)
-        let row = rows.total > 1 ? "\(min(rows.done + 1, rows.total)) / \(rows.total)  " : ""
+        // The row only: the status line's retry and fallback messages read as a failure in the system's display while
+        // the run goes on (step 6 device check, author's choice 2026-11-09 "行だけにする").
+        let row = rows.total > 1 ? "\(min(rows.done + 1, rows.total)) / \(rows.total)" : ""
         let done = state.advance(rowsDone: rows.done, now: now)
-        return (done, Int64(rows.total * ContinuedRunProgress.unitsPerRow), row + model.display.message(model.status))
+        return (done, Int64(rows.total * ContinuedRunProgress.unitsPerRow), row)
     }
 }
 #endif

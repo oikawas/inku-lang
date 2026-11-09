@@ -37,5 +37,11 @@
     <dict>
         <key>NSAllowsLocalNetworking</key><true/>
     </dict>
+    <!-- A drawing or batch keeps going in the background as a continued-processing task, iOS 26+ (ios-app step 5).
+         Each run takes a new name under this prefix (IOSBackgroundRuns.swift). -->
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>app.inku.ios.continued.*</string>
+    </array>
 </dict>
 </plist>

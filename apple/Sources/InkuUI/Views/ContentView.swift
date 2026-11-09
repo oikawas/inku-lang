@@ -232,6 +232,9 @@ public struct ContentView: View {
         .preferredColorScheme(model.display.colorScheme)
         .font(.system(size: 13 * model.display.preferences.textScale))
         .environment(\.inkuTextScale, model.display.preferences.textScale)
+        .inkuBackgroundRuns(model: model) {
+            Task { await maintenance.checkBackup(app: model, automationRunning: automation.isOccupied || dialog != nil) }
+        }
         .task {
             await model.initialize()
             await automation.connect(app: model)

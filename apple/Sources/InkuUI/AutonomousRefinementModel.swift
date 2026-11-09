@@ -155,6 +155,7 @@ public final class AutonomousRefinementModel {
         guard !running, !app.isBusy, connected, let source, !source.trashed, let provider, database != nil else { return }
         starting = true
         defer { starting = false }
+        app.runStops.track(self)
         guard !source.svg.isEmpty else { errorText = "autonomous_source_has_no_image"; return }
         let kinds = Self.kinds.filter(enabledKinds.contains)
         guard !kinds.isEmpty else { errorText = "aiRefineKindsError"; return }

@@ -130,7 +130,7 @@ private struct ImageFolderJournal: Codable, Sendable {
         }
         journal = current
         let options = app.drawSelections["batch_image"]
-        running = true; stopRequested = false; error = nil
+        running = true; stopRequested = false; error = nil; app.runStops.track(self)
         defer { running = false; drawing = false; refresh() }
         do {
             try await persist()

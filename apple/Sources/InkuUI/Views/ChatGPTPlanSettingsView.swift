@@ -8,6 +8,7 @@ public struct ChatGPTPlanSettingsView: View {
     @State private var controller = ChatGPTPlanSettingsModel()
     @State private var confirmingDelete: String?
     @Environment(\.openURL) private var openURL
+    @State private var login = InkuLoginPresenter()
     public init(model: AppModel, onOpenModelSettings: @escaping () -> Void) { app = model; self.onOpenModelSettings = onOpenModelSettings }
     public var body: some View {
         Group {
@@ -22,7 +23,7 @@ public struct ChatGPTPlanSettingsView: View {
                     .inkuFont(12).foregroundStyle(.secondary)
                 if controller.state?.enabled == true {
                     Button(app.display.localized("新しい個人プロファイルを接続")) {
-                        Task { await controller.authorize(app: app) { openURL($0) } }
+                        authorize(profileID: nil, consent: false)
                     }.disabled(controller.busy || (controller.state?.profiles.count ?? 0) >= 8)
                     if controller.authorizing {
                         Button(app.display.localized("認証を停止")) { Task { await controller.cancel(app: app) } }
@@ -45,9 +46,9 @@ public struct ChatGPTPlanSettingsView: View {
                                 .inkuFont(12).textSelection(.enabled)
                             WrappingHStack(spacing: 6) {
                                 Button(app.display.localized("選択")) { Task { await controller.selectProfile(profile.id, app: app) } }
-                                Button(app.display.localized("再認証")) { Task { await controller.authorize(profileID: profile.id, app: app) { openURL($0) } } }
+                                Button(app.display.localized("再認証")) { authorize(profileID: profile.id, consent: false) }
                                 if !profile.scopes.contains("chatgpt.tokens.use.direct") {
-                                    Button(app.display.localized("同意を更新")) { Task { await controller.authorize(profileID: profile.id, consent: true, app: app) { openURL($0) } } }
+                                    Button(app.display.localized("同意を更新")) { authorize(profileID: profile.id, consent: true) }
                                 }
                                 Button(app.display.localized("接続解除")) { Task { await controller.signOut(profile.id, app: app) } }
                                 if confirmingDelete != profile.id {
@@ -90,5 +91,16 @@ public struct ChatGPTPlanSettingsView: View {
         }
         .task { await controller.load(app: app) }
         .onDisappear { Task { await controller.cancel(app: app) } }
+    }
+
+    /// The Mac opens the sign-in in the browser; iOS in a login sheet over the app, closed when the callback arrives
+    /// (closing it by hand stops the sign-in, as "認証を停止" does).
+    private func authorize(profileID: String?, consent: Bool) {
+        let fallback = openURL
+        Task {
+            await controller.authorize(profileID: profileID, consent: consent, app: app,
+                openURL: { url in login.open(url, fallback: fallback) { Task { await controller.cancel(app: app) } } },
+                closeLogin: { login.close() })
+        }
     }
 }

@@ -44,7 +44,7 @@ public final class ToolChangeModel {
         let chosenMode = mode
         let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let run = UUID(); runID = run
-        running = true; saving = !selection.isEmpty; stopping = false; errorText = nil
+        running = true; saving = !selection.isEmpty; stopping = false; errorText = nil; app.runStops.track(self)
         defer { finish() }
         let succeeded = await app.performComparison(status: "てざわりの候補を用意中", restoreDisplayStatus: true) { token in
             try await app.validateSavedAdjustmentParent(parent)
@@ -103,7 +103,7 @@ public final class ToolChangeModel {
         guard !running, !app.isBusy, selectedCount > 0 else { return false }
         let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let run = UUID(); runID = run
-        running = true; saving = true; stopping = false; errorText = nil
+        running = true; saving = true; stopping = false; errorText = nil; app.runStops.track(self)
         defer { finish() }
         var savedCount = 0
         let succeeded = await app.performComparison(status: "選択した候補を保存中") { token in

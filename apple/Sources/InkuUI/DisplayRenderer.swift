@@ -188,6 +188,12 @@ public final class DisplayRenderer: Sendable {
 
     public func diagnostics() -> Diagnostics { state.withLock { $0.diagnostics } }
 
+    /// Drops the kept scenes and wholes (iOS: when the system warns that memory is low). The next request draws
+    /// them again; a drawing in flight keeps its own scene.
+    public func purgeCaches() {
+        state.withLock { $0.scenes.removeAll(); $0.coarse.removeAll(); $0.wholes.removeAll() }
+    }
+
     /// Failures are appended to `display-failures/failures.jsonl` in `directory`, with one copy of
     /// each failing SVG beside it. Without a directory they go to the system log only.
     public func connectFailureLog(directory: URL) {

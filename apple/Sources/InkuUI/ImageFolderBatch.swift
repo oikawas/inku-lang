@@ -28,6 +28,8 @@ private struct ImageFolderJournal: Codable, Sendable {
     private(set) var uncertain = 0
     private(set) var failures: [String] = []
     private(set) var running = false
+    /// The running folder's tiles (Web `ImageFolderBatchPanel.svelte` `BatchRunSummary`).
+    private(set) var summary = BatchRunSummary()
     private(set) var drawing = false
     private(set) var selecting = false
     private(set) var status = ""
@@ -131,12 +133,17 @@ private struct ImageFolderJournal: Codable, Sendable {
         journal = current
         let options = app.drawSelections["batch_image"]
         running = true; stopRequested = false; error = nil; app.runStops.track(self)
-        defer { running = false; drawing = false; refresh() }
+        // image-folder.svelte.ts:165-175: the plan is every picture, the round the ones left to draw.
+        let queue = current.rows.indices.filter { current.rows[$0].state == "waiting" }
+        summary.start(planTotal: current.rows.count, at: Date())
+        summary.beginRound(queue.count)
+        defer { running = false; drawing = false; summary = BatchRunSummary(); refresh() }
         do {
             try await persist()
             for index in current.rows.indices {
                 guard !stopRequested, !Task.isCancelled else { break }
                 guard journal?.rows[index].state == "waiting" else { continue }
+                summary.beginWork(position: (queue.firstIndex(of: index) ?? 0) + 1)
                 journal?.rows[index].state = "running"; try await persist()
                 if stopRequested || Task.isCancelled {
                     journal?.rows[index].state = "uncertain"
@@ -169,6 +176,8 @@ private struct ImageFolderJournal: Codable, Sendable {
                     drawing = true
                     let work = await app.runAutomation(request: pinned, image: image, background: true)
                     drawing = false
+                    // image-folder.svelte.ts:183-188: a stopped picture is not counted.
+                    summary.finishWork(saved: work != nil && !stopRequested && !Task.isCancelled)
                     if stopRequested || Task.isCancelled { journal?.rows[index].state = "uncertain" }
                     else if let work { journal?.rows[index].state = "succeeded"; journal?.rows[index].workID = work.id }
                     else { journal?.rows[index].state = "failed"; journal?.rows[index].error = app.automationFailureMessage ?? "生成できませんでした。" }

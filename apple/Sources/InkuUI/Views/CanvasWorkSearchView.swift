@@ -8,10 +8,12 @@ struct CanvasWorkSearchView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            InkuSearchField(value: $draft, placeholder: display.webCopy("canvasSearchPlaceholder", "記述・hash・作品ID"),
-                            label: display.webCopy("canvasSearchLabel", "作品を検索"), maxLength: 200, delay: .milliseconds(250),
-                            onSearch: { library.query = $0 })
-                .inkuSearchFieldHeight()
+            // CanvasWorkSearch.svelte `.search-input-wrap`: one bordered box holding the field and its "×".
+            InkuClearableSearchField(value: $draft, placeholder: display.webCopy("canvasSearchPlaceholder", "記述・hash・作品ID"),
+                                     label: display.webCopy("canvasSearchLabel", "作品を検索"), display: display,
+                                     maxLength: 200, delay: .milliseconds(250), onSearch: { library.query = $0 })
+                .padding(.leading, 4)
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
             // None found is said by the empty tile in the history strip (Web c265e28bb); a failure is still said here.
             if !library.loading, !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                library.query == draft, library.errorText != nil {

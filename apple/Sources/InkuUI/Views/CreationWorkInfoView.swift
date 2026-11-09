@@ -195,9 +195,12 @@ struct CreationWorkInfoView: View {
                     }.inkuFont(12)
                     hashRow("rh", work.renderHash, hint: "provenanceHintRenderHash", copyable: true)
                     hashRow("dh", work.descriptionHash, hint: "provenanceHintDescriptionHash", copyable: false)
-                    row("Render engine version", work.renderEngineVersion, hint: "provenanceHintRenderEngine")
+                    // CanvasGenerationInfo.svelte:587-592: DDL Spec, DDL engine, Score, Render engine, Build.
                     row(copy("provenanceLabelDdlSpec", "DDL version"), provenance?.ddlVersion, hint: "provenanceHintDdlSpec")
                     row(copy("provenanceLabelTransformLayer", "DDL engine version"), provenance?.ddlEngineVersion, hint: "provenanceHintTransformLayer")
+                    row("Score version", ScoreVersionDisplay.text(scoreJSON: work.score,
+                        notRecorded: copy("historyVersionNotRecorded", "記録なし")), hint: "provenanceHintScoreVersion")
+                    row("Render engine version", work.renderEngineVersion, hint: "provenanceHintRenderEngine")
                     row("Build", provenance?.build, hint: "provenanceHintBuild")
                 }
                 group(copy("provenanceSectionOrigin", "由来")) {

@@ -36,7 +36,7 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     let equal = counts.values.map(\.equal).reduce(0, +)
     let excluded = counts.values.map(\.excluded).reduce(0, +)
-    guard tooltipParityTable.count == 189, missing.isEmpty, excluded == 19, equal == 170 else {
+    guard tooltipParityTable.count == 189, missing.isEmpty, excluded == 11, equal == 178 else {
         throw CheckFailure.message("Tooltip parity: \(tooltipParityTable.count) sites, \(equal) equal, \(excluded) excluded, missing \(missing)")
     }
     // Failure (T2b): the Web gained or lost a tooltip and the table did not follow (10-15 to 11-06 it fell 21 behind

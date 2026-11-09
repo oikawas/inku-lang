@@ -113,6 +113,8 @@ struct AboutInkuView: View {
     @ViewBuilder private func layerVersions(_ reference: ProductReference, copy: ProductReferenceCopy) -> some View {
         versionRow("DDL Spec. ver.", value: reference.versions["ddlSpec"], hint: copy.text("appInfoHintDdlSpec"))
         versionRow("DDL engine ver.", value: reference.versions["ddlEngine"], hint: copy.text("appInfoHintDdlEngine"))
+        // +page.svelte:3490 (0bf463cd6): the Score version the linked core reads and writes.
+        versionRow("Score ver.", value: InkuCore.scoreVersion, hint: copy.text("appInfoHintScoreVersion"))
         versionRow("Render engine ver.", value: reference.versions["renderEngine"], hint: copy.text("appInfoHintRenderEngine"))
         versionRow("Binding protocol ver.", value: Self.bindingReport["protocol_version"], hint: copy.text("appInfoHintBindingProtocol"))
     }

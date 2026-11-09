@@ -27,7 +27,12 @@ struct InkuSearchField: NSViewRepresentable {
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
         // The Web hides the browser's clear button and draws its own "×" beside the box (InkuClearableSearchField).
-        (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
+        // The button is kept, unseen and unpressable: removing it (`cancelButtonCell = nil`) made the cell lay the
+        // edited text and the placeholder over the magnifier (step 1 screen check, 2026-11-09).
+        if let cancel = (field.cell as? NSSearchFieldCell)?.cancelButtonCell {
+            cancel.isTransparent = true
+            cancel.isEnabled = false
+        }
         context.coordinator.clearRequest = clearRequest
         field.delegate = context.coordinator
         field.target = context.coordinator

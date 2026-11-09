@@ -10,6 +10,8 @@ struct DrawingLogView: View {
     @State private var loading = false
     @State private var loadError: String?
     @State private var hasLoaded = false
+    @State private var phoneDetailShown = false
+    @Environment(\.inkuPhoneLayout) private var phone
 
     private var selected: DrawingLogRecord? { records.first { $0.id == selectedID } }
 
@@ -39,12 +41,40 @@ struct DrawingLogView: View {
             else if records.isEmpty {
                 Text(model.display.localized(hasLoaded ? "描画の実行記録はまだありません。" : "記録を更新して描画ログを読み込んでください。"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if phone {
+                // iPhone (ios-app step 7c): the list, then one record on the whole width with a way back.
+                if phoneDetailShown, let selected {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button { phoneDetailShown = false } label: {
+                            Label(model.display.localized("一覧"), systemImage: "chevron.left")
+                        }.padding(.horizontal, 14).padding(.vertical, 8)
+                        Divider()
+                        ScrollView { details(selected).padding(14).frame(maxWidth: .infinity, alignment: .leading) }
+                    }
+                } else {
+                    ScrollView { recordList }
+                }
             } else {
                 HStack(spacing: 0) {
+                    ScrollView { recordList }.frame(width: 280)
+                    Divider()
                     ScrollView {
+                        if let selected { details(selected).padding(18).frame(maxWidth: .infinity, alignment: .leading) }
+                    }.frame(maxWidth: .infinity)
+                }
+            }
+            Divider()
+            Text(model.display.localized("直近100件の実行記録です。開いても描画や再送信は行いません。"))
+                .inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12)
+        }
+        .inkuDialogFrame(minWidth: 760, idealWidth: 1040, minHeight: 480, idealHeight: 700)
+        .task { await load() }
+    }
+
+    private var recordList: some View {
                         LazyVStack(spacing: 6) {
                             ForEach(records) { record in
-                                Button { selectedID = record.id } label: {
+                                Button { selectedID = record.id; phoneDetailShown = true } label: {
                                     VStack(alignment: .leading, spacing: 5) {
                                         HStack {
                                             Text(model.display.localized(phase(record.phase))).fontWeight(.semibold)
@@ -60,19 +90,6 @@ struct DrawingLogView: View {
                                 }.buttonStyle(.plain)
                             }
                         }.padding(10)
-                    }.frame(width: 280)
-                    Divider()
-                    ScrollView {
-                        if let selected { details(selected).padding(18).frame(maxWidth: .infinity, alignment: .leading) }
-                    }.frame(maxWidth: .infinity)
-                }
-            }
-            Divider()
-            Text(model.display.localized("直近100件の実行記録です。開いても描画や再送信は行いません。"))
-                .inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12)
-        }
-        .inkuDialogFrame(minWidth: 760, idealWidth: 1040, minHeight: 480, idealHeight: 700)
-        .task { await load() }
     }
 
     private func details(_ record: DrawingLogRecord) -> some View {

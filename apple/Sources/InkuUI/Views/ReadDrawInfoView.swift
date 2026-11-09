@@ -6,6 +6,7 @@ struct ReadDrawInfoView: View {
     let record: ExactJSON
     let display: DisplaySettings
     var pluginOffers: [String] = []
+    @Environment(\.inkuPhoneLayout) private var phone
     private var ja: Bool { display.preferences.language != "en" }
     private func l(_ jaText: String, _ en: String) -> String { ja ? jaText : en }
     private var sep: String { ja ? "、" : ", " }
@@ -53,8 +54,8 @@ struct ReadDrawInfoView: View {
         GroupBox { VStack(alignment: .leading, spacing: 10, content: content).frame(maxWidth: .infinity, alignment: .leading).padding(6) } label: { Text(title).inkuFont(12, weight: .semibold).foregroundStyle(.secondary) }
     }
     private func row(_ title: String, _ value: String, _ hint: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Text(title).foregroundStyle(.secondary).frame(width: 190, alignment: .leading).inkuTooltip(display.tooltip(title, serverKey: hint))
+        (inkuLabelValueLayout(phone: phone)) {
+            Text(title).foregroundStyle(.secondary).inkuFixedWidth(190, alignment: .leading).inkuTooltip(display.tooltip(title, serverKey: hint))
             Text(value.isEmpty ? "-" : value).frame(maxWidth: .infinity, alignment: .leading)
         }.inkuFont(13)
     }

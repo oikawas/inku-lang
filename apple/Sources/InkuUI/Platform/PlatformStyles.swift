@@ -148,6 +148,34 @@ extension View {
         #endif
     }
 
+    /// An iPhone sheet (ios-app step 7c): the whole height, its own width; no Web box and no fitted size.
+    @ViewBuilder
+    func inkuPhoneSheet() -> some View {
+        #if os(iOS)
+        presentationDetents([.large])
+        #else
+        self
+        #endif
+    }
+
+    /// A popover's contents. On an iPhone the popover becomes a sheet that stops at half and at the whole height
+    /// (ios-app step 7c); elsewhere it stays a popover.
+    func inkuPopoverContent() -> some View { modifier(InkuPopoverContent()) }
+
+    /// A fixed width on the Mac and the iPad; on an iPhone the width it is given (ios-app step 7c).
+    func inkuFixedWidth(_ width: CGFloat, alignment: Alignment = .center) -> some View {
+        modifier(InkuFixedWidth(width: width, alignment: alignment))
+    }
+
+    /// A row of buttons that slides sideways on an iPhone when it is wider than the screen (ios-app step 7c).
+    func inkuPhoneSlidesSideways() -> some View { modifier(InkuPhoneSlidesSideways()) }
+
+    /// A minimum and ideal size on the Mac and the iPad; none on an iPhone, whose sheet is the screen (ios-app step 7c).
+    func inkuWideFrame(minWidth: CGFloat? = nil, idealWidth: CGFloat? = nil,
+                       minHeight: CGFloat? = nil, idealHeight: CGFloat? = nil) -> some View {
+        modifier(InkuWideFrame(minWidth: minWidth, idealWidth: idealWidth, minHeight: minHeight, idealHeight: idealHeight))
+    }
+
     /// The iPhone tab bar's accessory while a run goes on (iOS 26.1 and later); before, a bar above the tabs.
     @ViewBuilder
     func inkuTabRunAccessory<Accessory: View>(visible: Bool, @ViewBuilder accessory: () -> Accessory) -> some View {
@@ -164,4 +192,71 @@ extension View {
         self
         #endif
     }
+}
+
+// MARK: - iPhone sheets and fixed widths (ios-app step 7c)
+
+private struct InkuPhoneLayoutKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// Whether the window takes the iPhone layout. Set by the main view and handed into its sheets, where the size
+    /// classes describe the sheet (an iPad form sheet reads as narrow) rather than the window.
+    var inkuPhoneLayout: Bool {
+        get { self[InkuPhoneLayoutKey.self] }
+        set { self[InkuPhoneLayoutKey.self] = newValue }
+    }
+}
+
+private struct InkuPopoverContent: ViewModifier {
+    @Environment(\.inkuPhoneLayout) private var phone
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if phone {
+            content.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+private struct InkuFixedWidth: ViewModifier {
+    @Environment(\.inkuPhoneLayout) private var phone
+    let width: CGFloat
+    let alignment: Alignment
+    func body(content: Content) -> some View {
+        if phone { content.frame(maxWidth: .infinity, alignment: alignment) } else { content.frame(width: width, alignment: alignment) }
+    }
+}
+
+private struct InkuWideFrame: ViewModifier {
+    @Environment(\.inkuPhoneLayout) private var phone
+    let minWidth: CGFloat?
+    let idealWidth: CGFloat?
+    let minHeight: CGFloat?
+    let idealHeight: CGFloat?
+    func body(content: Content) -> some View {
+        if phone { content } else { content.frame(minWidth: minWidth, idealWidth: idealWidth, minHeight: minHeight, idealHeight: idealHeight) }
+    }
+}
+
+private struct InkuPhoneSlidesSideways: ViewModifier {
+    @Environment(\.inkuPhoneLayout) private var phone
+    func body(content: Content) -> some View {
+        if phone {
+            ScrollView(.horizontal, showsIndicators: false) { content }.scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        } else {
+            content
+        }
+    }
+}
+
+/// A label and its value: side by side on the Mac and the iPad, the label above the value on an iPhone
+/// (ios-app step 7c, the generation information's 190-point label column).
+func inkuLabelValueLayout(phone: Bool, alignment: VerticalAlignment = .firstTextBaseline) -> AnyLayout {
+    phone ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(alignment: alignment, spacing: 16))
 }

@@ -16,6 +16,7 @@ struct RefinementDialog<Controls: View, Options: View>: View {
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let options: () -> Options
     @State private var topControlsHeight: CGFloat = 0
+    @Environment(\.inkuPhoneLayout) private var phone
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,15 +39,26 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                                 }
                             }
                         }
-                        HStack(alignment: .top, spacing: 14) {
-                            ScrollView {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
-                                    controls()
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                            }.frame(width: 280)
-                            options().frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }.frame(height: max(360, geometry.size.height - 32 - (topControls == nil ? 0 : topControlsHeight + 12)))
+                        if phone {
+                            // iPhone (ios-app step 7c): the target and its controls above, the options below at
+                            // the screen's height; the whole slides up and down.
+                            VStack(alignment: .leading, spacing: 12) {
+                                RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                    .frame(maxWidth: 280, alignment: .leading)
+                                controls()
+                                options().frame(maxWidth: .infinity).frame(height: max(420, geometry.size.height - 32))
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            HStack(alignment: .top, spacing: 14) {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                        controls()
+                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                }.frame(width: 280)
+                                options().frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }.frame(height: max(360, geometry.size.height - 32 - (topControls == nil ? 0 : topControlsHeight + 12)))
+                        }
                     }.padding(16)
                 }
             }
@@ -147,7 +159,7 @@ struct RefinementOptionsGrid: View {
                                                 if let observation = option.observation {
                                                     ProviderObservationView(model: model, metrics: observation.providerMetrics,
                                                         workID: option.saved ? option.work.id : nil, executionID: observation.executionID)
-                                                        .padding(16).frame(width: 360)
+                                                        .padding(16).inkuFixedWidth(360).inkuPopoverContent()
                                                 }
                                             }
                                     }

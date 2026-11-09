@@ -131,6 +131,16 @@ Step 7b is the Library and Settings tabs.
 - On iOS the lineage details window has no minimum width (the Mac keeps its own).
 - The iPad's and the Mac's screens and behavior are unchanged.
 
+Step 7c is the sheets and windows.
+
+- The main view holds whether the window takes the iPhone layout as an environment value (`inkuPhoneLayout`) and hands it into the sheets it presents. Inside a sheet the size classes describe the sheet (an iPad sheet reads as narrow), so they do not decide.
+- A sheet sized by the Web formula (`inkuDialogFrame(_:)`) takes no box on an iPhone and stops at the whole height.
+- Minimum and ideal sizes (`inkuWideFrame`) and fixed widths (`inkuFixedWidth`) are dropped on an iPhone, which takes the screen's width (the autonomous refinement process, the colophon, the ChatGPT model list, the model settings windows, the license list, the export format column, the SVG help, the batch history and the popovers' contents).
+- Popovers (paper, the shown work's conditions, the work edit list, the autonomous refinement observation, the batch history, the limit help, the SVG help, the batch conditions and the rate help) become sheets on an iPhone that stop at half and at the whole height (`inkuPopoverContent`).
+- Two-column screens: the refinement dialog stacks the target and its controls above the options. The drawing log and the license list go from the list to one entry's page and back with "List". Export puts the works above the format column.
+- The generation information's 190-point label column sits above its value on an iPhone. The model list's fetch and selection buttons slide sideways.
+- The iPad's and the Mac's screens and behavior are unchanged.
+
 ## 2026-11-07 Tooltip parity with today's Web
 
 The Web tooltip parity table is rebuilt against the 189 sites in today's `web/src` (each `<Tooltip` and `title=` in a `.svelte` file). Its Web line numbers are today's instead of Build 1162's, and its markers point at the components that draw the tooltip (the work preview, the lineage details, the drawing-condition fields below the work). The check counts the Web's tooltips per component and compares them with the table, so it fails when the Web gains or loses one. `apple/scripts/list-web-tooltips.py` lists them (`--compare` compares the counts).

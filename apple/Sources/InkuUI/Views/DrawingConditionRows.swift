@@ -57,7 +57,7 @@ struct DrawingCompactConditions: View {
             .buttonStyle(InkuGhostButtonStyle())
             .inkuTooltip(display.tooltip("用紙の形と意図を見て、次の作品の用紙を選びます。", serverKey: "tooltipInputCanvas"))
             .popover(isPresented: $showPaperPicker) {
-                CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display)
+                CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display).inkuPopoverContent()
             }
             .accessibilityValue(canvas)
         }.padding(.top, 2)

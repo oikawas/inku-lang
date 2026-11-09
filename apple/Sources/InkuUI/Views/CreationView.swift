@@ -670,7 +670,7 @@ struct CreationView: View {
         return conditionRow(display.localized("画面比"), value: value, help: "") { showPaperPicker = true }
             .disabled(controlsDisabled)
             .popover(isPresented: $showPaperPicker) {
-                CreationPaperPicker(model: model, imageSelection: true) { showPaperPicker = false }.environment(display)
+                CreationPaperPicker(model: model, imageSelection: true) { showPaperPicker = false }.environment(display).inkuPopoverContent()
             }
     }
 
@@ -752,7 +752,7 @@ struct CreationView: View {
                 Button { showConditionDetails = true } label: { Image(systemName: "ellipsis") }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
                     .accessibilityLabel(display.localized("生成条件の詳細"))
-                    .popover(isPresented: $showConditionDetails) { conditionDetails }
+                    .popover(isPresented: $showConditionDetails) { conditionDetails.inkuPopoverContent() }
             }.padding(.top, 8).padding(.bottom, 2)
             conditionRow(display.webCopy("modelButton", "モデル"),
                          value: DrawPresentation.modelReference(model.nextBatchDrawingModelReference, empty: display.localized("選択してください")),
@@ -797,7 +797,7 @@ struct CreationView: View {
             }.inkuTooltip(tip("次の作品の配色を選びます。"))
             TextField(display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
                 .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"), focus: .text)
-        }.padding(16).frame(width: 360).disabled(controlsDisabled)
+        }.padding(16).inkuFixedWidth(360).disabled(controlsDisabled)
     }
 
     /// InputPanel.svelte:308-337: the paint button, or the run status while drawing.
@@ -1091,8 +1091,8 @@ struct CreationView: View {
                             ui.refinementMenuWorkID = nil
                             onWorkAction(target, action)
                         }, writingLocked: automation.isOccupied)
-                    }.padding(16).frame(width: 300)
-                }.frame(maxHeight: max(120, rightPanelHeight - 80))
+                    }.padding(16).inkuFixedWidth(300)
+                }.frame(maxHeight: max(120, rightPanelHeight - 80)).inkuPopoverContent()
             }
             .fixedSize()
             .disabled(browsingDisabled)

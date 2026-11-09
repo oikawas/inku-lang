@@ -220,8 +220,10 @@ struct BatchPanelView: View {
                             .accessibilityAddTraits(selectedHistoryPrompt == text ? .isSelected : [])
                     }
                 }
-            }.frame(width: 390, height: min(CGFloat(automation.batchPromptHistory.count) * 32 + 8, (windowSize?.height ?? 880) * 0.5))
+            }.frame(height: min(CGFloat(automation.batchPromptHistory.count) * 32 + 8, (windowSize?.height ?? 880) * 0.5))
+                .inkuFixedWidth(390)
                 .inkuOnEscape { historyOpen = false }
+                .inkuPopoverContent()
         }
     }
 

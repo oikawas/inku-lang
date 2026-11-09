@@ -62,7 +62,7 @@ public struct AutonomousRefinementView: View {
                 }
             }.padding(20)
         }
-        .frame(minWidth: 560, idealWidth: 720, minHeight: 440, idealHeight: 600)
+        .inkuWideFrame(minWidth: 560, idealWidth: 720, minHeight: 440, idealHeight: 600)
         .task { await refinement.initialize(app: model, work: work) }
         .onDisappear { Task { await refinement.didClose() } }
         .onChange(of: choices) { _, _ in if !refinement.running { refinement.remember(app: model) } }

@@ -101,6 +101,8 @@ public struct ContentView: View {
     @State private var presentationLoadID = UUID()
     @State private var presentationWasFullScreen = false
     @State private var windowSize = CGSize.zero
+    /// The iPhone layout, read in the shell and handed into the sheets presented from here (ios-app step 7c).
+    @State private var phoneLayout = false
     /// The window's file dialogs, which the menu's "open DDL" also asks.
     @State private var fileDialogs = InkuFileDialogs()
     @State private var importer = DDLImportController()
@@ -179,6 +181,7 @@ public struct ContentView: View {
             dialogView(item)
                 .environment(\.locale, Locale(identifier: model.display.preferences.language))
                 .environment(\.inkuWindowSize, windowSize)
+                .environment(\.inkuPhoneLayout, phoneLayout)
                 #if os(macOS)
                 .safeAreaInset(edge: .bottom, spacing: 0) { errorNotice }
                 #endif
@@ -209,6 +212,8 @@ public struct ContentView: View {
                 }
                 if presentation { presentationView.inkuAllowsLandscape(phone) }
             }
+            .environment(\.inkuPhoneLayout, phone)
+            .onChange(of: phone, initial: true) { _, phone in phoneLayout = phone }
         }
         .background {
             GeometryReader { geometry in

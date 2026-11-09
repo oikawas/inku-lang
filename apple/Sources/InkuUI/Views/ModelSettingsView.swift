@@ -284,7 +284,7 @@ struct ModelSettingsView: View {
                     .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized(help) : "")
                     .popover(isPresented: Binding(get: { rateHelp == title }, set: { if !$0 { rateHelp = nil } })) {
                         Text(model.display.localized(help)).inkuFont(13).padding()
-                            .frame(maxWidth: 320).fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: 320).fixedSize(horizontal: false, vertical: true).inkuPopoverContent()
                     }
             }
             TextField(model.display.localized(title), text: draftBinding(provider, key))

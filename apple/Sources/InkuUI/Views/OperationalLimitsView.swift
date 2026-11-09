@@ -38,7 +38,7 @@ import InkuHost
                                     .accessibilityLabel(model.display.localizedFormat("%@の説明", copy.limitGroups[group.id] ?? group.id))
                                     .inkuTooltip(model.display.preferences.showTooltips ? tip : "")
                                     .popover(isPresented: Binding(get: { helpGroup == group.id }, set: { if !$0 { helpGroup = nil } })) {
-                                        Text(tip).inkuFont(13).textSelection(.enabled).padding(16).frame(width: 380)
+                                        Text(tip).inkuFont(13).textSelection(.enabled).padding(16).inkuFixedWidth(380).inkuPopoverContent()
                                     }
                             }
                         }

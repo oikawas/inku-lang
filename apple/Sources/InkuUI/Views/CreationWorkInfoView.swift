@@ -7,6 +7,7 @@ struct CreationWorkInfoView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.inkuPhoneLayout) private var phone
     private let work: SavedWork?
     @State private var information: SavedGenerationInformation?
     @State private var loading = true
@@ -164,13 +165,13 @@ struct CreationWorkInfoView: View {
                     row(model.display.localized("色カタログ"), work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID, hint: "provenanceHintCatalog")
                     if let data = information?.context?.catalogReading, let record = try? ExactJSON(data: data), record.object != nil {
                         let detail = CatalogReadingDetails(record, japanese: model.display.preferences.language != "en")
-                        HStack(alignment: .firstTextBaseline, spacing: 16) {
-                            Text(model.display.label("選び方", "Selection")).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
+                        (inkuLabelValueLayout(phone: phone)) {
+                            Text(model.display.label("選び方", "Selection")).foregroundStyle(.secondary).inkuFixedWidth(190, alignment: .leading)
                             Text(detail.method).frame(maxWidth: .infinity, alignment: .leading)
                         }.inkuFont(13)
                         if !detail.text.isEmpty {
-                            HStack(alignment: .top, spacing: 16) {
-                                Text(model.display.label("色の読み", "Color reading")).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
+                            (inkuLabelValueLayout(phone: phone, alignment: .top)) {
+                                Text(model.display.label("色の読み", "Color reading")).foregroundStyle(.secondary).inkuFixedWidth(190, alignment: .leading)
                                 Text(detail.text).inkuFont(12, design: .monospaced).fixedSize(horizontal: false, vertical: true)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -302,8 +303,8 @@ struct CreationWorkInfoView: View {
     }
 
     private func row(_ label: String, _ value: String?, hint: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Text(label).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
+        (inkuLabelValueLayout(phone: phone)) {
+            Text(label).foregroundStyle(.secondary).inkuFixedWidth(190, alignment: .leading)
                 .inkuTooltip(model.display.tooltip(label, serverKey: hint))
             Text(value.flatMap { $0.isEmpty ? nil : $0 } ?? absent).frame(maxWidth: .infinity, alignment: .leading)
         }.inkuFont(13)
@@ -318,8 +319,8 @@ struct CreationWorkInfoView: View {
 
     @ViewBuilder private func colorMap(_ work: SavedWork) -> some View {
         if let raw = work.renderColorMap, let fields = try? ExactJSON(data: Data(raw.utf8)).object, !fields.isEmpty {
-            HStack(alignment: .top, spacing: 16) {
-                Text(copy("provenanceLabelColorMap", "色の対応")).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
+            (inkuLabelValueLayout(phone: phone, alignment: .top)) {
+                Text(copy("provenanceLabelColorMap", "色の対応")).foregroundStyle(.secondary).inkuFixedWidth(190, alignment: .leading)
                     .inkuTooltip(model.display.tooltip("色の対応", serverKey: "provenanceHintColorMap"))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), alignment: .leading)], alignment: .leading, spacing: 6) {
                     ForEach(fields.keys.sorted(), id: \.self) { key in

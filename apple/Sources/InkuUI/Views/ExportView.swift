@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct ExportView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.inkuPhoneLayout) private var phone
     @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
     @State private var candidates: [SavedWork]
     @State private var selectedIDs: Set<String>
@@ -67,7 +68,8 @@ struct ExportView: View {
                 Text(model.display.localizedFormat("%ld作品", selectedIDs.count)).foregroundStyle(.secondary)
             }
             if !directCard && !directFormat {
-              HStack(alignment: .top, spacing: 20) {
+              // iPhone (ios-app step 7c): the works above the format, each on the whole width.
+              (phone ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 20))) {
                 if !lineAnimation { VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Button(model.display.localized("すべて選択")) { selectedIDs = Set(candidates.map(\.id)) }
@@ -87,7 +89,7 @@ struct ExportView: View {
                                 }.inkuFont(12).foregroundStyle(.secondary)
                             }
                         }.disabled(isBusy || work.trashed)
-                    }.frame(minWidth: 240, maxWidth: 310, minHeight: 260)
+                    }.frame(minWidth: phone ? nil : 240, maxWidth: phone ? .infinity : 310, minHeight: phone ? 180 : 260, maxHeight: phone ? 240 : nil)
                     Text(model.display.localized(preserveOrder ? "系譜の順序で書き出します。" : "選択作品を作成日時の順で書き出します。"))
                         .inkuFont(12).foregroundStyle(.secondary)
                 } }
@@ -108,7 +110,7 @@ struct ExportView: View {
                             Button { svgHelpOpen.toggle() } label: { Image(systemName: "questionmark.circle") }
                                 .buttonStyle(.borderless).accessibilityLabel(copy("svgExportHelpAria", "SVGの用途と特徴"))
                                 .inkuTooltip(model.display.tooltip("SVGの用途と特徴", serverKey: "svgExportHelpAria"))
-                                .popover(isPresented: $svgHelpOpen) { svgHelp }
+                                .popover(isPresented: $svgHelpOpen) { svgHelp.inkuPopoverContent() }
                         }
                         Text(model.display.localized("表示用は保存時の記述をSVGへ添えます。ほかのプロファイルは作品の保存条件で描画します。"))
                             .inkuFont(12).foregroundStyle(.secondary)
@@ -175,7 +177,7 @@ struct ExportView: View {
                         }
                         if resolution == 0 { TextField(copy("animationCustomHeight", "Y軸ピクセル数"), value: $customHeight, format: .number) }
                     }
-                }.formStyle(.grouped).frame(minWidth: 370).disabled(isBusy)
+                }.formStyle(.grouped).inkuWideFrame(minWidth: 370).disabled(isBusy)
               }
             }
             if lineAnimation {
@@ -243,7 +245,7 @@ struct ExportView: View {
                     }
                 }
             }.inkuFont(13).fixedSize(horizontal: false, vertical: true)
-        }.padding(20).frame(width: 530)
+        }.padding(20).inkuFixedWidth(530)
     }
 
     private func begin() {

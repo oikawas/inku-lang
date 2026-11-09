@@ -62,9 +62,13 @@ struct InkuDialogSize: Equatable {
 
 private struct InkuDialogFrame: ViewModifier {
     @Environment(\.inkuWindowSize) private var window
+    @Environment(\.inkuPhoneLayout) private var phone
     let size: InkuDialogSize
     func body(content: Content) -> some View {
-        if let window, window.width > 0 {
+        if phone {
+            // iPhone (ios-app step 7c): the sheet is the screen; the Web box would cut it.
+            content.inkuPhoneSheet()
+        } else if let window, window.width > 0 {
             let box = size.resolved(in: window)
             content.frame(width: box.width, height: box.height).inkuFittedSheet()
         } else {

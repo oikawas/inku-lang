@@ -99,7 +99,7 @@ struct ProviderServiceEditorSheet: View {
                     .disabled(!canSave)
             }.padding(16)
         }
-        .frame(minWidth: 500, idealWidth: 600, minHeight: 360, idealHeight: isAdding ? 490 : 380)
+        .inkuWideFrame(minWidth: 500, idealWidth: 600, minHeight: 360, idealHeight: isAdding ? 490 : 380)
         .interactiveDismissDisabled(isSaving)
         .onDisappear { apiKey = "" }
     }
@@ -293,7 +293,7 @@ struct ProviderModelsSheet: View {
             Divider()
             footer
         }
-        .frame(minWidth: 690, idealWidth: 840, minHeight: 500, idealHeight: 680)
+        .inkuWideFrame(minWidth: 690, idealWidth: 840, minHeight: 500, idealHeight: 680)
         .interactiveDismissDisabled(isWorking)
         .task {
             guard !draftLoaded else { return }
@@ -351,7 +351,7 @@ struct ProviderModelsSheet: View {
                 Spacer()
                 Text(model.display.localizedFormat("%ld / %ld モデルを表示", visibleModels.count, draft.models.count))
                     .inkuFont(12).foregroundStyle(.secondary)
-            }
+            }.inkuPhoneSlidesSideways()
         }.padding(16)
     }
 

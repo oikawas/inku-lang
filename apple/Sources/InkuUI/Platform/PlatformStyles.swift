@@ -167,6 +167,17 @@ extension View {
         modifier(InkuFixedWidth(width: width, alignment: alignment))
     }
 
+    /// A button or link that takes only its own taps inside an iOS form row, where a plain button makes the whole row
+    /// one target and a tap fires every button in it (ios-app step 7c: the license button also opened the repository).
+    @ViewBuilder
+    func inkuOwnTapInFormRow() -> some View {
+        #if os(iOS)
+        buttonStyle(.borderless)
+        #else
+        self
+        #endif
+    }
+
     /// A row of buttons that slides sideways on an iPhone when it is wider than the screen (ios-app step 7c).
     func inkuPhoneSlidesSideways() -> some View { modifier(InkuPhoneSlidesSideways()) }
 

@@ -121,6 +121,7 @@ struct RefinementOptionsGrid: View {
     let onDiscard: () -> Void
     let onSave: () -> Void
     @State private var observationID: String?
+    @Environment(\.inkuPhoneLayout) private var phone
 
     private var shown: [RefinementOption] { options.filter { previewID == nil || $0.id == previewID } }
 
@@ -143,9 +144,13 @@ struct RefinementOptionsGrid: View {
                                 .background(InkuColor.bg2)
                                 .overlay(Rectangle().stroke(InkuColor.border, style: StrokeStyle(dash: [4])))
                         } else {
-                            let count = previewID == nil ? max(1, min(maxColumns, shown.count)) : 1
+                            // iPhone (ios-app step 7c): at most two columns, each card about as tall as it is wide
+                            // (plus its label); the grid slides up and down instead of filling the height.
+                            let count = previewID == nil ? max(1, min(phone ? 2 : maxColumns, shown.count)) : 1
                             let rows = (shown.count + count - 1) / count
-                            let height = max(150, (viewport.size.height - 4 - CGFloat(rows - 1) * 10) / CGFloat(rows))
+                            let height = phone && previewID == nil
+                                ? max(150, (viewport.size.width - 4 - CGFloat(count - 1) * 10) / CGFloat(count) + 56)
+                                : max(150, (viewport.size.height - 4 - CGFloat(rows - 1) * 10) / CGFloat(rows))
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
                                 ForEach(shown) { option in
                                     VStack(alignment: .leading, spacing: 4) {

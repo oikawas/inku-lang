@@ -138,7 +138,9 @@ Step 7c is the sheets and windows.
 - Minimum and ideal sizes (`inkuWideFrame`) and fixed widths (`inkuFixedWidth`) are dropped on an iPhone, which takes the screen's width (the autonomous refinement process, the colophon, the ChatGPT model list, the model settings windows, the license list, the export format column, the SVG help, the batch history and the popovers' contents).
 - Popovers (paper, the shown work's conditions, the work edit list, the autonomous refinement observation, the batch history, the limit help, the SVG help, the batch conditions and the rate help) become sheets on an iPhone that stop at half and at the whole height (`inkuPopoverContent`).
 - Two-column screens: the refinement dialog stacks the target and its controls above the options. The drawing log and the license list go from the list to one entry's page and back with "List". Export puts the works above the format column.
+- Refinement candidates show at most two columns on an iPhone, each card as tall as its width suggests, and the grid slides up and down. The autonomous refinement's move switches take one line each.
 - The generation information's 190-point label column sits above its value on an iPhone. The model list's fetch and selection buttons slide sideways.
+- In "About inku", the repository link and the license button each take only their own taps inside an iOS form row (one tap used to fire both and opened Safari).
 - The iPad's and the Mac's screens and behavior are unchanged.
 
 ## 2026-11-07 Tooltip parity with today's Web

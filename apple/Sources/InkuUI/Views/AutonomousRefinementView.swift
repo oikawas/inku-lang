@@ -10,6 +10,7 @@ public struct AutonomousRefinementView: View {
     let work: SavedWork?
     @State private var showModels = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.inkuPhoneLayout) private var phone
 
     public init(model: AppModel, work: SavedWork?) {
         self.model = model; self.refinement = model.autonomousRefinement; self.work = work
@@ -85,7 +86,8 @@ public struct AutonomousRefinementView: View {
                 Label(refinement.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : refinement.modelReference, systemImage: "eye")
             }
             GroupBox(copy("aiRefineKindsLabel")) {
-                HStack(spacing: 20) {
+                // iPhone (ios-app step 7c): one switch per line, so a name does not fold a character at a time.
+                (phone ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 20))) {
                     ForEach(AutonomousRefinementModel.kinds, id: \.self) { kind in
                         Toggle(kindLabel(kind), isOn: Binding(get: { refinement.enabledKinds.contains(kind) },
                             set: { if $0 { if kind == "chunks" { refinement.enabledKinds = ["chunks"] } else { refinement.enabledKinds.remove("chunks"); refinement.enabledKinds.insert(kind) } } else { refinement.enabledKinds.remove(kind) } }))

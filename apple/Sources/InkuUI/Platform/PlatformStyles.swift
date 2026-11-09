@@ -128,6 +128,16 @@ extension View {
         #endif
     }
 
+    /// No navigation bar over a view that draws its own heading (iOS).
+    @ViewBuilder
+    func inkuHidesNavigationBar() -> some View {
+        #if os(iOS)
+        toolbar(.hidden, for: .navigationBar)
+        #else
+        self
+        #endif
+    }
+
     /// A small title in the navigation bar (iOS); the Mac's toolbar has no such choice.
     @ViewBuilder
     func inkuInlineNavigationTitle() -> some View {

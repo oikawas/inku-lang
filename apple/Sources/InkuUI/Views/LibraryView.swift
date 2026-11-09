@@ -25,6 +25,8 @@ struct LibraryView: View {
     /// Web `onClose` ("制作に戻る"). The button is shown only when the owner can close the library.
     var onClose: (() -> Void)? = nil
     var onSelectionExport: ([String], String) -> Void = { _, _ in }
+    /// The iPhone's library tab (ios-app step 7b).
+    var phoneLayout = false
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @State private var providers: [ProviderSettings] = []
@@ -53,18 +55,22 @@ struct LibraryView: View {
     private static let lineageGroupPageSize = 8
 
     var body: some View {
-        VStack(spacing: 0) {
-            head.padding(.vertical, 9).padding(.horizontal, 12)
-            Divider()
-            tools.padding(.vertical, 7).padding(.horizontal, 12)
-            Divider()
-            statusRows
-            HStack(spacing: 0) {
-                listing.frame(maxWidth: .infinity, maxHeight: .infinity)
-                if preview.work != nil {
-                    Divider()
-                    previewContent.frame(minWidth: 280, idealWidth: 360, maxWidth: 360, maxHeight: .infinity)
+        Group {
+            if phoneLayout {
+                // iPhone (ios-app step 7b): a work opens as its own page, the preview's contents on the whole
+                // width; going back closes the preview. The page turns with the phone.
+                NavigationStack(path: Binding(get: { preview.work.map { [$0.id] } ?? [] },
+                                              set: { if $0.isEmpty { preview.close() } })) {
+                    surface
+                        .inkuHidesNavigationBar()
+                        .navigationDestination(for: String.self) { _ in
+                            previewContent
+                                .inkuInlineNavigationTitle()
+                                .inkuAllowsLandscape()
+                        }
                 }
+            } else {
+                surface
             }
         }
         .background(LibraryChrome.panel2)
@@ -92,6 +98,24 @@ struct LibraryView: View {
                       Task { if request.empty { await library.emptyTrash() } else { await library.permanentlyDelete(ids: request.ids) } }
                   }, secondaryButton: .cancel(Text(display.localized("キャンセル"))))
           }
+        }
+    }
+
+    /// The heading, the tools, the status and the listing; beside them the preview on the Mac and the iPad.
+    private var surface: some View {
+        VStack(spacing: 0) {
+            head.padding(.vertical, 9).padding(.horizontal, 12)
+            Divider()
+            tools.padding(.vertical, 7).padding(.horizontal, 12)
+            Divider()
+            statusRows
+            HStack(spacing: 0) {
+                listing.frame(maxWidth: .infinity, maxHeight: .infinity)
+                if preview.work != nil && !phoneLayout {
+                    Divider()
+                    previewContent.frame(minWidth: 280, idealWidth: 360, maxWidth: 360, maxHeight: .infinity)
+                }
+            }
         }
     }
 

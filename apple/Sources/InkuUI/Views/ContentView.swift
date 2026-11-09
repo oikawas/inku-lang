@@ -295,12 +295,13 @@ public struct ContentView: View {
             LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) },
                         onReplayWork: openReplay, onWorkAction: openWorkAction,
                         writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary,
-                        onSelectionExport: openSelectionExport)
+                        onSelectionExport: openSelectionExport, phoneLayout: true)
                 .disabled(importing)
                 .background(InkuColor.bg)
         } settings: {
             SettingsView(model: model, automation: automation, maintenance: maintenance, section: $ui.settingsSection,
-                         onClose: closeSettings)
+                         onClose: closeSettings, phoneLayout: true, phonePage: $ui.settingsPhonePage,
+                         onOpenDrawingLogs: { if dialog == nil, !importing { dialog = .drawingLogs } })
                 .disabled(importing)
                 .background(InkuColor.bg)
         }
@@ -515,6 +516,7 @@ public struct ContentView: View {
     private func openSettings(_ destination: SettingsSection?) {
         InkuWindow.removeFocus()
         ui.settingsSection = destination ?? savedSettingsSection ?? .display
+        ui.settingsPhonePage = destination
         ui.settingsOpen = true
     }
     private var savedSettingsSection: SettingsSection? {

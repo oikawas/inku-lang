@@ -515,7 +515,7 @@ struct CreationView: View {
     private var demoBanner: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(display.webCopy("demoOpenSettings", "デモの設定・進行状況")) {
-                ui.settingsSection = .demo; ui.settingsOpen = true
+                ui.showSettings(.demo)
             }.buttonStyle(InkuGhostButtonStyle())
             runStatus(label: automation.status, onStop: { Task { await automation.stop(app: model) } },
                       stopping: automation.stopping)
@@ -805,7 +805,7 @@ struct CreationView: View {
         VStack(alignment: .leading, spacing: 10) {
             if model.inputMode == "description" && !model.hasAvailableNextDrawingModel {
                 Button {
-                    ui.settingsSection = .drawingGuidance(hasConnection: model.hasDrawingConnection); ui.settingsOpen = true
+                    ui.showSettings(.drawingGuidance(hasConnection: model.hasDrawingConnection))
                 } label: {
                     Label(display.localized(model.hasDrawingConnection
                         ? "描くときのデフォルトで、使える描画モデルを選んでください。"
@@ -822,7 +822,7 @@ struct CreationView: View {
                     Text(display.localizedFormat("描画モデル（%@）の接続先にAPIキーがありません。設定の「モデル設定」でAPIキーを入力すると描けます。",
                                                  model.nextDrawingModelReference))
                         .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    Button(display.localized("接続設定を開く")) { ui.settingsSection = .models; ui.settingsOpen = true }
+                    Button(display.localized("接続設定を開く")) { ui.showSettings(.models) }
                         .buttonStyle(InkuGhostButtonStyle(prominent: true))
                         .disabled(browsingDisabled)
                 }

@@ -55,19 +55,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @State private var fanoutError: String?
     private var detailed: Bool { model.display.preferences.settingsDetail == "detailed" }
     var onClose: () -> Void = {}
+    /// The iPhone's settings tab (ios-app step 7b): the sections as a list, each pushing its page.
+    var phoneLayout = false
+    /// The page pushed over the list (`WorkspaceUIState.settingsPhonePage`).
+    var phonePage: Binding<SettingsSection?> = .constant(nil)
+    /// The rail's drawing log, which the iPhone reaches from this list.
+    var onOpenDrawingLogs: () -> Void = {}
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            HStack(spacing: 0) {
-                navigation
-                Rectangle().fill(InkuColor.border).frame(width: 1)
-                VStack(spacing: 0) {
-                    pageHeading
-                    pageBody.frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .inkuFont(14)
-            }
+        Group {
+            if phoneLayout { phoneBody } else { wideBody }
         }
         .task(id: section == .models ? model.providerSettingsRevision : nil) {
             guard section == .models else { return }
@@ -123,6 +120,92 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 backupRestoreName = nil
             }
             Button(model.display.localized("キャンセル"), role: .cancel) { backupRestoreName = nil }
+        }
+    }
+
+    /// The Mac's and the iPad's settings: the section list beside the chosen page.
+    private var wideBody: some View {
+        VStack(spacing: 0) {
+            header
+            HStack(spacing: 0) {
+                navigation
+                Rectangle().fill(InkuColor.border).frame(width: 1)
+                VStack(spacing: 0) {
+                    pageHeading
+                    pageBody.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .inkuFont(14)
+            }
+        }
+    }
+
+    // MARK: - iPhone
+
+    /// The iPhone: first the rail's choices (UI mode, theme, language), then the same groups and sections as the
+    /// Mac's list, the detail switch, the drawing log and the build number. A section pushes its page.
+    private var phoneBody: some View {
+        let display = model.display
+        return NavigationStack(path: Binding(get: { phonePage.wrappedValue.map { [$0] } ?? [] },
+                                             set: { phonePage.wrappedValue = $0.last })) {
+            List {
+                Section {
+                    Picker(display.webCopy("uiModeLabel", "UIモード"), selection: Bindable(display).preferences.uiMode) {
+                        Text(display.webCopy("uiModeSimple", "シンプルUI")).tag("simple")
+                        Text(display.webCopy("uiModeCustom", "カスタムUI")).tag("custom")
+                        Text(display.webCopy("uiModeFull", "フルUI")).tag("full")
+                    }
+                    if display.visible("auxiliary") {
+                        Picker(display.localized("テーマ"), selection: Bindable(display).preferences.theme) {
+                            Text(display.webCopy("themeLight", "ライトモード")).tag("light")
+                            Text(display.webCopy("themeDark", "ダークモード")).tag("dark")
+                        }
+                        Picker(display.localized("言語"), selection: Bindable(display).preferences.language) {
+                            Text("日本語").tag("ja")
+                            Text("English").tag("en")
+                        }
+                    }
+                    Toggle(display.webCopy("settingsDetailLabel", "表示モード") + "：" +
+                           display.webCopy(detailed ? "settingsDetailDetailed" : "settingsDetailStandard", detailed ? "詳細" : "標準"),
+                           isOn: Binding(get: { detailed }, set: { enabled in
+                               display.preferences.settingsDetail = enabled ? "detailed" : "standard"
+                           }))
+                }
+                ForEach(groups, id: \.label) { group in
+                    Section(group.label) {
+                        ForEach(group.items) { item in phoneRow(item) }
+                    }
+                }
+                Section {
+                    Button(display.localized("描画ログ"), action: onOpenDrawingLogs).tint(.primary)
+                } footer: {
+                    Text("Build " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"))
+                }
+            }
+            .navigationTitle(display.webCopy("settingsTitle", "設定"))
+            .navigationDestination(for: SettingsSection.self) { _ in
+                VStack(spacing: 0) {
+                    pageHeading
+                    pageBody.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .inkuFont(14)
+                .background(InkuColor.bg)
+                .inkuInlineNavigationTitle()
+            }
+        }
+    }
+
+    private func phoneRow(_ item: SettingsSection) -> some View {
+        Button {
+            section = item
+            model.display.rememberSettingsTab(item.rawValue)
+            phonePage.wrappedValue = item
+        } label: {
+            HStack {
+                Text(title(item)).foregroundStyle(Color.primary)
+                Spacer()
+                Image(systemName: "chevron.right").inkuFont(12).foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
         }
     }
 

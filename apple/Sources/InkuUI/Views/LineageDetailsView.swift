@@ -77,7 +77,8 @@ struct LineageDetailsView: View {
                 }
             }
         }
-        .frame(minWidth: 480, idealWidth: 640, minHeight: 420, idealHeight: 620)
+        // The Mac's window sizes; iOS sheets take the screen's width (an iPhone is narrower than 480, step 7b).
+        .inkuDialogFrame(minWidth: 480, idealWidth: 640, minHeight: 420, idealHeight: 620)
         .task(id: item.work?.id) {
             guard let work = item.work else { return }
             await model.loadWorkActionState(work)

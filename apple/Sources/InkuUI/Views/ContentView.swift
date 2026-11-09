@@ -197,12 +197,18 @@ public struct ContentView: View {
 
     /// The first part of `body`: the shell and its overlays, the environment, and the start-up task.
     private var startedShell: some View {
-        ZStack {
-            mainShell
-                .modifier(InkuCoveredView(covered: presentation || ui.libraryOpen || ui.settingsOpen, hidden: presentation))
-            if ui.libraryOpen && !presentation { libraryOverlay.modifier(InkuCoveredView(covered: ui.settingsOpen)) }
-            if ui.settingsOpen && !presentation { settingsOverlay }
-            if presentation { presentationView }
+        InkuPhoneLayoutReader { phone in
+            ZStack {
+                if phone {
+                    phoneShell.modifier(InkuCoveredView(covered: presentation, hidden: presentation))
+                } else {
+                    mainShell
+                        .modifier(InkuCoveredView(covered: presentation || ui.libraryOpen || ui.settingsOpen, hidden: presentation))
+                    if ui.libraryOpen && !presentation { libraryOverlay.modifier(InkuCoveredView(covered: ui.settingsOpen)) }
+                    if ui.settingsOpen && !presentation { settingsOverlay }
+                }
+                if presentation { presentationView.inkuAllowsLandscape(phone) }
+            }
         }
         .background {
             GeometryReader { geometry in
@@ -272,21 +278,55 @@ public struct ContentView: View {
                             onOpenAbout: openAbout, canExpand: railFits)
                     .disabled(!canNavigateSections && !ui.settingsOpen)
             }
-            CreationView(model: model, history: history, automation: automation, maintenance: maintenance, ui: ui,
-                         batchWorkspace: $batchWorkspace,
-                         onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) }, onReplayWork: openReplay,
-                         onWorkAction: openWorkAction, onLineageExport: openLineageExport,
-                         onPresentWork: { Task { await preparePresentation() } },
-                         onWorkspaceWorkChange: { work in
-                             workspaceWork = work
-                             Task { await history.locate(app: model, workID: work?.id) }
-                         })
-                .disabled(importing)
+            creationView(phone: false)
                 // HistoryManager hides the shell beneath it (`.main-shell.library-away`) and keeps its state.
                 .opacity(ui.libraryOpen ? 0 : 1)
                 .accessibilityHidden(ui.libraryOpen)
                 .allowsHitTesting(!ui.libraryOpen)
         }
+    }
+
+    /// The iPhone (ios-app step 7): the workspace, the library and the settings in tabs. Choosing a tab is opening the
+    /// library or the settings here, so every command and guard that reads those states works as on the Mac.
+    private var phoneShell: some View {
+        PhoneShellView(model: model, tab: phoneTab, runStatus: automation.running ? automation.status : model.status) {
+            creationView(phone: true)
+        } library: {
+            LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) },
+                        onReplayWork: openReplay, onWorkAction: openWorkAction,
+                        writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary,
+                        onSelectionExport: openSelectionExport)
+                .disabled(importing)
+                .background(InkuColor.bg)
+        } settings: {
+            SettingsView(model: model, automation: automation, maintenance: maintenance, section: $ui.settingsSection,
+                         onClose: closeSettings)
+                .disabled(importing)
+                .background(InkuColor.bg)
+        }
+    }
+
+    private var phoneTab: Binding<Int> {
+        Binding(get: { ui.settingsOpen ? 2 : ui.libraryOpen ? 1 : 0 }, set: { tab in
+            switch tab {
+            case 1: if !ui.libraryOpen || ui.settingsOpen { openLibrary() }
+            case 2: if !ui.settingsOpen { ui.libraryOpen = false; openSettings(nil) }
+            default: showCreation(tab: nil)
+            }
+        })
+    }
+
+    private func creationView(phone: Bool) -> some View {
+        CreationView(model: model, history: history, automation: automation, maintenance: maintenance, ui: ui,
+                     batchWorkspace: $batchWorkspace, phoneLayout: phone,
+                     onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) }, onReplayWork: openReplay,
+                     onWorkAction: openWorkAction, onLineageExport: openLineageExport,
+                     onPresentWork: { Task { await preparePresentation() } },
+                     onWorkspaceWorkChange: { work in
+                         workspaceWork = work
+                         Task { await history.locate(app: model, workID: work?.id) }
+                     })
+            .disabled(importing)
     }
 
     /// Web HistoryManager.svelte:1311 covers the window (`position: fixed; inset: 0`).

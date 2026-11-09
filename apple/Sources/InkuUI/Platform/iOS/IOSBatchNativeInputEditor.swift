@@ -53,6 +53,14 @@ struct BatchNativeInputEditor: UIViewRepresentable {
         editor.textColor = .label
         editor.backgroundColor = style.drawsBackground ? .secondarySystemBackground : .clear
         editor.alwaysBounceVertical = false
+        // iPhone (ios-app step 7): the keyboard covers half the screen and has no key that closes it; a Done bar does.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+            bar.items = [UIBarButtonItem(systemItem: .flexibleSpace),
+                         UIBarButtonItem(systemItem: .done, primaryAction: UIAction { [weak editor] _ in editor?.resignFirstResponder() })]
+            bar.sizeToFit()
+            editor.inputAccessoryView = bar
+        }
         context.coordinator.attach(editor)
         context.coordinator.update(from: self)
         return editor

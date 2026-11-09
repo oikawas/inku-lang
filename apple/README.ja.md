@@ -251,6 +251,17 @@ apple/scripts/build-ios.sh Release --run "iPad Pro 11-inch (M5)"
 
 最初の引数は`Debug`か`Release`です。iOSのRust artifactが無いときと、今のsourceより古いときだけ、先に`build-core.sh all`を実行します。`build-macos.sh`は毎回artifactをMacだけのものに作り直すので、Macをbuildした後にiOSをbuildすると、artifactをもう一度作り直します。バージョンとBuild番号はMacと同じく、buildのたびに割り当てます。この割り当てが無いので、Xcodeから`InkuIOS`を直接buildすると止まります。
 
-`--run`はSimulator.appを開かずにシミュレータの機器を起動し、buildしたアプリを入れて起動し、10秒後にアプリが動き続けているかを確かめます。機器の既定は`iPad Pro 11-inch (M5)`で、名前を続けて書くと別の機器を使います。iPadの実機に入れる手順はまだありません。
+`--run`はSimulator.appを開かずにシミュレータの機器を起動し、buildしたアプリを入れて起動し、10秒後にアプリが動き続けているかを確かめます。機器の既定は`iPad Pro 11-inch (M5)`で、名前を続けて書くと別の機器を使います。
 
-作品と設定は、アプリのApplication Supportの下の`app.inku.ios/`に保存します（Macは今までどおり`app.inku.macos/`）。iOSのアプリは別のプログラムを起動できないので、拡大の窓はCPUで区画に分けて描きます（IntelのMacと同じ）。Macの画面と振る舞いは変わりません。画像タブ、DDLの取り込み、書き出しの画面、プラグインの追加、バックアップの復元、3Dは、まだiPadで出ません。iPadで出ない物とMacとの違いは、[Swift仕様](SWIFT_SPEC.ja.md)の「2026-11-07 iOS（iPad）のアプリ」の節にあります。
+つないだiPadの実機には`--device`で入れます。署名のTeam IDは環境変数`INKU_IOS_TEAM`で渡し、checkoutには書きません。Xcodeにそのチームのアカウントを入れ、iPadの開発者モードを入にしておきます。初めて入れた後は、iPadの「設定」→「一般」→「VPNとデバイス管理」で開発者を信頼します。
+
+```sh
+INKU_IOS_TEAM=<Team ID> apple/scripts/build-ios.sh Release --device
+INKU_IOS_TEAM=<Team ID> apple/scripts/build-ios.sh Release --device "iPad 9"
+```
+
+実機にはReleaseを入れます。Debugのbuildは、iPad 9（iPadOS 27.2）で最初の画面を描く時に落ちました。最適化の無いSwiftが、制作の画面の深いSwiftUIの型の名を実行時に読み解き、実機のメインスレッドのスタック（シミュレータより小さい）を使い切るためです（2026-11-09）。
+
+`--device`の後にUDIDか名前を書くと、その機器を使います。書かなければ、つないだiPadが1台だけの時にそれを使います。Xcodeの自動の署名で、チームに開発用のプロファイルを作るか、今のものを使います。すでにアプリが入っていれば、先にアプリの`Library/Application Support`を`apple/build/iOS/device-backups/<日時>/`へコピーします（入れた後の起動でDBが移行されることがあるため）。その後に`devicectl`で入れて起動し、10秒後に動いているかを確かめます。
+
+作品と設定は、アプリのApplication Supportの下の`app.inku.ios/`に保存します（Macは今までどおり`app.inku.macos/`）。iOSのアプリは別のプログラムを起動できないので、拡大の窓はCPUで区画に分けて描きます（IntelのMacと同じ）。Macの画面と振る舞いは変わりません。画像タブには「撮影」（カメラのある機器だけ）と「写真から選ぶ」があります。iPadで出ない物とMacとの違いは、[Swift仕様](SWIFT_SPEC.ja.md)の「2026-11-07 iOS（iPad）のアプリ」の節にあります。

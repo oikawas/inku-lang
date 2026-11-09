@@ -382,6 +382,9 @@ struct CreationView: View {
             HStack {
                 Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
                 Spacer()
+                InkuCameraButton(title: display.localized("撮影"), disabled: controlsDisabled) { data in
+                    loadImage(data: data, fileName: nil)
+                }
                 InkuPhotoPickerButton(title: display.localized("写真から選ぶ"), disabled: controlsDisabled) { data in
                     loadImage(data: data, fileName: nil)
                 }

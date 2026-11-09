@@ -125,10 +125,9 @@ final class IOSBackgroundRunKeeper {
             }
         }
         continuedLoop = Task { @MainActor [weak self] in
-            var stages = 0
-            var lastStage: ProviderProgressSnapshot.Stage?
+            var state = ContinuedRunProgress()
             while model.hasActiveRun, !Task.isCancelled {
-                let progress = Self.progress(model: model, stages: &stages, lastStage: &lastStage)
+                let progress = Self.progress(model: model, state: &state)
                 task.progress.totalUnitCount = progress.total
                 task.progress.completedUnitCount = progress.done
                 task.updateTitle(title, subtitle: progress.subtitle)
@@ -140,14 +139,13 @@ final class IOSBackgroundRunKeeper {
         }
     }
 
-    /// The batch's rows when a batch runs; otherwise the drawing's stages as they change (a drawing has up to 8).
-    private static func progress(model: AppModel, stages: inout Int,
-                                 lastStage: inout ProviderProgressSnapshot.Stage?) -> (done: Int64, total: Int64, subtitle: String) {
-        if let rows = model.runStops.rows, rows.total > 0 {
-            return (Int64(rows.done), Int64(rows.total), "\(rows.done) / \(rows.total)")
-        }
-        if let stage = model.providerProgress?.stage, stage != lastStage { lastStage = stage; stages += 1 }
-        return (Int64(min(stages, 7)), 8, model.status)
+    static func progress(model: AppModel, state: inout ContinuedRunProgress, now: Date = Date()) -> (done: Int64, total: Int64, subtitle: String) {
+        let rows = model.runStops.rows.flatMap { $0.total > 0 ? $0 : nil } ?? (done: 0, total: 1)
+        // The row only: the status line's retry and fallback messages read as a failure in the system's display while
+        // the run goes on (step 6 device check, author's choice 2026-11-09 "行だけにする").
+        let row = rows.total > 1 ? "\(min(rows.done + 1, rows.total)) / \(rows.total)" : ""
+        let done = state.advance(rowsDone: rows.done, now: now)
+        return (done, Int64(rows.total * ContinuedRunProgress.unitsPerRow), row)
     }
 }
 #endif

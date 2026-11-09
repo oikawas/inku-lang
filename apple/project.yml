@@ -65,6 +65,8 @@ targets:
     sources:
       - path: Sources/InkuIOS
       - path: Resources/iOS/Assets.xcassets
+      # The permission prompts in Japanese and English (ios-app step 6).
+      - path: Resources/iOS/Localization
     dependencies:
       - package: InkuApple
         product: InkuUI

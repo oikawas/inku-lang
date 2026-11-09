@@ -31,6 +31,9 @@
     <!-- The share sheet's "Save Image" after an export adds the picture to Photos (ios-app step 2). -->
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>書き出した作品を写真に保存します。</string>
+    <!-- The image tab's "Take photo" draws from a photo taken in the app (ios-app step 6). English: InfoPlist.strings. -->
+    <key>NSCameraUsageDescription</key>
+    <string>撮った写真から作品を描きます。</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>設定したローカルLLMに接続して作品の記述を生成します。</string>
     <key>NSAppTransportSecurity</key>

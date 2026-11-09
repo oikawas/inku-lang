@@ -32,6 +32,16 @@ final class WorkspaceUIState {
     var libraryOpen = false
     var settingsOpen = false
     var settingsSection = SettingsSection.display
+    /// The iPhone's settings tab: the section page pushed over the list (ios-app step 7b). Opening the settings at a
+    /// named section pushes it; the tab alone shows the list. The Mac and iPad show the section beside the list.
+    var settingsPhonePage: SettingsSection?
+
+    /// Opens the settings at a section (a guidance button, the demo banner).
+    func showSettings(_ section: SettingsSection) {
+        settingsSection = section
+        settingsPhonePage = section
+        settingsOpen = true
+    }
     /// CanvasGenerationInfo drawer over the canvas.
     var generationInfoOpen = false
     var refinementMenuWorkID: String?

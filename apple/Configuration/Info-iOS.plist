@@ -16,8 +16,15 @@
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key><false/>
     </dict>
-    <!-- The Mac's layout needs the whole screen until the narrow screens exist (ios-app plan step 7). -->
+    <!-- An iPad keeps the Mac's layout, which needs the whole screen; an iPhone takes its own (ios-app step 7). -->
     <key>UIRequiresFullScreen</key><true/>
+    <!-- An iPhone stays upright except on the screens that show a work (InkuOrientationDelegate, ios-app step 7). -->
+    <key>UISupportedInterfaceOrientations~iphone</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
     <key>UISupportedInterfaceOrientations~ipad</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>

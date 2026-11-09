@@ -101,3 +101,57 @@ extension View {
         #endif
     }
 }
+
+// MARK: - iPhone layout (ios-app step 7)
+
+/// Hands its content whether the window takes the iPhone layout: a narrow width, or a short height (an iPhone on its
+/// side, which a Pro Max reports as a wide width). Never on the Mac; never on an iPad, which runs full screen.
+struct InkuPhoneLayoutReader<Content: View>: View {
+    @ViewBuilder let content: (Bool) -> Content
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontal
+    @Environment(\.verticalSizeClass) private var vertical
+    var body: some View { content(horizontal == .compact || vertical == .compact) }
+    #else
+    var body: some View { content(false) }
+    #endif
+}
+
+extension View {
+    /// A screen that shows a work turns with an iPhone; the others stay upright (STEP7 author's choice 2026-11-09).
+    @ViewBuilder
+    func inkuAllowsLandscape(_ enabled: Bool = true) -> some View {
+        #if os(iOS)
+        if enabled { onAppear { InkuOrientationGate.enter() }.onDisappear { InkuOrientationGate.leave() } } else { self }
+        #else
+        self
+        #endif
+    }
+
+    /// A small title in the navigation bar (iOS); the Mac's toolbar has no such choice.
+    @ViewBuilder
+    func inkuInlineNavigationTitle() -> some View {
+        #if os(iOS)
+        navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
+    }
+
+    /// The iPhone tab bar's accessory while a run goes on (iOS 26.1 and later); before, a bar above the tabs.
+    @ViewBuilder
+    func inkuTabRunAccessory<Accessory: View>(visible: Bool, @ViewBuilder accessory: () -> Accessory) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.1, *) {
+            tabViewBottomAccessory(isEnabled: visible, content: accessory)
+        } else {
+            let row = accessory()
+            safeAreaInset(edge: .bottom, spacing: 0) {
+                if visible { row.padding(.vertical, 8).background(.bar) }
+            }
+        }
+        #else
+        self
+        #endif
+    }
+}

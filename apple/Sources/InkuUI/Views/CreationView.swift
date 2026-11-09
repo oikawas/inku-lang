@@ -52,6 +52,8 @@ struct CreationView: View {
     @Binding var batchWorkspace: BatchWorkspaceSelection
     /// The refine workspace, shown in place of the canvas while it is open.
     var inlinePanel: AnyView? = nil
+    /// The iPhone's 制作 tab (ios-app step 7): the work above the input panel, the canvas tools in the navigation bar.
+    var phoneLayout = false
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
@@ -78,6 +80,9 @@ struct CreationView: View {
     @State private var rightPanelHeight: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
+    /// iPhone: a refinement chosen in the 作品編集 sheet, opened once the sheet has gone (one sheet at a time).
+    @State private var pendingPhoneAction: (SavedWork, String)?
+    @State private var phoneConditionsOpen = false
     @State private var lineageMounted = false
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
     @State private var ddl3d = Ddl3DController()
@@ -106,32 +111,11 @@ struct CreationView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                // The 3D full screen keeps only the canvas area (Web requests full screen for `.canvas-area`).
-                if !ui.leftPanelCollapsed && !ui.canvasFullScreen {
-                    leftPanel.frame(width: leftPanelWidth).disabled(inlinePanel != nil)
-                }
-                if !ui.canvasFullScreen { leftPanelToggle }
-                rightPanel
-            }
-            if display.visible("history") {
-                VStack(spacing: 0) {
-                    Rectangle().fill(InkuColor.border).frame(height: 1)
-                    HistoryStripView(model: model, history: history, displayedWorkID: workspaceWork?.id,
-                                     onSelectWork: { _ in batchWorkspace.showHistory() })
-                        .disabled(inlinePanel != nil)
-                }
-                // Folded rather than removed in the 3D full screen, so the strip's reads are not restarted.
-                .frame(height: ui.canvasFullScreen ? 0 : nil, alignment: .top)
-                .clipped()
-                .opacity(ui.canvasFullScreen ? 0 : 1)
-                .allowsHitTesting(!ui.canvasFullScreen)
-                .accessibilityHidden(ui.canvasFullScreen)
-            }
+        Group {
+            if phoneLayout { phoneWorkspace } else { wideWorkspace }
         }
         .overlay(alignment: .trailing) {
-            if ui.saijikiOpen { saijikiDrawer.transition(.move(edge: .trailing)) }
+            if ui.saijikiOpen && !phoneLayout { saijikiDrawer.transition(.move(edge: .trailing)) }
         }
         .animation(.easeOut(duration: 0.2), value: ui.saijikiOpen)
         .sheet(isPresented: $showColorCatalogs) {
@@ -220,11 +204,256 @@ struct CreationView: View {
         }
     }
 
+    /// The Mac's and the iPad's workspace: the input panel and the canvas side by side over the history strip.
+    private var wideWorkspace: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                // The 3D full screen keeps only the canvas area (Web requests full screen for `.canvas-area`).
+                if !ui.leftPanelCollapsed && !ui.canvasFullScreen {
+                    leftPanel.frame(width: leftPanelWidth).disabled(inlinePanel != nil)
+                }
+                if !ui.canvasFullScreen { leftPanelToggle }
+                rightPanel
+            }
+            if display.visible("history") {
+                VStack(spacing: 0) {
+                    Rectangle().fill(InkuColor.border).frame(height: 1)
+                    HistoryStripView(model: model, history: history, displayedWorkID: workspaceWork?.id,
+                                     onSelectWork: { _ in batchWorkspace.showHistory() })
+                        .disabled(inlinePanel != nil)
+                }
+                // Folded rather than removed in the 3D full screen, so the strip's reads are not restarted.
+                .frame(height: ui.canvasFullScreen ? 0 : nil, alignment: .top)
+                .clipped()
+                .opacity(ui.canvasFullScreen ? 0 : 1)
+                .allowsHitTesting(!ui.canvasFullScreen)
+                .accessibilityHidden(ui.canvasFullScreen)
+            }
+        }
+    }
+
+    // MARK: - iPhone
+
+    /// The iPhone's 制作 tab (ios-app step 7): the canvas above the input panel, which scrolls. The canvas keeps
+    /// 40 % of the height the keyboard leaves. Lineage takes the whole tab. The canvas's corner tools move to the
+    /// navigation bar's menu; its caption, star and revision mark stay in the row under it.
+    private var phoneWorkspace: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                if ui.workspaceTab == "lineage" && workspaceWork != nil {
+                    canvasArea
+                } else {
+                    canvasArea
+                        .frame(height: max(150, geometry.size.height * 0.4))
+                        .simultaneousGesture(phoneSwipe)
+                    phoneWorkRow
+                    ScrollView {
+                        leftPanelContent(width: max(0, geometry.size.width - 32))
+                            .padding(.vertical, 14).padding(.horizontal, 16)
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                    .background(InkuColor.bg)
+                }
+            }
+            .onAppear { rightPanelWidth = geometry.size.width; rightPanelHeight = geometry.size.height }
+            .onChange(of: geometry.size) { _, size in rightPanelWidth = size.width; rightPanelHeight = size.height }
+        }
+        // As the wide workspace's canvas panel does (`rightPanel`).
+        .task(id: workspaceWork?.id) {
+            guard let work = workspaceWork, hasSavedWorkspaceWork, !Task.isCancelled else { return }
+            await history.locate(app: model, workID: work.id)
+            guard !Task.isCancelled, workspaceWork?.id == work.id else { return }
+            await model.loadWorkActionState(work)
+        }
+        .toolbar { phoneToolbar }
+        .inkuInlineNavigationTitle()
+        .sheet(isPresented: Binding(get: { phoneLayout && ui.refinementMenuWorkID != nil && workspaceWork?.id == ui.refinementMenuWorkID },
+                                    set: { if !$0 { ui.refinementMenuWorkID = nil } }),
+               onDismiss: runPendingPhoneAction) { phoneRefinementSheet }
+        .sheet(isPresented: Binding(get: { phoneLayout && ui.generationInfoOpen && workspaceWork != nil },
+                                    set: { if !$0 { ui.generationInfoOpen = false } })) {
+            if let work = workspaceWork {
+                CreationWorkInfoView(model: model, work: work, tab: $ui.generationInfoTab, onClose: { ui.generationInfoOpen = false })
+                    .id(work.id)
+            }
+        }
+        .sheet(isPresented: Binding(get: { phoneLayout && ui.saijikiOpen }, set: { if !$0 { ui.saijikiOpen = false } })) {
+            SaijikiView(model: model, onInsertWord: canInsertIntoBox
+                        ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil,
+                        onClose: { ui.saijikiOpen = false })
+        }
+    }
+
+    /// A sideways swipe on the canvas moves to the newer (right) or older (left) work, as ‹ and › do; a zoomed picture
+    /// pans instead.
+    private var phoneSwipe: some Gesture {
+        DragGesture(minimumDistance: 24).onEnded { value in
+            let dx = value.translation.width, dy = value.translation.height
+            guard ui.canvasViewport.scale <= 1.01, abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+            navigateHistory(delta: dx < 0 ? 1 : -1)
+        }
+    }
+
+    /// The caption, star and revision mark; 最新 and the position; the shown work's conditions, folded.
+    private var phoneWorkRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                canvasControls(.left)
+                Spacer(minLength: 4)
+                if history.canMoveNewer {
+                    Button(display.webCopy("historyLatest", "最新")) { navigateHistory(boundary: "latest") }
+                        .buttonStyle(InkuGhostButtonStyle())
+                        .disabled(browsingDisabled)
+                }
+                if history.library.total > 0 {
+                    Text("\((history.selectedIndex ?? 0) + 1) / \(history.library.total)")
+                        .inkuFont(11).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+                }
+            }
+            if let work = workspaceWork {
+                DisclosureGroup(isExpanded: $phoneConditionsOpen) {
+                    metaStrip(work).frame(maxWidth: .infinity, alignment: .leading)
+                } label: {
+                    Text(display.webCopy("displayedWorkConditions", "表示中作品の条件")).inkuFont(11).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 6)
+        .background(InkuColor.bg)
+        .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1) }
+    }
+
+    @ToolbarContentBuilder private var phoneToolbar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Picker(display.localized("表示"), selection: Binding(get: { ui.workspaceTab == "lineage" ? "lineage" : "artwork" },
+                                                               set: { ui.workspaceTab = $0 })) {
+                Text(display.webCopy("tabCanvas", "作品")).tag("artwork")
+                Text(display.localized("系譜")).tag("lineage")
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .disabled(workspaceWork == nil || browsingDisabled)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                phoneWorkMenu
+            } label: {
+                Label(display.localized("作品の操作"), systemImage: "ellipsis.circle")
+            }
+            .disabled(workspaceWork == nil)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button(display.webCopy("workActionRefine", "推敲する")) {
+                if let work = workspaceWork { ui.refinementMenuWorkID = work.id }
+            }
+            .disabled(!hasSavedWorkspaceWork || browsingDisabled)
+        }
+    }
+
+    /// CreationCanvasControls' right corner, and the oldest work, as a menu.
+    @ViewBuilder private var phoneWorkMenu: some View {
+        if let work = workspaceWork {
+            Section {
+                if workspaceWork != nil && Ddl3DInstallation.available {
+                    Toggle(isOn: $ui.canvasThreeDimensional) { Label(display.webCopy("ddl3dMode", "2D / 3D表示"), systemImage: "cube") }
+                }
+                if display.visible("work_tools") {
+                    Button { phonePerform(work, "presentation") } label: {
+                        Label(display.localized("プレゼンテーションモードを開く"), systemImage: "arrow.up.left.and.arrow.down.right")
+                    }
+                    .disabled(work.svg.isEmpty || browsingDisabled)
+                }
+            }
+            Section {
+                if display.visible("work_tools") {
+                    SavedWorkExportMenu(model: model, count: hasSavedWorkspaceWork ? 1 : 0, symbolOnly: false,
+                                        onAction: { phonePerform(work, $0) })
+                        .disabled(!hasSavedWorkspaceWork || controlsDisabled)
+                } else {
+                    Button { phonePerform(work, "export-card") } label: {
+                        Label(display.localized("共有カード"), systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(!hasSavedWorkspaceWork || controlsDisabled)
+                }
+                Button { Task { await model.copyImage(work: work) } } label: {
+                    Label(display.localized("クリップボードにコピー"), systemImage: "doc.on.clipboard")
+                }
+                .disabled(work.svg.isEmpty || controlsDisabled)
+                if hasSavedWorkspaceWork && display.visible("detail_status") {
+                    Button { phonePerform(work, "copy-hash") } label: {
+                        Label(display.webCopy("historyIdCopyTitle", "クリックで作品のUUIDをコピーします"), systemImage: "number")
+                    }
+                    .disabled(browsingDisabled)
+                }
+            }
+            Section {
+                if display.visible("detail_status") {
+                    Button { ui.generationInfoOpen = true } label: { Label(display.localized("生成情報"), systemImage: "info.circle") }
+                        .disabled(browsingDisabled)
+                }
+                if display.visible("work_tools") {
+                    Button { onReplayWork(work) } label: { Label(display.localized("再現を比較"), systemImage: "arrow.clockwise") }
+                        .disabled(!hasSavedWorkspaceWork || controlsDisabled)
+                    Button { ui.saijikiOpen = true } label: { Label(display.localized("歳時記を開く"), systemImage: "book") }
+                        .disabled(browsingDisabled)
+                }
+            }
+            Button { navigateHistory(boundary: "oldest") } label: {
+                Label(display.localized("最古の履歴"), systemImage: "arrow.right.to.line")
+            }
+            .disabled(!history.canMoveOlder || browsingDisabled)
+        }
+    }
+
+    /// CreationCanvasControls `perform`: browsing actions wait only for browsing, the others for the controls.
+    private func phonePerform(_ work: SavedWork, _ action: String) {
+        let allowed = SavedWorkActionState.isBrowsingAction(action) ? !browsingDisabled : !controlsDisabled
+        guard allowed else { return }
+        onWorkAction(work, action)
+    }
+
+    /// The Mac's 推敲する popover as a sheet. A chosen action opens its dialog after the sheet has gone.
+    @ViewBuilder private var phoneRefinementSheet: some View {
+        if let work = workspaceWork {
+            NavigationStack {
+                ScrollView {
+                    SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
+                        pendingPhoneAction = (target, action)
+                        ui.refinementMenuWorkID = nil
+                    }, writingLocked: automation.isOccupied)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .navigationTitle(workActionTitle(work))
+                .inkuInlineNavigationTitle()
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(display.localized("閉じる")) { ui.refinementMenuWorkID = nil }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    private func runPendingPhoneAction() {
+        guard let (work, action) = pendingPhoneAction else { return }
+        pendingPhoneAction = nil
+        onWorkAction(work, action)
+    }
+
     // MARK: - Left panel
 
     /// Web `.left-panel` / `.panel-scroll`: padding 14×16 (12 at 1180 or narrower), 14 between sections.
     private var leftPanel: some View {
         ScrollView {
+            leftPanelContent(width: max(0, leftPanelWidth - (compactWindow ? 24 : 32)))
+                .padding(.vertical, 14).padding(.horizontal, compactWindow ? 12 : 16)
+        }
+        .background(InkuColor.bg)
+    }
+
+    private func leftPanelContent(width: CGFloat) -> some View {
             VStack(alignment: .leading, spacing: 14) {
                 if automation.running && automation.mode == "demo" { demoBanner }
                 if display.visible("input_modes") { inputTabs }
@@ -249,10 +478,7 @@ struct CreationView: View {
                 }
                 statusFooter
             }
-            .frame(width: max(0, leftPanelWidth - (compactWindow ? 24 : 32)), alignment: .leading)
-            .padding(.vertical, 14).padding(.horizontal, compactWindow ? 12 : 16)
-        }
-        .background(InkuColor.bg)
+            .frame(width: width, alignment: .leading)
     }
 
     /// InputPanel.svelte:180-198: two equal underline tabs; a running tab carries a dot and `(n/N ↻r)`.
@@ -920,7 +1146,7 @@ struct CreationView: View {
                                     batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
                                 })
                         .background(InkuColor.bg)
-                        .padding(.horizontal, display.visible("history") ? 68 : 0)
+                        .padding(.horizontal, display.visible("history") && !phoneLayout ? 68 : 0)
                         // Native scroll views can still receive pointer events while their SwiftUI
                         // parent is transparent and hit testing is disabled. Keep the lineage
                         // mounted, but move it outside the clipped canvas when artwork is shown.
@@ -933,13 +1159,13 @@ struct CreationView: View {
             }
         }
         .overlay(alignment: .leading) {
-            if display.visible("history") && inlinePanel == nil { navigationLeft.padding(.leading, 14) }
+            if display.visible("history") && inlinePanel == nil && !phoneLayout { navigationLeft.padding(.leading, 14) }
         }
         .overlay(alignment: .trailing) {
-            if display.visible("history") && inlinePanel == nil { navigationRight.padding(.trailing, 14) }
+            if display.visible("history") && inlinePanel == nil && !phoneLayout { navigationRight.padding(.trailing, 14) }
         }
         .overlay(alignment: .topTrailing) {
-            if ui.generationInfoOpen, inlinePanel == nil, let work = workspaceWork { generationInfoDrawer(work) }
+            if ui.generationInfoOpen, inlinePanel == nil, !phoneLayout, let work = workspaceWork { generationInfoDrawer(work) }
         }
         .clipped()
     }
@@ -966,6 +1192,8 @@ struct CreationView: View {
                           replacement: threeDimensionalReplacement)
             // The two corner rows side by side; where they would meet (an iPad in portrait), the right row goes
             // above the left one.
+            // On an iPhone the corner tools are in the row under the canvas and the navigation bar's menu.
+            if !phoneLayout {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .bottom, spacing: 0) {
                     canvasControls(.left)
@@ -979,9 +1207,10 @@ struct CreationView: View {
             }
                 .padding(.horizontal, 18).padding(.bottom, 14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
             if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
             VStack(alignment: .trailing, spacing: 6) {
-                workActionMenu
+                if !phoneLayout { workActionMenu }
                 CanvasFallbackBadges(display: display, work: workspaceWork)
             }
                 .padding([.top, .trailing], 12)

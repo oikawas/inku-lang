@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS, iOS: In the "Refine" list, the items that call the LLM (change the description, change the composition form, redraw with or without the sketch, change the model, juxtapose, AI autonomous refinement) show an "LLM" mark after their names (it was not drawn before). After saving candidates, the status line no longer stays at "Saving the chosen options" and reads "Saved the chosen options" (color catalog, color arrangement, ground, touches, model, composition form).
+
 - macOS, iOS: The work actions gain "Change the composition form", as on the Web. Choose one of seven forms, redraw one or four options from the description, and save the ones you choose. The description is read again in words with composition on, keeping the original work's sketch, models, color catalog, canvas and seed. The lineage names it "Composition form". A description-locked work cannot use it.
 
 - macOS, iOS: Added parts the Web had. While a batch runs, "Line", "Since start" and "Avg / work" tiles are shown (an image-folder batch too). About Inku shows the Score version the app reads and writes (Score ver.), and the work information shows the version of the work's Score (Score version). The model choice shows the chosen model in a "Selected" field at the bottom (the summary box above is gone) and gives a not-recommended model's card an explaining tooltip. Search fields end in a "×" button that clears the search at once, and the Mac's search fields have no magnifier, as on the Web. Shared core: the app binding gains `score_version()` (`version_report()` is unchanged).

@@ -2007,6 +2007,8 @@ public final class AppModel {
     public func saveComparisonCandidate(executionID: String, token: UUID) async throws -> SavedWork {
         guard generationToken == token, !stopping, let host else { throw CancellationError() }
         let saved = try await host.saveCandidate(executionID: executionID)
+        // As adoptDrawingAdjustmentCandidate: the "saving the chosen options" line does not outlive the save.
+        status = "選択した候補を保存しました"
         await notifySavedWork(saved)
         // The explicit transaction result remains authoritative if a later refresh is interrupted.
         do { try await reloadWorks() } catch { report(error) }

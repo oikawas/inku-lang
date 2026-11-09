@@ -45,8 +45,17 @@ struct SavedWorkRefinementActions: View {
 
     /// WorkActionMenu.svelte: the items that always call the LLM carry a small mark; layout and the instruction
     /// editor call it only to fill a hole, so they do not.
-    private func llm<Item: View>(_ item: Item) -> some View {
-        item.badge(Text("LLM")).accessibilityHint(model.display.webCopy("workActionLlmMarkLabel", "LLMを呼びます"))
+    /// The mark is part of the item's title text: `.badge` drew nothing in the popover's sections (web-parts step 2
+    /// screen check, 2026-11-09), and a menu keeps the title's text.
+    private func llm(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label {
+                Text(title) + Text("  LLM").font(.system(size: 9 * model.display.preferences.textScale, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            } icon: { Image(systemName: systemImage) }
+        }
+        .accessibilityLabel(title)
+        .accessibilityHint(model.display.webCopy("workActionLlmMarkLabel", "LLMを呼びます"))
     }
 
     /// SPEC.ja.md:656 (2026-10-18): four groups, lightest first, each under a small heading; a menu draws a
@@ -68,24 +77,24 @@ struct SavedWorkRefinementActions: View {
                 }
                 if state?.showsDescriptionActions != false {
                     Section(model.display.webCopy("workActionGroupDescription", "記述から描き直す")) {
-                        llm(Button(model.display.webCopy("workActionDescription", "記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
-                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("記述を変える") : reason))
+                        llm(model.display.webCopy("workActionDescription", "記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
+                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("記述を変える") : reason)
                         // WorkActionMenu.svelte:145: next to the description edit, with no tooltip of its own.
-                        llm(Button(model.display.webCopy("workActionCompositionForm", "構図の形を変える"), systemImage: "rectangle.3.group") { onAction(work, "composition-form") }
-                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription != true ? reason : ""))
-                        llm(Button(model.display.webCopy("workActionSketchGrain", "写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onAction(work, "sketch") }
-                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("写生なし／ありで描き直す") : reason))
-                        llm(Button(model.display.webCopy("workActionModels", "モデルを変える"), systemImage: "cpu") { onAction(work, "model") }
-                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("モデルを変える") : reason))
+                        llm(model.display.webCopy("workActionCompositionForm", "構図の形を変える"), systemImage: "rectangle.3.group") { onAction(work, "composition-form") }
+                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription != true ? reason : "")
+                        llm(model.display.webCopy("workActionSketchGrain", "写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onAction(work, "sketch") }
+                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("写生なし／ありで描き直す") : reason)
+                        llm(model.display.webCopy("workActionModels", "モデルを変える"), systemImage: "cpu") { onAction(work, "model") }
+                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("モデルを変える") : reason)
                         // WorkActionMenu.svelte:147: a sentence from another work, added after the description.
-                        llm(Button(model.display.webCopy("workActionJuxtapose", "取り合わせ"), systemImage: "text.badge.plus") { onAction(work, "juxtapose") }
-                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? "" : reason))
+                        llm(model.display.webCopy("workActionJuxtapose", "取り合わせ"), systemImage: "text.badge.plus") { onAction(work, "juxtapose") }
+                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? "" : reason)
                         if state?.canReadDescription != true { Text(reason) }
                     }
                 }
             }.disabled(model.isBusy || writingLocked || work.trashed)
             Section(model.display.webCopy("workActionGroupAi", "AIに任せる")) {
-                llm(Button(model.display.webCopy("workActionAutonomous", "AI自動推敲プロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") })
+                llm(model.display.webCopy("workActionAutonomous", "AI自動推敲プロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") }
             }.disabled(work.trashed || ((model.isBusy || writingLocked) && !model.autonomousRefinement.running))
         }
     }

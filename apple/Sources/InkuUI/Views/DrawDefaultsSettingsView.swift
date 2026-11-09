@@ -8,6 +8,7 @@ import InkuHost
     @State private var saved = false
     @State private var failed = false
     @State private var providers: [ProviderSettings] = []
+    @State private var loaded = false
     @Environment(\.inkuPhoneLayout) private var phone
     private let tabs = ["describe", "image", "batch_text", "batch_image"]
     static func optionKeys(tab: String) -> [String] {
@@ -45,12 +46,17 @@ import InkuHost
         Group {
             if phone { phoneBody } else { wideBody }
         }
-        .onAppear { draft = model.drawDefaults }
+        // The unsaved edits are read once. On an iPhone the catalog and canvas lists are pages pushed over this one,
+        // and coming back appears again; reading the saved defaults then threw the other edits away (author 2026-11-09).
+        .onAppear { if !loaded { draft = model.drawDefaults; loaded = true } }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
         .sheet(isPresented: Binding(get: { pickerTab != nil }, set: { if !$0 { pickerTab = nil } })) {
             if let tab = pickerTab {
-                BatchModelPickerView(model: model, initialReference: imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1,
+                BatchModelPickerView(model: model, initialReference: imageTab(tab) ? options(tab).models.vision : options(tab).models.stage1,
                     immediateSelection: true, purpose: imageTab(tab) ? "vision" : "llm", onSelection: { reference in
+                        // A tab without an unsaved edit yet starts from what is shown, as the other controls do;
+                        // before, the choice fell on nothing and was lost.
+                        if draft[tab] == nil { draft[tab] = options(tab) }
                         if imageTab(tab) { draft[tab]?.models.vision = reference }
                         else { draft[tab]?.models.stage1 = reference; draft[tab]?.models.stage2 = reference }
                         saved = false
@@ -84,7 +90,7 @@ import InkuHost
                         Text(imageTab(tab) ? copy("drawDefaultsVision", "画像を読むモデル") : copy("drawDefaultsModel", "描画モデル"))
                             .foregroundStyle(.primary)
                         Spacer()
-                        Text(modelName((imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1) ?? ""))
+                        Text(modelName(shownModel(tab)))
                             .foregroundStyle(.secondary).lineLimit(1)
                         Image(systemName: "chevron.right").inkuFont(12).foregroundStyle(.tertiary)
                     }.contentShape(Rectangle())
@@ -170,7 +176,7 @@ import InkuHost
                     HStack {
                         Text(imageTab(tab) ? copy("drawDefaultsVision", "画像を読むモデル") : copy("drawDefaultsModel", "描画モデル"))
                         Spacer()
-                        Text(modelName((imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1) ?? ""))
+                        Text(modelName(shownModel(tab)))
                             .foregroundStyle(.secondary)
                         Button(copy("editButton", "変更")) { pickerTab = tab }
                     }
@@ -184,6 +190,12 @@ import InkuHost
             if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
         }
     }
+    /// The model the tab draws with: its unsaved edit, or else the saved or release default the other rows show.
+    private func shownModel(_ tab: String) -> String {
+        let models = options(tab).models
+        return (imageTab(tab) ? models.vision : models.stage1) ?? ""
+    }
+
     private func modelName(_ reference: String) -> String {
         ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID).displayName(reference)
     }

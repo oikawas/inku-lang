@@ -33,6 +33,11 @@ public struct ChatGPTPlanSettingsView: View {
                     Task { await controller.checkConnection(app: app) }
                 }.disabled(controller.busy)
             }
+            // The page's start and end go on this section only, which is always shown. On the group they were handed
+            // to every section and row: the state loaded once per section, and on iOS, whose form lets rows scrolled
+            // out of sight disappear, any of them could stop a sign-in (ios-app step 7d, the author's request).
+            .task { await controller.load(app: app) }
+            .onDisappear { Task { await controller.cancel(app: app) } }
             if let state = controller.state {
                 Section(app.display.localized("保存された接続")) {
                     ForEach(state.profiles) { profile in
@@ -89,8 +94,6 @@ public struct ChatGPTPlanSettingsView: View {
             if !controller.status.isEmpty { Text(app.display.message(controller.status)).foregroundStyle(.secondary) }
             if let error = controller.errorText { Text(error).foregroundStyle(.red).textSelection(.enabled) }
         }
-        .task { await controller.load(app: app) }
-        .onDisappear { Task { await controller.cancel(app: app) } }
     }
 
     /// The Mac opens the sign-in in the browser; iOS in a login sheet over the app, closed when the callback arrives

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Build an iOS Simulator application (iPad) from this product checkout, signed as Xcode's "Sign to Run Locally"
-# (ad hoc, no team): the Simulator's Keychain and the Files app's view of the app's Documents need the signed app and
-# its application identifier (ios-app step 2, 2026-11-08).
-# With --device, build for a connected iPad instead, signed automatically by the team in INKU_IOS_TEAM (the author's,
-# never committed), copy the installed app's data aside, then install and launch it (ios-app step 6, 2026-11-09).
+# Build an iOS Simulator application (iPad and iPhone) from this product checkout, signed as Xcode's "Sign to Run
+# Locally" (ad hoc, no team): the Simulator's Keychain and the Files app's view of the app's Documents need the signed
+# app and its application identifier (ios-app step 2, 2026-11-08).
+# With --device, build for a connected iPad or iPhone instead, signed automatically by the team in INKU_IOS_TEAM (the
+# author's, never committed), copy the installed app's data aside, then install and launch it (ios-app steps 6 and 7d).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -13,7 +13,7 @@ CONFIGURATION=Release
 BUNDLE_ID=app.inku.ios
 RUN_APP=false
 DEVICE_NAME='iPad Pro 11-inch (M5)'
-# --device: a connected physical device (its UDID or name; default: the only connected physical iPad).
+# --device: a connected physical device (its UDID or name; default: the only connected physical device).
 PHYSICAL=false
 PHYSICAL_DEVICE=''
 # How long the launched application must stay alive before the run counts as started.
@@ -21,7 +21,8 @@ LAUNCH_SETTLE_SECONDS=10
 
 usage() {
     printf 'usage: apple/scripts/build-ios.sh [Debug|Release] [--run [DEVICE_NAME] | --device [UDID_OR_NAME]]\n' >&2
-    printf 'With --device, build for a connected physical iPad, signed by the team in INKU_IOS_TEAM (Xcode must be\n' >&2
+    printf 'With --device, build for a connected physical iPad or iPhone (name it when several are connected), signed by\n' >&2
+    printf 'the team in INKU_IOS_TEAM (Xcode must be\n' >&2
     printf 'signed in to that team), copy the installed app'"'"'s Library/Application Support to\n' >&2
     printf 'apple/build/iOS/device-backups/, then install and launch it with devicectl.\n' >&2
     printf 'Default: Release application and release Rust archives, for the iOS Simulator, signed to run locally.\n' >&2
@@ -90,12 +91,13 @@ physical = [d for d in devices if d.get("hardwareProperties", {}).get("reality")
 if wanted:
     found = [d for d in physical if wanted in (d.get("hardwareProperties", {}).get("udid"), d.get("deviceProperties", {}).get("name"))]
 else:
-    found = [d for d in physical if d.get("hardwareProperties", {}).get("deviceType") == "iPad"]
+    # ios-app step 7d: an iPhone is a target too, so without a name only a single connected device is picked.
+    found = physical
 if len(found) == 1:
     print(found[0]["hardwareProperties"]["udid"])
 ' "$PHYSICAL_DEVICE" "$DEVICE_LIST")" || true
     [[ -n "$PHYSICAL_UDID" ]] || {
-        printf 'No single paired physical device matches %s (see xcrun devicectl list devices).\n' "${PHYSICAL_DEVICE:-"an iPad"}" >&2
+        printf 'No single paired physical device matches %s (see xcrun devicectl list devices).\n' "${PHYSICAL_DEVICE:-"the only connected device; name one when several are connected"}" >&2
         exit 1
     }
 else

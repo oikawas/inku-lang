@@ -167,6 +167,16 @@ extension View {
         modifier(InkuFixedWidth(width: width, alignment: alignment))
     }
 
+    /// A picker with many choices: a page listing them on iOS (inside a navigation stack), the Mac's menu otherwise.
+    @ViewBuilder
+    func inkuListPickerStyle() -> some View {
+        #if os(iOS)
+        pickerStyle(.navigationLink)
+        #else
+        self
+        #endif
+    }
+
     /// A button or link that takes only its own taps inside an iOS form row, where a plain button makes the whole row
     /// one target and a tap fires every button in it (ios-app step 7c: the license button also opened the repository).
     @ViewBuilder

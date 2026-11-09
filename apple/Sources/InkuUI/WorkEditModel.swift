@@ -59,6 +59,7 @@ public final class WorkEditModel {
         running = true
         stopping = false
         errorText = nil
+        app.runStops.track(self)
         let pending = Task { @MainActor [weak self] in
             guard let self else { return false }
             defer { self.operation = nil; self.running = false; self.stopping = false }

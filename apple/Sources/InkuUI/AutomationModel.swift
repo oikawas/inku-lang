@@ -569,7 +569,7 @@ public final class AutomationModel {
     private func runBatch(app: AppModel, only scope: Set<String>? = nil, startedAt: Date = Date()) async {
         guard let initial = journal else { return }
         let runToken = UUID()
-        token = runToken; running = true; stopping = false; mode = "batch"; errorText = nil
+        token = runToken; running = true; stopping = false; mode = "batch"; errorText = nil; app.runStops.track(self)
         batchStartedAt = startedAt; batchRowStartedAt = nil
         batchSummary.start(planTotal: rows.count, at: startedAt)
         let task = Task { @MainActor [weak self] in
@@ -656,6 +656,7 @@ public final class AutomationModel {
             guard let template = try await app.pinPersonalPlanRequests([draft]).first else { throw HostError("personal_plan_demo_pin_incomplete") }
             let runToken = UUID()
             token = runToken; running = true; stopping = false; mode = "demo"; errorText = nil; demoCount = 0
+            app.runStops.track(self)
             app.setDemoBrowsingLocked(true)
             defer { app.setDemoBrowsingLocked(false) }
             preparing = false

@@ -259,6 +259,8 @@ public final class AppModel {
     public let renderer = ArtworkRenderer()
     /// The work area's painter (Skia).
     public let displayRenderer = DisplayRenderer()
+    /// Owners of runs with their own stop button, for stopping them all when iOS may not keep the app running.
+    public let runStops = RunStopRegistry()
     /// Thumbnails baked to PNG beside the database (I-718).
     public let thumbnails = ArtworkThumbnails()
     @ObservationIgnored public var onSavedWork: (@MainActor (SavedWork) async -> Void)?

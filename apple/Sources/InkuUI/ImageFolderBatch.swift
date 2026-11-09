@@ -132,7 +132,7 @@ private struct ImageFolderJournal: Codable, Sendable {
         }
         journal = current
         let options = app.drawSelections["batch_image"]
-        running = true; stopRequested = false; error = nil
+        running = true; stopRequested = false; error = nil; app.runStops.track(self)
         // image-folder.svelte.ts:165-175: the plan is every picture, the round the ones left to draw.
         let queue = current.rows.indices.filter { current.rows[$0].state == "waiting" }
         summary.start(planTotal: current.rows.count, at: Date())

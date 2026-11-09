@@ -248,7 +248,7 @@ public final class AuxiliaryModel {
     private func run(app: AppModel, message: String, operation: @escaping @MainActor (UUID) async throws -> Void) async {
         guard !running, !app.isBusy else { return }
         let runToken = UUID()
-        token = runToken; running = true; stopping = false; errorText = nil; status = message
+        token = runToken; running = true; stopping = false; errorText = nil; status = message; app.runStops.track(self)
         let work = Task { @MainActor [weak self] in
             guard let self else { return }
             let success = await app.performSerialized(status: message) { _ in try await operation(runToken) }

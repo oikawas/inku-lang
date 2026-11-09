@@ -133,7 +133,7 @@ public final class RefinementModel {
         let selectedWild: Bool? = app.wild
         let selectedModel: String? = app.nextDrawingModelReference
         let run = UUID()
-        runID = run; running = true; saving = !selection.isEmpty; stopping = false
+        runID = run; running = true; saving = !selection.isEmpty; stopping = false; app.runStops.track(self)
         errorText = nil
         capturedStage1Model = work.stage1Model
         capturedStage2Model = selectedModel
@@ -222,7 +222,7 @@ public final class RefinementModel {
         guard canSave, !app.isBusy, !app.isPreview, operation == nil else { return false }
         let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let run = UUID()
-        runID = run; running = true; saving = true; stopping = false; errorText = nil
+        runID = run; running = true; saving = true; stopping = false; errorText = nil; app.runStops.track(self)
         status = "選択した候補を保存中"
         let pending = Task { @MainActor [weak self] in
             guard let self else { return false }

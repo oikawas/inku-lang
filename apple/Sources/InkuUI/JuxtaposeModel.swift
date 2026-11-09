@@ -82,7 +82,7 @@ public final class JuxtaposeModel {
         let exclude = shown
         let language = language
         let work = work
-        begin(asking: true)
+        begin(asking: true); app.runStops.track(self)
         let pending = Task { @MainActor [weak self] in
             guard let self else { return false }
             defer { self.finish() }
@@ -127,7 +127,7 @@ public final class JuxtaposeModel {
     @discardableResult public func draw(app: AppModel) async -> Bool {
         guard !busy, operation == nil, !app.isBusy, !app.isPreview, let result, let choice else { return false }
         let work = work
-        begin(asking: false)
+        begin(asking: false); app.runStops.track(self)
         let pending = Task { @MainActor [weak self] in
             guard let self else { return false }
             defer { self.finish() }

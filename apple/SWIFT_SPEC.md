@@ -126,7 +126,7 @@ Step 7 (2026-11-09 on) builds the iPhone screens (author's choice 2026-11-09, "o
 
 Step 7b is the Library and Settings tabs.
 
-- Library (`LibraryView` `phoneLayout`): the heading, tools, status rows and listing fill the width; the side preview is not shown. Tapping a work (its preview) pushes the preview's contents (the work, its comment, its actions, open in Making) as a full-width page; going back closes the preview. The work page turns with the phone.
+- Library (`LibraryView` `phoneLayout`): the heading, tools, status rows and listing fill the width; the side preview is not shown. The heading's tabs, the pager and the tools are each a row that slides sideways inside the screen, and the search field takes the whole width. Tapping a work (its preview) pushes the preview's contents (the work, its comment, its actions, open in Making) as a full-width page; going back closes the preview. The work page turns with the phone.
 - Settings (`SettingsView` `phoneLayout`): the section list (the Mac's groups and order) pushes each section's page. The list starts with the rail's UI mode, theme and language (theme and language only when the interface shows the auxiliary controls, as on the Mac) and the standard / detailed switch, and ends with the drawing log and the build number. The tooltip switch is not shown (iOS has no tooltips). Opening the settings at a named section (open the connection settings, the demo settings) shows that section's page pushed (`WorkspaceUIState.showSettings`, `settingsPhonePage`).
 - On iOS the lineage details window has no minimum width (the Mac keeps its own).
 - The iPad's and the Mac's screens and behavior are unchanged.

@@ -121,12 +121,29 @@ struct LibraryView: View {
 
     // MARK: Heading (Web .modal-head)
 
-    private var head: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) { headLeft; Spacer(minLength: 8); headActions }
-            VStack(alignment: .leading, spacing: 7) { headLeft; HStack { Spacer(minLength: 0); headActions } }
+    @ViewBuilder private var head: some View {
+        if phoneLayout {
+            // iPhone (ios-app step 7b): the heading's tabs and the pager are wider than the phone, so each is a row
+            // that slides sideways inside the screen instead of widening the whole tab.
+            VStack(alignment: .leading, spacing: 7) {
+                phoneRow { headLeft }
+                phoneRow { headActions }
+            }
+            .disabled(library.mutating || model.isBrowsingLocked)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { headLeft; Spacer(minLength: 8); headActions }
+                VStack(alignment: .leading, spacing: 7) { headLeft; HStack { Spacer(minLength: 0); headActions } }
+            }
+            .disabled(library.mutating || model.isBrowsingLocked)
         }
-        .disabled(library.mutating || model.isBrowsingLocked)
+    }
+
+    /// One iPhone row that keeps the screen's width and slides sideways when its contents are wider.
+    private func phoneRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) { content() }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
     }
 
     private var headLeft: some View {
@@ -186,12 +203,20 @@ struct LibraryView: View {
 
     // MARK: Tools (Web .history-tools)
 
-    private var tools: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) { toolGroup; Spacer(minLength: 8); searchField }
-            VStack(alignment: .leading, spacing: 7) { toolGroup; searchField }
+    @ViewBuilder private var tools: some View {
+        if phoneLayout {
+            VStack(alignment: .leading, spacing: 7) {
+                phoneRow { toolGroup }
+                searchField
+            }
+            .disabled(library.mutating || model.isBrowsingLocked)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { toolGroup; Spacer(minLength: 8); searchField }
+                VStack(alignment: .leading, spacing: 7) { toolGroup; searchField }
+            }
+            .disabled(library.mutating || model.isBrowsingLocked)
         }
-        .disabled(library.mutating || model.isBrowsingLocked)
     }
 
     private var toolGroup: some View {
@@ -296,7 +321,8 @@ struct LibraryView: View {
                                      onCancel: onClose, onSearch: { library.query = $0 })
         }
         // Web `.history-search`: flex 0 1 22rem, at least 10rem.
-        .frame(minWidth: 130, idealWidth: 286, maxWidth: 286)
+        // iPhone (ios-app step 7b): the whole width of the screen.
+        .frame(minWidth: 130, idealWidth: 286, maxWidth: phoneLayout ? .infinity : 286)
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? InkuColor.border2 : Color.accentColor))
         .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
     }

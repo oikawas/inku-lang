@@ -8,6 +8,7 @@ import InkuHost
     @State private var saved = false
     @State private var failed = false
     @State private var providers: [ProviderSettings] = []
+    @Environment(\.inkuPhoneLayout) private var phone
     private let tabs = ["describe", "image", "batch_text", "batch_image"]
     static func optionKeys(tab: String) -> [String] {
         let image = tab == "image" || tab == "batch_image"
@@ -41,6 +42,101 @@ import InkuHost
         }
     }
     var body: some View {
+        Group {
+            if phone { phoneBody } else { wideBody }
+        }
+        .onAppear { draft = model.drawDefaults }
+        .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
+        .sheet(isPresented: Binding(get: { pickerTab != nil }, set: { if !$0 { pickerTab = nil } })) {
+            if let tab = pickerTab {
+                BatchModelPickerView(model: model, initialReference: imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1,
+                    immediateSelection: true, purpose: imageTab(tab) ? "vision" : "llm", onSelection: { reference in
+                        if imageTab(tab) { draft[tab]?.models.vision = reference }
+                        else { draft[tab]?.models.stage1 = reference; draft[tab]?.models.stage2 = reference }
+                        saved = false
+                    })
+            }
+        }
+    }
+
+    /// iPhone (ios-app step 7d, the author's request): one control per row, each in the form a choice of its kind
+    /// takes on iOS — a switch for on and off, a segmented control for the two ways of drawing, a list page for
+    /// the catalogs and the canvases, and a row that opens the model choice. One tab is one section.
+    @ViewBuilder private var phoneBody: some View {
+        ForEach(tabs, id: \.self) { tab in
+            Section {
+                if Self.optionKeys(tab: tab).contains("route") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(copy("drawDefaultsRoute", "描き方"))
+                        Picker(copy("drawDefaultsRoute", "描き方"), selection: binding(tab, \.route)) {
+                            Text(copy("drawDefaultsRead", "言葉で描く")).tag("read_and_draw")
+                            Text(copy("drawDefaultsStages", "型で描く")).tag("stages")
+                        }.pickerStyle(.segmented).labelsHidden()
+                    }
+                    Toggle(copy("sketchLabel", "写生"), isOn: switchBinding(tab, \.sketch))
+                    Toggle(copy("drawDefaultsComposition", "構図・法則・配色"), isOn: switchBinding(tab, \.composition))
+                    Toggle(copy("wildButton", "筆致制限を外す"), isOn: switchBinding(tab, \.wild))
+                }
+                catalogPicker(tab).inkuListPickerStyle()
+                canvasPicker(tab).inkuListPickerStyle()
+                Button { pickerTab = tab } label: {
+                    HStack {
+                        Text(imageTab(tab) ? copy("drawDefaultsVision", "画像を読むモデル") : copy("drawDefaultsModel", "描画モデル"))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text(modelName((imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1) ?? ""))
+                            .foregroundStyle(.secondary).lineLimit(1)
+                        Image(systemName: "chevron.right").inkuFont(12).foregroundStyle(.tertiary)
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain)
+            } header: {
+                Text(tabTitle(tab))
+            } footer: {
+                Text(hint(tab))
+            }
+        }
+        Section {
+            saveButton
+            if saved { Text(copy("drawDefaultsSaved", "保存しました。左の欄には、次に「新規作成」を押したときに出ます。")) }
+            if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
+        }
+    }
+
+    private var saveButton: some View {
+        Button(copy("drawDefaultsSave", "デフォルトを保存")) {
+            do { try model.saveDrawDefaults(draft); saved = true; failed = false }
+            catch { failed = true; saved = false }
+        }
+    }
+
+    private func switchBinding(_ tab: String, _ path: WritableKeyPath<DrawOptions, String>) -> Binding<Bool> {
+        let value = binding(tab, path)
+        return Binding(get: { value.wrappedValue == "on" }, set: { value.wrappedValue = $0 ? "on" : "off" })
+    }
+
+    private func catalogPicker(_ tab: String) -> some View {
+        Picker(copy("colorCatalogButton", "色カタログ"), selection: Binding(get: {
+            let catalog = options(tab).catalog
+            return catalog.mode == "auto" ? "auto" : catalog.id
+        }, set: { value in
+            if draft[tab] == nil { draft[tab] = options(tab) }
+            draft[tab]?.catalog.mode = value == "auto" ? "auto" : "fixed"
+            if value != "auto" { draft[tab]?.catalog.id = value }
+            saved = false
+        })) {
+            Text(copy("colorCatalogAuto", "記述から自動選択")).tag("auto")
+            ForEach(model.catalogs) { Text($0.name).tag($0.id) }
+        }
+    }
+
+    private func canvasPicker(_ tab: String) -> some View {
+        Picker(copy("drawDefaultsCanvas", "キャンバス"), selection: binding(tab, \.canvasAspect)) {
+            if imageTab(tab) { Text(copy("imageCanvasAspect", "画像に合わせる")).tag("image") }
+            ForEach(model.canvases) { Text($0.name).tag($0.id) }
+        }
+    }
+
+    private var wideBody: some View {
         Section {
             ForEach(tabs, id: \.self) { tab in
                 VStack(alignment: .leading, spacing: 8) {
@@ -86,18 +182,6 @@ import InkuHost
             }
             if saved { Text(copy("drawDefaultsSaved", "保存しました。左の欄には、次に「新規作成」を押したときに出ます。")) }
             if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
-        }
-        .onAppear { draft = model.drawDefaults }
-        .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
-        .sheet(isPresented: Binding(get: { pickerTab != nil }, set: { if !$0 { pickerTab = nil } })) {
-            if let tab = pickerTab {
-                BatchModelPickerView(model: model, initialReference: imageTab(tab) ? draft[tab]?.models.vision : draft[tab]?.models.stage1,
-                    immediateSelection: true, purpose: imageTab(tab) ? "vision" : "llm", onSelection: { reference in
-                        if imageTab(tab) { draft[tab]?.models.vision = reference }
-                        else { draft[tab]?.models.stage1 = reference; draft[tab]?.models.stage2 = reference }
-                        saved = false
-                    })
-            }
         }
     }
     private func modelName(_ reference: String) -> String {

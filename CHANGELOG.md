@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- iOS: The app can be installed on a physical iPad (`apple/scripts/build-ios.sh --device`; the signing Team ID is passed in the `INKU_IOS_TEAM` environment variable, and the installed app's data is copied aside first). The Image tab gains "Take Photo": a photo taken with the camera is drawn the same way as an image chosen from Photos or Files (devices without a camera do not show it). The permission prompts gain English text. The Mac's screens and behavior are unchanged.
+- iOS: The app can be installed on a physical iPad (`apple/scripts/build-ios.sh --device`; the signing Team ID is passed in the `INKU_IOS_TEAM` environment variable, and the installed app's data is copied aside first). The Image tab gains "Take Photo": a photo taken with the camera is drawn the same way as an image chosen from Photos or Files (devices without a camera do not show it). The permission prompts gain English text. A batch drawing in the background could be ended by iOS in the middle of a two-minute row, so progress is now reported steadily within a row too. The Mac's screens and behavior are unchanged.
 
 - macOS, iOS: In the "Refine" list, the items that call the LLM (change the description, change the composition form, redraw with or without the sketch, change the model, juxtapose, AI autonomous refinement) show an "LLM" mark after their names (it was not drawn before). After saving candidates, the status line no longer stays at "Saving the chosen options" and reads "Saved the chosen options" (color catalog, color arrangement, ground, touches, model, composition form).
 

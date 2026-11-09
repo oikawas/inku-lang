@@ -43,9 +43,19 @@ import InkuHost
         }
     }
     var body: some View {
-        Group {
-            if phone { phoneBody } else { wideBody }
+        // The presenters go on one section only. A modifier on a group of form sections is handed to every section,
+        // and on an iPhone, where each tab is its own section, five sheets watched one state: the first choice of a
+        // model opened one and another closed it at once (author 2026-11-09).
+        if phone {
+            phoneSections
+            presenters(phoneSaveSection)
+        } else {
+            presenters(wideBody)
         }
+    }
+
+    private func presenters<Content: View>(_ content: Content) -> some View {
+        content
         // The unsaved edits are read once. On an iPhone the catalog and canvas lists are pages pushed over this one,
         // and coming back appears again; reading the saved defaults then threw the other edits away (author 2026-11-09).
         .onAppear { if !loaded { draft = model.drawDefaults; loaded = true } }
@@ -68,7 +78,7 @@ import InkuHost
     /// iPhone (ios-app step 7d, the author's request): one control per row, each in the form a choice of its kind
     /// takes on iOS — a switch for on and off, a segmented control for the two ways of drawing, a list page for
     /// the catalogs and the canvases, and a row that opens the model choice. One tab is one section.
-    @ViewBuilder private var phoneBody: some View {
+    private var phoneSections: some View {
         ForEach(tabs, id: \.self) { tab in
             Section {
                 if Self.optionKeys(tab: tab).contains("route") {
@@ -101,6 +111,9 @@ import InkuHost
                 Text(hint(tab))
             }
         }
+    }
+
+    private var phoneSaveSection: some View {
         Section {
             saveButton
             if saved { Text(copy("drawDefaultsSaved", "保存しました。左の欄には、次に「新規作成」を押したときに出ます。")) }

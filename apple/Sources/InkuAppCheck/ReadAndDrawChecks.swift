@@ -59,8 +59,53 @@ import InkuUI
         guard nextDemo.drawRoute == "read_and_draw", nextDemo.descriptionComposition == composed else { throw CheckFailure.message("demo template did not retain drawing conditions") }
         let stages = try app.requestForCurrentInput(parentWorkID: nil)
         guard stages.drawRoute == nil, stages.descriptionComposition == nil, stages.descriptionReview == nil else { throw CheckFailure.message("legacy stages gained route settings") }
+        if composed && vision { try await checkCompositionForm(app: app, work: work, provider: provider, database: database) }
     }
     print("Read and draw: 3/5 fake calls with Vision, 2 without Vision, review PNG, saved reading and route, reopening; no provider calls.")
+}
+
+/// Web `generateCompositionFormCandidates` and `save_composition_form`: a candidate of a decided form is drawn unsaved,
+/// with the work's sketch, models, catalog and seed, and saving it keeps that execution as the child (no new drawing).
+@MainActor private func checkCompositionForm(app: AppModel, work: SavedWork, provider: ReadAndDrawCheckProvider,
+                                             database: InkuDatabase) async throws {
+    let form = CompositionFormModel(work: work)
+    await form.initialize(app: app)
+    guard form.contextAvailable, !form.sourceIsLocked, form.currentForm == "one_corner", !form.switchesComposition,
+          form.selectedForm == "one_corner" else {
+        throw CheckFailure.message("composition form did not open on the work's own form: \(form.errorText ?? "")")
+    }
+    form.selectedForm = "grid"
+    let asked = await provider.actions.count
+    let listed = try await database.list().count
+    await form.generate(app: app, count: 1)
+    let calls = Array(await provider.actions.dropFirst(asked))
+    let compose = calls.first { $0["tag"].string == "compose_description" }
+    let message = try ExactJSON(data: Data((compose?["payload"]["prompt"]["message"].string ?? "").utf8))
+    guard form.candidates.count == 1, form.failures.isEmpty, form.errorText == nil, message["composition_form"].string == "grid",
+          try await database.list().count == listed, app.selectedWork?.id == work.id else {
+        throw CheckFailure.message("composition form candidate: \(form.failures) \(form.errorText ?? "") \(calls.compactMap { $0["tag"].string })")
+    }
+    let candidate = form.candidates[0]
+    guard candidate.work.renderSeed == work.renderSeed, candidate.work.stage1Model == work.stage1Model,
+          candidate.work.sketchText == work.sketchText,
+          (candidate.work.renderColorCatalogID ?? candidate.work.catalogID) == (work.renderColorCatalogID ?? work.catalogID) else {
+        throw CheckFailure.message("composition form candidate lost the work's seed, model, sketch or catalog")
+    }
+    form.selectCandidate(candidate.id, selected: true)
+    let sent = await provider.actions.count
+    guard await form.saveSelected(app: app), let child = form.candidates.first?.savedWork,
+          await provider.actions.count == sent, try await database.list().count == listed + 1,
+          let node = child.lineageNodeID, let edge = try await database.edge(childNodeID: node),
+          edge.derivationKind == "composition_form_change", edge.parentNodeID == work.lineageNodeID else {
+        throw CheckFailure.message("composition form save drew again or lost its edge: \(form.errorText ?? form.status)")
+    }
+    let metadata = try ExactJSON(data: Data(edge.metadataJSON.utf8))
+    let context = try await app.savedConfiguration(workID: child.id)
+    let record = try context.descriptionDDL.map(ExactJSON.init(data:))
+    guard metadata["form_from"].string == "one_corner", metadata["form_to"].string == "grid",
+          record?["composition"]["requested_form"].string == "grid", context.drawRoute == "read_and_draw" else {
+        throw CheckFailure.message("composition form child record: \(edge.metadataJSON)")
+    }
 }
 
 private actor ReadAndDrawCheckProvider: ProviderTransport {
@@ -79,7 +124,11 @@ private actor ReadAndDrawCheckProvider: ProviderTransport {
             response = #"{"viewpoint":{"speaker":"我","speaker_quote":"我","eye":"妹の姿を見る。","addressee_quote":"妹","speaker_seen_quote":""},"core":["紫の姿"],"items":[{"kind":"scene","quote":"紫の にほへる妹","image":"紫の円"}],"reading":"紫の姿を読んだ。"}"#
         case "compose_description":
             result = "description_composed"
-            response = #"{"thesis":"紫の妹を左上に置く。","form":"one_corner","things":[{"thing":1,"what":"妹","role":"focal","kind":"cluster","quote":"妹"},{"thing":2,"what":"紫の影","role":"accent","kind":"cluster","quote":"紫"}],"main_law":"B1","laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}},"reason":"妹を画の中心にする。"}"#
+            // A decided form (the composition-form refinement) is the only one the answer may name.
+            let message = try? ExactJSON(data: Data((value["payload"]["prompt"]["message"].string ?? "").utf8))
+            let form = message?["composition_form"].string ?? "one_corner"
+            response = #"{"thesis":"紫の妹を左上に置く。","form":""# + form + #"","#
+                + #""things":[{"thing":1,"what":"妹","role":"focal","kind":"cluster","quote":"妹"},{"thing":2,"what":"紫の影","role":"accent","kind":"cluster","quote":"紫"}],"main_law":"B1","laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}},"reason":"妹を画の中心にする。"}"#
         case "write_description_ddl", "review_description_ddl":
             result = tag == "write_description_ddl" ? "description_ddl_written" : "description_ddl_reviewed"
             response = composed ? #"{"sentences":[{"thing":0,"text":"背景を白で埋める。"},{"thing":1,"text":"画面の横0.381966、縦0.381966の位置に、直径0.3の紫の塗りの円を1個置く。"},{"thing":2,"text":"画面の横0.6、縦0.6の位置に、幅0.2、高さ0.15の青の薄い塗りの三角を1個置く。"}],"figures":[]}"# : #"{"ddl":"赤い円を1個置く。","figures":[]}"#

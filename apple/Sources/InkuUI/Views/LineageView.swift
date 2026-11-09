@@ -635,7 +635,8 @@ struct LineageView: View {
                           "color_arrangement_change": "Color arrangement", "ground_change": "Ground", "tool_change": "Touches",
                           "reinterpretation": "Reading", "model_comparison": "Model", "language_comparison": "Language",
                           "ddl_edit": "DDL edit", "description_edit": "Description edit", "replay": "Replay",
-                          "canvas_aspect_change": "Canvas change", "canvas_fit": "Fit", "variation": "Variation (retired)", "sketch_grain_change": "Sketch from life"]
+                          "canvas_aspect_change": "Canvas change", "canvas_fit": "Fit", "variation": "Variation (retired)", "sketch_grain_change": "Sketch from life",
+                          "composition_form_change": "Composition form"]
             if let kind, let label = labels[kind] { return label }
         }
         let labels = ["tool_change": "てざわり", "touch_change": "タッチ", "layout_change": "構図", "catalog_change": "色",
@@ -643,7 +644,7 @@ struct LineageView: View {
                       "reinterpretation": "解釈", "model_comparison": "モデル", "language_comparison": "言語",
                       "ddl_edit": "DDL編集", "description_edit": "記述編集", "replay": "再描画",
                       "canvas_aspect_change": "キャンバス変更", "canvas_fit": "はめ込み", "variation": "変奏（旧）", "sketch_grain_change": "写生の有無",
-                      "render_engine_change": "描画エンジン", "external_seed_change": "シード", "renga_reply": "連歌"]
+                      "composition_form_change": "構図の形", "render_engine_change": "描画エンジン", "external_seed_change": "シード", "renga_reply": "連歌"]
         return model.display.localized(kind.flatMap { labels[$0] ?? $0 } ?? "起点")
     }
 }

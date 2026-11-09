@@ -33,6 +33,16 @@ The Mac and the iPad gain these parts, in the Web's form.
 
 Of the tooltip table's 19 excluded sites, 8 become equal: 11 excluded, 178 equal (the work menu's composition form follows in step 2).
 
+Step 2 adds "Change the composition form" to the work actions (Web `RefinementCompositionFormView`, Server `save_composition_form`).
+
+- Place: in the work actions' "Redraw from the description" group, after "Change the description", with the LLM mark. A description-locked work cannot use it and shows why, as the other description items do. A work drawn straight from DDL shows no such group.
+- Dialog: the target picture; a notice when the parent was not drawn with composition ("Draws using In words with composition enabled"); the seven forms (one corner, all over, bands, dividing line, grid, flock and stray, unequal triangle), each a name over a description, the parent's marked "current"; "Make one option" and "Make four options"; progress and lanes; the candidate grid with save and discard. The parent's form is chosen first, one corner when it has none. While drawing, and while unsaved candidates are shown, the one and four buttons wait.
+- Drawing: each candidate reads the parent's description again in words with composition on, and the chosen form is decided through the core's `authoring.composition.form`. The sketch is the parent's saved one, or a new one when it has none. The models are the parent's stage 1 and stage 2 (the current ones when absent); the catalog is the parent's, fixed; the canvas and `render_seed` are the parent's. Candidates are not saved. The derivation is `composition_form_change` with `{form_from, form_to}`.
+- Saving: a chosen candidate's execution is saved as the child as drawn (no new drawing; the model comparison's `saveComparisonCandidate`). When the execution is gone, "The candidate is no longer available. Draw it again." is shown.
+- Host rules (as on the Server): a form is accepted only in words with composition on, and only one of the seven (`invalid_authoring_options`). `composition_form_change` refuses a description-locked parent even when the description is the same (`description_source_locked`). A child does not inherit the form (draw conditions are recorded for new works only).
+- The lineage name is "Composition form" ("構図の形"). The seven forms' names and descriptions come from the Web's list strings, exported into `ui-reference.json` as `compositionFormNames.<index>` and `compositionFormDescriptions.<index>` (`export-web-reference.mjs`).
+- The tooltip table turns the remaining "composition form" exclusion into a match: 10 excluded, 179 equal.
+
 ## 2026-11-07 The iOS (iPad) app
 
 An iPad app is added. Its scope ends at building and starting it in the iOS Simulator; the iPhone screens and physical devices come in later steps.

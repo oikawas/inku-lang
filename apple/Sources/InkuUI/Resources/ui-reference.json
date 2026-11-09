@@ -1,8 +1,8 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.329",
-  "build": "1405",
-  "buildDate": "2026-11-07T06:14:47.591Z",
+  "version": "v2.15.330",
+  "build": "1406",
+  "buildDate": "2026-11-09T08:05:41.190Z",
   "versions": {
     "ddlSpec": "30",
     "ddlEngine": "78",
@@ -1575,7 +1575,21 @@
         "attentionReason.compiler_boundary_failed": "DDLを楽譜へ変換できませんでした",
         "descriptionDdlFailed": "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください",
         "descriptionDdlUndrawable": "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください",
-        "limitWeightFormat": "この本数なら 1 枚およそ %@〜%@ MB（細い筆致〜太い筆致）"
+        "limitWeightFormat": "この本数なら 1 枚およそ %@〜%@ MB（細い筆致〜太い筆致）",
+        "compositionFormNames.0": "一角",
+        "compositionFormNames.1": "全面",
+        "compositionFormNames.2": "帯",
+        "compositionFormNames.3": "分ける線",
+        "compositionFormNames.4": "格子",
+        "compositionFormNames.5": "群れと逸れ",
+        "compositionFormNames.6": "不等辺の三角",
+        "compositionFormDescriptions.0": "主を片隅や片側に寄せて広く空ける",
+        "compositionFormDescriptions.1": "全面に均して中心を消す",
+        "compositionFormDescriptions.2": "横の帯を重ねる",
+        "compositionFormDescriptions.3": "場を分ける線",
+        "compositionFormDescriptions.4": "格子",
+        "compositionFormDescriptions.5": "群れと一つの逸脱",
+        "compositionFormDescriptions.6": "主・従・添えの不等辺の三角"
       },
       "dynamicTexts": {
         "settingsDbVacuumResult": "整理前 %@、整理後 %@",
@@ -3445,7 +3459,21 @@
         "attentionReason.compiler_boundary_failed": "the DDL could not be converted into a score",
         "descriptionDdlFailed": "no instructions could be written from the description; change the model and draw again",
         "descriptionDdlUndrawable": "the instructions written drew nothing; change the description or the model and draw again",
-        "limitWeightFormat": "About %@-%@ MB per work at this count (thin to thick tool)"
+        "limitWeightFormat": "About %@-%@ MB per work at this count (thin to thick tool)",
+        "compositionFormNames.0": "One corner",
+        "compositionFormNames.1": "All over",
+        "compositionFormNames.2": "Bands",
+        "compositionFormNames.3": "Dividing line",
+        "compositionFormNames.4": "Grid",
+        "compositionFormNames.5": "Flock and stray",
+        "compositionFormNames.6": "Unequal triangle",
+        "compositionFormDescriptions.0": "Push the focal thing to one side and leave wide space",
+        "compositionFormDescriptions.1": "Spread evenly and erase the center",
+        "compositionFormDescriptions.2": "Stack horizontal bands",
+        "compositionFormDescriptions.3": "Divide the field with a line",
+        "compositionFormDescriptions.4": "Grid",
+        "compositionFormDescriptions.5": "A flock and one that strays",
+        "compositionFormDescriptions.6": "An unequal triangle of focal, secondary and accent"
       },
       "dynamicTexts": {
         "settingsDbVacuumResult": "Before %@, after %@",
@@ -4500,14 +4528,14 @@
     }
   },
   "source": {
-    "commit": "7a50e467097e6718da763a5401191f9cb6173609",
+    "commit": "8735785d1b9d53d84bc558118a813c07b0faaca7",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "b1bc854bc259eb370758f65e1b84cbd59886dfd9983b72bbdea22524ca639a4f",
       "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
       "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
-      "web/APP_VERSION": "fc846bb11f8d678947256a910f8080c182d92262dc770400c61b6cd441ac481e",
-      "web/BUILD_NUMBER": "95203d34940cc692a350d0df31bff44b2314f0630ea6e50b5636cf9feff21555",
+      "web/APP_VERSION": "67a4466449e2a216d0054bd6a401320e0d2ed38408d7ed592ba23b883c339a0f",
+      "web/BUILD_NUMBER": "9cf31c0fe4e7014fb3a3bcdead1ede2306806012f66f6a092c1177c340f91ea6",
       "server/src/inku_server/layer_versions.py": "07ac2c29547d1921adf33eb4f8536a2ad45dfdd12a29d1b975b38e2ba2a143a2",
       "core/crates/inku-render/src/lib.rs": "2c07f89ffefefb7dcbda467ae788e2394bb4cd0a28e05c3e2ee10b53ce6cf75b",
       "web/src/lib/i18n/ja.ts": "d0145c78c7620d358bd8e6bac0118e80f2ee78501cb05e7a6c1b8d030e5cb5e0",

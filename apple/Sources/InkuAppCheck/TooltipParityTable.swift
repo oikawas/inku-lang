@@ -164,7 +164,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "VariationLanes.svelte:85", swift: "Views/RunStatusView.swift", marker: ".inkuTooltip(display.tooltipValue(label))"),
     .init(web: "WorkActionMenu.svelte:109", swift: "Views/CreationView.swift", marker: "serverKey: \"workActionGenerationLocked\""),
     .init(web: "WorkActionMenu.svelte:144", swift: "SavedWorkActionState.swift", marker: "tooltip(\"記述を変える\") : reason"),
-    .init(web: "WorkActionMenu.svelte:145", excluded: "macOS の作品の操作に「構図の形」（Web 42d5d291c、11-02）が無い"),
+    .init(web: "WorkActionMenu.svelte:145", swift: "SavedWorkActionState.swift", marker: ".help(state?.canReadDescription != true ? reason : \"\")"),
     .init(web: "WorkActionMenu.svelte:146", swift: "SavedWorkActionState.swift", marker: "tooltip(\"写生なし／ありで描き直す\") : reason"),
     .init(web: "WorkActionMenu.svelte:147", swift: "SavedWorkActionState.swift", marker: "tooltip(\"モデルを変える\") : reason"),
     .init(web: "WorkActionMenu.svelte:148", swift: "SavedWorkActionState.swift", marker: "canReadDescription == true ? \"\" : reason"),

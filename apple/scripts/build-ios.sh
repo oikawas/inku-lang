@@ -171,9 +171,14 @@ if [[ "$PHYSICAL" == true ]]; then
     # The installed app's works and settings are copied aside first: installing can migrate its database at the
     # next start, and the app starts right after the install (ios-app plan step 6).
     # An app that has not stored anything yet (it never got past its first screen) has no Application Support.
-    if xcrun devicectl device info apps --device "$PHYSICAL_UDID" --bundle-id "$BUNDLE_ID" 2>/dev/null | grep -q "$BUNDLE_ID" \
-        && xcrun devicectl device info files --device "$PHYSICAL_UDID" --domain-type appDataContainer \
-            --domain-identifier "$BUNDLE_ID" --subdirectory Library --no-recurse 2>/dev/null | grep -q '^Application Support '; then
+    # The listings are read whole first: `devicectl … | grep -q` fails under pipefail when grep stops reading early.
+    installed="$(xcrun devicectl device info apps --device "$PHYSICAL_UDID" --bundle-id "$BUNDLE_ID" 2>/dev/null || true)"
+    library=''
+    if grep -q "$BUNDLE_ID" <<< "$installed"; then
+        library="$(xcrun devicectl device info files --device "$PHYSICAL_UDID" --domain-type appDataContainer \
+            --domain-identifier "$BUNDLE_ID" --subdirectory Library --no-recurse 2>/dev/null || true)"
+    fi
+    if grep -q '^Application Support ' <<< "$library"; then
         BACKUP="$BUILD/device-backups/$(date +%Y%m%d-%H%M%S)"
         mkdir -p "$BACKUP"
         xcrun devicectl device copy from --device "$PHYSICAL_UDID" --domain-type appDataContainer \
@@ -184,7 +189,8 @@ if [[ "$PHYSICAL" == true ]]; then
     xcrun devicectl device install app --device "$PHYSICAL_UDID" "$APP"
     xcrun devicectl device process launch --device "$PHYSICAL_UDID" --terminate-existing "$BUNDLE_ID"
     sleep "$LAUNCH_SETTLE_SECONDS"
-    xcrun devicectl device info processes --device "$PHYSICAL_UDID" 2>/dev/null | grep -q '/Inku.app/' || {
+    processes="$(xcrun devicectl device info processes --device "$PHYSICAL_UDID" 2>/dev/null || true)"
+    grep -q '/Inku.app/' <<< "$processes" || {
         printf '%s is not running on %s %s seconds after launch.\n' "$BUNDLE_ID" "$PHYSICAL_UDID" "$LAUNCH_SETTLE_SECONDS" >&2
         exit 1
     }

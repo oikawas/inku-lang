@@ -36,7 +36,7 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     let equal = counts.values.map(\.equal).reduce(0, +)
     let excluded = counts.values.map(\.excluded).reduce(0, +)
-    guard tooltipParityTable.count == 189, missing.isEmpty, excluded == 11, equal == 178 else {
+    guard tooltipParityTable.count == 189, missing.isEmpty, excluded == 10, equal == 179 else {
         throw CheckFailure.message("Tooltip parity: \(tooltipParityTable.count) sites, \(equal) equal, \(excluded) excluded, missing \(missing)")
     }
     // Failure (T2b): the Web gained or lost a tooltip and the table did not follow (10-15 to 11-06 it fell 21 behind
@@ -73,7 +73,7 @@ func runTooltipAndLeftoverChecks() async throws {
         bubbles += text.components(separatedBy: ".inkuTooltip(").count - 1
     }
     // The export menus' SVG/PNG items are menu items too; InkuTooltip's one is the iOS stand-in, which has no bubble.
-    guard helps == ["SavedWorkActionState.swift": 4, "LineageView.swift": 3, "LibraryView.swift": 3,
+    guard helps == ["SavedWorkActionState.swift": 5, "LineageView.swift": 3, "LibraryView.swift": 3,
                     "LibraryPreviewPanel.swift": 2, "SavedWorkExportMenu.swift": 1, "IOSInkuTooltipModifier.swift": 1] else {
         throw CheckFailure.message("`.help` outside menu items: \(helps)")
     }

@@ -44,8 +44,11 @@ public actor PipelineHost {
         }
         // Server `fork_linked_history`/`fork_description`: a work its edited DDL holds refuses a description that
         // rewords it (`_refuse_if_locked`), while its own description starts a new child (the description fork).
+        try CompositionForm.validate(request)
         if !request.authoring.isDirect, let parentID = request.parentWorkID,
            try await savedAuthoringContext(workID: parentID).authority == "ddl_authoritative" {
+            // Server `fork_*`: a composition-form child reads the description again even when its words are the same.
+            if request.derivationKind == CompositionForm.derivationKind { throw HostError("description_source_locked") }
             guard let parent = try await database.work(id: parentID),
                   try !DescriptionLabels.rewords(request.description, parent.effectiveSourceText) else {
                 throw HostError("description_source_locked")
@@ -792,7 +795,11 @@ private actor ExecutionDriver {
         if case .description(let text, _, _) = request.authoring, request.drawRoute == "read_and_draw" {
             authoring["route"] = .string("read_and_draw")
             authoring["description"] = .string(try InkuCore.descriptionWithoutLabels(text))
-            if request.descriptionComposition == true { authoring["composition"] = .object(["mode": .string("on")]) }
+            if request.descriptionComposition == true {
+                var composition: [String: ExactJSON] = ["mode": .string("on")]
+                if let form = request.descriptionCompositionForm { composition["form"] = .string(form) }
+                authoring["composition"] = .object(composition)
+            }
             let result = try ExactJSON(data: Data(InkuCore.descriptionSourceLabels(text).utf8))
             guard let labels = result.array, labels.allSatisfy({ $0.string != nil }) else { throw HostError("provider_core_invalid") }
             if !labels.isEmpty { authoring["source_labels"] = .array(labels) }

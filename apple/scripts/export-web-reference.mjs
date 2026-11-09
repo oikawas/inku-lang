@@ -78,6 +78,12 @@ async function copyFor(language) {
     texts[key] = value.slice(prefix.length);
   }
   texts.limitWeightFormat = pack.settingsRenderLimitsWeight('%@', '%@');
+  // Lists read by position (composition-form.ts pairs COMPOSITION_FORMS with them): `<key>.<index>`.
+  for (const key of ['compositionFormNames', 'compositionFormDescriptions']) {
+    const list = pack[key];
+    if (!Array.isArray(list) || !list.every((item) => typeof item === 'string')) throw new Error(`string list missing: ${language} ${key}`);
+    list.forEach((item, index) => { texts[`${key}.${index}`] = item; });
+  }
   return {
     texts,
     dynamicTexts,

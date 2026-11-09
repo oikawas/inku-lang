@@ -143,6 +143,29 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
         _ = try await reopened.makeSavedWorkEditRequest(work: locked, mode: .sketch, description: locked.effectiveSourceText, sketchMode: "on")
         throw CheckFailure.message("Locked saved source accepted sketch regeneration")
     } catch let error as HostError where error.code == "description_source_locked" { }
+    // Composition form (Server `fork_*`): a locked parent is refused even when the description is the same, and a form
+    // goes only with drawing in words with composition on.
+    do {
+        _ = try await reopened.makeRefinementRequest(work: locked, kind: CompositionForm.derivationKind, compositionForm: "grid")
+        throw CheckFailure.message("Locked saved source accepted a composition-form request")
+    } catch let error as HostError where error.code == "description_source_locked" { }
+    let formRequest = try await reopened.makeRefinementRequest(work: on, kind: CompositionForm.derivationKind, compositionForm: "grid")
+    let formHost = PipelineHost(database: database, transport: transport)
+    var lockedParent = formRequest; lockedParent.parentWorkID = locked.id
+    var staged = formRequest; staged.drawRoute = "stages"
+    var plain = formRequest; plain.descriptionComposition = false
+    var unknown = formRequest; unknown.descriptionCompositionForm = "spiral"
+    for (request, code) in [(lockedParent, "description_source_locked"), (staged, "invalid_authoring_options"),
+                            (plain, "invalid_authoring_options"), (unknown, "invalid_authoring_options")] {
+        do {
+            _ = try await formHost.generate(request) { _ in }
+            throw CheckFailure.message("Host accepted a composition form it must refuse (\(code))")
+        } catch let error as HostError where error.code == code { }
+    }
+    guard formRequest.drawRoute == "read_and_draw", formRequest.descriptionComposition == true,
+          formRequest.descriptionCompositionForm == "grid", formRequest.derivationKind == CompositionForm.derivationKind else {
+        throw CheckFailure.message("Composition-form request lost its route, composition or form")
+    }
     guard await transport.calls == calls, try await database.list().count == count else {
         throw CheckFailure.message("Locked saved edit sent a request or added a child")
     }

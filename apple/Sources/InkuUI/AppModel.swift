@@ -1516,16 +1516,18 @@ public final class AppModel {
 
     public func makeRefinementRequest(work: SavedWork, kind: String,
                                       modelReference: String? = nil, catalogIDOverride: String? = nil,
-                                      wildOverride: Bool? = nil) async throws -> GenerationRequest {
+                                      wildOverride: Bool? = nil, compositionForm: String? = nil) async throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
-        guard ["layout_change", "catalog_change", "model_comparison"].contains(kind) else {
+        guard ["layout_change", "catalog_change", "model_comparison", CompositionForm.derivationKind].contains(kind) else {
             throw HostError("unknown_refinement_kind")
         }
+        let formChange = kind == CompositionForm.derivationKind
+        if formChange { guard let compositionForm, CompositionForm.all.contains(compositionForm) else { throw HostError("invalid_authoring_options") } }
         let saved = try await savedConfiguration(workID: work.id)
         let config = try ExactJSON(data: saved.configuration)
         let options = try ExactJSON(data: saved.renderOptions)
         let held = saved.authority == "ddl_authoritative"
-        let reading = kind == "model_comparison"
+        let reading = kind == "model_comparison" || formChange
         if held && reading { throw HostError("description_source_locked") }
         let language = work.instructionLangResolved ?? config["language"].string ?? instructionLanguage(for: work.effectiveSourceText)
         guard let renderSeed = work.renderSeed ?? options["render_seed"].string ?? options["render_seed"].number,
@@ -1534,14 +1536,24 @@ public final class AppModel {
             throw HostError("saved_refinement_options_unavailable")
         }
         let fresh = String(UInt64.random(in: 0...((UInt64(1) << 53) - 1)))
-        let chosenCatalog = catalogIDOverride ?? (kind == "catalog_change" ? catalogID : self.catalogID)
+        // Web generateCompositionFormCandidates: the work's own catalog, fixed, and a sketch (its saved one, else a new one).
+        let chosenCatalog = catalogIDOverride ?? (kind == "catalog_change" || formChange ? catalogID : self.catalogID)
         let description = work.effectiveSourceText
-        let sketch: SketchRequest = work.sketchText.map(SketchRequest.supplied) ?? .off
+        let sketch: SketchRequest = work.sketchText.map(SketchRequest.supplied) ?? (formChange ? .on : .off)
         var request = try bootstrap.request(inputMode: reading ? "description" : "ddl", source: work.ddl ?? "", description: description,
             language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: renderSeed, wild: wildOverride ?? work.renderWild ?? false,
             settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind,
-            catalogMode: reading ? self.catalogMode : "fixed", sketch: sketch,
+            catalogMode: reading && !formChange ? self.catalogMode : "fixed", sketch: sketch,
             savedConfiguration: saved.configuration)
+        if formChange, let compositionForm {
+            request.drawRoute = "read_and_draw"; request.descriptionComposition = true
+            request.descriptionCompositionForm = compositionForm
+            if let stage1 = work.stage1Model ?? work.stage2Model { request.models.stage1Model = stage1 }
+            if let stage2 = work.stage2Model ?? work.stage1Model { request.models.stage2Model = stage2 }
+            let from = saved.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"]["answer"]["form"].string
+            request.derivationMetadata = ExactJSON.object(["form_from": from.map(ExactJSON.string) ?? .null,
+                                                           "form_to": .string(compositionForm)]).data
+        }
         var nextConfig = try ExactJSON(data: request.configuration)
         var nextOptions = try ExactJSON(data: request.renderOptions)
         let composition: ExactJSON = kind == "layout_change" ? .string(fresh) : config["compiler"]["composition_seed"]

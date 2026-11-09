@@ -60,7 +60,7 @@ private struct NewDdlSession {
 private enum WorkDialog: Identifiable {
     case export(ExportSession), edit(WorkEditSession), juxtapose(RefinementSession), refinement(RefinementSession), replay(ReplaySession)
     case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), tool(RefinementSession), advice(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
-    case scoreVariant(SavedScoreVariantSession)
+    case scoreVariant(SavedScoreVariantSession), compositionForm(RefinementSession)
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
@@ -73,6 +73,7 @@ private enum WorkDialog: Identifiable {
         case .comparison(let session): session.id.uuidString
         case .tool(let session): session.id.uuidString
         case .scoreVariant(let session): session.id.uuidString
+        case .compositionForm(let session): session.id.uuidString
         case .advice(let session): session.id.uuidString
         case .colophon(let session): session.id.uuidString
         case .information(let session): session.id.uuidString
@@ -552,6 +553,9 @@ public struct ContentView: View {
         case .tool(let session):
             ToolChangeView(model: model, work: session.work, onCommitted: refinementCommitted).id(session.id).environment(model.display)
                 .inkuDialogFrame(.comparison)
+        case .compositionForm(let session):
+            CompositionFormView(model: model, work: session.work, onCommitted: refinementCommitted).id(session.id).environment(model.display)
+                .inkuDialogFrame(.comparison)
         case .scoreVariant(let session):
             SavedScoreVariantView(model: model, work: session.work, kind: session.kind, onCommitted: refinementCommitted).id(session.id).environment(model.display)
                 .inkuDialogFrame(.comparison)
@@ -632,6 +636,7 @@ public struct ContentView: View {
         case "ground": dialog = .scoreVariant(SavedScoreVariantSession(work: work, kind: .ground))
         case "tool": dialog = .tool(RefinementSession(work: work))
         case "model": dialog = .comparison(ComparisonSession(work: work, kind: .model))
+        case "composition-form": dialog = .compositionForm(RefinementSession(work: work))
         case "ai": dialog = .advice(RefinementSession(work: work))
         case "colophon": dialog = .colophon(RefinementSession(work: work))
         case "export": dialog = .export(ExportSession(works: [work], preserveOrder: false))

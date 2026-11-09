@@ -94,6 +94,9 @@ public struct GenerationRequest: Codable, Sendable {
     /// Absent for the original stages route and older saved executions.
     public var drawRoute: String?
     public var descriptionComposition: Bool?
+    /// Server `composition_form`: one of `CompositionForm.all`, only with `read_and_draw` and composition on (the
+    /// composition-form refinement). Sent as `authoring.composition.form`; a saved child does not inherit it.
+    public var descriptionCompositionForm: String?
     public var descriptionReview: Bool?
     public var catalogMode: String?
     /// Only a new description or text-batch input records the four draw options.

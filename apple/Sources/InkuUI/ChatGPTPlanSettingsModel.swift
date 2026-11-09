@@ -43,7 +43,8 @@ public final class ChatGPTPlanSettingsModel {
         }
     }
     public func authorize(profileID: String? = nil, consent: Bool = false, app: AppModel,
-                          openURL: @escaping @MainActor (URL) -> Void) async {
+                          openURL: @escaping @MainActor (URL) -> Void,
+                          closeLogin: @escaping @MainActor () -> Void = {}) async {
         guard !busy else { return }
         busy = true; authorizing = true; errorText = nil; status = "ブラウザで本人確認を完了してください。"
         let task = Task { @MainActor [weak self] in
@@ -54,7 +55,9 @@ public final class ChatGPTPlanSettingsModel {
                 self.attemptID = attempt.id
                 try Task.checkCancellation()
                 openURL(attempt.authorizationURL)
-                _ = try await runtime.finishAuthorization(attempt.id)
+                // iOS: the login sheet stays open over the app until the callback reaches the loopback listener.
+                do { _ = try await runtime.finishAuthorization(attempt.id) } catch { closeLogin(); throw error }
+                closeLogin()
                 try Task.checkCancellation()
                 // A connected profile has a fresh catalog before the pickers are synchronized.
                 // Catalog failure does not undo the successful authorization.

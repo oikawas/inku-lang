@@ -162,8 +162,20 @@ struct ChatGPTPlanStore: Sendable {
     var stateURL: URL { directory.appendingPathComponent("profiles.sealed") }
     init(directory: URL, keys: (any ChatGPTVaultKeyStore)? = nil) {
         self.directory = directory
-        let account = SHA256.hash(data: Data(directory.standardizedFileURL.path.utf8)).map { String(format: "%02x", $0) }.joined()
+        let account = SHA256.hash(data: Data(Self.accountPath(directory).utf8)).map { String(format: "%02x", $0) }.joined()
         self.keys = keys ?? ChatGPTKeychainVaultKeyStore(account: account)
+    }
+
+    /// The vault key's Keychain account is named by the folder. iOS moves the app's sandbox to a new path on every
+    /// install and update while keeping its files (ios-app step 5 screen check, 2026-11-09), so on iOS the folder is
+    /// named from the app's home; with the full path the key was lost and the sealed vault could not be opened.
+    static func accountPath(_ directory: URL) -> String {
+        let path = directory.standardizedFileURL.path
+        #if os(iOS)
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true).standardizedFileURL.path
+        if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
+        #endif
+        return path
     }
     func load() throws -> ChatGPTVaultState {
         guard FileManager.default.fileExists(atPath: stateURL.path) else { cache.clear(); return .init() }

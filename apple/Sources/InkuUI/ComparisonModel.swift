@@ -159,7 +159,7 @@ public final class ComparisonModel {
         }
         let run = UUID()
         runID = run
-        running = true; saving = false; stopping = false
+        running = true; saving = false; stopping = false; app.runStops.track(self)
         errorText = nil; failures = []; failureOrder = [:]; failedModelReferences = []; candidates = []; previewID = nil
         laneLabels = labels.map(\.1)
         laneStates = labels.map { _ in .waiting }
@@ -212,7 +212,7 @@ public final class ComparisonModel {
         guard !running, !app.isBusy, selectedCount > 0 else { return false }
         let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let run = UUID()
-        runID = run; running = true; saving = true; stopping = false; errorText = nil
+        runID = run; running = true; saving = true; stopping = false; errorText = nil; app.runStops.track(self)
         var savedCount = 0
         let succeeded = await app.performComparison(status: "選択した候補を保存中") { token in
             for candidate in selection {

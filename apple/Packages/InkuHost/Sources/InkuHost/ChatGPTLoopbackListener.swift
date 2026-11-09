@@ -38,7 +38,13 @@ public final class ChatGPTLoopbackListener: Sendable {
             let parameters = NWParameters.tcp
             // A listener on .any alone would expose the callback on other interfaces.
             parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
+            #if os(iOS)
+            // iOS resets every connection, the login sheet's 127.0.0.1 callback included, on a listener that accepts
+            // local peers only (ios-app step 5 screen check, 2026-11-09: POSIX 96 in the sheet, curl "reset by peer").
+            // The loopback endpoint above already keeps other devices out.
+            #else
             parameters.acceptLocalOnly = true
+            #endif
             parameters.includePeerToPeer = false
             parameters.allowLocalEndpointReuse = false
             engine = LoopbackEngine(listener: try NWListener(using: parameters, on: .any),

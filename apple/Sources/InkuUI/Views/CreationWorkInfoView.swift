@@ -92,8 +92,8 @@ struct CreationWorkInfoView: View {
             }
         }
         .padding(onClose == nil ? 20 : 16)
-        .frame(minWidth: onClose == nil ? 660 : nil, idealWidth: onClose == nil ? 760 : nil,
-               minHeight: onClose == nil ? 520 : nil, idealHeight: onClose == nil ? 740 : nil)
+        .inkuWideFrame(minWidth: onClose == nil ? 660 : nil, idealWidth: onClose == nil ? 760 : nil,
+                       minHeight: onClose == nil ? 520 : nil, idealHeight: onClose == nil ? 740 : nil)
         .task(id: work?.id) {
             copied = nil; copyToken = UUID()
             svgWeight = work.map { SavedSVGWeight($0.svg) }

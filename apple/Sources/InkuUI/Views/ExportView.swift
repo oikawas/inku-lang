@@ -207,7 +207,9 @@ struct ExportView: View {
                 }
             }
         }
-        .padding(24).frame(minWidth: directCard || directFormat ? 440 : 760, minHeight: directCard || directFormat ? 220 : 520)
+        .padding(phone ? 16 : 24)
+        // iPhone (ios-app step 7c): no minimum size; the sheet is the screen.
+        .inkuWideFrame(minWidth: directCard || directFormat ? 440 : 760, minHeight: directCard || directFormat ? 220 : 520)
         .interactiveDismissDisabled(isBusy)
         .onChange(of: options.format) { previous, next in
             let wasAnimation = previous == .apng || previous == .gif

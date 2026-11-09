@@ -2,7 +2,7 @@
 import SwiftUI
 import UIKit
 
-/// The search field of both history searches, as the Mac's `NSSearchField` (MacInkuSearchField.swift): a search is
+/// The search field of both history searches, as the Mac's box (MacInkuSearchField.swift): a search is
 /// not applied while the input method still owns marked text, the strip's search waits `delay` after typing, the clear
 /// button empties it, and Escape on a hardware keyboard calls `onCancel` (the library closes) or clears the field.
 @MainActor

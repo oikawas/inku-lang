@@ -16,6 +16,7 @@ struct RefinementDialog<Controls: View, Options: View>: View {
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let options: () -> Options
     @State private var topControlsHeight: CGFloat = 0
+    @Environment(\.inkuPhoneLayout) private var phone
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,15 +39,26 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                                 }
                             }
                         }
-                        HStack(alignment: .top, spacing: 14) {
-                            ScrollView {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
-                                    controls()
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                            }.frame(width: 280)
-                            options().frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }.frame(height: max(360, geometry.size.height - 32 - (topControls == nil ? 0 : topControlsHeight + 12)))
+                        if phone {
+                            // iPhone (ios-app step 7c): the target and its controls above, the options below at
+                            // the screen's height; the whole slides up and down.
+                            VStack(alignment: .leading, spacing: 12) {
+                                RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                    .frame(maxWidth: 280, alignment: .leading)
+                                controls()
+                                options().frame(maxWidth: .infinity).frame(height: max(420, geometry.size.height - 32))
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            HStack(alignment: .top, spacing: 14) {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                        controls()
+                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                }.frame(width: 280)
+                                options().frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }.frame(height: max(360, geometry.size.height - 32 - (topControls == nil ? 0 : topControlsHeight + 12)))
+                        }
                     }.padding(16)
                 }
             }
@@ -109,6 +121,7 @@ struct RefinementOptionsGrid: View {
     let onDiscard: () -> Void
     let onSave: () -> Void
     @State private var observationID: String?
+    @Environment(\.inkuPhoneLayout) private var phone
 
     private var shown: [RefinementOption] { options.filter { previewID == nil || $0.id == previewID } }
 
@@ -131,9 +144,13 @@ struct RefinementOptionsGrid: View {
                                 .background(InkuColor.bg2)
                                 .overlay(Rectangle().stroke(InkuColor.border, style: StrokeStyle(dash: [4])))
                         } else {
-                            let count = previewID == nil ? max(1, min(maxColumns, shown.count)) : 1
+                            // iPhone (ios-app step 7c): at most two columns, each card about as tall as it is wide
+                            // (plus its label); the grid slides up and down instead of filling the height.
+                            let count = previewID == nil ? max(1, min(phone ? 2 : maxColumns, shown.count)) : 1
                             let rows = (shown.count + count - 1) / count
-                            let height = max(150, (viewport.size.height - 4 - CGFloat(rows - 1) * 10) / CGFloat(rows))
+                            let height = phone && previewID == nil
+                                ? max(150, (viewport.size.width - 4 - CGFloat(count - 1) * 10) / CGFloat(count) + 56)
+                                : max(150, (viewport.size.height - 4 - CGFloat(rows - 1) * 10) / CGFloat(rows))
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
                                 ForEach(shown) { option in
                                     VStack(alignment: .leading, spacing: 4) {
@@ -147,7 +164,7 @@ struct RefinementOptionsGrid: View {
                                                 if let observation = option.observation {
                                                     ProviderObservationView(model: model, metrics: observation.providerMetrics,
                                                         workID: option.saved ? option.work.id : nil, executionID: observation.executionID)
-                                                        .padding(16).frame(width: 360)
+                                                        .padding(16).inkuFixedWidth(360).inkuPopoverContent()
                                                 }
                                             }
                                     }

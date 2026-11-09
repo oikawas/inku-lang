@@ -27,7 +27,7 @@ struct BatchConditionsView: View {
                 Button { showDetails = true } label: { Image(systemName: "ellipsis") }
                     .buttonStyle(InkuGhostButtonStyle())
                     .accessibilityLabel(model.display.localized("生成条件の詳細"))
-                    .popover(isPresented: $showDetails) { details }
+                    .popover(isPresented: $showDetails) { details.inkuPopoverContent() }
             }.padding(.bottom, 2)
             DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"), value: modelSummary,
                                 help: tip("次のバッチで使う描画モデルを選びます。")) { showModelPicker = true }
@@ -86,7 +86,7 @@ struct BatchConditionsView: View {
             TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
                 .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"), focus: .text)
         }
-        .padding(16).frame(width: 340).disabled(disabled)
+        .padding(16).inkuFixedWidth(340).disabled(disabled)
     }
 
     private func tip(_ key: String) -> String {

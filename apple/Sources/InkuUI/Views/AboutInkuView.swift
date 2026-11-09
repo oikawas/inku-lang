@@ -55,12 +55,13 @@ struct AboutInkuView: View {
                         HStack(spacing: 8) {
                             Text(copy.text("appInfoRepositoryLabel")).foregroundStyle(.secondary)
                             Link("https://github.com/oikawas/inku-lang", destination: URL(string: "https://github.com/oikawas/inku-lang")!)
+                                .inkuOwnTapInFormRow()
                         }.inkuFont(12)
                     }
                     Divider()
                     aboutSection(copy.text("appInfoLicenseTitle")) {
                         Text("inku · MIT License")
-                        Button(copy.text("appInfoShowNotices")) { showsLicenses = true }
+                        Button(copy.text("appInfoShowNotices")) { showsLicenses = true }.inkuOwnTapInFormRow()
                     }
                     aboutSection(copy.text("appInfoConceptTitle")) {
                         Text(copy.text("appInfoConceptBody")).fixedSize(horizontal: false, vertical: true)

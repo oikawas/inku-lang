@@ -50,6 +50,8 @@ struct ThirdPartyNoticesView: View {
     @State private var notices: ThirdPartyNotices?
     @State private var loaded = false
     @State private var selection: ThirdPartyNotices.Component.ID?
+    @State private var phoneDetailShown = false
+    @Environment(\.inkuPhoneLayout) private var phone
 
     private static let groups = ["inku", "swift", "rust", "native", "resources", "ddl3d"]
 
@@ -62,7 +64,36 @@ struct ThirdPartyNoticesView: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             Divider()
-            if let notices {
+            if let notices, phone {
+                // iPhone (ios-app step 7c): the list, then one notice on the whole width with a way back.
+                if phoneDetailShown, let component = notices.components.first(where: { $0.id == selection }) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button { phoneDetailShown = false } label: {
+                            Label(display.localized("一覧"), systemImage: "chevron.left")
+                        }.padding(.horizontal, 14).padding(.vertical, 8)
+                        Divider()
+                        detail(component, body: notices.body(of: component))
+                    }
+                } else {
+                    List {
+                        ForEach(Self.groups.filter { group in notices.components.contains { $0.group == group } }, id: \.self) { group in
+                            Section(groupTitle(group)) {
+                                ForEach(notices.components.filter { $0.group == group }) { component in
+                                    Button { selection = component.id; phoneDetailShown = true } label: {
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(component.name).inkuFont(12)
+                                            Text([component.version, component.license].filter { !$0.isEmpty }.joined(separator: " · "))
+                                                .inkuFont(10).foregroundStyle(.secondary)
+                                        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                                    }.buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .accessibilityLabel(display.webCopy("noticesList", "ライセンスの一覧"))
+                }
+            } else if let notices {
                 HStack(spacing: 0) {
                     List(selection: $selection) {
                         ForEach(Self.groups.filter { group in notices.components.contains { $0.group == group } }, id: \.self) { group in
@@ -99,7 +130,7 @@ struct ThirdPartyNoticesView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .frame(minWidth: 760, idealWidth: 960, minHeight: 520, idealHeight: 640)
+        .inkuWideFrame(minWidth: 760, idealWidth: 960, minHeight: 520, idealHeight: 640)
         .task {
             guard !loaded else { return }
             notices = await Task.detached(priority: .userInitiated) { ThirdPartyNotices.bundled() }.value

@@ -89,7 +89,7 @@ struct ChatGPTModelsSheet: View {
             Divider()
             footer
         }
-        .frame(minWidth: 560, idealWidth: 680, minHeight: 420, idealHeight: 560)
+        .inkuWideFrame(minWidth: 560, idealWidth: 680, minHeight: 420, idealHeight: 560)
         .interactiveDismissDisabled(working)
     }
 
@@ -136,7 +136,7 @@ struct ChatGPTModelsSheet: View {
                 Spacer()
                 Text(display.localizedFormat("%ld / %ld モデルを表示", visibleModels.count, publication.models.count))
                     .inkuFont(12).foregroundStyle(.secondary)
-            }
+            }.inkuPhoneSlidesSideways()
         }.padding(16)
     }
 

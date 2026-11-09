@@ -82,7 +82,7 @@ private enum DemoModelPicker: String, Identifiable {
                                 Button { showPaper = true } label: {
                                     Label(model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID, systemImage: "rectangle.portrait")
                                 }.popover(isPresented: $showPaper) {
-                                    CreationPaperPicker(model: model) { showPaper = false }
+                                    CreationPaperPicker(model: model) { showPaper = false }.inkuPopoverContent()
                                 }
                             }
                         }.padding(6)

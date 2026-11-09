@@ -61,7 +61,7 @@ public struct AuxiliaryView: View {
                 if mode == .colophon { savedColophons }
             }.padding(20)
         }
-        .frame(minWidth: 460, idealWidth: 700, minHeight: 520)
+        .inkuWideFrame(minWidth: 460, idealWidth: 700, minHeight: 520)
         .task(id: work?.id ?? model.selectedWorkID) {
             await auxiliary.initialize(app: model, work: work, mode: mode)
         }

@@ -251,6 +251,17 @@ apple/scripts/build-ios.sh Release --run "iPad Pro 11-inch (M5)"
 
 The first argument is `Debug` or `Release`. The script runs `build-core.sh all` first only when the iOS Rust artifact is missing or older than the current source. `build-macos.sh` always rebuilds the artifact as a Mac-only one, so building iOS after a Mac build rebuilds the artifact again. As on the Mac, a version and build number are allocated for every build. Building `InkuIOS` directly from Xcode stops, because it has no such allocation.
 
-`--run` starts a simulator device without opening Simulator.app, installs and launches the built app, and checks after 10 seconds that the app is still running. The default device is `iPad Pro 11-inch (M5)`; add a name to use another device. There is no procedure yet for installing on a physical iPad.
+`--run` starts a simulator device without opening Simulator.app, installs and launches the built app, and checks after 10 seconds that the app is still running. The default device is `iPad Pro 11-inch (M5)`; add a name to use another device.
 
-Works and settings are stored in `app.inku.ios/` under the app's Application Support (the Mac keeps `app.inku.macos/`). An iOS app cannot start another program, so zoomed windows are drawn on the CPU in tiles (as on Intel Macs). The Mac's screens and behavior are unchanged. The Image tab, DDL import, the export screen, adding plugins, restoring a backup, and 3D are not shown on iPad yet. The features iPad does not show yet and the differences from the Mac are in the "2026-11-07 The iOS (iPad) app" section of the [Swift specification](SWIFT_SPEC.md).
+`--device` installs on a connected physical iPad. Pass the signing Team ID in the `INKU_IOS_TEAM` environment variable; it is never written into the checkout. Sign in to that team in Xcode and turn on Developer Mode on the iPad. After the first install, trust the developer on the iPad under Settings > General > VPN & Device Management.
+
+```sh
+INKU_IOS_TEAM=<Team ID> apple/scripts/build-ios.sh Release --device
+INKU_IOS_TEAM=<Team ID> apple/scripts/build-ios.sh Release --device "iPad 9"
+```
+
+Install Release builds on devices. A Debug build crashed on an iPad 9 (iPadOS 27.2) while drawing its first screen: unoptimized Swift decodes the creation screen's deep SwiftUI type names at run time and exhausts the device's main-thread stack, which is smaller than the simulator's (2026-11-09).
+
+A UDID or name after `--device` selects that device; without one, the only connected iPad is used. Xcode's automatic signing creates or reuses the team's development profile. When the app is already installed, its `Library/Application Support` is first copied to `apple/build/iOS/device-backups/<date-time>/` (the next start after an install can migrate the database). The app is then installed and launched with `devicectl`, and the script checks that it is still running 10 seconds later.
+
+Works and settings are stored in `app.inku.ios/` under the app's Application Support (the Mac keeps `app.inku.macos/`). An iOS app cannot start another program, so zoomed windows are drawn on the CPU in tiles (as on Intel Macs). The Mac's screens and behavior are unchanged. The Image tab has "Take Photo" (on devices with a camera) and "Choose from Photos". The features iPad does not show yet and the differences from the Mac are in the "2026-11-07 The iOS (iPad) app" section of the [Swift specification](SWIFT_SPEC.md).

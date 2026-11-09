@@ -1,0 +1,4 @@
+/* The system's permission prompts on iOS (Info-iOS.plist holds the Japanese). */
+"NSCameraUsageDescription" = "Draws a work from the photo you take.";
+"NSPhotoLibraryAddUsageDescription" = "Saves exported works to Photos.";
+"NSLocalNetworkUsageDescription" = "Connects to the local LLM you set to write the work's description.";

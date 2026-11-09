@@ -1582,6 +1582,7 @@
 "描くときのデフォルトで、使える描画モデルを選んでください。" = "Choose an available drawing model in Drawing Defaults.";
 "上のボタンでデモのモデルを選んでください。" = "Choose the demo models with the buttons above.";
 "写真から選ぶ" = "Choose from Photos";
+"撮影" = "Take Photo";
 "写真" = "Photo";
 "ダブルタップで作品を開く" = "Double-tap to open the work";
 "inkuで描画しています" = "Drawing in inku";

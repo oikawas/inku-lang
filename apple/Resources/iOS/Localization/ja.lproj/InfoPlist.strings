@@ -1,0 +1,4 @@
+/* iOS の許可の確かめの文（Info-iOS.plist と同じ文）。 */
+"NSCameraUsageDescription" = "撮った写真から作品を描きます。";
+"NSPhotoLibraryAddUsageDescription" = "書き出した作品を写真に保存します。";
+"NSLocalNetworkUsageDescription" = "設定したローカルLLMに接続して作品の記述を生成します。";

@@ -9,4 +9,13 @@ struct InkuPhotoPickerButton: View {
 
     var body: some View { EmptyView() }
 }
+
+/// The image tab's "Take photo" exists on iOS only.
+struct InkuCameraButton: View {
+    let title: String
+    let disabled: Bool
+    let onCapture: (Data) -> Void
+
+    var body: some View { EmptyView() }
+}
 #endif

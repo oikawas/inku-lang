@@ -168,6 +168,8 @@ public enum InkuCore {
     }
     public static let svgConsumerMaximumBytes: UInt64 = 64 * 1_024 * 1_024
     public static var versionReport: String { InkuCoreBindings.versionReport() }
+    /// The newest Score version this core reads and writes (Server `/api/info` `score_version`).
+    public static var scoreVersion: String { InkuCoreBindings.scoreVersion() }
     public static var rasterAPIVersion: String { InkuCoreBindings.rasterApiVersion() }
     public static var canvasRegistry: Data { Data(InkuCoreBindings.canvasRegistry().utf8) }
 

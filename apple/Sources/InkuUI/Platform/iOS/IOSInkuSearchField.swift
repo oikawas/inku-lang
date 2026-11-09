@@ -14,6 +14,8 @@ struct InkuSearchField: UIViewRepresentable {
     var delay: Duration? = nil
     var borderless: Bool = false
     var onCancel: (() -> Void)? = nil
+    /// Raised by `InkuClearableSearchField`'s "×", as on the Mac: each new value empties the field.
+    var clearRequest = 0
     let onSearch: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -23,7 +25,9 @@ struct InkuSearchField: UIViewRepresentable {
         field.returnKeyType = .search
         field.autocorrectionType = .no
         field.autocapitalizationType = .none
-        field.clearButtonMode = .whileEditing
+        // The "×" beside the box (InkuClearableSearchField) replaces the system's clear button, as on the Web.
+        field.clearButtonMode = .never
+        context.coordinator.clearRequest = clearRequest
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
@@ -42,6 +46,10 @@ struct InkuSearchField: UIViewRepresentable {
             field.borderStyle = .none
             field.backgroundColor = .clear
         }
+        if clearRequest != context.coordinator.clearRequest {
+            context.coordinator.clearRequest = clearRequest
+            context.coordinator.clear(field)
+        }
         if !field.isFirstResponder, field.text != value { field.text = value }
     }
     /// The field's own one-line height and the offered width. Without it SwiftUI gives a UIKit view all the height on
@@ -57,7 +65,17 @@ struct InkuSearchField: UIViewRepresentable {
         var parent: InkuSearchField
         var pending: Task<Void, Never>?
         weak var field: UITextField?
+        var clearRequest = 0
         init(_ parent: InkuSearchField) { self.parent = parent }
+
+        /// Empty the field, apply the empty search without the pause, and keep the caret in the field.
+        func clear(_ field: UITextField) {
+            pending?.cancel()
+            field.text = ""
+            parent.value = ""
+            parent.onSearch("")
+            field.becomeFirstResponder()
+        }
 
         private func limitedText(of field: UITextField) -> String {
             let text = field.text ?? ""

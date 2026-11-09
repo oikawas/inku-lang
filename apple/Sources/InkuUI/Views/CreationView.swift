@@ -351,6 +351,8 @@ struct CreationView: View {
                         .foregroundStyle(.orange)
                 }
                 if imageBatch.running {
+                    // ImageFolderBatchPanel.svelte:97-99: the folder's tiles above the drawing indicator.
+                    BatchRunSummaryView(summary: imageBatch.summary, display: display)
                     RunStatusView(display: display, label: imageBatch.status, onStop: { Task { await imageBatch.stop(app: model) } }, journalModel: model,
                                   journalActive: imageBatch.drawing) { EmptyView() }
                 } else {

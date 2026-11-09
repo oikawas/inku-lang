@@ -270,15 +270,8 @@ struct BatchPanelView: View {
                     Text(model.display.localized("バッチを準備中…")).inkuFont(13)
                 }
             } else if automation.running {
-                // BatchPanel.svelte:280: the running batch shows the drawing indicator with its progress.
-                if let startedAt = automation.batchStartedAt, automation.batchRowStartedAt != nil {
-                    TimelineView(.periodic(from: startedAt, by: 1)) { context in
-                        Text(BatchProgressCopy.line(current: currentBatchRow, total: automation.rows.count,
-                                                    elapsed: context.date.timeIntervalSince(startedAt), display: model.display))
-                            .inkuFont(12).foregroundStyle(.primary).lineLimit(1).truncationMode(.tail)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+                // BatchPanel.svelte:319-321: while the batch runs, its tiles stand above the drawing indicator.
+                if !automation.rows.isEmpty { BatchRunSummaryView(summary: automation.batchSummary, display: model.display) }
                 RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
                               stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
                               onStop: { Task { await automation.stop(app: model) } }, journalModel: model,

@@ -526,6 +526,13 @@ pub fn version_report() -> String {
     format!(r#"{{"binding_version":"{BINDING_VERSION}","protocol_version":"{PROTOCOL_VERSION}"}}"#)
 }
 
+/// The newest Score version this core reads and writes (the Server's `/api/info` `score_version`).
+/// Kept out of `version_report`, which hosts compare whole.
+#[uniffi::export]
+pub fn score_version() -> String {
+    inku_score::ScoreEdition::LATEST.as_str().to_owned()
+}
+
 /// Exact word-touch identity, carried as decimal text across every host boundary.
 #[derive(uniffi::Record)]
 pub struct TextRenderSeed {

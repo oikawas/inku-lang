@@ -72,7 +72,6 @@ struct BatchModelPickerView: View {
                 ProgressView().frame(maxWidth: .infinity).padding(24)
             } else if groups.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    selectionSummary
                     sharedModelHint
                     Text(model.display.localized("選べるモデルがありません。設定 → モデル設定 で使用するモデルを選択してください。"))
                         .inkuFont(13).foregroundStyle(.secondary)
@@ -81,7 +80,6 @@ struct BatchModelPickerView: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
-                        selectionSummary
                         sharedModelHint
                         ForEach(groups) { provider in
                             VStack(alignment: .leading, spacing: 7) {
@@ -102,7 +100,11 @@ struct BatchModelPickerView: View {
             }
             Divider()
             HStack(spacing: 8) {
-                Spacer()
+                // ModelSelectionSettings.svelte:120: the chosen model, beside Cancel and Confirm, cut to one line.
+                Text(selectedSummaryText).inkuFont(12).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .inkuTooltip(model.display.tooltipValue(selectedSummaryText))
                 Button(model.display.localized("キャンセル")) { dismiss() }
                     .keyboardShortcut(.cancelAction).environment(\.isEnabled, true)
                     .disabled(committing)
@@ -158,17 +160,11 @@ struct BatchModelPickerView: View {
             .accessibilityAddTraits(.isSelected)
     }
 
-    private var selectionSummary: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(singlePurposeSelection ? model.display.localized(title) : model.display.label("描画モデル", "Drawing model")).inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
-            Text(entry(for: draftReference, purpose: purpose).map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
-                 ?? model.display.localized("未設定"))
-                .inkuFont(13).fixedSize(horizontal: false, vertical: true)
-
-        }
-        .frame(maxWidth: .infinity, alignment: .leading).padding(10)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
+    /// ModelSelectionSettings.svelte `selectedName`: the chosen model's label, else its id as stored.
+    private var selectedSummaryText: String {
+        let name = entry(for: draftReference, purpose: purpose).map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
+            ?? (draftReference.isEmpty ? model.display.localized("未設定") : draftReference)
+        return model.display.webCopyFormat("modelSelectionSelected", "選択中 %@", name)
     }
 
     private var sharedModelHint: some View {
@@ -214,7 +210,7 @@ struct BatchModelPickerView: View {
                     if selected { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
                 }
                 if unrecommended {
-                    Text(Self.notRecommended(language: model.display.preferences.language))
+                    Text(model.display.webCopy("modelNotRecommended", Self.notRecommended(language: model.display.preferences.language)))
                         .inkuFont(11, weight: .semibold).foregroundStyle(Color.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -240,6 +236,8 @@ struct BatchModelPickerView: View {
         }
         .buttonStyle(.plain)
         .disabled(cannotSelect || !entry.isSelectable)
+        // ModelSelectionSettings.svelte:92: why a choosable card is framed in red.
+        .inkuTooltip(unrecommended ? model.display.tooltip("この用途は計測で応答が無かったモデルです。選べますが、システムとしては推奨しません。描けずに失敗することがあります。", serverKey: "modelNotRecommendedHint") : "")
         .opacity(entry.isSelectable ? 1 : 0.55)
         .focused($focusedReference, equals: reference)
         .onHover { inside in

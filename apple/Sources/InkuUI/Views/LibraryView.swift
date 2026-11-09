@@ -267,9 +267,9 @@ struct LibraryView: View {
         let placeholder = display.webCopy("historySearchPlaceholder", "記述・ハッシュ・作品ID")
         let label = display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）")
         return Group {
-            InkuSearchField(value: $library.query, placeholder: placeholder, label: label, borderless: true, onCancel: onClose,
-                            onSearch: { library.query = $0 })
-                .inkuSearchFieldHeight()
+            // HistoryManager.svelte:1090-1097: the field and its "×" inside one box.
+            InkuClearableSearchField(value: $library.query, placeholder: placeholder, label: label, display: display,
+                                     onCancel: onClose, onSearch: { library.query = $0 })
         }
         // Web `.history-search`: flex 0 1 22rem, at least 10rem.
         .frame(minWidth: 130, idealWidth: 286, maxWidth: 286)
@@ -949,7 +949,7 @@ private struct LibraryPager: View {
                         .foregroundStyle(Color.accentColor)
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor))
                 }.buttonStyle(.plain)
-                    .inkuTooltip(display.tooltip("検索を解除", serverKey: "historySearchClear"))
+                    .inkuTooltip(display.tooltip("検索をクリア", serverKey: "historySearchClear"))
             }
             Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setLatestPage() } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))

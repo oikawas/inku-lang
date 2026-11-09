@@ -315,6 +315,8 @@ public final class AutomationModel {
     public private(set) var currentRetryRound = 0
     public private(set) var batchStartedAt: Date?
     public private(set) var batchRowStartedAt: Date?
+    /// The running batch's tiles (Web `BatchRunSummary`).
+    private(set) var batchSummary = BatchRunSummary()
     private var observedRowID: String?
     @ObservationIgnored private var store: BatchJournalStore?
     @ObservationIgnored private var journal: BatchJournal?
@@ -569,6 +571,7 @@ public final class AutomationModel {
         let runToken = UUID()
         token = runToken; running = true; stopping = false; mode = "batch"; errorText = nil
         batchStartedAt = startedAt; batchRowStartedAt = nil
+        batchSummary.start(planTotal: rows.count, at: startedAt)
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
@@ -579,7 +582,8 @@ public final class AutomationModel {
                         (scope?.contains(self.rows[$0].id) ?? true)
                             && (self.rows[$0].state == .waiting || (round > 0 && self.rows[$0].state == .failed))
                     }
-                    for index in indices {
+                    self.batchSummary.beginRound(indices.count)
+                    for (position, index) in indices.enumerated() {
                         try Task.checkCancellation()
                         guard self.token == runToken else { return }
                         self.rows[index].state = .running; self.rows[index].attempts += 1; self.rows[index].error = nil
@@ -587,6 +591,7 @@ public final class AutomationModel {
                         self.status = "\(index + 1) / \(self.rows.count)（元の\(self.rows[index].line)行目）\(round > 0 ? "・再試行\(round)" : "")"
                         try await self.saveJournal()
                         self.batchRowStartedAt = Date()
+                        self.batchSummary.beginWork(position: position + 1)
                         let rowID = self.rows[index].id
                         let result = await app.runAutomation(request: self.rows[index].request, background: true) { executionID in
                             guard self.token == runToken, !self.stopping,
@@ -595,6 +600,8 @@ public final class AutomationModel {
                             try await self.saveJournal()
                         }
                         self.batchRowStartedAt = nil
+                        // state.svelte.ts:599: every line whose work was saved counts, as this loop marks it succeeded.
+                        self.batchSummary.finishWork(saved: result != nil)
                         if let result {
                             self.rows[index].state = .succeeded; self.rows[index].workID = result.id
                             self.observedRowID = self.rows[index].id; self.observedWork = result
@@ -780,7 +787,7 @@ public final class AutomationModel {
     private func finish(_ runToken: UUID) {
         guard token == runToken else { return }
         if mode == "demo" { demoEndedAt = Date(); demoWaitUntil = nil; demoDrawing = false }
-        batchStartedAt = nil; batchRowStartedAt = nil; operation = nil; token = nil
+        batchStartedAt = nil; batchRowStartedAt = nil; batchSummary = BatchRunSummary(); operation = nil; token = nil
         running = false; stopping = false
     }
     private func saveJournal() async throws {

@@ -19,11 +19,16 @@ struct InkuSearchField: NSViewRepresentable {
     /// Escape. Without it the field clears itself, as a search field does; the library's closes the library, as Escape
     /// does there on the Web, and keeps the search.
     var onCancel: (() -> Void)? = nil
+    /// Raised by `InkuClearableSearchField`'s "×" (Web `CanvasWorkSearch` `clear`): each new value empties the field.
+    var clearRequest = 0
     let onSearch: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
+        // The Web hides the browser's clear button and draws its own "×" beside the box (InkuClearableSearchField).
+        (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
+        context.coordinator.clearRequest = clearRequest
         field.delegate = context.coordinator
         field.target = context.coordinator
         field.action = #selector(Coordinator.submit(_:))
@@ -40,13 +45,26 @@ struct InkuSearchField: NSViewRepresentable {
         field.isEnabled = context.environment.isEnabled
         field.isEditable = context.environment.isEnabled && !context.environment.inkuTooltipsCovered
         field.isBezeled = !borderless
+        if clearRequest != context.coordinator.clearRequest {
+            context.coordinator.clearRequest = clearRequest
+            context.coordinator.clear(field)
+        }
         if field.currentEditor() == nil, field.stringValue != value { field.stringValue = value }
     }
     static func dismantleNSView(_ field: NSSearchField, coordinator: Coordinator) { coordinator.pending?.cancel() }
     @MainActor final class Coordinator: NSObject, NSSearchFieldDelegate {
         var parent: InkuSearchField
         var pending: Task<Void, Never>?
+        var clearRequest = 0
         init(_ parent: InkuSearchField) { self.parent = parent }
+        /// Empty the field, apply the empty search without the pause, and keep the caret in the field.
+        func clear(_ field: NSSearchField) {
+            pending?.cancel()
+            field.stringValue = ""
+            parent.value = ""
+            parent.onSearch("")
+            field.window?.makeFirstResponder(field)
+        }
         private func limitedText(of field: NSSearchField) -> String {
             guard let maxLength = parent.maxLength else { return field.stringValue }
             let text = String(field.stringValue.prefix(maxLength))

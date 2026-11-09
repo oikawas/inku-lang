@@ -22,6 +22,17 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-09 Parts the Web had and the Swift app lacked (step 1)
+
+The Mac and the iPad gain these parts, in the Web's form.
+
+- Batch progress: while a batch runs, two or three tiles ("Line", "Since start", "Avg / work") stand above the drawing indicator. The line is a position among the whole plan: in a retry round or a resume it reads as the plan's lines minus the round's lines plus the position in the round. Since start and the average show `m:ss` (`h:mm:ss` from an hour), and their tooltips say it as a sentence ("12 min 03 s since the batch started"). The average counts only saved works and is not shown until the first work is saved. An image-folder batch shows the same tiles (a stopped picture is not counted). The former one-line sentence is removed.
+- About Inku's version rows gain "Score ver." between DDL engine and Render engine. It is the newest Score version the bundled shared core reads and writes (the core's `score_version()`, the same value as the Server's `/api/info` `score_version`). The work information gains a "Score version" row: the `version` of the Score JSON the work saved, as it is; "-" without a Score and "not recorded" when no version was recorded (reading it through the core's type would read a Score without a version as 0.9.0). The work information lists the versions in the Web's order (DDL Spec, DDL engine, Score, Render engine, Build).
+- Model choice: the summary box above the list is removed, and "Selected <model name>" stands left of Cancel and Confirm (one line, cut with an ellipsis, the whole name in its tooltip). A not-recommended model's card carries the Web's explaining tooltip.
+- Search fields (the library and the work strip): the system's clear button is hidden and a "×" button stands at the field's right. It shows even when the field is empty, then not pressable. Pressing it empties the field, clears the search without the pause, and returns the caret to the field. Its tooltip is "Clear search". The library's "Searching" chip uses the same tooltip.
+
+Of the tooltip table's 19 excluded sites, 8 become equal: 11 excluded, 178 equal (the work menu's composition form follows in step 2).
+
 ## 2026-11-07 The iOS (iPad) app
 
 An iPad app is added. Its scope ends at building and starting it in the iOS Simulator; the iPhone screens and physical devices come in later steps.

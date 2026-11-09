@@ -141,6 +141,12 @@ Step 7c is the sheets and windows.
 - Refinement candidates show at most two columns on an iPhone, each card as tall as its width suggests, and the grid slides up and down. The autonomous refinement's move switches take one line each.
 - The generation information's 190-point label column sits above its value on an iPhone. The model list's fetch and selection buttons slide sideways.
 - In "About inku", the repository link and the license button each take only their own taps inside an iOS form row (one tap used to fire both and opened Safari).
+
+Step 7d is the devices and the documents.
+
+- Without a name, `build-ios.sh --device` uses the only connected device (iPad or iPhone); before, it looked for an iPad only. With several connected, name one or give its UDID.
+- A Release build was installed and launched on an iPhone 14 Pro Max (iOS 27.2, over the same network). The author's device checks (screen layout, keyboard, camera, running in the background, zooming a heavy work, one work with Claude API Sonnet 5.5) are the step 7d screen check.
+- Documents: the `apple/README` in both languages describes installing on iPhone and the iPhone screens.
 - The iPad's and the Mac's screens and behavior are unchanged.
 
 ## 2026-11-07 Tooltip parity with today's Web

@@ -10,7 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Vision chooser follows Web's `ModelCardPicker` and `modelMeta` (purpose badges, selectability, order). */
+/** The Vision chooser follows Web's `ModelCardPicker` and `modelMeta` (purposes, selectability, order). */
 class VisionModelPickerTest {
     private val eol = ModelCatalogLabel("eol", "提供終了", "End of life", publishable = false)
     private val old = ModelCatalogLabel("legacy", "旧世代", "Older", publishable = true)
@@ -19,16 +19,13 @@ class VisionModelPickerTest {
         ModelCatalog.EMPTY.classify(JSONObject(record).put("id", id).put("labels", org.json.JSONArray(labels.map { it.id })))
 
     @Test
-    fun aPurposeTheModelCannotBeChosenForIsGreyed() {
-        assertEquals(listOf("LLM" to false, "Vision" to true),
-            modelPurposeBadges(model("a", """{"purposes":["vision"],"unsupported_purposes":["llm"]}""")))
-        assertEquals(listOf("LLM" to true, "Vision" to true),
-            modelPurposeBadges(model("b", """{"purposes":["llm","vision"]}""")))
-        // Measured not to answer Vision: offered for it or not, it cannot be chosen.
-        assertEquals(listOf("LLM" to true, "Vision" to false),
-            modelPurposeBadges(model("c", """{"purposes":["llm","vision"],"unsupported_purposes":["vision"]}""")))
+    fun aModelServesOnlyThePurposesItAnswered() {
+        assertEquals(listOf("vision"), modelPurposes(model("a", """{"purposes":["vision"],"unsupported_purposes":["llm"]}""")))
+        assertEquals(listOf("llm", "vision"), modelPurposes(model("b", """{"purposes":["llm","vision"]}""")))
+        // Measured not to answer Vision: offered for it or not, it does not serve it.
+        assertEquals(listOf("llm"), modelPurposes(model("c", """{"purposes":["llm","vision"],"unsupported_purposes":["vision"]}""")))
         // No purposes written reads as LLM, as on Web.
-        assertEquals(listOf("LLM" to true, "Vision" to false), modelPurposeBadges(model("d", "{}")))
+        assertEquals(listOf("llm"), modelPurposes(model("d", "{}")))
     }
 
     @Test
@@ -68,14 +65,12 @@ class VisionModelPickerTest {
         val mute = model("b", """{"purposes":["llm"],"unsupported_purposes":["vision"]}""")
         assertEquals(listOf("llm"), modelPurposes(mute))
         assertEquals(listOf("llm", "vision"), modelPurposes(mute, listOf("llm", "vision")))
-        assertEquals(listOf("LLM" to true, "Vision" to true), modelPurposeBadges(mute, listOf("llm", "vision")))
         assertTrue(purposeUnsupported(mute, "vision"))
         val silent = model("s", """{"purposes":[],"unsupported_purposes":["llm","vision"]}""")
         assertEquals(emptyList<String>(), modelPurposes(silent))
         assertEquals(listOf("llm"), modelPurposes(silent, listOf("llm")))
         // A catalog row that names no purpose serves LLM, as Server normalises it.
         assertEquals(listOf("llm"), modelPurposes(model("c", """{"purposes":[]}""")))
-        assertEquals(listOf("LLM" to false, "Vision" to true), modelPurposeBadges(both, listOf("vision")))
     }
 
     @Test

@@ -96,15 +96,6 @@ internal fun modelPurposes(model: CatalogModel, ticked: List<String>? = null): L
 }
 
 /**
- * Web `modelPurposeBadges`: LLM and Vision side by side, each selectable only
- * when the model serves it ([modelPurposes]).
- */
-internal fun modelPurposeBadges(model: CatalogModel, ticked: List<String>? = null): List<Pair<String, Boolean>> {
-    val purposes = modelPurposes(model, ticked)
-    return listOf("llm" to "LLM", "vision" to "Vision").map { (purpose, label) -> label to (purpose in purposes) }
-}
-
-/**
  * Web `isModelUnselectable`: a label that keeps it from publication. No
  * response when measured no longer does (2026-10-26).
  */
@@ -127,12 +118,16 @@ internal fun ModelRecommendationStars(model: CatalogModel, purpose: String, modi
         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
 }
 
-/** The drawing model chooser's details: the labels, then the catalog's figures. */
+/**
+ * A model choice card's status labels. The catalog's figures (recommendation,
+ * seconds, cost, comment) are not shown where a model is chosen: they are read
+ * in model administration's details (the author, 2026-11-12: "モデルの選択時に
+ * 出るフロートは全て廃止", Web's evaluation card).
+ */
 @Composable
 internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
         model.labels.forEach { label -> ModelLabelText(label, strings) }
-        ModelCatalogFigures(model, strings)
     }
 }
 
@@ -173,7 +168,8 @@ private fun ModelCatalogFigures(model: CatalogModel, strings: InkuStrings) {
  * A pressed one is filled and ticked, an unpressed one only outlined, so the
  * two cannot be mistaken at a glance (the author, 2026-10-26: Material's tinted
  * FilterChip was hard to read). A purpose it was measured not to answer is
- * framed in red as not recommended, and says why. Where [lockUnsupported] (a
+ * framed in red as not recommended; no note explains it (2026-11-12, as Web
+ * dropped the toggle's tooltip). Where [lockUnsupported] (a
  * ChatGPT plan model, whose purposes are each person's own) it still cannot be
  * pressed.
  */
@@ -187,15 +183,6 @@ internal fun ModelPurposeToggles(model: CatalogModel, ticked: List<String>, enab
                 modifier = Modifier.testTag("CatalogPurpose:${model.id}:$purpose")) { onToggle(purpose) }
         }
     }
-}
-
-/** The note under [ModelPurposeToggles] when a purpose gave no response. */
-@Composable
-internal fun ModelPurposeNote(model: CatalogModel, strings: InkuStrings, lockUnsupported: Boolean) {
-    if (listOf("llm", "vision").none { purposeUnsupported(model, it) }) return
-    Text(if (lockUnsupported) strings.modelPurposeNoResponse else strings.modelPurposeNotRecommended,
-        style = MaterialTheme.typography.labelSmall,
-        color = if (lockUnsupported) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
 }
 
 @Composable
@@ -237,7 +224,6 @@ private fun ModelCatalogEntry(
     detailsOpen: Boolean,
     onToggleDetails: () -> Unit,
     toggles: (@Composable (Modifier) -> Unit)?,
-    note: (@Composable () -> Unit)?,
     accessCheck: (@Composable () -> Unit)?,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -270,7 +256,6 @@ private fun ModelCatalogEntry(
                         Text("${strings.modelDetails} ${if (detailsOpen) "▾" else "▸"}", style = MaterialTheme.typography.labelMedium)
                     }
                 }
-                note?.invoke()
                 if (detailsOpen) {
                     ModelCatalogFigures(model, strings)
                     accessCheck?.invoke()
@@ -321,7 +306,6 @@ internal fun ModelCatalogRows(
                         ModelPurposeToggles(model, purposes!![model.id].orEmpty(), enabled = offered, strings = strings,
                             lockUnsupported = lockUnsupportedPurposes, modifier = rowModifier) { purpose -> onTogglePurpose!!(model.id, purpose) }
                     } else null,
-                    note = if (withToggles) { { ModelPurposeNote(model, strings, lockUnsupportedPurposes) } } else null,
                     accessCheck = if (onCheckAccess != null && model.fold != "eol") {
                         { TextButton(onClick = { onCheckAccess(model.id) }, enabled = enabled) { Text(strings.modelAccessCheck) } }
                     } else null,

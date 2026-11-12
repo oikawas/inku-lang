@@ -23,8 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -145,18 +143,7 @@ private fun VisionModelCard(model: VisionModelOption, selected: Boolean, onClick
             if (notRecommended) Text(strings.modelNotRecommended, style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag("VisionModelNotRecommended:${model.id}"))
-            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                modelPurposeBadges(model.catalog, model.purposes).forEach { (badge, selectable) ->
-                    Surface(shape = RoundedCornerShape(Dimens.radiusPill),
-                        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier.alpha(if (selectable) 1f else 0.45f)
-                            .semantics { contentDescription = if (selectable) badge else badge + strings.modelPurposeNotSelectable }
-                            .testTag("VisionModelPurpose:${model.id}:$badge:$selectable")) {
-                        Text(badge, style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceM))
-                    }
-                }
-            }
+            // The purpose badges and the catalog's figures went with Web's evaluation card (2026-11-12).
             ModelCatalogDetails(model.catalog, strings)
         }
     }

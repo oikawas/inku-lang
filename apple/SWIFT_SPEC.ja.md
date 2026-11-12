@@ -1013,7 +1013,7 @@ comment、mark、trash／復元、明示した完全削除、複数選択、系�
 
 履歴の世代はServerと同じくrootを1とし、primary parentのedgeごとに1加算する。削除済みの祖先も数え、nodeのない作品は独立作品と表示する。初期表示は世代とmodel、保存済みの表示項目は保持する。世代をvariationの種類や幅で代用しない。libraryでは表示中の作品と複数選択のcheckbox、系譜では表示作品と範囲を決めるfocusを区別する。記述のないDDL作品は保存DDLの先頭行を表示名へ使い、保存本文を補わない。hash、comment、mark、親子への移動はcardとmenuから操作できる。
 
-Swift物理schemaはv4で、10table構成を保ち、local annotationの廃止した書き出し印`for_share`を削除する。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql)と[schema export](../persistence/reference/swift-schema-v4.json)。既知の完全なv1／v2／v3だけを原子的に移行し、作品・コメント・推敲印・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全10tableを対象とし、旧backupは隔離snapshotをv4へ移行してから復元する。復元先の送信予算・待機期限も保守的に引き継ぎ、古い作品backupで当日の上限をリセットしない。Server／Android DBや旧作品JSONのimportは含めない。
+Swift物理schemaのv4の移行は、10table構成を保ち、local annotationの廃止した書き出し印`for_share`を削除する（現行の版はv9。下の「保存、読出し、保存Scoreの再演奏」と[共通保存契約](../persistence/contract.json)の`hosts.swift`）。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql)と[schema export](../persistence/reference/swift-schema-v4.json)。既知の完全なv1／v2／v3だけを原子的に移行し、作品・コメント・推敲印・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全10tableを対象とし、旧backupは隔離snapshotをv4へ移行してから復元する。復元先の送信予算・待機期限も保守的に引き継ぎ、古い作品backupで当日の上限をリセットしない。Server／Android DBや旧作品JSONのimportは含めない。
 
 ### 比較・推敲・奥書と自動実行
 

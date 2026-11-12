@@ -199,6 +199,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             }
         }
         .environment(\.inkuTextScale, textScale * Self.phoneTextScale)
+        // The system's own controls (menu pickers' values, segmented controls, section titles) do not take inkuFont;
+        // at least one Dynamic Type step up brings them to the scaled text around them (screen check of Build 138).
+        .dynamicTypeSize(.xLarge ... .accessibility5)
     }
 
     private func phoneRow(_ item: SettingsSection) -> some View {

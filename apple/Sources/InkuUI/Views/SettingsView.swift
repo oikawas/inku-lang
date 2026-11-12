@@ -46,6 +46,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// The confirmation chose "select a backup": the file dialog opens once the confirmation has closed.
     @State private var restoreRequested = false
     @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
+    @Environment(\.inkuTextScale) private var textScale
+    /// iPhone (author 2026-11-12, "the settings' text is small, with much space"): the pages' 14-point Web text
+    /// reads as the iPhone's 17-point body text; every size on the settings scales with it.
+    private static let phoneTextScale = 17.0 / 14.0
     @State private var backupDeleteName: String?
     @State private var backupRestoreName: String?
     @State private var backupRestoreFinal = false
@@ -170,13 +174,14 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                                display.preferences.settingsDetail = enabled ? "detailed" : "standard"
                            }))
                 }
+                .inkuFont(14)
                 ForEach(groups, id: \.label) { group in
                     Section(group.label) {
                         ForEach(group.items) { item in phoneRow(item) }
                     }
                 }
                 Section {
-                    Button(display.localized("描画ログ"), action: onOpenDrawingLogs).tint(.primary)
+                    Button(display.localized("描画ログ"), action: onOpenDrawingLogs).tint(.primary).inkuFont(14)
                 } footer: {
                     Text("Build " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"))
                 }
@@ -190,8 +195,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 .inkuFont(14)
                 .background(InkuColor.bg)
                 .inkuInlineNavigationTitle()
+                .environment(\.inkuTextScale, textScale * Self.phoneTextScale)
             }
         }
+        .environment(\.inkuTextScale, textScale * Self.phoneTextScale)
     }
 
     private func phoneRow(_ item: SettingsSection) -> some View {
@@ -201,7 +208,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             phonePage.wrappedValue = item
         } label: {
             HStack {
-                Text(title(item)).foregroundStyle(Color.primary)
+                Text(title(item)).foregroundStyle(Color.primary).inkuFont(14)
                 Spacer()
                 Image(systemName: "chevron.right").inkuFont(12).foregroundStyle(.tertiary)
             }

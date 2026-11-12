@@ -13,19 +13,15 @@ struct BatchModelPickerView: View {
     @Environment(\.isEnabled) private var isEnabled
     @State private var settings: HostSettings?
     @State private var draftReference = ""
-    @State private var hoveredReference: String?
-    @State private var metadataHeight: CGFloat = 220
     @State private var selectionError: String?
     @State private var committing = false
     @State private var draftThinking = false
-    @FocusState private var focusedReference: String?
 
     private var groups: [ProviderSettings] {
         (settings?.providers ?? []).filter { !SettingsModel.registeredModels(for: $0, purpose: selectedPurpose).isEmpty }
     }
     private var selectedPurpose: String { purpose }
     private var selectedReference: String { draftReference }
-    private var inspectedReference: String? { hoveredReference ?? focusedReference }
     init(model: AppModel, initialReference: String? = nil, immediateSelection: Bool = false,
          title: String = "モデル選択", purpose: String = "llm",
          onSelection: (@MainActor (String) async throws -> Void)? = nil) {
@@ -113,30 +109,9 @@ struct BatchModelPickerView: View {
                     .disabled(!canConfirm)
             }.padding(.horizontal, 18).padding(.vertical, 14)
         }
+        // No floating card over a hovered, focused or pressed model (author 2026-11-12: every float in model choice
+        // is gone, as on the Web). The card's name, labels, use and recommendation stay inside the button.
         .inkuDialogFrame(width: groups.isEmpty ? 440 : 800, iOSMaxWidth: 800)
-        .overlayPreferenceValue(BatchModelCardBounds.self) { anchors in
-            GeometryReader { geometry in
-                if let reference = inspectedReference, let anchor = anchors[reference],
-                   let selected = entry(for: reference) {
-                    let card = geometry[anchor]
-                    let width = min(340, geometry.size.width - 16)
-                    let x = min(max(8, card.minX), geometry.size.width - width - 8)
-                    let below = card.maxY + 5
-                    let y = below + metadataHeight <= geometry.size.height - 8
-                        ? below : max(8, card.minY - metadataHeight - 5)
-                    metadata(selected.model, provider: selected.provider)
-                        .frame(width: width, alignment: .leading)
-                        .background {
-                            GeometryReader { size in
-                                Color.clear.onAppear { metadataHeight = size.size.height }
-                                    .onChange(of: size.size.height) { _, height in metadataHeight = height }
-                            }
-                        }
-                        .offset(x: x, y: y)
-                        .allowsHitTesting(false)
-                }
-            }
-        }
         .task(id: model.providerSettingsRevision) {
             let current = await model.hostSettings()
             guard !Task.isCancelled else { return }
@@ -146,8 +121,6 @@ struct BatchModelPickerView: View {
             }
             else if !SettingsModel.isRegisteredModelAvailable(draftReference, purpose: purpose, settings: current) { draftReference = "" }
             settings = current
-            hoveredReference = nil
-            focusedReference = nil
             selectionError = nil
         }
         .interactiveDismissDisabled(committing)
@@ -236,20 +209,11 @@ struct BatchModelPickerView: View {
         }
         .buttonStyle(.plain)
         .disabled(cannotSelect || !entry.isSelectable)
-        // ModelSelectionSettings.svelte:92: why a choosable card is framed in red.
-        .inkuTooltip(unrecommended ? model.display.tooltip("この用途は計測で応答が無かったモデルです。選べますが、システムとしては推奨しません。描けずに失敗することがあります。", serverKey: "modelNotRecommendedHint") : "")
+        // The red frame's tooltip is gone with the floats (author 2026-11-12); the card says "not recommended".
         .opacity(entry.isSelectable ? 1 : 0.55)
-        .focused($focusedReference, equals: reference)
-        .onHover { inside in
-            if inside { hoveredReference = reference }
-            else if hoveredReference == reference { hoveredReference = nil }
-        }
-        // A finger has no hover: pressing a card inspects it, as the pointer already does when it presses one.
-        .simultaneousGesture(TapGesture().onEnded { hoveredReference = reference })
         .accessibilityElement(children: .combine)
         .accessibilityValue(selected ? model.display.localized("選択中") : "")
         .accessibilityHint(metadataText(entry, provider: provider))
-        .anchorPreference(key: BatchModelCardBounds.self, value: .bounds) { [reference: $0] }
     }
 
     private func sortedModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
@@ -264,15 +228,6 @@ struct BatchModelPickerView: View {
             }
         }
         return nil
-    }
-
-    private func metadata(_ entry: ProviderModelSettings, provider: ProviderSettings) -> some View {
-        RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display, purpose: selectedPurpose)
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
-        .accessibilityHidden(true)
     }
 
     private func sharedRecommendationLevel(_ entry: ProviderModelSettings) -> Int {
@@ -319,12 +274,5 @@ struct BatchModelPickerView: View {
         let warning = entry.isNotRecommended(for: selectedPurpose) ? [Self.notRecommended(language: model.display.preferences.language)] : []
         return (warning + entry.resolvedLabels.map { $0.name(language: model.display.preferences.language) }
                 + rows.map { model.display.localized($0.0) + ": " + $0.1 }).joined(separator: ". ")
-    }
-}
-
-private struct BatchModelCardBounds: PreferenceKey {
-    static var defaultValue: [String: Anchor<CGRect>] { [:] }
-    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }

@@ -16,6 +16,8 @@
 // no longer Build1162's. Markers now point at the components that draw the tooltip (LibraryPreviewPanel,
 // LineageDetailsView, the shared metaField), not at unused strings left in LibraryView. The check also counts the
 // Web's sites per component, so a tooltip added to the Web fails it until the table has a row.
+// 2026-11-12: the model choice's floats are gone (author), with the not-recommended card's tooltip
+// (ModelSelectionSettings.svelte:92): 188 sites.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -207,7 +209,6 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "DatabaseAdministrationSettings.svelte:202", swift: "Views/SettingsView.swift", marker: "serverKey: \"settingsDbBackupEstimatedDiskHint\""),
     .init(web: "ModelAdministrationSettings.svelte:643", swift: "Views/ChatGPTModelsSheet.swift", marker: "inkuTooltip(locked ? note : \"\")"),
     .init(web: "ModelAdministrationSettings.svelte:686", swift: "Views/ModelSettingsDialogs.swift", marker: "serverKey: \"settingsModelFetchDisabledWhileDirty\""),
-    .init(web: "ModelSelectionSettings.svelte:92", swift: "Views/BatchModelPickerView.swift", marker: "serverKey: \"modelNotRecommendedHint\""),
     .init(web: "ModelSelectionSettings.svelte:120", swift: "Views/BatchModelPickerView.swift", marker: "inkuTooltip(model.display.tooltipValue(selectedSummaryText))"),
     .init(web: "RenderLimitsSettings.svelte:129", swift: "Views/OperationalLimitsView.swift", marker: "showTooltips ? tip : \"\""),
     .init(web: "+page.svelte:2930", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipDdlNew\""),

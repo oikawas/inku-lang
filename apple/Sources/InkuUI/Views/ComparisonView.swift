@@ -154,7 +154,7 @@ public struct ComparisonView: View {
             // Published for drawing though it did not answer when measured: framed in red (2026-10-26).
             .overlay(Rectangle().stroke(entry.isNotRecommended(for: "llm") ? Color.red : selected || target ? Color.accentColor : InkuColor.border,
                                         lineWidth: entry.isNotRecommended(for: "llm") ? 2 : 1))
-            .inkuTooltip(model.display.preferences.showTooltips ? modelMetadata(entry, provider: provider) : "")
+            // No floating model card here either (author 2026-11-12); VoiceOver still reads the facts as a hint.
             .accessibilityHint(modelMetadata(entry, provider: provider))
     }
 

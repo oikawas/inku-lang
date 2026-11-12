@@ -402,7 +402,7 @@ struct ProviderModelsSheet: View {
             .background(selected ? tint.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
             .overlay(Capsule().stroke(unrecommended ? Color.red : selected ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2),
                                       lineWidth: unrecommended ? 2 : 1))
-            .inkuTooltip(unrecommended ? note : "")
+            // No tooltip (author 2026-11-12, Web `noResponseTitle` removed); the red frame stays, VoiceOver reads why.
             .accessibilityLabel(item.label + " " + label)
             .accessibilityValue(model.display.localized(selected ? "選択中" : "未選択"))
             .accessibilityHint(unrecommended ? note : "")

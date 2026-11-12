@@ -23,8 +23,6 @@ public enum ServerTips {
         "tooltipSketchToggle": "写生層が書いた文章を表示します。開閉の状態はこのMacに保存されます。",
         "settingsModelsHint": "このアプリに登録するAIサービスのモデルと接続情報を管理します。",
         "settingsModelSecurityNote": "APIキーはKeychainに保存され、画面には再表示されません。",
-        "settingsModelRpmHelp": "このアプリが同じ接続先へ送る1分当たりの要求数です。写生・解釈・カタログ選択・構図読み・再試行を含みます。0は上限なしです。",
-        "settingsModelRpdHelp": "このアプリが同じ接続先へ送る1日当たりの要求数です。再試行も含み、Geminiは太平洋時間、その他はUTCの0時にリセットします。0は上限なしです。",
     ]
 
     // Exact native consumer aliases, rather than a fuzzy match between actions.

@@ -96,11 +96,11 @@ struct BatchModelPickerView: View {
             }
             Divider()
             HStack(spacing: 8) {
-                // ModelSelectionSettings.svelte:120: the chosen model, beside Cancel and Confirm, cut to one line.
+                // ModelSelectionSettings.svelte `model-selection-current`: the chosen model, beside Cancel and Confirm.
+                // A long name wraps instead of being cut, and has no tooltip (author 2026-11-12, as on the Web).
                 Text(selectedSummaryText).inkuFont(12).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .inkuTooltip(model.display.tooltipValue(selectedSummaryText))
                 Button(model.display.localized("キャンセル")) { dismiss() }
                     .keyboardShortcut(.cancelAction).environment(\.isEnabled, true)
                     .disabled(committing)

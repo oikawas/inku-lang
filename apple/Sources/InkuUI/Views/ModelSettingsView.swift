@@ -12,7 +12,6 @@ struct ModelSettingsView: View {
     @State private var sheetRoute: SheetRoute?
     @State private var confirmation: Confirmation?
     @State private var saving = false
-    @State private var rateHelp: String?
     /// The active ChatGPT profile's saved publication; nil hides the ChatGPT plan service, as the Web does when
     /// `/api/me/chatgpt/models/settings` fails (no connected, plan-scoped active profile).
     @State private var chatGPT: ChatGPTPlanPublication?
@@ -276,17 +275,8 @@ struct ModelSettingsView: View {
     private func rateField(_ title: String, help: String, provider: ProviderSettings,
                            key: WritableKeyPath<ServiceDraft, String>) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Text(model.display.localized(title)).inkuFont(13)
-                Button { rateHelp = title } label: { Image(systemName: "info.circle") }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel(model.display.localizedFormat("%@の説明", model.display.localized(title)))
-                    .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized(help) : "")
-                    .popover(isPresented: Binding(get: { rateHelp == title }, set: { if !$0 { rateHelp = nil } })) {
-                        Text(model.display.localized(help)).inkuFont(13).padding()
-                            .frame(maxWidth: 320).fixedSize(horizontal: false, vertical: true).inkuPopoverContent()
-                    }
-            }
+            // No "i" button and no floating explanation (author 2026-11-12, as on the Web); VoiceOver reads the help.
+            Text(model.display.localized(title)).inkuFont(13)
             TextField(model.display.localized(title), text: draftBinding(provider, key))
                 .textFieldStyle(.roundedBorder).autocorrectionDisabled()
                 .accessibilityHint(model.display.localized(help))

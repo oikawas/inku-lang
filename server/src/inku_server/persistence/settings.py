@@ -13,9 +13,9 @@ from typing import Any, Callable
 from sqlalchemy.orm import Session
 
 from ..model_settings import update_user_model_settings
+from .schema import AppSettingRow, UserAccountRow, UserGroupRow
 
 LEGACY_CANVAS_STORAGE_KEY = "canvas-aspect"
-from .schema import AppSettingRow, UserAccountRow, UserGroupRow
 
 
 SETTINGS_TABS = {

@@ -91,7 +91,8 @@ def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_use
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
-        if _unique_conflict(e): raise HTTPException(status_code=409, detail="group already exists") from e
+        if _unique_conflict(e):
+            raise HTTPException(status_code=409, detail="group already exists") from e
         raise _unexpected_http_error("group create", 500) from e
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("group create", 500) from e
@@ -115,7 +116,8 @@ def api_user_groups_update(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
-        if _unique_conflict(e): raise HTTPException(status_code=409, detail="group already exists") from e
+        if _unique_conflict(e):
+            raise HTTPException(status_code=409, detail="group already exists") from e
         raise _unexpected_http_error("group update", 500) from e
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("group update", 500) from e
@@ -177,7 +179,8 @@ def api_users_create(body: UserAccountCreateBody, actor: dict = Depends(_user_ma
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
-        if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
+        if _unique_conflict(e):
+            raise HTTPException(status_code=409, detail="account already exists") from e
         raise _unexpected_http_error("user create", 500) from e
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("user create", 500) from e
@@ -214,7 +217,8 @@ def api_users_update(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
-        if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
+        if _unique_conflict(e):
+            raise HTTPException(status_code=409, detail="account already exists") from e
         raise _unexpected_http_error("user update", 500) from e
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("user update", 500) from e

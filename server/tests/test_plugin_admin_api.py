@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+
+from inku_server import db
+from inku_server.api import app
+from inku_server.plugins import PLUGIN_PACKAGE_MANAGER
+
 
 def test_disabled_state_keeps_last_valid_value_when_read_is_corrupt(tmp_path):
     from inku_server.plugins.packages import PluginPackageManager
@@ -17,14 +26,6 @@ def test_disabled_state_keeps_last_valid_value_when_read_is_corrupt(tmp_path):
     assert manager._disabled() == {"Other.words"}
     assert list(tmp_path.glob(".package-state-*")) == []
 
-import uuid
-
-import pytest
-from fastapi.testclient import TestClient
-
-from inku_server import db
-from inku_server.api import app
-from inku_server.plugins import PLUGIN_PACKAGE_MANAGER
 
 client = TestClient(app)
 

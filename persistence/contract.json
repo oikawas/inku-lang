@@ -142,7 +142,7 @@
         "lineage_nodes": {"model": "LineageNodeRow", "table": "lineage_nodes", "fields": {"id": {"column": "id"}, "history_id": {"column": "history_id"}, "state": {"column": "state"}, "description_hash": {"column": "description_hash"}, "render_hash": {"column": "render_hash"}, "at": {"column": "at"}, "deleted_at": {"column": "deleted_at"}, "root_node_id": {"column": "root_node_id"}}},
         "lineage_edges": {"model": "LineageEdgeRow", "table": "lineage_edges", "fields": {"id": {"column": "id"}, "parent_node_id": {"column": "parent_node_id"}, "child_node_id": {"column": "child_node_id"}, "derivation_kind": {"column": "derivation_kind"}, "metadata_json": {"column": "metadata_json"}, "at": {"column": "at"}}}
       },
-      "host_only_history_extensions": ["user_id", "output_path", "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest", "tokens_in", "tokens_out", "catalog_mode", "ddl_version", "ddl_engine_version", "render_build_number", "render_color_catalog", "ui_lang", "tenkei", "focus", "for_revision", "for_share", "share_group_id", "note", "display_label", "batch_line_number", "batch_run_id", "idempotency_key", "score_pre_coerce", "coerce_trace_version", "coerce_catalog_digest", "coerce_trace", "image_provenance", "image_ddl"],
+      "host_only_history_extensions": ["user_id", "output_path", "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest", "tokens_in", "tokens_out", "catalog_mode", "ddl_version", "ddl_engine_version", "render_build_number", "render_color_catalog", "ui_lang", "tenkei", "focus", "for_revision", "for_share", "share_group_id", "note", "display_label", "batch_line_number", "batch_run_id", "idempotency_key", "score_pre_coerce", "coerce_trace_version", "coerce_catalog_digest", "coerce_trace", "image_provenance", "image_ddl", "draw_route", "sketch_requested", "composition_requested"],
       "constraint_coverage": {
         "history.id.primary_key": {"status": "enforced", "mechanism": "database", "authority": "HistoryRow.id"},
         "history.render_hash.non_unique": {"status": "enforced", "mechanism": "database", "authority": "HistoryRow.render_hash"},
@@ -198,12 +198,12 @@
       }
     },
     "swift": {
-      "source": "persistence/reference/swift-schema-v4.json",
+      "source": "persistence/reference/swift-schema-v9.json",
       "schema_sql": "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql",
-      "schema_migration_sql": ["apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v3.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql"],
+      "schema_migration_sql": ["apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v3.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v5.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v6.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v7.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v8.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v9-prepare.sql", "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v9.sql"],
       "adapter_source": "apple/Packages/InkuPersistence/Sources/InkuPersistence/InkuDatabase.swift",
       "records_source": "apple/Packages/InkuPersistence/Sources/InkuPersistence/Records.swift",
-      "schema_version": 4,
+      "schema_version": 9,
       "records": {
         "history": {
           "model": "SavedWork",
@@ -232,7 +232,7 @@
         "lineage_nodes": {"model": "LineageNode", "table": "lineage_nodes", "fields": {"id": {"column": "id"}, "history_id": {"column": "history_id"}, "state": {"column": "state"}, "description_hash": {"column": "description_hash"}, "render_hash": {"column": "render_hash"}, "at": {"column": "at"}, "deleted_at": {"column": "deleted_at"}, "root_node_id": {"column": "root_node_id"}}},
         "lineage_edges": {"model": "LineageEdge", "table": "lineage_edges", "fields": {"id": {"column": "id"}, "parent_node_id": {"column": "parent_node_id"}, "child_node_id": {"column": "child_node_id"}, "derivation_kind": {"column": "derivation_kind"}, "metadata_json": {"column": "metadata_json"}, "at": {"column": "at"}}}
       },
-      "host_only_history_extensions": [],
+      "host_only_history_extensions": ["draw_route", "sketch_requested", "composition_requested", "catalog_mode"],
       "constraint_coverage": {
         "history.id.primary_key": {"status": "enforced", "mechanism": "database", "authority": "history.id"},
         "history.render_hash.non_unique": {"status": "enforced", "mechanism": "database", "authority": "index_history_render_hash"},

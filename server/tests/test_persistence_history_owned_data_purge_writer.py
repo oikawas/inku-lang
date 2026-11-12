@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 from dataclasses import FrozenInstanceError, is_dataclass
 import inspect
 from typing import Any
@@ -11,7 +10,6 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from inku_server import db
 from inku_server.persistence import history
 from inku_server.persistence.schema import (
     Base,

@@ -28,7 +28,7 @@ from collections.abc import Iterable
 from sqlalchemy import tuple_
 
 from .ddl_source import LEGACY_EXPANDED_ORIGIN
-from .schema import HistoryRow, LineageEdgeRow, LineageNodeRow, PipelineHistoryLinkRow, VariationAuthorityRow
+from .schema import HistoryRow, LineageNodeRow, PipelineHistoryLinkRow, VariationAuthorityRow
 
 # Derivations that draw from the description again. A child made this way
 # follows its words, whatever its parent was.

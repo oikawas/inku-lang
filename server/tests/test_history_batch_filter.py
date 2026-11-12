@@ -4,7 +4,7 @@ from inku_server import db
 from .test_api import auth_context, client  # noqa: F401
 
 
-def test_batch_filter_only_returns_the_callers_works(auth_context):
+def test_batch_filter_only_returns_the_callers_works(auth_context):  # noqa: F811 - the pytest fixture imported above
     headers, user, group = auth_context
     suffix = uuid.uuid4().hex
     other = db.add_user('batch-' + suffix, suffix + '@example.test', 'password-123', ['users'], group['id'])

@@ -20,6 +20,9 @@ class ContractError(RuntimeError):
 
 AFFINITIES = {"INTEGER", "REAL", "TEXT", "BLOB", "NUMERIC"}
 CLASSIFICATIONS = {"required_common", "optional_common", "host_only"}
+# The Swift database's own version (InkuDatabase.swift's last migration), independent of the
+# logical contract, Room and the Server registry.
+SWIFT_SCHEMA_VERSION = 9
 CONSTRAINT_STATUSES = {"enforced", "gap"}
 CONSTRAINT_MECHANISMS = {"database", "application_transaction", "none"}
 SERVER_AFFINITIES = {
@@ -488,8 +491,8 @@ def _validate_swift(
     actual = export_swift_schema(root, contract)
     if actual != _load_json(root / host["source"]):
         raise ContractError("Swift schema export differs from the bundled SQL authority")
-    if actual["schema_version"] != 4 or host["schema_version"] != 4:
-        raise ContractError("Swift schema must use independent version 4")
+    if actual["schema_version"] != SWIFT_SCHEMA_VERSION or host["schema_version"] != SWIFT_SCHEMA_VERSION:
+        raise ContractError(f"Swift schema must use independent version {SWIFT_SCHEMA_VERSION}")
     tables = actual["tables"]
     source = (root / host["records_source"]).read_text(encoding="utf-8")
     for record_name, mapping in host["records"].items():
@@ -741,7 +744,7 @@ def main() -> int:
         except (ContractError, OSError) as exc:
             print(f"portable persistence Swift contract: FAIL: {exc}")
             return 1
-        print(f"portable persistence Swift contract: OK v2 schema=4 tables={len(swift_tables)}")
+        print(f"portable persistence Swift contract: OK v2 schema={SWIFT_SCHEMA_VERSION} tables={len(swift_tables)}")
         return 0
     if args.fingerprint_stdin:
         try:

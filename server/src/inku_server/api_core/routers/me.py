@@ -287,7 +287,8 @@ def api_auth_me_profile(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
-        if _unique_conflict(e): raise HTTPException(status_code=409, detail="account already exists") from e
+        if _unique_conflict(e):
+            raise HTTPException(status_code=409, detail="account already exists") from e
         raise _unexpected_http_error("profile update", 500) from e
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("profile update", 500) from e

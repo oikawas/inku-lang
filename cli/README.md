@@ -442,10 +442,11 @@ options:
                         HTTP timeout in seconds (default: 600)
   --file FILE, -f FILE  read the description from a UTF-8 file, or '-'
   --image PATH          draw from this image instead of a description, as the
-                        web image tab does: the Vision model writes the DDL in
-                        Japanese and the paper follows the image unless
-                        --canvas-aspect names one; the server holds the image
-                        in memory only and never saves it
+                        web image tab does: the DDL language follows
+                        --instruction-lang (auto uses --ui-lang or Japanese),
+                        and the paper follows the image unless --canvas-aspect
+                        names one; the server holds the image in memory only
+                        and never saves it
   --provenance TEXT     with --image: the source note of the image (where it
                         came from), kept with the work apart from the
                         description and never sent to the models

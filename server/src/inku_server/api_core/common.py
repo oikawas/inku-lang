@@ -6,7 +6,7 @@ import importlib.metadata
 import os
 from pathlib import Path
 from fastapi import HTTPException
-from ..build_info import build_number as _build_number
+from ..build_info import build_number as _build_number  # noqa: F401 - api.py and the pipeline modules import it from here
 from ..languages import SUPPORTED_INSTRUCTION_LANGS, normalize_instruction_lang, resolve_instruction_lang
 from ..model_settings import model_is_offered, provider_for_model
 from ..verified_model_catalog import core_catalog

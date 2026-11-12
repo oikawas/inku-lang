@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import ModelMetaCard from '$lib/components/ModelMetaCard.svelte';
 	import PaintButton from '$lib/components/PaintButton.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -66,14 +65,10 @@
 			{@const checked = modelInspection.selectedModels.includes(choice.id)}
 			{@const failed = !!modelInspection.failedModels[choice.id]}
 			{@const full = !checked && modelInspection.selectedModels.length >= 4}
-			{@const choiceExtra = [blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join(' · ')}
-			<div class="model-metadata-hover">
-				<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || full}>
-					<input type="checkbox" checked={checked} disabled={busy || blocked || full} onchange={() => modelInspection.toggleModel(choice.id)} />
-					<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
-				</label>
-				<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} purpose="llm" />
-			</div>
+			<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || full}>
+				<input type="checkbox" checked={checked} disabled={busy || blocked || full} onchange={() => modelInspection.toggleModel(choice.id)} />
+				<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
+			</label>
 		{/each}
 	</div>
 	<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspection.selectedModels.length, 4)}</div>

@@ -490,7 +490,6 @@ export interface LangPack {
 	modelPickerEmpty: string;
 	modelPickerNotInList: string;
 	modelNotRecommended: string;
-	modelNotRecommendedHint: string;
 	modelButton: string;
 	colorCatalogButton: string;
 	instructionLangLabel: string;
@@ -631,7 +630,6 @@ export interface LangPack {
 	comparisonPrev: string;
 	comparisonCurrent: string;
 	modelCompareButton: string;
-	modelCompareTargetDisabledTooltip: string;
 	modelCompareSubtitle: string;
 	modelCompareModelSelectLabel: string;
 	modelCompareSelectPrompt: string;
@@ -1165,7 +1163,6 @@ export interface LangPack {
 	settingsModelAddServiceButton: string;
 	settingsModelEditServiceTitle: string;
 	settingsModelServiceId: string;
-	settingsModelServiceIdHelp: string;
 	settingsModelServiceName: string;
 	settingsModelServiceKind: string;
 	settingsModelRequiresApiKey: string;
@@ -1201,11 +1198,8 @@ export interface LangPack {
 	settingsModelConnectionDetails: string;
 	settingsModelRateLimits: string;
 	settingsModelRpm: string;
-	settingsModelRpmHelp: string;
 	settingsModelTpm: string;
-	settingsModelTpmHelp: string;
 	settingsModelRpd: string;
-	settingsModelRpdHelp: string;
 	settingsModelSelectVisible: string;
 	settingsModelClearVisible: string;
 	settingsModelFilterLabel: string;

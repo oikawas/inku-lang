@@ -1,12 +1,11 @@
 // Run with: node --import ./scripts/ts-extensionless-resolve.mjs --test src/lib/modelMeta.test.ts
 //
-// What the model card prints from the measured reference numbers and the
-// purposes (the author's tooltip request, 2026-10-13). The levels have their own
-// check in scripts/model-recommendation-check.mjs.
+// What the model lists print from the measured reference numbers and the labels.
+// The levels have their own check in scripts/model-recommendation-check.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, modelPurposeBadges, modelSpeed, modelStatusLabel, modelStatusParts, purposeUnsupported, setModelLabelTable, sortModels } from './modelMeta';
+import { isModelUnselectable, modelFold, modelFoldTitle, modelFolds, modelSpeed, modelStatusLabel, modelStatusParts, purposeUnsupported, setModelLabelTable, sortModels } from './modelMeta';
 import type { ModelLabel, ModelOption } from './models';
 
 // The Server's model catalog and the cases every client checks itself against (2026-10-13).
@@ -24,18 +23,8 @@ function coreModel<T extends ModelOption>(model: T): T {
 }
 setModelLabelTable(catalog.labels);
 
-test('both purposes are listed, and the one a model cannot be chosen for is marked', () => {
-	assert.deepEqual(
-		modelPurposeBadges({ id: 'x', label: 'x', purposes: ['vision'] }).map(({ label, selectable }) => [label, selectable]),
-		[['LLM', false], ['Vision', true]]
-	);
-	// A model whose purposes are not stated is an LLM, as everywhere else.
-	assert.deepEqual(modelPurposeBadges({ id: 'x', label: 'x' }).map((badge) => badge.selectable), [true, false]);
-});
-
 test('a purpose measured without a response is not recommended, and a model with neither can still be chosen', () => {
 	const drawsNothing = coreModel({ id: 'x', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], labels: [], fold: null });
-	assert.deepEqual(modelPurposeBadges(drawsNothing).map((badge) => badge.selectable), [false, true]);
 	assert.equal(isModelUnselectable(drawsNothing), false);
 	assert.deepEqual([purposeUnsupported(drawsNothing, 'llm'), purposeUnsupported(drawsNothing, 'vision')], [true, false]);
 	// Chosen against the measurement (2026-10-26): publishable, its label still in the warning colour.
@@ -85,13 +74,6 @@ test('the server selection decides whether the model can be chosen', () => {
 	assert.equal(isModelUnselectable(coreModel({ id: 'paid', label: 'x', requires_subscription: true })), true);
 	assert.equal(isModelUnselectable(coreModel({ id: 'free', label: 'x' })), false);
 	assert.equal(modelFold({ id: 'paid', label: 'x', requires_subscription: true }), null);
-});
-
-test('cost prints per drawing and per image, and a free model costs $0 rather than nothing', () => {
-	const model = { id: 'x', label: 'x', cost_usd_llm: 0.007718, cost_usd_vision: 0 };
-	assert.equal(modelCost(model, true), 'LLM $0.0077（描画1回） / Vision $0（画像1枚）');
-	assert.equal(modelCost(model, false), 'LLM $0.0077 per drawing / Vision $0 per picture');
-	assert.equal(modelCost({ id: 'x', label: 'x' }, true), '—');
 });
 
 test('measured means read as a reference and replace the old label; an unmeasured model keeps it', () => {

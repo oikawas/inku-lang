@@ -535,8 +535,8 @@ test("T-22  a late listing answer cannot put its page back over a newer one", ()
 // ── T-23 ────────────────────────────────────────────────────────────────────
 test('T-23  and neither can a late trash answer', () => {
 	const body = bodyOf(BROWSING, 'async fetchTrashPage(): Promise<void> {');
-	const assignAt = body.indexOf('this.trashItems = data.items');
-	assert.ok(assignAt > 0, 'the trash list is no longer written where this gate is looking');
+	const assignAt = body.indexOf('this.trashTotal = data.total');
+	assert.ok(assignAt > 0, 'the trash count is no longer written where this gate is looking');
 	const lastAwait = body.lastIndexOf('await ', assignAt);
 	assert.ok(lastAwait > 0);
 	const guards = [...body.matchAll(/if \(requestId !== this\.trashRequest\) return/g)].map((m) => m.index!);

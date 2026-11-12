@@ -7,7 +7,10 @@ struct CreationWorkInfoView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.inkuPhoneLayout) private var phone
+    @Environment(\.inkuPhoneLayout) private var phoneLayout
+    /// iPad (ios-app 7c fixes): a panel too narrow for the 190-point label column stacks labels as on an iPhone.
+    @State private var narrowPanel = false
+    private var phone: Bool { phoneLayout || narrowPanel }
     private let work: SavedWork?
     @State private var information: SavedGenerationInformation?
     @State private var loading = true
@@ -94,6 +97,7 @@ struct CreationWorkInfoView: View {
         .padding(onClose == nil ? 20 : 16)
         .inkuWideFrame(minWidth: onClose == nil ? 660 : nil, idealWidth: onClose == nil ? 760 : nil,
                        minHeight: onClose == nil ? 520 : nil, idealHeight: onClose == nil ? 740 : nil)
+        .inkuStacksLabelsWhenNarrow(below: 560, narrow: $narrowPanel)
         .task(id: work?.id) {
             copied = nil; copyToken = UUID()
             svgWeight = work.map { SavedSVGWeight($0.svg) }

@@ -6,7 +6,9 @@ struct ReadDrawInfoView: View {
     let record: ExactJSON
     let display: DisplaySettings
     var pluginOffers: [String] = []
-    @Environment(\.inkuPhoneLayout) private var phone
+    @Environment(\.inkuPhoneLayout) private var phoneLayout
+    @Environment(\.inkuStacksLabels) private var stacksLabels
+    private var phone: Bool { phoneLayout || stacksLabels }
     private var ja: Bool { display.preferences.language != "en" }
     private func l(_ jaText: String, _ en: String) -> String { ja ? jaText : en }
     private var sep: String { ja ? "、" : ", " }

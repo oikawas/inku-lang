@@ -292,11 +292,6 @@
 	}
 	.compare-action-wrap .tooltip-wrap { width: 100%; }
 	.compare-action-wrap .paint-btn { margin-top: 0; }
-	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
-	.model-metadata-hover > .model-choice { width: 100%; }
-	.model-metadata-hover:hover .model-hover-card,
-	.model-metadata-hover:focus-within .model-hover-card { display: block; }
-
 	.model-choice-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -310,6 +305,7 @@
 		grid-template-columns: auto minmax(0, 1fr);
 		gap: 8px;
 		align-items: start;
+		min-width: 0;
 		padding: 8px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);

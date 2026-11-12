@@ -16,6 +16,9 @@
 // no longer Build1162's. Markers now point at the components that draw the tooltip (LibraryPreviewPanel,
 // LineageDetailsView, the shared metaField), not at unused strings left in LibraryView. The check also counts the
 // Web's sites per component, so a tooltip added to the Web fails it until the table has a row.
+// 2026-11-12: the model choice's floats are gone (author, Web product 62fead382): the not-recommended card's and
+// the chosen model's tooltips (ModelSelectionSettings) and the no-response purpose tooltip
+// (ModelAdministrationSettings noResponseTitle): 186 sites.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -201,14 +204,11 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "RefinementCandidateGrid.svelte:35", swift: "Views/RefinementDialog.swift", marker: "serverKey: \"tooltipRefineDiscardAndClose\""),
     .init(web: "RefinementCandidateGrid.svelte:40", swift: "Views/RefinementDialog.swift", marker: "serverKey: \"tooltipVariationGridSaveSelected\""),
     .init(web: "RefinementCandidateGrid.svelte:70", swift: "Views/RefinementDialog.swift", marker: "tooltip(\"保存済み\")"),
-    .init(web: "RefinementModelCompareView.svelte:56", swift: "Views/ComparisonView.swift", marker: "serverKey: \"tooltipModelCompare\""),
+    .init(web: "RefinementModelCompareView.svelte:55", swift: "Views/ComparisonView.swift", marker: "serverKey: \"tooltipModelCompare\""),
     .init(web: "Ddl3DHost.svelte:62", swift: "Views/Ddl3DViews.swift", marker: "title: display.webCopy(\"ddl3dTitle\""),
     .init(web: "Ddl3DModeSwitch.svelte:8", swift: "Views/Ddl3DViews.swift", marker: "serverKey: \"ddl3dReturn\") : display.tooltip(\"3D表示（実験）\", serverKey: \"ddl3dTitle\")"),
     .init(web: "DatabaseAdministrationSettings.svelte:202", swift: "Views/SettingsView.swift", marker: "serverKey: \"settingsDbBackupEstimatedDiskHint\""),
-    .init(web: "ModelAdministrationSettings.svelte:643", swift: "Views/ChatGPTModelsSheet.swift", marker: "inkuTooltip(locked ? note : \"\")"),
-    .init(web: "ModelAdministrationSettings.svelte:686", swift: "Views/ModelSettingsDialogs.swift", marker: "serverKey: \"settingsModelFetchDisabledWhileDirty\""),
-    .init(web: "ModelSelectionSettings.svelte:92", swift: "Views/BatchModelPickerView.swift", marker: "serverKey: \"modelNotRecommendedHint\""),
-    .init(web: "ModelSelectionSettings.svelte:120", swift: "Views/BatchModelPickerView.swift", marker: "inkuTooltip(model.display.tooltipValue(selectedSummaryText))"),
+    .init(web: "ModelAdministrationSettings.svelte:673", swift: "Views/ModelSettingsDialogs.swift", marker: "serverKey: \"settingsModelFetchDisabledWhileDirty\""),
     .init(web: "RenderLimitsSettings.svelte:129", swift: "Views/OperationalLimitsView.swift", marker: "showTooltips ? tip : \"\""),
     .init(web: "+page.svelte:2930", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipDdlNew\""),
     .init(web: "+page.svelte:2984", swift: "Views/CreationControls.swift", marker: "serverKey: \"tooltipSketchToggle\""),

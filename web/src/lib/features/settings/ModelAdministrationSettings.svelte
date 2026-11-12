@@ -319,12 +319,6 @@
 		return modelPickerProvider?.id === 'chatgpt' && purposeUnsupported(model, purpose);
 	}
 
-	function noResponseTitle(locked: boolean): string {
-		if (locked) return t().code === 'ja' ? '計測で応答が無かったため選べません' : 'Not selectable: no response when measured';
-		return t().code === 'ja'
-			? '計測で応答が無かった用途です。選べますが、システムとしては推奨しません'
-			: 'No response when measured for this purpose. It can be chosen, but the system does not recommend it';
-	}
 
 	function serviceIdLabel(provider: Provider): string {
 		return `${t().settingsModelServiceId}: ${provider}`;
@@ -487,9 +481,8 @@
 							<div class="model-connection-fields model-rate-fields">
 								{#each rateFields as field (field)}
 									{@const label = field === 'rpm' ? t().settingsModelRpm : field === 'tpm' ? t().settingsModelTpm : t().settingsModelRpd}
-									{@const help = field === 'rpm' ? t().settingsModelRpmHelp : field === 'tpm' ? t().settingsModelTpmHelp : t().settingsModelRpdHelp}
 									<label>
-										<span class="model-add-label-with-help">{label}<button type="button" class="model-key-info" aria-label={help}>i<span class="model-key-tooltip" role="tooltip">{help}</span></button></span>
+										<span>{label}</span>
 										<input type="number" min="0" max="1000000000" step="1" value={rateValue(activeProvider.id, activeProviderSetting, field)} oninput={(e) => setRateDraft(activeProvider!.id, field, e.currentTarget.value)} />
 									</label>
 								{/each}
@@ -525,13 +518,7 @@
 		<div class="add-service-body">
 			<div class="model-add-grid">
 				<label>
-					<span class="model-add-label-with-help">
-						{t().settingsModelServiceId}
-						<button type="button" class="model-key-info model-service-id-info" aria-label={t().settingsModelServiceIdHelp}>
-							i
-							<span class="model-key-tooltip model-service-id-tooltip">{t().settingsModelServiceIdHelp}</span>
-						</button>
-					</span>
+					<span>{t().settingsModelServiceId}</span>
 						<input bind:value={newProviderId} placeholder="my-openai" data-dialog-focus />
 				</label>
 				<label>
@@ -640,7 +627,7 @@
 								</label>
 								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
 									{#each ['llm', 'vision'] as const as purpose (purpose)}
-										<button type="button" class:active={modelPurposeSelected(model.id, purpose)} class:not-recommended={purposeUnsupported(model, purpose)} aria-pressed={modelPurposeSelected(model.id, purpose)} disabled={purposeLocked(model, purpose)} title={purposeUnsupported(model, purpose) ? noResponseTitle(purposeLocked(model, purpose)) : undefined} onclick={() => toggleModelPurpose(model.id, purpose)}>{purpose === 'llm' ? 'LLM' : 'Vision'}</button>
+										<button type="button" class:active={modelPurposeSelected(model.id, purpose)} class:not-recommended={purposeUnsupported(model, purpose)} aria-pressed={modelPurposeSelected(model.id, purpose)} disabled={purposeLocked(model, purpose)} onclick={() => toggleModelPurpose(model.id, purpose)}>{purpose === 'llm' ? 'LLM' : 'Vision'}</button>
 									{/each}
 								</div>
 							</div>

@@ -83,7 +83,7 @@ test('T-1  one canonical palette supplies distinct accessible tooltip themes', (
 		assert.deepEqual(otherOwners, [], `${token} has another owner`);
 	}
 
-	for (const relativePath of ['components/Tooltip.svelte', 'components/ModelMetaCard.svelte', 'components/ModelCardPicker.svelte']) {
+	for (const relativePath of ['components/Tooltip.svelte']) {
 		const source = read(join(LIB_DIR, relativePath));
 		assert.match(source, /var\(--tooltip-bg\)/);
 		assert.match(source, /var\(--tooltip-fg\)/);

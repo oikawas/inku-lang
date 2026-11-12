@@ -182,7 +182,8 @@ struct ChatGPTModelsSheet: View {
     private func purposeButton(_ label: String, purpose: String, item: ProviderModelSettings) -> some View {
         let on = purposes(of: item.id).contains(purpose)
         let locked = (item.unsupportedPurposes ?? []).contains(purpose)
-        // Web ModelAdministrationSettings.svelte `noResponseTitle(true)`: a ChatGPT purpose measured without a response.
+        // A ChatGPT purpose measured without a response is disabled; its tooltip is gone with the model choice's floats
+        // (author 2026-11-12, Web `noResponseTitle` removed). VoiceOver still reads the reason.
         let note = display.preferences.language == "en" ? "Not selectable: no response when measured" : "計測で応答が無かったため選べません"
         return Button(label) {
             var next = purposes(of: item.id)
@@ -196,9 +197,9 @@ struct ChatGPTModelsSheet: View {
             .foregroundStyle(on ? Color.accentColor : Color.secondary)
             .background(on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
             .overlay(Capsule().stroke(on ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2)))
-            .inkuTooltip(locked ? note : "")
             .accessibilityLabel(item.label + " " + label)
             .accessibilityValue(display.localized(on ? "選択中" : "未選択"))
+            .accessibilityHint(locked ? note : "")
     }
 
     private var footer: some View {

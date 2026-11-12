@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import ModelMetaCard from '$lib/components/ModelMetaCard.svelte';
 	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import './model-selection-settings.css';
@@ -84,12 +83,10 @@
 								{#each (provider.id === 'chatgpt' ? provider.models : sortModels(provider.models, recommendationPurpose, recommendationStage)) as model (model.id)}
 								<button
 									type="button"
-									class="model-metadata-hover"
 									class:selected={modelSelected(provider.id, model.id)}
 									class:eol={model.eol}
 									class:unselectable={isModelUnselectable(model)}
 									class:not-recommended={purposeUnsupported(model, recommendationPurpose)}
-									title={purposeUnsupported(model, recommendationPurpose) ? t().modelNotRecommendedHint : undefined}
 									disabled={isModelUnselectable(model)}
 									aria-pressed={modelSelected(provider.id, model.id)}
 									onclick={() => selectGenerationModel(provider.id, model.id)}
@@ -101,7 +98,6 @@
 									{#if purposeUnsupported(model, recommendationPurpose)}<span class="not-recommended-note">{t().modelNotRecommended}</span>{/if}
 									{#if modelStatusLabel(model, isJapanese)}<span class="model-label-mark">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:eol-mark={part.blocking}>{part.text}</span>{/each}</span>{/if}
 									{#if model.notes}<span>{model.notes}</span>{/if}
-									<ModelMetaCard {model} {isJapanese} purpose={recommendationPurpose} />
 								</button>
 							{/each}
 							</div>
@@ -117,7 +113,7 @@
 			{/if}
 	</div>
 		<div class="catalog-modal-foot">
-			<span class="model-selection-current" title={t().modelSelectionSelected(selectedName)}>{t().modelSelectionSelected(selectedName)}</span>
+			<span class="model-selection-current">{t().modelSelectionSelected(selectedName)}</span>
 			<button class="ghost-btn" onclick={onCancel}>{t().confirmCancel}</button>
 			<button class="ghost-btn primary-inline" onclick={onConfirm}>{t().colorCatalogConfirm}</button>
 		</div>

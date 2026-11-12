@@ -2,9 +2,7 @@
 	import { getContext, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-	import { modelRecommendation, modelRecommendationStars, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose } from '$lib/modelMeta';
-	import { openFloatingCard } from '$lib/floatingCard';
-	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
+	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose } from '$lib/modelMeta';
 
 	type Props = {
 		label: string;
@@ -72,14 +70,6 @@
 			first.focus();
 		}
 	}
-
-	// Measured once shown rather than guessed: a guessed height let a taller card
-	// run past the bottom of the window.
-	function positionMeta(event: Event) {
-		const btn = event.currentTarget as HTMLElement;
-		const meta = btn.querySelector('.metadata') as HTMLElement | null;
-		if (meta) openFloatingCard(meta, btn);
-	}
 </script>
 
 <div class="context-model-picker">
@@ -101,21 +91,13 @@
 			{#each configuredGroups as group (group.id)}
 				<section><h3>{group.id === 'chatgpt' ? t().chatgptPlanLabel : group.label}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
-						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} class:not-recommended={purposeUnsupported(model, purpose)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
+						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} class:not-recommended={purposeUnsupported(model, purpose)} disabled={isModelUnselectable(model)} onclick={() => choose(group.id, model.id)}>
 							<div class="model-button-heading">
 								<strong>{model.label}</strong>
 								<span class="model-recommendation" aria-label={`${t().settingsModelRecommendationFields[purpose === 'vision' ? 'recommendation_vision' : 'recommendation_llm']} ${modelRecommendation(model, purpose)}`}>{modelRecommendationStars(model, purpose)}</span>
 							</div>
 							{#if purposeUnsupported(model, purpose)}<small class="not-recommended-note">{t().modelNotRecommended}</small>{/if}
 							{#if modelStatusLabel(model, isJapanese)}<small class="model-label-mark">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:eol-mark={part.blocking}>{part.text}</span>{/each}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
-							<span class="metadata" role="tooltip">
-								{#if modelStatusLabel(model, isJapanese)}<span><b>状態 / Status</b><span class="status-muted">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:status-warning={part.blocking}>{part.text}</span>{/each}</span></span>{/if}
-								<span><b>用途 / Use</b><ModelPurposeBadges {model} {isJapanese} /></span>
-								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model, purpose)}</span>
-								<span><b>概算コスト / Est. cost</b>{modelCost(model, isJapanese)}</span>
-								<span><b>速度 / Speed</b>{modelSpeed(model, isJapanese)}</span>
-								<span><b>評価 / Comment</b>{modelComment(model, isJapanese)}</span>
-							</span>
 						</button>
 					{/each}
 				</div></section>
@@ -135,9 +117,6 @@
 	.model-grid > button > small .eol-mark { color: var(--danger); font-weight: 600; }
 	/* A label that leaves the model selectable (older model, not measured) is not a warning. */
 	.model-label-mark { color: var(--fg3); }
-	/* The hover card colours the labels the same way, in the tooltip's own palette. */
-	.metadata .status-warning { color: var(--danger); font-weight: 600; }
-	.metadata .status-muted { color: var(--tooltip-muted); }
 	.context-model-picker { display: grid; gap: 4px; min-width: 0; }
 	.field-label { color: var(--fg2); font-size: var(--ui-font-size-11); }
 	.picker-launch { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); text-align: left; cursor: pointer; font: inherit; }
@@ -172,9 +151,5 @@
 	.model-button-heading strong { flex: 1 1 auto; min-width: 0; font-size: var(--ui-font-size-12); font-weight: 500; overflow-wrap: anywhere; }
 	.model-recommendation { flex: 0 0 auto; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	.model-grid > button > small { color: var(--fg3); font-size: var(--ui-font-size-10); }
-	.metadata { display: none; position: fixed; left: 0; top: 0; z-index: 1610; width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--tooltip-border); border-radius: var(--r); background: var(--tooltip-bg); box-shadow: var(--tooltip-shadow); pointer-events: none; }
-	.model-grid > button:hover .metadata, .model-grid > button:focus-visible .metadata { display: grid; gap: 6px; }
-	.metadata > span { display: grid; gap: 2px; color: var(--tooltip-fg); font-size: var(--ui-font-size-11); line-height: 1.4; }
-	.metadata b { color: var(--tooltip-muted); font-size: var(--ui-font-size-9); font-weight: 500; letter-spacing: .04em; text-transform: uppercase; }
 	@media (max-width: 640px) { .picker-dialog { inset: 4vh 3vw; } .model-grid { grid-template-columns: 1fr; } }
 </style>

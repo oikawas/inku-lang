@@ -1,24 +1,11 @@
-// Single source for formatting model evaluation metadata (purposes,
-// recommendation, cost, speed, comment). All model-picker surfaces read from here so
-// the values and formatting stay consistent. The underlying data lives on
-// ModelOption (server model catalog, editable via settings).
+// Single source for formatting model evaluation metadata (recommendation, speed,
+// labels). All model-picker surfaces read from here so the values and formatting
+// stay consistent. The underlying data lives on ModelOption (server model catalog,
+// editable via settings). The pickers show no floating card (the author,
+// 2026-11-12: every float shown while choosing a model is abolished).
 import type { ModelLabel, ModelOption } from './models';
 
 export type ModelPurpose = 'llm' | 'vision';
-
-// Both purposes are always listed, so the card says what a model cannot be chosen
-// for as well as what it can (the author, 2026-10-13). Whether it can is the
-// model's purposes, which the measurements set: a model whose drawings failed is
-// not offered as an LLM, and one whose Vision answers could not be confirmed is
-// not offered for Vision.
-export function modelPurposeBadges(model: ModelOption): { purpose: ModelPurpose; label: string; selectable: boolean }[] {
-	const purposes = model.purposes ?? ['llm'];
-	return (['llm', 'vision'] as const).map((purpose) => ({
-		purpose,
-		label: purpose === 'vision' ? 'Vision' : 'LLM',
-		selectable: purposes.includes(purpose) && !purposeUnsupported(model, purpose)
-	}));
-}
 
 // A purpose the benchmark found the model does not answer (no drawing, or no
 // Vision answer). It can be chosen, but the system does not recommend it: every
@@ -72,31 +59,6 @@ export function modelRecommendation(
 	return tier > 0 ? `${modelRecommendationStars(model, purpose, stage)} (${tier}/3)` : '—';
 }
 
-/**
- * The two stage rows for the hover card, or null when one row is the honest shape.
- *
- * A model measured end to end has one number and both stages read it, so splitting
- * it would print the same stars twice and imply a measurement nobody took. Only a
- * model carrying at least one stage key is split. Vision is never split — the stage
- * keys narrow the LLM level and say nothing about reading an image.
- *
- * Returning strings rather than levels keeps the card free of formatting decisions,
- * and keeps this decidable without rendering a component.
- */
-export function modelStageRecommendations(
-	model: ModelOption,
-	purpose?: ModelPurpose
-): { stage1: string; stage2: string } | null {
-	if (purpose === 'vision') return null;
-	const staged =
-		typeof model.recommendation_stage1 === 'number' || typeof model.recommendation_stage2 === 'number';
-	if (!staged) return null;
-	return {
-		stage1: modelRecommendation(model, 'llm', 'stage1'),
-		stage2: modelRecommendation(model, 'llm', 'stage2')
-	};
-}
-
 // The Server returns a core-generated key for each purpose and stage.
 export function sortModels(models: ModelOption[], purpose?: ModelPurpose, stage?: ModelStage): ModelOption[] {
 	return [...models].sort((a, b) => {
@@ -129,19 +91,6 @@ export function modelSpeed(model: ModelOption, isJapanese: boolean): string {
 		isJapanese ? `平均 ${seconds(value)}秒` : `mean ${seconds(value)} s`);
 	if (means) return isJapanese ? `${means}（参考値）` : `${means} (reference)`;
 	return model.speed_label || '—';
-}
-
-// Approximate USD for one drawing (every generation request it made) and for one
-// Vision image. A free model costs $0, which is shown rather than left out.
-export function modelCost(model: ModelOption, isJapanese: boolean): string {
-	const usd = (value: number) => (value === 0 ? '$0' : value < 0.0001 ? '<$0.0001' : `$${Number(value.toPrecision(2))}`);
-	const unit = (purpose: ModelPurpose) =>
-		purpose === 'llm' ? (isJapanese ? '（描画1回）' : ' per drawing') : (isJapanese ? '（画像1枚）' : ' per picture');
-	return perPurpose(model.cost_usd_llm, model.cost_usd_vision, (value, purpose) => `${usd(value)}${unit(purpose)}`) ?? '—';
-}
-
-export function modelComment(model: ModelOption, isJapanese: boolean): string {
-	return isJapanese ? (model.comment_ja || model.comment_en || '—') : (model.comment_en || model.comment_ja || '—');
 }
 
 // The label table of the core model catalog (the author,

@@ -693,6 +693,10 @@ Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal 
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
 
+## v2.15.332 (2026-11-12 / Build 1408)
+
+- Server and Web: Keep the behavior of v2.15.331 and finalize the distribution version from current main.
+
 ## v2.15.331 (2026-11-12 / Build 1407)
 
 - Web: The screens that choose a model show nothing floating any more (the author's instruction). The model selection dialog, the model selection in settings and refinement's Change model no longer show the evaluation card (purposes, recommendation, cost, speed, comment, status) on hover or focus, nor the tooltips of a not-recommended button and of the selected model's name. Model administration no longer shows the tooltip of a purpose button measured without a response, nor the "i" explanations of the rate limits (RPM, TPM, RPD) and of the service ID. A model is shown by the name, stars, status labels, not-recommended note and red frame inside its button; the cost, measured means and comments can be read in model administration's edit fields. A long selected model name in settings wraps instead of being cut short.

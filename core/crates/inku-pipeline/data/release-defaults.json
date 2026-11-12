@@ -1,6 +1,6 @@
 {
   "schema": "inku.release-draw-defaults.v1",
-  "reviewed_for_version": "",
+  "reviewed_for_version": "v2.15.332",
   "tabs": {
     "describe": {
       "route": "read_and_draw",

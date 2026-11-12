@@ -22,6 +22,7 @@ struct BatchPanelView: View {
     @State private var editorHeight: CGFloat?
     @State private var resizeStartHeight: CGFloat?
     @Environment(\.inkuWindowSize) private var windowSize
+    @Environment(\.inkuPhoneLayout) private var phone
 
     private var resultsExpanded: Binding<Bool> { kept(\.batchResultsExpanded, $localResultsExpanded) }
     private var issuesExpanded: Binding<Bool> { kept(\.batchIssuesExpanded, $localIssuesExpanded) }
@@ -179,18 +180,52 @@ struct BatchPanelView: View {
         }
     }
 
-    private var inputHistory: some View {
-        Button { historyOpen.toggle() } label: {
-            HStack(spacing: 6) {
-                Text(selectedHistoryPrompt.isEmpty ? model.display.webCopy("batchHistoryPlaceholder", "履歴から選択") : historyLabel(selectedHistoryPrompt))
-                    .lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.down").inkuFont(11)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8).padding(.vertical, 6)
-            .contentShape(Rectangle())
+    private var historyFieldLabel: some View {
+        HStack(spacing: 6) {
+            Text(selectedHistoryPrompt.isEmpty ? model.display.webCopy("batchHistoryPlaceholder", "履歴から選択") : historyLabel(selectedHistoryPrompt))
+                .lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.down").inkuFont(11)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .contentShape(Rectangle())
+    }
+
+    private func restoreHistory(_ text: String) {
+        guard !controlsDisabled else { return }
+        selectedHistoryPrompt = text
+        automation.restoreBatchInput(text)
+        historyOpen = false
+    }
+
+    @ViewBuilder private var inputHistory: some View {
+        if phone { phoneInputHistory } else { wideInputHistory }
+    }
+
+    /// iPhone (author 2026-11-12, "the menu is broken"): the system menu at the field, one item per history entry,
+    /// the chosen one checked. The Mac's popover became a half-height sheet holding a list a few rows tall.
+    private var phoneInputHistory: some View {
+        Menu {
+            ForEach(Array(automation.batchPromptHistory.enumerated()), id: \.offset) { _, text in
+                Button { restoreHistory(text) } label: {
+                    if selectedHistoryPrompt == text { Label(historyLabel(text), systemImage: "checkmark") }
+                    else { Text(historyLabel(text)) }
+                }
+            }
+        } label: { historyFieldLabel }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+        .background(InkuColor.bg2, in: RoundedRectangle(cornerRadius: 4))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+        .inkuFont(12)
+        .disabled(controlsDisabled || automation.batchPromptHistory.isEmpty)
+        .accessibilityLabel(model.display.webCopy("batchHistoryLabel", "バッチ記述履歴"))
+        .accessibilityValue(selectedHistoryPrompt.isEmpty ? model.display.localized("履歴から選択") : historyLabel(selectedHistoryPrompt))
+    }
+
+    private var wideInputHistory: some View {
+        Button { historyOpen.toggle() } label: { historyFieldLabel }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
         .background(InkuColor.bg2, in: RoundedRectangle(cornerRadius: 4))
@@ -205,12 +240,7 @@ struct BatchPanelView: View {
                 // At most 50 rows: eager layout also keeps macOS accessibility scroll actions stable.
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(automation.batchPromptHistory.enumerated()), id: \.offset) { _, text in
-                        Button {
-                            guard !controlsDisabled else { return }
-                            selectedHistoryPrompt = text
-                            automation.restoreBatchInput(text)
-                            historyOpen = false
-                        } label: {
+                        Button { restoreHistory(text) } label: {
                             Text(historyLabel(text)).inkuFont(13).lineLimit(1).truncationMode(.tail)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 10).padding(.vertical, 7)

@@ -98,10 +98,12 @@ import InkuHost
                 Button { pickerTab = tab } label: {
                     HStack {
                         Text(imageTab(tab) ? copy("drawDefaultsVision", "画像を読むモデル") : copy("drawDefaultsModel", "描画モデル"))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.primary).fixedSize()
                         Spacer()
+                        // Two lines: at the iPhone settings' 17-point text a service and model name no longer fit one
+                        // (2026-11-12, "NVIDIA NIM / google/gemma…").
                         Text(modelName(shownModel(tab)))
-                            .foregroundStyle(.secondary).lineLimit(1)
+                            .foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.trailing)
                         Image(systemName: "chevron.right").inkuFont(12).foregroundStyle(.tertiary)
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain)

@@ -338,7 +338,7 @@ requires-dist = [{ name = "pillow", specifier = ">=12.3.0" }]
 
 [[package]]
 name = "inku-server"
-version = "2.15.312"
+version = "2.15.332"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

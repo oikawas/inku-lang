@@ -272,6 +272,10 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
             {"permission_group_labels", "history_strip_fields"}
             if name == "UserAccountItem" else set()
         )
+        # Password changes now require the current password except for an
+        # administrator changing another account.
+        if name == "UserAccountUpdateBody":
+            expected_arrivals.add("current_password")
         assert new_props - old_props == expected_arrivals, name
 
 

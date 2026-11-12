@@ -276,6 +276,42 @@ private struct InkuPhoneSlidesSideways: ViewModifier {
     }
 }
 
+private struct InkuStacksLabelsKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// Whether label-value rows put the label above the value although the window is not an iPhone: an iPad panel
+    /// narrower than the label column allows (ios-app 7c fixes). Never set on the Mac.
+    var inkuStacksLabels: Bool {
+        get { self[InkuStacksLabelsKey.self] }
+        set { self[InkuStacksLabelsKey.self] = newValue }
+    }
+}
+
+private struct InkuStacksLabelsWhenNarrow: ViewModifier {
+    let width: CGFloat
+    @Binding var narrow: Bool
+    func body(content: Content) -> some View {
+        content.environment(\.inkuStacksLabels, narrow)
+            .onGeometryChange(for: Bool.self) { $0.size.width < width } action: { narrow = $0 }
+    }
+}
+
+extension View {
+    /// iOS: while this view is narrower than `width`, `narrow` is true and the label-value rows inside stack their
+    /// labels (the iPad's generation information, where 190-point labels left about 100 points for the values).
+    /// The view that owns `narrow` reads it for its own rows. The Mac stays as it is.
+    @ViewBuilder
+    func inkuStacksLabelsWhenNarrow(below width: CGFloat, narrow: Binding<Bool>) -> some View {
+        #if os(iOS)
+        modifier(InkuStacksLabelsWhenNarrow(width: width, narrow: narrow))
+        #else
+        self
+        #endif
+    }
+}
+
 /// A label and its value: side by side on the Mac and the iPad, the label above the value on an iPhone
 /// (ios-app step 7c, the generation information's 190-point label column).
 func inkuLabelValueLayout(phone: Bool, alignment: VerticalAlignment = .firstTextBaseline) -> AnyLayout {

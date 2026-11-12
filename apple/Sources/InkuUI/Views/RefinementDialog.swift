@@ -40,13 +40,15 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                             }
                         }
                         if phone {
-                            // iPhone (ios-app step 7c): the target and its controls above, the options below at
-                            // the screen's height; the whole slides up and down.
+                            // iPhone (ios-app step 7c): the target and its controls above, the options below; the
+                            // whole slides up and down as one. The options take their own height and do not slide
+                            // by themselves (7c fixes: a swipe over the target moved nothing while the options
+                            // slid inside a box of the screen's height).
                             VStack(alignment: .leading, spacing: 12) {
                                 RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
                                     .frame(maxWidth: 280, alignment: .leading)
                                 controls()
-                                options().frame(maxWidth: .infinity).frame(height: max(420, geometry.size.height - 32))
+                                options().frame(maxWidth: .infinity)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             HStack(alignment: .top, spacing: 14) {
@@ -126,15 +128,50 @@ struct RefinementOptionsGrid: View {
     private var shown: [RefinementOption] { options.filter { previewID == nil || $0.id == previewID } }
 
     var body: some View {
+        if phone { phoneBody } else { wideBody }
+    }
+
+    @ViewBuilder private var header: some View {
+        if !status.isEmpty { Text(model.display.message(status)).inkuFont(12).foregroundStyle(.secondary) }
+        if !options.isEmpty {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { actions }.frame(maxWidth: .infinity, alignment: .trailing)
+                VStack(alignment: .trailing, spacing: 8) { actions }.frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    @ViewBuilder private var errorLines: some View {
+        ForEach(Array(errors.enumerated()), id: \.offset) { _, error in
+            Text(model.display.message(error)).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
+        }
+    }
+
+    /// iPhone (ios-app 7c fixes): no box of its own and no sliding of its own. The dialog's one scroll view moves the
+    /// target and the options together; two columns of square pictures, or the enlarged one at its paper's ratio.
+    private var phoneBody: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            if shown.isEmpty {
+                Text(model.display.localized(placeholder)).inkuFont(12).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: .infinity, minHeight: 180)
+                    .background(InkuColor.bg2)
+                    .overlay(Rectangle().stroke(InkuColor.border, style: StrokeStyle(dash: [4])))
+            } else if previewID != nil {
+                ForEach(shown) { option in optionCell(option, height: nil) }
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: min(2, shown.count)), spacing: 10) {
+                    ForEach(shown) { option in optionCell(option, height: nil) }
+                }
+            }
+            errorLines
+        }.padding(2)
+    }
+
+    private var wideBody: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 12) {
-                if !status.isEmpty { Text(model.display.message(status)).inkuFont(12).foregroundStyle(.secondary) }
-                if !options.isEmpty {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) { actions }.frame(maxWidth: .infinity, alignment: .trailing)
-                        VStack(alignment: .trailing, spacing: 8) { actions }.frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                }
+                header
                 GeometryReader { viewport in
                   ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
@@ -144,36 +181,14 @@ struct RefinementOptionsGrid: View {
                                 .background(InkuColor.bg2)
                                 .overlay(Rectangle().stroke(InkuColor.border, style: StrokeStyle(dash: [4])))
                         } else {
-                            // iPhone (ios-app step 7c): at most two columns, each card about as tall as it is wide
-                            // (plus its label); the grid slides up and down instead of filling the height.
-                            let count = previewID == nil ? max(1, min(phone ? 2 : maxColumns, shown.count)) : 1
+                            let count = previewID == nil ? max(1, min(maxColumns, shown.count)) : 1
                             let rows = (shown.count + count - 1) / count
-                            let height = phone && previewID == nil
-                                ? max(150, (viewport.size.width - 4 - CGFloat(count - 1) * 10) / CGFloat(count) + 56)
-                                : max(150, (viewport.size.height - 4 - CGFloat(rows - 1) * 10) / CGFloat(rows))
+                            let height = max(150, (viewport.size.height - 4 - CGFloat(rows - 1) * 10) / CGFloat(rows))
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
-                                ForEach(shown) { option in
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        optionCard(option, height: height)
-                                            .contextMenu {
-                                                if option.observation != nil {
-                                                    Button(model.display.localized("モデルの実測記録")) { observationID = option.id }
-                                                }
-                                            }
-                                            .popover(isPresented: Binding(get: { observationID == option.id }, set: { if !$0 { observationID = nil } })) {
-                                                if let observation = option.observation {
-                                                    ProviderObservationView(model: model, metrics: observation.providerMetrics,
-                                                        workID: option.saved ? option.work.id : nil, executionID: observation.executionID)
-                                                        .padding(16).inkuFixedWidth(360).inkuPopoverContent()
-                                                }
-                                            }
-                                    }
-                                }
+                                ForEach(shown) { option in optionCell(option, height: height) }
                             }
                         }
-                        ForEach(Array(errors.enumerated()), id: \.offset) { _, error in
-                            Text(model.display.message(error)).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
-                        }
+                        errorLines
                     }.padding(2)
                   }.id(previewID.map { "preview:" + $0 } ?? "grid:" + (options.first?.id ?? "empty"))
                 }
@@ -193,13 +208,37 @@ struct RefinementOptionsGrid: View {
             .inkuTooltip(model.display.tooltip("チェックした候補を履歴に保存して閉じます。選ばなかった候補は破棄します。保存した候補には、スターと選んだ理由を残せます。", serverKey: "tooltipVariationGridSaveSelected"))
     }
 
-    private func optionCard(_ option: RefinementOption, height: CGFloat) -> some View {
+    /// A card with its observation menu. `height` nil: the picture sets the height (iPhone).
+    private func optionCell(_ option: RefinementOption, height: CGFloat?) -> some View {
+        optionCard(option, height: height)
+            .contextMenu {
+                if option.observation != nil {
+                    Button(model.display.localized("モデルの実測記録")) { observationID = option.id }
+                }
+            }
+            .popover(isPresented: Binding(get: { observationID == option.id }, set: { if !$0 { observationID = nil } })) {
+                if let observation = option.observation {
+                    ProviderObservationView(model: model, metrics: observation.providerMetrics,
+                        workID: option.saved ? option.work.id : nil, executionID: observation.executionID)
+                        .padding(16).inkuFixedWidth(360).inkuPopoverContent()
+                }
+            }
+    }
+
+    private func optionCard(_ option: RefinementOption, height: CGFloat?) -> some View {
         Button { onPreview(previewID == option.id ? nil : option.id) } label: {
             VStack(alignment: .leading, spacing: 0) {
                 if previewID == option.id {
-                    ArtworkCanvas(svg: option.work.svg, renderer: model.displayRenderer, style: .workspace, showsZoomControls: false,
+                    let canvas = ArtworkCanvas(svg: option.work.svg, renderer: model.displayRenderer, style: .workspace, showsZoomControls: false,
                         aspectRatio: option.work.renderCanvasAspectRatio)
-                        .frame(minHeight: 0, maxHeight: .infinity).allowsHitTesting(false).accessibilityHidden(true)
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                    if height == nil {
+                        canvas.aspectRatio(CGFloat(option.work.renderCanvasAspectRatio ?? 1), contentMode: .fit)
+                    } else {
+                        canvas.frame(minHeight: 0, maxHeight: .infinity)
+                    }
+                } else if height == nil {
+                    ArtworkThumbnail(work: option.work, thumbnails: model.thumbnails).aspectRatio(1, contentMode: .fit)
                 } else {
                     ArtworkThumbnail(work: option.work, thumbnails: model.thumbnails)
                         .frame(minHeight: 0, maxHeight: .infinity)

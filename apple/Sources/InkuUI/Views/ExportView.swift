@@ -60,6 +60,36 @@ struct ExportView: View {
     }
     private var animation: Bool { options.format == .apng || options.format == .gif }
 
+    private var selectAllButtons: some View {
+        HStack {
+            Button(model.display.localized("すべて選択")) { selectedIDs = Set(candidates.map(\.id)) }
+            Button(model.display.localized("選択解除")) { selectedIDs = [] }
+        }.disabled(isBusy)
+    }
+
+    private var workRows: some View {
+        ForEach(candidates, id: \.id) { work in
+            Toggle(isOn: Binding(get: { selectedIDs.contains(work.id) }, set: { included in
+                if included { selectedIDs.insert(work.id) } else { selectedIDs.remove(work.id) }
+            })) {
+                // SavedWorkExportMenu.svelte:189-190: the id prefix and the text, each whole on hover.
+                VStack(alignment: .leading, spacing: 3) {
+                    LibraryWorkTitle(work: work, untitled: model.display.localized("無題"))
+                        .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText))
+                    HStack(spacing: 6) {
+                        Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime)
+                        Text(String(work.id.prefix(8))).monospaced().inkuTooltip(model.display.tooltipValue(work.id))
+                    }.inkuFont(12).foregroundStyle(.secondary)
+                }
+            }.disabled(isBusy || work.trashed)
+        }
+    }
+
+    private var orderNote: some View {
+        Text(model.display.localized(preserveOrder ? "系譜の順序で書き出します。" : "選択作品を作成日時の順で書き出します。"))
+            .inkuFont(12).foregroundStyle(.secondary)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -70,30 +100,17 @@ struct ExportView: View {
             if !directCard && !directFormat {
               // iPhone (ios-app step 7c): the works above the format, each on the whole width.
               (phone ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 20))) {
-                if !lineAnimation { VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Button(model.display.localized("すべて選択")) { selectedIDs = Set(candidates.map(\.id)) }
-                        Button(model.display.localized("選択解除")) { selectedIDs = [] }
-                    }.disabled(isBusy)
-                    List(candidates, id: \.id) { work in
-                        Toggle(isOn: Binding(get: { selectedIDs.contains(work.id) }, set: { included in
-                            if included { selectedIDs.insert(work.id) } else { selectedIDs.remove(work.id) }
-                        })) {
-                            // SavedWorkExportMenu.svelte:189-190: the id prefix and the text, each whole on hover.
-                            VStack(alignment: .leading, spacing: 3) {
-                                LibraryWorkTitle(work: work, untitled: model.display.localized("無題"))
-                                    .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText))
-                                HStack(spacing: 6) {
-                                    Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime)
-                                    Text(String(work.id.prefix(8))).monospaced().inkuTooltip(model.display.tooltipValue(work.id))
-                                }.inkuFont(12).foregroundStyle(.secondary)
-                            }
-                        }.disabled(isBusy || work.trashed)
-                    }.frame(minWidth: phone ? nil : 240, maxWidth: phone ? .infinity : 310, minHeight: phone ? 180 : 260, maxHeight: phone ? 240 : nil)
-                    Text(model.display.localized(preserveOrder ? "系譜の順序で書き出します。" : "選択作品を作成日時の順で書き出します。"))
-                        .inkuFont(12).foregroundStyle(.secondary)
+                if !lineAnimation && !phone { VStack(alignment: .leading, spacing: 8) {
+                    selectAllButtons
+                    List { workRows }.frame(minWidth: 240, maxWidth: 310, minHeight: 260)
+                    orderNote
                 } }
                 Form {
+                    // iPhone (ios-app 7c fixes): the works are the form's first section, as tall as their rows;
+                    // a list box of 180 to 240 points left space below one work.
+                    if phone && !lineAnimation {
+                        Section { workRows } header: { selectAllButtons.inkuOwnTapInFormRow() } footer: { orderNote }
+                    }
                     Picker(lineAnimation ? copy("settingsAnimationFormat", "フォーマット") : model.display.localized("形式"), selection: $options.format) {
                         ForEach(lineAnimation ? [.apng, .gif] : SavedExportFormat.allCases, id: \.self) { format in
                             Text(lineAnimation ? copy(format == .apng ? "animationFormatApng" : "animationFormatGif", format.title) : model.display.localized(format.title)).tag(format)

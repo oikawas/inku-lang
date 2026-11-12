@@ -5,6 +5,7 @@ struct CreationPaperPicker: View {
     @Bindable var model: AppModel
     var imageSelection = false
     let onClose: () -> Void
+    @Environment(\.inkuPhoneLayout) private var phone
 
     private var selectedID: String { imageSelection ? model.imageCanvasID : model.canvasID }
     private func select(_ id: String) {
@@ -66,9 +67,12 @@ struct CreationPaperPicker: View {
                         .inkuTooltip(tip("この用紙を次の作品に使います。保存作品の用紙は変わりません。"))
                     }
                 }.padding(6)
-            }.frame(maxHeight: 520)
+            }.frame(maxHeight: phone ? .infinity : 520)
         }
-        .inkuDialogFrame(width: 390, iOSMaxWidth: 390)
+        // iPhone (ios-app 7c fixes): the list fills the sheet at either height, starting at the top; with the
+        // 520-point cap it stayed at the half height, leaving space above and below at the whole height.
+        .frame(maxHeight: phone ? .infinity : nil, alignment: .top)
+        .inkuDialogFrame(width: 390, iOSMaxWidth: phone ? nil : 390)
     }
 
     private func tip(_ key: String) -> String {

@@ -1,5 +1,13 @@
 # inku Android Implementation Notes
 
+## 2026-11-12 The screens that choose a model show no evaluation details
+
+The author's instruction ("abolish every float shown while choosing a model", "remove the display on Android too") follows Web, which removed its floating evaluation card and tooltips. Android has nothing floating; it showed the same content inside each card, and that is what goes.
+
+- Choosing the drawing model (the model list in settings) and the Vision model (juxtaposition, autonomous refinement): no recommendation lines, mean seconds, estimated cost, speed label or comment. The Vision card also loses its LLM and Vision purpose badges. The name, stars, status labels, the "Not recommended (no response when measured)" note and the red frame stay.
+- Choosing the published models (administration): the note under the LLM and Vision buttons ("A purpose framed in red …", and for a ChatGPT plan "A greyed purpose is not selectable …") is gone; the red frame and the greying show it alone (the author's choice). The recommendation, mean seconds, cost and comment are still read under "Model details ▸".
+- This replaces "the drawing model chooser's details are unchanged" and "a note … is shown" in the 2026-10-26 sections below, and "the LLM and Vision purpose badges and the catalog's figures" of the 2026-10-24 section.
+
 ## 2026-11-07 Room schema 15: a work's large columns in their own table
 
 A work's `score_json`, `display_svg` and `render_metadata_json` move to `history_payloads` (one row per `history_items` row, by id). Queries that read a whole work join the two tables; the list, star, trash and thumbnail queries read the small `history_items` alone. Saving and deleting a work write both tables in one transaction. The migration does not change any value. The single `starred` and `trashed` indexes (the head of the composite ones) and `render_hash`/`render_hash_short` (used only by a lookup nothing called) are dropped; the thumbnail path, lineage parent and variation id gain one each. The empty `color_catalogs` table is dropped. At start, the stored state of ended executions (completed, failed, cancelled) is removed, except the newest one and any written in this process; `needs_user_edit`, which can still be continued, is kept.

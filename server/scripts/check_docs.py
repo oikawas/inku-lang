@@ -657,8 +657,13 @@ def check_3d_viewer_edition() -> list[str]:
         problems.append(f"{DDL_3D_BUILDS}/{build}: built from a core with local changes")
     built_source = _file_at_commit(commit, SCORE_EDITIONS) if commit else None
     if built_source is None:
+        shallow = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--is-shallow-repository"],
+            capture_output=True, text=True, check=False,
+        ).stdout.strip() == "true"
+        hint = " (this checkout is shallow: fetch the full history)" if shallow else ""
         return problems + [
-            f"{DDL_3D_BUILDS}/{build}: cannot read {SCORE_EDITIONS} at core {commit[:12] or '(none)'}"
+            f"{DDL_3D_BUILDS}/{build}: cannot read {SCORE_EDITIONS} at core {commit[:12] or '(none)'}{hint}"
         ]
     current = REPO_ROOT / SCORE_EDITIONS
     today = newest_score_edition(current.read_text(encoding="utf-8")) if current.is_file() else None

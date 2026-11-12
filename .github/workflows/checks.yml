@@ -107,6 +107,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # check_docs.py reads the Score editions at the core commit the 3D viewer was built from,
+          # which a depth-1 checkout does not have.
+          fetch-depth: 0
       - name: Bilingual documents
         run: python3 server/scripts/check_docs.py
       - name: Portable persistence contract

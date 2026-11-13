@@ -12,6 +12,8 @@ export type PlaceTarget = {
 	workId: string | null;
 	units: ThingUnit[];
 	things: { thing: number; role: string; what: string }[];
+	/** The instructions draw free lines, which moving a thing may draw again (the author's choice, 2026-11-13). */
+	freeLines: boolean;
 };
 
 /** The nine places, as the core names them (chunk_moves.rs `PLACES`), with where each sits. */

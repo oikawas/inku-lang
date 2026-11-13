@@ -597,6 +597,7 @@ export const en: LangPack = {
 	placeClamped: ' (stops at the canvas edge)',
 	placeChangesTerm: 'Changes',
 	placeKeeps: 'The other things’ drawing (not one character changes), and this thing’s shape and size',
+	placeKeepsFreeLines: 'The other things’ drawing (free lines may be drawn again), and this thing’s shape and size',
 	placeChanges: 'The numbers of this thing’s sentences (its place). Only this thing’s strokes are drawn again',
 	placeEmpty: 'Press a place and the options appear here.',
 	placeRefused: (reason) => ({

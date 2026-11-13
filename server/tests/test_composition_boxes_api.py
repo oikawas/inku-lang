@@ -45,6 +45,7 @@ def test_composition_boxes_tie_chunks_to_things_lines_and_boxes(monkeypatch):
         answer = client.get(path, headers={"Authorization": f"Bearer {token}"})
         assert answer.status_code == 200, answer.text
         units = answer.json()["units"]
+        assert answer.json()["free_lines"] is False
         places = units[0].pop("places")
         assert units == [{"title": "大海の", "thing": None, "lines": [3, 4], "sentences": 1,
                           "unplaced": 0, "box": [0.12, 0.24, 0.89, 0.32]}]

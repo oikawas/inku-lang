@@ -529,6 +529,10 @@ class CompositionBoxesResponse(BaseModel):
     """A work's chunks, tied to its composition record's things and to the picture."""
 
     units: list[CompositionBoxUnit] = Field(description="The chunks in the order their first sentences come; empty when the instructions have none.")
+    free_lines: bool = Field(
+        default=False,
+        description="Whether the instructions draw free lines: moving one thing may draw them again (step 3).",
+    )
 
 
 def _fitted_onto_another_paper(item: dict) -> bool:
@@ -569,13 +573,13 @@ def api_history_composition_boxes(
 
     item, config, composition = _chunk_input(actor, item_id)
     try:
-        units = composition_boxes(config, item.get("ddl") or "", composition)
+        units, free_lines = composition_boxes(config, item.get("ddl") or "", composition)
     except CompositionBoxesRefused as error:
         raise HTTPException(status_code=422, detail=error.detail) from error
     if _fitted_onto_another_paper(item):
         # Its numbers are the declared ratio's: no box, and no place to move to.
         units = [{**unit, "box": None, "places": {at: "fitted" for at in unit.get("places") or {}}} for unit in units]
-    return CompositionBoxesResponse(units=units)
+    return CompositionBoxesResponse(units=units, free_lines=free_lines)
 
 
 def _chunk_input(actor: dict, item_id: str) -> tuple[dict, dict, dict | None]:

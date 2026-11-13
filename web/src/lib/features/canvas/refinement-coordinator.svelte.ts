@@ -678,15 +678,17 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		const contextVersion = targetIdentityVersion;
 		const workId = refinementWorkId();
 		refinementSession.setPlaceTarget(null);
-		let target: PlaceTarget = { workId, units: [], things: [] };
+		let target: PlaceTarget = { workId, units: [], things: [], freeLines: false };
 		if (workId) {
 			try {
 				const response = await apiFetch(`/api/history/${encodeURIComponent(workId)}/composition-boxes`);
-				const units = response.ok ? readUnits(await response.json()) : [];
+				const body: unknown = response.ok ? await response.json() : null;
+				const units = readUnits(body);
+				const freeLines = !!body && typeof body === 'object' && (body as { free_lines?: unknown }).free_lines === true;
 				const { record } = shownRecordOf(work.displayedHistoryItem);
 				const things = (record?.answer?.things ?? []).flatMap((thing) => typeof thing.thing === 'number'
 					? [{ thing: thing.thing, role: thing.role ?? '', what: thing.what ?? '' }] : []);
-				target = { workId, units, things };
+				target = { workId, units, things, freeLines };
 			} catch {
 				// No chunks to offer: the dialog keeps the near/chance choice.
 			}

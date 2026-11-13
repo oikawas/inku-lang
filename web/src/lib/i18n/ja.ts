@@ -595,6 +595,7 @@ export const ja: LangPack = {
 	placeClamped: '（画面の端で止まる）',
 	placeChangesTerm: '変わるもの',
 	placeKeeps: 'ほかの物の画（1 字も変わりません）・この物の形と大きさ',
+	placeKeepsFreeLines: 'ほかの物の画（自由線は引き直されることがあります）・この物の形と大きさ',
 	placeChanges: 'この物の文の数（置き場）。筆致は、この物だけ引き直されます',
 	placeEmpty: '置き場を押すと、候補がここに並びます。',
 	placeRefused: (reason) => ({

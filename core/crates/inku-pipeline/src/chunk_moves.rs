@@ -2106,7 +2106,12 @@ fn respond(request: Request) -> Result<Value, Refusal> {
         }
         Request::Boxes(request) => {
             let units = boxes(&request.config, &request.ddl, request.composition.as_ref())?;
-            return Ok(json!({"units": units}));
+            let (paper, _) = paper_of(&request.config)?;
+            // A work with free lines says so: moving a thing may draw them again.
+            let free_lines = request.ddl.lines().any(|line| {
+                crate::description_laws::draws_free_line(line, paper.language, paper.definitions)
+            });
+            return Ok(json!({"units": units, "free_lines": free_lines}));
         }
         Request::Place(request) => {
             let (ddl, place) = place_at(
@@ -2917,6 +2922,13 @@ mod tests {
         );
         let without = ask(json!({"action": "boxes", "config": config(), "ddl": plain}));
         assert_eq!(without["units"], json!([]));
+        // A work with a free line says so (step 3); one without does not.
+        assert_eq!(recorded["free_lines"], false);
+        let free = format!(
+            "{plain}\n画面の横0.1、縦0.1から横0.3、縦0.2まで、赤の水彩のごく細い細かく揺れる自由線を1本引く。"
+        );
+        let with_free = ask(json!({"action": "boxes", "config": config(), "ddl": free}));
+        assert_eq!(with_free["free_lines"], true, "{with_free}");
 
         // A chunk of a plugin word alone has no box.
         let package: Value = serde_json::from_str(include_str!(

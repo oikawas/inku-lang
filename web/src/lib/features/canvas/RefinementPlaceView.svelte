@@ -94,7 +94,7 @@
 				{/each}
 			</div>
 			{#if refused}<p class="place-refused">{refused}</p>{/if}
-			<dl class="keeps"><dt>{t().compositionKeepsTerm}</dt><dd>{t().placeKeeps}</dd><dt>{t().placeChangesTerm}</dt><dd>{t().placeChanges}</dd></dl>
+			<dl class="keeps"><dt>{t().compositionKeepsTerm}</dt><dd>{target.freeLines ? t().placeKeepsFreeLines : t().placeKeeps}</dd><dt>{t().placeChangesTerm}</dt><dd>{t().placeChanges}</dd></dl>
 			{#if busy}<RunStatus label={t().refineGeneratingTask(refinementSession.gridTaskLabel)}
 				progressDone={refinementSession.gridDone} progressTotal={refinementSession.gridTotal}
 				elapsedMs={refinementSession.elapsedMs} progress={refinementSession.gridProgress}

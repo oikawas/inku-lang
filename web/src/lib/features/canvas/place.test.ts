@@ -16,6 +16,7 @@ const TARGET: PlaceTarget = {
 		{ title: '若葉', thing: null, lines: [6], box: null, places: all('scene_word') },
 	],
 	things: [{ thing: 1, role: 'field', what: '広い海面' }, { thing: 2, role: 'secondary', what: '磯の岩肌' }],
+	freeLines: false,
 };
 
 test('the core\'s nine places sit where its AT puts them', () => {
@@ -58,6 +59,8 @@ test('step 3: "Change the layout" shows the places when a chunk can move, else t
 	assert.match(view, /aria-disabled=\{!pressable\(place\.id\)\}/);
 	assert.doesNotMatch(view, /\sdisabled=\{!pressable/);
 	assert.match(view, /class="keeps"/);
+	// A work with free lines says they may be drawn again (the author's choice after the measure).
+	assert.match(view, /target\.freeLines \? t\(\)\.placeKeepsFreeLines : t\(\)\.placeKeeps/);
 	const coordinator = read('./refinement-coordinator.svelte.ts');
 	// The option is a DDL fork saved as a layout change, never a send.
 	assert.match(coordinator, /pipeline\.fromDdl\(ddl,/);

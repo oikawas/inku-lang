@@ -472,6 +472,8 @@ export interface LangPack {
 	placeClamped: string;
 	placeChangesTerm: string;
 	placeKeeps: string;
+	/** The same, on a work with free lines (the author's choice after the measure, 2026-11-13). */
+	placeKeepsFreeLines: string;
 	placeChanges: string;
 	placeEmpty: string;
 	/** Why a thing cannot go to a place, by the core's reason. */

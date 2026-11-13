@@ -8,6 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: on iPhone, a model chosen in Drawing defaults was sometimes not saved (the author's report). Before the page was scrolled to the bottom a model row opened no sheet, and values changed above went back to the saved ones at the first scroll to the bottom. The Mac and the iPad do not change.
 - Web: right after saving a layout child, "Composition and laws" no longer says there is no composition record (the v2.15.337 fix did not reach the canvas showing the saved child). The parent's composition shows without a reload.
 - macOS and iOS: the Japanese name of a layout child (`layout_change`) changes from 「構図」 to 「配置」 (the author's choice, as on the Web; in the generation details and on the lineage labels). The English stays "Layout".
 - iOS: the iPhone tab bar gains "Camera" (the author's instruction; second, as on Android). It goes straight to taking a photo and draws from it with the Image values in Settings > Drawing defaults (the model that reads images, the color catalog and the canvas). The camera has no model choice. Before the photo it checks that the default model can be used, and otherwise shows the reason and "Open Settings". Progress and the result show as an Image tab drawing does. Drawing from the camera puts the Image tab's choices back to the defaults. The iPhone's Image tab no longer has "Take Photo" (the iPad's Image tab keeps it). The Mac's screens and behavior do not change.

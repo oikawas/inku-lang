@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-13 — Children show the parent's composition; model-change children keep a record
+
+- "Image Creation": §4 now says that a child drawn without reading the description again shows its ancestor's composition and laws marked `Parent's composition`. §9 "Change the model" now says that the options are drawn the way the target was drawn, that a saved child keeps its composition record, and that generations are counted per option drawn.
+
 ## 2026-11-13 — Things joined to the drawing, instructions and caption
 
 - "Image Creation": §4's `Composition and laws` now describes that pointing at a thing in its row, on the drawing or in a line of the instructions shows it in the others, that pressing a row sends the instructions to its chunk, and how a thing with no position and a work fitted into its paper behave.

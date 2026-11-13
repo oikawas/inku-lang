@@ -16,6 +16,39 @@ export function compositionOf(work: WorkWithRecord): CompositionRecord | null {
 	return composition && typeof composition === 'object' ? composition as CompositionRecord : null;
 }
 
+/** A record a child shows from the ancestor it was drawn from without reading the description again (step 1d). */
+export type InheritedComposition = {
+	historyId: string;
+	at: number | null;
+	/** The edges walked, from the child up (the first is the child's own kind). */
+	via: string[];
+	record: CompositionRecord;
+};
+
+/**
+ * The ancestor's record the Server adds to a work without its own
+ * (`composition_inherited`: the answer and the requested form only). Read as
+ * a used record so the same views show it; it never carries the colors.
+ */
+export function inheritedOf(work: { composition_inherited?: unknown } | null | undefined): InheritedComposition | null {
+	const raw = work?.composition_inherited;
+	if (!raw || typeof raw !== 'object') return null;
+	const fields = raw as Record<string, unknown>;
+	if (typeof fields.history_id !== 'string' || !fields.answer || typeof fields.answer !== 'object') return null;
+	const via = Array.isArray(fields.via) ? fields.via.filter((kind): kind is string => typeof kind === 'string') : [];
+	const record: CompositionRecord = { state: 'used', answer: fields.answer as CompositionRecord['answer'] };
+	if (typeof fields.requested_form === 'string') record.requested_form = fields.requested_form;
+	return { historyId: fields.history_id, at: typeof fields.at === 'number' ? fields.at : null, via, record };
+}
+
+/** The record a work shows: its own, else the one it inherited (marked as the parent's). */
+export function shownRecordOf(work: { description_ddl?: unknown; composition_inherited?: unknown } | null | undefined): { record: CompositionRecord | null; inherited: InheritedComposition | null } {
+	const own = compositionOf(work);
+	if (own) return { record: own, inherited: null };
+	const inherited = inheritedOf(work);
+	return { record: inherited?.record ?? null, inherited };
+}
+
 /** The thesis of a record the drawing used; none for a fallback or a record without one. */
 export function thesisOf(record: CompositionRecord | null | undefined): string | null {
 	if (record?.state !== 'used') return null;

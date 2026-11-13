@@ -440,6 +440,9 @@ export interface LangPack {
 	compositionFromReading: string;
 	compositionNoRecord: string;
 	compositionNoRecordNote: string;
+	/** A child shows the record of the ancestor it was drawn from (step 1d). */
+	compositionInheritedMark: string;
+	compositionInheritedNote: (kind: string, at: string) => string;
 	compositionFallback: string;
 	/** A chip's title against the refinement target: "画の型（対象: 分ける線）". */
 	compositionChipVersusTarget: (term: string, value: string) => string;

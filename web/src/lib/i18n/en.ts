@@ -571,6 +571,8 @@ export const en: LangPack = {
 	compositionFromReading: 'From the reading',
 	compositionNoRecord: 'No record',
 	compositionNoRecordNote: 'This work keeps no composition record (a work drawn from a picture, drawn without the composition, or drawn before 2026-10-26).',
+	compositionInheritedMark: "Parent's composition",
+	compositionInheritedNote: (kind, at) => `This work is a "${kind}" child. Below are the composition and laws of its parent work (${at}).`,
 	compositionFallback: 'No composition',
 	compositionChipVersusTarget: (term, value) => `${term} (target: ${value})`,
 	compositionDdlTerm: 'Instructions',

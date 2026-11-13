@@ -15,6 +15,7 @@ import { layoutCandidateResult, requestLayoutComposition, type RecomposeMode, ty
 import { PipelineApi } from '../pipeline/api';
 import { PipelineController } from '../pipeline/controller';
 import type { CompositionForm } from './composition-form';
+import { compositionModeOf, compositionOption, drawRouteOf } from '$lib/draw-route';
 
 type Iteration = HistoryItem;
 type RefinementWork = Pick<WorkState,
@@ -284,39 +285,48 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	}
 
 	// The work drawn again from its description by another model, which draws
-	// both stages. The render settings are the work's own, as for the other
-	// options, so only the model differs.
+	// both stages. Since 2026-11-13 (step 1d) it is drawn as the composition
+	// form's options are: a fork of the work's pipeline, in the way the work
+	// itself was drawn (its route, its composition and its sketch, not the
+	// input panel's), kept unsaved until chosen and then saved as that run, so
+	// the child keeps its own composition record. The render settings are the
+	// work's own, as for the other options, so only the model differs.
 	async function renderModelCandidate(model: string, label: string, signal: AbortSignal,
-		onProgress: NonNullable<import('../run/current-work.ts').PaintOptions['onProgress']>): Promise<VariationCandidate> {
+		onProgress: (progress: import('../../paintStream.ts').PaintProgressEvent | null) => void,
+		workId: string, parentNode: string): Promise<VariationCandidate> {
 		const target = refinementTarget();
-		const source = target.source;
-		const r = await work.paintOne(source, {
-			detached: true,
-			historyInput: source,
-			sourceText: source,
-			saveHistory: false,
-			saveArtifacts: false,
-			countGeneration: false,
-			canvasAspectId: refinementCanvasAspectId(),
-			sketchText: target.sketchText,
-			signal,
-			renderOverrides: refinementRenderOverrides(),
-			lineageParentNodeId: deps.lineageParentId(),
-			stage1Model: model,
-			stage2Model: model,
-			onProgress,
+		const shown = work.displayedHistoryItem;
+		const recorded = shown?.draw_options ?? null;
+		const route = recorded?.route ?? drawRouteOf(shown);
+		const composition = recorded?.composition ?? compositionModeOf(shown);
+		const sketch = recorded?.sketch ?? (route === 'read_and_draw' ? 'on' : 'off');
+		const overrides = refinementRenderOverrides();
+		const metadata = { comparison_mode: 'common', compared_model: model, stage1_model: model, stage2_model: model };
+		const api = new PipelineApi(apiFetch);
+		const pipeline = new PipelineController(api, () => ({}), () => {}, undefined, (view) => {
+			onProgress(view.progress ? { event: 'progress', ...view.progress } : null);
 		});
-		return {
-			id: modelCandidateId(model),
-			label,
-			selected: false,
-			result: {
-				...r,
-				lineage_parent_node_id: deps.lineageParentId(),
-				derivation_kind: deps.lineageParentId() ? 'model_comparison' : null,
-				derivation_metadata: { comparison_mode: 'common', compared_model: model, stage1_model: r.stage1_model ?? model, stage2_model: r.stage2_model ?? model },
-			},
-		};
+		const cancel = () => { void pipeline.cancel().catch(() => {}); };
+		signal.addEventListener('abort', cancel, { once: true });
+		try {
+			await pipeline.selectHistory(workId, null, signal);
+			const view = await pipeline.fromDescription(target.source, {
+				route, ...compositionOption(route, composition),
+				sketch, ...(target.sketchText ? { sketch_text: target.sketchText } : {}),
+				stage1_model: model, stage2_model: model,
+				catalog_id: refinementCatalogId(), catalog_mode: 'fixed', canvas_aspect: refinementCanvasAspectId(),
+				...(work.result?.render_seed != null ? { render_seed: work.result.render_seed } : {}),
+				...(typeof overrides.wild === 'boolean' ? { wild: overrides.wild } : {}),
+				save_history: false, save_artifacts: false, count_generation: true,
+				lineage_parent_node_id: parentNode, derivation_kind: 'model_comparison', derivation_metadata: metadata,
+			}, signal);
+			signal.throwIfAborted();
+			if (!view.result?.ddl || !view.result.svg) throw new Error(t().pipelineAttentionReason('host_commit_failed'));
+			return { id: modelCandidateId(model), executionId: view.execution_id, label, selected: false,
+				result: { ...view.result, ddl: view.result.ddl, thinking: view.result.thinking ?? null,
+					lineage_parent_node_id: parentNode, derivation_kind: 'model_comparison',
+					derivation_metadata: { ...metadata, stage1_model: view.result.stage1_model ?? model, stage2_model: view.result.stage2_model ?? model } } };
+		} finally { signal.removeEventListener('abort', cancel); }
 	}
 
 	/** The work in every other catalog; the color change dialog starts it on open. */
@@ -558,8 +568,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			return {};
 		}
 		const contextVersion = targetIdentityVersion;
-		await deps.ensureVisibleLineageParentId();
-		if (contextVersion !== targetIdentityVersion) return {};
+		const workId = refinementWorkId();
+		const parentNode = await deps.ensureVisibleLineageParentId();
+		if (contextVersion !== targetIdentityVersion || !workId || !parentNode) return {};
 		const labels = pending.map((model) => deps.models.label(model));
 		const abortController = refinementSession.beginGrid({
 			includesReading: true,
@@ -575,7 +586,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			const results = await runRefinementFanout(pending.map((model, index) => async () => {
 				try {
 					return await renderModelCandidate(model, labels[index], abortController.signal,
-						(progress) => refinementSession.setSlotProgress(abortController, index, progress));
+						(progress) => refinementSession.setSlotProgress(abortController, index, progress), workId, parentNode);
 				} catch (e) {
 					if (abortController.signal.aborted) throw e;
 					failed[model] = e instanceof Error ? e.message : String(e);
@@ -677,7 +688,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 					const response = await apiFetch(`/api/pipeline/executions/${encodeURIComponent(candidate.executionId!)}/save`, {
 						method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
 							lineage_parent_node_id: candidate.result.lineage_parent_node_id,
-							derivation_kind: 'composition_form_change', derivation_metadata: candidate.result.derivation_metadata ?? {},
+							// The option's own kind: a composition form or a model change (step 1d).
+							derivation_kind: candidate.result.derivation_kind, derivation_metadata: candidate.result.derivation_metadata ?? {},
 						}),
 					});
 					if (response.status === 404) throw new Error(t().compositionFormExpired);

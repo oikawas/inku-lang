@@ -524,7 +524,8 @@ def api_history_composition_boxes(
 ) -> CompositionBoxesResponse:
     """Return the chunks of one work's instructions with the composition record's thing, the lines and the box of each.
 
-    The work's own composition record titles untitled instructions. Returns 404 when the work is not found for
+    The work's own composition record titles untitled instructions; a work without one uses the record of the
+    ancestor it keeps its composition from (composition_inherited). Returns 404 when the work is not found for
     the caller, and 422 when no configuration can be made to read the work's instructions.
     """
     from ...composition_record import CompositionBoxesRefused, composition_boxes, composition_of
@@ -538,9 +539,17 @@ def api_history_composition_boxes(
     config = get_service().retouch_config(actor["id"], item["id"], ddl)
     if config is None:
         raise HTTPException(status_code=422, detail="composition boxes cannot be read: binding_unavailable")
-    # The work's own record only; step 1d adds the parent's for a child that keeps none.
+    composition = composition_of(item)
+    inherited = item.get("composition_inherited")
+    if composition is None and isinstance(inherited, dict):
+        # A child that keeps no record of its own titles its chunks from the
+        # ancestor's (step 1d): that ancestor's things, and its line owners,
+        # which the core reads only for an untitled DDL with exactly as many
+        # lines as the ancestor's; another DDL is left untitled, as before.
+        ancestors = _db.get_items(actor["id"], [inherited["history_id"]])
+        composition = composition_of(ancestors[0]) if ancestors else None
     try:
-        units = composition_boxes(config, ddl, composition_of(item))
+        units = composition_boxes(config, ddl, composition)
     except CompositionBoxesRefused as error:
         raise HTTPException(status_code=422, detail=error.detail) from error
     if _fitted_onto_another_paper(item):

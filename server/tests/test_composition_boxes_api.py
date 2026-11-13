@@ -70,3 +70,26 @@ def test_composition_boxes_tie_chunks_to_things_lines_and_boxes(monkeypatch):
         for user, group in ((owner, owner_group), (other, other_group)):
             db.delete_user(user["id"], cascade=True)
             db.delete_user_group(group["id"])
+
+
+def test_a_child_without_a_record_is_titled_from_the_ancestors_record(monkeypatch):
+    owner, group = _user("boxes-child")
+    token = db.create_session(owner["id"])
+    client = TestClient(app)
+    try:
+        parent, child = _work(owner, UNTITLED), _work(owner, UNTITLED)
+        # The ancestor keeps the record; the child names it as its inherited one (step 1d).
+        monkeypatch.setattr(composition_record, "composition_of",
+                            lambda item: RECORD if item["id"] == parent["id"] else None)
+        read = db.get_items
+        monkeypatch.setattr(db, "get_items", lambda user_id, ids: [
+            {**item, "composition_inherited": {"history_id": parent["id"]}} if item["id"] == child["id"] else item
+            for item in read(user_id, ids)])
+        units = client.get(f"/api/history/{child['id']}/composition-boxes",
+                           headers={"Authorization": f"Bearer {token}"}).json()["units"]
+        assert [(unit["title"], unit["thing"], unit["lines"]) for unit in units] == [
+            ("大海の", 1, [1]), ("岩", 2, [2])]
+    finally:
+        db.delete_session(token)
+        db.delete_user(owner["id"], cascade=True)
+        db.delete_user_group(group["id"])

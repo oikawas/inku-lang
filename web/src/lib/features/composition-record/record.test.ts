@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { atName, lawName, placeName } from './composition-names.ts';
-import { candidateComposition, compositionOf, compositionShown, quoteInDescription, thesisOf, thingPlaces } from './record.ts';
+import { candidateComposition, compositionOf, compositionShown, inheritedOf, quoteInDescription, shownRecordOf, thesisOf, thingPlaces } from './record.ts';
 
 // The shape of a saved read-and-draw work's record (the 11-06 work drawn from 大海の, abridged).
 const USED = {
@@ -54,4 +54,19 @@ test('an option names its record: form, main law, thesis and reason; a fallback 
 		{ state: 'fallback', thesis: null, form: null, mainLaw: null, reason: null });
 	assert.equal(candidateComposition({ description_ddl: null }).state, 'none');
 	assert.equal(candidateComposition(null).state, 'none');
+});
+
+test('a child without its own record shows the ancestor\'s, marked; its own record wins', () => {
+	const inherited = { history_id: 'parent-1', at: 1794000000000, via: ['tool_change', 'catalog_change'], answer: USED.answer, requested_form: 'bands' };
+	const child = shownRecordOf({ description_ddl: null, composition_inherited: inherited });
+	assert.equal(child.inherited?.historyId, 'parent-1');
+	assert.deepEqual(child.inherited?.via, ['tool_change', 'catalog_change']);
+	assert.equal(child.record?.state, 'used');
+	assert.equal(thesisOf(child.record), USED.answer.thesis);
+	assert.equal(child.record?.requested_form, 'bands');
+	const own = shownRecordOf({ description_ddl: { composition: USED }, composition_inherited: inherited });
+	assert.equal(own.inherited, null);
+	assert.equal(own.record, USED);
+	assert.equal(inheritedOf({ composition_inherited: { history_id: 'x' } }), null);
+	assert.deepEqual(shownRecordOf(null), { record: null, inherited: null });
 });

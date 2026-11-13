@@ -481,6 +481,19 @@ class HistoryItem(HistoryPostBody):
             "the work was drawn through the stages."
         ),
     )
+    # Read-only: what a child that keeps no composition record of its own shows
+    # from the ancestor it was drawn from without reading the description
+    # again (step 1d, 2026-11-13). Computed in listings, never stored.
+    composition_inherited: dict | None = Field(
+        default=None,
+        description=(
+            "Read-only. For a work without its own composition record, the nearest ancestor's record reached through "
+            "derivations that keep the parent's DDL (touch, tools, ground, colors, paper fit, layout, one chunk, or a "
+            "replay of the same DDL): history_id and at of that work, via (the derivation kinds walked, from this work "
+            "up), answer (the composition's answer) and requested_form when the author asked for one. Absent when the "
+            "work keeps its own record or no readable ancestor gives one."
+        ),
+    )
     catalog_reading: dict | None = Field(default=None, description="Light and color reading and selection method when a color catalog was chosen automatically from the description, on either drawing route; otherwise None.")
     plugin_offers: list[dict] | None = Field(default=None, description="Plugin words offered to model requests in this work's run.")
     provider_usage: dict[str, ProviderStageUsage] | None = Field(

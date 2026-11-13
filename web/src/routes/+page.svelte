@@ -79,7 +79,7 @@
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import CompositionSection from '$lib/features/composition-record/CompositionSection.svelte';
 	import { ThingLinks } from '$lib/features/composition-record/things.svelte';
-	import { compositionOf } from '$lib/features/composition-record/record';
+	import { shownRecordOf } from '$lib/features/composition-record/record';
 	import { bindGenerationInfoSettingsPersist } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
@@ -1177,7 +1177,8 @@
 	// Fetched for a saved work only while "composition and laws" is open.
 	const thingLinks = new ThingLinks();
 	const thingWork = $derived(work.displayedHistoryItem ?? null);
-	const thingAnswer = $derived(compositionOf(thingWork)?.answer ?? null);
+	// A child without its own record joins its things through the ancestor's (step 1d).
+	const thingAnswer = $derived(shownRecordOf(thingWork).record?.answer ?? null);
 	$effect(() => {
 		const id = thingWork?.id, ddl = thingWork?.ddl;
 		if (!id || !ddl || !thingAnswer) { thingLinks.clear(); return; }

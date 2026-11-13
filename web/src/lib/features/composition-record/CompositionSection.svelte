@@ -9,10 +9,12 @@
 	import { describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import CompositionFigure from './CompositionFigure.svelte';
 	import { colorLawName, formName, lawName, roleName } from './composition-names';
-	import { compositionOf, compositionShown, quoteInDescription, thingPlaces } from './record';
+	import { compositionShown, quoteInDescription, shownRecordOf, thingPlaces } from './record';
+	import { derivationKindLabel } from '$lib/derivation';
+	import { formatHistoryMinute } from '$lib/historyManagerPresentation';
 
 	type Props = {
-		work: { description_ddl?: unknown } | null | undefined;
+		work: { description_ddl?: unknown; composition_inherited?: unknown } | null | undefined;
 		description: string | null | undefined;
 		isJapanese: boolean;
 		/** Whether the work menu offers the description group at all (not for a DDL work). */
@@ -30,7 +32,14 @@
 	let { work, description, isJapanese, offersDescriptionActions, descriptionLocked, onChangeForm,
 		activeThing = null, onPointThing = () => {}, onRevealThing = () => {} }: Props = $props();
 
-	const record = $derived(compositionOf(work));
+	const view = $derived(shownRecordOf(work));
+	const record = $derived(view.record);
+	// A child drawn without reading the description again shows its ancestor's record, marked (step 1d).
+	const inherited = $derived(view.inherited);
+	const inheritedNote = $derived(inherited
+		? t().compositionInheritedNote(derivationKindLabel(inherited.via[0] ?? null, isJapanese),
+			inherited.at === null ? '—' : formatHistoryMinute(inherited.at, isJapanese ? 'ja-JP' : 'en-US'))
+		: null);
 	const shown = $derived(compositionShown(record));
 	const answer = $derived(shown.kind === 'used' ? shown.record.answer ?? null : null);
 	const form = $derived(typeof answer?.form === 'string' ? answer.form : null);
@@ -52,6 +61,7 @@
 			<span class="composition-title">{t().compositionSectionTitle}</span>
 		</button>
 		<span class="composition-summary">
+			{#if inherited}<span class="inherited-mark">{t().compositionInheritedMark}</span>{/if}
 			{#if shown.kind === 'used'}
 				{#if form}<span class="name-fig"><CompositionFigure figure={form} />{formName(form, isJapanese)}</span>{/if}
 				{#if form && mainLaw}<span aria-hidden="true">·</span>{/if}
@@ -68,6 +78,7 @@
 		{#if answer?.thesis}<p class="composition-thesis" class:open>{answer.thesis}</p>{/if}
 		{#if open}
 			<div class="composition-body">
+				{#if inheritedNote}<p class="inherited-note">{inheritedNote}</p>{/if}
 				{#if offersDescriptionActions}
 					<div class="comp-actions">
 						<button class="ghost-btn" type="button" aria-disabled={descriptionLocked} class:held={descriptionLocked}
@@ -135,6 +146,8 @@
 	.composition-title { font-size: var(--ui-font-size-12); color: var(--fg2); }
 	.composition-summary { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: var(--ui-font-size-12); color: var(--fg2); white-space: nowrap; }
 	.summary-plain { color: var(--fg3); }
+	.inherited-mark { padding: 0 6px; border: 1px solid var(--border2); border-radius: 999px; color: var(--fg3); font-size: var(--ui-font-size-10); line-height: 1.6; }
+	.inherited-note { margin: 0; color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.6; }
 	.name-fig { display: inline-flex; align-items: center; gap: 4px; }
 	.composition-thesis { margin: -2px 0 0 13px; color: var(--fg); font-size: var(--ui-font-size-13); line-height: 1.7; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 	.composition-thesis.open { display: block; }

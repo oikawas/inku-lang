@@ -80,6 +80,17 @@ DESCRIPTION_LOCKED = {
 }
 
 
+# Description forks that keep the words but read them again: another
+# composition form, or another model (step 1d, 2026-11-13). A work its DDL
+# holds refuses them as it refuses changed words, since drawing from the
+# description again would throw the edits away.
+_REREADING_FORKS = frozenset({"composition_form_change", "model_comparison"})
+
+
+def _rereads(options: dict | None) -> bool:
+    return (options or {}).get("derivation_kind") in _REREADING_FORKS
+
+
 def _rewords(text: str, description: str) -> bool:
     """Whether the words read differ, labels and spacing aside (the stored
     description may keep the labels the page strips before showing it)."""
@@ -113,7 +124,10 @@ def _refuse_if_locked(history_id: str) -> None:
 class SaveCompositionFormBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     lineage_parent_node_id: str
-    derivation_kind: Literal["composition_form_change"]
+    # Another composition form, or the work drawn by another model
+    # with the parent's route (step 1d, 2026-11-13). The metadata is the
+    # Server's, built from the execution; what a client sends here is ignored.
+    derivation_kind: Literal["composition_form_change", "model_comparison"]
     derivation_metadata: dict = Field(default_factory=dict)
 
 
@@ -958,7 +972,7 @@ class PipelineService:
 
     def fork_legacy(self, owner: str, history_id: str, kind: str, text: str, **choices) -> dict:
         work = self.legacy(owner, history_id)
-        if kind == "description" and (_rewords(text, work["description"]) or (choices.get("options") or {}).get("derivation_kind") == "composition_form_change"):
+        if kind == "description" and (_rewords(text, work["description"]) or _rereads(choices.get("options"))):
             _refuse_if_locked(history_id)
         return self.start(owner, kind, text, parent={"kind": "legacy_history", "id": history_id}, source_work=work, **choices)
 
@@ -994,7 +1008,7 @@ class PipelineService:
         # Once drawn, the saved work decides: a DDL drawn again unedited is held
         # only if its parent was (persistence/description_lock.py).
         if previous["authority"]["authority"] == "ddl_authoritative" and (
-            _rewords(body.description, previous.get("description", "")) or body.options.get("derivation_kind") == "composition_form_change"
+            _rewords(body.description, previous.get("description", "")) or _rereads(body.options)
         ):
             drawn = (previous.get("result") or {}).get("history_id")
             if drawn:
@@ -1035,7 +1049,7 @@ class PipelineService:
         if linked is None:
             raise HTTPException(404, "pipeline_history_not_found")
         source_work = linked_source_work(linked)
-        if body.kind == "description" and (_rewords(body.text, source_work["description"]) or body.options.get("derivation_kind") == "composition_form_change"):
+        if body.kind == "description" and (_rewords(body.text, source_work["description"]) or _rereads(body.options)):
             _refuse_if_locked(history_id)
         return self.start(
             owner,
@@ -1059,7 +1073,9 @@ class PipelineService:
                 raise HTTPException(409, "execution_already_saved")
             if run.view()["busy"] or run._rendered is None or self.project_result is None:
                 raise HTTPException(409, "candidate_not_ready")
-            if settings.get("derivation_kind") != body.derivation_kind or settings.get("composition_form") is None:
+            if settings.get("derivation_kind") != body.derivation_kind:
+                raise HTTPException(422, "invalid_candidate")
+            if body.derivation_kind == "composition_form_change" and settings.get("composition_form") is None:
                 raise HTTPException(422, "invalid_candidate")
             if settings.get("lineage_parent_node_id") != body.lineage_parent_node_id:
                 raise HTTPException(422, "candidate_parent_mismatch")
@@ -1075,9 +1091,15 @@ class PipelineService:
                     (not link and parent == {"kind": "legacy_history", "id": history_id})):
                 raise HTTPException(422, "candidate_parent_mismatch")
             _refuse_if_locked(history_id)
-            description = parents[0].get("description_ddl") or {}
-            form_from = (description.get("composition") or {}).get("answer") or {}
-            metadata = {"form_from": form_from.get("form"), "form_to": settings["composition_form"]}
+            if body.derivation_kind == "model_comparison":
+                # Both stages are drawn by the compared model, as the history
+                # save of a model candidate has recorded it.
+                metadata = {"comparison_mode": "common", "compared_model": settings.get("stage1_model"),
+                            "stage1_model": settings.get("stage1_model"), "stage2_model": settings.get("stage2_model")}
+            else:
+                description = parents[0].get("description_ddl") or {}
+                form_from = (description.get("composition") or {}).get("answer") or {}
+                metadata = {"form_from": form_from.get("form"), "form_to": settings["composition_form"]}
             context = deepcopy(run.context)
             context["host_options"] = {**settings, "save_history": True, "save_artifacts": True, "count_generation": False,
                                        "derivation_kind": body.derivation_kind, "derivation_metadata": metadata}
@@ -1285,9 +1307,9 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
         """Start a new description variation from a variation, with the description given in the body, and return its state. Requires a signed-in user; returns 409 (authority_conflict) when expected_revision is stale and 409 (description_locked) when the words change on a variation whose DDL holds the work."""
         return current_service().fork_description(actor["id"], variation_id, body)
 
-    @router.post("/executions/{execution_id}/save", summary="Save a rendered composition-form candidate")
+    @router.post("/executions/{execution_id}/save", summary="Save a rendered candidate")
     def save_composition_form(body: SaveCompositionFormBody, execution_id: str = Path(description="ID of the rendered execution."), actor: dict = Depends(actor_dependency)):
-        """Save an owned, completed candidate as a child without rendering it again."""
+        """Save an owned, completed candidate (another composition form, or another model) as a child without rendering it again. The kind must be the one the execution was started with and the parent its parent; returns 409 when it was saved already, is not ready, or its parent is held by its DDL, and 422 for another kind or parent."""
         return current_service().save_composition_form(actor["id"], execution_id, body)
 
     @router.post("/executions/{execution_id}/commands", summary="Send a command to an execution")

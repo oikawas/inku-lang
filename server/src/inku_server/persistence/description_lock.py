@@ -44,9 +44,83 @@ DESCRIPTION_READING_KINDS = frozenset({
 
 _MAX_DEPTH = 256
 
+# Derivations whose child keeps its parent's composition: they change how the
+# parent's DDL is drawn (touch, tools, ground, colors, paper, place, one
+# chunk), not what it draws (step 1d, 2026-11-13). A `replay` joins them only
+# when its DDL is its parent's. Not here: the readings above, `ddl_edit` (the
+# author rewrote the DDL), `laws_change` (the laws stage again) and the old
+# kinds whose meaning was never checked.
+COMPOSITION_KEEPING_KINDS = frozenset({
+    "replay",
+    "tool_change",
+    "ground_change",
+    "catalog_change",
+    "color_arrangement_change",
+    "canvas_fit",
+    "layout_change",
+    "chunk_move",
+    "touch_change",
+})
 
-def locked_history_ids(session, history_ids: Iterable[str], *, ancestry=None, links=None) -> set[str]:
-    """The subset of `history_ids` that is description-locked."""
+
+def replay_ddls(session, ancestry) -> dict[str, str]:
+    """The DDL, spacing aside, of each work on either end of a `replay` edge in
+    `ancestry`: what tells a replay of the same DDL from a reading."""
+    nodes, edges, _ = ancestry
+    ends = {node for child, edge in edges.items() if edge.derivation_kind == "replay"
+            for node in (child, edge.parent_node_id)}
+    return _ddl_of_histories(session, [nodes[node].history_id for node in ends if node in nodes])
+
+
+def composition_sources(
+    starts: dict[str, str],
+    ancestry,
+    ddls: dict[str, str],
+    record_of,
+    readable_node=None,
+) -> dict[str, tuple[str, list[str]]]:
+    """For each work in `starts` (history id -> its lineage node), the nearest
+    ancestor whose composition it keeps, and the kinds walked from the work up.
+
+    The walk takes the edges `locked_history_ids` takes, in the same way and as
+    far: from child to parent while the kind keeps the composition, a `replay`
+    only when both DDLs are known and equal. It stops at the first work with a
+    composition record (`record_of(history_id)` is not None), and never takes an
+    edge the viewer cannot read (`ancestry`'s readable edges) or lands on a
+    parent `readable_node(node_id)` refuses. A work with its own record is not
+    asked about; the caller leaves it out of `starts`."""
+    nodes, edges, readable = ancestry
+    found: dict[str, tuple[str, list[str]]] = {}
+    for history_id, start in starts.items():
+        seen: set[str] = set()
+        current, via = start, []
+        while current not in seen:
+            seen.add(current)
+            edge = edges.get(current)
+            if edge is None or edge.id not in readable or edge.derivation_kind not in COMPOSITION_KEEPING_KINDS:
+                break
+            parent = nodes.get(edge.parent_node_id)
+            if parent is None or not parent.history_id or parent.state == "tombstone":
+                break
+            if edge.derivation_kind == "replay":
+                child_ddl = ddls.get(nodes[current].history_id or "") if current in nodes else None
+                parent_ddl = ddls.get(parent.history_id)
+                if not child_ddl or child_ddl != parent_ddl:
+                    break
+            if readable_node is not None and not readable_node(parent.id):
+                break
+            via.append(edge.derivation_kind)
+            if record_of(parent.history_id) is not None:
+                found[history_id] = (parent.history_id, list(via))
+                break
+            current = parent.id
+    return found
+
+
+def locked_history_ids(session, history_ids: Iterable[str], *, ancestry=None, links=None, ddls=None) -> set[str]:
+    """The subset of `history_ids` that is description-locked.
+
+    `ddls` is `replay_ddls(session, ancestry)` when the caller has read it."""
     starts = [history_id for history_id in dict.fromkeys(history_ids) if history_id]
     if not starts:
         return set()
@@ -69,7 +143,7 @@ def locked_history_ids(session, history_ids: Iterable[str], *, ancestry=None, li
         links = session.query(PipelineHistoryLinkRow).filter(
             tuple_(PipelineHistoryLinkRow.owner_id, PipelineHistoryLinkRow.history_id).in_(pairs)).all() if pairs else []
     ddl_authoritative = _ddl_authoritative_histories(session, histories, links=links)
-    ddl_of_history = _ddl_of_histories(session, [
+    ddl_of_history = ddls if ddls is not None else _ddl_of_histories(session, [
         history_of_node.get(node) for node in {
             node for child, (parent, kind) in edge_of_child.items() if kind == "replay" for node in (child, parent)
         }

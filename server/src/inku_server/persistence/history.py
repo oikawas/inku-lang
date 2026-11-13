@@ -28,7 +28,13 @@ from .schema import (
     UserAccountRow,
     UserGroupRow,
 )
-from .description_lock import DESCRIPTION_READING_KINDS, locked_history_ids
+from .description_lock import (
+    COMPOSITION_KEEPING_KINDS,
+    DESCRIPTION_READING_KINDS,
+    composition_sources,
+    locked_history_ids,
+    replay_ddls,
+)
 from .ddl_source import LEGACY_EXPANDED_ORIGIN
 from .variation_authority import (
     VariationAuthorityAdapterError,
@@ -1048,9 +1054,11 @@ class HistoryListProjector:
                     item["shared"] = True
         # A work its DDL holds (edited, or derived from an edited one) is not
         # drawn from its description again; the client offers the fork instead.
-        locked = locked_history_ids(session, [row.id for row in rows], ancestry=ancestry, links=links)
+        ddls = replay_ddls(session, ancestry)
+        locked = locked_history_ids(session, [row.id for row in rows], ancestry=ancestry, links=links, ddls=ddls)
         for item, row in zip(items, rows, strict=True):
             item["description_locked"] = row.id in locked
+        self._attach_inherited_compositions(session, rows, items, ancestry, ddls, links, actor)
         if not node_ids:
             return items
         node_by_id, ancestor_edges, readable_edges = ancestry
@@ -1075,6 +1083,94 @@ class HistoryListProjector:
             item["derivation_kind"] = edge.derivation_kind
             item["derivation_metadata"] = self.lineage_edge_to_dict_fn(edge)["metadata"]
         return items
+
+    @staticmethod
+    def _attach_inherited_compositions(session, rows, items, ancestry, ddls, links, actor) -> None:
+        """The composition a work without its own record keeps from an ancestor
+        (step 1d, 2026-11-13): that work's id and time, the kinds walked, and
+        the record's answer and requested form. Not its targets, its colors or
+        each sentence's thing: the child's colors and places may differ, and
+        its sentences are its own DDL's.
+
+        The ancestors and their saving contexts are the ones this listing read
+        already; only a shared ancestor's visibility may need one more query."""
+        def own_record(item) -> bool:
+            record = item.get("description_ddl")
+            return isinstance(record, dict) and isinstance(record.get("composition"), dict)
+
+        starts = {row.id: row.lineage_node_id for row, item in zip(rows, items, strict=True)
+                  if row.lineage_node_id and not own_record(item)}
+        if not starts:
+            return
+        nodes, edges, readable = ancestry
+        links_by_work = {(link.owner_id, link.history_id): link for link in links}
+        node_of_history = {node.history_id: node for node in nodes.values() if node.history_id}
+        records: dict[str, dict | None] = {}
+
+        def record_of(history_id: str) -> dict | None:
+            if history_id not in records:
+                node = node_of_history.get(history_id)
+                link = links_by_work.get((node.user_id, history_id)) if node is not None else None
+                composition = None
+                if link is not None:
+                    try:
+                        _, kept = history_link_records({
+                            "variation_id": link.variation_id, "revision": link.revision,
+                            "ddl_digest": link.ddl_digest, "fork_context_bytes": link.fork_context_bytes,
+                            "fork_context_digest": link.fork_context_digest,
+                        })
+                    except VariationAuthorityAdapterError:
+                        kept = {}
+                    composition = (kept.get("description_ddl") or {}).get("composition")
+                records[history_id] = composition if isinstance(composition, dict) else None
+            return records[history_id]
+
+        # A parent is readable when it is the viewer's, or when an edge that is
+        # readable (its child is) leaves it; others are asked once, together.
+        def readable_node(node_id: str) -> bool:
+            if actor is None:
+                return True
+            node = nodes.get(node_id)
+            edge = edges.get(node_id)
+            return (node is not None and node.user_id == actor["id"]) or (edge is not None and edge.id in readable)
+
+        unknown: set[str] = set()
+        if actor is not None:
+            # Only the parents a walk could land on: up the readable edges of
+            # the kinds that keep a composition, from the works asked about.
+            for start in starts.values():
+                seen, current = set(), start
+                while current not in seen:
+                    seen.add(current)
+                    edge = edges.get(current)
+                    if edge is None or edge.id not in readable or edge.derivation_kind not in COMPOSITION_KEEPING_KINDS:
+                        break
+                    if edge.parent_node_id not in nodes:
+                        break
+                    if not readable_node(edge.parent_node_id):
+                        unknown.add(edge.parent_node_id)
+                    current = edge.parent_node_id
+        if unknown:
+            readable_ids = {node_id for node_id, in session.query(LineageNodeRow.id).filter(
+                LineageNodeRow.id.in_(unknown), access._readable_node(actor)).all()}
+
+            def readable_node(node_id: str, _known=readable_node) -> bool:
+                return _known(node_id) or node_id in readable_ids
+
+        sources = composition_sources(starts, ancestry, ddls, record_of, readable_node)
+        for row, item in zip(rows, items, strict=True):
+            source = sources.get(row.id)
+            if source is None:
+                continue
+            ancestor, via = source
+            record = record_of(ancestor) or {}
+            if not isinstance(record.get("answer"), dict):
+                continue  # the ancestor's composition fell back: there is no answer to show
+            inherited = {"history_id": ancestor, "at": getattr(node_of_history.get(ancestor), "at", None),
+                         "via": via, "answer": record["answer"]}
+            if record.get("requested_form") is not None:
+                inherited["requested_form"] = record["requested_form"]
+            item["composition_inherited"] = inherited
 
 
 @dataclass(frozen=True)

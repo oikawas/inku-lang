@@ -416,6 +416,42 @@ def test_composition_form_candidate_saves_its_actual_execution_once(host, compos
     assert client.post(path, json=body, headers={"x-owner": "owner"}).status_code == 409
 
 
+def test_model_candidate_saves_its_execution_with_its_composition(host, composed, monkeypatch):
+    client, service, _, _ = host
+    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
+    node = parent["result"]["lineage_node_id"]
+    options = {"route": "read_and_draw", "composition": "on", "stage1_model": "openai:fixture-text",
+               "stage2_model": "openai:fixture-text", "save_history": False, "save_artifacts": False,
+               "count_generation": True, "lineage_parent_node_id": node, "derivation_kind": "model_comparison"}
+    fork_path = f"/api/pipeline/variations/{parent['variation_id']}/fork-description"
+    fork = client.post(fork_path, headers={"x-owner": "owner"},
+                       json={"expected_revision": parent["authority"]["revision"], "description": POEM, "options": options})
+    assert fork.status_code == 200, fork.text
+    candidate = _wait(service, fork.json()["execution_id"])
+    done = service.command("owner", candidate["execution_id"], {"tag": "perform"})
+    assert not done["result"].get("history_id")
+    path = f"/api/pipeline/executions/{candidate['execution_id']}/save"
+    body = {"lineage_parent_node_id": node, "derivation_kind": "model_comparison", "derivation_metadata": {}}
+    # Another kind than the execution's is refused.
+    assert client.post(path, json={**body, "derivation_kind": "composition_form_change"},
+                       headers={"x-owner": "owner"}).status_code == 422
+    saved = client.post(path, json=body, headers={"x-owner": "owner"})
+    assert saved.status_code == 200, saved.text
+    item = db.get_items("owner", [saved.json()["history_id"]])[0]
+    assert item["derivation_kind"] == "model_comparison"
+    assert item["derivation_metadata"] == {"comparison_mode": "common", "compared_model": "openai:fixture-text",
+                                           "stage1_model": "openai:fixture-text", "stage2_model": "openai:fixture-text"}
+    assert item["description_ddl"]["composition"]["state"] == "used"
+    assert "composition_inherited" not in item
+    # A parent its DDL holds refuses another model, as it refuses changed words.
+    monkeypatch.setattr(db, "history_description_locked", lambda _history_id: True)
+    linked = client.post(f"/api/pipeline/history/{parent['result']['history_id']}/fork", headers={"x-owner": "owner"},
+                         json={"kind": "description", "text": POEM, "options": options})
+    assert linked.status_code == 409, linked.text
+    assert client.post(path, json=body, headers={"x-owner": "owner"}).status_code == 409
+
+
 @pytest.mark.parametrize("options", [
     {"route": "stages", "composition": "on", "composition_form": "bands"},
     {"route": "read_and_draw", "composition": "off", "composition_form": "bands"},

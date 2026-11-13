@@ -569,6 +569,8 @@ export const ja: LangPack = {
 	compositionFromReading: '読みから',
 	compositionNoRecord: '記録なし',
 	compositionNoRecordNote: 'この作品には構図の記録がありません（画像から描いた作品、構図なしで描いた作品、2026-10-26 より前の作品など）。',
+	compositionInheritedMark: '親の構図',
+	compositionInheritedNote: (kind, at) => `この作品は『${kind}』の子です。下は、親の作品（${at}）の構図と法則です。`,
 	compositionFallback: '構図なし',
 	compositionChipVersusTarget: (term, value) => `${term}（対象: ${value}）`,
 	compositionDdlTerm: '指示書',

@@ -1594,6 +1594,13 @@ pub fn place_at(
     let (paper, _) = paper_of(config)?;
     let doc = Doc::of(&titled_source(ddl, composition, paper.language));
     let (child, from, to, clamped) = move_chunk(&doc, paper, chunk, at)?;
+    // A moved sentence the compiler would not draw (an arc stopped right at
+    // the edge was left out without a word, step 3a's measure) is refused,
+    // as the AI turn asks such a child again.
+    let problems = new_problems(config, &doc, &child);
+    if !problems.is_empty() {
+        return Err(refuse("undrawable", undrawn(paper, &problems)));
+    }
     let thing = composition.and_then(|composition| {
         composed_thing_titles(&composition.owners, &composition.things, paper.language)
             .iter()
@@ -2808,6 +2815,17 @@ mod tests {
             refused(place(unplaced, "地", "center")).1.as_deref(),
             Some("no_numeric_place")
         );
+        // Two arcs (step 3a's measure, work 0082c231): stopped at the left edge,
+        // the grey one would be left out by the compiler without a word, so
+        // that place is refused; the center draws.
+        let arcs = "画面比1:1。\n\n「山里」\n\
+            画面の横0.33、縦0.618034の位置に、弦長0.424、矢高0.045の灰の水彩の薄い細いゆるやかに揺れる弧を1本引く。\n\
+            画面の横0.67、縦0.618034の位置に、弦長0.424、矢高0.055の青の水彩の薄い細いゆるやかに揺れる弧を1本引く。";
+        assert_eq!(
+            refused(place(arcs, "山里", "golden_ul")).1.as_deref(),
+            Some("undrawable")
+        );
+        assert_eq!(place(arcs, "山里", "center")["outcome"], "ok");
         // boxes tell each place's outcome before it is asked.
         let boxes = ask(json!({"action": "boxes", "config": config(), "ddl": centered}));
         let lighthouse = &boxes["units"][0]["places"];

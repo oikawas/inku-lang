@@ -605,6 +605,7 @@ export const ja: LangPack = {
 		no_numeric_place: '位置を数で書いていない文があります',
 		fitted: '紙にはめ込んだ作品では動かせません',
 		no_chunk: 'この物は指示書にありません',
+		undrawable: 'そこへ動かすと描かれない文が出ます',
 	}[reason] ?? `動かせません（${reason}）`),
 	refineCompareTarget: '対象',
 	refineCompareOption: (n) => `候補 ${n}`,

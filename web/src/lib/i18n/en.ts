@@ -607,6 +607,7 @@ export const en: LangPack = {
 		no_numeric_place: 'Some of its sentences have no numeric place',
 		fitted: 'A work fitted onto its paper cannot move things',
 		no_chunk: 'The instructions have no such thing',
+		undrawable: 'Moved there, a sentence would not be drawn',
 	}[reason] ?? `It cannot move there (${reason})`),
 	refineCompareTarget: 'Target',
 	refineCompareOption: (n) => `Option ${n}`,

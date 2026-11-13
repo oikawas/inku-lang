@@ -8,6 +8,7 @@
 
 ## 未リリース
 
+- 共通core・Server・Web：言葉で描いた作品の「配置を変える」で、物を 1 つ選び、9 つの置き場（黄金分割の 4 つの交点・三分割の 4 本の線・中心）へ動かせるようにしました（送信なし）。coreの`chunk_moves`に action `place`（まとまりの文の数だけを書き換え、大きさは変えない。画面より大きい物は`too_large`で断る）を足し、`boxes`の答えに置き場ごとの可否`places`を足しました。Serverは`POST /api/history/{item_id}/chunk-place`で子の指示書を返し、Webはそれを作品の指示書のforkとして描いて候補に足します。選んだ候補は`layout_change`（metadata `place`）として保存され、記述固定になります。物のまとまりの無い作品は今までどおり「原理に沿う／偶然に委ねる」です。
 - Android：作品編集メニューから「取り合わせ」と「AIに自律推敲させる」を削除しました（作者の決定。Web・Serverと同じ）。推敲の項目は9つになります。実行中の行の「AIに自律推敲させる」と、その2つだけが使ったVisionのモデルの選び、法則のstageだけをやり直す道、保存の画をPNGにしてVisionへ送る道も外しました。前に作った子の札と系譜の記録は今までどおり読めます。端末に保存した自律推敲の記録と設定は消さず、読まなくなります。
 - macOS・iOS：作品編集メニューから「取り合わせ」と「AI自動推敲プロセス」を削除しました（作者の決定。Webと同じ3つの群の10項目）。取り合わせの窓、AI自動推敲の実行と画面、奥書の窓に残っていた画像助言の道と、それらの確かめも削除しました。前の作品の記録（系譜の詳細の「AIの手」の行、派生の種類の札、記述固定）はそのまま読めます。アプリの保存物（`<DB名>.autonomous-runs.json`、設定の`autonomousRefine`）は消さず、読まなくなります。奥書の窓から、子を描くと読める古い文を外しました。前から落ちていた確かめ2つ（`--lineage-migration-only`・`--refinement-only`）を、今のDBの版と今の指示書の答えの形に合わせて直しました。
 - iOS：`apple/scripts/build-ios.sh --device`が入れる前にアプリのデータをコピーする先を、作業木の外にしました。`INKU_IOS_DEVICE_BACKUPS`（絶対パス）か、無ければ`~/Library/Application Support/Inku Development/ios-device-backups`の下の、機器のUDIDごとのフォルダです。前は`apple/build/iOS/device-backups/`で、作業木を消すと一緒に消えていました。相対パスや作業木の中を指すと、buildの前に止まります。

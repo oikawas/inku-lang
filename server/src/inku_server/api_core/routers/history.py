@@ -617,7 +617,8 @@ def api_history_chunk_place(
     Only the numbers of the chunk's sentences change, and never its size. Nothing is drawn or saved: the caller
     draws the instructions as a DDL fork of the work and saves the drawn option. Returns 404 when the work is not
     found for the caller, and 422 with the reason when the chunk cannot move there (no_chunk, scene_word,
-    no_numeric_place, too_large, leaves_canvas, unchanged, fitted, binding_unavailable).
+    no_numeric_place, too_large, leaves_canvas, unchanged, undrawable — a moved sentence the compiler would not
+    draw — fitted, binding_unavailable).
     """
     from ...composition_record import CompositionBoxesRefused, chunk_place
 

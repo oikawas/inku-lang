@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-13 — Change the composition and laws
+
+- "Image Creation": `Change the composition form` is now `Change the composition and laws`; it describes choosing the form or the main law in `What to change`, the main law's tiles, `Stays` and `Decided again`, both laws' names in Lineage's `Derived by`, and `(chosen by the author)` in the generation info.
+
 ## 2026-11-13 — The Library's "By description"
 
 - "Image Creation": the Library's `Group by` gains `By description` (the works of one description in columns by form; numbers and notes make no difference; works drawn from a picture are left out; the mark on a child that shows its parent's composition).

@@ -83,7 +83,7 @@
 					<div class="comp-actions">
 						<button class="ghost-btn" type="button" aria-disabled={descriptionLocked} class:held={descriptionLocked}
 							title={descriptionLocked ? t().descriptionLockedReason : undefined}
-							onclick={() => { if (!descriptionLocked) void onChangeForm(); }}>{t().workActionCompositionForm}</button>
+							onclick={() => { if (!descriptionLocked) void onChangeForm(); }}>{t().workActionComposition}</button>
 					</div>
 				{/if}
 				<dl class="comp-grid">

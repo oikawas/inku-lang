@@ -448,6 +448,18 @@ export interface LangPack {
 	compositionChipVersusTarget: (term: string, value: string) => string;
 	compositionDdlTerm: string;
 	compositionTargetNow: string;
+	/** The refinement that changes the form or the main law (step 2, 2026-11-13). macOS reads workActionCompositionForm, which keeps its words. */
+	workActionComposition: string;
+	compositionWhatToChange: string;
+	compositionKeepsTerm: string;
+	compositionRedecidesTerm: string;
+	compositionFormKeeps: string;
+	compositionFormRedecides: string;
+	/** What a main-law change keeps: the parent's form, by name, when it has one. */
+	compositionMainLawKeeps: (form: string | null) => string;
+	compositionMainLawRedecides: (keepsForm: boolean) => string;
+	/** Beside a form or main law the author named in the generation info. */
+	compositionAuthorChose: string;
 	refineCompareTarget: string;
 	refineCompareOption: (n: number) => string;
 	sketchLabel: string;

@@ -14,7 +14,7 @@ import { otherCatalogIds, planRefinementCandidates, runRefinementFanout } from '
 import { layoutCandidateResult, requestLayoutComposition, type RecomposeMode, type LayoutComposeResponse } from './recomposition.ts';
 import { PipelineApi } from '../pipeline/api';
 import { PipelineController } from '../pipeline/controller';
-import type { CompositionForm } from './composition-form';
+import { compositionChangeOptions, type CompositionChange } from './composition-form';
 import { compositionModeOf, compositionOption, drawRouteOf } from '$lib/draw-route';
 
 type Iteration = HistoryItem;
@@ -614,7 +614,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return contextVersion === targetIdentityVersion ? failed : {};
 	}
 
-	async function generateCompositionFormCandidates(form: CompositionForm, count: 1 | 4): Promise<void> {
+	async function generateCompositionCandidates(change: CompositionChange, count: 1 | 4): Promise<void> {
 		const workId = refinementWorkId();
 		const target = refinementTarget();
 		if (!workId || !target.source || !work.result || refinementSession.gridBusy) return;
@@ -622,8 +622,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		const parentNode = await deps.ensureVisibleLineageParentId();
 		if (!parentNode || version !== targetIdentityVersion) return;
 		const parent = work.result;
-		const from = work.displayedHistoryItem?.description_ddl?.composition?.answer?.form ?? null;
-		const controller = refinementSession.beginGrid({ includesReading: true, taskLabel: t().workActionCompositionForm, count });
+		const answer = work.displayedHistoryItem?.description_ddl?.composition?.answer;
+		const { options: changed, metadata } = compositionChangeOptions(change, { form: answer?.form ?? null, mainLaw: answer?.main_law ?? null });
+		const controller = refinementSession.beginGrid({ includesReading: true, taskLabel: t().workActionComposition, count });
 		const timer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
 		try {
 			const plans = Array.from({ length: count }, (_, index) => async (): Promise<VariationCandidate> => {
@@ -636,21 +637,21 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				try {
 					await pipeline.selectHistory(workId, null, controller.signal);
 					const view = await pipeline.fromDescription(target.source, {
-						route: 'read_and_draw', composition: 'on', composition_form: form,
+						route: 'read_and_draw', composition: 'on', ...changed,
 						sketch: 'on', ...(target.sketchText ? { sketch_text: target.sketchText } : {}),
 						stage1_model: parent.stage1_model ?? deps.models.stage1(), stage2_model: parent.stage2_model ?? deps.models.stage2(),
 						catalog_id: refinementCatalogId(), catalog_mode: 'fixed', canvas_aspect: refinementCanvasAspectId(),
 						...(parent.render_seed != null ? { render_seed: parent.render_seed } : {}),
 						save_history: false, save_artifacts: false, count_generation: true,
 						lineage_parent_node_id: parentNode, derivation_kind: 'composition_form_change',
-						derivation_metadata: { form_from: from, form_to: form },
+						derivation_metadata: metadata,
 					}, controller.signal);
 					controller.signal.throwIfAborted();
 					if (!view.result?.ddl || !view.result.svg) throw new Error(t().pipelineAttentionReason('host_commit_failed'));
 					return { id: view.execution_id, executionId: view.execution_id, label: String(index + 1), selected: false,
 						result: { ...view.result, ddl: view.result.ddl, thinking: view.result.thinking ?? null,
 							lineage_parent_node_id: parentNode, derivation_kind: 'composition_form_change',
-							derivation_metadata: { form_from: from, form_to: form } } };
+							derivation_metadata: metadata } };
 				} finally { controller.signal.removeEventListener('abort', cancel); }
 			});
 			refinementSession.setPlans(controller, plans.map((_, index) => String(index + 1)));
@@ -730,7 +731,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		generateGroundCandidates,
 		generateToolCandidates,
 		generateModelCandidates,
-		generateCompositionFormCandidates,
+		generateCompositionCandidates,
 		saveSelectedVariationCandidates,
 	};
 }

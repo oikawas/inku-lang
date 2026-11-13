@@ -113,7 +113,7 @@ test('unsaved options hide × while discard-and-close and save-and-close are the
 
 test('2026-11-13: option cards name their composition and a pressed option sits beside the target', () => {
 	const grid = read('./RefinementCandidateGrid.svelte');
-	const form = read('./RefinementCompositionFormView.svelte');
+	const form = read('./RefinementCompositionView.svelte');
 	const panel = read('../../components/CanvasPanel.svelte');
 	assert.match(grid, /candidateComposition\(/);
 	// The color, ground, touch and placement views pass no composition: their options keep the parent's record.
@@ -128,4 +128,19 @@ test('2026-11-13: option cards name their composition and a pressed option sits 
 	assert.match(form, /class="target-now"/);
 	assert.match(form, /<CompositionFigure figure=\{form\.id\}/);
 	assert.match(panel, /targetComposition=\{statusComposition\}/);
+});
+
+test('step 2: "Change the composition and laws" chooses the form or the main law, and says what stays', () => {
+	const view = read('./RefinementCompositionView.svelte');
+	// Buttons, not a pull-down, for what to change.
+	assert.match(view, /class="segmented what-tabs"/);
+	assert.doesNotMatch(view, /<select/);
+	assert.match(view, /<CompositionFigure figure=\{law\.code\}/);
+	assert.match(view, /mainLawFamilies\(isJapanese\)/);
+	assert.match(view, /class="what-scroll"/);
+	// What stays and the draw buttons sit outside the scrolled list.
+	const scrollEnd = view.indexOf('</div>', view.indexOf('{/if}', view.indexOf('class="what-scroll"')));
+	assert.ok(view.indexOf('class="keeps"') > scrollEnd);
+	assert.ok(view.indexOf('refine-paint-actions') > view.indexOf('class="keeps"'));
+	assert.match(read('./CanvasRefinementWorkspace.svelte'), /t\(\)\.workActionComposition :/);
 });

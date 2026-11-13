@@ -1,7 +1,7 @@
 // Derivation kinds (the operation that made a work from its parent). Single
 // source for the labels, shared by the lineage panel and the provenance drawer.
 // A work with no kind recorded is the origin of its lineage.
-import { formName } from './features/composition-record/composition-names.ts';
+import { formName, lawName } from './features/composition-record/composition-names.ts';
 
 export type DerivationKind =
 	| 'touch_change'
@@ -37,7 +37,7 @@ const JA: Record<string, string> = {
 	description_edit: '記述編集',
 	replay: '再描画',
 	canvas_aspect_change: 'キャンバス変更',
-	composition_form_change: '構図の形',
+	composition_form_change: '構図と法則',
 	canvas_fit: 'はめ込み',
 	variation: '変奏（旧）',
 	sketch_grain_change: '写生の有無',
@@ -60,7 +60,7 @@ const EN: Record<string, string> = {
 	description_edit: 'Description edit',
 	replay: 'Replay',
 	canvas_aspect_change: 'Canvas change',
-	composition_form_change: 'Composition form',
+	composition_form_change: 'Composition and laws',
 	canvas_fit: 'Fit',
 	variation: 'Variation (retired)',
 	sketch_grain_change: 'Sketch from life',
@@ -73,10 +73,17 @@ export function derivationKindLabel(kind: string | null | undefined, isJapanese:
 }
 
 /** What an edge's metadata adds to its kind's label, if anything (2026-11-13).
- *  A form change that recorded both forms reads "画の型: 分ける線 → 帯"; a
- *  form a newer core named and this table does not have reads as its id. */
+ *  A form change that recorded both forms reads "画の型: 分ける線 → 帯", and a
+ *  main-law change that recorded both laws reads "主の法則: 黄金分割 → 漸進"
+ *  (step 2); a form or law a newer core named and this table does not have
+ *  reads as its key. */
 export function derivationDetail(kind: string | null | undefined, metadata: unknown, isJapanese: boolean): string | null {
 	if (kind !== 'composition_form_change' || !metadata || typeof metadata !== 'object') return null;
+	const { main_law_from: lawFrom, main_law_to: lawTo } = metadata as { main_law_from?: unknown; main_law_to?: unknown };
+	if (typeof lawTo === 'string' && lawTo) {
+		if (typeof lawFrom !== 'string' || !lawFrom) return null;
+		return `${isJapanese ? '主の法則: ' : 'Main law: '}${lawName(lawFrom, isJapanese)} → ${lawName(lawTo, isJapanese)}`;
+	}
 	const { form_from: from, form_to: to } = metadata as { form_from?: unknown; form_to?: unknown };
 	if (typeof from !== 'string' || !from || typeof to !== 'string' || !to) return null;
 	const term = isJapanese ? '画の型: ' : 'Form: ';

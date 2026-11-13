@@ -54,13 +54,15 @@ test('four composition-form forks retain the parent settings and only selected e
 		seeds: { composition: () => 1 }, lineageParentId: () => 'node', ensureVisibleLineageParentId: async () => 'node',
 		pushHistory: async () => { throw new Error('must save execution'); }, resetTargetScopedState: () => {},
 	} as unknown as Parameters<typeof createRefinementCoordinator>[0]);
-	await coordinator.generateCompositionFormCandidates('bands', 4);
+	await coordinator.generateCompositionCandidates({ kind: 'form', form: 'bands' }, 4);
 	assert.equal(session.candidates.length, 4);
 	const forks = calls.filter((call) => call.path.endsWith('/fork'));
 	assert.equal(forks.length, 4);
 	for (const fork of forks) {
 		const options = fork.body.options as Record<string, unknown>;
 		assert.equal(options.composition_form, 'bands');
+		assert.equal('composition_main_law' in options, false);
+		assert.deepEqual(options.derivation_metadata, { form_from: 'one_corner', form_to: 'bands' });
 		assert.equal(options.sketch_text, 'reading');
 		assert.equal(options.render_seed, 123);
 		assert.equal(options.catalog_mode, 'fixed');
@@ -69,4 +71,20 @@ test('four composition-form forks retain the parent settings and only selected e
 	session.toggleCandidate(session.candidates[1].id);
 	assert.equal(await coordinator.saveSelectedVariationCandidates(), true);
 	assert.deepEqual(calls.filter((call) => call.path.endsWith('/save')).map((call) => call.path), ['/api/pipeline/executions/e2/save']);
+});
+
+test('step 2: a main-law change names the law and keeps the parent\'s form', async () => {
+	const { compositionChangeOptions } = await import('./composition-form.ts');
+	assert.deepEqual(compositionChangeOptions({ kind: 'main_law', mainLaw: 'B10', form: 'one_corner' }, { form: 'one_corner', mainLaw: 'B1' }), {
+		options: { composition_form: 'one_corner', composition_main_law: 'B10' },
+		metadata: { main_law_from: 'B1', main_law_to: 'B10', form: 'one_corner' },
+	});
+	// A parent without a form (no record yet) fixes no form.
+	assert.deepEqual(compositionChangeOptions({ kind: 'main_law', mainLaw: 'C5', form: null }, { form: null, mainLaw: null }), {
+		options: { composition_main_law: 'C5' },
+		metadata: { main_law_from: null, main_law_to: 'C5', form: null },
+	});
+	assert.deepEqual(compositionChangeOptions({ kind: 'form', form: 'grid' }, { form: 'bands', mainLaw: 'B1' }), {
+		options: { composition_form: 'grid' }, metadata: { form_from: 'bands', form_to: 'grid' },
+	});
 });

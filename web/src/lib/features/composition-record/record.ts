@@ -38,6 +38,7 @@ export function inheritedOf(work: { composition_inherited?: unknown } | null | u
 	const via = Array.isArray(fields.via) ? fields.via.filter((kind): kind is string => typeof kind === 'string') : [];
 	const record: CompositionRecord = { state: 'used', answer: fields.answer as CompositionRecord['answer'] };
 	if (typeof fields.requested_form === 'string') record.requested_form = fields.requested_form;
+	if (typeof fields.requested_main_law === 'string') record.requested_main_law = fields.requested_main_law;
 	return { historyId: fields.history_id, at: typeof fields.at === 'number' ? fields.at : null, via, record };
 }
 

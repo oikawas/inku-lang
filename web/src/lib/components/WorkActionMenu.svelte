@@ -142,7 +142,7 @@
 				<div class="work-action-group" role="group" aria-label={t().workActionGroupDescription}>
 					<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupDescription}</div>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}{@render llmMark()}</button>
-					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('composition-form', event)}>{t().workActionCompositionForm}{@render llmMark()}</button>
+					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('composition-form', event)}>{t().workActionComposition}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('models', event)}>{t().workActionModels}{@render llmMark()}</button>
 					{#if descriptionLocked}<p class="work-action-held-note">{t().descriptionLockedReason}</p>{/if}

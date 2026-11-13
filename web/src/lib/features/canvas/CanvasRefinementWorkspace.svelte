@@ -4,7 +4,7 @@
 	import RefinementGroundView from './RefinementGroundView.svelte';
 	import RefinementToolView from './RefinementToolView.svelte';
 	import RefinementModelCompareView from './RefinementModelCompareView.svelte';
-	import RefinementCompositionFormView from './RefinementCompositionFormView.svelte';
+	import RefinementCompositionView from './RefinementCompositionView.svelte';
 	import './refinement-workspace.css';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { CompositionSummary } from '$lib/features/composition-record/record';
@@ -43,7 +43,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
-		onGenerateCompositionFormCandidates: (form: import('./composition-form').CompositionForm, count: 1 | 4) => void | Promise<void>;
+		onGenerateCompositionCandidates: (change: import('./composition-form').CompositionChange, count: 1 | 4) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
@@ -75,7 +75,7 @@
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
 		onGenerateGroundCandidates,
-		onGenerateCompositionFormCandidates,
+		onGenerateCompositionCandidates,
 		onGenerateToolCandidates,
 		onGenerateModelCandidates,
 		onSaveAndClose,
@@ -84,7 +84,7 @@
 	}: Props = $props();
 
 	const dialogTitle = $derived(
-		view === 'composition-form' ? t().workActionCompositionForm : view === 'layout'
+		view === 'composition-form' ? t().workActionComposition : view === 'layout'
 				? t().canvasVaryComposition
 				: view === 'color-arrangement'
 					? t().workActionColorArrangement
@@ -174,9 +174,9 @@
 		     holds is not drawn from. -->
 		<p class="refine-held-note">{t().descriptionLockedReason}</p>
 	{:else if view === 'composition-form'}
-		<RefinementCompositionFormView {isJapanese} {resultAvailable} {artworkUrl} {canvasAspectWidth} {canvasAspectHeight}
+		<RefinementCompositionView {isJapanese} {resultAvailable} {artworkUrl} {canvasAspectWidth} {canvasAspectHeight}
 			{refinementSession} {compositionForm} {compositionFormSwitch} {targetComposition}
-			onGenerateCandidates={onGenerateCompositionFormCandidates} {onSaveAndClose} {onDiscardAndClose} />
+			onGenerateCandidates={onGenerateCompositionCandidates} {onSaveAndClose} {onDiscardAndClose} />
 	{:else}
 		<RefinementModelCompareView
 			{isJapanese}

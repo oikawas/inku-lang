@@ -1077,6 +1077,26 @@ pub fn titled_composed_source(
     if lines.len() != owners.len() + 1 {
         return source.to_owned();
     }
+    let names = composed_thing_titles(owners, things, language);
+    let chunks = std::iter::once(None)
+        .chain(
+            owners
+                .iter()
+                .map(|owner| names.get(owner).map(String::as_str)),
+        )
+        .collect::<Vec<_>>();
+    inku_ddl::print_ddl_titles(&lines, &chunks, language)
+}
+
+/// Each thing's title, by its number: its words from the description, or else
+/// what it is, or else 「物n」; a name two things share is numbered from the
+/// second (「月」「月2」). The things are the record's and every nonzero owner.
+#[must_use]
+pub fn composed_thing_titles(
+    owners: &[u64],
+    things: &[CompositionThing],
+    language: ResolvedInstructionLanguage,
+) -> BTreeMap<u64, String> {
     let fallback = |thing: u64| match language {
         ResolvedInstructionLanguage::Ja => format!("物{thing}"),
         ResolvedInstructionLanguage::En => format!("thing {thing}"),
@@ -1111,14 +1131,7 @@ pub fn titled_composed_source(
             },
         );
     }
-    let chunks = std::iter::once(None)
-        .chain(
-            owners
-                .iter()
-                .map(|owner| names.get(owner).map(String::as_str)),
-        )
-        .collect::<Vec<_>>();
-    inku_ddl::print_ddl_titles(&lines, &chunks, language)
+    names
 }
 
 fn pick<'a>(table: &[(&str, &'a str, &'a str)], key: &str, ja: bool) -> &'a str {

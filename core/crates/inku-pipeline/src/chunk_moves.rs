@@ -38,16 +38,20 @@
 //! `draw` a DDL, `keep` the child with its record, or `skip` the turn. Nothing
 //! is sent, drawn or saved here.
 
+use std::collections::BTreeMap;
+
 use inku_ddl::{
-    MacroDefinition, ResolvedInstructionLanguage, ddl_title_lines, print_ddl_titles,
-    split_ddl_titles,
+    MacroDefinition, ResolvedInstructionLanguage, ddl_title_lines, ddl_title_name,
+    print_ddl_titles, split_ddl_titles,
 };
 use inku_score::CanvasRatio;
 use inku_score::math::DetFloat;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::description_composition::{CompositionThing, GOLDEN, number, titled_composed_source};
+use crate::description_composition::{
+    CompositionThing, GOLDEN, composed_thing_titles, number, titled_composed_source,
+};
 use crate::description_ddl::{hint, writing_guide};
 use crate::description_laws::{
     Numbers, PlaceKind, center, extent, inside, moved_values, parse_with_definitions, rewritten,
@@ -1377,6 +1381,122 @@ pub fn titled_source(
     )
 }
 
+/// One chunk of a work, for a host to tie a composition record's thing, the
+/// DDL's title and the picture together.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct UnitBox {
+    pub title: String,
+    /// The record's thing whose title is this chunk's, when there is one.
+    pub thing: Option<u64>,
+    /// The chunk's lines in the DDL as the host gave it, from 0, its title
+    /// line among them when it has one.
+    pub lines: Vec<usize>,
+    pub sentences: usize,
+    /// The chunk's sentences with no numeric place the parser can read.
+    pub unplaced: usize,
+    /// The union of the boxes of the sentences that have one, as canvas
+    /// fractions `[x0, y0, x1, y1]`; `None` when no sentence has one.
+    #[serde(rename = "box")]
+    pub area: Option<[f64; 4]>,
+}
+
+/// A work's chunks with their things and boxes. Unlike `Paper::box_of`, a
+/// sentence with no readable place (a plugin word alone) is counted and left
+/// out instead of refusing the chunk.
+pub fn boxes(
+    config: &PipelineConfig,
+    ddl: &str,
+    composition: Option<&Composition>,
+) -> Result<Vec<UnitBox>, Refusal> {
+    let (paper, _) = paper_of(config)?;
+    let doc = Doc::of(&titled_source(ddl, composition, paper.language));
+    let titles = composition.map(|composition| {
+        composed_thing_titles(&composition.owners, &composition.things, paper.language)
+    });
+    let owners = source_line_chunks(ddl, composition, titles.as_ref());
+    Ok(doc
+        .units()
+        .into_iter()
+        .map(|title| {
+            let members = doc.members(&title);
+            let placed: Vec<[f64; 4]> = members
+                .iter()
+                .filter_map(|index| {
+                    parse_with_definitions(&doc.lines[*index], paper.language, paper.definitions)
+                })
+                .map(|numbers| sentence_box(&numbers, paper.units))
+                .collect();
+            let thing = titles.as_ref().and_then(|titles| {
+                titles
+                    .iter()
+                    .find(|(_, name)| **name == title)
+                    .map(|(number, _)| *number)
+            });
+            let lines = owners
+                .iter()
+                .enumerate()
+                .filter(|(_, owner)| owner.as_deref() == Some(title.as_str()))
+                .map(|(index, _)| index)
+                .collect();
+            UnitBox {
+                thing,
+                lines,
+                sentences: members.len(),
+                unplaced: members.len() - placed.len(),
+                area: union(placed),
+                title,
+            }
+        })
+        .collect())
+}
+
+/// The chunk of each line of the DDL as the host gave it (not as titled
+/// here): with title lines, a title line and the sentences after it are its
+/// chunk's; without, line `n` is the record's `owners[n - 1]`'s, as
+/// `titled_composed_source` titles it. Blank lines are no chunk's.
+fn source_line_chunks(
+    ddl: &str,
+    composition: Option<&Composition>,
+    titles: Option<&BTreeMap<u64, String>>,
+) -> Vec<Option<String>> {
+    let lines: Vec<&str> = ddl
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .collect();
+    if !ddl_title_lines(ddl).is_empty() {
+        let mut current: Option<String> = None;
+        return lines
+            .iter()
+            .map(|line| {
+                if let Some(name) = ddl_title_name(line) {
+                    current = (!name.is_empty()).then(|| name.to_owned());
+                    current.clone()
+                } else if line.trim().is_empty() {
+                    None
+                } else {
+                    current.clone()
+                }
+            })
+            .collect();
+    }
+    let (Some(composition), Some(titles)) = (composition, titles) else {
+        return vec![None; lines.len()];
+    };
+    if lines.len() != composition.owners.len() + 1 {
+        return vec![None; lines.len()];
+    }
+    lines
+        .iter()
+        .enumerate()
+        .map(|(index, line)| {
+            if index == 0 || line.trim().is_empty() {
+                return None;
+            }
+            titles.get(&composition.owners[index - 1]).cloned()
+        })
+        .collect()
+}
+
 /// The first request of a turn.
 pub fn start(
     config: &PipelineConfig,
@@ -1743,10 +1863,23 @@ struct UnitsRequest {
     language: ResolvedInstructionLanguage,
 }
 
+/// A work's chunks with the record's thing and the box of each: its DDL, the
+/// configuration it is drawn with (paper, language, definitions) and its
+/// composition record.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BoxesRequest {
+    config: PipelineConfig,
+    ddl: String,
+    #[serde(default)]
+    composition: Option<Composition>,
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 enum Request {
     Units(Box<UnitsRequest>),
+    Boxes(Box<BoxesRequest>),
     Start(Box<StartRequest>),
     Answer(Box<AnswerRequest>),
     Drawn(Box<DrawnRequest>),
@@ -1770,6 +1903,10 @@ fn respond(request: Request) -> Result<Value, Refusal> {
             let source =
                 titled_source(&request.ddl, request.composition.as_ref(), request.language);
             return Ok(json!({"units": Doc::of(&source).units()}));
+        }
+        Request::Boxes(request) => {
+            let units = boxes(&request.config, &request.ddl, request.composition.as_ref())?;
+            return Ok(json!({"units": units}));
         }
         Request::Start(request) => start(
             &request.config,
@@ -2386,5 +2523,106 @@ mod tests {
         assert_eq!(units["units"], json!(["灯台", "波の筋"]));
         let none = ask(json!({"action": "units", "ddl": plain, "language": "ja"}));
         assert_eq!(none["units"], json!([]));
+    }
+
+    #[test]
+    fn boxes_tie_each_chunk_to_its_thing_lines_and_box() {
+        let ask = |request: Value| -> Value {
+            serde_json::from_slice(&chunk_moves_json(&serde_json::to_vec(&request).unwrap()))
+                .unwrap()
+        };
+        let thing = |thing: u64, what: &str, quote: &str| CompositionThing {
+            thing,
+            what: what.to_owned(),
+            role: "main".to_owned(),
+            kind: "object".to_owned(),
+            quote: quote.to_owned(),
+            word: String::new(),
+        };
+        // A short made-up DDL: the second chunk is the mock work's (76ba66d8)
+        // 「磯もとどろに」, whose box the work's evidence measured.
+        let titled = "画面比1:1。\n背景を青で埋める。\n\n「大海の」\n\
+            画面の横0.12、縦0.24から横0.89、縦0.32まで、白の水彩の細いゆるやかに波打つ線を1本引く。\n\n\
+            「磯もとどろに」\n\
+            画面の横0.618034、縦0.618034の位置に、幅0.36、高さ0.3の回転20.0度の黒のガッシュの塗りの楕円を1個置く。\n\
+            画面の横0.66、縦0.61の位置に、幅0.16、高さ0.2の回転25.0度の灰のガッシュの刷毛目の三角を1個置く。\n\
+            画面の横0.58、縦0.69から横0.72、縦0.58まで、紫の鉛筆の細い線を1本引く。";
+        let composition = json!({
+            "owners": [0, 1, 2, 2, 2],
+            "things": [thing(1, "海", "大海の"), thing(2, "岩", "磯もとどろに")],
+        });
+        let answer = ask(json!({
+            "action": "boxes", "config": config(), "ddl": titled, "composition": composition,
+        }));
+        assert_eq!(answer["schema"], CHUNK_MOVES_SCHEMA_ID);
+        assert_eq!(answer["outcome"], "ok");
+        let units = answer["units"].as_array().unwrap();
+        assert_eq!(units.len(), 2);
+        assert_eq!(units[0]["title"], "大海の");
+        assert_eq!(units[0]["thing"], 1);
+        assert_eq!(units[0]["lines"], json!([3, 4]));
+        assert_eq!(units[0]["box"], json!([0.12, 0.24, 0.89, 0.32]));
+        assert_eq!(units[1]["title"], "磯もとどろに");
+        assert_eq!(units[1]["thing"], 2);
+        assert_eq!(units[1]["lines"], json!([6, 7, 8, 9]));
+        assert_eq!(
+            (
+                units[1]["sentences"].as_u64(),
+                units[1]["unplaced"].as_u64()
+            ),
+            (Some(3), Some(0))
+        );
+        let area: Vec<f64> = serde_json::from_value(units[1]["box"].clone()).unwrap();
+        let expected = [
+            0.397_586_306_759_686_2,
+            0.415_516_481_083_493_37,
+            0.838_481_693_240_313_7,
+            0.820_551_518_916_506_6,
+        ];
+        for (got, want) in area.iter().zip(expected) {
+            assert!((got - want).abs() < 1e-9, "{area:?}");
+        }
+
+        // No title lines: the record titles the chunks here, and the lines
+        // are the given DDL's.
+        let plain = "画面比1:1。\n背景を青で埋める。\n\
+            画面の横0.12、縦0.24から横0.89、縦0.32まで、白の水彩の細いゆるやかに波打つ線を1本引く。\n\
+            画面の横0.58、縦0.69から横0.72、縦0.58まで、紫の鉛筆の細い線を1本引く。";
+        let composition = json!({
+            "owners": [0, 1, 2],
+            "things": [thing(1, "海", "大海の"), thing(2, "岩", "")],
+        });
+        let recorded = ask(json!({
+            "action": "boxes", "config": config(), "ddl": plain, "composition": composition,
+        }));
+        let units = recorded["units"].as_array().unwrap();
+        assert_eq!(units.len(), 2);
+        assert_eq!(
+            (&units[0]["title"], &units[0]["thing"], &units[0]["lines"]),
+            (&json!("大海の"), &json!(1), &json!([2]))
+        );
+        assert_eq!(
+            (&units[1]["title"], &units[1]["thing"], &units[1]["lines"]),
+            (&json!("岩"), &json!(2), &json!([3]))
+        );
+        let without = ask(json!({"action": "boxes", "config": config(), "ddl": plain}));
+        assert_eq!(without["units"], json!([]));
+
+        // A chunk of a plugin word alone has no box.
+        let package: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
+        let mut config = config();
+        config.definitions.push(
+            MacroDefinition::from_json(&package["entries"][0]["definition"].to_string()).unwrap(),
+        );
+        let scene = ask(json!({
+            "action": "boxes", "config": config, "ddl": "画面比1:1。\n\n「葉」\n｛若葉｝。",
+        }));
+        assert_eq!(
+            scene["units"],
+            json!([{"title": "葉", "thing": null, "lines": [2, 3], "sentences": 1, "unplaced": 1, "box": null}])
+        );
     }
 }

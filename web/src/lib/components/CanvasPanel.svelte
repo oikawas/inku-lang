@@ -35,6 +35,7 @@
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
 	import type { RangePreview } from '$lib/composition-ranges';
+	import { quoteSpan, type ThingFrame } from '$lib/features/composition-record/things';
 	import type { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { CanvasStatusHistoryItem as HistoryItem } from '$lib/features/canvas/view-types';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
@@ -52,6 +53,10 @@
 		viewMode?: '2d' | '3d';
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
+		/** The thing pointed at: its frame on the drawing, the point reports, and its words in the caption (step 1c). */
+		thingFrame?: ThingFrame | null;
+		onPointCanvas?: ((point: { x: number; y: number } | null) => void) | null;
+		captionQuote?: string | null;
 		unsavedRefinementPreview: boolean;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
@@ -201,6 +206,9 @@
 		viewMode = $bindable('2d'),
 		result,
 		rangePreview = null,
+		thingFrame = null,
+		onPointCanvas = null,
+		captionQuote = null,
 		unsavedRefinementPreview = false,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
@@ -603,6 +611,7 @@
 	};
 	const canvasBaseHeight = $derived(400 * canvasAspectHeight / canvasMaxRatio);
 	const displayInstructionText = $derived((instructionText || '').trim());
+	const captionHighlight = $derived(quoteSpan(displayInstructionText, captionQuote));
 	const canShowInstructionCaption = $derived(!!displayInstructionText);
 	const canUseVerticalInstructionCaption = $derived(supportsVerticalCaption(displayInstructionText));
 	const instructionCaptionVertical = $derived(
@@ -846,6 +855,9 @@
 				} : null}
 				{result}
 				{rangePreview}
+				{thingFrame}
+				{onPointCanvas}
+				{captionHighlight}
 				{artworkUrl}
 				bind:canvasContentEl
 				{canvasAspectWidth}

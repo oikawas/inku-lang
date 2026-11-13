@@ -474,6 +474,80 @@ def api_history_thumb(
     return Response(content=row["png"], media_type="image/png", headers=headers)
 
 
+class CompositionBoxUnit(BaseModel):
+    """One chunk of a work's instructions: its title, its thing and where it is drawn."""
+
+    title: str = Field(description="The chunk's title, as its title line or the composition record names it.")
+    thing: int | None = Field(description="The number of the composition record's thing this chunk is, or null when none is.")
+    lines: list[int] = Field(description="The chunk's zero-based line numbers in the work's instructions, its title line included when it has one.")
+    sentences: int = Field(description="How many sentences the chunk has.")
+    unplaced: int = Field(description="How many of the chunk's sentences have no numeric place (a plugin word alone).")
+    box: list[float] | None = Field(
+        description="The union of the placed sentences' boxes as canvas fractions [x0, y0, x1, y1], or null when none is "
+                    "placed or the work was fitted onto another paper.",
+    )
+
+
+class CompositionBoxesResponse(BaseModel):
+    """A work's chunks, tied to its composition record's things and to the picture."""
+
+    units: list[CompositionBoxUnit] = Field(description="The chunks in the order their first sentences come; empty when the instructions have none.")
+
+
+def _fitted_onto_another_paper(item: dict) -> bool:
+    """A work fitted onto another paper (はめ込み), or a child keeping its Score: the instructions'
+    numbers are the declared ratio's and the picture sits in a centred frame of it, so the boxes
+    (fractions of the paper) would miss. A frame of the paper's own ratio fills it."""
+    from ...canvas_formats import canvas_format
+
+    if item.get("derivation_kind") == "canvas_fit":
+        return True
+    canvas = (item.get("score") or {}).get("canvas")
+    if not isinstance(canvas, dict) or canvas.get("fit") is None:
+        return False
+    declared = canvas.get("declared_ratio") or {}
+    try:
+        paper = canvas_format(str(canvas.get("aspect")))
+        width, height = int(declared["width_units"]), int(declared["height_units"])
+    except (KeyError, TypeError, ValueError):
+        return True
+    return width * paper.height_units != height * paper.width_units
+
+
+@router.get(
+    "/api/history/{item_id}/composition-boxes",
+    response_model=CompositionBoxesResponse,
+    summary="Get a work's chunks and their boxes",
+)
+def api_history_composition_boxes(
+    item_id: Annotated[str, Path(description="Id of the work.")], actor: dict = Depends(_current_user)
+) -> CompositionBoxesResponse:
+    """Return the chunks of one work's instructions with the composition record's thing, the lines and the box of each.
+
+    The work's own composition record titles untitled instructions. Returns 404 when the work is not found for
+    the caller, and 422 when no configuration can be made to read the work's instructions.
+    """
+    from ...composition_record import CompositionBoxesRefused, composition_boxes, composition_of
+    from ...pipeline_runtime import get_service
+
+    items = _db.get_items(actor["id"], [item_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="history item not found")
+    item = items[0]
+    ddl = item.get("ddl") or ""
+    config = get_service().retouch_config(actor["id"], item["id"], ddl)
+    if config is None:
+        raise HTTPException(status_code=422, detail="composition boxes cannot be read: binding_unavailable")
+    # The work's own record only; step 1d adds the parent's for a child that keeps none.
+    try:
+        units = composition_boxes(config, ddl, composition_of(item))
+    except CompositionBoxesRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
+    if _fitted_onto_another_paper(item):
+        units = [{**unit, "box": None} for unit in units]
+    return CompositionBoxesResponse(units=units)
+
+
 @router.get("/api/history/{item_id}/svg", summary="Get a work's SVG", responses={500: {"description": "Unexpected server failure"}})
 def api_history_svg(
     item_id: Annotated[str, Path(description="Id of the work.")],

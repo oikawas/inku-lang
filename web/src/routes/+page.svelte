@@ -78,6 +78,8 @@
 	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import CompositionSection from '$lib/features/composition-record/CompositionSection.svelte';
+	import { ThingLinks } from '$lib/features/composition-record/things.svelte';
+	import { compositionOf } from '$lib/features/composition-record/record';
 	import { bindGenerationInfoSettingsPersist } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
@@ -1171,6 +1173,27 @@
 
 	let compositionRanges = $state<CompositionRange[]>([]);
 	let ddlRangePreview = $state<RangePreview | null>(null);
+	// The displayed work's things joined to its drawing, DDL and caption (step 1c).
+	// Fetched for a saved work only while "composition and laws" is open.
+	const thingLinks = new ThingLinks();
+	const thingWork = $derived(work.displayedHistoryItem ?? null);
+	const thingAnswer = $derived(compositionOf(thingWork)?.answer ?? null);
+	$effect(() => {
+		const id = thingWork?.id, ddl = thingWork?.ddl;
+		if (!id || !ddl || !thingAnswer) { thingLinks.clear(); return; }
+		if (describePanelSettings.compositionOpen) thingLinks.load(apiFetch, id, ddl);
+	});
+	const pointedThing = $derived(thingLinks.active === null ? null
+		: (thingAnswer?.things ?? []).find((thing) => thing.thing === thingLinks.active) ?? null);
+	const thingFrame = $derived.by(() => {
+		const box = thingLinks.activeBox;
+		if (!box || !pointedThing) return null;
+		return { box, label: `${pointedThing.thing} ${pointedThing.what ?? ''}`.trim() };
+	});
+	function revealThing(thing: number): void {
+		const line = thingLinks.units.find((unit) => unit.thing === thing)?.lines[0];
+		if (line !== undefined) ddlViewer?.revealLine(line);
+	}
 	let ddlViewer = $state<DdlViewer | null>(null);
 	async function loadCompositionRanges(): Promise<void> {
 		compositionRanges = [];
@@ -2997,6 +3020,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							offersDescriptionActions={work.displayedHistoryItem?.display_label !== 'DDL'}
 							descriptionLocked={!!work.displayedHistoryItem?.description_locked}
 							onChangeForm={() => canvasPanelHandle?.runCurrentWorkAction('composition-form')}
+							activeThing={thingLinks.active}
+							onPointThing={(thing) => thingLinks.point(thing)}
+							onRevealThing={revealThing}
 						/>
 					{/if}
 
@@ -3016,6 +3042,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								workKey={ddlWorkKey(work.displayedHistoryItem?.id, work.result)}
 								onDdlChange={(ddl) => { if (canEditCurrentDdl && !rangeEditingLocked) work.ddl = ddl; }}
 								onRangePreview={(preview) => { ddlRangePreview = preview; }}
+								activeLines={work.ddl === thingWork?.ddl ? thingLinks.activeLines : []}
+								onLineHover={thingLinks.units.length && work.ddl === thingWork?.ddl ? (line) => thingLinks.pointLine(line) : null}
 								{pluginEntries}
 								previewForWord={saijikiPreview}
 								previewForPlugin={pluginPreview}
@@ -3129,6 +3157,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				exportCardOnly={!session.uiVisibility.work_tools}
 				result={work.result}
 				rangePreview={ddlRangePreview}
+				{thingFrame}
+				onPointCanvas={thingLinks.hasBoxes ? (point) => (point ? thingLinks.pointAt(point.x, point.y) : thingLinks.point(null)) : null}
+				captionQuote={pointedThing?.quote ?? null}
 				{unsavedRefinementPreview}
 				allowEmptyOutputTabs={work.showingDemo}
 				{currentRenderedAt}

@@ -11,6 +11,7 @@ import type { CompositionRange } from '../../composition-ranges';
 import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from './types';
 import { compositionChanged, externalDdlValue, hoveredRange, numericRangeEditing, openRangeAt, rangeEditorState, rangeFocusChanged, type RangeEditorStatus } from './codemirror-ranges';
 import { completionRangeTagState, completionRangeTagsChanged, type CompletionRangeLabels } from './completion-range-tags';
+import { chunkLineState, chunkLinesChanged, lineOf } from './codemirror-chunks';
 import type { CompletionRangeState } from './completion-range-states';
 import type { PluginCall } from './plugin-calls';
 
@@ -141,6 +142,8 @@ export type DdlEditorOptions = CompletionOptions & {
 	placeholder: string;
 	onChange: (value: string) => void;
 	onRanges: (status: RangeEditorStatus) => void;
+	/** The line (from 0) the pointer is over, or null when it leaves (step 1c). */
+	onLineHover?: (line: number | null) => void;
 };
 
 export type DdlEditorControl = {
@@ -149,6 +152,10 @@ export type DdlEditorControl = {
 	replaceValueWithHistory: (value: string) => void;
 	insertWord: (word: string) => void;
 	focus: () => void;
+	/** Lights the lines (from 0) of the chunk pointed at; an empty list clears them. */
+	highlightLines: (lines: readonly number[]) => void;
+	/** Scrolls a line (from 0) into view, at the top. */
+	revealLine: (line: number) => void;
 	destroy: () => void;
 };
 
@@ -185,6 +192,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 	let compositionTimer: ReturnType<typeof setTimeout> | null = null;
 	let nativeCompositionTarget: EventTarget | null = null;
 	let cursorPlaced = false;
+	let hoverLine: number | null = null;
 	const configuration = new Compartment();
 	const composing = () => view?.composing ?? false;
 	const configurable = () => [ddlEditorModel(options.ranges, options.disabled, composing, { source: options.pluginCallSource ?? '', calls: options.pluginCalls ?? [] }),
@@ -230,7 +238,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 	view = new EditorView({ parent, state: EditorState.create({ doc: value,
 		selection: initial.cursorAtEnd ? EditorSelection.cursor(value.length) : undefined,
 		extensions: [
-		completionRangeTagState,
+		completionRangeTagState, chunkLineState,
 		configuration.of(configurable()), history(), keymap.of([...defaultKeymap, ...historyKeymap]),
 		drawSelection(), EditorView.lineWrapping,
 		hoverTooltip((view, pos) => {
@@ -256,8 +264,16 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 				const label = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-ddl-range]') : null;
 				const start = label ? Number(label.dataset.ddlRange) : null;
 				if (editor.state.field(rangeEditorState).hover !== start) editor.dispatch({ effects: hoveredRange.of(start) });
+				if (options.onLineHover) {
+					const position = editor.posAtCoords({ x: event.clientX, y: event.clientY });
+					const line = position === null ? null : lineOf(editor.state, position);
+					if (line !== hoverLine) { hoverLine = line; options.onLineHover(line); }
+				}
 			},
-			mouseleave(_event, editor) { if (editor.state.field(rangeEditorState).hover !== null) editor.dispatch({ effects: hoveredRange.of(null) }); },
+			mouseleave(_event, editor) {
+				if (editor.state.field(rangeEditorState).hover !== null) editor.dispatch({ effects: hoveredRange.of(null) });
+				if (hoverLine !== null) { hoverLine = null; options.onLineHover?.(null); }
+			},
 			focus(_event, editor) { cursorPlaced = true; editor.dispatch({ effects: rangeFocusChanged.of(true) }); },
 			blur(_event, editor) { editor.dispatch({ effects: rangeFocusChanged.of(false) }); }
 		}),
@@ -318,6 +334,16 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			if (tr) { view.dispatch(tr); view.focus(); }
 		},
 		focus() { view?.focus(); },
+		highlightLines(lines) {
+			if (!view) return;
+			const shown = view.state.field(chunkLineState).lines;
+			if (shown.length === lines.length && shown.every((line, index) => line === lines[index])) return;
+			view.dispatch({ effects: chunkLinesChanged.of([...lines]) });
+		},
+		revealLine(line) {
+			if (!view || line < 0 || line >= view.state.doc.lines) return;
+			view.dispatch({ effects: EditorView.scrollIntoView(view.state.doc.line(line + 1).from, { y: 'start' }) });
+		},
 		destroy() {
 			destroyed = true;
 			if (compositionTimer !== null) clearTimeout(compositionTimer);

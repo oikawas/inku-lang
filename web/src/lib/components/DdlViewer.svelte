@@ -35,9 +35,12 @@
 		pluginEntries?: PluginEntry[];
 		previewForWord: PreviewForWord;
 		previewForPlugin: PreviewForPlugin;
+		/** The lines (from 0) of the chunk whose thing is pointed at, and the line under the pointer (step 1c). */
+		activeLines?: readonly number[];
+		onLineHover?: ((line: number | null) => void) | null;
 	};
 
-	let { ddl, savedDdl = null, onConfirmDiscard, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], completionWork = null, apiFetch, workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin }: Props = $props();
+	let { ddl, savedDdl = null, onConfirmDiscard, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], completionWork = null, apiFetch, workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin, activeLines = [], onLineHover = null }: Props = $props();
 	let editor = $state<DdlEditor | null>(null);
 	let rangeStatus = $state<RangeEditorStatus>({ preview: null, invalid: false, composing: false });
 
@@ -51,6 +54,7 @@
 		onRangePreview?.(status.preview);
 	}
 	export function insertWord(word: string): void { if (!readOnly) editor?.insertWord(word); }
+	export function revealLine(line: number): void { editor?.revealLine(line); }
 	function canDiscardEdits(): boolean {
 		return savedDdl !== null && !!onConfirmDiscard && !readOnly && !paintDisabled && !rangeStatus.composing && ddl !== savedDdl;
 	}
@@ -100,6 +104,8 @@
 				{previewForPlugin}
 				onChange={onDdlChange ?? undefined}
 				onRanges={updateRangeStatus}
+				{activeLines}
+				onLineHover={onLineHover ?? undefined}
 			/>
 		{/key}
 	</div>

@@ -27,6 +27,9 @@
 		apiFetch?: ApiFetch;
 		onRanges?: (status: RangeEditorStatus) => void;
 		onChange?: (value: string) => void;
+		/** The lines (from 0) of the chunk whose thing is pointed at (step 1c). */
+		activeLines?: readonly number[];
+		onLineHover?: (line: number | null) => void;
 	};
 
 	let {
@@ -42,6 +45,8 @@
 		apiFetch,
 		onRanges,
 		onChange,
+		activeLines = [],
+		onLineHover,
 	}: Props = $props();
 
 	let editorHost = $state<HTMLDivElement | null>(null);
@@ -101,7 +106,8 @@
 			completionSource, completionStates, completionLabels,
 			lineNumbers: !compact, cursorAtEnd: compact,
 			label: t().ddlEditorInstructions, placeholder: t().ddlEditPlaceholder,
-			onChange: (next) => { value = next; onChange?.(next); }, onPreview: (next) => activeSaijikiPreview = next, onRanges: (status) => onRanges?.(status) };
+			onChange: (next) => { value = next; onChange?.(next); }, onPreview: (next) => activeSaijikiPreview = next, onRanges: (status) => onRanges?.(status),
+			onLineHover: onLineHover ? (line) => onLineHover?.(line) : undefined };
 	}
 
 	onMount(() => {
@@ -116,6 +122,9 @@
 		control?.setValue(value);
 	});
 
+	$effect(() => { control?.highlightLines(activeLines); });
+
+	export function revealLine(line: number): void { control?.revealLine(line); }
 	export function focus(): void { void tick().then(() => control?.focus()); }
 	export function insertWord(word: string): void { if (!disabled) control?.insertWord(word); }
 	export function replaceValueWithHistory(next: string): void { if (!disabled) control?.replaceValueWithHistory(next); }
@@ -286,6 +295,8 @@
 	.ddl-editor-frame :global(.cm-cursor) { border-left-color: var(--fg); }
 	.ddl-editor-frame :global(.cm-selectionBackground) { background: color-mix(in srgb, var(--accent) 28%, transparent) !important; }
 	.ddl-editor-frame :global(.cm-placeholder) { color: var(--fg3); }
+	/* The chunk of the thing pointed at (step 1c). */
+	.ddl-editor-frame :global(.cm-ddl-chunk-active) { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 	.ddl-editor-frame :global(.cm-ddl-range-name) { text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
 	.ddl-editor-frame :global(.cm-tooltip) { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); }
 	.ddl-editor-frame :global(.cm-tooltip:has(.cm-ddl-plugin-hover)) { border: 1px solid var(--tooltip-border); border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: var(--tooltip-shadow); }

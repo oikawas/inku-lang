@@ -228,7 +228,7 @@ struct LibraryView: View {
     private var toolGroup: some View {
         @Bindable var library = library
         return HStack(spacing: 8) {
-            if phoneLayout && !library.isGrouped && library.layout != .list {
+            if phoneLayout && !library.isGrouped {
                 // Photos' 選択 / 完了: 完了 ends selecting and drops the selection.
                 Button(display.localized(phoneSelecting ? "完了" : "選択")) {
                     if phoneSelecting { library.selectedIDs.removeAll() }
@@ -390,7 +390,8 @@ struct LibraryView: View {
         } else if library.isGrouped {
             lineageList
         } else if library.layout == .list {
-            alignedList
+            // A table on the iPhone's width shows its first column only (the check, screen check 2026-11-13).
+            if phoneLayout { phoneList } else { alignedList }
         } else if phoneLayout {
             phoneGrid
         } else {
@@ -418,6 +419,61 @@ struct LibraryView: View {
                 proxy.scrollTo(id, anchor: .center)
             }
         }
+    }
+
+    /// The iPhone's list: one row a work, the picture beside its title, date and models; the same taps, menu and
+    /// selecting as the tiles.
+    private var phoneList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(library.works, id: \.id) { work in
+                        phoneRow(work).id(work.id)
+                        Divider().padding(.leading, 80)
+                    }
+                }
+                moreWorksFooter
+            }
+            .onChange(of: library.focusRequest?.visit) { _, _ in
+                guard let id = library.focusRequest?.workID, library.works.contains(where: { $0.id == id }) else { return }
+                proxy.scrollTo(id, anchor: .center)
+            }
+        }
+    }
+
+    private func phoneRow(_ work: SavedWork) -> some View {
+        let selected = library.selectedIDs.contains(work.id)
+        let annotation = library.annotation(for: work.id)
+        return Button {
+            if phoneSelecting { library.toggleSelection(work.id) } else { openWork(work) }
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Color.clear.frame(width: 56, height: 56)
+                    .overlay { ArtworkThumbnail(work: work, thumbnails: model.thumbnails, fills: true) }
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(model.workPresentationTitle(work)).inkuFont(15).lineLimit(2).foregroundStyle(.primary)
+                    HStack(spacing: 6) {
+                        Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
+                        if work.starred { Image(systemName: "star.fill") }
+                        if annotation.forRevision { Image(systemName: "pencil.circle.fill") }
+                    }
+                    .inkuFont(12).foregroundStyle(.secondary)
+                    LibraryModelLinesView(work: work, display: display, naming: naming)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if phoneSelecting || selected {
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .inkuFont(20).foregroundStyle(selected ? Color.accentColor : .secondary)
+                }
+            }
+            .padding(.vertical, 8).padding(.horizontal, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isBrowsingLocked)
+        .contextMenu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: menuActions) }
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     /// Read the next works while this row is on screen; again after each read, as long as it stays in view.
@@ -600,13 +656,7 @@ struct LibraryView: View {
             get: { preview.work?.id },
             set: { id in if let work = library.works.first(where: { $0.id == id }) { openWork(work) } }
         )) {
-            TableColumn("") { row in
-                selectionCheck(row.work)
-                    // The iPhone's continuous list reads the next works once its last row is drawn.
-                    .task(id: row.work.id == library.works.last?.id ? library.works.count : -1) {
-                        if library.continuous, row.work.id == library.works.last?.id { await library.loadMore() }
-                    }
-            }.width(32)
+            TableColumn("") { row in selectionCheck(row.work) }.width(32)
             TableColumn(display.webCopy("historyImageHeader", fallback: "画像")) { row in
                 HStack(spacing: 6) {
                     LibraryTableThumbnail(locked: model.isBrowsingLocked, preview: { openWork(row.work) },

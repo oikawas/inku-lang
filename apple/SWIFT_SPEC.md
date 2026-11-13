@@ -28,7 +28,7 @@ The author's instruction (2026-11-13): the iPhone library shows every work in on
 
 - The iPhone library's timeline no longer pages; it scrolls through every work (`LibraryModel.continuous`). It reads 120 works from the newest and adds the next 120 as the scroll nears the end (`loadMore()`). A read again (after a star, for example) reads every listed work at once, so the scroll keeps its place. Opened from a work in Making, it reads down to that work and scrolls to it. The heading has no pager; the count is "listed / all".
 - The thumbnail view shows square tiles, three to a row with 2pt between (the picture fills the tile). No text: a star and the revision mark at the lower left, and a check at the upper right of a selected work. A tap opens the work's page as before; a long press gives the work's menu. "Select" in the tools row starts selecting (a tap toggles a work's selection), and "Done" drops the selection and ends it.
-- The list view also reads on through every work (the next works are added once its last row is drawn).
+- On iPhone the list view is no longer a table but one row a work (the picture at the left; the title, date, star, revision mark and models at the right; taps, the long press and "Select" as for the tiles). It also reads on through every work. At the iPhone's width the table (`Table`) showed its first column only (the selection check), so no title, picture or date was visible (found in the 2026-11-13 screen check; an earlier defect).
 - The lineage view still pages (eight lineages). The iPad's and the Mac's screens and behavior do not change.
 
 ## 2026-11-13 The iPhone camera

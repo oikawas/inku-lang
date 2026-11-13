@@ -418,7 +418,10 @@ struct CreationWorkInfoView: View {
     private func derivation(_ kind: String?) -> String {
         if kind == "laws_change" { return model.display.preferences.language == "en" ? "Laws" : "法則" }
         if kind == "chunk_move" { return model.display.webCopy("aiRefineKindChunks", "まとまりの手") }
-        let titles = ["tool_change": "てざわり", "touch_change": "タッチ", "layout_change": "構図", "catalog_change": "色", "reinterpretation": "解釈",
+        // The child that moved one thing to another place (Web 3a90dea84, the author's choice 2026-11-13). The key
+        // 配置 reads "Composition" in English elsewhere, so both words are given here.
+        if kind == "layout_change" { return model.display.label("配置", "Layout") }
+        let titles = ["tool_change": "てざわり", "touch_change": "タッチ", "catalog_change": "色", "reinterpretation": "解釈",
             "model_comparison": "モデル", "language_comparison": "言語", "ddl_edit": "DDL編集", "description_edit": "記述編集",
             "replay": "再描画", "canvas_aspect_change": "キャンバス変更", "canvas_fit": "はめ込み", "variation": "変奏（旧）", "sketch_grain_change": "写生の有無",
             "composition_form_change": "構図の形"]

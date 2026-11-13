@@ -1362,7 +1362,7 @@
 	let canvasPanelHandle = $state<{
 		openDirectActionMenu: () => Promise<void>;
 		focusCurrentWork: () => Promise<void>;
-		runCurrentWorkAction: (action: 'composition-form') => Promise<void>;
+		runCurrentWorkAction: (action: 'composition-form' | 'layout') => Promise<void>;
 	} | null>(null);
 	let libraryFocusRequest = $state(0);
 	$effect(() => {
@@ -3021,6 +3021,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							offersDescriptionActions={work.displayedHistoryItem?.display_label !== 'DDL'}
 							descriptionLocked={!!work.displayedHistoryItem?.description_locked}
 							onChangeForm={() => canvasPanelHandle?.runCurrentWorkAction('composition-form')}
+								onChangeLayout={() => canvasPanelHandle?.runCurrentWorkAction('layout')}
 							activeThing={thingLinks.active}
 							onPointThing={(thing) => thingLinks.point(thing)}
 							onRevealThing={revealThing}
@@ -3235,6 +3236,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onGenerateCompositionCandidates={refinement.generateCompositionCandidates}
 				onGenerateToolCandidates={refinement.generateToolCandidates}
 				onGenerateModelCandidates={generateModelCandidates}
+				onLoadPlaceTarget={refinement.loadPlaceTarget}
+				onGeneratePlaceCandidate={refinement.generatePlaceCandidate}
 				onSaveSelectedVariationCandidates={refinement.saveSelectedVariationCandidates}
 				lineageGraph={lineageState.graph}
 				{libraryFocusRequest}

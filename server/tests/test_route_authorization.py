@@ -114,7 +114,9 @@ PUBLIC = {  # every entry needs a reason
 #   +2 for GET /api/history/description-groups and
 #   GET /api/history/description-groups/{key}/items, the library's "by description"
 #   (2026-11-13).
-EXPECTED_ROUTE_COUNT = 152
+#   +1 for POST /api/history/{item_id}/chunk-place, one thing of a work moved to a
+#   place for the refinement "Change the layout" (step 3, 2026-11-13).
+EXPECTED_ROUTE_COUNT = 153
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

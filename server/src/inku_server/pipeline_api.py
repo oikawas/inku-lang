@@ -127,9 +127,11 @@ class SaveCompositionFormBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     lineage_parent_node_id: str
     # Another composition form, or the work drawn by another model
-    # with the parent's route (step 1d, 2026-11-13). The metadata is the
-    # Server's, built from the execution; what a client sends here is ignored.
-    derivation_kind: Literal["composition_form_change", "model_comparison"]
+    # with the parent's route (step 1d, 2026-11-13), or one thing moved to a
+    # place (step 3: a direct_ddl fork of the core's chunk place). The metadata
+    # is the Server's, built from the execution; what a client sends here is
+    # ignored.
+    derivation_kind: Literal["composition_form_change", "model_comparison", "layout_change"]
     derivation_metadata: dict = Field(default_factory=dict)
 
 
@@ -1080,6 +1082,12 @@ class PipelineService:
             if body.derivation_kind == "composition_form_change" and settings.get("composition_form") is None \
                     and settings.get("composition_main_law") is None:
                 raise HTTPException(422, "invalid_candidate")
+            place = (settings.get("derivation_metadata") or {}).get("place")
+            if body.derivation_kind == "layout_change" and (
+                    run.context.get("derivation_kind") not in ("variation_ddl_fork", "legacy_ddl_fork")
+                    or not isinstance(place, dict)):
+                # Only a DDL fork that recorded what it moved (step 3).
+                raise HTTPException(422, "invalid_candidate")
             if settings.get("lineage_parent_node_id") != body.lineage_parent_node_id:
                 raise HTTPException(422, "candidate_parent_mismatch")
             with db.SessionLocal() as session:
@@ -1093,8 +1101,13 @@ class PipelineService:
             if not ((link and parent == {"kind": "variation", "id": link["variation_id"]}) or
                     (not link and parent == {"kind": "legacy_history", "id": history_id})):
                 raise HTTPException(422, "candidate_parent_mismatch")
-            _refuse_if_locked(history_id)
-            if body.derivation_kind == "model_comparison":
+            if body.derivation_kind != "layout_change":
+                # Moving a thing keeps the DDL, so a parent its DDL holds may
+                # still take it; the others read the description again.
+                _refuse_if_locked(history_id)
+            if body.derivation_kind == "layout_change":
+                metadata = {"place": {key: place.get(key) for key in ("title", "thing", "at_from", "at")}}
+            elif body.derivation_kind == "model_comparison":
                 # Both stages are drawn by the compared model, as the history
                 # save of a model candidate has recorded it.
                 metadata = {"comparison_mode": "common", "compared_model": settings.get("stage1_model"),

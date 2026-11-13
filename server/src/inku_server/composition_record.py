@@ -25,9 +25,10 @@ class CompositionBoxesRefused(ValueError):
         self.detail = detail
 
 
-def composition_boxes(config: dict[str, Any], ddl: str, composition: dict[str, Any] | None) -> list[dict[str, Any]]:
+def composition_boxes(config: dict[str, Any], ddl: str, composition: dict[str, Any] | None) -> tuple[list[dict[str, Any]], bool]:
     """The core's chunks of a work (``chunk_moves.rs``, action ``boxes``): each chunk's title,
-    the record's thing, its lines in ``ddl``, its sentences, those with no readable place, and its box."""
+    the record's thing, its lines in ``ddl``, its sentences, those with no readable place, its box and its
+    places; and whether the work draws free lines (step 3)."""
     native = importlib.import_module("inku_render")
     request = {"action": "boxes", "config": config, "ddl": ddl, "composition": composition}
     answer = json.loads(native.pipeline_chunk_moves(json.dumps(request, ensure_ascii=False).encode("utf-8")))
@@ -35,7 +36,21 @@ def composition_boxes(config: dict[str, Any], ddl: str, composition: dict[str, A
         raise RuntimeError(f"chunk moves core (boxes): {answer!r}")
     if answer.get("outcome") == "refused":
         raise CompositionBoxesRefused(str(answer.get("reason")), str(answer.get("detail")))
-    return list(answer.get("units") or [])
+    return list(answer.get("units") or []), bool(answer.get("free_lines"))
+
+
+def chunk_place(config: dict[str, Any], ddl: str, composition: dict[str, Any] | None, chunk: str,
+                at: str) -> tuple[str, dict[str, Any]]:
+    """The core's child DDL with one chunk moved to a place (``chunk_moves.rs``, action ``place``, step 3),
+    and what moved (title, thing, at, at_from, from, to, clamped)."""
+    native = importlib.import_module("inku_render")
+    request = {"action": "place", "config": config, "ddl": ddl, "composition": composition, "chunk": chunk, "at": at}
+    answer = json.loads(native.pipeline_chunk_moves(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+    if not isinstance(answer, dict) or answer.get("error"):
+        raise RuntimeError(f"chunk moves core (place): {answer!r}")
+    if answer.get("outcome") == "refused":
+        raise CompositionBoxesRefused(str(answer.get("reason")), str(answer.get("detail")))
+    return str(answer["ddl"]), dict(answer["place"])
 
 
 def composition_of(item: dict[str, Any]) -> dict[str, Any] | None:

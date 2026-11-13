@@ -8,9 +8,6 @@
 
 ## 未リリース
 
-- Web・Server・core：ライブラリのまとめ方に「記述ごと」を足しました。同じ記述の作品を1組にし、画の型ごとの列（最後に「構図の記録なし」）に古い順で並べます。親の構図を出す子は親の列に「〈種類〉の子」の印つきで並び、カードに主の法則の名が出ます。頭の番号（`#1 `・`1. `・`01 `など）と角かっこの注の違いは見ず、`(AI)`は見ます。束ねる鍵は共有coreの`description_group_key`（UniFFI `description_group_key`、Python `pipeline_description_group_key`、共有の資料`server/tests/data/description-group-cases.json`）です。新しい口`GET /api/history/description-groups`と`GET /api/history/description-groups/{key}/items`（口の数は150から152）。鍵は列に持たず、要求ごとに見える行を1回読みます。画像から描いた作品は入りません。`BINDING_VERSION`は変わらず、`Cargo.lock`も変わりません。
-- Web・Server：記述を読み直さずに描いた子（てざわり・支持体・色カタログ・配色・配置を変えた子、指示書の同じ再描画、はめ込み、まとまりの手、タッチ）が、構図の記録を持つ祖先の構図と法則を`親の構図`の印つきで出すようにしました。Serverは作品の項目に`composition_inherited`（`history_id`・`at`・`via`・`answer`・`requested_form`）を添えます。一覧の問い合わせは増やしていません。「モデルを変える」の候補は「構図の形を変える」と同じ道（パイプラインのforkと実行の保存）で、対象の作品を描いた時の描き方で描くようにしました（前は入力の欄の今の描き方でした）。保存した子に構図の記録が残ります。生成の数は描いた候補ごとに数えます（前は保存した候補だけ）。`POST /api/pipeline/executions/{execution_id}/save`は`model_comparison`も受け、記述が錠の親からのモデルを変えるのforkと保存は409で断ります。
-- Web・Server・core：物と画・指示書・詞書きをつなぎました。保存した作品で`構図と法則`を開くと、物の行・画・指示書の行のどれかで指した物を、ほかの3つも示します（画は実線の枠と番号・名の札、指示書はまとまりの行の背景、詞書きは引いた語）。物の行を押すと指示書がそのまとまりへ送られます。新しい口`GET /api/history/{item_id}/composition-boxes`（口の数は149から150）が、共有coreの`chunk_moves`の新しいaction`boxes`で、まとまりごとの題・物の番号・行・四角を返します。題の無い指示書は構図の記録の物の題で分けます。位置の無いまとまりと、紙にはめ込んだ作品は四角を持ちません。exportは増えず、`BINDING_VERSION`は変わりません。
 - Android：作品編集メニューから「取り合わせ」と「AIに自律推敲させる」を削除しました（作者の決定。Web・Serverと同じ）。推敲の項目は9つになります。実行中の行の「AIに自律推敲させる」と、その2つだけが使ったVisionのモデルの選び、法則のstageだけをやり直す道、保存の画をPNGにしてVisionへ送る道も外しました。前に作った子の札と系譜の記録は今までどおり読めます。端末に保存した自律推敲の記録と設定は消さず、読まなくなります。
 - macOS・iOS：作品編集メニューから「取り合わせ」と「AI自動推敲プロセス」を削除しました（作者の決定。Webと同じ3つの群の10項目）。取り合わせの窓、AI自動推敲の実行と画面、奥書の窓に残っていた画像助言の道と、それらの確かめも削除しました。前の作品の記録（系譜の詳細の「AIの手」の行、派生の種類の札、記述固定）はそのまま読めます。アプリの保存物（`<DB名>.autonomous-runs.json`、設定の`autonomousRefine`）は消さず、読まなくなります。奥書の窓から、子を描くと読める古い文を外しました。前から落ちていた確かめ2つ（`--lineage-migration-only`・`--refinement-only`）を、今のDBの版と今の指示書の答えの形に合わせて直しました。
 - iOS：`apple/scripts/build-ios.sh --device`が入れる前にアプリのデータをコピーする先を、作業木の外にしました。`INKU_IOS_DEVICE_BACKUPS`（絶対パス）か、無ければ`~/Library/Application Support/Inku Development/ios-device-backups`の下の、機器のUDIDごとのフォルダです。前は`apple/build/iOS/device-backups/`で、作業木を消すと一緒に消えていました。相対パスや作業木の中を指すと、buildの前に止まります。
@@ -698,6 +695,12 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.334（2026-11-13 / Build 1410）
+
+- Web・Server・core：ライブラリのまとめ方に「記述ごと」を足しました。同じ記述の作品を1組にし、画の型ごとの列（最後に「構図の記録なし」）に古い順で並べます。親の構図を出す子は親の列に「〈種類〉の子」の印つきで並び、カードに主の法則の名が出ます。頭の番号（`#1 `・`1. `・`01 `など）と角かっこの注の違いは見ず、`(AI)`は見ます。束ねる鍵は共有coreの`description_group_key`（UniFFI `description_group_key`、Python `pipeline_description_group_key`、共有の資料`server/tests/data/description-group-cases.json`）です。新しい口`GET /api/history/description-groups`と`GET /api/history/description-groups/{key}/items`（口の数は150から152）。鍵は列に持たず、要求ごとに見える行を1回読みます。画像から描いた作品は入りません。`BINDING_VERSION`は変わらず、`Cargo.lock`も変わりません。
+- Web・Server：記述を読み直さずに描いた子（てざわり・支持体・色カタログ・配色・配置を変えた子、指示書の同じ再描画、はめ込み、まとまりの手、タッチ）が、構図の記録を持つ祖先の構図と法則を`親の構図`の印つきで出すようにしました。Serverは作品の項目に`composition_inherited`（`history_id`・`at`・`via`・`answer`・`requested_form`）を添えます。一覧の問い合わせは増やしていません。「モデルを変える」の候補は「構図の形を変える」と同じ道（パイプラインのforkと実行の保存）で、対象の作品を描いた時の描き方で描くようにしました（前は入力の欄の今の描き方でした）。保存した子に構図の記録が残ります。生成の数は描いた候補ごとに数えます（前は保存した候補だけ）。`POST /api/pipeline/executions/{execution_id}/save`は`model_comparison`も受け、記述が錠の親からのモデルを変えるのforkと保存は409で断ります。
+- Web・Server・core：物と画・指示書・詞書きをつなぎました。保存した作品で`構図と法則`を開くと、物の行・画・指示書の行のどれかで指した物を、ほかの3つも示します（画は実線の枠と番号・名の札、指示書はまとまりの行の背景、詞書きは引いた語）。物の行を押すと指示書がそのまとまりへ送られます。新しい口`GET /api/history/{item_id}/composition-boxes`（口の数は149から150）が、共有coreの`chunk_moves`の新しいaction`boxes`で、まとまりごとの題・物の番号・行・四角を返します。題の無い指示書は構図の記録の物の題で分けます。位置の無いまとまりと、紙にはめ込んだ作品は四角を持ちません。exportは増えず、`BINDING_VERSION`は変わりません。
 
 ## v2.15.333（2026-11-13 / Build 1409）
 

@@ -234,7 +234,7 @@ import InkuHost
     }
 
     private func modelName(_ reference: String) -> String {
-        ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID).displayName(reference)
+        ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language).displayName(reference)
     }
     private func togglePicker(_ title: String, tab: String, path: WritableKeyPath<DrawOptions, String>) -> some View {
         Picker(title, selection: binding(tab, path)) {

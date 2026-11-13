@@ -334,7 +334,7 @@ import SwiftUI
 
     private func metadata(_ work: SavedWork) -> [(short: String, full: String, model: Bool)] {
         let fields = display.preferences.historyStripFields
-        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID)
+        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language)
         var output: [(short: String, full: String, model: Bool)] = []
         if fields.contains("generation") { let label = generationLabel(work); output.append((label, label, false)) }
         if fields.contains("model") {
@@ -388,7 +388,7 @@ import SwiftUI
 
     /// Web `.thumb-tooltip` rows, with the native SVG size.
     private func detailsTip(_ work: SavedWork) -> String {
-        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID)
+        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language)
         let unrecorded = display.localized("未記録")
         let saved = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened)
         return [title(work),

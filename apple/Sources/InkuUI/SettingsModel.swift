@@ -54,6 +54,12 @@ public final class SettingsModel {
         }.map(\.element)
     }
 
+    /// The model settings cards. Core `provider_groups` puts the signed-in connection (`signIn`, passed while its
+    /// publication can be read) before every other service; the others keep `orderedProviders`.
+    public func serviceCardProviders(signIn: ProviderSettings?) -> [ProviderSettings] {
+        ProviderCoreSettings.orderedBySignIn(orderedProviders + (signIn.map { [$0] } ?? []))
+    }
+
     public func catalogModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
         provider.kind == .chatGPTPlan ? (provider.models ?? []) : ProviderCoreSettings.catalogModels(provider, includeDisabled: true)
     }
@@ -95,7 +101,7 @@ public final class SettingsModel {
         } else if !models.isEmpty {
             var provider = ProviderSettings.personalPlan
             provider.models = models
-            next.providers.append(provider)
+            next.providers = ProviderCoreSettings.orderedBySignIn(next.providers + [provider])
         }
         return next
     }

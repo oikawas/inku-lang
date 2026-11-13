@@ -641,7 +641,6 @@
 "%.3f 秒" = "%.3f s";
 "%@ハッシュ: %@" = "%@ hash: %@";
 "描画" = "Render";
-"Personal ChatGPTのモデルは専用の設定画面で取得してください。" = "Load Personal ChatGPT models from its dedicated settings page.";
 "自動バックアップ: %@" = "Automatic backup: %@";
 "生成結果のログを保存できませんでした: %@" = "Could not save result logs: %@";
 "表示設定を読み込めませんでした: %@" = "Could not load display settings: %@";
@@ -650,9 +649,8 @@
 "形式判定の設定を保存できませんでした: %@" = "Could not save form detection settings: %@";
 "保存先を記録できませんでした: %@" = "Could not save the destination: %@";
 "DDLファイルを読み込めませんでした: %@" = "Could not import the DDL file: %@";
-"個人ChatGPTプラン" = "Personal ChatGPT plan";
 "本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこのMacの同じライブラリに残ります。" = "Draw using your ChatGPT plan. Connect the account separately from API key connections; choose drawing models in model settings. Saved works remain in this Mac's Library.";
-"個人ChatGPTプラン接続を有効にする" = "Enable personal ChatGPT plan connection";
+"ChatGPT でサインインを有効にする" = "Enable Sign in with ChatGPT";
 "記述の解釈・写生・自動配色選択・指示書の補完で利用できます。Vision推敲、奥書、デモ記述生成、モデル調査には対応していません。" = "Supports description interpretation, sketches, automatic color selection and DDL hole filling. Vision refinement, colophons, demo description generation and model inspection are unavailable.";
 "新しい個人プロファイルを接続" = "Connect a new personal profile";
 "認証を停止" = "Stop authorization";
@@ -669,8 +667,8 @@
 "モデル一覧を更新" = "Refresh model list";
 "記述に使用" = "Use for descriptions";
 "穴埋めに使用" = "Use for hole filling";
-"ChatGPTプラン接続を有効にしました。接続は認証ボタンから開始します。" = "ChatGPT plan connection enabled. Use the authorization button to connect.";
-"ChatGPTプラン接続を無効にしました。" = "ChatGPT plan connection disabled.";
+"ChatGPT でサインインを有効にしました。接続は認証ボタンから開始します。" = "Sign in with ChatGPT enabled. Use the authorization button to connect.";
+"ChatGPT でサインインを無効にしました。" = "Sign in with ChatGPT disabled.";
 "ブラウザで本人確認を完了してください。" = "Complete account verification in your browser.";
 "次の描画で使う個人プロファイルを変更しました。実行中・待機中の要求は元の接続に固定されています。" = "Changed the personal profile for the next drawing. Running and queued requests keep their original connection.";
 "ローカル接続を解除し、提供元での失効を確認しました。" = "Disconnected locally and confirmed revocation with the provider.";

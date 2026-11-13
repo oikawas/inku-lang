@@ -83,7 +83,7 @@ struct LineageView: View {
     @State private var providers: [ProviderSettings] = []
     @FocusState private var focusedNodeID: String?
     private var library: LibraryModel { model.library }
-    private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID) }
+    private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language) }
     private var focusWork: SavedWork? {
         library.graph.flatMap { graph in graph.nodes.first { $0.id == graph.focusNodeID }?.work }
     }

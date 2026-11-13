@@ -42,7 +42,7 @@ struct LibraryView: View {
     @State private var phoneSelecting = false
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
-    private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID) }
+    private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language) }
     private var writingDisabled: Bool { model.isBusy || writingLocked }
     private var hasFilters: Bool {
         !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -595,7 +595,7 @@ struct LibraryView: View {
             writingDisabled: writingDisabled,
             mutating: library.mutating,
             hashCopied: library.copiedHash == work.id,
-            modelLines: modelLines.lines(for: work, providers: providers, stageProvider: model.stageDefaultProviderID),
+            modelLines: modelLines.lines(for: work, providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language),
             strings: LibraryGridCardStrings(title: model.workPresentationTitle(work), display: display,
                                              selected: library.selectedIDs.contains(work.id), copied: library.copiedHash == work.id),
             focus: $focusedSlot,
@@ -1085,14 +1085,16 @@ private final class LibraryGridMeasurements {
 private final class LibraryModelLineMemo {
     private var providers: [ProviderSettings] = []
     private var stageProvider = ""
+    private var language = ""
     private var naming = ModelNaming()
     private var lines: [String: [ModelNaming.Line]] = [:]
 
-    func lines(for work: SavedWork, providers: [ProviderSettings], stageProvider: String) -> [ModelNaming.Line] {
-        if providers != self.providers || stageProvider != self.stageProvider {
+    func lines(for work: SavedWork, providers: [ProviderSettings], stageProvider: String, language: String) -> [ModelNaming.Line] {
+        if providers != self.providers || stageProvider != self.stageProvider || language != self.language {
             self.providers = providers
             self.stageProvider = stageProvider
-            naming = ModelNaming(providers: providers, stageProvider: stageProvider)
+            self.language = language
+            naming = ModelNaming(providers: providers, stageProvider: stageProvider, language: language)
             lines.removeAll()
         }
         let key = (work.stage1Model ?? "") + "\u{0}" + (work.stage2Model ?? "")

@@ -18,7 +18,9 @@ struct BatchModelPickerView: View {
     @State private var draftThinking = false
 
     private var groups: [ProviderSettings] {
-        (settings?.providers ?? []).filter { !SettingsModel.registeredModels(for: $0, purpose: selectedPurpose).isEmpty }
+        // Core `provider_groups`: the sign-in connection first, then the saved order.
+        ProviderCoreSettings.orderedBySignIn(settings?.providers ?? [])
+            .filter { !SettingsModel.registeredModels(for: $0, purpose: selectedPurpose).isEmpty }
     }
     private var selectedPurpose: String { purpose }
     private var selectedReference: String { draftReference }

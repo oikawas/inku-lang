@@ -2,10 +2,20 @@ import InkuHost
 import SwiftUI
 
 extension DisplaySettings {
-    /// ModelSelectionSettings.svelte / ModelAdministrationSettings.svelte name the reserved `chatgpt` provider
-    /// "ChatGPT plan" (`chatgptPlanLabel`) wherever other providers show their label.
+    /// The reserved `chatgpt` provider is named by core's sign-in descriptor ("ChatGPT でサインイン" /
+    /// "Sign in with ChatGPT") wherever other providers show their label.
     func providerName(_ provider: ProviderSettings) -> String {
-        provider.kind == .chatGPTPlan ? webCopy("chatgptPlanLabel", "ChatGPTプラン") : provider.displayName
+        provider.kind == .chatGPTPlan ? signInLabel(provider.id) : provider.displayName
+    }
+
+    /// Core `sign_in_services`: the connection's name in the display language.
+    func signInLabel(_ id: String = ProviderSettings.personalPlan.id) -> String {
+        ProviderCoreSettings.signInService(id, language: preferences.language)?["label"] as? String ?? id
+    }
+
+    /// Core `sign_in_services`: the service's usage page.
+    func signInUsageURL(_ id: String = ProviderSettings.personalPlan.id) -> URL? {
+        (ProviderCoreSettings.signInService(id, language: preferences.language)?["usage_url"] as? String).flatMap(URL.init(string:))
     }
 
     /// A Web function text such as `chatgptModelsLoaded(count)`, exported as a `%@` template.
@@ -96,7 +106,7 @@ struct ChatGPTModelsSheet: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(display.webCopyFormat("settingsModelSelectModelsTitle", "%@ の公開モデル選択", display.webCopy("chatgptPlanLabel", "ChatGPTプラン")))
+                Text(display.webCopyFormat("settingsModelSelectModelsTitle", "%@ の公開モデル選択", display.signInLabel()))
                     .inkuFont(16, weight: .semibold)
                 Text(display.localizedFormat("サービスID: %@", "chatgpt")).inkuFont(12).foregroundStyle(.secondary)
             }

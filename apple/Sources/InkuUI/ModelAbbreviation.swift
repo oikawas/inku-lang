@@ -11,23 +11,27 @@ public struct ModelNaming: Sendable {
 
     private let connections: [ProviderSettings]
     private let stageDefault: String
+    /// `ja` or `en`: core names a sign-in connection in it ("ChatGPT でサインイン" / "Sign in with ChatGPT").
+    private let language: String
     private static let resolutionCache = ModelResolutionCache()
 
-    public init(providers: [ProviderSettings] = [], stageProvider: String = defaultProvider) {
+    public init(providers: [ProviderSettings] = [], stageProvider: String = defaultProvider, language: String = "en") {
         connections = providers
         stageDefault = stageProvider
+        self.language = language == "ja" ? "ja" : "en"
     }
 
     private func displayResolution(_ reference: String, defaultProvider: String? = nil) -> [String: Any] {
-        let key = ModelResolutionCache.Key(reference: reference, provider: defaultProvider ?? stageDefault)
+        let key = ModelResolutionCache.Key(reference: reference, provider: defaultProvider ?? stageDefault, language: language)
         if let cached = Self.resolutionCache.get(key, connections: connections) { return cached }
         var providers = ProviderModelReference.referenceProviders(connections)
         if let plan = connections.first(where: { $0.kind == .chatGPTPlan && $0.id == "chatgpt" }) {
-            providers["chatgpt"] = ["id": "chatgpt", "label": "ChatGPT plan", "active": true,
+            // Core resolve_display names the sign-in connection and its abbreviation from its descriptor.
+            providers["chatgpt"] = ["id": "chatgpt", "active": true,
                 "models": (plan.models ?? []).map { ["id": $0.id, "label": $0.label] }] as [String: Any]
         }
         let resolved = (try? ProviderCoreSettings.call("resolve_display", ["ref": reference,
-            "providers": providers, "default_provider": defaultProvider ?? stageDefault])) ?? [:]
+            "providers": providers, "default_provider": defaultProvider ?? stageDefault, "language": language])) ?? [:]
         Self.resolutionCache.put(resolved, for: key, connections: connections)
         return resolved
     }
@@ -38,6 +42,12 @@ public struct ModelNaming: Sendable {
     public func providerLabel(_ provider: String) -> String {
         guard !provider.isEmpty else { return "" }
         return displayResolution(provider + ":_", defaultProvider: provider)["provider_label"] as? String ?? provider
+    }
+
+    /// Core `provider_abbreviation`, given for a sign-in connection only ("SIWC").
+    private func providerAbbreviation(_ provider: String) -> String? {
+        guard !provider.isEmpty else { return nil }
+        return displayResolution(provider + ":_", defaultProvider: provider)["provider_abbreviation"] as? String
     }
 
     private func modelLabel(provider: String, model: String) -> String? {
@@ -95,18 +105,20 @@ public struct ModelNaming: Sendable {
         let (provider, model) = resolve(reference)
         let label = modelLabel(provider: provider, model: model) ?? model
         let name = label.firstIndex(of: "/").map { String(label[label.index(after: $0)...]) } ?? label
-        return Self.abbreviateStripModel(owner: providerLabel(provider), name: name)
+        return Self.abbreviateStripModel(owner: providerLabel(provider), name: name, abbreviation: providerAbbreviation(provider))
     }
 
     // MARK: historyStripFields.ts
 
     /// Web historyStripFields.ts: compact recognizable words while retaining versions, sizes and variants.
-    public static func abbreviateStripModel(owner: String, name: String) -> String {
+    /// A sign-in connection's own abbreviation from core ("SIWC") replaces the first two letters of its name.
+    public static func abbreviateStripModel(owner: String, name: String, abbreviation: String? = nil) -> String {
         func replace(_ text: String, _ pattern: String, _ replacement: String) -> String {
             text.replacingOccurrences(of: pattern, with: replacement, options: [.regularExpression, .caseInsensitive])
         }
-        let provider = owner.range(of: "ollama.*cloud", options: [.regularExpression, .caseInsensitive]) != nil
-            ? "Oc" : String(owner.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2))
+        let provider = abbreviation.flatMap { $0.isEmpty ? nil : $0 }
+            ?? (owner.range(of: "ollama.*cloud", options: [.regularExpression, .caseInsensitive]) != nil
+                ? "Oc" : String(owner.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2)))
         var model = replace(name.trimmingCharacters(in: .whitespacesAndNewlines), "^.*/", "")
         model = replace(model, "^(?:anthropic|google|meta|mistral\\s+ai)\\s+", "")
         model = replace(model, "\\s*\\([\\d.]+\\s*[GM]B\\)\\s*$", "")
@@ -185,6 +197,7 @@ private final class ModelResolutionCache: @unchecked Sendable {
     struct Key: Hashable {
         let reference: String
         let provider: String
+        let language: String
     }
 
     private let lock = NSLock()

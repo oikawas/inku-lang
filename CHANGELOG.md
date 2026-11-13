@@ -8,7 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: a work opened from Lineage no longer always says it has no composition record in "Composition and laws". Lineage's rows carry no composition, and the child "Save and close" opens came from such a row (why v2.15.338 still showed it right after saving). Once the history listing holds the opened work, its composition (its own record or the parent's) shows.
 - macOS and iOS: the Japanese name of a layout child (`layout_change`) changes from 「構図」 to 「配置」 (the author's choice, as on the Web; in the generation details and on the lineage labels). The English stays "Layout".
 - iOS: the iPhone tab bar gains "Camera" (the author's instruction; second, as on Android). It goes straight to taking a photo and draws from it with the Image values in Settings > Drawing defaults (the model that reads images, the color catalog and the canvas). The camera has no model choice. Before the photo it checks that the default model can be used, and otherwise shows the reason and "Open Settings". Progress and the result show as an Image tab drawing does. Drawing from the camera puts the Image tab's choices back to the defaults. The iPhone's Image tab no longer has "Take Photo" (the iPad's Image tab keeps it). The Mac's screens and behavior do not change.
 - Android: "Juxtapose" and "Autonomous refinement" left the work-editing menu (the author's decision, as on Web and Server). The refinement items are now nine. The running row's "Autonomous refinement", the Vision model chooser only those two used, the path that redoes only the laws stage and the path that sends a saved image to Vision as a PNG are gone too. Earlier children keep their labels and lineage records. The autonomous refinement records and settings saved on the device are not deleted; they are no longer read.
@@ -698,6 +697,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.339 (2026-11-13 / Build 1415)
+
+- Web: a work opened from Lineage no longer always says it has no composition record in "Composition and laws". Lineage's rows carry no composition, and the child "Save and close" opens came from such a row (why v2.15.338 still showed it right after saving). Once the history listing holds the opened work, its composition (its own record or the parent's) shows.
 
 ## v2.15.338 (2026-11-13 / Build 1414)
 

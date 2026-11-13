@@ -58,14 +58,13 @@ private struct NewDdlSession {
 }
 
 private enum WorkDialog: Identifiable {
-    case export(ExportSession), edit(WorkEditSession), juxtapose(RefinementSession), refinement(RefinementSession), replay(ReplaySession)
-    case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), tool(RefinementSession), advice(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
+    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession)
+    case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), tool(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
     case scoreVariant(SavedScoreVariantSession), compositionForm(RefinementSession)
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
         case .edit(let session): session.id.uuidString
-        case .juxtapose(let session): session.id.uuidString
         case .refinement(let session): session.id.uuidString
         case .replay(let session): session.id.uuidString
         case .ddl(let session): session.id.uuidString
@@ -74,7 +73,6 @@ private enum WorkDialog: Identifiable {
         case .tool(let session): session.id.uuidString
         case .scoreVariant(let session): session.id.uuidString
         case .compositionForm(let session): session.id.uuidString
-        case .advice(let session): session.id.uuidString
         case .colophon(let session): session.id.uuidString
         case .information(let session): session.id.uuidString
         case .drawingLogs: "drawingLogs"
@@ -568,11 +566,6 @@ public struct ContentView: View {
                        initialSVGProfile: session.initialSVGProfile, initialPixelHeight: session.initialPixelHeight, lineAnimation: session.lineAnimation)
                 .id(session.id)
                 .environment(model.display)
-        case .juxtapose(let session):
-            JuxtaposeView(model: model, work: session.work, onCommitted: { closeLibrary() })
-                .id(session.id)
-                .environment(model.display)
-                .inkuDialogFrame(.juxtapose)
         case .edit(let session):
             WorkEditView(model: model, work: session.work, mode: session.mode, onCommitted: { closeLibrary() })
                 .id(session.id)
@@ -606,9 +599,6 @@ public struct ContentView: View {
         case .scoreVariant(let session):
             SavedScoreVariantView(model: model, work: session.work, kind: session.kind, onCommitted: refinementCommitted).id(session.id).environment(model.display)
                 .inkuDialogFrame(.comparison)
-        case .advice(let session):
-            AuxiliaryView(model: model, mode: .advice, work: session.work).id(session.id).environment(model.display)
-                .inkuDialogFrame(.auxiliary)
         case .colophon(let session):
             AuxiliaryView(model: model, mode: .colophon, work: session.work).id(session.id).environment(model.display)
                 .inkuDialogFrame(.auxiliary)
@@ -684,7 +674,6 @@ public struct ContentView: View {
         case "tool": dialog = .tool(RefinementSession(work: work))
         case "model": dialog = .comparison(ComparisonSession(work: work, kind: .model))
         case "composition-form": dialog = .compositionForm(RefinementSession(work: work))
-        case "ai": dialog = .advice(RefinementSession(work: work))
         case "colophon": dialog = .colophon(RefinementSession(work: work))
         case "export": dialog = .export(ExportSession(works: [work], preserveOrder: false))
         case "export-line-animation": dialog = .export(ExportSession(works: [work], preserveOrder: false, lineAnimation: true))
@@ -709,9 +698,6 @@ public struct ContentView: View {
         case "layout": openRefinement(work)
         case "description": openWorkEdit(work, .description)
         case "sketch": openWorkEdit(work, .sketch)
-        case "juxtapose":
-            guard canUseWork, !work.trashed else { return }
-            dialog = .juxtapose(RefinementSession(work: work))
         case "create":
             batchWorkspace.showHistory()
             Task { await model.selectWork(work); showCreation(tab: "artwork") }

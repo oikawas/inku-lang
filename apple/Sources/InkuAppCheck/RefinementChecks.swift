@@ -37,7 +37,8 @@ func runRefinementChecks() async throws {
     let initialRows = try await database.list().count
     let initialCalls = await provider.calls
 
-    // Failure: retired reading/touch still reaches either the manual or autonomous generation path.
+    // Failure: retired reading/touch still reaches either the plan or the saved-work request path (the refinement
+    // dialogs' `makeRefinementRequest`; the AI refinement process that also used it is gone, 2026-11-13).
     guard RefinementKind.availableKinds == [.layout] else { throw CheckFailure.message("Retired parameters are still offered") }
     for kind in ["touch_change", "reinterpretation"] {
         do {
@@ -46,7 +47,7 @@ func runRefinementChecks() async throws {
         } catch let error as HostError where error.code == "unknown_refinement_kind" { }
         do {
             _ = try await app.makeRefinementRequest(work: parent, kind: kind)
-            throw CheckFailure.message("Retired autonomous \(kind) accepted a request")
+            throw CheckFailure.message("Retired saved-work \(kind) accepted a request")
         } catch let error as HostError where error.code == "unknown_refinement_kind" { }
     }
     guard await provider.calls == initialCalls, try await database.list().count == initialRows,
@@ -87,7 +88,7 @@ func runRefinementChecks() async throws {
           try await app.savedConfiguration(workID: parent.id).document == context.document else {
         throw CheckFailure.message("Layout adoption lost parent/locks/provenance: \(layout.errorText ?? layout.status)")
     }
-    print(String(format: "Refinement passed in %.3fs: retired manual/autonomous reading and touch refused without provider or save; layout-only dialog draws four saved-DDL previews with zero additional Stage 1 calls and adopts one layout edge; parent remains unchanged. Mock transport + isolated SQLite + real Rust only.", Date().timeIntervalSince(began)))
+    print(String(format: "Refinement passed in %.3fs: retired reading and touch refused on the plan and saved-work request paths without provider or save; layout-only dialog draws four saved-DDL previews with zero additional Stage 1 calls and adopts one layout edge; parent remains unchanged. Mock transport + isolated SQLite + real Rust only.", Date().timeIntervalSince(began)))
 }
 
 private actor RefinementProvider: ProviderTransport {

@@ -807,12 +807,6 @@ private actor ExecutionDriver {
         if request.authoring.isDirect, request.parentWorkID == nil, request.declareCanvas == true {
             authoring["declare_canvas"] = .bool(true)
         }
-        if let direction = request.savedLawsDirection {
-            guard case .directDDL(let source) = request.authoring else { throw HostError("saved_laws_requires_saved_ddl") }
-            authoring = .object(["tag": .string("saved_laws"), "source": .string(source),
-                "description": .string(try InkuCore.descriptionWithoutLabels(request.description)),
-                "direction": try ExactJSON(data: direction)])
-        }
         if request.authoring.isDirect, let record = request.completionRanges { authoring["completion_ranges"] = try ExactJSON(data: record) }
         if request.authoring.isDirect { try LawsRecords.write(request.lawsRecords, into: &authoring) }
         return authoring

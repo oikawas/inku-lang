@@ -71,7 +71,6 @@
 "この候補を保存" = "Save this candidate";
 "この奥書を削除しますか？" = "Delete this colophon?";
 "この接続のAPIキーを削除します" = "Remove this connection's API key";
-"この方針で子を描く" = "Draw a child from this direction";
 "この端末で使う書き出し条件です。作品の保存内容は変わりません。" = "Export defaults for this device. Saved work contents are preserved.";
 "この節点を中心に表示" = "Focus on this node";
 "この系譜の奥書はまだありません。" = "No colophons have been saved for this lineage.";
@@ -387,10 +386,7 @@
 "推敲を完了できませんでした。" = "Could not complete refinement.";
 "編集した奥書を保存しました。" = "Edited colophon saved.";
 "奥書の草稿を生成しました。編集して保存してください。" = "Colophon draft generated. Edit it and save.";
-"助言を受け取りました。次の方針を編集して採用できます。" = "Advice received. Edit and adopt the next direction.";
-"この方針で子の作品を保存しました。" = "Saved a child work from this direction.";
 "停止しました。保存済みの世代は系譜に残ります。" = "Stopped. Saved generations remain in the lineage.";
-"モデルが作品を観察しています" = "The model is observing the work";
 "奥書を読む準備をしています" = "Preparing to read the colophon";
 "描画の上限を保存しました。" = "Drawing limits saved.";
 "描画定義なし" = "No drawing definition";
@@ -448,7 +444,6 @@
 "上のモデルが観察し、同じモデルで各世代を描きます。" = "The model above observes the work and draws each generation.";
 "制作のモデルで描きます。方向性は読み取りを変える世代にだけ渡します。" = "Uses the drawing model. The direction applies only to generations that change the interpretation.";
 "編集して採用する奥書" = "Edit and adopt a colophon";
-"編集して採用する次の方針" = "Edit and adopt the next direction";
 "辞書による形式判定は4000文字までです。" = "Dictionary-based form detection supports up to 4,000 characters.";
 "計数用の辞書を読み込めませんでした。" = "Could not load the counting dictionary.";
 "音数を確認中" = "Counting morae";
@@ -1219,7 +1214,6 @@
 "画像を扱える登録モデルを選択してください。" = "Choose a registered model that can read images.";
 "系譜を持つ保存作品を選択してください。" = "Choose a saved work with a lineage.";
 "奥書を追記しました。" = "Appended the colophon.";
-"子の作品を生成できませんでした。" = "Could not paint the child work.";
 "少なくとも1つの推敲要素を選んでください。" = "Choose at least one refinement element.";
 "推敲方針: " = "Refinement intent: ";
 "補助モデルの処理を完了できませんでした。" = "The auxiliary model operation could not be completed.";
@@ -1505,7 +1499,6 @@
 "拡大を戻す" = "Back to all options";
 "選択を外す" = "Deselect option";
 "支持体を変える" = "Change the ground";
-"AI自動推敲プロセス" = "Autonomous refinement process";
 "推敲対象" = "Refine target";
 "一覧へ戻る" = "Back to all options";
 "すべて破棄して閉じる" = "Discard all and close";
@@ -1526,11 +1519,6 @@
 "モデルを選んで描くと、候補をここに並べます。" = "Choose models and draw options to see them here.";
 "配色の候補を用意中" = "Preparing color arrangements";
 "支持体の候補を用意中" = "Preparing ground options";
-"一文を選べませんでした。" = "No sentences could be picked.";
-"ほかの作品の記述に、選べる一文が4つありません。" = "The other works' descriptions do not hold four sentences to choose from.";
-"この作品には記述がありません。" = "This work has no description.";
-"この作品には画がありません。" = "This work has no image.";
-"モデルの答えを2回とも使えませんでした（%@）。" = "The model's choices could not be used, twice (%@).";
 "歳時記で語の作例と説明を確認します。語をクリックすると、編集中の指示書に挿入します。" = "Open Saijiki to see word examples and explanations. Click a word to insert it into the instruction draft.";
 "語にマウスを重ねると作例を表示します。クリックすると、挿入できる語を編集中の指示書に入れます。" = "Hover over a word to see its example. Click to insert the word into the instruction draft if its definition is available.";
 "画面比が異なります" = "Different aspect ratio";

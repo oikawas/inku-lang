@@ -155,7 +155,7 @@ SVG生成上限も「設定 → 制限値」で編集できます。既定・推
 
 作品menuの記述・写生・model再解釈は、保存時のoriginと確定状態で使用可否を決めます。直接DDLでは表示せず、編集DDLで記述がロックされた場合は理由を表示します。保存条件の読込中や未記録を、記述作品と推定しません。専用DDL editorの取消しは保存親を変更せず、確定した新しい子だけを保存します。空記述のDDL作品は表示名にDDLの先頭行を使い、記述本文を補いません。
 
-AI助言／自動推敲は対象作品を固定し、画像を扱える登録modelを選択して使います。AIへ渡す方針はcounterの160までです。保存世代の「観察」は表示だけで、「この作品から再開」を明示すると保存条件を読んで次の親を変更します。読込失敗では元の親を保持します。奥書は起点から表示作品までの固定経路と世代数を確認して生成し、成功時に追記して保存されます。既存本文を編集して上書きしません。model比較は使用中LLMを4件まで選択します。通常の描画model dialogは思考表示もdraftとして確定・取消しできますが、この設定をproviderの推論制御としては使用していません。
+作品menuは Web と同じ3群・10項目で、AI自動推敲プロセスと取り合わせは2026-11-13に廃止しました。奥書は画像を扱える登録modelを選択して使います。奥書は起点から表示作品までの固定経路と世代数を確認して生成し、成功時に追記して保存されます。既存本文を編集して上書きしません。model比較は使用中LLMを4件まで選択します。通常の描画model dialogは思考表示もdraftとして確定・取消しできますが、この設定をproviderの推論制御としては使用していません。
 
 書出しdialogで形式・サイズ・card／animationを変更しても「今回だけ」の条件です。defaultとPNG templateは設定画面で保存してください。clipboardも設定で画像／cardと高さ256〜4096px・64px刻みを選べます。Tipsは同梱のServer日英正本を使用し、星・印・hash・系譜の各buttonに操作別の説明を表示します。書き出し印はlocalの印で、グループ共有を実行するものではありません。
 
@@ -237,7 +237,7 @@ UI差分の限定確認は`--library-browsing-only`、`--lineage-presentation-on
 
 送信予算の限定確認は`swift test --package-path apple/Packages/InkuHost --filter ProviderRateLimitChecks/testDurableAdmissionDeadlineAndRetryAccounting`です。一時SQLite、模擬HTTPと時計で同時接続の予約、期限・日次・入力上限、旧記録の取込とbackup／restoreを扱い、実provider、認証情報、通常作品DBを使いません。
 
-限定したCLI確認は、artifactと固定辞書の準備後の`apple/scripts/check-core.sh`と`swift run --package-path apple InkuAppCheck`です。具体差分に必要なものだけを選びます。`--model-selection-only`は保存default・開始時snapshotの分離、`--work-edit-only`は保存親の編集・写生・DDL authority・取消し、`--replay-comparison-only`はprovider不要の再現比較の保存／表示不変を扱います。`--shared-autonomous-refine-only <cases>`は共有の`server/tests/data/autonomous-refine-cases.json`をUniFFIに通して照合し、`--auxiliary-provenance-only`は偽providerで法則・取り合わせの手、辺の記録、可視差、履歴への昇格、停止・再起動を確かめます。ほかに`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--raster-only <SVG path>`があります。旧`--refinement-only`の無変更variation確認は過去実装の確認であり、新variationを退役した現行の受入証拠へ流用しません。native画面、実providerと実機の受入は別です。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。
+限定したCLI確認は、artifactと固定辞書の準備後の`apple/scripts/check-core.sh`と`swift run --package-path apple InkuAppCheck`です。具体差分に必要なものだけを選びます。`--model-selection-only`は保存default・開始時snapshotの分離、`--work-edit-only`は保存親の編集・写生・DDL authority・取消し、`--replay-comparison-only`はprovider不要の再現比較の保存／表示不変を扱います。ほかに`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--raster-only <SVG path>`があります。旧`--refinement-only`の無変更variation確認は過去実装の確認であり、新variationを退役した現行の受入証拠へ流用しません。native画面、実providerと実機の受入は別です。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。
 
 ### iPadとiPhoneのアプリ
 

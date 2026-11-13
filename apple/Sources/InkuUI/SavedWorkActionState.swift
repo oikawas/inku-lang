@@ -21,7 +21,7 @@ public enum SavedWorkActionState: Sendable, Equatable {
     var canReadDescription: Bool { self == .description }
 
     static func isBrowsingAction(_ action: String) -> Bool {
-        ["info", "presentation", "copy-hash", "create", "lineage", "ai"].contains(action)
+        ["info", "presentation", "copy-hash", "create", "lineage"].contains(action)
     }
 }
 
@@ -58,8 +58,9 @@ struct SavedWorkRefinementActions: View {
         .accessibilityHint(model.display.webCopy("workActionLlmMarkLabel", "LLMを呼びます"))
     }
 
-    /// SPEC.ja.md:656 (2026-10-18): four groups, lightest first, each under a small heading; a menu draws a
-    /// separator between sections. A work drawn straight from DDL shows no "redraw from the description" group.
+    /// WorkActionMenu.svelte (2026-11-13, product a3a2ef002): three groups and ten items, lightest first, each under a
+    /// small heading; a menu draws a separator between sections. A work drawn straight from DDL shows no "redraw from
+    /// the description" group. The AI refinement process and the juxtaposition are gone (author 2026-11-13).
     var body: some View {
         Group {
             Group {
@@ -86,16 +87,10 @@ struct SavedWorkRefinementActions: View {
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("写生なし／ありで描き直す") : reason)
                         llm(model.display.webCopy("workActionModels", "モデルを変える"), systemImage: "cpu") { onAction(work, "model") }
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("モデルを変える") : reason)
-                        // WorkActionMenu.svelte:147: a sentence from another work, added after the description.
-                        llm(model.display.webCopy("workActionJuxtapose", "取り合わせ"), systemImage: "text.badge.plus") { onAction(work, "juxtapose") }
-                            .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? "" : reason)
                         if state?.canReadDescription != true { Text(reason) }
                     }
                 }
             }.disabled(model.isBusy || writingLocked || work.trashed)
-            Section(model.display.webCopy("workActionGroupAi", "AIに任せる")) {
-                llm(model.display.webCopy("workActionAutonomous", "AI自動推敲プロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") }
-            }.disabled(work.trashed || ((model.isBusy || writingLocked) && !model.autonomousRefinement.running))
         }
     }
 }

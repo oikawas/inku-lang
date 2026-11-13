@@ -19,6 +19,8 @@
 // 2026-11-12: the model choice's floats are gone (author, Web product 62fead382): the not-recommended card's and
 // the chosen model's tooltips (ModelSelectionSettings) and the no-response purpose tooltip
 // (ModelAdministrationSettings noResponseTitle): 186 sites.
+// 2026-11-13: the juxtaposition item is gone from the work menu with the AI refinement process (author, Web product
+// a3a2ef002; WorkActionMenu.svelte:148): 185 sites.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -170,7 +172,6 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "WorkActionMenu.svelte:145", swift: "SavedWorkActionState.swift", marker: ".help(state?.canReadDescription != true ? reason : \"\")"),
     .init(web: "WorkActionMenu.svelte:146", swift: "SavedWorkActionState.swift", marker: "tooltip(\"写生なし／ありで描き直す\") : reason"),
     .init(web: "WorkActionMenu.svelte:147", swift: "SavedWorkActionState.swift", marker: "tooltip(\"モデルを変える\") : reason"),
-    .init(web: "WorkActionMenu.svelte:148", swift: "SavedWorkActionState.swift", marker: "canReadDescription == true ? \"\" : reason"),
     .init(web: "CanvasArtworkWorkspace.svelte:218", swift: "Views/CreationControls.swift", marker: "FallbackCopy.interpretHint(interpret"),
     .init(web: "CanvasArtworkWorkspace.svelte:223", swift: "Views/CreationControls.swift", marker: "FallbackCopy.composeHint(compose"),
     .init(web: "CanvasArtworkWorkspace.svelte:235", swift: "Views/CreationControls.swift", marker: "serverKey: \"tooltipCanvasCaption\""),

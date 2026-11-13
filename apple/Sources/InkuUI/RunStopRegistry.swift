@@ -57,8 +57,6 @@ extension ToolChangeModel: StoppableRun { var isStoppableRunActive: Bool { runni
 extension SavedScoreVariantModel: StoppableRun { var isStoppableRunActive: Bool { running } }
 extension WorkEditModel: StoppableRun { var isStoppableRunActive: Bool { running } }
 extension AuxiliaryModel: StoppableRun { var isStoppableRunActive: Bool { running } }
-extension AutonomousRefinementModel: StoppableRun { var isStoppableRunActive: Bool { running } }
-extension JuxtaposeModel: StoppableRun { var isStoppableRunActive: Bool { busy } }
 extension ImageFolderBatch: StoppableRun {
     var isStoppableRunActive: Bool { running }
     var stoppableRunRows: (done: Int, total: Int)? { (completed, total) }

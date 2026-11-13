@@ -124,8 +124,6 @@ _RENDER_CONCURRENCY_SETTINGS_KEY = _settings.RENDER_CONCURRENCY_SETTINGS_KEY
 _RENDER_CONCURRENCY_DEFAULT_SETTINGS = _settings.RENDER_CONCURRENCY_DEFAULT_SETTINGS
 RENDER_CONCURRENCY_MIN = _settings.RENDER_CONCURRENCY_MIN
 RENDER_CONCURRENCY_MAX = _settings.RENDER_CONCURRENCY_MAX
-JUXTAPOSITION_CANDIDATE_MIN = _settings.JUXTAPOSITION_CANDIDATE_MIN
-JUXTAPOSITION_CANDIDATE_MAX = _settings.JUXTAPOSITION_CANDIDATE_MAX
 _RENDER_LIMIT_SETTINGS_KEY = _settings.RENDER_LIMIT_SETTINGS_KEY
 _LOG_RETENTION_SETTINGS_KEY = _settings.LOG_RETENTION_SETTINGS_KEY
 _LOG_RETENTION_DEFAULT_SETTINGS = _settings.LOG_RETENTION_DEFAULT_SETTINGS
@@ -562,15 +560,6 @@ def history_description_locked(history_id: str) -> bool:
         return history_id in locked_history_ids(session, [history_id])
 
 
-def juxtaposition_sources(user_id: str) -> list[tuple[str, str]]:
-    """(id, description) of the user's own works that may lend a sentence to a juxtaposition."""
-    from .persistence.juxtaposition import owned_description_sources
-
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        return owned_description_sources(session, actor)
-
-
 def lineage_node_description_locked(node_id: str) -> bool:
     """Whether the work at this lineage node is held by its DDL (not redrawn from its description)."""
     from .persistence.description_lock import node_is_locked
@@ -587,16 +576,6 @@ def get_lineage(
         actor_of_fn=_actor_of,
         row_to_dict_fn=_row_to_dict,
     ).get_lineage(user_id, focus_node_id, descendant_depth, node_limit, include_svg)
-
-
-def set_lineage_edge_metadata(user_id: str, child_node_id: str, metadata: dict) -> bool:
-    """Replace the metadata of the edge into one of the user's own nodes. The AI
-    refinement writes a child's move record once the child is measured (2026-10-21)."""
-    return _lineage.LineageStore(
-        session_factory=SessionLocal,
-        actor_of_fn=_actor_of,
-        row_to_dict_fn=_row_to_dict,
-    ).set_lineage_edge_metadata(user_id, child_node_id, _canonical_json(metadata))
 
 
 def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
@@ -847,14 +826,6 @@ def update_image_upload_notice_settings(enabled: bool) -> dict:
     return _settings.ImageUploadNoticeSettingsStore(_app_settings_store()).update(enabled)
 
 
-def get_juxtaposition_settings() -> dict:
-    return _settings.JuxtapositionSettingsStore(_app_settings_store()).get()
-
-
-def update_juxtaposition_settings(candidate_limit: int) -> dict:
-    return _settings.JuxtapositionSettingsStore(_app_settings_store()).update(candidate_limit)
-
-
 def get_db_write_lock() -> dict:
     return _settings.DbWriteLockSettingsStore(_app_settings_store()).get()
 
@@ -1040,7 +1011,7 @@ def update_execution_retention(days: int | None) -> dict:
 
 def prune_execution_records(days: int | None) -> dict:
     if days is None:
-        return {"executions": 0, "observations": 0, "autonomous": 0}
+        return {"executions": 0, "observations": 0}
     if type(days) is not int or not 1 <= days <= 36500:
         raise ValueError("invalid retention days")
     import hashlib
@@ -1048,7 +1019,7 @@ def prune_execution_records(days: int | None) -> dict:
     from .persistence.schema import PipelineCandidateExecutionRow as Execution, ProviderObservationRow as Observation
     require_background_write()
     cutoff = _now_ms() - days * 86400000
-    counts = {"executions": 0, "observations": 0, "autonomous": 0}
+    counts = {"executions": 0, "observations": 0}
     with engine.connect() as connection:
         connection.exec_driver_sql("BEGIN IMMEDIATE")
         try:
@@ -1081,20 +1052,6 @@ def prune_execution_records(days: int | None) -> dict:
         except Exception:
             connection.rollback()
             raise
-    from .autonomous_refine import AutonomousRunRow, runs_db_url
-    from .persistence.config import sqlite_database_path
-    url = runs_db_url(PERSISTENCE_CONFIG.canonical_url)
-    path = sqlite_database_path(url, setting="INKU_AUTONOMOUS_RUNS_DB_URL")
-    if path is not None and path.is_file():
-        from .persistence.engine import THUMBNAIL_SQLITE_PRAGMAS, create_sqlite_engine
-        runs_engine = create_sqlite_engine(url, setting="INKU_AUTONOMOUS_RUNS_DB_URL", pragmas=THUMBNAIL_SQLITE_PRAGMAS)
-        try:
-            with runs_engine.begin() as connection:
-                counts["autonomous"] = connection.execute(delete(AutonomousRunRow).where(
-                    AutonomousRunRow.state.in_(("done", "stopped", "failed", "interrupted")),
-                    AutonomousRunRow.updated_at < cutoff)).rowcount
-        finally:
-            runs_engine.dispose()
     return counts
 
 

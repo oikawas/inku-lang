@@ -513,12 +513,6 @@ class DbWriteLockStatus(BaseModel):
     locked: bool = Field(description="DB への書き込みを伴う要求をすべて断る（管理者の切り替えだけは通す）")
 
 
-class JuxtapositionSettingsStatus(BaseModel):
-    candidate_limit: int = Field(description="取り合わせで AI に渡す一文の上限。超えるときは要求ごとに無作為に選ぶ")
-    min_limit: int = Field(description="Smallest value accepted for candidate_limit")
-    max_limit: int = Field(description="Largest value accepted for candidate_limit")
-
-
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus = Field(description="Database connection and file information")
     db_backup: DbBackupStatus = Field(description="Automatic and manual database backups")
@@ -531,7 +525,6 @@ class SettingsStatusResponse(BaseModel):
     description_meter: DescriptionMeterStatus = Field(description="Which description languages the meter judges")
     image_upload_notice: ImageUploadNoticeStatus = Field(description="Whether the Web warns before painting from a picture")
     db_write_lock: DbWriteLockStatus = Field(description="Whether writes to the database are locked")
-    juxtaposition: JuxtapositionSettingsStatus = Field(description="How many sentences Juxtaposition offers the model")
 
 
 @router.get("/api/settings/status", response_model=SettingsStatusResponse, summary="Read all settings status")
@@ -574,7 +567,6 @@ def api_settings_status() -> SettingsStatusResponse:
         description_meter=DescriptionMeterStatus(**_db.get_description_meter_settings()),
         image_upload_notice=ImageUploadNoticeStatus(**_db.get_image_upload_notice_settings()),
         db_write_lock=DbWriteLockStatus(**_db.get_db_write_lock()),
-        juxtaposition=_juxtaposition_status(),
     )
 
 
@@ -1086,33 +1078,6 @@ def api_settings_update_image_upload_notice(body: ImageUploadNoticeBody) -> Imag
     Only an administrator may call it.
     """
     return ImageUploadNoticeStatus(**_db.update_image_upload_notice_settings(body.enabled))
-
-
-def _juxtaposition_status() -> JuxtapositionSettingsStatus:
-    return JuxtapositionSettingsStatus(
-        **_db.get_juxtaposition_settings(),
-        min_limit=_db.JUXTAPOSITION_CANDIDATE_MIN,
-        max_limit=_db.JUXTAPOSITION_CANDIDATE_MAX,
-    )
-
-
-class JuxtapositionSettingsBody(BaseModel):
-    candidate_limit: StrictInt = Field(
-        description="Number of sentences from other works offered to the model per request, within the accepted range; a random subset is taken when there are more",
-    )
-
-
-@router.put("/api/settings/juxtaposition", response_model=JuxtapositionSettingsStatus, summary="Update juxtaposition candidate limit")
-def api_settings_update_juxtaposition(body: JuxtapositionSettingsBody) -> JuxtapositionSettingsStatus:
-    """Save how many sentences from other works a juxtaposition offers the model, and return the status.
-
-    Returns 400 when the value is outside the accepted range. Only an administrator may call it.
-    """
-    try:
-        _db.update_juxtaposition_settings(body.candidate_limit)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    return _juxtaposition_status()
 
 
 class DbWriteLockBody(BaseModel):

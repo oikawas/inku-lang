@@ -533,7 +533,7 @@ class ProductPipelineEffects:
                 # the commit (2026-10-26); the core asks no other run.
                 config["description_ddl"] = {"review": reads_images(), "colors": True}
             for stage in (() if kind == "image" else
-                          (("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",))):
+                          (("stage1", "stage2") if kind == "description" else ("stage2",))):
                 if not _model_offered_to(
                     actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline",
                     resolved=(provider, model_id), normalized_settings=model_settings

@@ -4919,7 +4919,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_server_args(me)
     me.set_defaults(func=command_me)
 
-    activity = subparsers.add_parser("activity", help="show pipeline executions, autonomous runs and render slots")
+    activity = subparsers.add_parser("activity", help="show pipeline executions, batches and render slots")
     _add_common_server_args(activity)
     activity.add_argument("--all", action="store_true", help="show all users and render-slot count (administrator only)")
     activity.set_defaults(func=command_activity)

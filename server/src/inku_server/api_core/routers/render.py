@@ -16,9 +16,6 @@ from pydantic import BaseModel, Field, computed_field, field_validator
 
 from ... import db as _db
 from ... import pipeline_compat as _pipeline_compat
-from ...description_labels import pipeline_description
-from ...juxtaposition import CHOICES as JUXTAPOSITION_CHOICES, JuxtapositionAnswerError, gather_candidates
-from ...juxtaposition import suggest_juxtaposition
 from ...limits import limits_as_dict
 import secrets
 
@@ -26,9 +23,7 @@ from ...saved_variants import SavedVariantRefused, ask as _variants
 from ...color_catalogs import get_color_catalog, render_color_map_for_catalog
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
-from ..common import DESCRIPTION_LOCKED_DETAIL, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
-from ..vision import chatgpt_vision_error, prepare_vision_settings
-from ...chatgpt_store import ChatGPTError
+from ..common import DESCRIPTION_LOCKED_DETAIL, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
 from ..models import CompositionRanges, JsonSeed, ProviderStageUsage, RecompositionResult
 from ..rendering import (
@@ -706,29 +701,6 @@ def api_render_tool_variant(req: ToolVariantRenderRequest, actor: dict = Depends
     return _render_tool_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.mode, req.tools, wild=req.wild)
 
 
-class JuxtapositionBody(BaseModel):
-    history_id: str = Field(..., min_length=1, max_length=200, description="Id of the history item whose description the sentences are added after.")
-    model: str | None = Field(default=None, min_length=1, max_length=200, description="Vision model to ask for the sentences. None uses the signed-in user's default.")
-    language: str = Field(default="ja", pattern="^(ja|en)$", description="Language of the reasons returned: ja or en.")
-    # Sentences shown before, left out when the author asks for another four.
-    exclude: list[str] = Field(default_factory=list, max_length=64, description="Sentences already shown, which are left out of the candidates so that another set of four can be offered. Empty by default.")
-
-
-class JuxtapositionChoice(BaseModel):
-    sentence: str = Field(description="A sentence chosen from another of the author's works.")
-    reason: str = Field(description="Why the model chose this sentence, in the requested language.")
-    history_ids: list[str] = Field(description="Ids of the history items the sentence came from.")
-    rank: int = Field(description="Order in which the model picked this sentence.")
-    position: float = Field(description="Where the sentence stood in the shuffled candidate list: 0 is the head and 1 is the tail.")
-    # The description with the sentence after it, joined by the shared core's rule (2026-10-20).
-    joined: str = Field(description="The description with this sentence after it, as the work keeps it, labels included.")
-
-
-class JuxtapositionResponse(BaseModel):
-    choices: list[JuxtapositionChoice] = Field(description="The four sentences the model chose.")
-    candidates: int = Field(description="Number of candidate sentences the choices were picked from.")
-    model: str = Field(description="Name of the Vision model that chose the sentences.")
-
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True, summary="Render a score", responses={500: {"description": "Unexpected server failure"}})
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
     """Draw a score with SVG and metadata; a saved-work replay uses the saved conditions. Invalid input returns 422, and unexpected failures return 500."""
@@ -972,92 +944,3 @@ def api_paint_stream(
         media_type="application/x-ndjson",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )
-
-
-def _juxtaposition_lineage(actor: dict, work: dict) -> tuple[list[str], list[str]]:
-    """The lineage's descriptions, root to the work, and the sentences it already added."""
-    node_id = work.get("lineage_node_id")
-    branch = _db.get_lineage_branch(actor["id"], node_id) if node_id else None
-    texts: list[str] = []
-    for node in (branch or {}).get("nodes", []):
-        history = node.get("history") or {}
-        text = pipeline_description(history.get("source_text") or history.get("input") or "").strip()
-        if text and (not texts or texts[-1] != text):
-            texts.append(text)
-    added = []
-    for edge in (branch or {}).get("edges", []):
-        recorded = (edge.get("metadata") or {}).get("juxtaposition")
-        sentence = str(recorded.get("sentence") or "").strip() if isinstance(recorded, dict) else ""
-        if sentence:
-            added.append(sentence)
-    return texts, added
-
-
-def juxtaposition_offer(actor: dict, work: dict, exclude: list[str]) -> dict:
-    """What a juxtaposition of one work sends, read before anything is sent. The
-    exception says why the work takes no sentence; the AI refinement counts it as
-    a move that could not start (2026-10-21)."""
-    if work.get("description_locked") or work.get("display_label") == "DDL":
-        raise HTTPException(status_code=409, detail=DESCRIPTION_LOCKED_DETAIL)
-    description = pipeline_description(work.get("source_text") or work.get("input") or "").strip()
-    if not description:
-        raise HTTPException(status_code=422, detail="juxtaposition source has no description")
-    svg = str(work.get("svg") or "")
-    if not svg:
-        raise HTTPException(status_code=422, detail="juxtaposition source has no image")
-    lineage, added = _juxtaposition_lineage(actor, work)
-    sources = [
-        (history_id, pipeline_description(text))
-        for history_id, text in _db.juxtaposition_sources(actor["id"])
-        if history_id != work.get("id")
-    ]
-    candidates = gather_candidates(sources, description=description, lineage=lineage, added=added,
-                                   exclude=exclude, limit=_db.get_juxtaposition_settings()["candidate_limit"])
-    if len(candidates) < JUXTAPOSITION_CHOICES:
-        raise HTTPException(status_code=422, detail="not enough sentences in other works to choose from")
-    # The child keeps the author's labels: the sentence follows the stored text.
-    return {"svg": svg, "description": description, "lineage": lineage, "candidates": candidates,
-            "written": work.get("source_text") or work.get("input") or ""}
-
-
-def juxtaposition_settings(actor: dict, model: str | None) -> tuple[str, dict]:
-    """The Vision model a juxtaposition asks, and its settings; refused before anything is sent."""
-    resolved = _resolved_vision_model(model, actor)
-    return resolved, prepare_vision_settings(actor, resolved, _db.get_model_settings())
-
-
-def juxtaposition_choices(offer: dict, *, model: str, settings: dict, language: str) -> dict:
-    """The four sentences the model chose for an offer."""
-    try:
-        return suggest_juxtaposition(
-            svg=offer["svg"],
-            description=offer["description"],
-            lineage=offer["lineage"],
-            candidates=offer["candidates"],
-            model=model,
-            language=language,
-            settings=settings,
-            written=offer["written"],
-        )
-    except ChatGPTError as exc:
-        raise chatgpt_vision_error(exc) from None
-    except JuxtapositionAnswerError as exc:
-        raise HTTPException(status_code=502, detail=f"the model's choices could not be used: {exc}") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
-        raise _unexpected_http_error("Juxtaposition", 502) from exc
-
-
-@router.post("/api/refine/juxtaposition", response_model=JuxtapositionResponse, summary="Suggest juxtaposed sentences")
-def api_juxtaposition(
-    body: JuxtapositionBody,
-    actor: dict = Depends(_current_user),
-) -> JuxtapositionResponse:
-    """Four sentences from the author's other works that a model would add after this work's description."""
-    items = _db.get_items(actor["id"], [body.history_id])
-    if not items:
-        raise HTTPException(status_code=404, detail="juxtaposition source not found")
-    offer = juxtaposition_offer(actor, items[0], body.exclude)
-    model, settings = juxtaposition_settings(actor, body.model)
-    return JuxtapositionResponse(**juxtaposition_choices(offer, model=model, settings=settings, language=body.language))

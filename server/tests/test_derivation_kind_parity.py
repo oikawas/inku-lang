@@ -64,7 +64,8 @@ EXPECTED_KINDS = {
 # operations that do not exist yet on either side (`hacho` / `renga` / `age`
 # have no implementation anywhere); `render_engine_change` and
 # `external_seed_change` are written by other paths, and `laws_change` and
-# `chunk_move` by the Server's AI refinement run (2026-10-21, 2026-10-27).
+# `chunk_move` were written by the Server's AI refinement run (2026-10-21,
+# 2026-10-27; removed on 2026-11-13, the kinds kept for the children it saved).
 RESERVED_WITHOUT_A_WEB_SENDER = {
     "age_change",
     "chunk_move",

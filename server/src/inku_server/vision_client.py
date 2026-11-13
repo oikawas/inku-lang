@@ -1,7 +1,8 @@
 """One text answer about images, from any provider kind the settings know.
 
-The colophon and the Vision advice of autonomous refinement both ask a Vision
-model a question with images attached. They used to speak only the
+The colophon asks a Vision model a question with images attached (the
+juxtaposition and the AI refinement did too, until 2026-11-13). It used to
+speak only the
 OpenAI-compatible dialect, so a Vision model published through the Gemini or
 Anthropic API was offered and then refused at the point of use. The request
 shapes follow the pipeline transport (pipeline_provider.py): the same endpoints,

@@ -107,7 +107,9 @@ PUBLIC = {  # every entry needs a reason
 # Five authenticated routes were added: activity, batch list/start/heartbeat,
 # and saving a composition-form execution.
 # Drawing options and the three maintenance endpoints are guarded.
-EXPECTED_ROUTE_COUNT = 155
+#   -6 for retiring the juxtaposition and the AI refinement: POST /api/refine/juxtaposition,
+#   PUT /api/settings/juxtaposition and the four /api/refine/autonomous routes (2026-11-13).
+EXPECTED_ROUTE_COUNT = 149
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

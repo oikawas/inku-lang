@@ -65,11 +65,12 @@ LINEAGE_DERIVATION_KINDS = {
     # server did not know the name and the whole save was lost ([I-137]).
     "sketch_grain_change",
     # The AI refinement's laws move: the laws stage again on the parent's saved
-    # DDL (2026-10-21). The Server's run saves it; no client sends it.
+    # DDL (2026-10-21). The AI refinement was removed on 2026-11-13; the kind
+    # stays for the children it saved. Nothing saves it now.
     "laws_change",
     # The AI refinement's chunk move (まとまりの手, 2026-10-27): one move on
-    # one chunk of the parent's titled DDL. The Server's run saves it; no
-    # client sends it.
+    # one chunk of the parent's titled DDL. Kept, as laws_change is, for the
+    # children saved before 2026-11-13.
     "chunk_move",
 }
 

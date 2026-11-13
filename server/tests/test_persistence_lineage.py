@@ -172,7 +172,6 @@ def test_persistence_lineage_owns_exact_imports_and_db_keeps_eight_facades() -> 
         "_lineage_node_payload",
         "_lineage_generations",
         "get_lineage",
-        "set_lineage_edge_metadata",
         "get_lineage_branch",
     )
     store_tree = next(

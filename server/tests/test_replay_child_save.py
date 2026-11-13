@@ -188,7 +188,6 @@ def test_managed_replay_child_replays_its_inherited_saved_policy(monkeypatch):
         canonical_url = str(db.engine.url)
         monkeypatch.setattr(db, "PERSISTENCE_CONFIG", PersistenceConfig(canonical_url=canonical_url,
                             thumbnail_url="sqlite://"))
-        monkeypatch.delenv("INKU_AUTONOMOUS_RUNS_DB_URL", raising=False)
         assert db.prune_execution_records(1)["executions"] >= 1
         assert store.read_execution(user["id"], execution_id) is None
         assert store.read_linked_history(user["id"], parent["id"]) is not None

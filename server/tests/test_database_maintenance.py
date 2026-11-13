@@ -56,16 +56,7 @@ def test_retention_default_keeps_everything_and_prunes_only_old_idle(tmp_path, m
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     monkeypatch.setattr(db, "PERSISTENCE_CONFIG", SimpleNamespace(canonical_url=f"sqlite:///{path}"))
     monkeypatch.setattr(db, "database_write_block_reason", lambda: None)
-    monkeypatch.delenv("INKU_AUTONOMOUS_RUNS_DB_URL", raising=False)
     old = db._now_ms() - 3 * 86400000
-    from inku_server.autonomous_refine import RunStore, AutonomousRunRow
-    runs = RunStore(f"sqlite:///{tmp_path / 'canonical-autonomous-runs.db'}")
-    for run_id, state in (("done", "done"), ("running", "running")):
-        runs.save({"id": run_id, "owner_id": "u", "history_id": "work", "state": state,
-                   "settings": {}, "turns": [], "created_at": old})
-    with runs._sessions.begin() as session:
-        for row in session.query(AutonomousRunRow).all():
-            row.updated_at = old
     def execution(name, action, updated):
         data = json.dumps({"snapshot": {"action": action}}).encode()
         return PipelineCandidateExecutionRow(owner_id="u", execution_id=name, variation_id="v", sequence="0",
@@ -81,12 +72,10 @@ def test_retention_default_keeps_everything_and_prunes_only_old_idle(tmp_path, m
                 action_tag="action", stage="stage1", provider_id="p", model="m", attempt=1, timeout_ms=1,
                 request_body="{}", outcome="completed", capture_complete=False, created_at=old, updated_at=old))
     assert db.database_maintenance_settings()["retention_days"] is None
-    assert db.prune_execution_records(None) == {"executions": 0, "observations": 0, "autonomous": 0}
-    assert db.prune_execution_records(1) == {"executions": 1, "observations": 1, "autonomous": 1}
+    assert db.prune_execution_records(None) == {"executions": 0, "observations": 0}
+    assert db.prune_execution_records(1) == {"executions": 1, "observations": 1}
     with db.SessionLocal() as session:
         assert set(session.scalars(select(PipelineCandidateExecutionRow.execution_id))) == {"old-busy", "new-idle"}
         assert session.get(HistoryRow, "work") and session.get(PipelineHistoryLinkRow, ("u", "work"))
         assert set(session.scalars(select(ProviderObservationRow.execution_id))) == {"old-busy"}
-    assert runs.get("u", "done") is None and runs.get("u", "running") is not None
-    runs.engine.dispose()
     engine.dispose()

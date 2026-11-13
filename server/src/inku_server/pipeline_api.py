@@ -423,11 +423,8 @@ class PipelineService:
     def start(self, owner: str, kind: str, text: str, *, parent: dict | None = None, source_work: dict | None = None,
               canvas_format_id: str | None = None, canvas_aspect: str | None = None,
               options: dict | None = None, prepared: tuple[dict, dict] | None = None,
-              direction: dict | None = None, image_id: str | None = None, batch_lease: str | None = None) -> dict:
-        """Start from a description, direct DDL, transient image, or `saved_laws`:
-        the laws stage again on a saved work's DDL (`text`), with the records
-        `source_work` keeps and the refinement's `direction` (the AI
-        refinement's laws move, 2026-10-21)."""
+              image_id: str | None = None, batch_lease: str | None = None) -> dict:
+        """Start from a description, direct DDL or transient image."""
         description = text if kind == "description" else (source_work or {}).get("description", "")
         drawn = "" if kind == "image" else (_drawn_description(text) if kind == "description" else text)
         context = {"description": description, "committed_description": description, "parent": parent, "derivation_kind": "new"}
@@ -469,8 +466,6 @@ class PipelineService:
                 context.update(resolved_context)
             else:
                 config = self.config_for(owner, source_work)
-            if (source_work or {}).get("chunk_plugin_offers"):
-                context["chunk_plugin_offers"] = deepcopy(source_work["chunk_plugin_offers"])
             if canvas_format_id is not None and canvas_aspect is not None and canvas_format_id != canvas_aspect:
                 raise CandidateHostError("canvas_alias_conflict")
             selected = canvas_format_id if canvas_format_id is not None else canvas_aspect
@@ -487,9 +482,6 @@ class PipelineService:
             elif kind == "description":
                 authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog),
                              **_route_fields(context, text)}
-            elif kind == "saved_laws":
-                authoring = {"tag": "saved_laws", "source": text,
-                             "description": pipeline_description(description), "direction": deepcopy(direction or {})}
             else:
                 authoring = {"tag": "direct_ddl", "source": text}
                 if parent is None and source_work is None:
@@ -1164,8 +1156,7 @@ class BatchUpdateBody(BaseModel):
 
 
 def pipeline_router(service: PipelineService | Callable[[], PipelineService], actor_dependency: Callable,
-                    *, binding_for: Callable[[], PipelineBinding] | None = None,
-                    autonomous_runner_for: Callable | None = None) -> APIRouter:
+                    *, binding_for: Callable[[], PipelineBinding] | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/pipeline")
 
     def current_service() -> PipelineService:
@@ -1205,16 +1196,8 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
         batches = BatchRuns(current_service().store.engine).list(owner, active_batch_ids(owner))
         # The activity overview never needs descriptions or saved settings.
         batches = [{key: value for key, value in batch.items() if key not in {"prompt", "conditions"}} for batch in batches]
-        if autonomous_runner_for is None:
-            from .autonomous_refine import get_runner
-            runner = get_runner()
-        else:
-            runner = autonomous_runner_for()
-        autonomous_runs, children = runner.activity(owner)
-        executions = [{**entry, "autonomous_run_id": children.get(entry["execution_id"])}
-                      for entry in current_service().activity(owner)]
         return {"scope": "all_users" if all_users else "current_user", "process_scope": "current_process",
-                "executions": executions, "batches": batches, "autonomous_runs": autonomous_runs,
+                "executions": current_service().activity(owner), "batches": batches,
                 "render_slots_active": _render_slots.active if all_users else None,
                 "batch_waiting_known": False}
 

@@ -35,8 +35,7 @@ from .api_core.thumbnails import shutdown_bake_pool
 from .pipeline_api import pipeline_router, register_pipeline_errors
 from .pipeline_runtime import get_binding as _pipeline_binding, get_service as _pipeline_service, shutdown as _shutdown_pipeline
 from .api_core.deps import _current_user
-from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback, description, chatgpt, autonomous
-from . import autonomous_refine as _autonomous_refine
+from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback, description, chatgpt
 
 
 _DB_BACKUP_SCHEDULER_TICK_SECONDS = 60
@@ -84,8 +83,6 @@ async def _lifespan(_app: FastAPI):
         # else closes them: they are held in a pool that outlives every request,
         # unlike the rebuild's, which is made and dropped inside one run.
         shutdown_bake_pool()
-        # The refinement runs stop before the pipeline runs they wait on.
-        _autonomous_refine.shutdown()
         try:
             await asyncio.to_thread(_shutdown_pipeline)
         finally:
@@ -105,7 +102,6 @@ API_TAGS = [
     {"name": "History", "description": "Saved works: listing, saving, stars and comments, sharing, trash and exports."},
     {"name": "Lineage", "description": "How works descend from one another, and the colophon of a branch."},
     {"name": "Drawing", "description": "Draw from a description or DDL, render a Score, and plan color arrangement, ground and tool variants of a saved work."},
-    {"name": "Autonomous refinement", "description": "Runs in which a model revises a work over several turns."},
     {"name": "Pipeline", "description": "Variations drawn step by step from a description, DDL or an image, with their executions and forks."},
     {"name": "Unread words", "description": "Words in descriptions that the drawing did not read."},
     {"name": "Descriptions", "description": "Count the morae and syllables of a description."},
@@ -126,8 +122,6 @@ _db.init_db()
 # deleting its file is the supported way to clear every thumbnail, and the next
 # start makes an empty one again.
 _thumbs_db.init_thumbs_db()
-# The AI refinement runs this process was taking when it stopped were cut off.
-_autonomous_refine.get_runner().recover()
 
 
 def _apply_stored_render_concurrency() -> None:
@@ -329,7 +323,6 @@ app.include_router(users.router, tags=["Users and groups"])
 app.include_router(history.router, tags=["History"])
 app.include_router(lineage.router, tags=["Lineage"])
 app.include_router(render.router, tags=["Drawing"])
-app.include_router(autonomous.router, tags=["Autonomous refinement"])
 app.include_router(pipeline_router(_pipeline_service, _current_user, binding_for=_pipeline_binding), tags=["Pipeline"])
 app.include_router(feedback.router, tags=["Unread words"])
 app.include_router(description.router, tags=["Descriptions"])

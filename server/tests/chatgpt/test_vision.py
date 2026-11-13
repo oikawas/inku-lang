@@ -170,30 +170,22 @@ def test_text_decoder_requires_completion_and_refuses_partial_refusal_tool_and_b
     assert fallback.finish() == "墨"
 
 
-@pytest.mark.parametrize("route", ["juxtaposition", "colophon"])
-def test_vision_routes_carry_owner_pin_and_preserve_chatgpt_error(personal, monkeypatch, route):
+def test_the_colophon_route_carries_owner_pin_and_preserves_chatgpt_error(personal, monkeypatch):
     # Failure: the route loses owner/profile/generation or turns the classified refusal into a generic 502.
-    from inku_server.api_core.routers import render, lineage
+    # (The juxtaposition's route made the same call until it was removed on 2026-11-13.)
+    from inku_server.api_core.routers import lineage
     _store, settings = personal
-    monkeypatch.setattr(render._db, "get_model_settings", lambda: settings)
-    monkeypatch.setattr(render._db, "get_items", lambda *_: [{"svg": "<svg/>"}])
+    monkeypatch.setattr(lineage._db, "get_model_settings", lambda: settings)
+    monkeypatch.setattr(lineage._db, "get_items", lambda *_: [{"svg": "<svg/>"}])
     monkeypatch.setattr(lineage._db, "get_lineage_branch", lambda *_: {})
     def refuse(*_args, **kwargs):
         assert kwargs["settings"]["chatgpt_owner_id"] == "owner"
         assert kwargs["settings"]["chatgpt_profile_id"] == "fixture-a"
         assert kwargs["settings"]["chatgpt_generation"] == 1
         raise ChatGPTError("chatgpt_session_changed")
-    monkeypatch.setattr(render, "suggest_juxtaposition", refuse)
     monkeypatch.setattr(lineage, "generate_okugaki", refuse)
     with pytest.raises(HTTPException) as refused:
-        if route == "juxtaposition":
-            # The juxtaposition's model call, as the AI refinement's runs also make it (2026-10-21).
-            model, settings = render.juxtaposition_settings({"id": "owner"}, "chatgpt:sight")
-            render.juxtaposition_choices({"svg": "<svg/>", "description": "fixture", "lineage": [],
-                                          "candidates": [], "written": "fixture"},
-                                         model=model, settings=settings, language="ja")
-        else:
-            lineage.api_okugaki_generate("fixture", lineage.OkugakiGenerateBody(model="chatgpt:sight", save=False), None, {"id": "owner"})
+        lineage.api_okugaki_generate("fixture", lineage.OkugakiGenerateBody(model="chatgpt:sight", save=False), None, {"id": "owner"})
     assert refused.value.status_code == 403
     assert refused.value.detail == {"code": "chatgpt_session_changed", "action": "retry"}
 

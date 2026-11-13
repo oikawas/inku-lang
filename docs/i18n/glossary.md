@@ -24,9 +24,15 @@
 |---|---|---|---|
 | 記述 | **description** | 名詞。動詞は write | ~~prompt~~（思想に反する） |
 | 構図の形を変える | **Change the composition form** | 推敲の操作 | 7形から選ぶ |
-| 一角／全面／帯 | **One corner / All over / Bands** | 構図の形 | — |
-| 分ける線／格子 | **Dividing line / Grid** | 構図の形 | — |
-| 群れと逸れ／不等辺の三角 | **Flock and stray / Unequal triangle** | 構図の形 | — |
+| 一角／全面／帯 | **One corner / All over / Bands** | 画の型 | — |
+| 分ける線／格子 | **Dividing line / Grid** | 画の型 | — |
+| 群れと逸れ／不等辺の三角 | **Flock and stray / Unequal triangle** | 画の型 | — |
+| 画の型 | **Form** | 構図の記録の、画面全体の型（2026-11-13 に呼び名を揃えた） | 構図の形（操作の名「構図の形を変える」には残る） |
+| 命題 | **Thesis** | 構図の記録の、画が言うことの一文 | — |
+| 主の法則 | **Main law** | 構図の記録の、主に据えた法則 | — |
+| 法則 | **Laws** | 構図の記録の、物の置き方・並べ方を決める決まり。名で示し、記号（B1 など）は生成情報の詳細にだけ残す | — |
+| 物 | **Things** | 構図の記録の、番号の付いた描く物 | — |
+| 理由 | **Reason** | 構図の記録の、型と法則を選んだ理由 | — |
 | 解釈（記述を指示書へ読み解くこと） | **interpretation** / **interpret** | 名詞／動詞。工程の名ではない（型で描くは型を埋める、言葉で描くは書く・見比べが行う） | ~~reading~~（読み取りと混線する） |
 | 型を埋める（型で描くの工程。旧 Stage 1） | **Fill the plan** | 工程の名（2026-11-04 作者の決定） | ~~Interpretation~~（工程の名として）、~~Stage 1~~ |
 | 書く（言葉で描くの工程） | **Writing** | 工程の名（2026-11-04 作者の決定） | ~~Write in words~~（描き方の名 In words と紛れる） |

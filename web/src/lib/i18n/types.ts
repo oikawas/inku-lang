@@ -434,6 +434,21 @@ export interface LangPack {
 	ddlLabelIn: (lang: 'ja' | 'en') => string;
 	tooltipDdlLang: string;
 	displayedWorkProcess: string;
+	// The left panel's heading once it shows the composition (2026-11-13). The
+	// key above keeps its words: macOS reads it through ui-reference.json.
+	displayedWorkProcessWithComposition: string;
+	compositionSectionTitle: string;
+	compositionThesisLabel: string;
+	compositionFormTerm: string;
+	compositionMainLawTerm: string;
+	compositionLawsTerm: string;
+	compositionColorsTerm: string;
+	compositionReasonTerm: string;
+	compositionThingsHead: string;
+	compositionFromReading: string;
+	compositionNoRecord: string;
+	compositionNoRecordNote: string;
+	compositionFallback: string;
 	sketchLabel: string;
 	readDrawReadingLabel: string;
 	sketchGrainLabel: string;

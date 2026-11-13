@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
+	COMPOSITION_DEFAULT,
+	COMPOSITION_FIELD,
 	DEFAULT_FOLDS,
 	foldsFromSettings,
 	foldsToSettings,
@@ -18,7 +20,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 
 test('T-16: the retained sketch section defaults open', () => {
 	assert.equal(SKETCH_DEFAULT, true);
-	assert.deepEqual(DEFAULT_FOLDS, { sketchOpen: true });
+	assert.deepEqual(DEFAULT_FOLDS, { sketchOpen: true, compositionOpen: false });
 });
 
 test('T-16: a user who has never folded anything gets each default, not one of them', () => {
@@ -30,16 +32,16 @@ test('T-16: a user who has never folded anything gets each default, not one of t
 });
 
 test('T-16: a fold survives the round trip in both directions', () => {
-	const folded = { sketchOpen: false };
+	const folded = { sketchOpen: false, compositionOpen: false };
 	assert.deepEqual(foldsFromSettings(foldsToSettings(folded)), folded);
-	const opened = { sketchOpen: true };
+	const opened = { sketchOpen: true, compositionOpen: true };
 	assert.deepEqual(foldsFromSettings(foldsToSettings(opened)), opened);
 });
 
 test('T-16: a retired expanded key cannot move the sketch section or return on save', () => {
-	assert.deepEqual(foldsFromSettings({ sketch_open: false, ddl_expanded_open: true }), { sketchOpen: false });
+	assert.deepEqual(foldsFromSettings({ sketch_open: false, ddl_expanded_open: true }), { sketchOpen: false, compositionOpen: false });
 	assert.deepEqual(foldsFromSettings({ ddl_expanded_open: false }), DEFAULT_FOLDS);
-	assert.deepEqual(foldsToSettings(foldsFromSettings({ ddl_expanded_open: true })), { sketch_open: true });
+	assert.deepEqual(foldsToSettings(foldsFromSettings({ ddl_expanded_open: true })), { sketch_open: true, composition_open: false });
 });
 
 test('T-16: a stored value that is not a boolean falls back to that section, not to false', () => {
@@ -133,4 +135,18 @@ test('T-19: the server keeps the sketch fold and ignores the retired field', () 
 	assert.equal(cases.user_normalization.find((item: {input: unknown}) => item.input === null).result.sketch_open, true);
 	assert.equal(cases.user_normalization.find((item: {input: {sketch_open?: boolean} | null}) => item.input?.sketch_open === false).result.sketch_open, false);
 	assert.ok(cases.user_normalization.every((item: {result: Record<string, unknown>}) => !('ddl_expanded_open' in item.result)));
+});
+
+// ------------------------------------- T-20 (the composition fold, 2026-11-13)
+
+test('T-20: the composition section starts folded, and its fold is saved and kept by the server', () => {
+	assert.equal(COMPOSITION_DEFAULT, false);
+	assert.equal(storedFold({ [COMPOSITION_FIELD]: 'yes' }, COMPOSITION_FIELD, COMPOSITION_DEFAULT), false);
+	assert.deepEqual(foldsFromSettings({ composition_open: true }), { sketchOpen: true, compositionOpen: true });
+	const settings = read('./settings.svelte.ts');
+	assert.match(settings, /toggleComposition = \(\) => \{[\s\S]*?persist\(\{ \[COMPOSITION_FIELD\]/);
+	// Unknown keys do not survive the server's normalization; the core keeps this one.
+	const cases = JSON.parse(readFileSync(new URL('../../../../../server/tests/data/provider-settings-cases.json', import.meta.url), 'utf8'));
+	assert.ok(cases.user_normalization.every((item: {result: Record<string, unknown>}) => typeof item.result.composition_open === 'boolean'));
+	assert.ok(cases.user_normalization.some((item: {result: Record<string, unknown>}) => item.result.composition_open === true));
 });

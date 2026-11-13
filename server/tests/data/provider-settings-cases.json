@@ -8143,6 +8143,7 @@
       "input": null,
       "result": {
         "color_catalog_id": "default",
+        "composition_open": false,
         "draw_defaults": {
           "batch_image": {
             "canvas_aspect": "image",
@@ -8225,6 +8226,7 @@
       "input": {},
       "result": {
         "color_catalog_id": "default",
+        "composition_open": false,
         "draw_defaults": {
           "batch_image": {
             "canvas_aspect": "image",
@@ -8312,6 +8314,7 @@
       },
       "result": {
         "color_catalog_id": "default",
+        "composition_open": false,
         "draw_defaults": {
           "batch_image": {
             "canvas_aspect": "image",
@@ -8405,6 +8408,7 @@
       },
       "result": {
         "color_catalog_id": "default",
+        "composition_open": false,
         "draw_defaults": {
           "batch_image": {
             "canvas_aspect": "image",
@@ -8501,6 +8505,7 @@
       },
       "result": {
         "color_catalog_id": "auto",
+        "composition_open": false,
         "draw_defaults": {
           "batch_image": {
             "canvas_aspect": "image",
@@ -8587,6 +8592,92 @@
       },
       "result": {
         "color_catalog_id": "default",
+        "composition_open": false,
+        "draw_defaults": {
+          "batch_image": {
+            "canvas_aspect": "image",
+            "catalog": {
+              "id": "default",
+              "mode": "fixed"
+            },
+            "composition": "off",
+            "models": {
+              "vision": "nvidia:meta/llama-3.2-90b-vision-instruct"
+            },
+            "route": "read_and_draw",
+            "sketch": "off",
+            "wild": "off"
+          },
+          "batch_text": {
+            "canvas_aspect": "square",
+            "catalog": {
+              "id": "default",
+              "mode": "fixed"
+            },
+            "composition": "off",
+            "models": {
+              "stage1": "nvidia:google/gemma-4-31b-it",
+              "stage2": "nvidia:google/gemma-4-31b-it"
+            },
+            "route": "read_and_draw",
+            "sketch": "on",
+            "wild": "off"
+          },
+          "describe": {
+            "canvas_aspect": "square",
+            "catalog": {
+              "id": "default",
+              "mode": "fixed"
+            },
+            "composition": "off",
+            "models": {
+              "stage1": "nvidia:google/gemma-4-31b-it",
+              "stage2": "nvidia:google/gemma-4-31b-it"
+            },
+            "route": "read_and_draw",
+            "sketch": "on",
+            "wild": "off"
+          },
+          "image": {
+            "canvas_aspect": "image",
+            "catalog": {
+              "id": "default",
+              "mode": "fixed"
+            },
+            "composition": "off",
+            "models": {
+              "vision": "nvidia:meta/llama-3.2-90b-vision-instruct"
+            },
+            "route": "read_and_draw",
+            "sketch": "off",
+            "wild": "off"
+          }
+        },
+        "generation_info_follows_selection": true,
+        "generation_info_token_detail": false,
+        "instruction_caption_position": "left",
+        "instruction_caption_visible": true,
+        "instruction_caption_writing_mode": "horizontal",
+        "model_inspection_selected_models": [],
+        "okugaki_model": "meta/llama-3.2-90b-vision-instruct",
+        "okugaki_provider": "nvidia",
+        "sketch_open": true,
+        "stage1_model": "google/gemma-4-31b-it",
+        "stage1_provider": "nvidia",
+        "stage2_model": "google/gemma-4-31b-it",
+        "stage2_provider": "nvidia",
+        "ui_text_size": 1,
+        "vision_model": "meta/llama-3.2-90b-vision-instruct",
+        "vision_provider": "nvidia"
+      }
+    },
+    {
+      "input": {
+        "composition_open": true
+      },
+      "result": {
+        "color_catalog_id": "default",
+        "composition_open": true,
         "draw_defaults": {
           "batch_image": {
             "canvas_aspect": "image",
@@ -8676,6 +8767,7 @@
         "stage2_provider": "ollama"
       },
       "result": {
+        "composition_open": false,
         "generation_info_follows_selection": true,
         "generation_info_token_detail": false,
         "instruction_caption_position": "left",
@@ -8702,6 +8794,7 @@
       },
       "result": {
         "color_catalog_id": "auto",
+        "composition_open": false,
         "generation_info_follows_selection": true,
         "generation_info_token_detail": false,
         "instruction_caption_position": "left",
@@ -8728,6 +8821,7 @@
         ]
       },
       "result": {
+        "composition_open": false,
         "generation_info_follows_selection": true,
         "generation_info_token_detail": true,
         "instruction_caption_position": "left",

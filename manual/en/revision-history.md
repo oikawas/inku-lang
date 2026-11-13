@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-13 — Where the composition and laws can be read
+
+- "Image Creation": §4 now describes the `Thesis` line on the Work tab and the left panel's section `Composition and laws` on the Description tab (the thesis and names shown folded, what opens, `No composition` and `No record`, and that the fold is kept), and that laws are shown by name with their codes only inside the `Details` of Generation Info. The left panel is headed "Sketch from life, composition and instructions of the displayed work".
+
 ## 2026-11-13 — Removal of Juxtapose and the autonomous refinement process
 
 `Juxtapose` and `Autonomous refinement process` left the work-editing menu (the author's decision), so they were taken out of the Web operation and administration documents.

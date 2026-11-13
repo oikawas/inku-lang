@@ -1700,6 +1700,15 @@ const fn both(text: &'static str) -> [&'static str; 2] {
     [text, text]
 }
 
+/// A color law's name and family (ja, en), which the hosts' names table
+/// shows (`composition_names`).
+pub(crate) fn color_law_words(law: &str) -> Option<([&'static str; 2], [&'static str; 2])> {
+    LAW_TEXTS
+        .iter()
+        .find(|(name, _)| *name == law)
+        .map(|(_, text)| (text.name, text.family))
+}
+
 /// The color laws as the request lists them: the laws stage prototype's texts
 /// for the eleven moved laws and the color stage prototype's for D1 to D7,
 /// with what the ground kept as it is (V1) and the drawn lightness change.

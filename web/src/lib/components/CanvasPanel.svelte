@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import WorkThesisLine from '$lib/features/composition-record/WorkThesisLine.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import { modelShortName, type Provider, type ProviderGroup } from '$lib/models';
@@ -478,6 +479,16 @@
 		directActionMenuOpen = !!node;
 	}
 
+	/** Open one of the work menu's actions on the work on screen, as the menu would (the left panel's composition section, 2026-11-13). */
+	export async function runCurrentWorkAction(action: WorkAction): Promise<void> {
+		if (interactionLocked || generationLocked) return;
+		const historyId = currentHistoryId;
+		if (!historyId) return;
+		const node = await onResolveCurrentLineageNode();
+		if (!node || currentHistoryId !== historyId) return;
+		await runDirectWorkAction(action, node);
+	}
+
 	function startDirectRefinement(node: LineageNode, view: RefinementView): void {
 		onSetRefineWild(null);
 		refineView = view;
@@ -765,6 +776,10 @@
 			</div>
 		{/if}
 	</div>
+	{#if outputTab === 'canvas'}
+		<!-- The thesis under the strip (2026-11-13): read without opening anything. -->
+		<WorkThesisLine work={statusWork} {isJapanese} />
+	{/if}
 
 	<!-- The work's actions over the canvas's top right, on the Work tab only:
 	     the lineage tab gives every node its own. -->

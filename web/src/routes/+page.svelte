@@ -77,6 +77,7 @@
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
+	import CompositionSection from '$lib/features/composition-record/CompositionSection.svelte';
 	import { bindGenerationInfoSettingsPersist } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
@@ -1334,7 +1335,11 @@
 	});
 	const historyManager = history.manager;
 	let libraryMounted = $state(false);
-	let canvasPanelHandle = $state<{ openDirectActionMenu: () => Promise<void>; focusCurrentWork: () => Promise<void> } | null>(null);
+	let canvasPanelHandle = $state<{
+		openDirectActionMenu: () => Promise<void>;
+		focusCurrentWork: () => Promise<void>;
+		runCurrentWorkAction: (action: 'composition-form') => Promise<void>;
+	} | null>(null);
 	let libraryFocusRequest = $state(0);
 	$effect(() => {
 		if (historyManager.open) libraryMounted = true;
@@ -2932,7 +2937,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					/>
 
 					{#if work.inputMode !== 'batch' && (work.result !== null || work.ddl !== null || work.sketchText !== null)}
-						<h3 class="displayed-work-heading">{t().displayedWorkProcess}</h3>
+						<h3 class="displayed-work-heading">{t().displayedWorkProcessWithComposition}</h3>
 					{/if}
 
 					<!-- DDL-run status belongs below the action buttons, not inside the input field. -->
@@ -2980,6 +2985,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								{/if}
 							{/if}
 						</section>
+					{/if}
+
+					<!-- The composition and laws (2026-11-13): between the reading and the
+					     instructions they were written toward. -->
+					{#if work.inputMode === 'single' && work.result !== null}
+						<CompositionSection
+							work={work.displayedHistoryItem ?? work.result}
+							description={work.displayedHistoryItem?.source_text ?? work.displayedHistoryItem?.input ?? null}
+							isJapanese={getLang() === 'ja'}
+							offersDescriptionActions={work.displayedHistoryItem?.display_label !== 'DDL'}
+							descriptionLocked={!!work.displayedHistoryItem?.description_locked}
+							onChangeForm={() => canvasPanelHandle?.runCurrentWorkAction('composition-form')}
+						/>
 					{/if}
 
 					<!-- The complete DDL draft uses the same editor as the dialog. -->

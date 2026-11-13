@@ -12,6 +12,7 @@ pub mod chunk_moves;
 pub mod colors;
 pub mod completion_ranges;
 pub mod composition;
+pub mod composition_names;
 pub mod composition_reading;
 pub mod core_boundary;
 pub mod ddl3d;

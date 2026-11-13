@@ -38,7 +38,10 @@ export function currentWork(
 	}, s);
 }
 
-export function finishedText(item: PaintProgressEvent['run_progress']['finished'][number], s: LangPack): string {
+/** How a finished stage names its main law (2026-11-13: by name from the composition names table); without one, the code. */
+export type LawNamer = { law: (code: string) => string; colorLaw: (code: string) => string };
+
+export function finishedText(item: PaintProgressEvent['run_progress']['finished'][number], s: LangPack, names?: LawNamer): string {
 	const stage = stageName(item.action, s);
 	if (item.outcome === 'fallback') return s.runFinishedFallback(stage);
 	if (item.outcome === 'retried') return s.runFinishedRetried(stage);
@@ -46,11 +49,15 @@ export function finishedText(item: PaintProgressEvent['run_progress']['finished'
 	if (item.action === 'read_description') return Number(facts.dropped_items) > 0
 		? s.runFinishedReadingDropped(String(facts.dropped_items)) : s.runFinishedReading;
 	if (item.action === 'compose_description' && facts.things != null && facts.main_law != null)
-		return s.runFinishedComposition(String(facts.things), String(facts.main_law));
+		return s.runFinishedComposition(String(facts.things), names ? names.law(String(facts.main_law)) : String(facts.main_law));
 	if (item.action === 'write_description_ddl' || item.action === 'write_image_ddl') return s.runFinishedWriting;
 	if (item.action === 'review_description_ddl' || item.action === 'review_image_ddl') return s.runFinishedReview;
 	if (facts.catalog_id != null) return s.runFinishedCatalog(stage, String(facts.catalog_id));
-	if (facts.main_law != null) return s.runFinishedLaw(stage, String(facts.main_law));
+	if (facts.main_law != null) {
+		const code = String(facts.main_law);
+		const named = !names ? code : item.action === 'choose_colors' ? names.colorLaw(code) : names.law(code);
+		return s.runFinishedLaw(stage, named);
+	}
 	return s.runFinishedReady(stage);
 }
 

@@ -1,4 +1,5 @@
-// Whether sketch from life (Stage 0.5) is open. Key, default, state and both sides of the round
+// Whether sketch from life (Stage 0.5) and the composition and laws
+// (2026-11-13) are open. Key, default, state and both sides of the round
 // trip live together -- see features/color-catalog/settings.svelte.ts for why.
 //
 // These ride in the user's `model_settings` on the server rather than in
@@ -9,6 +10,8 @@
 // The keys, defaults and parsing live in ./folds.ts (plain .ts, so they are
 // testable without the rune compiler); this file holds only the live state.
 import {
+	COMPOSITION_DEFAULT,
+	COMPOSITION_FIELD,
 	foldsFromSettings,
 	foldsToSettings,
 	SKETCH_DEFAULT,
@@ -18,10 +21,16 @@ import { registerUserSettingsContributor } from '$lib/features/user-settings';
 
 class DescribePanelSettings {
 	sketchOpen = $state(SKETCH_DEFAULT);
+	compositionOpen = $state(COMPOSITION_DEFAULT);
 
 	toggleSketch = () => {
 		this.sketchOpen = !this.sketchOpen;
 		persist({ [SKETCH_FIELD]: this.sketchOpen });
+	};
+
+	toggleComposition = () => {
+		this.compositionOpen = !this.compositionOpen;
+		persist({ [COMPOSITION_FIELD]: this.compositionOpen });
 	};
 
 	/**
@@ -51,10 +60,12 @@ registerUserSettingsContributor({
 	id: 'describe-panel',
 	collect: () =>
 		foldsToSettings({
-			sketchOpen: describePanelSettings.sketchOpen
+			sketchOpen: describePanelSettings.sketchOpen,
+			compositionOpen: describePanelSettings.compositionOpen
 		}),
 	apply: (settings) => {
 		const folds = foldsFromSettings(settings);
 		describePanelSettings.sketchOpen = folds.sketchOpen;
+		describePanelSettings.compositionOpen = folds.compositionOpen;
 	}
 });

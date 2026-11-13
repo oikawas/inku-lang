@@ -93,14 +93,14 @@ def text_request_with_count(connection: dict, model: str, *, system: str, text: 
 
 
 def chatgpt_request(model: str, prompt: dict, answer_limit: int, *, images: list[str] | None = None) -> dict:
-    """The ChatGPT plan's body for one pipeline effect: body, canonical, wire_limit, event_limit."""
+    """The Sign in with ChatGPT body for one pipeline effect: body, canonical, wire_limit, event_limit."""
     return _ask("chatgpt_request", model=model, answer_limit=answer_limit,
                 prompt={key: prompt[key] for key in ("system", "message", "response_schema", "action_name", "images") if key in prompt},
                 **({"images": list(images)} if images is not None else {}))
 
 
 def chatgpt_vision_request(model: str, *, system: str, text: str, images: list[str], answer_limit: int) -> dict:
-    """The ChatGPT plan's Vision body; an image that is not a base64 data URL is refused."""
+    """The Sign in with ChatGPT Vision body; an image that is not a base64 data URL is refused."""
     return _ask("chatgpt_vision_request", model=model, system=system, text=text, images=list(images),
                 answer_limit=answer_limit)
 

@@ -72,6 +72,9 @@ type ChatGPTPublication = {
 	enabled_models: Record<string, boolean>;
 	model_labels?: ModelLabel[];
 	assessment_keys?: (keyof ModelOption)[];
+	// The shared core's descriptor of the sign-in service (Sign in with ChatGPT).
+	service?: { id: string; label: string; labels: { ja: string; en: string }; abbreviation: string;
+		usage_url: string; kind: string; requires_api_key: boolean };
 };
 
 export function createModelAdministration<TActor extends SettingsActor>(
@@ -112,9 +115,14 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		if (data.assessment_keys) assessmentKeys = data.assessment_keys;
 		const models = data.models.map((model) => ({ ...model, purposes: model.purposes ?? ['llm', 'vision'] as ('llm' | 'vision')[] }));
 		chatgptPublication = { ...data, models };
-		const provider: ProviderGroup = { id: 'chatgpt', label: t().chatgptPlanLabel,
-			kind: 'chatgpt_responses', requires_api_key: false, models };
-		modelCatalog = [...modelCatalog.filter((group) => group.id !== 'chatgpt'), provider];
+		// The group is the core's sign-in service descriptor with this plan's models; like the
+		// core's provider_groups it replaces a same-id group and leads the list (2026-11-14).
+		const service = data.service;
+		const provider: ProviderGroup = service
+			? { id: 'chatgpt', label: service.label, labels: service.labels, abbreviation: service.abbreviation,
+				usage_url: service.usage_url, kind: service.kind, requires_api_key: service.requires_api_key, models }
+			: { id: 'chatgpt', label: t().chatgptPlanLabel, kind: 'chatgpt_responses', requires_api_key: false, models };
+		modelCatalog = [provider, ...modelCatalog.filter((group) => group.id !== 'chatgpt')];
 		modelSettings = { providers: { ...modelSettings?.providers, chatgpt: {
 			base_url: '', api_key_set: false, api_key_hint: null, models,
 			enabled_models: data.enabled_models

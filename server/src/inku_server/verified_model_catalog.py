@@ -35,6 +35,16 @@ MODEL_CONFIG_LAST_UPDATED = MODEL_CATALOG["updated"]
 STORED_LABEL_KEYS = _info["stored_label_keys"]
 
 
+def sign_in_service(service_id):
+    """The core descriptor of a sign-in service (labels in both languages, abbreviation, usage page)."""
+    return next(row for row in core_catalog("sign_in_services")["services"] if row["id"] == service_id)
+
+
+def sign_in_provider_groups(groups, sign_in):
+    """Place the signed-in services' groups first, in the core descriptor's order, then `groups` as given."""
+    return core_catalog("provider_groups", groups=groups, sign_in=sign_in)["groups"]
+
+
 def internal_model(record):
     return core_catalog("internal", model=record)["model"]
 

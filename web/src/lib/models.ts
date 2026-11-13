@@ -73,8 +73,23 @@ export type ProviderGroup = {
 	builtin?: boolean;
 	requires_api_key?: boolean;
 	memo?: string;
+	// A sign-in service's group ("Sign in with ChatGPT") carries its core labels in both
+	// languages and its abbreviation; the Server puts it first.
+	labels?: { ja: string; en: string };
+	abbreviation?: string;
+	usage_url?: string;
 	models: ModelOption[];
 };
+
+/** A group's name in the screen's language: a sign-in service's core label, else its label. */
+export function providerGroupLabel(group: Pick<ProviderGroup, 'label' | 'labels'>, lang: string): string {
+	return group.labels?.[lang === 'ja' ? 'ja' : 'en'] ?? group.label;
+}
+
+/** A sign-in service's group comes before every other group (the author, 2026-11-14). */
+export function isSignInGroup(group: Pick<ProviderGroup, 'abbreviation'>): boolean {
+	return typeof group.abbreviation === 'string' && group.abbreviation !== '';
+}
 
 // The API supplies model-reference decisions from core.
 import { modelReference } from './modelReferences';
@@ -89,9 +104,10 @@ export function splitModelReference(ref: string, _groups?: ProviderGroup[]): {pr
     const answer = modelReference({action:'split_ref', ref});
     return {provider: answer?.provider ?? null, model: answer?.model ?? ref};
 }
-export function displayModelReference(ref: string, _groups?: ProviderGroup[], defaultProvider?: Provider): {provider: Provider; model: string; providerLabel: string} {
+export function displayModelReference(ref: string, _groups?: ProviderGroup[], defaultProvider?: Provider): {provider: Provider; model: string; providerLabel: string; providerAbbreviation?: string} {
     const answer = modelReference({action:'resolve_display', ref, default_provider: defaultProvider});
-    return {provider: answer?.provider ?? '', model: answer?.model ?? ref, providerLabel: answer?.provider_label ?? ''};
+    return {provider: answer?.provider ?? '', model: answer?.model ?? ref, providerLabel: answer?.provider_label ?? '',
+        providerAbbreviation: answer?.provider_abbreviation};
 }
 export function modelDisplayName(ref: string | null | undefined, _groups?: ProviderGroup[], defaultProvider?: Provider): string {
 	ref = ref?.trim();

@@ -156,8 +156,12 @@ test('the strip keeps model versions, families, sizes and variants distinct', ()
 		const b = abbreviateStripModel(owner, second);
 		assert.notEqual(a, b, `${first} and ${second} must be readable as different models`);
 	}
-	assert.equal(abbreviateStripModel('ChatGPT plan', 'GPT-6.1-Sol'), 'Ch GPT6.1So');
-	assert.equal(abbreviateStripModel('ChatGPT plan', 'GPT-6-Luna'), 'Ch GPT6Lu');
+	// Sign in with ChatGPT is abbreviated as the shared core names it (2026-11-14).
+	const signIn = (JSON.parse(readFileSync(new URL('../../../core/crates/inku-pipeline/data/sign-in-cases.json', import.meta.url), 'utf8')) as {
+		cases: { name: string; answer: { provider_label?: string; provider_abbreviation?: string } }[];
+	}).cases.find((row) => row.name === 'display English label without language')!.answer;
+	assert.equal(abbreviateStripModel(signIn.provider_label!, 'GPT-6.1-Sol', signIn.provider_abbreviation), 'SIWC GPT6.1So');
+	assert.equal(abbreviateStripModel(signIn.provider_label!, 'GPT-6-Luna', signIn.provider_abbreviation), 'SIWC GPT6Lu');
 	assert.equal(abbreviateStripModel('Claude API (Cloud)', 'Anthropic Claude Sonnet 5.5'), 'Cl So5.5');
 	assert.equal(abbreviateStripModel('Claude API (Cloud)', 'Claude Opus 4.7'), 'Cl Op4.7');
 	assert.equal(abbreviateStripModel('Gemini API (Cloud)', 'Gemini 3.5 Flash-Lite'), 'Ge 3.5FlL');

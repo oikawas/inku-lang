@@ -95,7 +95,7 @@ API_TAGS = [
     {"name": "Server", "description": "Health, version, client configuration, color catalogs, models, notices, the Saijiki and the implementation reference. Some calls need no sign-in."},
     {"name": "Sign-in", "description": "Sign in and out, and how this server authenticates."},
     {"name": "My account", "description": "The signed-in user's profile, settings, templates and plugin storage."},
-    {"name": "ChatGPT plan", "description": "Connect the signed-in user's ChatGPT plan and choose its models."},
+    {"name": "Sign in with ChatGPT", "description": "Sign the signed-in user in with ChatGPT and choose its models."},
     {"name": "Plugins", "description": "Declarative DDL plugins."},
     {"name": "Administration", "description": "Server settings. Administrators only."},
     {"name": "Users and groups", "description": "User accounts and user groups."},
@@ -316,7 +316,7 @@ app.include_router(auth.router, tags=["Sign-in"])
 app.include_router(auth.authenticated_router, tags=["Sign-in"])
 app.include_router(auth.admin_router, tags=["Sign-in"])
 app.include_router(me.router, tags=["My account"])
-app.include_router(chatgpt.router, tags=["ChatGPT plan"])
+app.include_router(chatgpt.router, tags=["Sign in with ChatGPT"])
 app.include_router(plugins.router, tags=["Plugins"])
 app.include_router(settings.router, tags=["Administration"])
 app.include_router(users.router, tags=["Users and groups"])

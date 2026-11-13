@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { isModelUnselectable, modelFold, modelFolds, modelFoldTitle, modelStatusLabel, modelStatusParts, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
-	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
+	import { isSignInGroup, providerGroupLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
 
@@ -358,11 +358,14 @@
 		return provider.id === 'chatgpt' ? models : sortModels(models, purpose);
 	}
 
+	// Ollama is brought forward, but never ahead of a sign-in service's group, which the
+	// Server already put first (the author, 2026-11-14: Sign in with ChatGPT leads every list).
 	const settingsProviderGroups = $derived.by(() => {
-		const priority: Record<string, number> = { "ollama-cloud": 0, ollama: 1 };
+		const priority = (provider: ProviderGroup) =>
+			isSignInGroup(provider) ? -1 : ({ "ollama-cloud": 0, ollama: 1 } as Record<string, number>)[provider.id] ?? 2;
 		return providerGroups
 			.map((provider, index) => ({ provider, index }))
-			.sort((a, b) => (priority[a.provider.id] ?? 2) - (priority[b.provider.id] ?? 2) || a.index - b.index)
+			.sort((a, b) => priority(a.provider) - priority(b.provider) || a.index - b.index)
 			.map(({ provider }) => provider);
 	});
 	const modelPickerProvider = $derived(providerGroups.find((provider) => provider.id === modelPickerProviderId) ?? null);
@@ -438,7 +441,7 @@
 							aria-pressed={activeProvider?.id === provider.id}
 							onclick={() => (activeProviderId = provider.id)}
 						>
-							<span class="model-provider-choice-label">{provider.id === 'chatgpt' ? t().chatgptPlanLabel : provider.label}</span>
+							<span class="model-provider-choice-label">{providerGroupLabel(provider, t().code)}</span>
 							<span class="model-provider-choice-meta">{provider.id} · {provider.id === 'chatgpt' ? t().chatgptStatus('chatgpt_connected') : setting.api_key_set ? t().settingsModelApiKeySet : t().settingsModelApiKeyUnset}</span>
 							<span class="model-provider-choice-count">{t().settingsModelPublishedCount(publishedModelCount(provider, setting))}</span>
 						</button>

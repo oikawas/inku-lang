@@ -1100,7 +1100,7 @@
 			modelCatalogStatus = 'loading';
 			return;
 		}
-		configureModelReferences(apiFetch);
+		configureModelReferences(apiFetch, getLang);
 		modelCatalogStatus = 'loading';
 		availableModelsLoaded = false;
 		clearModelReferences();
@@ -2528,8 +2528,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function historyModelStage1Short(it: Iteration): string {
 		if (!it.stage1_model) return '-';
-		const { providerLabel: owner } = displayModelReference(it.stage1_model);
-		return abbreviateStripModel(owner, modelShortName(it.stage1_model));
+		const { providerLabel: owner, providerAbbreviation } = displayModelReference(it.stage1_model);
+		return abbreviateStripModel(owner, modelShortName(it.stage1_model), providerAbbreviation);
 	}
 
 	function historyModelStage1Full(it: Iteration): string {

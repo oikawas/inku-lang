@@ -47,7 +47,7 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
 
 
 def normalize_chatgpt_models(entries: Any) -> list[dict[str, Any]]:
-    """The shared assessments of ChatGPT plan models (the author, 2026-10-13).
+    """The shared assessments of Sign in with ChatGPT models (the author, 2026-10-13).
 
     A model's measurements are the same for every subscriber, so they are kept
     with the other providers' instead of in each person's registration, in the
@@ -58,7 +58,7 @@ def normalize_chatgpt_models(entries: Any) -> list[dict[str, Any]]:
 
 
 def chatgpt_assessments(settings: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
-    """The shared assessment of each ChatGPT plan model, by model id.
+    """The shared assessment of each Sign in with ChatGPT model, by model id.
 
     The catalog's `chatgpt` entries, with what an administrator changed since the catalog last
     changed laid over them (see normalize_model_settings).

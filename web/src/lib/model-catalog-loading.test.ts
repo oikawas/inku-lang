@@ -13,6 +13,7 @@ const moduleSource = `export function create(fetcher) {
   const session = {currentUser:{id:'actor'}}, apiFetch = fetcher;
   const console = {warn() {}};
   const clearModelReferences = () => {}, configureModelReferences = () => {}, loadModelReferences = async () => {}, setModelLabelTable = () => {};
+  const getLang = () => 'en';
   const qualifiedModelRef = (provider, model) => provider + ':' + model, demoInstructionModelGroups = groups => groups;
   const applyUserModelSettings = () => {}, modelsFor = () => [{id:'x'}], visionModelsFor = () => [{id:'x'}];
   const demo = {reconcilePromptModel() {}};

@@ -1,16 +1,22 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 export type ReferenceQuery = { action: 'split_ref' | 'qualify_ref' | 'resolve_ref' | 'resolve_display'; ref: string; provider?: string; default_provider?: string };
-export type ReferenceResult = { outcome: string; ref?: string; provider?: string | null; model?: string; provider_label?: string; model_label?: string };
+export type ReferenceResult = { outcome: string; ref?: string; provider?: string | null; model?: string; provider_label?: string; provider_abbreviation?: string; model_label?: string };
 type Transport = (path: string, init?: RequestInit) => Promise<Response>;
 const answers = new SvelteMap<string, ReferenceResult>();
 const waiting = new Map<string, ReferenceQuery>();
 let transport: Transport | undefined;
+// The core names a sign-in service ("Sign in with ChatGPT") in the screen's language, so an
+// answer is kept per language and the request says which one.
+let language: () => string = () => 'en';
 let scheduled = false;
 let generation = 0;
-const keyOf = (query: ReferenceQuery) => JSON.stringify([query.action, query.ref, query.provider ?? '', query.default_provider ?? '']);
+const keyOf = (query: ReferenceQuery, lang = language()) => JSON.stringify([query.action, query.ref, query.provider ?? '', query.default_provider ?? '', lang]);
 
-export function configureModelReferences(fetcher: Transport): void { transport = fetcher; }
+export function configureModelReferences(fetcher: Transport, lang?: () => string): void {
+	transport = fetcher;
+	if (lang) language = lang;
+}
 export function clearModelReferences(): void { generation++; answers.clear(); waiting.clear(); }
 export function disableModelReferences(): void { clearModelReferences(); transport = undefined; }
 export function clearChatGPTReferences(): void {
@@ -26,14 +32,15 @@ export function clearChatGPTReferences(): void {
 
 async function requestBatch(queries: ReferenceQuery[], version: number): Promise<void> {
 	if (!transport) throw new Error('model reference transport unavailable');
+	const lang = language() === 'ja' ? 'ja' : 'en';
 	for (let index = 0; index < queries.length; index += 256) {
 		const batch = queries.slice(index, index + 256);
-		const response = await transport('/api/model-references', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ queries: batch }) });
+		const response = await transport('/api/model-references', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ queries: batch, language: lang }) });
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		const data = await response.json() as { results: ReferenceResult[] };
 		if (!Array.isArray(data.results) || data.results.length !== batch.length || data.results.some((result) => result.outcome !== 'ok')) throw new Error('invalid model reference response');
 		if (version !== generation) return;
-		for (let i = 0; i < batch.length; i++) answers.set(keyOf(batch[i]), data.results[i]);
+		for (let i = 0; i < batch.length; i++) answers.set(keyOf(batch[i], language()), data.results[i]);
 	}
 }
 

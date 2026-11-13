@@ -160,6 +160,9 @@ composition / color catalog と食い違って見える（→ §8）。
 | 重なる | **overlaps** | 歳時記のあいだ。直前の形に一部を重ねる。句は overlapping the previous shape | 組の並べ方の overlapping（重ねて）とは別の語 |
 | 横切る | **crossing** | 歳時記のあいだ。直前の形を片方の縁から反対の縁まで越える | 「切る」（cutting、視覚の断絶）とは別 |
 | 自由線 | **free line** | 歳時記のかたち。始点と終点の間の道筋を演奏が決める線。Score の値は `free_line` | ~~free-form line~~、~~random line~~（偶然の歩みに読める） |
+| ChatGPT でサインイン | **Sign in with ChatGPT** | 固有名詞（作者の正式名、2026-11-14）。利用者が自分の ChatGPT の口座でサインインし、そのサブスクの利用枠でモデルを使う接続の名。名札は共通 core の `sign-in-services.json` が持つ。識別子 `chatgpt` は替えない | ~~ChatGPTプラン~~・~~ChatGPT plan~~（接続の名としては廃止）。利用者のプランそのもの（「ChatGPTプランの利用枠」など）は今のまま |
+| Sign in with ChatGPT | **Sign in with ChatGPT** | 上の項の英語の正式名。文の中でも冠詞を付けず固有名詞として置く（"Sign in with ChatGPT is disabled."） | ~~ChatGPT sign-in~~ |
+| SIWC | **SIWC** | 「ChatGPT でサインイン」の略称。履歴の帯のモデルの略称の頭（「SIWC GPT6.1So」）。共通 core の `provider_abbreviation` | ~~Ch~~（名札の頭の 2 字。2026-11-14 まで） |
 
 ## 5. 文書・調査の語
 

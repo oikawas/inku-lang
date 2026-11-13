@@ -505,6 +505,8 @@ final class ThumbnailPublication {
 struct ArtworkThumbnail: View {
     let work: SavedWork
     let thumbnails: ArtworkThumbnails
+    /// The iPhone library's square tiles (2026-11-13, as in Photos): the picture fills the tile, without the frame.
+    var fills = false
     @Environment(DisplaySettings.self) private var display: DisplaySettings?
     @State private var image: CGImage?
     @State private var failed = false
@@ -530,9 +532,10 @@ struct ArtworkThumbnail: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.3))
+            if fills { Rectangle().fill(.quaternary.opacity(0.3)) } else { RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.3)) }
             if let image = currentImage {
-                Image(decorative: image, scale: 1).resizable().scaledToFit().padding(4)
+                if fills { Image(decorative: image, scale: 1).resizable().scaledToFill() }
+                else { Image(decorative: image, scale: 1).resizable().scaledToFit().padding(4) }
             } else if failed, displayedIdentity == identity {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
             }

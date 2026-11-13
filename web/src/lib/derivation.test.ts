@@ -4,6 +4,15 @@ import { test } from 'node:test';
 
 import { derivationDetail, derivationKindLabel } from './derivation.ts';
 
+test('step 3: a moved thing names the thing and both places', () => {
+	const metadata = { place: { title: '磯の岩肌', thing: 2, at_from: 'golden_lr', at: 'center' } };
+	assert.equal(derivationDetail('layout_change', metadata, true), '磯の岩肌: 黄金分割・右下の交点 → 中心');
+	assert.equal(derivationDetail('layout_change', { place: { ...metadata.place, at_from: null } }, false),
+		'磯の岩肌: off the places → Center');
+	// A layout change of the near/chance choice records no place.
+	assert.equal(derivationDetail('layout_change', { recomposition: { mode: 'near' } }, true), null);
+});
+
 test('step 2: a main-law change names both laws, and the kind reads "composition and laws"', () => {
 	const metadata = { main_law_from: 'B1', main_law_to: 'B10', form: 'one_corner' };
 	assert.equal(derivationDetail('composition_form_change', metadata, true), '主の法則: 黄金分割 → 漸進');

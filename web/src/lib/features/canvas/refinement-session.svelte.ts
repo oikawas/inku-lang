@@ -53,6 +53,8 @@ export type RefinementSession = {
 	readonly colorArrangementExhausted?: boolean;
 	/** The name of the ground the work being changed is on, shown in its dialog. */
 	readonly groundCurrent?: string | null;
+	/** What "Change the layout" offers on the work (step 3); null until it is read. */
+	readonly placeTarget?: import('./place').PlaceTarget | null;
 	abort(): void;
 	toggleCandidate(id: string): void;
 	preview(id: string | null): void;
@@ -87,6 +89,12 @@ export class RefinementSessionState implements RefinementSession {
 
 	setToolMode(mode: ToolMode): void {
 		this.toolMode = mode;
+	}
+
+	placeTarget = $state<import('./place').PlaceTarget | null>(null);
+
+	setPlaceTarget(target: import('./place').PlaceTarget | null): void {
+		this.placeTarget = target;
 	}
 
 	busy = $state(false);
@@ -251,6 +259,7 @@ export class RefinementSessionState implements RefinementSession {
 		this.gridIncludesReading = false;
 		this.colorArrangementExhausted = false;
 		this.groundCurrent = null;
+		this.placeTarget = null;
 		this.gridTaskLabel = '';
 		this.gridDone = 0;
 		this.gridTotal = 0;

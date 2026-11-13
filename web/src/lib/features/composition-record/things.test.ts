@@ -13,7 +13,8 @@ const ANSWER = {
 	units: [
 		{ title: null, thing: null, lines: [0, 1], sentences: 2, unplaced: 2, box: null },
 		{ title: '大海の', thing: 1, lines: [3, 4, 5], sentences: 2, unplaced: 0, box: [0.08, 0.2, 0.9, 0.45] },
-		{ title: '磯もとどろに', thing: 2, lines: [6, 7], sentences: 1, unplaced: 0, box: [0.4, 0.4, 0.84, 0.82] },
+		{ title: '磯もとどろに', thing: 2, lines: [6, 7], sentences: 1, unplaced: 0, box: [0.4, 0.4, 0.84, 0.82],
+			places: { golden_ul: 'ok', center: 'unchanged', third_top: 'clamped', bad: 3 } },
 		{ title: '白い破片', thing: 3, lines: [8, 9], sentences: 1, unplaced: 0, box: [0.5, 0.3, 0.6, 0.42] },
 		{ title: '舟', thing: 4, lines: [10, 11], sentences: 1, unplaced: 1, box: null },
 		{ title: 'bad', thing: 5, lines: [12], box: [0, 1] }
@@ -23,7 +24,9 @@ const ANSWER = {
 test('the answer reads as units; a malformed box is no box', () => {
 	const units = readUnits(ANSWER);
 	assert.equal(units.length, 6);
-	assert.deepEqual(units[1], { title: '大海の', thing: 1, lines: [3, 4, 5], box: [0.08, 0.2, 0.9, 0.45] });
+	assert.deepEqual(units[1], { title: '大海の', thing: 1, lines: [3, 4, 5], box: [0.08, 0.2, 0.9, 0.45], places: {} });
+	// Each place's outcome (step 3); a value that is no word is left out.
+	assert.deepEqual(units[2].places, { golden_ul: 'ok', center: 'unchanged', third_top: 'clamped' });
 	assert.equal(units[5].box, null);
 	assert.deepEqual(readUnits({ units: 'no' }), []);
 	assert.deepEqual(readUnits(null), []);

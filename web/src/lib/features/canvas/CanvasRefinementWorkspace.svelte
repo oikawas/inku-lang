@@ -1,5 +1,7 @@
 <script lang="ts">
 	import RefinementAdjustView from './RefinementAdjustView.svelte';
+	import RefinementPlaceView from './RefinementPlaceView.svelte';
+	import { offersPlaces } from './place';
 	import RefinementColorCatalogView from './RefinementColorCatalogView.svelte';
 	import RefinementGroundView from './RefinementGroundView.svelte';
 	import RefinementToolView from './RefinementToolView.svelte';
@@ -46,6 +48,9 @@
 		onGenerateCompositionCandidates: (change: import('./composition-form').CompositionChange, count: 1 | 4) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
+		/** The displayed work's chunks for "Change the layout" (step 3). */
+		onLoadPlaceTarget: () => Promise<void>;
+		onGeneratePlaceCandidate: (chunk: string, at: string, label: string) => Promise<string | null>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
 		onSetRefineWild: (value: boolean | null) => void;
@@ -78,10 +83,20 @@
 		onGenerateCompositionCandidates,
 		onGenerateToolCandidates,
 		onGenerateModelCandidates,
+		onLoadPlaceTarget,
+		onGeneratePlaceCandidate,
 		onSaveAndClose,
 		onDiscardAndClose,
 		onSetRefineWild
 	}: Props = $props();
+
+	// A work whose instructions have chunks a place can take shows the places
+	// (step 3); the others keep the near/chance choice. Read once per opening;
+	// the session owns what was read.
+	$effect(() => {
+		if (view === 'layout') void onLoadPlaceTarget();
+	});
+	const placeTarget = $derived(refinementSession.placeTarget ?? null);
 
 	const dialogTitle = $derived(
 		view === 'composition-form' ? t().workActionComposition : view === 'layout'
@@ -111,7 +126,13 @@
 			{/if}
 		</div>
 	{/if}
-	{#if view === 'layout'}
+	{#if view === 'layout' && !placeTarget}
+		<p class="refine-held-note">{t().placeLoading}</p>
+	{:else if view === 'layout' && placeTarget && offersPlaces(placeTarget)}
+		<RefinementPlaceView {isJapanese} {resultAvailable} {artworkUrl} {canvasAspectWidth} {canvasAspectHeight}
+			{refinementSession} {targetComposition} target={placeTarget} {onGeneratePlaceCandidate}
+			{onSaveAndClose} {onDiscardAndClose} />
+	{:else if view === 'layout'}
 		<RefinementAdjustView
 			{isJapanese}
 			{resultAvailable}

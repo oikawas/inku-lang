@@ -16,6 +16,9 @@ import { PipelineApi } from '../pipeline/api';
 import { PipelineController } from '../pipeline/controller';
 import { compositionChangeOptions, type CompositionChange } from './composition-form';
 import { compositionModeOf, compositionOption, drawRouteOf } from '$lib/draw-route';
+import { readUnits } from '$lib/features/composition-record/things';
+import { shownRecordOf } from '$lib/features/composition-record/record';
+import type { PlaceTarget } from './place';
 
 type Iteration = HistoryItem;
 type RefinementWork = Pick<WorkState,
@@ -669,6 +672,90 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}
 	}
 
+	/** The displayed work's chunks with each place's outcome, and its record's things
+	 *  (step 3): what "Change the layout" offers on a work written in words. */
+	async function loadPlaceTarget(): Promise<void> {
+		const contextVersion = targetIdentityVersion;
+		const workId = refinementWorkId();
+		refinementSession.setPlaceTarget(null);
+		let target: PlaceTarget = { workId, units: [], things: [] };
+		if (workId) {
+			try {
+				const response = await apiFetch(`/api/history/${encodeURIComponent(workId)}/composition-boxes`);
+				const units = response.ok ? readUnits(await response.json()) : [];
+				const { record } = shownRecordOf(work.displayedHistoryItem);
+				const things = (record?.answer?.things ?? []).flatMap((thing) => typeof thing.thing === 'number'
+					? [{ thing: thing.thing, role: thing.role ?? '', what: thing.what ?? '' }] : []);
+				target = { workId, units, things };
+			} catch {
+				// No chunks to offer: the dialog keeps the near/chance choice.
+			}
+		}
+		// An answer for a work no longer shown is dropped (SPEC 7.8).
+		if (contextVersion === targetIdentityVersion) refinementSession.setPlaceTarget(target);
+	}
+
+	/** One option with one chunk moved to a place (step 3): the core writes the child's
+	 *  DDL (no send), and the work's pipeline draws it as a DDL fork with the work's seed,
+	 *  catalog and paper, unsaved until chosen. Each press adds one option. Answers the
+	 *  reason when the chunk cannot move there. */
+	async function generatePlaceCandidate(chunk: string, at: string, label: string): Promise<string | null> {
+		if (!work.result || refinementSession.gridBusy || work.loading) return null;
+		const id = `place-${chunk}-${at}`;
+		if (refinementSession.candidates.some((candidate) => candidate.id === id)) return null;
+		const contextVersion = targetIdentityVersion;
+		const workId = refinementWorkId();
+		const parentNode = await deps.ensureVisibleLineageParentId();
+		if (contextVersion !== targetIdentityVersion || !workId || !parentNode) return null;
+		const placed = await apiFetch(`/api/history/${encodeURIComponent(workId)}/chunk-place`, {
+			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chunk, at }),
+		});
+		if (placed.status === 422) {
+			const detail = (await placed.json().catch(() => ({}))) as { detail?: unknown };
+			return typeof detail.detail === 'string' ? detail.detail : 'refused';
+		}
+		if (!placed.ok) throw await apiError(placed);
+		const { ddl, place } = await placed.json() as { ddl: string; place: Record<string, unknown> };
+		if (contextVersion !== targetIdentityVersion) return null;
+		const metadata = { place };
+		const controller = refinementSession.beginGrid({ includesReading: false, taskLabel: t().canvasVaryComposition, count: 1 });
+		const timer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
+		try {
+			refinementSession.setPlans(controller, [label]);
+			const [candidate] = await runRefinementFanout([async (): Promise<VariationCandidate> => {
+				const pipeline = new PipelineController(new PipelineApi(apiFetch), () => ({}), () => {}, undefined, (view) => {
+					refinementSession.setSlotProgress(controller, 0, view.progress ? { event: 'progress', ...view.progress } : null);
+				});
+				const cancel = () => { void pipeline.cancel().catch(() => {}); };
+				controller.signal.addEventListener('abort', cancel, { once: true });
+				try {
+					await pipeline.selectHistory(workId, null, controller.signal);
+					const view = await pipeline.fromDdl(ddl, {
+						catalog_id: refinementCatalogId(), catalog_mode: 'fixed', canvas_aspect: refinementCanvasAspectId(),
+						...(work.result?.render_seed != null ? { render_seed: work.result.render_seed } : {}),
+						save_history: false, save_artifacts: false, count_generation: false,
+						lineage_parent_node_id: parentNode, derivation_kind: 'layout_change', derivation_metadata: metadata,
+					}, controller.signal);
+					controller.signal.throwIfAborted();
+					if (!view.result?.ddl || !view.result.svg) throw new Error(t().pipelineAttentionReason('host_commit_failed'));
+					return { id, executionId: view.execution_id, label, selected: false,
+						result: { ...view.result, ddl: view.result.ddl, thinking: view.result.thinking ?? null,
+							lineage_parent_node_id: parentNode, derivation_kind: 'layout_change', derivation_metadata: metadata } };
+				} finally { controller.signal.removeEventListener('abort', cancel); }
+			}], 1, {
+				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
+				onDone: (index) => refinementSession.finishSlot(controller, index),
+			});
+			refinementSession.commitCandidates(controller, [...refinementSession.candidates, candidate]);
+		} catch (error) {
+			if (!controller.signal.aborted) refinementSession.failGrid(controller, error instanceof Error ? error.message : String(error));
+		} finally {
+			window.clearTimeout(timer);
+			refinementSession.finishGrid(controller);
+		}
+		return null;
+	}
+
 	/** True when every chosen option is now in the history. */
 	async function saveSelectedVariationCandidates(): Promise<boolean> {
 		const contextVersion = targetIdentityVersion;
@@ -732,6 +819,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		generateToolCandidates,
 		generateModelCandidates,
 		generateCompositionCandidates,
+		loadPlaceTarget,
+		generatePlaceCandidate,
 		saveSelectedVariationCandidates,
 	};
 }

@@ -177,7 +177,6 @@
 "停止中" = "Stopping";
 "筆致制限を外すかを元の作品から引き継ぐ" = "Keep whether the source work lifted the stroke limit";
 "元の作品" = "Source work";
-"元の作品は保持し、新しい子を系譜に保存します。" = "The source work is kept; a new child is saved in the lineage.";
 "元の節点と接続を保持しています。作品本文は削除されています。" = "The original node and edges are kept. The work contents have been deleted.";
 "先頭ページ" = "First page";
 "入力" = "Input";

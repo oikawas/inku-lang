@@ -35,10 +35,8 @@ public struct AuxiliaryView: View {
                 if let work = auxiliary.sourceWork ?? work {
                     HStack(spacing: 14) {
                         ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 110, height: 95)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(work.effectiveSourceText).lineLimit(3)
-                            Text(model.display.localized("元の作品は保持し、新しい子を系譜に保存します。")).inkuFont(12).foregroundStyle(.secondary)
-                        }
+                        // A colophon is appended to the lineage; it draws no child (the advice note that said so is gone).
+                        Text(work.effectiveSourceText).lineLimit(3)
                     }
                 } else {
                     ContentUnavailableView(model.display.localized("保存作品を選択"), systemImage: "photo", description: Text(model.display.localized("ライブラリか制作画面で元の作品を選択してください。")))

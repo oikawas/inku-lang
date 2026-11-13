@@ -30,7 +30,8 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 消した物：自動推敲の実行と画面（`AutonomousRefinementModel`・`AutonomousRefinementView`）、取り合わせの窓（`JuxtaposeModel`・`JuxtaposeView`・`InkuHost.Juxtaposition`・`AuxiliaryProvider.juxtaposition`）、保存作品からの法則の手の要求（`makeSavedLawsRequest`・`GenerationRequest.savedLawsDirection`・pipelineの`saved_laws`）、まとまりの手の送信（`sendChunkPrompt`）、取り合わせの候補の読み出し、辺の記録の書き換え（`setLineageEdgeMetadata`）、UniFFIの`juxtaposition`・`autonomousRefine`・`chunkMoves`のSwiftの包み、奥書の窓に残っていた画像助言の道（`AuxiliaryMode.advice`・`requestAdvice`・`adoptAdvice`）、その確かめ（`--shared-autonomous-refine-only`・`--saved-laws-stages-only`・`--auxiliary-provenance-only`・`--chunk-move-only`・`--shared-juxtaposition-only`・`--juxtaposition-only`）。coreのexportは、この統合の後に描画セッションが消す（0d）。
 - 残した物：古い作品の記録と読み手。系譜の詳細の「AIの手」の行（`ai_move`、`ChunkMoveText`）、派生の種類の札（`laws_change`・`chunk_move`）、記述固定の判定。`--lineage-migration-only`。
 - 端末の保存物は消さず、読まなくするだけ：実行の記録`<DB名>.autonomous-runs.json`と、`interface.json`の`autonomousRefine`（読み込んでも無視し、次に設定を書く時に落ちる）。
-- 吹き出しの照合はWebの185か所（取り合わせの`title=`が1つ減った）。
+- 吹き出しの照合はWebの185か所（取り合わせの`title=`が1つ減った）。奥書の窓から「元の作品は保持し、新しい子を系譜に保存します。」を外した（奥書は子を描かない。画像助言の名残）。
+- 前から落ちていた確かめ2つを直した（作者の指示）。`--lineage-migration-only`は、今のDBに`user_version = 4`を書く作り方が版6から表と移行の名の照合で断られていたので、同梱のSQL（`schema-v1`と`migration-v2〜v4`）で本物の版4のDBを作り、版4にある列だけを写してから版9まで移行する。描く前に次の描画モデルも選ぶ。`--refinement-only`は、作り物が古い形の答え（`normalized_ddl`の文）を返して親の指示書が用紙の1行だけになり、配置の候補がすべて親の指示書のまま親のモデルを記録していたので、段ごとに答える作り物（`LawsColorsCheckProvider`）に任せる。候補の指示書は、その候補が選び直した範囲（変えなければ親の指示書）と照らす。
 - これより前の日付の節にあるAI自動推敲・取り合わせ・画像助言の記述は、その時点の記録である。
 
 ## 2026-11-09 Web にあって Swift 版に無かった部品（step 1）

@@ -2015,6 +2015,19 @@ $effect(() => {
 	}
 
 	let openedWorkController: AbortController | null = null;
+	// A work opened from the lineage graph (a node, or the child just saved by a
+	// refinement) carries the graph's history row, which has no composition: not
+	// its own record (description_ddl) nor the one it keeps (composition_inherited).
+	// Once the history listing holds the work, its composition joins the work shown
+	// (step 3, 2026-11-13: "Composition and laws" said there was no record).
+	function adoptListedComposition(it: Iteration, signal: AbortSignal): void {
+		if (signal.aborted || !it.id || work.displayedHistoryItem !== it) return;
+		const listed = history.items.find((item) => item.id === it.id);
+		if (!listed || listed === it || (listed.description_ddl == null && listed.composition_inherited == null)) return;
+		if (it.description_ddl != null || it.composition_inherited != null) return;
+		work.displayedHistoryItem = { ...it, description_ddl: listed.description_ddl, composition_inherited: listed.composition_inherited };
+	}
+
 	function loadIterationItem(it: Iteration, options: { preserveAuthoring?: boolean } = {}) {
 		if (demoRunning) return;
 		openedWorkController?.abort();
@@ -2028,7 +2041,7 @@ $effect(() => {
 		const imageWork = !!it.image_ddl || it.image_provenance != null;
 		void adoptWorkOptions(it.draw_options, imageWork ? 'image' : 'describe', signal);
 		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id, signal).catch((error) => { if (!signal.aborted) console.warn(error); });
-		void history.syncToItem(it, signal);
+		void history.syncToItem(it, signal).then(() => adoptListedComposition(it, signal));
 		work.lineageDetached = false;
 		if (!options.preserveAuthoring) {
 			if (work.inputMode !== 'batch') work.inputMode = imageWork ? 'image' : 'single';

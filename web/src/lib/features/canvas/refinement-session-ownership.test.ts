@@ -34,6 +34,10 @@ test('T-312/T-313: page and panel share one typed refinement session owner', () 
 	assert.doesNotMatch(coordinator.slice(saveStart, returnStart), /pushHistory\(\{/);
 	// The saved child on the canvas keeps the parent's composition the save answers (step 3).
 	assert.match(coordinator.slice(saveStart, returnStart), /work\.result = \{[^;]*composition_inherited: saved\.composition_inherited/);
+	// The child "save and close" opens comes from the lineage graph, whose rows have no
+	// composition; the listing's joins it once synced (step 3, seen on 5173 Build 1414).
+	assert.match(page, /history\.syncToItem\(it, signal\)\.then\(\(\) => adoptListedComposition\(it, signal\)\)/);
+	assert.match(page, /work\.displayedHistoryItem = \{ \.\.\.it, description_ddl: listed\.description_ddl, composition_inherited: listed\.composition_inherited \}/);
 
 	assert.match(panel, /refinementSession:\s*RefinementSession/);
 	assert.match(panel, /<CanvasRefinementWorkspace[\s\S]*\{refinementSession\}/);

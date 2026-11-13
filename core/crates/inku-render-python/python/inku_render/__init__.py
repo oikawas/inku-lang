@@ -3,7 +3,6 @@
 from ._native import (
     core_api_version,
     default_color_map_json,
-    pipeline_autonomous_refine,
     pipeline_canonical_json,
     pipeline_canvas_registry,
     pipeline_chunk_moves,
@@ -18,7 +17,6 @@ from ._native import (
     pipeline_image_canvas,
     pipeline_image_input_policy,
     pipeline_image_review_svg,
-    pipeline_juxtaposition,
     pipeline_line_animation,
     pipeline_migrate_saijiki_v1,
     pipeline_migrate_saijiki_v2,
@@ -57,7 +55,6 @@ from ._native import (
 __all__ = (
     "core_api_version",
     "default_color_map_json",
-    "pipeline_autonomous_refine",
     "pipeline_canonical_json",
     "pipeline_canvas_registry",
     "pipeline_chunk_moves",
@@ -72,7 +69,6 @@ __all__ = (
     "pipeline_image_canvas",
     "pipeline_image_input_policy",
     "pipeline_image_review_svg",
-    "pipeline_juxtaposition",
     "pipeline_line_animation",
     "pipeline_migrate_saijiki_v1",
     "pipeline_migrate_saijiki_v2",

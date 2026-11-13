@@ -4,7 +4,6 @@
 
 pub mod appearance;
 pub mod authority;
-pub mod autonomous_refine;
 pub mod byte_envelope;
 pub mod catalog_reading;
 mod catalog_reading_text;
@@ -24,9 +23,7 @@ pub mod draw_options;
 mod hole_completion;
 pub mod identity;
 pub mod image_ddl;
-pub mod juxtaposition;
 pub mod laws;
-pub mod laws_entry;
 pub mod laws_record;
 pub mod machine;
 pub mod model_catalog;
@@ -43,3 +40,5 @@ pub mod saved_variants;
 
 #[cfg(test)]
 mod focused_flow;
+#[cfg(test)]
+mod object_word_tests;

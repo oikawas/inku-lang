@@ -32,7 +32,7 @@ use crate::composition_reading::{
 use crate::core_boundary::CatalogMode;
 use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOptions};
 use crate::description_ddl::{DescriptionReading, DrawnFigure, ReadingItem};
-use crate::laws::{self, ComposedPlan, LawsContext, LawsDirection};
+use crate::laws::{self, ComposedPlan, LawsContext};
 use crate::laws_record::{LawsBasis, LawsLayerRecord};
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
@@ -570,15 +570,6 @@ pub struct PendingLaws {
     pub counted: BTreeSet<usize>,
 }
 
-/// A saved work as the laws stage from it reads it (2026-10-20).
-struct SavedWork {
-    source: String,
-    description: String,
-    completion_ranges: Option<CompletionRangeRecord>,
-    laws_layers: Option<LawsLayerRecord>,
-    laws_basis: Option<LawsBasis>,
-}
-
 /// Whether a description run sketches before Stage 1. The sketch only
 /// supplements place and light beside the description; it runs only when the
 /// author asks for it, never waits for approval, and never stops a run.
@@ -697,23 +688,6 @@ pub enum AuthoringInput {
         /// is drawn as written.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         declare_canvas: bool,
-    },
-    /// The laws stage from a saved work (the AI refinement's laws move,
-    /// 2026-10-20): the work's DDL and description, the records kept with it,
-    /// and the refinement's direction. The laws are applied to the composed
-    /// document the work keeps, or to its DDL when it has no laws, and the
-    /// run stops with a reason rather than commit a child like its parent.
-    SavedLaws {
-        source: String,
-        description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        completion_ranges: Option<CompletionRangeRecord>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        laws_layers: Option<LawsLayerRecord>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        laws_basis: Option<LawsBasis>,
-        #[serde(default)]
-        direction: LawsDirection,
     },
     Description {
         description: String,
@@ -929,11 +903,12 @@ pub struct PipelineSnapshot {
     /// saved work beside the layers record.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laws_basis: Option<LawsBasis>,
-    /// Present in a run of the laws stage from a saved work: the refinement's
-    /// direction, which the laws read, and the mark that the run commits as a
-    /// DDL edit and stops rather than commit its base unchanged.
+    /// The mark of a run of the laws stage from a saved work, removed with the
+    /// AI refinement (2026-11-13). The last snapshot of such a run still holds
+    /// it, so a stored snapshot is read with it and gives it back byte for
+    /// byte, which keeps its digest; no run writes it any more.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub laws_move: Option<LawsMove>,
+    pub laws_move: Option<Box<serde_json::value::RawValue>>,
     /// The record of a work written from an image (2026-10-24): made when the
     /// run starts and kept after it commits, for the host to save with the
     /// work.
@@ -975,23 +950,6 @@ pub struct RunProgress {
 pub struct RunCurrent {
     pub kind: &'static str,
     pub action: String,
-}
-
-/// A run of the laws stage from a saved work (2026-10-20).
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct LawsMove {
-    #[serde(default)]
-    pub direction: LawsDirection,
-    /// The ratio the saved work's DDL declares (DDL 26). The laws are applied
-    /// to the DDL without its declaration, and the child declares it again.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas_ratio: Option<inku_score::CanvasRatio>,
-    /// The chunk of each sentence of the saved work's DDL, when it has titles
-    /// (DDL 27). The laws are applied to the sentences without the titles,
-    /// and the child is titled again.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub titles: Vec<Option<String>>,
 }
 
 /// The provider attempt a host is running, for showing retry progress.
@@ -2216,57 +2174,14 @@ impl PipelineSnapshot {
         Ok(VisibleDocument::from_document(&wire.document()?))
     }
 
-    /// A laws child titled as its saved work was (DDL 27): `titles` gives the
-    /// chunk of each of the work's sentences, and the child keeps them in
-    /// order after its ratio sentence. A child whose sentences no longer line
-    /// up, or that the titles would carry past the source limit, is committed
-    /// without them.
-    fn with_carried_titles(
-        &self,
-        document: VisibleDocument,
-        titles: &[Option<String>],
-    ) -> Result<VisibleDocument, ProtocolError> {
-        let lines = document.source.split('\n').collect::<Vec<_>>();
-        let Some(head) = lines
-            .len()
-            .checked_sub(titles.len())
-            .filter(|head| *head <= 1)
-        else {
-            return Ok(document);
-        };
-        let chunks = std::iter::repeat_n(None, head)
-            .chain(titles.iter().map(Option::as_deref))
-            .collect::<Vec<_>>();
-        let source = inku_ddl::print_ddl_titles(&lines, &chunks, document.language);
-        if source == document.source || source.len() > self.config.prompt_limits.max_source_bytes {
-            return Ok(document);
-        }
-        let wire = VisibleDocument { source, ..document };
-        Ok(VisibleDocument::from_document(&wire.document()?))
-    }
-
     fn commit_stage1(
         &mut self,
         document: VisibleDocument,
         reason: &str,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        // A new DDL declares the paper it is written for. The laws stage from
-        // a saved work declares again the ratio the work's DDL declared, and
-        // a work without a declaration stays without one (DDL 26).
-        let document = match &self.laws_move {
-            None => self.with_paper_ratio(document, CanvasRatioWriting::ReplaceDeclared)?,
-            Some(LawsMove {
-                canvas_ratio: Some(ratio),
-                ..
-            }) => self.with_ratio(document, *ratio, CanvasRatioWriting::ReplaceDeclared)?,
-            Some(_) => document,
-        };
-        // ... and the work's titles, after the declaration (DDL 27).
-        let document = match self.laws_move.as_ref().map(|laws_move| &laws_move.titles) {
-            Some(titles) if !titles.is_empty() => self.with_carried_titles(document, titles)?,
-            _ => document,
-        };
+        // A new DDL declares the paper it is written for (DDL 26).
+        let document = self.with_paper_ratio(document, CanvasRatioWriting::ReplaceDeclared)?;
         if let Some(basis) = self
             .laws_basis
             .as_mut()
@@ -2274,14 +2189,9 @@ impl PipelineSnapshot {
         {
             basis.committed_digest = document.source_digest();
         }
-        // The laws stage from a saved work edits a DDL, as "change the layout" does.
-        let outcome = if self.laws_move.is_some() {
-            self.authority
-                .propose_committed_user_ddl_mutation(self.authority.revision(), true)
-        } else {
-            self.authority
-                .propose_stage1_result_commit(self.authority.revision())
-        };
+        let outcome = self
+            .authority
+            .propose_stage1_result_commit(self.authority.revision());
         let next = proposal(outcome)?.ok_or(ProtocolError::InternalInvariant)?;
         self.commit_document(document, next, reason, events)
     }
@@ -2427,135 +2337,9 @@ impl PipelineSnapshot {
         Ok((document, composed))
     }
 
-    /// Start the laws stage from a saved work (the AI refinement's laws move,
-    /// 2026-10-20). Its base is the composed document the work keeps, while the
-    /// work's DDL is still the one that run committed, else its DDL when it has
-    /// no laws. The base is read back as the plan it was printed from, which
-    /// must draw what the base draws, and the laws are asked for as a
-    /// description run asks for them, with the refinement's direction. A work
-    /// that cannot take them stops with the reason, before any request.
-    fn saved_laws(
-        &mut self,
-        work: SavedWork,
-        direction: LawsDirection,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<(), ProtocolError> {
-        if matches!(
-            self.config.compiler.host.catalog_mode(),
-            CatalogMode::AutoSelected | CatalogMode::AutoFallbackDefault
-        ) {
-            return Err(ProtocolError::InvalidPolicy);
-        }
-        direction
-            .validate()
-            .map_err(|_| ProtocolError::SchemaViolation)?;
-        self.completion_ranges = work.completion_ranges.filter(|record| !record.is_empty());
-        // The laws read the DDL's sentences; its ratio declaration is carried
-        // apart and written again on the child (DDL 26), and so are its title
-        // lines (DDL 27).
-        let canvas_ratio = inku_ddl::source_canvas_ratio(&work.source, self.config.language);
-        let (sentences, titles) = inku_ddl::split_ddl_titles(&inku_ddl::without_canvas_ratio(
-            &work.source,
-            self.config.language,
-        ));
-        let titles = if titles.iter().any(Option::is_some) {
-            titles
-        } else {
-            Vec::new()
-        };
-        let untitled = (!titles.is_empty()).then(|| sentences.join("\n"));
-        self.laws_move = Some(LawsMove {
-            direction,
-            canvas_ratio,
-            titles,
-        });
-        if work.description.trim().is_empty() {
-            return self.fail_laws_move("no_description", None, events);
-        }
-        let recorded = work.laws_layers.filter(|record| !record.is_empty());
-        let base = match (work.laws_basis, recorded) {
-            (Some(basis), _) => {
-                if self.new_document(work.source)?.source_digest() != basis.committed_digest {
-                    return self.fail_laws_move("laws_basis_stale", None, events);
-                }
-                basis.composed
-            }
-            (None, Some(_)) => return self.fail_laws_move("laws_without_basis", None, events),
-            (None, None) => untitled.unwrap_or_else(|| {
-                inku_ddl::without_canvas_ratio(&work.source, self.config.language)
-            }),
-        };
-        let document = self.new_document(base)?;
-        let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
-        let limits = self
-            .config
-            .compiler
-            .macro_limits()
-            .map_err(|_| ProtocolError::InvalidPolicy)?;
-        let composed = match crate::laws_entry::composed_plan_of(
-            &document.source,
-            self.config.language,
-            &self.config.definitions,
-            limits,
-            &plugins,
-        ) {
-            Ok(composed) => composed,
-            Err(reason) => return self.fail_laws_move(reason, None, events),
-        };
-        if !self.draws_alike(&document, composed.source(self.config.language, &plugins)) {
-            return self.fail_laws_move("not_faithful", None, events);
-        }
-        self.ask_laws(
-            document,
-            composed,
-            "saved_laws",
-            Some(work.description),
-            events,
-        )
-    }
-
-    /// Whether a plan's print draws what the base draws: the same text, or the
-    /// same Score as the run compiles both.
-    fn draws_alike(&self, base: &VisibleDocument, printed: String) -> bool {
-        if base.source == printed {
-            return true;
-        }
-        let Ok(printed) = self.new_document(printed) else {
-            return false;
-        };
-        match (self.compile_for_run(base), self.compile_for_run(&printed)) {
-            (Some(base), Some(printed)) => {
-                base.score().is_some() && base.score() == printed.score()
-            }
-            _ => false,
-        }
-    }
-
-    /// Stop the laws stage from a saved work with its reason: such a run
-    /// commits only a document its laws printed, never its base unchanged.
-    fn fail_laws_move(
-        &mut self,
-        reason: &str,
-        detail: Option<&str>,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<(), ProtocolError> {
-        self.action = None;
-        self.laws = None;
-        self.laws_basis = None;
-        self.phase = PipelinePhase::Failed {
-            reason: reason.to_owned(),
-        };
-        let mut payload = json!({"stage": LlmStage::ChooseLaws, "reason": reason});
-        if let Some(detail) = detail {
-            payload["detail"] = json!(detail);
-        }
-        self.event(events, "failed", payload)
-    }
-
     /// Ask for the laws of a composed document (stage B-2c). When the request
     /// cannot be built (no description, a Score the laws cannot read, no law
-    /// that takes a layer of the work), the composed document is committed;
-    /// the laws stage from a saved work stops instead.
+    /// that takes a layer of the work), the composed document is committed.
     fn ask_laws(
         &mut self,
         document: VisibleDocument,
@@ -2582,14 +2366,6 @@ impl PipelineSnapshot {
                     .ok()
                 });
         let Some(prompt) = prompt else {
-            if self.laws_move.is_some() {
-                let reason = if context.is_none() {
-                    "laws_context"
-                } else {
-                    "no_law"
-                };
-                return self.fail_laws_move(reason, None, events);
-            }
             self.event(events, "laws_fallback", json!({"failure": "prompt"}))?;
             let printed = PrintedPlan::composed(&composed);
             return self.after_laws(
@@ -2626,10 +2402,6 @@ impl PipelineSnapshot {
             self.config.compiler.host.canvas_format_id(),
             &crate::prompts::work_plan_plugins(self.config.definitions.iter()),
         )?;
-        let context = match &self.laws_move {
-            Some(laws_move) => context.with_direction(laws_move.direction.clone()),
-            None => context,
-        };
         Some((context, shortfalls(&compiled)))
     }
 
@@ -2689,21 +2461,7 @@ impl PipelineSnapshot {
         };
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
         let printed = chosen.print.source(self.config.language, &plugins);
-        let composed = pending.composed.source(self.config.language, &plugins);
-        // A saved work keeps its own words on the lines the laws did not change.
-        let printed = if self.laws_move.is_some() && composed != pending.document.source {
-            crate::laws_entry::spliced(
-                &pending.document.source,
-                &composed,
-                pending.composed.plan.layers.len(),
-                &printed,
-                &chosen.print,
-            )
-        } else {
-            Some(printed)
-        };
-        let Some((document, compiled)) = printed.and_then(|source| self.laws_document(source))
-        else {
+        let Some((document, compiled)) = self.laws_document(printed) else {
             return self.laws_fallback(json!({"failure": "compile"}), events);
         };
         let record = laws::layers_record(&chosen, &document.source, compiled.compilation());
@@ -2884,27 +2642,12 @@ impl PipelineSnapshot {
             .then_some((document, compiled))
     }
 
-    /// Commit the composed document without laws and say why. The laws stage
-    /// from a saved work stops with a reason instead: its answers refused
-    /// within the budget (`laws_refused`), a print that does not compile
-    /// (`laws_compile`), or a provider that could not answer
-    /// (`laws_unavailable`).
+    /// Commit the composed document without laws and say why.
     fn laws_fallback(
         &mut self,
         payload: serde_json::Value,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        if self.laws_move.is_some() {
-            let failure = payload["failure"].as_str().unwrap_or_default();
-            let reason = match failure {
-                "compile" => "laws_compile",
-                "context" => "laws_context",
-                "schema_violation" | "semantic_violation" => "laws_refused",
-                _ => "laws_unavailable",
-            };
-            let detail = payload["detail"].as_str().unwrap_or(failure).to_owned();
-            return self.fail_laws_move(reason, Some(&detail), events);
-        }
         self.action = None;
         let pending = self.laws.take().ok_or(ProtocolError::InternalInvariant)?;
         let description = match &self.phase {
@@ -4678,7 +4421,7 @@ fn advance_impl(
             &json!({
                 "variation_id": variation_id, "nonce": authoring_nonce,
                 "config": config, "authority": authority,
-                "request_kind": match &authoring { AuthoringInput::DirectDdl { .. } => "direct_ddl", AuthoringInput::SavedLaws { .. } => "saved_laws", AuthoringInput::Description { .. } => "description", AuthoringInput::Image { .. } => "image" },
+                "request_kind": match &authoring { AuthoringInput::DirectDdl { .. } => "direct_ddl", AuthoringInput::Description { .. } => "description", AuthoringInput::Image { .. } => "image" },
             }),
         )?;
         let mut state = PipelineSnapshot {
@@ -4748,24 +4491,6 @@ fn advance_impl(
                 .ok_or(ProtocolError::InternalInvariant)?;
                 state.commit_document(document, next, "direct_ddl", &mut events)?;
             }
-            AuthoringInput::SavedLaws {
-                source,
-                description,
-                completion_ranges,
-                laws_layers,
-                laws_basis,
-                direction,
-            } => state.saved_laws(
-                SavedWork {
-                    source,
-                    description,
-                    completion_ranges,
-                    laws_layers,
-                    laws_basis,
-                },
-                direction,
-                &mut events,
-            )?,
             AuthoringInput::Description {
                 description,
                 auto_catalog,

@@ -472,21 +472,6 @@ fn pipeline_saved_variants<'py>(
     })
 }
 
-/// The juxtaposition (取り合わせ) from the shared core: gather, prompt, check, join, same.
-#[pyfunction]
-fn pipeline_juxtaposition<'py>(
-    py: Python<'py>,
-    input_bytes: &Bound<'py, PyBytes>,
-) -> PyResult<Bound<'py, PyBytes>> {
-    catch_python_panic(|| {
-        Ok({
-            let input = input_bytes.as_bytes().to_vec();
-            let output = py.detach(|| inku_pipeline_uniffi::juxtaposition(input));
-            PyBytes::new(py, &output)
-        })
-    })
-}
-
 /// The chunk moves (まとまりの手) from the shared core: start, answer, drawn.
 #[pyfunction]
 fn pipeline_chunk_moves<'py>(
@@ -510,21 +495,6 @@ fn pipeline_plugin_package(py: Python<'_>, input_bytes: &Bound<'_, PyBytes>) -> 
             let input = input_bytes.as_bytes().to_vec();
             let output = py.detach(|| inku_pipeline_uniffi::plugin_package(input));
             String::from_utf8(output).expect("plugin package output is UTF-8 JSON")
-        })
-    })
-}
-
-/// The autonomous refinement (AI自動推敲) from the shared core: next, record, measure.
-#[pyfunction]
-fn pipeline_autonomous_refine<'py>(
-    py: Python<'py>,
-    input_bytes: &Bound<'py, PyBytes>,
-) -> PyResult<Bound<'py, PyBytes>> {
-    catch_python_panic(|| {
-        Ok({
-            let input = input_bytes.as_bytes().to_vec();
-            let output = py.detach(|| inku_pipeline_uniffi::autonomous_refine(input));
-            PyBytes::new(py, &output)
         })
     })
 }
@@ -955,8 +925,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_completion_range_states, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_saved_variants, module)?)?;
-    module.add_function(wrap_pyfunction!(pipeline_juxtaposition, module)?)?;
-    module.add_function(wrap_pyfunction!(pipeline_autonomous_refine, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_chunk_moves, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_plugin_package, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;

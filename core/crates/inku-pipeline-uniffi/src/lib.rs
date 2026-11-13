@@ -232,18 +232,6 @@ pub fn saved_variants(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
-/// The juxtaposition (取り合わせ): one JSON request with an `action` (`gather`,
-/// `prompt`, `check`, `join`, `same`), one JSON answer (`inku.juxtaposition.v1`).
-/// The host collects the sources, sends the prompt with the image and draws the
-/// child. A panic answers `{"error": "internal_invariant"}`.
-#[uniffi::export]
-pub fn juxtaposition(input_bytes: Vec<u8>) -> Vec<u8> {
-    catch_unwind(AssertUnwindSafe(|| {
-        inku_pipeline::juxtaposition::juxtaposition_json(&input_bytes)
-    }))
-    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
-}
-
 /// The chunk moves (まとまりの手, 2026-10-27): one JSON request with an
 /// `action` (`start`, `answer`, `drawn`), one JSON answer
 /// (`inku.chunk-moves.v1`) carrying the turn's state and what to do next. The
@@ -254,21 +242,6 @@ pub fn juxtaposition(input_bytes: Vec<u8>) -> Vec<u8> {
 pub fn chunk_moves(input_bytes: Vec<u8>) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {
         inku_pipeline::chunk_moves::chunk_moves_json(&input_bytes)
-    }))
-    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
-}
-
-/// The autonomous refinement (AI自動推敲): one JSON request with an `action`
-/// (`next`, `record`, `measure`), one JSON answer (`inku.autonomous-refine.v1`).
-/// `measure` draws its two SVGs here with the shared rasterizer and counts the
-/// visible-difference gate on them. The host sends, draws and saves the moves.
-/// A panic answers `{"error": "internal_invariant"}`.
-#[uniffi::export]
-pub fn autonomous_refine(input_bytes: Vec<u8>) -> Vec<u8> {
-    catch_unwind(AssertUnwindSafe(|| {
-        raster::measure_visible_difference(&input_bytes).unwrap_or_else(|| {
-            inku_pipeline::autonomous_refine::autonomous_refine_json(&input_bytes)
-        })
     }))
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
@@ -914,34 +887,6 @@ mod tests {
         assert_eq!(
             refusal(render_saved(b"{".to_vec())),
             "invalid_saved_performance"
-        );
-    }
-
-    /// The gate is drawn here; the table's drawings have counts known from their shapes.
-    #[test]
-    fn the_autonomous_refinement_measures_and_forwards_as_the_shared_table_says() {
-        let table: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../server/tests/data/autonomous-refine-cases.json"
-        ))
-        .unwrap();
-        let ask = |request: &serde_json::Value| -> serde_json::Value {
-            serde_json::from_slice(&autonomous_refine(serde_json::to_vec(request).unwrap()))
-                .unwrap()
-        };
-        for row in table["measure"].as_array().unwrap() {
-            let mut answer = ask(&row["request"]);
-            if answer["outcome"] == "refused" {
-                assert!(answer.as_object_mut().unwrap().remove("detail").is_some());
-            }
-            assert_eq!(answer, row["answer"], "measure: {}", row["why"]);
-        }
-        let first = &table["next"][0];
-        assert_eq!(ask(&first["request"]), first["answer"], "{}", first["why"]);
-        let invalid = &table["invalid"][0];
-        assert_eq!(ask(&invalid["request"]), invalid["answer"]);
-        assert_eq!(
-            ask(&serde_json::json!({"action": "measure", "before": "<svg/>"})),
-            serde_json::json!({"error": "invalid_request"})
         );
     }
 }

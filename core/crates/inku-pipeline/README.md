@@ -106,13 +106,10 @@ the layer) and compiles the printed document as the run compiles it before it
 is committed; the record of the laws follows the sentences printed again. A run
 that applies its laws keeps their basis in its snapshot (`laws_basis`: the
 composed document, the digest of the committed document, the answer), which a
-host saves with the work. The start `saved_laws` runs the laws stage from a
-saved work (the AI refinement's laws move): `laws_entry` reads the composed
-document the work keeps, or the DDL of a work without laws, back as the plan it
-was printed from, the run checks that the plan compiles to the same Score, asks
-for the laws with the refinement's direction (laws left out, the cards, the
-author's sentence), keeps the work's own lines where the laws changed nothing,
-and commits as a DDL edit; it stops with a reason rather than commit its base.
+host saves with the work. The start `saved_laws`, which ran the laws stage
+from a saved work for the AI refinement's laws move, was removed with the AI
+refinement (2026-11-13); a stored snapshot that still holds its `laws_move`
+mark is read and given back unchanged, and no run writes it.
 Each result echoes action ID, attempt, and request
 digest. Retries preserve the logical action ID and increase its attempt; a new
 action receives a new identity. Corrective Stage 1 normalization is a new action

@@ -114,14 +114,6 @@ export interface LangPack {
 	pipelineForkDescription: string;
 	descriptionLockedMark: string;
 	descriptionLockedShort: string;
-	// The Web lost the AI refinement and the juxtaposition on 2026-11-13; the
-	// apps read their words through ui-reference.json until they lose them too.
-	// Kept for the apps, removed with the core's part (step 0d): this key, the
-	// aiRefine* keys below other than the six the lineage reads (aiRefineKindLaws,
-	// aiRefineKindJuxtaposition, aiRefineKindChunks, aiRefineTurn,
-	// aiRefineChunkMoveName, aiRefineChunkMove), workActionAutonomous,
-	// workActionJuxtapose, juxtapose*, workActionGroupAi and settingsJuxtaposition*.
-	aiRefineHeldNote: string;
 	tooltipForkDescription: string;
 	descriptionLockedReason: string;
 	pipelineSaveDdl: string;
@@ -682,44 +674,14 @@ export interface LangPack {
 	refineGenerating: string;
 	refineGeneratingBody: string;
 	refineGeneratingTask: (task: string) => string;
-	aiRefineTitle: string;
-	aiRefineHelp: string;
-	aiRefineModel: string;
-	aiRefineDirectionLabel: string;
-	aiRefineDirectionPlaceholder: string;
-	aiRefineMovesLabel: string;
-	aiRefineKindsLabel: string;
+	// The removed AI refinement's words the lineage still reads for its old
+	// children's "AI move" row (2026-11-13).
 	aiRefineKindLaws: string;
 	aiRefineKindJuxtaposition: string;
 	aiRefineKindChunks: string;
-	aiRefineChunksNote: string;
-	aiRefineChunksDirectionLabel: string;
-	aiRefineChunksDirectionPlaceholder: string;
-	aiRefineChunksNoteRequired: string;
 	aiRefineChunkMoveName: (move: string) => string;
 	aiRefineChunkMove: (name: string, targets: string[], title: string | null) => string;
-	aiRefineKindsError: string;
-	aiRefineStartButton: string;
-	aiRefineGoesOn: string;
-	aiRefineStop: string;
-	aiRefineStopping: string;
-	aiRefineTaking: (turn: number, kind: string) => string;
 	aiRefineTurn: (turn: number) => string;
-	aiRefineOutcomeKept: string;
-	aiRefineOutcomeNotVisible: string;
-	aiRefineOutcomeUnavailable: string;
-	aiRefineOutcomeFailed: string;
-	aiRefineShare: (percent: string) => string;
-	aiRefineEndedMovesDone: string;
-	aiRefineEndedNothingAvailable: string;
-	aiRefineEndedNothingAvailableChunks: string;
-	aiRefineEndedStalled: string;
-	aiRefineEndedStalledChunks: string;
-	aiRefineEndedStopped: string;
-	aiRefineEndedInterrupted: string;
-	aiRefineEndedFailed: string;
-	aiRefineOpenLast: string;
-	aiRefineNoneKept: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;
 	canvasPresentationTitle: string;
@@ -847,23 +809,9 @@ export interface LangPack {
 	workActionInstructions: string;
 	workActionSketchGrain: string;
 	workActionModels: string;
-	workActionAutonomous: string;
-	workActionJuxtapose: string;
-	juxtaposeTitle: string;
-	juxtaposeHelp: string;
-	juxtaposeModel: string;
-	juxtaposeAsk: string;
-	juxtaposeAskAgain: string;
-	juxtaposeAsking: string;
-	juxtaposeChoices: string;
-	juxtaposeSentenceLabel: string;
-	juxtaposeReasonLabel: string;
-	juxtaposeJoined: string;
-	juxtaposeDraw: string;
 	workActionGroupLook: string;
 	workActionGroupForm: string;
 	workActionGroupDescription: string;
-	workActionGroupAi: string;
 	workActionLlmMarkLabel: string;
 	workActionSaveFirst: string;
 	workActionGenerationLocked: string;
@@ -1163,11 +1111,6 @@ export interface LangPack {
 	settingsDbWriteLockHelp: string;
 	settingsDbWriteLockOn: string;
 	settingsDbWriteLockOff: string;
-	settingsJuxtapositionTitle: string;
-	settingsJuxtapositionCandidateLimit: string;
-	settingsJuxtapositionCandidateLimitHelp: string;
-	settingsJuxtapositionRange: (min: number, max: number) => string;
-	settingsJuxtapositionSaved: string;
 	settingsLogRetentionTitle: string;
 	settingsLogRetentionEnabled: string;
 	settingsLogRetentionDays: string;

@@ -443,6 +443,7 @@ export interface LangPack {
 	/** A child shows the record of the ancestor it was drawn from (step 1d). */
 	compositionInheritedMark: string;
 	compositionInheritedNote: (kind: string, at: string) => string;
+	compositionMovedNote: string;
 	compositionFallback: string;
 	/** A chip's title against the refinement target: "画の型（対象: 分ける線）". */
 	compositionChipVersusTarget: (term: string, value: string) => string;
@@ -460,6 +461,24 @@ export interface LangPack {
 	compositionMainLawRedecides: (keepsForm: boolean) => string;
 	/** Beside a form or main law the author named in the generation info. */
 	compositionAuthorChose: string;
+	/** "Change the layout" on a work written in words (step 3, 2026-11-13). */
+	placeLoading: string;
+	placeThingsHead: string;
+	placePlacesHead: string;
+	placeHint: string;
+	placePadGolden: string;
+	placePadThirds: string;
+	placePadCenter: string;
+	placeNow: (place: string) => string;
+	placeClamped: string;
+	placeChangesTerm: string;
+	placeKeeps: string;
+	/** The same, on a work with free lines (the author's choice after the measure, 2026-11-13). */
+	placeKeepsFreeLines: string;
+	placeChanges: string;
+	placeEmpty: string;
+	/** Why a thing cannot go to a place, by the core's reason. */
+	placeRefused: (reason: string) => string;
 	refineCompareTarget: string;
 	refineCompareOption: (n: number) => string;
 	sketchLabel: string;

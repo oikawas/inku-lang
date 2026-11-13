@@ -2,6 +2,11 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-13 — Places for a thing (Another composition)
+
+- "Image Creation": in a child whose layout changed, `Parent's composition` shows a moved thing at its place now, with "(moved by changing the layout)".
+- "Image Creation": `Another composition` on a work drawn in words now moves one chosen thing to one of nine places (each press adds an option, nothing is sent, its shape and size stay, the reasons a place cannot be taken, the saved child's description is held, the `Derived by` wording, the button in `Composition and laws`).
+
 ## 2026-11-13 — Change the composition and laws
 
 - "Image Creation": `Change the composition form` is now `Change the composition and laws`; it describes choosing the form or the main law in `What to change`, the main law's tiles, `Stays` and `Decided again`, both laws' names in Lineage's `Derived by`, and `(chosen by the author)` in the generation info.

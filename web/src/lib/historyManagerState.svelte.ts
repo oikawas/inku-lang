@@ -105,6 +105,8 @@ export type HistoryItem = {
 	// report the conditions it was drawn under.
 	tenkei?: string | null;
 	composition_seed?: number | string | null;
+	// A child without its own composition record: the ancestor's, computed by the Server (step 1d; read by record.ts).
+	composition_inherited?: unknown;
 	interpretation_seed?: string | null;
 	// Sketch from life (Stage 0.5, v2.10). Absent on works made before the layer.
 	sketch_text?: string | null;

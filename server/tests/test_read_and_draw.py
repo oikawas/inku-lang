@@ -446,6 +446,47 @@ def test_main_law_candidate_saves_with_the_laws_it_changed(host, composed):
     assert item["description_ddl"]["composition"]["requested_main_law"] == "B1"
 
 
+def test_a_moved_thing_is_a_ddl_fork_saved_as_a_layout_change_and_held(host, composed, monkeypatch):
+    client, service, _, _ = host
+    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
+    history_id, node = parent["result"]["history_id"], parent["result"]["lineage_node_id"]
+    ddl = db.get_items("owner", [history_id])[0]["ddl"]
+    place = {"title": "波", "thing": 1, "at": "center", "at_from": None, "from": [0.5, 0.2], "to": [0.5, 0.5],
+             "clamped": False}
+    options = {"save_history": False, "save_artifacts": False, "count_generation": False,
+               "lineage_parent_node_id": node, "derivation_kind": "layout_change",
+               "derivation_metadata": {"place": place}}
+    fork = client.post(f"/api/pipeline/history/{history_id}/fork", headers={"x-owner": "owner"},
+                       json={"kind": "direct_ddl", "text": ddl, "options": options})
+    assert fork.status_code == 200, fork.text
+    candidate = _wait(service, fork.json()["execution_id"])
+    candidate = service.command("owner", candidate["execution_id"], {"tag": "perform"})
+    assert not candidate["result"].get("history_id")
+    path = f"/api/pipeline/executions/{candidate['execution_id']}/save"
+    body = {"lineage_parent_node_id": node, "derivation_kind": "layout_change", "derivation_metadata": {}}
+    # The kind is the execution's own.
+    assert client.post(path, json={**body, "derivation_kind": "model_comparison"},
+                       headers={"x-owner": "owner"}).status_code == 422
+    # A parent its DDL holds still takes a moved thing: the DDL is kept.
+    locked = db.history_description_locked
+    monkeypatch.setattr(db, "history_description_locked", lambda _history_id: True)
+    saved = client.post(path, json=body, headers={"x-owner": "owner"})
+    assert saved.status_code == 200, saved.text
+    monkeypatch.setattr(db, "history_description_locked", locked)
+    item = db.get_items("owner", [saved.json()["history_id"]])[0]
+    assert item["derivation_kind"] == "layout_change"
+    assert item["derivation_metadata"] == {"place": {"title": "波", "thing": 1, "at_from": None, "at": "center"}}
+    # The child was drawn from its DDL, so its description is held (step 3).
+    assert item["description_locked"] is True
+    # It keeps the parent's composition with the moved thing's new place, and
+    # the save answers it as the listing does (step 3, 2026-11-13).
+    inherited = item["composition_inherited"]
+    assert inherited["history_id"] == history_id and inherited["via"] == ["layout_change"]
+    assert inherited["places"] == [{"thing": 1, "at": "center"}]
+    assert saved.json()["composition_inherited"] == inherited
+
+
 def test_model_candidate_saves_its_execution_with_its_composition(host, composed, monkeypatch):
     client, service, _, _ = host
     parent = _wait(service, _start(client, composition="on")["execution_id"])

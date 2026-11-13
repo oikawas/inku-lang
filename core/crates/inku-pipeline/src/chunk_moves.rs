@@ -31,7 +31,10 @@
 //!
 //! One JSON request with an `action`, one JSON answer (`inku.chunk-moves.v1`):
 //! the `units` (chunks) a work has, for a host to tell the run whether a chunk
-//! move can start; `start` a turn from the parent's DDL, give the `answer` to the request it
+//! move can start; the `boxes` of the chunks, with each of the nine places'
+//! outcome; `place` one chunk at a place, as the author asks it in "Change
+//! the layout" (step 3, 2026-11-13: its size never changes, and a chunk
+//! larger than the canvas is refused rather than shrunk); `start` a turn from the parent's DDL, give the `answer` to the request it
 //! asked the host to send, and say how the child it asked to have drawn came
 //! out (`drawn`). Each answer carries the turn's `state`, which the host gives
 //! back with the next request, and what to do (`todo`): `send` a request,
@@ -1398,6 +1401,9 @@ pub struct UnitBox {
     /// fractions `[x0, y0, x1, y1]`; `None` when no sentence has one.
     #[serde(rename = "box")]
     pub area: Option<[f64; 4]>,
+    /// Each of the nine places' outcome for this chunk (`place_at`): `ok`,
+    /// `clamped` or the reason it is refused (step 3).
+    pub places: BTreeMap<String, String>,
 }
 
 /// A work's chunks with their things and boxes. Unlike `Paper::box_of`, a
@@ -1444,10 +1450,191 @@ pub fn boxes(
                 sentences: members.len(),
                 unplaced: members.len() - placed.len(),
                 area: union(placed),
+                places: places_of(&doc, paper, &title),
                 title,
             }
         })
         .collect())
+}
+
+/// The places an author can move a chunk to (step 3, 2026-11-13): `AT`
+/// without `keep`.
+pub const PLACES: [&str; 9] = [
+    "golden_ul",
+    "golden_ur",
+    "golden_ll",
+    "golden_lr",
+    "third_left",
+    "third_right",
+    "third_top",
+    "third_bottom",
+    "center",
+];
+/// How near a chunk's center is to a place for the place to be its own
+/// (canvas fractions).
+const AT_FROM_NEAR: f64 = 0.02;
+
+/// What `place_at` did: the chunk, where it was and where it went.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Placed {
+    pub title: String,
+    /// The record's thing whose title is this chunk's, when there is one.
+    pub thing: Option<u64>,
+    pub at: String,
+    /// The place the chunk's center was at (within 0.02), if any.
+    pub at_from: Option<String>,
+    pub from: [f64; 2],
+    pub to: [f64; 2],
+    /// Whether the chunk stopped short of the place to stay on the canvas.
+    pub clamped: bool,
+}
+
+/// The place a center is at: a point (both coordinates within 0.02) before a
+/// line (its one coordinate within 0.02).
+fn place_of(center: [f64; 2]) -> Option<String> {
+    let near =
+        |value: Option<f64>, at: f64| value.is_none_or(|place| (place - at).abs() <= AT_FROM_NEAR);
+    let mut found = None;
+    for (name, x, y) in AT.iter().filter(|(name, _, _)| PLACES.contains(name)) {
+        if near(*x, center[0]) && near(*y, center[1]) {
+            if x.is_some() && y.is_some() {
+                return Some((*name).to_owned());
+            }
+            found.get_or_insert_with(|| (*name).to_owned());
+        }
+    }
+    found
+}
+
+/// One chunk moved to a place, as the author asks it (step 3): only the
+/// numbers of its sentences change, and never its size. A chunk larger than
+/// the canvas is refused (`too_large`) rather than shrunk, as the AI
+/// refinement's `place` shrinks it.
+fn move_chunk(
+    doc: &Doc,
+    paper: Paper,
+    chunk: &str,
+    at: &str,
+) -> Result<(Doc, [f64; 2], [f64; 2], bool), Refusal> {
+    let Some((_, to_x, to_y)) = AT
+        .iter()
+        .find(|(name, _, _)| *name == at && PLACES.contains(name))
+        .copied()
+    else {
+        return Err(refuse("unknown_place", at.to_owned()));
+    };
+    let indexes = doc.members(chunk);
+    if indexes.is_empty() {
+        return Err(refuse("no_chunk", chunk.to_owned()));
+    }
+    let lines: Vec<String> = indexes
+        .iter()
+        .map(|index| doc.lines[*index].clone())
+        .collect();
+    if lines
+        .iter()
+        .any(|line| scene_word(line, paper.language, paper.definitions))
+    {
+        return Err(refuse(
+            "scene_word",
+            paper.say("情景の語のまとまり", "a chunk of a scene word"),
+        ));
+    }
+    let b = paper
+        .box_of(&lines)
+        .map_err(|detail| refuse("no_numeric_place", detail))?;
+    let (half_w, half_h) = ((b[2] - b[0]) / 2.0, (b[3] - b[1]) / 2.0);
+    if half_w * 2.0 > 1.0 || half_h * 2.0 > 1.0 {
+        return Err(refuse(
+            "too_large",
+            paper.say(
+                "画面より大きい物は動かせない",
+                "a thing larger than the canvas cannot move",
+            ),
+        ));
+    }
+    let c = center(b);
+    let (want_x, want_y) = (to_x.unwrap_or(c[0]), to_y.unwrap_or(c[1]));
+    let tx = want_x.max(half_w).min(1.0 - half_w);
+    let ty = want_y.max(half_h).min(1.0 - half_h);
+    let clamped = (tx - want_x).abs() > 1e-9 || (ty - want_y).abs() > 1e-9;
+    let new = lines
+        .iter()
+        .map(|line| paper.transformed(line, tx - c[0], ty - c[1], 1.0, c))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|detail| refuse("no_numeric_place", detail))?;
+    if !new.iter().all(|line| paper.fits(line)) {
+        return Err(refuse(
+            "leaves_canvas",
+            paper.say("動かすと画面からはみ出す", "moving it leaves the canvas"),
+        ));
+    }
+    if new == lines {
+        return Err(refuse(
+            "unchanged",
+            paper.say("置き場が変わらない", "its place does not change"),
+        ));
+    }
+    let mut child = doc.clone();
+    for (index, line) in indexes.iter().zip(new) {
+        child.lines[*index] = line;
+    }
+    Ok((child, c, [tx, ty], clamped))
+}
+
+/// The child DDL (titled) with one chunk moved to a place, and what moved
+/// (step 3, the refinement "Change the layout" on a work written in words).
+pub fn place_at(
+    config: &PipelineConfig,
+    ddl: &str,
+    composition: Option<&Composition>,
+    chunk: &str,
+    at: &str,
+) -> Result<(String, Placed), Refusal> {
+    let (paper, _) = paper_of(config)?;
+    let doc = Doc::of(&titled_source(ddl, composition, paper.language));
+    let (child, from, to, clamped) = move_chunk(&doc, paper, chunk, at)?;
+    // A moved sentence the compiler would not draw (an arc stopped right at
+    // the edge was left out without a word, step 3a's measure) is refused,
+    // as the AI turn asks such a child again.
+    let problems = new_problems(config, &doc, &child);
+    if !problems.is_empty() {
+        return Err(refuse("undrawable", undrawn(paper, &problems)));
+    }
+    let thing = composition.and_then(|composition| {
+        composed_thing_titles(&composition.owners, &composition.things, paper.language)
+            .iter()
+            .find(|(_, name)| name.as_str() == chunk)
+            .map(|(number, _)| *number)
+    });
+    Ok((
+        child.titled(paper.language),
+        Placed {
+            title: chunk.to_owned(),
+            thing,
+            at: at.to_owned(),
+            at_from: place_of(from),
+            from,
+            to,
+            clamped,
+        },
+    ))
+}
+
+/// Each place's outcome for a chunk: `ok`, `clamped`, or the reason it is
+/// refused (`unchanged` among them), so a screen can show it before it asks.
+fn places_of(doc: &Doc, paper: Paper, chunk: &str) -> BTreeMap<String, String> {
+    PLACES
+        .iter()
+        .map(|at| {
+            let outcome = match move_chunk(doc, paper, chunk, at) {
+                Ok((_, _, _, true)) => "clamped".to_owned(),
+                Ok(_) => "ok".to_owned(),
+                Err(refusal) => refusal.reason.to_owned(),
+            };
+            ((*at).to_owned(), outcome)
+        })
+        .collect()
 }
 
 /// The chunk of each line of the DDL as the host gave it (not as titled
@@ -1875,11 +2062,24 @@ struct BoxesRequest {
     composition: Option<Composition>,
 }
 
+/// One chunk moved to one place by the author (step 3).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PlaceRequest {
+    config: PipelineConfig,
+    ddl: String,
+    #[serde(default)]
+    composition: Option<Composition>,
+    chunk: String,
+    at: String,
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 enum Request {
     Units(Box<UnitsRequest>),
     Boxes(Box<BoxesRequest>),
+    Place(Box<PlaceRequest>),
     Start(Box<StartRequest>),
     Answer(Box<AnswerRequest>),
     Drawn(Box<DrawnRequest>),
@@ -1906,7 +2106,22 @@ fn respond(request: Request) -> Result<Value, Refusal> {
         }
         Request::Boxes(request) => {
             let units = boxes(&request.config, &request.ddl, request.composition.as_ref())?;
-            return Ok(json!({"units": units}));
+            let (paper, _) = paper_of(&request.config)?;
+            // A work with free lines says so: moving a thing may draw them again.
+            let free_lines = request.ddl.lines().any(|line| {
+                crate::description_laws::draws_free_line(line, paper.language, paper.definitions)
+            });
+            return Ok(json!({"units": units, "free_lines": free_lines}));
+        }
+        Request::Place(request) => {
+            let (ddl, place) = place_at(
+                &request.config,
+                &request.ddl,
+                request.composition.as_ref(),
+                &request.chunk,
+                &request.at,
+            )?;
+            return Ok(json!({"ddl": ddl, "place": place}));
         }
         Request::Start(request) => start(
             &request.config,
@@ -2526,6 +2741,106 @@ mod tests {
     }
 
     #[test]
+    fn the_author_places_one_chunk_without_resizing_it() {
+        let ask = |request: Value| -> Value {
+            serde_json::from_slice(&chunk_moves_json(&serde_json::to_vec(&request).unwrap()))
+                .unwrap()
+        };
+        let place = |ddl: &str, chunk: &str, at: &str| {
+            ask(
+                json!({"action": "place", "config": config(), "ddl": ddl, "chunk": chunk, "at": at}),
+            )
+        };
+        // The lighthouse (its box 0.55..0.65 × 0.18..0.55) to the center:
+        // only its two sentences' numbers change, by the same move.
+        let moved = place(LIGHTHOUSE, "灯台", "center");
+        assert_eq!(moved["schema"], CHUNK_MOVES_SCHEMA_ID);
+        assert_eq!(moved["outcome"], "ok", "{moved}");
+        let child: Vec<&str> = moved["ddl"].as_str().unwrap().lines().collect();
+        let parent: Vec<&str> = LIGHTHOUSE.lines().collect();
+        assert_eq!(child.len(), parent.len());
+        let changed: Vec<usize> = (0..parent.len())
+            .filter(|at| child[*at] != parent[*at])
+            .collect();
+        assert_eq!(changed, [4, 5]);
+        assert_eq!(
+            child[4],
+            "画面の横0.5、縦0.535の位置に、幅0.1、高さ0.3の白の塗りの四角を1個置く。"
+        );
+        assert_eq!(
+            child[5],
+            "画面の横0.5、縦0.355の位置に、直径0.08の黄の塗りの円を1個置く。"
+        );
+        assert_eq!(moved["place"]["title"], "灯台");
+        assert_eq!(moved["place"]["at"], "center");
+        // Its center (0.6, 0.365) is within 0.02 of the golden upper right
+        // (0.618, 0.382).
+        assert_eq!(moved["place"]["at_from"], "golden_ur");
+        assert_eq!(moved["place"]["clamped"], false);
+        assert_eq!(moved["place"]["to"], json!([0.5, 0.5]));
+        // The waves (0.8 wide) cannot reach the golden line at 0.382: they stop
+        // at 0.4 (clamped). Going to the top third keeps x; their center
+        // (0.5, 0.8) is at no place.
+        let waves = place(LIGHTHOUSE, "波の筋", "golden_ul");
+        assert_eq!(waves["place"]["clamped"], true, "{waves}");
+        assert_eq!(waves["place"]["to"][0], 0.4);
+        let top = place(LIGHTHOUSE, "波の筋", "third_top");
+        assert_eq!(top["place"]["clamped"], false);
+        assert_eq!(top["place"]["at_from"], Value::Null);
+        // A chunk at a place names it as where it was, and placing it there
+        // again changes nothing.
+        let centered = moved["ddl"].as_str().unwrap();
+        let again = place(centered, "灯台", "golden_ul");
+        assert_eq!(again["place"]["at_from"], "center");
+        let refused = |answer: Value| {
+            (
+                answer["outcome"].as_str().map(str::to_owned),
+                answer["reason"].as_str().map(str::to_owned),
+            )
+        };
+        assert_eq!(
+            refused(place(centered, "灯台", "center")),
+            (Some("refused".into()), Some("unchanged".into()))
+        );
+        assert_eq!(
+            refused(place(LIGHTHOUSE, "月", "center")).1.as_deref(),
+            Some("no_chunk")
+        );
+        assert_eq!(
+            refused(place(LIGHTHOUSE, "灯台", "keep")).1.as_deref(),
+            Some("unknown_place")
+        );
+        let wide = "画面比1:1。\n\n「帯」\n画面の横0.5、縦0.5の位置に、幅1.2、高さ0.1の青の塗りの四角を1個置く。";
+        assert_eq!(
+            refused(place(wide, "帯", "center")).1.as_deref(),
+            Some("too_large")
+        );
+        let unplaced = "画面比1:1。\n\n「地」\n背景を白で埋める。";
+        assert_eq!(
+            refused(place(unplaced, "地", "center")).1.as_deref(),
+            Some("no_numeric_place")
+        );
+        // Two arcs (step 3a's measure, work 0082c231): stopped at the left edge,
+        // the grey one would be left out by the compiler without a word, so
+        // that place is refused; the center draws.
+        let arcs = "画面比1:1。\n\n「山里」\n\
+            画面の横0.33、縦0.618034の位置に、弦長0.424、矢高0.045の灰の水彩の薄い細いゆるやかに揺れる弧を1本引く。\n\
+            画面の横0.67、縦0.618034の位置に、弦長0.424、矢高0.055の青の水彩の薄い細いゆるやかに揺れる弧を1本引く。";
+        assert_eq!(
+            refused(place(arcs, "山里", "golden_ul")).1.as_deref(),
+            Some("undrawable")
+        );
+        assert_eq!(place(arcs, "山里", "center")["outcome"], "ok");
+        // boxes tell each place's outcome before it is asked.
+        let boxes = ask(json!({"action": "boxes", "config": config(), "ddl": centered}));
+        let lighthouse = &boxes["units"][0]["places"];
+        assert_eq!(lighthouse["center"], "unchanged");
+        assert_eq!(lighthouse["golden_ul"], "ok");
+        assert_eq!(boxes["units"][1]["places"]["golden_ul"], "clamped");
+        assert_eq!(boxes["units"][1]["places"].as_object().unwrap().len(), 9);
+    }
+
+    #[test]
     fn boxes_tie_each_chunk_to_its_thing_lines_and_box() {
         let ask = |request: Value| -> Value {
             serde_json::from_slice(&chunk_moves_json(&serde_json::to_vec(&request).unwrap()))
@@ -2607,6 +2922,13 @@ mod tests {
         );
         let without = ask(json!({"action": "boxes", "config": config(), "ddl": plain}));
         assert_eq!(without["units"], json!([]));
+        // A work with a free line says so (step 3); one without does not.
+        assert_eq!(recorded["free_lines"], false);
+        let free = format!(
+            "{plain}\n画面の横0.1、縦0.1から横0.3、縦0.2まで、赤の水彩のごく細い細かく揺れる自由線を1本引く。"
+        );
+        let with_free = ask(json!({"action": "boxes", "config": config(), "ddl": free}));
+        assert_eq!(with_free["free_lines"], true, "{with_free}");
 
         // A chunk of a plugin word alone has no box.
         let package: Value = serde_json::from_str(include_str!(
@@ -2622,7 +2944,10 @@ mod tests {
         }));
         assert_eq!(
             scene["units"],
-            json!([{"title": "葉", "thing": null, "lines": [2, 3], "sentences": 1, "unplaced": 1, "box": null}])
+            json!([{"title": "葉", "thing": null, "lines": [2, 3], "sentences": 1, "unplaced": 1, "box": null,
+                "places": {"golden_ul": "scene_word", "golden_ur": "scene_word", "golden_ll": "scene_word",
+                    "golden_lr": "scene_word", "third_left": "scene_word", "third_right": "scene_word",
+                    "third_top": "scene_word", "third_bottom": "scene_word", "center": "scene_word"}}])
         );
     }
 }

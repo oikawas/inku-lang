@@ -1,7 +1,7 @@
 // Derivation kinds (the operation that made a work from its parent). Single
 // source for the labels, shared by the lineage panel and the provenance drawer.
 // A work with no kind recorded is the origin of its lineage.
-import { formName, lawName } from './features/composition-record/composition-names.ts';
+import { formName, lawName, placeName } from './features/composition-record/composition-names.ts';
 
 export type DerivationKind =
 	| 'touch_change'
@@ -25,7 +25,7 @@ export type DerivationKind =
 
 const JA: Record<string, string> = {
 	touch_change: 'タッチ',
-	layout_change: '構図',
+	layout_change: '配置',
 	catalog_change: '色',
 	color_arrangement_change: '配色',
 	ground_change: '支持体',
@@ -78,6 +78,15 @@ export function derivationKindLabel(kind: string | null | undefined, isJapanese:
  *  (step 2); a form or law a newer core named and this table does not have
  *  reads as its key. */
 export function derivationDetail(kind: string | null | undefined, metadata: unknown, isJapanese: boolean): string | null {
+	if (kind === 'layout_change' && metadata && typeof metadata === 'object') {
+		// One thing moved to a place (step 3): "磯の岩肌: 黄金分割・右下の交点 → 中心".
+		const place = (metadata as { place?: unknown }).place;
+		if (!place || typeof place !== 'object') return null;
+		const { title, at_from: from, at } = place as { title?: unknown; at_from?: unknown; at?: unknown };
+		if (typeof title !== 'string' || !title || typeof at !== 'string' || !at) return null;
+		const before = typeof from === 'string' && from ? placeName(from, isJapanese) : (isJapanese ? '置き場の外' : 'off the places');
+		return `${title}: ${before} → ${placeName(at, isJapanese)}`;
+	}
 	if (kind !== 'composition_form_change' || !metadata || typeof metadata !== 'object') return null;
 	const { main_law_from: lawFrom, main_law_to: lawTo } = metadata as { main_law_from?: unknown; main_law_to?: unknown };
 	if (typeof lawTo === 'string' && lawTo) {

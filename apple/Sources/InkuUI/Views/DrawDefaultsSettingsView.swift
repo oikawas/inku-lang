@@ -46,33 +46,46 @@ import InkuHost
         // The presenters go on one section only. A modifier on a group of form sections is handed to every section,
         // and on an iPhone, where each tab is its own section, five sheets watched one state: the first choice of a
         // model opened one and another closed it at once (author 2026-11-09).
+        //
+        // On an iPhone the form makes a section only once it scrolls into view, so presenters on the last section did
+        // nothing until it was seen: the model rows opened no sheet, and the first scroll down read the saved defaults
+        // over the edits made above (author 2026-11-13). Each section now carries the read and the sheet of its own
+        // tab, which only its own row opens.
         if phone {
             phoneSections
-            presenters(phoneSaveSection)
+            phoneSaveSection.modifier(loader)
         } else {
             presenters(wideBody)
         }
     }
 
+    /// The unsaved edits are read once, by whichever part shows first. On an iPhone the catalog and canvas lists are
+    /// pages pushed over this one, and coming back appears again; reading the saved defaults then threw the other
+    /// edits away (author 2026-11-09).
+    private var loader: DrawDefaultsLoader {
+        DrawDefaultsLoader(revision: model.providerSettingsRevision, load: {
+            if !loaded { draft = model.drawDefaults; loaded = true }
+        }, loadProviders: { providers = await model.hostSettings().providers })
+    }
+
     private func presenters<Content: View>(_ content: Content) -> some View {
         content
-        // The unsaved edits are read once. On an iPhone the catalog and canvas lists are pages pushed over this one,
-        // and coming back appears again; reading the saved defaults then threw the other edits away (author 2026-11-09).
-        .onAppear { if !loaded { draft = model.drawDefaults; loaded = true } }
-        .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
-        .sheet(isPresented: Binding(get: { pickerTab != nil }, set: { if !$0 { pickerTab = nil } })) {
-            if let tab = pickerTab {
-                BatchModelPickerView(model: model, initialReference: imageTab(tab) ? options(tab).models.vision : options(tab).models.stage1,
-                    immediateSelection: true, purpose: imageTab(tab) ? "vision" : "llm", onSelection: { reference in
-                        // A tab without an unsaved edit yet starts from what is shown, as the other controls do;
-                        // before, the choice fell on nothing and was lost.
-                        if draft[tab] == nil { draft[tab] = options(tab) }
-                        if imageTab(tab) { draft[tab]?.models.vision = reference }
-                        else { draft[tab]?.models.stage1 = reference; draft[tab]?.models.stage2 = reference }
-                        saved = false
-                    })
+            .modifier(loader)
+            .sheet(isPresented: Binding(get: { pickerTab != nil }, set: { if !$0 { pickerTab = nil } })) {
+                if let tab = pickerTab { modelPicker(tab) }
             }
-        }
+    }
+
+    private func modelPicker(_ tab: String) -> some View {
+        BatchModelPickerView(model: model, initialReference: imageTab(tab) ? options(tab).models.vision : options(tab).models.stage1,
+            immediateSelection: true, purpose: imageTab(tab) ? "vision" : "llm", onSelection: { reference in
+                // A tab without an unsaved edit yet starts from what is shown, as the other controls do;
+                // before, the choice fell on nothing and was lost.
+                if draft[tab] == nil { draft[tab] = options(tab) }
+                if imageTab(tab) { draft[tab]?.models.vision = reference }
+                else { draft[tab]?.models.stage1 = reference; draft[tab]?.models.stage2 = reference }
+                saved = false
+            })
     }
 
     /// iPhone (ios-app step 7d, the author's request): one control per row, each in the form a choice of its kind
@@ -107,11 +120,20 @@ import InkuHost
                         Image(systemName: "chevron.right").inkuFont(12).foregroundStyle(.tertiary)
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain)
+                // The sheet sits on the row that opens it: a modifier on a section is handed to each of its rows, and
+                // six sheets on one press left the first press unanswered (screen check, Build 154). The row is on
+                // screen when pressed, so its sheet is in place.
+                .sheet(isPresented: Binding(get: { pickerTab == tab }, set: { if !$0 && pickerTab == tab { pickerTab = nil } })) {
+                    modelPicker(tab)
+                }
+                .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
             } header: {
                 Text(tabTitle(tab))
             } footer: {
                 Text(hint(tab))
             }
+            // The first read, on whichever row shows first (handed to every row; it reads once).
+            .onAppear { if !loaded { draft = model.drawDefaults; loaded = true } }
         }
     }
 
@@ -219,5 +241,18 @@ import InkuHost
             Text(copy("drawDefaultsOff", "オフ")).tag("off")
             Text(copy("drawDefaultsOn", "オン")).tag("on")
         }
+    }
+}
+
+/// The page's first read and its services' names, on whichever part of the page shows first.
+private struct DrawDefaultsLoader: ViewModifier {
+    let revision: Int
+    let load: () -> Void
+    let loadProviders: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear(perform: load)
+            .task(id: revision) { await loadProviders() }
     }
 }

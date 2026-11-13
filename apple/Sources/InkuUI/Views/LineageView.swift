@@ -639,7 +639,8 @@ struct LineageView: View {
                           "composition_form_change": "Composition form"]
             if let kind, let label = labels[kind] { return label }
         }
-        let labels = ["tool_change": "てざわり", "touch_change": "タッチ", "layout_change": "構図", "catalog_change": "色",
+        // layout_change: the child that moved one thing to another place (Web 3a90dea84, author 2026-11-13).
+        let labels = ["tool_change": "てざわり", "touch_change": "タッチ", "layout_change": "配置", "catalog_change": "色",
                       "color_arrangement_change": "配色", "ground_change": "支持体",
                       "reinterpretation": "解釈", "model_comparison": "モデル", "language_comparison": "言語",
                       "ddl_edit": "DDL編集", "description_edit": "記述編集", "replay": "再描画",

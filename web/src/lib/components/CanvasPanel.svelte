@@ -165,6 +165,8 @@
 		onGenerateToolCandidates: () => void | Promise<void>;
 		/** Draws the work with each model picked in the "change the model" dialog. */
 		onGenerateModelCandidates: () => void | Promise<void>;
+		onLoadPlaceTarget: () => Promise<void>;
+		onGeneratePlaceCandidate: (chunk: string, at: string, label: string) => Promise<string | null>;
 		/** True when every chosen option is now in the history. */
 		onSaveSelectedVariationCandidates: () => Promise<boolean>;
 		lineageGraph: LineageGraph | null;
@@ -291,6 +293,8 @@
 		onGenerateCompositionCandidates,
 		onGenerateToolCandidates,
 		onGenerateModelCandidates,
+		onLoadPlaceTarget,
+		onGeneratePlaceCandidate,
 		onSaveSelectedVariationCandidates,
 		lineageGraph = null,
 		libraryFocusRequest = 0,
@@ -938,6 +942,8 @@
 					{onGenerateCompositionCandidates}
 					{onGenerateToolCandidates}
 					{onGenerateModelCandidates}
+					{onLoadPlaceTarget}
+					{onGeneratePlaceCandidate}
 					catalogName={statusCatalogName}
 					onSaveAndClose={saveCandidatesAndClose}
 					onDiscardAndClose={discardCandidatesAndClose}

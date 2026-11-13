@@ -23,6 +23,8 @@ export type InheritedComposition = {
 	/** The edges walked, from the child up (the first is the child's own kind). */
 	via: string[];
 	record: CompositionRecord;
+	/** The things "change the layout" moved on the way, by thing: the place each is at now (step 3). */
+	moved: Map<number, string>;
 };
 
 /**
@@ -39,7 +41,20 @@ export function inheritedOf(work: { composition_inherited?: unknown } | null | u
 	const record: CompositionRecord = { state: 'used', answer: fields.answer as CompositionRecord['answer'] };
 	if (typeof fields.requested_form === 'string') record.requested_form = fields.requested_form;
 	if (typeof fields.requested_main_law === 'string') record.requested_main_law = fields.requested_main_law;
-	return { historyId: fields.history_id, at: typeof fields.at === 'number' ? fields.at : null, via, record };
+	const moved = new Map<number, string>();
+	for (const place of Array.isArray(fields.places) ? fields.places : []) {
+		const { thing, at } = fieldsOf(place);
+		if (Number.isInteger(thing) && typeof at === 'string' && !moved.has(thing as number)) moved.set(thing as number, at);
+	}
+	return { historyId: fields.history_id, at: typeof fields.at === 'number' ? fields.at : null, via, record, moved };
+}
+
+/** Each thing's place as the work shows it: the record's, with a thing moved since at its new place, marked. */
+export function shownThingPlaces(answer: CompositionRecord['answer'], moved: Map<number, string> | null | undefined,
+	isJapanese: boolean, movedNote: string): Map<number, string> {
+	const places = thingPlaces(answer, isJapanese);
+	for (const [thing, at] of moved ?? []) places.set(thing, `${placeName(at, isJapanese)}${movedNote}`);
+	return places;
 }
 
 /** The record a work shows: its own, else the one it inherited (marked as the parent's). */

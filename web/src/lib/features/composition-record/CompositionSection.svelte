@@ -9,7 +9,7 @@
 	import { describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import CompositionFigure from './CompositionFigure.svelte';
 	import { colorLawName, formName, lawName, roleName } from './composition-names';
-	import { compositionShown, quoteInDescription, shownRecordOf, thingPlaces } from './record';
+	import { compositionShown, quoteInDescription, shownRecordOf, shownThingPlaces } from './record';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { formatHistoryMinute } from '$lib/historyManagerPresentation';
 
@@ -22,6 +22,8 @@
 		/** Held by its DDL: the actions that read the description again are greyed. */
 		descriptionLocked: boolean;
 		onChangeForm: () => void | Promise<void>;
+		/** Opens "Change the layout", which moves one thing to a place (step 3); it keeps the DDL, so a held work may use it. */
+		onChangeLayout?: () => void | Promise<void>;
 		/** The thing pointed at anywhere on the page, and the reports of this list (step 1c). */
 		activeThing?: number | null;
 		onPointThing?: (thing: number | null) => void;
@@ -29,7 +31,7 @@
 		onRevealThing?: (thing: number) => void;
 	};
 
-	let { work, description, isJapanese, offersDescriptionActions, descriptionLocked, onChangeForm,
+	let { work, description, isJapanese, offersDescriptionActions, descriptionLocked, onChangeForm, onChangeLayout,
 		activeThing = null, onPointThing = () => {}, onRevealThing = () => {} }: Props = $props();
 
 	const view = $derived(shownRecordOf(work));
@@ -49,7 +51,8 @@
 	const colorLaws = $derived(colors?.state === 'used'
 		? (Array.isArray((colors as { laws?: unknown }).laws) ? ((colors as { laws: unknown[] }).laws.filter((code): code is string => typeof code === 'string')) : [])
 		: []);
-	const places = $derived(thingPlaces(answer, isJapanese));
+	// A thing "change the layout" moved shows its new place, not the parent's (step 3).
+	const places = $derived(shownThingPlaces(answer, inherited?.moved, isJapanese, t().compositionMovedNote));
 	const things = $derived((answer?.things ?? []).filter((thing) => Number.isInteger(thing.thing)));
 	const open = $derived(describePanelSettings.compositionOpen);
 </script>
@@ -79,11 +82,16 @@
 		{#if open}
 			<div class="composition-body">
 				{#if inheritedNote}<p class="inherited-note">{inheritedNote}</p>{/if}
-				{#if offersDescriptionActions}
+				{#if offersDescriptionActions || onChangeLayout}
 					<div class="comp-actions">
-						<button class="ghost-btn" type="button" aria-disabled={descriptionLocked} class:held={descriptionLocked}
-							title={descriptionLocked ? t().descriptionLockedReason : undefined}
-							onclick={() => { if (!descriptionLocked) void onChangeForm(); }}>{t().workActionComposition}</button>
+						{#if offersDescriptionActions}
+							<button class="ghost-btn" type="button" aria-disabled={descriptionLocked} class:held={descriptionLocked}
+								title={descriptionLocked ? t().descriptionLockedReason : undefined}
+								onclick={() => { if (!descriptionLocked) void onChangeForm(); }}>{t().workActionComposition}</button>
+						{/if}
+						{#if onChangeLayout}
+							<button class="ghost-btn" type="button" onclick={() => void onChangeLayout()}>{t().canvasVaryComposition}</button>
+						{/if}
 					</div>
 				{/if}
 				<dl class="comp-grid">

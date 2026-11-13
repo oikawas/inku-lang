@@ -16,6 +16,8 @@ export type ThingUnit = {
 	thing: number | null;
 	lines: number[];
 	box: Box | null;
+	/** Each of the nine places' outcome for this chunk (step 3): ok, clamped, or why it cannot move there. */
+	places: Readonly<Record<string, string>>;
 };
 
 function isBox(value: unknown): value is Box {
@@ -34,7 +36,11 @@ export function readUnits(body: unknown): ThingUnit[] {
 			title: typeof fields.title === 'string' ? fields.title : null,
 			thing: Number.isInteger(fields.thing) ? fields.thing as number : null,
 			lines,
-			box: isBox(fields.box) ? fields.box : null
+			box: isBox(fields.box) ? fields.box : null,
+			places: fields.places && typeof fields.places === 'object'
+				? Object.fromEntries(Object.entries(fields.places as Record<string, unknown>)
+					.filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+				: {}
 		}];
 	});
 }

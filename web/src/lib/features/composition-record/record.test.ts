@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { atName, lawName, placeName } from './composition-names.ts';
-import { candidateComposition, compositionOf, compositionShown, inheritedOf, quoteInDescription, shownRecordOf, thesisOf, thingPlaces } from './record.ts';
+import { candidateComposition, compositionOf, compositionShown, inheritedOf, quoteInDescription, shownRecordOf, shownThingPlaces, thesisOf, thingPlaces } from './record.ts';
 
 // The shape of a saved read-and-draw work's record (the 11-06 work drawn from 大海の, abridged).
 const USED = {
@@ -69,4 +69,14 @@ test('a child without its own record shows the ancestor\'s, marked; its own reco
 	assert.equal(own.record, USED);
 	assert.equal(inheritedOf({ composition_inherited: { history_id: 'x' } }), null);
 	assert.deepEqual(shownRecordOf(null), { record: null, inherited: null });
+});
+
+test('a thing "change the layout" moved shows its new place, marked; the others keep the parent\'s (step 3)', () => {
+	const inherited = inheritedOf({ composition_inherited: { history_id: 'parent-1', via: ['layout_change'], answer: USED.answer,
+		places: [{ thing: 3, at: 'center' }, { thing: 'x', at: 'golden_ul' }, { thing: 2 }] } });
+	assert.deepEqual([...inherited!.moved], [[3, 'center']]);
+	const places = shownThingPlaces(USED.answer, inherited!.moved, true, '（移した）');
+	assert.equal(places.get(3), `${placeName('center', true)}（移した）`);
+	assert.equal(places.get(2), `${lawName('B1', true)}・${atName('point_lr', true)}`);
+	assert.deepEqual(shownThingPlaces(USED.answer, null, true, '（移した）'), thingPlaces(USED.answer, true));
 });

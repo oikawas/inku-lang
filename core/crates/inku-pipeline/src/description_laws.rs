@@ -186,6 +186,28 @@ pub(crate) fn parse_with_definitions(
     found.then_some(numbers)
 }
 
+/// Whether a sentence draws free lines (step 3, 2026-11-13: a free line may be
+/// drawn again when another thing of the work moves, as the measure found).
+pub(crate) fn draws_free_line(
+    line: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> bool {
+    let Some(document) = locked_document(line, language, definitions) else {
+        return false;
+    };
+    let compilation = compile_typed_ddl(document, definitions, None, LIMITS);
+    compilation
+        .semantic_document
+        .as_ref()
+        .is_some_and(|semantic| {
+            semantic.ast.instructions.iter().any(|instruction| {
+                matches!(&instruction.entity.head, SemanticHead::Primitive(term)
+                if term.identity.category == "shape" && term.identity.id == "free_line")
+            })
+        })
+}
+
 pub(crate) fn locked_document(
     source: &str,
     language: ResolvedInstructionLanguage,

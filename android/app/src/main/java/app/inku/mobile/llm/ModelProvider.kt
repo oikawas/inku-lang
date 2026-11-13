@@ -39,8 +39,6 @@ data class ModelRequest(
     val chatGptSession: ChatGptSessionRef? = null,
     /** The demo's free-text instruction, whose Claude budget follows Server's demo route. */
     val demoInstruction: Boolean = false,
-    /** A square PNG for autonomous refinement Vision only. */
-    val imagePng: ByteArray? = null,
     /**
      * A pipeline request's images (the image stages, SPEC §12.6.6): the
      * prompt's `images` references as the core wrote them, and the `data:`
@@ -55,17 +53,8 @@ class PipelineImages(val referencesJson: String, val dataUrls: List<String>)
 
 internal data class ModelImage(val bytes: ByteArray, val mimeType: String)
 
-/** Select one image with its actual wire type; camera JPEG remains unchanged. */
-internal fun ModelRequest.imagePayload(): ModelImage? {
-    require(imageJpeg == null || imagePng == null) { "Only one model image is allowed" }
-    if (isVisionTextAction(pipelineAction)) {
-        val png = requireNotNull(imagePng) { "Refinement advice needs a PNG." }
-        RefinementVisionImage.requirePng768(png)
-        return ModelImage(png, "image/png")
-    }
-    require(imagePng == null) { "PNG images are reserved for refinement advice" }
-    return imageJpeg?.let { ModelImage(it, "image/jpeg") }
-}
+/** The camera's JPEG, sent unchanged. */
+internal fun ModelRequest.imagePayload(): ModelImage? = imageJpeg?.let { ModelImage(it, "image/jpeg") }
 
 class ModelProviderHttpException(
     val statusCode: Int,

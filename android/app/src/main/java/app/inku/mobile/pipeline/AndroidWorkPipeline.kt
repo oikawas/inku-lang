@@ -153,14 +153,6 @@ class AndroidWorkPipeline(
         return readyResult(outcome)
     }
 
-    /** Re-runs only the laws stage under the saved work's policy. */
-    suspend fun savedLaws(request: PaintRequest, source: String, directionJson: String): PaintResult {
-        val prepared = prepare(request, descriptionFlow = false, text = source, preserveSavedConfig = true)
-        val run = prepared.request.copy(context = prepared.request.context.copy(
-            description = binding.pipelineDescription(request.description).trim()))
-        return readyResult(authoring.startSavedLaws(run, directionJson))
-    }
-
     suspend fun interpret(request: PaintRequest): InterpretResult {
         val run = prepare(request, descriptionFlow = true)
         val view = authoring.startDescriptionView(run.request)

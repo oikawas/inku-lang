@@ -40,43 +40,6 @@ class OpenAiCompatibleRequestBodyTest {
         assertFalse(payload.has("stream"))
     }
 
-    @Test
-    fun refinementVisionAdviceUsesTextRequestAndPngInChatCompletions() {
-        val request = ModelRequest(
-            modelId = "openai:gpt-4.1",
-            prompt = "Observe this generation",
-            temperature = 0.35,
-            maxTokens = 320,
-            systemInstruction = "Return bounded advice",
-            pipelineAction = JUXTAPOSITION_VISION_ACTION,
-            imagePng = refinementPngHeader(),
-        )
-        val body = OpenAiCompatibleProvider.requestBody("openai", request, OPENAI_URL)
-        val content = body.getJSONArray("messages").getJSONObject(1).getJSONArray("content")
-        assertEquals("text", content.getJSONObject(0).getString("type"))
-        assertEquals(request.prompt, content.getJSONObject(0).getString("text"))
-        assertEquals("image_url", content.getJSONObject(1).getString("type"))
-        assertEquals("data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(refinementPngHeader()),
-            content.getJSONObject(1).getJSONObject("image_url").getString("url"))
-        RefinementVisionImage.requirePng768(java.util.Base64.getDecoder().decode(
-            content.getJSONObject(1).getJSONObject("image_url").getString("url").substringAfter("base64,")))
-        assertEquals(0.35, body.getDouble("temperature"), 0.0)
-        assertEquals(320, body.getInt("max_completion_tokens"))
-        assertFalse(body.has("tools"))
-        assertEquals("Draw a circle", OpenAiCompatibleProvider.requestBody("openai", pipelineRequest("openai:gpt-4.1"), OPENAI_URL)
-            .getJSONArray("input").getJSONObject(0).getString("content"))
-        assertThrows(IllegalArgumentException::class.java) {
-            OpenAiCompatibleProvider.requestBody("openai", request.copy(imagePng = null), OPENAI_URL)
-        }
-
-        val compatible = OpenAiCompatibleProvider.requestBody("custom-api", request.copy(modelId = "custom-api:vision"), "https://example.invalid/v1")
-        val messages = compatible.getJSONArray("messages")
-        val imageUrl = messages.getJSONObject(messages.length() - 1).getJSONArray("content")
-            .getJSONObject(1).getJSONObject("image_url").getString("url")
-        assertTrue(imageUrl.startsWith("data:image/png;base64,"))
-        RefinementVisionImage.requirePng768(java.util.Base64.getDecoder().decode(imageUrl.substringAfter("base64,")))
-    }
-
     /** The server's `pipeline_provider.py` shapes: Ollama answers through `response_format`. */
     @Test
     fun ollamaAnswersThroughAJsonSchemaAndOthersThroughAForcedCall() {

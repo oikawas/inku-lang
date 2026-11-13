@@ -81,14 +81,6 @@ class ChatGptPlanBoundaryTest {
     private fun completedStream(arguments: String = "{\"ddl\":\"赤い円。\"}"): String = event("response.output_item.added", "item", function().put("arguments", "")) +
         event("response.output_item.done", "item", function(arguments)) + event("response.completed", "response",
             JSONObject().put("status", "completed").put("output", JSONObject.NULL).put("usage", JSONObject().put("input_tokens", 10).put("output_tokens", 12)))
-    private fun completedVisionStream(text: String): String {
-        val item = JSONObject().put("type", "message").put("role", "assistant").put("id", "vision-item")
-            .put("status", "completed")
-            .put("content", JSONArray().put(JSONObject().put("type", "output_text").put("text", text)))
-        return event("response.output_item.done", "item", item) + event("response.completed", "response",
-            JSONObject().put("status", "completed").put("output", JSONObject.NULL)
-                .put("usage", JSONObject().put("input_tokens", 15).put("output_tokens", 28)))
-    }
 
     /** A stream read as the plan manager reads it: received in pieces, then read once by the core. */
     private fun stream(mode: String = "pipeline"): ChatGptStream {
@@ -440,57 +432,14 @@ class ChatGptPlanBoundaryTest {
     }
 
     @Test
-    fun onlyPinnedJuxtapositionSendsAnImageAndReadsCompletedAssistantText() = runBlocking {
-        val text = "A sentence from another work."
-        withPlan({ completedVisionStream(text) }) { manager, ref, http ->
-            var wire = ""
-            http.handler = { url, token, body ->
-                assertEquals("access-a", token)
-                when {
-                    url.endsWith("/models") -> ChatGptHttpResponse(200,
-                        """{"models":[{"slug":"personal-model","display_name":"Personal model","visibility":"list"}]}""")
-                    url.endsWith("/responses") -> {
-                        wire = body!!
-                        ChatGptHttpResponse(200, completedVisionStream(text))
-                    }
-                    else -> error("Unexpected provider endpoint")
-                }
-            }
-            val visionRequest = ModelRequest(
-                modelId = "chatgpt:personal-model", prompt = "Choose sentences", temperature = 0.35, maxTokens = 1200,
-                pipelineAction = JUXTAPOSITION_VISION_ACTION, imagePng = refinementPngHeader(), chatGptSession = ref,
-            )
-            assertEquals(text, manager.generate(visionRequest).text)
-            val sent = JSONObject(wire)
-            assertFalse(sent.getBoolean("store"))
-            assertTrue(sent.getBoolean("stream"))
-            assertFalse(sent.has("tools"))
-            assertFalse(sent.has("tool_choice"))
-            assertFalse(sent.has("max_output_tokens"))
-            val content = sent.getJSONArray("input").getJSONObject(0).getJSONArray("content")
-            assertEquals("input_text", content.getJSONObject(0).getString("type"))
-            assertEquals("input_image", content.getJSONObject(1).getString("type"))
-            assertEquals("data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(refinementPngHeader()),
-                content.getJSONObject(1).getString("image_url"))
-            RefinementVisionImage.requirePng768(java.util.Base64.getDecoder().decode(
-                content.getJSONObject(1).getString("image_url").substringAfter("base64,")))
-            val calls = http.calls.size
+    fun aCameraImageIsNeverSentOnTheChatGptPlan() = runBlocking {
+        withPlan({ "" }) { _, ref, _ ->
             rejected("chatgpt_operation_not_supported") {
                 chatGptRequest(request(ref).copy(imageJpeg = byteArrayOf(1, 2, 3)))
             }
             rejected("chatgpt_operation_not_supported") {
                 chatGptRequest(request(ref).copy(pipelineAction = null, imageJpeg = byteArrayOf(1, 2, 3)))
             }
-            rejected("chatgpt_operation_not_supported") {
-                chatGptRequest(request(ref).copy(pipelineAction = JUXTAPOSITION_VISION_ACTION, imageJpeg = byteArrayOf(1)))
-            }
-            try {
-                manager.generate(visionRequest.copy(chatGptSession = ref.copy(generation = ref.generation - 1)))
-                fail("An old profile generation must not advise")
-            } catch (error: ChatGptException) {
-                assertEquals("chatgpt_session_changed", error.code)
-            }
-            assertEquals(calls, http.calls.size)
         }
     }
 
@@ -695,27 +644,6 @@ class ChatGptPlanBoundaryTest {
                 .put("system", "system").put("message", "message").put("response_schema", JSONObject().put("type", "object"))))
         JSONObject(app.inku.mobile.pipeline.SingleAttemptModelEffectProvider(provider)
             .perform(action.toString(), app.inku.mobile.pipeline.PipelineModelSelection("chatgpt:m", "chatgpt:m"))).getString("failure")
-    }
-
-    @Test
-    fun publicationChecksPurposeBeforeSending() = runBlocking {
-        val store = Store().apply { value.getJSONObject("profiles").put("a", profile("a")); value.put("active", "a") }
-        val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val policy = ChatGptModelPolicy(JSONObject().put("personal-model", JSONArray().put("llm")))
-        val manager = ChatGptPlanManager(store, scope, http, modelPolicy = { policy }) { now }
-        try {
-            http.handler = { url, _, _ -> if (url.endsWith("/models"))
-                ChatGptHttpResponse(200, "{\"models\":[{\"slug\":\"personal-model\",\"display_name\":\"Personal model\",\"visibility\":\"list\"}]}")
-            else error("Vision must not be sent") }
-            val ref = manager.pinSession()
-            manager.refreshModels()
-            manager.publishModels(ref, listOf("personal-model"))
-            val vision = ModelRequest("chatgpt:personal-model", "Choose", 0.0, 1200,
-                pipelineAction = JUXTAPOSITION_VISION_ACTION, imagePng = refinementPngHeader(), chatGptSession = ref)
-            try { manager.generate(vision); fail("Vision purpose was not published") }
-            catch (error: ChatGptException) { assertEquals("chatgpt_model_not_offered", error.code) }
-            assertEquals(1, http.calls.size)
-        } finally { manager.cancelAuthorization(); scope.cancel() }
     }
 
     /** A published personal model on profile "a", answering /responses with [stream]. */

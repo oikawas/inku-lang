@@ -103,13 +103,10 @@ private fun ecdsaDer(raw: ByteArray): ByteArray {
 }
 
 internal fun chatGptPurpose(action: String?): String {
-    if (isVisionTextAction(action)) return "vision"
     val effects = ChatGptCore.call("chatgpt_auth_constants").getJSONArray("image_effects")
     return if ((0 until effects.length()).any { effects.getString(it) == action }) "vision" else "llm"
 }
 
-/** Server `request_vision`: the assistant text read up to 512 KiB. */
-private const val CHATGPT_VISION_ANSWER_LIMIT = 512 * 1024
 
 /** What the shared core wrote for one request, and the bounds its stream is read to. */
 internal class ChatGptRequest(val body: String, val mode: String, val answerLimit: Int, val wireLimit: Long)
@@ -133,23 +130,9 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
     val model = request.modelId.removePrefix("chatgpt:")
     val purpose = chatGptPurpose(request.pipelineAction)
     ChatGptCore.call("chatgpt_auth_operation", JSONObject().put("purpose", purpose)
-        .put("tag", if (isVisionTextAction(request.pipelineAction)) "vision" else request.pipelineAction ?: JSONObject.NULL))
-    if (isVisionTextAction(request.pipelineAction)) {
-        val image = request.imagePng
-        if (image == null || image.isEmpty() || request.imageJpeg != null || request.tool != null) {
-            throw ChatGptException("chatgpt_operation_not_supported")
-        }
-        RefinementVisionImage.requirePng768(image)
-        // Server request_vision: bounded assistant text with one input_image,
-        // never a pipeline function call or the generic camera route.
-        val built = SharedProviderWire.call(JSONObject().put("action", "chatgpt_vision_request").put("model", model)
-            .put("system", request.systemInstruction.orEmpty()).put("text", request.prompt)
-            .put("images", JSONArray().put("data:image/png;base64," + Base64.getEncoder().encodeToString(image)))
-            .put("answer_limit", CHATGPT_VISION_ANSWER_LIMIT))
-        return built(built, "text", CHATGPT_VISION_ANSWER_LIMIT)
-    }
+        .put("tag", request.pipelineAction ?: JSONObject.NULL))
     val tool = request.tool
-    if (request.imageJpeg != null || request.imagePng != null || tool == null) {
+    if (request.imageJpeg != null || tool == null) {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
     // The schema's original member order matters when it has no propertyOrdering.

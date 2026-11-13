@@ -1,5 +1,14 @@
 # inku Android Implementation Notes
 
+## 2026-11-13 "Juxtapose" and "Autonomous refinement" leave the work-editing menu
+
+The author's decision ("reduce the menu to ten items", "remove them from all three apps") removes both, as on Web and Server. The refinement items go from 11 to 9 (Android has no "Change the composition shape").
+
+- Removed: the juxtaposition dialog and its sentence choice, the autonomous refinement dialog, its run and its entry in the running row, the Vision model chooser only those two used (`VisionModelPicker`), the path that redoes only the laws stage (`saved_laws`), the path that sends a saved SVG to Vision as a 768×768 PNG (OpenAI-compatible, Gemini, Anthropic, ChatGPT plan), and the JNI calls `juxtaposition` and `autonomousRefine`.
+- Kept: the readers of older records (the `laws_change` kind label; an edge's `ai_move` and `juxtaposition` fields stay saved and the lineage reads them as before), and whether the drawing model serves Vision (the description run's and the batch's review).
+- Nothing saved on the device is deleted. `files/autonomous-refinement-runs.json` and the setting row `autonomous_refinement_settings` stay, unread.
+- This replaces the sections below on autonomous refinement (2026-10-21, 2026-10-18), juxtaposition (2026-10-20), the Vision model chooser (2026-10-24) and the PNG paragraph of Vision advice.
+
 ## 2026-11-12 The screens that choose a model show no evaluation details
 
 The author's instruction ("abolish every float shown while choosing a model", "remove the display on Android too") follows Web, which removed its floating evaluation card and tooltips. Android has nothing floating; it showed the same content inside each card, and that is what goes.

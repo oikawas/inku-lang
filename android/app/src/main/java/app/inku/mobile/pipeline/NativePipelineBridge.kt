@@ -22,8 +22,6 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun recompose(inputBytes: ByteArray): ByteArray
     external override fun retouch(inputBytes: ByteArray): ByteArray
     external override fun savedVariants(inputBytes: ByteArray): ByteArray
-    external override fun juxtaposition(inputBytes: ByteArray): ByteArray
-    external override fun autonomousRefine(inputBytes: ByteArray): ByteArray
     external override fun providerWire(inputBytes: ByteArray): ByteArray
     external override fun imageInputPolicy(): String
     external override fun imageCanvas(inputBytes: ByteArray): ByteArray

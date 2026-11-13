@@ -10,13 +10,6 @@ import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.messageFor
-import app.inku.mobile.ui.i18n.juxtaposeStrings
-import app.inku.mobile.data.refinement.SharedJuxtaposition
-import app.inku.mobile.data.refinement.juxtapositionMetadata
-import app.inku.mobile.llm.JuxtapositionException
-import app.inku.mobile.llm.JuxtapositionRequest
-import app.inku.mobile.llm.RefinementVisionImage
-import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -102,8 +95,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlin.math.abs
 import org.json.JSONArray
 import org.json.JSONObject
@@ -116,9 +107,6 @@ const val DemoHistoryInputPrefix = "[demo] "
 /** The prose that determines a history row's parent description. */
 internal fun sourceTextOf(item: HistoryItemEntity): String =
     (item.sourceText ?: item.originalInput).trim()
-
-/** 取り合わせ's child: the joined description, what its edge records, and the parent's 暴れる. */
-internal data class JuxtaposedDraw(val text: String, val metadata: Map<String, Any?>, val wild: Boolean)
 
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 const val SETTING_KEY_UI_LANGUAGE = "ui_lang"
@@ -294,8 +282,6 @@ data class InkuUiState(
     /** Contextual work operations never replace the new-work draft. */
     val workContextId: String? = null,
     val workActionsTarget: HistoryItemEntity? = null,
-    /** Whether [workActionsTarget] is held by its DDL; null while it is read. */
-    val workActionsDescriptionLocked: Boolean? = null,
     val workSketchTarget: HistoryItemEntity? = null,
     val ddlEditorOpen: Boolean = false,
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
@@ -370,12 +356,6 @@ data class InkuUiState(
     val replaySavedHistoryId: String? = null,
     val replayError: String? = null,
     val replayComparison: app.inku.mobile.data.refinement.ReplayComparison? = null,
-    val autonomousOpen: Boolean = false,
-    val autonomousParent: HistoryItemEntity? = null,
-    val autonomousHeld: Boolean? = null,
-    val autonomousSettings: AutonomousRefinementSettings = AutonomousRefinementSettings(),
-    val autonomousStatus: AutonomousRefinementStatus = AutonomousRefinementStatus(),
-    val juxtaposition: JuxtapositionDialogState? = null,
     /** [SETTING_KEY_MODEL_PURPOSES]: which published models serve LLM and which Vision. */
     val modelPurposes: Map<String, Map<String, List<String>>> = emptyMap(),
 ) {
@@ -389,8 +369,8 @@ data class InkuUiState(
      * DDL editor's draw; `refinementBusy` covers the lineage's refinement and
      * the model and language comparisons.
      */
-    val isRunning: Boolean get() = isDrawing || refinementBusy || replayBusy || replaySaving || autonomousStatus.busy ||
-        juxtaposition?.busy == true || cameraCaptureState.locksCameraInteraction
+    val isRunning: Boolean get() = isDrawing || refinementBusy || replayBusy || replaySaving ||
+        cameraCaptureState.locksCameraInteraction
 }
 
 private data class CameraDrawRunInput(
@@ -568,8 +548,6 @@ class InkuViewModel @JvmOverloads constructor(
     private var refinementJob: Job? = null
     private var canvasSearchJob: Job? = null
     private var replayJob: Job? = null
-    private var autonomousStartJob: Job? = null
-    private var juxtapositionJob: Job? = null
     private var refinementSaving = false
     private var replaySerial = 0L
     private var canvasSearchSerial = 0L
@@ -642,21 +620,12 @@ class InkuViewModel @JvmOverloads constructor(
 
     init {
         guardedScope.launch {
-            repository.autonomousRefinement.updates.collect { json ->
-                if (json != null) {
-                    localState.value = localState.value.copy(autonomousStatus = AutonomousRefinementStatus.fromRun(JSONObject(json)))
-                    if (!localState.value.autonomousStatus.busy) refreshLineage()
-                }
-            }
-        }
-        guardedScope.launch {
             // Also normalizes the provider settings (it calls
             // ensureDefaultProviderSettings first); calling that again here
             // repeated the transaction and its reads at every start.
             repository.ensureDefaultModelAssets()
             repository.ensureDefaultExportTemplates()
             restorePersistedSettings()
-            withContext(Dispatchers.IO) { repository.autonomousRefinement.recover() }
             runCatching { withContext(Dispatchers.IO) { repository.restoreActivePipeline() } }
                 .onSuccess { view ->
                     // The latest execution is read after the settings above,
@@ -1722,14 +1691,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun openWorkActions(item: HistoryItemEntity) {
         if (state.value.isRunning || item.trashed) return
-        localState.value = localState.value.copy(workActionsTarget = item, workActionsDescriptionLocked = null)
-        // 取り合わせ is held while the lock is read, so a DDL-led work never offers it.
-        guardedScope.launch {
-            val locked = runCatching { withContext(Dispatchers.IO) { repository.isDescriptionLocked(item) } }.getOrNull()
-            if (localState.value.workActionsTarget?.id == item.id) {
-                localState.value = localState.value.copy(workActionsDescriptionLocked = locked)
-            }
-        }
+        localState.value = localState.value.copy(workActionsTarget = item)
     }
 
     fun closeWorkActions() {
@@ -1983,7 +1945,6 @@ class InkuViewModel @JvmOverloads constructor(
         colorArrangementExhausted = source.colorArrangementExhausted, groundCurrentLabel = source.groundCurrentLabel,
         replayOpen = false, replayBusy = false, replaySaving = false, replayComparison = null,
         replaySavedHistoryId = null, replayError = null, canvasSearchOpen = false,
-        autonomousOpen = false, autonomousParent = null, autonomousStatus = localState.value.autonomousStatus,
     )
 
     fun setSettingsPane(panel: SettingsPane) {
@@ -2438,16 +2399,14 @@ class InkuViewModel @JvmOverloads constructor(
         startSketchRedraw(item, SketchMode.On, supplied)
     }
 
-    /** Also draws 取り合わせ's child: [juxtaposed] carries its longer description. */
-    private fun startSketchRedraw(item: HistoryItemEntity, mode: SketchMode, suppliedText: String?,
-                                  juxtaposed: JuxtaposedDraw? = null) {
+    private fun startSketchRedraw(item: HistoryItemEntity, mode: SketchMode, suppliedText: String?) {
         val description = sourceTextOf(item)
         if (item.lineageNodeId.isNullOrEmpty() || description.isBlank()) return
         val before = state.value
         if (before.isDrawing || before.refinementBusy) return
         applyHistorySelection(item, AppTab.Lineage)
         val current = localState.value.copy(
-            prompt = juxtaposed?.text ?: description,
+            prompt = description,
             sketchMode = mode,
             selectedCatalogId = item.colorCatalogId,
             selectedCanvasAspect = item.canvasAspect,
@@ -2463,7 +2422,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(message = message)
             return
         }
-        runSubmit(current, sketchRedraw = true, suppliedSketchText = suppliedText, juxtaposed = juxtaposed)
+        runSubmit(current, sketchRedraw = true, suppliedSketchText = suppliedText)
     }
 
     /**
@@ -2877,8 +2836,8 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false,
-                          suppliedSketchText: String? = null, juxtaposed: JuxtaposedDraw? = null) {
-        if (current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
+                          suppliedSketchText: String? = null) {
+        if (current.replayBusy || current.replaySaving) return
         if (current.descriptionLocked && !current.historyAuthorityLoading) {
             // Said rather than ignored: the button looks the same either way.
             localState.value = current.copy(message = strings().pipelineDdlAuthority)
@@ -2896,16 +2855,6 @@ class InkuViewModel @JvmOverloads constructor(
         // Read before the coroutine starts: the first thing it does is clear
         // `selectedHistory` (below), so a parent read from inside would be gone.
         val declared = when {
-            juxtaposed != null -> {
-                val parent = requireNotNull(lineageParent(current))
-                LineageDeclaration(
-                    parentNodeId = parent.lineageNodeId,
-                    derivationKind = SubmitDerivationKind.DESCRIPTION_EDIT,
-                    // Web's description edit with `juxtapositionMetadata`: the
-                    // lineage reads `sentence` back to leave it out next time.
-                    derivationMetadata = mapOf("edited_from_history_id" to parent.id) + juxtaposed.metadata,
-                )
-            }
             sketchRedraw -> {
                 val parent = requireNotNull(lineageParent(current))
                 LineageDeclaration(
@@ -2923,8 +2872,6 @@ class InkuViewModel @JvmOverloads constructor(
         }
         val sketchInput = when {
             suppliedSketchText != null -> SketchInput(text = suppliedSketchText)
-            // The description changed, so its 写生 is asked for again at the parent's mode.
-            juxtaposed != null -> describeSketchInput(current, forceFresh = true)
             cameraProvenance == null -> describeSketchInput(current, forceFresh = sketchRedraw)
             // A camera description is a new root; it follows the 写生 setting.
             else -> SketchInput(requested = current.sketchMode == SketchMode.On)
@@ -2993,11 +2940,10 @@ class InkuViewModel @JvmOverloads constructor(
                         sketch = sketchInput,
                         parentHistoryId = descriptionParent?.id,
                         inputProvenance = cameraProvenance,
-                        // 取り合わせ follows its parent work's 暴れる, as on Web.
-                        renderWild = juxtaposed?.wild ?: current.renderWild,
+                        renderWild = current.renderWild,
                         readAndDraw = current.drawRoute == DrawRoute.ReadAndDraw && !app.inku.mobile.llm.isLocalVisionModel(stage1ModelId),
                         descriptionComposition = current.descriptionComposition,
-                        descriptionReview = stage1ModelId in autonomousVisionModelIds(current),
+                        descriptionReview = stage1ModelId in visionModelIds(current),
                         onPerformanceSaved = {
                             withContext(Dispatchers.Main.immediate) { descriptionPerformanceSaved(runId) }
                         },
@@ -3050,7 +2996,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
-        if (current.isRunning || current.canvasFitQuestion != null || current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
+        if (current.isRunning || current.canvasFitQuestion != null || current.replayBusy || current.replaySaving) return
         val ddl = current.ddl
         if (!DdlSource.hasBody(ddl)) return
         val parent = lineageParent(current)
@@ -3153,7 +3099,7 @@ class InkuViewModel @JvmOverloads constructor(
                 current.selectedModelId, current.selectedStage2ModelId, current.uiLanguage.code, current.renderWild,
                 current.drawRoute == DrawRoute.ReadAndDraw && !app.inku.mobile.llm.isLocalVisionModel(current.selectedModelId),
                 current.descriptionComposition, current.sketchMode == SketchMode.On,
-                current.selectedModelId in autonomousVisionModelIds(current)))
+                current.selectedModelId in visionModelIds(current)))
         lastBatchSnapshot = snapshot
         lastBatchSavedWork = null
         runBatchSnapshot(snapshot, snapshot.lines, retry = false)
@@ -4040,197 +3986,6 @@ class InkuViewModel @JvmOverloads constructor(
         } finally { refinementSaving = false }
     }
 
-    fun openAutonomousRefinement(item: HistoryItemEntity) {
-        if ((state.value.isRunning && !state.value.autonomousStatus.busy) || item.trashed) return
-        val active = repository.autonomousRefinement.updates.value?.let(::JSONObject)
-            ?.takeIf { it.optString("state") == "running" }
-        val sourceId = active?.getString("history_id") ?: item.id
-        closeRefinement()
-        localState.value = localState.value.copy(autonomousOpen = true, autonomousParent = item,
-            autonomousHeld = null, autonomousSettings = localState.value.autonomousSettings.copy(wildOverride = null))
-        guardedScope.launch {
-            try {
-                val source = withContext(Dispatchers.IO) { repository.getHistoryById(sourceId) } ?: return@launch
-                val run = withContext(Dispatchers.IO) { repository.autonomousRefinement.forHistory(sourceId) }
-                val held = withContext(Dispatchers.IO) { repository.isDescriptionLocked(source) }
-                if (!localState.value.autonomousOpen) return@launch
-                val models = autonomousVisionModelIds(state.value)
-                val settings = localState.value.autonomousSettings
-                localState.value = localState.value.copy(autonomousParent = source, autonomousHeld = held,
-                    autonomousSettings = if (settings.modelId in models || models.isEmpty()) settings else settings.copy(modelId = models.first()),
-                    autonomousStatus = run?.let(AutonomousRefinementStatus::fromRun) ?: AutonomousRefinementStatus())
-            } catch (error: Exception) {
-                localState.value = localState.value.copy(autonomousStatus = AutonomousRefinementStatus(error = error.message))
-            }
-        }
-    }
-
-    fun updateAutonomousRefinementSettings(settings: AutonomousRefinementSettings) {
-        if (localState.value.autonomousStatus.busy) return
-        val direction = settings.direction.take(settings.direction.offsetByCodePoints(0,
-            settings.direction.codePointCount(0, settings.direction.length).coerceAtMost(1000)))
-        val normalized = settings.copy(moves = settings.moves.coerceIn(1, 10), direction = direction)
-        localState.value = localState.value.copy(autonomousSettings = normalized)
-        persistSetting("autonomous_refinement_settings", normalized.toJson(localState.value.uiLanguage.code).toString())
-    }
-
-    fun closeAutonomousRefinement() {
-        localState.value = localState.value.copy(autonomousOpen = false)
-    }
-
-    fun reopenAutonomousRefinement() {
-        val id = repository.autonomousRefinement.updates.value?.let(::JSONObject)?.optString("history_id") ?: return
-        guardedScope.launch {
-            withContext(Dispatchers.IO) { repository.getHistoryById(id) }?.let(::openAutonomousRefinement)
-        }
-    }
-
-    fun stopAutonomousRefinement() {
-        autonomousStartJob?.cancel()
-        guardedScope.launch { repository.autonomousRefinement.stop() }
-    }
-
-    fun openLastAutonomousChild() {
-        val id = localState.value.autonomousStatus.lastKeptHistoryId ?: return
-        closeAutonomousRefinement()
-        guardedScope.launch {
-            withContext(Dispatchers.IO) { repository.getHistoryById(id) }?.let { selectHistory(it) }
-        }
-    }
-
-    fun autonomousChild(id: String): kotlinx.coroutines.flow.Flow<HistoryItemEntity?> = repository.observeHistoryById(id)
-
-    fun startAutonomousRefinement() {
-        val current = localState.value
-        if (state.value.isRunning || !current.autonomousOpen || current.autonomousHeld == null) return
-        val original = current.autonomousParent ?: return
-        val settings = current.autonomousSettings
-        if (settings.allowedKinds.isEmpty() || original.displaySvg.isBlank() ||
-            settings.modelId !in autonomousVisionModelIds(state.value)) return
-        localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(busy = true))
-        autonomousStartJob = guardedScope.launch {
-            try {
-                withContext(Dispatchers.IO) { repository.autonomousRefinement.start(original.id, settings, current.uiLanguage.code) }
-            } catch (error: Exception) {
-                if (repository.autonomousRefinement.updates.value?.let(::JSONObject)?.optString("state") != "running") {
-                    localState.value = localState.value.copy(autonomousStatus = AutonomousRefinementStatus(
-                        error = if (error is CancellationException) strings().statusStopped else error.message))
-                }
-            }
-        }
-    }
-
-    /**
-     * 取り合わせ (SPEC §7.8). The Vision model is the autonomous refinement's:
-     * choosing one here chooses it there too, as Web saves the settings' Vision
-     * model. Android keeps no such setting, so it lasts while the app runs.
-     */
-    fun openJuxtaposition(item: HistoryItemEntity) {
-        val current = localState.value
-        if (state.value.isRunning || item.trashed || sourceTextOf(item).isBlank() ||
-            current.workActionsDescriptionLocked != false) return
-        val models = autonomousVisionModelIds(state.value)
-        val settings = current.autonomousSettings
-        localState.value = current.copy(
-            workActionsTarget = null,
-            juxtaposition = JuxtapositionDialogState(item),
-            autonomousSettings = if (settings.modelId in models || models.isEmpty()) settings
-                else settings.copy(modelId = models.first()),
-        )
-    }
-
-    fun selectJuxtapositionModel(modelId: String) {
-        if (localState.value.juxtaposition?.busy != false) return
-        updateAutonomousRefinementSettings(localState.value.autonomousSettings.copy(modelId = modelId))
-    }
-
-    fun chooseJuxtaposition(index: Int) {
-        val dialog = localState.value.juxtaposition ?: return
-        if (dialog.busy || dialog.result?.choices?.getOrNull(index) == null) return
-        localState.value = localState.value.copy(juxtaposition = dialog.copy(chosen = index))
-    }
-
-    fun stopJuxtaposition() {
-        juxtapositionJob?.cancel()
-    }
-
-    fun closeJuxtaposition() {
-        if (localState.value.juxtaposition?.busy == true) return
-        localState.value = localState.value.copy(juxtaposition = null)
-    }
-
-    /**
-     * Four sentences from the author's other works (Server's `api_juxtaposition`).
-     * 選び直す asks again leaving out every sentence this dialog has shown.
-     */
-    fun askJuxtaposition() {
-        val current = localState.value
-        val dialog = current.juxtaposition ?: return
-        if (state.value.isRunning) return
-        val item = dialog.target
-        val modelId = current.autonomousSettings.modelId
-        if (modelId !in autonomousVisionModelIds(state.value)) return
-        val texts = juxtaposeStrings(current.uiLanguage)
-        val language = current.uiLanguage.code
-        localState.value = current.copy(juxtaposition = dialog.copy(busy = true, startedAtMs = System.currentTimeMillis(), error = null))
-        juxtapositionJob = guardedScope.launch {
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    val inputs = repository.juxtapositionInputs(item)
-                    // The model reads the description without its labels; the
-                    // child keeps them, so each pick is joined to the stored text.
-                    val written = sourceTextOf(item)
-                    val description = NativePipelineBridge.pipelineDescription(written).trim()
-                    require(description.isNotEmpty()) { "juxtaposition source has no description" }
-                    val candidates = SharedJuxtaposition.gather(inputs.sources, description, inputs.lineage,
-                        inputs.added, dialog.shown, kotlin.random.Random.nextLong().toULong())
-                    if (candidates.length() < SharedJuxtaposition.CHOICES) {
-                        throw JuxtapositionException("not enough candidate sentences", tooFew = true)
-                    }
-                    val png = RefinementVisionImage.fromSvg(item.displaySvg)
-                    currentCoroutineContext().ensureActive()
-                    repository.juxtapose(JuxtapositionRequest(
-                        modelId = modelId, description = description, written = written, lineage = inputs.lineage,
-                        candidates = candidates, languageCode = language, imagePng = png))
-                }
-                currentCoroutineContext().ensureActive()
-                val latest = localState.value.juxtaposition ?: return@launch
-                localState.value = localState.value.copy(juxtaposition = latest.copy(
-                    result = result, chosen = null, shown = latest.shown + result.choices.map { it.sentence }))
-            } catch (error: Exception) {
-                val message = when {
-                    error is CancellationException -> strings().statusStopped
-                    error is JuxtapositionException && error.tooFew -> texts.tooFew
-                    error is JuxtapositionException -> texts.unusable(error.message.orEmpty())
-                    else -> messageFor(error, strings(), texts.failed)
-                }
-                localState.value.juxtaposition?.let {
-                    localState.value = localState.value.copy(juxtaposition = it.copy(error = message))
-                }
-            } finally {
-                localState.value.juxtaposition?.let {
-                    localState.value = localState.value.copy(juxtaposition = it.copy(busy = false))
-                }
-            }
-        }
-    }
-
-    /**
-     * Draws the chosen description as a child of the work, as the sketch
-     * redraw does: the dialog closes and the lineage shows the run and its stop.
-     */
-    fun drawJuxtaposition() {
-        val dialog = localState.value.juxtaposition ?: return
-        if (dialog.busy || state.value.isRunning) return
-        val choice = dialog.choice ?: return
-        val result = dialog.result ?: return
-        val item = dialog.target
-        localState.value = localState.value.copy(juxtaposition = null)
-        enterWorkContext(item)
-        startSketchRedraw(item, Sketches.modeOfWork(item.sketchState, item.sketchGrain), suppliedText = null,
-            juxtaposed = JuxtaposedDraw(choice.joined, juxtapositionMetadata(choice, result), item.drawnWild))
-    }
-
     /** Puts a candidate on the canvas without saving it. */
     fun previewRefinementCandidate(candidateId: String) {
         val current = localState.value
@@ -4625,11 +4380,8 @@ class InkuViewModel @JvmOverloads constructor(
 
     private suspend fun restorePersistedSettings() {
         val settings = repository.getSettingsMap()
-        settings["autonomous_refinement_settings"]?.let { saved ->
-            runCatching { AutonomousRefinementSettings.fromJson(JSONObject(saved)) }.getOrNull()?.let {
-                localState.value = localState.value.copy(autonomousSettings = it)
-            }
-        }
+        // `autonomous_refinement_settings` (AI refinement and 取り合わせ, removed
+        // 2026-11-13) stays in the table unread.
         val bundledPluginsEnabled = repository.isBundledPluginPackageEnabled()
         val bundledPluginWords = withContext(Dispatchers.IO) {
             runCatching { repository.bundledPluginWords(japanese = true) to repository.bundledPluginWords(japanese = false) }

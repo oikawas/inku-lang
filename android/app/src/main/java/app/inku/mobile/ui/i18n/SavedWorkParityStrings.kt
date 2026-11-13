@@ -1,6 +1,6 @@
 package app.inku.mobile.ui.i18n
 
-/** Text shared by the saved-work search, replay, and autonomous refinement dialogs. */
+/** Text shared by the saved-work search, replay and refinement dialogs. */
 internal data class SavedWorkParityStrings(
     val searchTitle: String,
     val close: String,
@@ -42,7 +42,6 @@ internal data class SavedWorkParityStrings(
     val saving: String,
     val saveReplayChild: String,
     val provisionalSeed: (String) -> String,
-    val autonomousTitle: String,
     val wild: String,
     val inherit: String,
     val on: String,
@@ -92,7 +91,6 @@ private val savedWorkParityJa = SavedWorkParityStrings(
     saving = "保存中…",
     saveReplayChild = "描き直しを子として保存",
     provisionalSeed = { seed -> "Seedを補完した暫定表示（seed: $seed）" },
-    autonomousTitle = "AIに自律推敲させる",
     wild = "筆致制限を外す",
     inherit = "継承",
     on = "オン",
@@ -139,7 +137,6 @@ private val savedWorkParityEn = SavedWorkParityStrings(
     saving = "Saving…",
     saveReplayChild = "Save replay as a child",
     provisionalSeed = { seed -> "Preview uses a provisional seed (seed: $seed)" },
-    autonomousTitle = "Autonomous refinement",
     wild = "Lift the stroke limit",
     inherit = "Inherit",
     on = "On",

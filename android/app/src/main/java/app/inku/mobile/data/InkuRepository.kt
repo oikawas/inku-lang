@@ -4,7 +4,6 @@ import app.inku.mobile.data.db.deletePermanently
 import app.inku.mobile.data.db.insert
 import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.inkuError
-import app.inku.mobile.ui.DemoHistoryInputPrefix
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -46,7 +45,6 @@ import app.inku.mobile.data.refinement.GroundVariants
 import app.inku.mobile.data.refinement.ReplayComparison
 import app.inku.mobile.data.refinement.SavedColorArrangements
 import app.inku.mobile.data.refinement.SentPrompts
-import app.inku.mobile.data.refinement.SharedJuxtaposition
 import app.inku.mobile.data.refinement.sentPromptsFromHistoryRecord
 import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.CameraDescriptionRequest
@@ -92,7 +90,6 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -197,112 +194,6 @@ class InkuRepository(
     }
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
     private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val autonomousScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val autonomousRefinement by lazy {
-        app.inku.mobile.data.refinement.AutonomousRefinementRunner(
-            autonomousHost,
-            app.inku.mobile.data.refinement.AutonomousRunFile(File(context.filesDir, "autonomous-refinement-runs.json")),
-            autonomousScope,
-        )
-    }
-
-    private val autonomousHost = object : app.inku.mobile.data.refinement.AutonomousHost {
-        private suspend fun item(id: String) = getHistoryById(id)?.takeUnless { it.trashed }
-            ?: throw app.inku.mobile.data.refinement.AutonomousMoveFailure("unavailable", "autonomous_source_not_found")
-
-        override suspend fun work(id: String): app.inku.mobile.data.refinement.AutonomousWork {
-            val item = item(id)
-            val basis = JSONObject(item.renderMetadataJson).optJSONObject("laws_basis")
-            val names = buildList {
-                (basis?.opt("main_law") as? String)?.let(::add)
-                basis?.optJSONObject("laws")?.keys()?.forEach { if (it !in this) add(it) }
-            }
-            val description = NativePipelineBridge.pipelineDescription(item.sourceText ?: item.originalInput).trim()
-            val facts = JSONObject().put("description_locked", isDescriptionLocked(item))
-                .put("ddl_work", description.isEmpty()).put("laws", JSONArray(names))
-            basis?.opt("main_law")?.let { facts.put("main_law", it) }
-            return app.inku.mobile.data.refinement.AutonomousWork(id, item.displaySvg, facts, basis)
-        }
-
-        override suspend fun laws(parent: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
-            language: String, direction: JSONObject, onSaved: suspend (app.inku.mobile.data.refinement.AutonomousWork) -> Unit) =
-            draw(parent, settings, language, "laws_change", null, emptyMap(), direction, onSaved)
-
-        override suspend fun juxtapose(parent: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
-            language: String, exclude: List<String>): app.inku.mobile.data.refinement.JuxtapositionResult {
-            val item = item(parent)
-            val inputs = juxtapositionInputs(item)
-            val written = item.sourceText ?: item.originalInput
-            val description = NativePipelineBridge.pipelineDescription(written).trim()
-            val candidates = SharedJuxtaposition.gather(inputs.sources, description, inputs.lineage, inputs.added,
-                exclude, kotlin.random.Random.nextLong().toULong())
-            if (candidates.length() < SharedJuxtaposition.CHOICES) {
-                throw app.inku.mobile.data.refinement.AutonomousMoveFailure("unavailable", "juxtaposition_too_few")
-            }
-            return try {
-                juxtapose(app.inku.mobile.llm.JuxtapositionRequest(settings.modelId, description, written, inputs.lineage,
-                    candidates, language, app.inku.mobile.llm.RefinementVisionImage.fromSvg(item.displaySvg)))
-            } catch (error: CancellationException) { throw error
-            } catch (error: Exception) {
-                throw app.inku.mobile.data.refinement.AutonomousMoveFailure("failed", error.message ?: "juxtaposition_failed")
-            }
-        }
-
-        override suspend fun drawJuxtaposition(parent: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
-            language: String, choice: app.inku.mobile.data.refinement.JuxtapositionChoice,
-            result: app.inku.mobile.data.refinement.JuxtapositionResult,
-            onSaved: suspend (app.inku.mobile.data.refinement.AutonomousWork) -> Unit) =
-            draw(parent, settings, language, "description_edit", choice.joined,
-                mapOf("edited_from_history_id" to parent) + app.inku.mobile.data.refinement.juxtapositionMetadata(choice, result), null, onSaved)
-
-        private suspend fun draw(id: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
-            language: String, kind: String, joined: String?, metadata: Map<String, Any?>,
-            direction: JSONObject?, onSaved: suspend (app.inku.mobile.data.refinement.AutonomousWork) -> Unit) {
-            val item = item(id)
-            val parent = RefinementParent.of(item, item.sourceText ?: item.originalInput)
-            val plan = RefinementPlan(null, RefinementRoute.Paint, parent.catalogId, parent.canvasAspect,
-                parent.seeds, kind, metadata, stage1Model = settings.modelId, stage2Model = settings.modelId,
-                renderWildOverride = settings.wildOverride)
-            val request = refinementRequest(parent, plan).copy(description = joined ?: parent.description,
-                originalText = joined ?: parent.description, uiLang = language)
-            val started = System.currentTimeMillis()
-            val result = try {
-                if (direction != null) pipeline.savedLaws(request, parent.ddl, direction.toString()) else pipeline.paint(request)
-            } catch (error: CancellationException) { throw error
-            } catch (error: app.inku.mobile.pipeline.PipelineInteractionRequired) {
-                val reason = error.view.phaseReason ?: error.view.phaseTag
-                withContext(NonCancellable) { pipeline.cancel(error.view.executionId) }
-                val outcome = if (direction != null && reason !in setOf("laws_refused", "laws_compile", "laws_unavailable"))
-                    "unavailable" else "failed"
-                throw app.inku.mobile.data.refinement.AutonomousMoveFailure(outcome, reason)
-            } catch (error: Exception) {
-                throw app.inku.mobile.data.refinement.AutonomousMoveFailure(
-                    if (direction != null) "unavailable" else "failed", error.message ?: "pipeline_failed")
-            }
-            withContext(NonCancellable) {
-                val child = saveResult(result, parent.catalogId, parent.canvasAspect, settings.modelId, settings.modelId,
-                    System.currentTimeMillis() - started,
-                    lineage = LineageDeclaration(parentNodeId = requireNotNull(item.lineageNodeId),
-                        derivationKind = kind, derivationMetadata = metadata), historyVisibility = "lineage_only",
-                    sourceText = joined ?: parent.description)
-                onSaved(work(child.id))
-            }
-        }
-
-        override suspend fun annotate(child: String, metadata: JSONObject) {
-            database.withTransaction {
-                val node = requireNotNull(item(child).lineageNodeId)
-                val edge = requireNotNull(database.lineageDao().getEdgeByChildId(node))
-                val merged = JSONObject(edge.metadataJson)
-                metadata.keys().forEach { merged.put(it, metadata.get(it)) }
-                database.lineageDao().setEdgeMetadata(node, LineagePlanner.canonicalJson(merged))
-            }
-        }
-
-        override suspend fun promote(child: String) {
-            getHistoryById(child)?.takeUnless { it.trashed }?.lineageNodeId?.let { database.lineageDao().promoteNode(it) }
-        }
-    }
     private val originalPhotos = app.inku.mobile.ui.camera.CameraOriginalPhotoStore(context.filesDir)
 
     /**
@@ -397,8 +288,6 @@ class InkuRepository(
      * database.
      */
     suspend fun close() {
-        autonomousScope.coroutineContext.job.cancel()
-        autonomousScope.coroutineContext.job.children.toList().joinAll()
         thumbnailScope.coroutineContext.job.children.toList().joinAll()
         thumbnailScope.cancel()
         localLiteRtProvider.close()
@@ -410,51 +299,6 @@ class InkuRepository(
 
     suspend fun canvasSearchEntries(): List<app.inku.mobile.data.db.CanvasSearchEntry> =
         database.historyDao().canvasSearchEntries()
-
-    /**
-     * What juxtaposition gathers from for [item] (Server's `api_juxtaposition`):
-     * the other works that may lend a sentence, and the lineage from its root
-     * to [item]. Android decides which works lend: the list already leaves out
-     * the trash and works kept only in a lineage; here go the works with no
-     * description (drawn straight from DDL), demo works, works held by their
-     * DDL and [item] itself. Android keeps no display label or comment, so
-     * Server's "DDL" label is the empty description, its "[demo]" label is the
-     * input's prefix, and no "test data" comment is read. Labels are removed
-     * by the one shared rule.
-     */
-    internal suspend fun juxtapositionInputs(item: HistoryItemEntity): JuxtapositionInputs {
-        val describe = NativePipelineBridge::pipelineDescription
-        val entries = canvasSearchEntries()
-        val locked = juxtapositionSources(entries, item.id, emptySet()) { it }.map { it.id }
-            .chunked(JUXTAPOSITION_LOCK_BATCH)
-            .flatMapTo(mutableSetOf()) { DescriptionLock.lockedHistoryIds(descriptionLockStore, it) }
-        val sources = juxtapositionSources(entries, item.id, locked, describe)
-
-        // Root to the work, one primary parent at a time; the set of seen
-        // edges stops a cycle, as in `loadLineage`.
-        val dao = database.lineageDao()
-        val path = mutableListOf<LineageEdgeEntity>()
-        var cursor = item.lineageNodeId
-        while (cursor != null) {
-            val edge = dao.getEdgeByChildId(cursor)
-            if (edge == null || path.any { it.id == edge.id }) break
-            path.add(0, edge)
-            cursor = edge.parentNodeId
-        }
-        val nodeIds = (path.map { it.parentNodeId } + listOfNotNull(item.lineageNodeId)).distinct()
-        val historyOfNode = dao.getNodesByIds(nodeIds).associate { it.id to it.historyId }
-        val descriptions = nodeIds.mapNotNull { nodeId ->
-            historyOfNode[nodeId]?.let { database.historyDao().getById(it) }
-                ?.let { describe(it.sourceText ?: it.originalInput) }
-        }
-        return JuxtapositionInputs(sources, juxtapositionLineage(descriptions), juxtapositionAdded(path.map { it.metadataJson }))
-    }
-
-    suspend fun juxtapose(request: app.inku.mobile.llm.JuxtapositionRequest): app.inku.mobile.data.refinement.JuxtapositionResult =
-        app.inku.mobile.llm.JuxtapositionAdviser(
-            activeModelProvider,
-            chatGptSession = chatGptPlan.state.value.activeSession,
-        ).suggest(request)
 
     fun pipelineCommitStore(): PipelineCommitStore = sharedPipelineStore
 
@@ -1861,45 +1705,6 @@ internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementP
 
 /** `plugin_settings` key of the bundled plugin package switch. */
 private const val BUNDLED_PLUGIN_SETTING_KEY = "bundled:$BUNDLED_PLUGIN_PACKAGE:enabled"
-
-/** What juxtaposition gathers from: other works' descriptions, the lineage's, and the sentences it added. */
-internal data class JuxtapositionInputs(
-    val sources: List<SharedJuxtaposition.Source>,
-    val lineage: List<String>,
-    val added: List<String>,
-)
-
-/** Works whose description lock is read in one pass, as Server's `_LOCK_BATCH`. */
-private const val JUXTAPOSITION_LOCK_BATCH = 500
-
-/**
- * The works that may lend a sentence to [workId]'s juxtaposition, from the
- * list that already leaves out the trash and works kept only in a lineage.
- * Left out here: [workId], demo works, works with no description and [locked]
- * ones. Each text is the description as kept, through [describe].
- */
-internal fun juxtapositionSources(
-    entries: List<app.inku.mobile.data.db.CanvasSearchEntry>,
-    workId: String,
-    locked: Set<String>,
-    describe: (String) -> String,
-): List<SharedJuxtaposition.Source> = entries.mapNotNull { entry ->
-    val text = entry.sourceText ?: entry.originalInput
-    entry.takeIf {
-        it.id != workId && it.id !in locked && !it.originalInput.startsWith(DemoHistoryInputPrefix) && text.isNotBlank()
-    }?.let { SharedJuxtaposition.Source(it.id, describe(text)) }
-}
-
-/** The lineage's descriptions, root to the work, labels removed: one kept where the same runs on. */
-internal fun juxtapositionLineage(descriptions: List<String>): List<String> =
-    descriptions.map { it.trim() }.filter { it.isNotEmpty() }
-        .fold(mutableListOf()) { kept, text -> if (kept.lastOrNull() != text) kept.add(text); kept }
-
-/** The sentences the lineage's edges record as added (`juxtaposition.sentence`). */
-internal fun juxtapositionAdded(edgeMetadata: List<String>): List<String> = edgeMetadata.mapNotNull { json ->
-    runCatching { JSONObject(json.ifEmpty { "{}" }).optJSONObject("juxtaposition") }.getOrNull()
-        ?.optString("sentence")?.trim()?.takeIf { it.isNotEmpty() }
-}
 
 /**
  * Thumbnail files of an earlier format that no row points at and that were

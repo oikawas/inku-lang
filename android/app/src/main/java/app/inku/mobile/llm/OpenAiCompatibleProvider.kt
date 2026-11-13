@@ -108,7 +108,7 @@ internal object ProviderWireTransport {
 
     fun build(kind: String, providerId: String, baseUrl: String, request: ModelRequest): JSONObject {
         ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
-        val textRequest = request.pipelineAction == null || isVisionTextAction(request.pipelineAction)
+        val textRequest = request.pipelineAction == null
         val model = OpenAiCompatibleProvider.modelForRequest(providerId, request.modelId)
         val connection = JSONObject()
             .put("id", providerId)
@@ -174,8 +174,7 @@ internal object ProviderWireTransport {
                 connection.disconnect()
             }
             val response = SharedProviderWire.call(JSONObject()
-                .put("action", if (request.pipelineAction == null || isVisionTextAction(request.pipelineAction))
-                    "text_response_with_usage" else "pipeline_response")
+                .put("action", if (request.pipelineAction == null) "text_response_with_usage" else "pipeline_response")
                 .put("format", built.getString("format"))
                 .put("status", http.status)
                 .put("body", http.body))

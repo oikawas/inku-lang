@@ -10,8 +10,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Vision chooser follows Web's `ModelCardPicker` and `modelMeta` (purposes, selectability, order). */
-class VisionModelPickerTest {
+/** A published model's purposes, selectability and order follow Web's `modelMeta`. */
+class ModelPurposesTest {
     private val eol = ModelCatalogLabel("eol", "提供終了", "End of life", publishable = false)
     private val old = ModelCatalogLabel("legacy", "旧世代", "Older", publishable = true)
 
@@ -104,19 +104,5 @@ class VisionModelPickerTest {
         // The camera reads the photo and draws with one model, so it offers those used for both (2026-10-21).
         assertTrue(app.contains("\"llm\" in purposes && (!state.modelSelectionForCamera || \"vision\" in purposes)"))
         assertTrue(app.contains("testTag(\"PublishedPurpose:\${provider.providerId}:\$purpose\")"))
-    }
-
-    @Test
-    fun bothVisionDialogsUseTheOneChooserFedFromTheGroupedCatalog() {
-        fun source(name: String): String {
-            val relative = "app/src/main/java/app/inku/mobile/ui/$name"
-            val candidates = listOf(File(relative), File(relative.removePrefix("app/")), File("android", relative))
-            return (candidates.firstOrNull(File::isFile) ?: candidates.first()).readText()
-        }
-        assertTrue(source("JuxtaposeDialog.kt").contains("VisionModelPicker(label = s.model"))
-        // The autonomous refinement's own label since its moves moved to the shared core (7dc4755f4).
-        assertTrue(source("SavedWorkParityDialogs.kt").contains("VisionModelPicker(label = s[\"aiRefineModel\"]"))
-        assertFalse(source("SavedWorkParityDialogs.kt").contains("DropdownMenu"))
-        assertEquals(2, Regex("models = visionModelGroupsFor\\(state\\)").findAll(source("InkuApp.kt")).count())
     }
 }

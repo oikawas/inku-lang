@@ -72,13 +72,6 @@ sealed interface PipelineAuthoring {
         val lawsRecordsJson: String? = null,
         val declareCanvas: Boolean = false,
     ) : PipelineAuthoring
-    data class SavedLaws(
-        val source: String,
-        val description: String,
-        val directionJson: String,
-        val completionRangesJson: String?,
-        val lawsRecordsJson: String?,
-    ) : PipelineAuthoring
     /** A work written from an image (SPEC §12.6.6): the core's `ImageInput` and the catalog choice. */
     data class Image(
         val imageJson: String,

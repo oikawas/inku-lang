@@ -243,7 +243,6 @@ import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.i18n.savedWorkParityStrings
-import app.inku.mobile.ui.i18n.juxtaposeStrings
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraDevelopmentEffect
 import app.inku.mobile.ui.camera.CameraFailure
@@ -640,17 +639,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 if (state.canvasSelectionOpen) {
                     CanvasAspectSelectionDialog(state, viewModel)
                 }
-                state.workActionsTarget?.let { WorkActionsDialog(it, state.workActionsDescriptionLocked, viewModel) }
-                state.juxtaposition?.let { dialog ->
-                    JuxtaposeDialog(
-                        dialog = dialog, modelId = state.autonomousSettings.modelId,
-                        models = visionModelGroupsFor(state),
-                        language = state.uiLanguage, onModel = viewModel::selectJuxtapositionModel,
-                        onAsk = viewModel::askJuxtaposition, onChoose = viewModel::chooseJuxtaposition,
-                        onDraw = viewModel::drawJuxtaposition, onStop = viewModel::stopJuxtaposition,
-                        onDismiss = viewModel::closeJuxtaposition,
-                    )
-                }
+                state.workActionsTarget?.let { WorkActionsDialog(it, viewModel) }
                 if (state.toolChangeOpen) ToolChangeDialog(state, viewModel, S)
                 // After the dialogs it may be asked from, so it is drawn over them.
                 state.discardConfirm?.let { DiscardConfirmDialog(it, viewModel) }
@@ -682,22 +671,6 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                         title = { Text(savedWorkParityStrings(state.uiLanguage).replayTitle) },
                         text = { Text(state.replayError ?: S.working) },
                         confirmButton = { TextButton(onClick = viewModel::closeReplayComparison) { Text(S.close) } },
-                    )
-                }
-                if (state.autonomousOpen) {
-                    AutonomousRefinementDialog(
-                        settings = state.autonomousSettings, status = state.autonomousStatus,
-                        models = visionModelGroupsFor(state),
-                        held = state.autonomousHeld,
-                        thumbnail = { id ->
-                            val child by remember(id) { viewModel.autonomousChild(id) }.collectAsState(initial = null)
-                            child?.let { ArtworkThumbnail(it.id, it.renderHash, it.thumbnailPath,
-                                Modifier.size(Dimens.lineageThumbSize)) }
-                        },
-                        language = state.uiLanguage, onSettings = viewModel::updateAutonomousRefinementSettings,
-                        onStart = viewModel::startAutonomousRefinement, onStop = viewModel::stopAutonomousRefinement,
-                        onOpenLast = viewModel::openLastAutonomousChild,
-                        onDismiss = viewModel::closeAutonomousRefinement,
                     )
                 }
                 CameraDevelopmentSurface(state, viewModel)
@@ -784,7 +757,7 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
 
 /** All saved-work entrances share this menu and the same immutable target. */
 @Composable
-private fun WorkActionsDialog(item: HistoryItemEntity, descriptionLocked: Boolean?, viewModel: InkuViewModel) {
+private fun WorkActionsDialog(item: HistoryItemEntity, viewModel: InkuViewModel) {
     var confirmTrash by remember(item.id) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = viewModel::closeWorkActions,
@@ -801,15 +774,6 @@ private fun WorkActionsDialog(item: HistoryItemEntity, descriptionLocked: Boolea
                 TextButton(onClick = { viewModel.editWorkInstructions(item) }, modifier = Modifier.fillMaxWidth().testTag(DDL_ENTRY_TAG)) { Text(S.instructionEditAction) }
                 TextButton(onClick = { viewModel.showWorkSketch(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workActionSketchRedraw) }
                 TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.Model) }, modifier = Modifier.fillMaxWidth().testTag(MODEL_ENTRY_TAG)) { Text(S.modelEditAction) }
-                // A work drawn straight from DDL has no description to add to
-                // (SPEC §7.8); one held by its DDL says why it is not offered.
-                if (sourceTextOf(item).isNotBlank()) {
-                    TextButton(onClick = { viewModel.openJuxtaposition(item) }, enabled = descriptionLocked == false,
-                        modifier = Modifier.fillMaxWidth().testTag(JUXTAPOSE_ENTRY_TAG)) { Text(juxtaposeStrings(LocalUiLanguage.current).action) }
-                    if (descriptionLocked == true) Text(juxtaposeStrings(LocalUiLanguage.current).heldReason(S.descriptionEditAction), style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                TextButton(onClick = { viewModel.openAutonomousRefinement(item) }, modifier = Modifier.fillMaxWidth().testTag("autonomous-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).autonomousTitle) }
                 HorizontalDivider()
                 TextButton(onClick = { viewModel.openReplayComparison(item) }, modifier = Modifier.fillMaxWidth().testTag("replay-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).replayAction) }
                 TextButton(onClick = { viewModel.openWorkLineage(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workLineage) }
@@ -2728,16 +2692,10 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
                 )
                 }
             }
-            if (state.autonomousStatus.busy) MiniPill(
-                text = savedWorkParityStrings(state.uiLanguage).autonomousTitle,
-                onClick = viewModel::reopenAutonomousRefinement,
-            )
             MiniPill(
                 text = S.stop,
                 onClick = when {
                     state.cameraCaptureState.locksCameraInteraction -> viewModel::cancelCameraDevelopment
-                    state.autonomousStatus.busy -> viewModel::stopAutonomousRefinement
-                    state.juxtaposition?.busy == true -> viewModel::stopJuxtaposition
                     state.refinementBusy -> viewModel::abortRefinementCandidates
                     else -> viewModel::stopDrawing
                 },
@@ -4081,9 +4039,6 @@ internal const val REFINE_GENERATE_TAG = "refine_generate"
 
 /** The model comparison entry on a lineage card, beside 描画要素 (SPEC `:618`). */
 internal const val MODEL_ENTRY_TAG = "model_entry"
-
-/** 取り合わせ in the work-actions menu (SPEC §7.8). */
-internal const val JUXTAPOSE_ENTRY_TAG = "juxtapose_entry"
 
 /** Tags for the sub-view chips and the model selection grid. */
 internal fun refinementSubviewTag(subview: RefinementSubview): String = "refine_subview_${subview.id}"
@@ -6144,7 +6099,6 @@ private fun <T> remembered(slot: java.util.concurrent.atomic.AtomicReference<Mod
 
 private val modelChoicesWithChatGpt = java.util.concurrent.atomic.AtomicReference<ModelListMemo<List<ModelChoice>>?>(null)
 private val modelChoicesWithoutChatGpt = java.util.concurrent.atomic.AtomicReference<ModelListMemo<List<ModelChoice>>?>(null)
-private val visionModelGroupsMemo = java.util.concurrent.atomic.AtomicReference<ModelListMemo<List<VisionModelGroup>>?>(null)
 
 private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true): List<ModelChoice> =
     remembered(if (includeChatGpt) modelChoicesWithChatGpt else modelChoicesWithoutChatGpt, modelListInputs(state)) {
@@ -6181,19 +6135,8 @@ private fun servedPurposes(state: InkuUiState, providerId: String, modelId: Stri
     modelPurposes(catalogModelFor(state, providerId, modelId),
         state.modelPurposes[providerId]?.get(app.inku.mobile.data.ModelCatalog.rawId(providerId, modelId)))
 
-/** [visionModelChoicesFor] grouped by connection, as Web's `vision_catalog` reaches `ModelCardPicker`. */
-private fun visionModelGroupsFor(state: InkuUiState): List<VisionModelGroup> =
-    remembered(visionModelGroupsMemo, modelListInputs(state)) { buildVisionModelGroups(state) }
-
-private fun buildVisionModelGroups(state: InkuUiState): List<VisionModelGroup> =
-    visionModelChoicesFor(state).groupBy { providerOfModelId(it.id, state) }.map { (provider, choices) ->
-        VisionModelGroup(provider, choices.first().providerName, choices.map {
-            VisionModelOption(it.id, it.label, catalogModelFor(state, provider, it.id), servedPurposes(state, provider, it.id))
-        })
-    }
-
-/** The same catalog-filtered IDs shown by the autonomous Vision picker. */
-internal fun autonomousVisionModelIds(state: InkuUiState): Set<String> =
+/** The published remote models that serve Vision (Server's `vision_catalog`), by qualified ID. */
+internal fun visionModelIds(state: InkuUiState): Set<String> =
     visionModelChoicesFor(state).mapTo(linkedSetOf()) { it.id }
 
 private fun modelProviderGroupsFor(state: InkuUiState): List<app.inku.mobile.data.db.ProviderSettingEntity> {

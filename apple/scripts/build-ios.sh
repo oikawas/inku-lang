@@ -16,6 +16,10 @@ DEVICE_NAME='iPad Pro 11-inch (M5)'
 # --device: a connected physical device (its UDID or name; default: the only connected physical device).
 PHYSICAL=false
 PHYSICAL_DEVICE=''
+# --device: where the installed app's data is copied before installing, one folder per device UDID. Never inside the
+# checkout, whose ignored files are removed with the worktree (2026-11-13). INKU_IOS_DEVICE_BACKUPS (an absolute path)
+# chooses another place.
+BACKUP_ROOT="${INKU_IOS_DEVICE_BACKUPS:-$HOME/Library/Application Support/Inku Development/ios-device-backups}"
 # How long the launched application must stay alive before the run counts as started.
 LAUNCH_SETTLE_SECONDS=10
 
@@ -24,7 +28,8 @@ usage() {
     printf 'With --device, build for a connected physical iPad or iPhone (name it when several are connected), signed by\n' >&2
     printf 'the team in INKU_IOS_TEAM (Xcode must be\n' >&2
     printf 'signed in to that team), copy the installed app'"'"'s Library/Application Support to\n' >&2
-    printf 'apple/build/iOS/device-backups/, then install and launch it with devicectl.\n' >&2
+    printf '$INKU_IOS_DEVICE_BACKUPS/<UDID>/<time> (an absolute path outside the checkout; default\n' >&2
+    printf '~/Library/Application Support/Inku Development/ios-device-backups), then install and launch it with devicectl.\n' >&2
     printf 'Default: Release application and release Rust archives, for the iOS Simulator, signed to run locally.\n' >&2
     printf 'Set INKU_APPLE_PROFILE=debug to explicitly select debug Rust archives.\n' >&2
     printf 'With --run, boot the simulator device (default: %s) without opening Simulator.app,\n' "$DEVICE_NAME" >&2
@@ -69,6 +74,15 @@ done
 if [[ "$PHYSICAL" == true && -z "${INKU_IOS_TEAM:-}" ]]; then
     printf 'Set INKU_IOS_TEAM to the signing team ID (10 characters) for --device; it is not stored in the checkout.\n' >&2
     exit 2
+fi
+if [[ "$PHYSICAL" == true ]]; then
+    case "$BACKUP_ROOT" in
+        /*) ;;
+        *) printf 'INKU_IOS_DEVICE_BACKUPS must be an absolute path: %s\n' "$BACKUP_ROOT" >&2; exit 2 ;;
+    esac
+    case "$BACKUP_ROOT/" in
+        "$ROOT"/*) printf 'INKU_IOS_DEVICE_BACKUPS must be outside the checkout %s: %s\n' "$ROOT" "$BACKUP_ROOT" >&2; exit 2 ;;
+    esac
 fi
 [[ "$(uname -s)" == Darwin ]] || { printf 'The iOS application build requires macOS and Xcode.\n' >&2; exit 2; }
 for tool in python3 node uv xcodegen xcodebuild xcrun; do
@@ -181,7 +195,8 @@ if [[ "$PHYSICAL" == true ]]; then
             --domain-identifier "$BUNDLE_ID" --subdirectory Library --no-recurse 2>/dev/null || true)"
     fi
     if grep -q '^Application Support ' <<< "$library"; then
-        BACKUP="$BUILD/device-backups/$(date +%Y%m%d-%H%M%S)"
+        # Outside the checkout (2026-11-13): copies under apple/build/ went with removed worktrees, taken for a cache.
+        BACKUP="$BACKUP_ROOT/$PHYSICAL_UDID/$(date +%Y%m%d-%H%M%S)"
         mkdir -p "$BACKUP"
         xcrun devicectl device copy from --device "$PHYSICAL_UDID" --domain-type appDataContainer \
             --domain-identifier "$BUNDLE_ID" --source "Library/Application Support" --destination "$BACKUP" \

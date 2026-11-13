@@ -140,9 +140,10 @@
 	.comp-grid dd.comp-reason { display: block; line-height: 1.75; }
 	.comp-things-head { margin-top: 2px; color: var(--fg3); font-size: var(--ui-font-size-11); }
 	.thing-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
-	.thing-row { display: grid; grid-template-columns: 18px 2.6em minmax(0, 1fr); gap: 2px 8px; align-items: baseline; padding: 5px 8px 5px 6px; border-left: 2px solid transparent; }
-	.thing-no { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 50%; color: var(--fg2); font-size: var(--ui-font-size-10); line-height: 1; align-self: center; }
-	.thing-role { color: var(--fg3); font-size: var(--ui-font-size-11); white-space: nowrap; }
+	/* Top-aligned: the things' names can wrap, and the number and role stay on their first line. */
+	.thing-row { display: grid; grid-template-columns: 18px 2.6em minmax(0, 1fr); gap: 2px 8px; align-items: start; padding: 5px 8px 5px 6px; border-left: 2px solid transparent; }
+	.thing-no { display: grid; place-items: center; width: 16px; height: 16px; margin-top: 1px; border: 1px solid var(--border2); border-radius: 50%; color: var(--fg2); font-size: var(--ui-font-size-10); line-height: 1; }
+	.thing-role { color: var(--fg3); font-size: var(--ui-font-size-11); line-height: 1.7; white-space: nowrap; }
 	.thing-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; min-width: 0; }
 	.thing-what { color: var(--fg); font-size: var(--ui-font-size-12); line-height: 1.55; }
 	.thing-place { color: var(--fg3); font-size: var(--ui-font-size-11); white-space: nowrap; align-self: baseline; }

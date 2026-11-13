@@ -22,6 +22,16 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-14 Sign in with ChatGPT (step 1)
+
+The author's instruction (2026-11-14: put ChatGPT first in the model settings and model selection of the Web, Swift and Android) and the official names (Japanese 「ChatGPT でサインイン」, English "Sign in with ChatGPT", abbreviation "SIWC"). The shared core's `model_catalog_json` actions `provider_groups`, `sign_in_services` and `resolve_display` are used.
+
+- Order: reading and writing the saved settings (`ProviderCoreSettings.fromCore`), copying the ChatGPT publication (`SettingsModel.mirroringPersonalPlan`) and adding the connection when it is enabled (`ChatGPTPlanSettingsModel.setEnabled`) no longer append the ChatGPT connection last; they take the core `provider_groups` order (the sign-in connection first, the other services as before; `ProviderCoreSettings.orderedBySignIn`). The model settings cards (`SettingsModel.serviceCardProviders`; the Ollama-first order stays behind it), model selection (`BatchModelPickerView`) and comparison (`ComparisonModel`) use the same order.
+- Names: the connection is named by the core descriptor's label in the display language (the settings section, the ChatGPT page's heading, the model settings card, the title of the model publication sheet). Saved model names (`ModelNaming`) pass the display language to core `resolve_display` and take its label and abbreviation. The hard-coded "ChatGPT plan" is gone. The history strip abbreviation becomes "SIWC" instead of "Ch".
+- Text: the words that name the connection changed ("Enable Sign in with ChatGPT", the enabled and disabled notices, and the failure text's default, disabled, startup command and not-connected entries; not connected reads "Sign in with ChatGPT."). Words about the user's plan itself (such as "Draw using your ChatGPT plan. …") are unchanged. The usage link beside the model in the Description tab reads "Manage usage" (Web `chatgptManageUsage`) and takes its URL from the core descriptor. Two unused translations ("Personal ChatGPT plan", "Load Personal ChatGPT models …") were removed.
+- Unchanged: the id `chatgpt`, model names `chatgpt:…`, failure codes, and what is sent, saved and recorded for a work. The Web copy (`ui-reference.json`) `chatgptPlanLabel` is no longer used as the name (the copy of the Web text is exported again together with the Web change on the Server side).
+- Check: the 21 shared rows of `sign-in-cases.json` go through the app's binding (`InkuCore.modelCatalog`) and the whole answer is compared (`InkuAppCheck --sign-in-only`).
+
 ## 2026-11-13 The iPhone library scrolls through every work
 
 The author's instruction (2026-11-13): the iPhone library shows every work in one scroll, as Photos does. The tiles take Photos' form and the newest works come first (the author's choices).

@@ -118,6 +118,10 @@ struct AppCheck {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected a disposable identity-check.sqlite copy") }
             try await runLibraryPaginationBenchmark(url: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--sign-in-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing shared sign-in cases") }
+            try runSignInChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--model-catalog-only") {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing shared model catalog cases") }
             try await runModelCatalogChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

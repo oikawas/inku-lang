@@ -32,10 +32,15 @@ func runHistoryModelNameChecks() throws {
     var plan = ProviderSettings.personalPlan
     plan.models = [.init(id: "gpt-6.1-sol", label: "GPT-6.1-Sol")]
     let naming = ModelNaming(providers: [plan])
-    guard naming.displayName("chatgpt:gpt-6.1-sol") == "ChatGPT plan / GPT-6.1-Sol",
+    // Sign in with ChatGPT step 1: core names the connection in the display language and gives its abbreviation.
+    let japanese = ModelNaming(providers: [plan], language: "ja")
+    guard naming.displayName("chatgpt:gpt-6.1-sol") == "Sign in with ChatGPT / GPT-6.1-Sol",
+          japanese.displayName("chatgpt:gpt-6.1-sol") == "ChatGPT でサインイン / GPT-6.1-Sol",
+          naming.stripModel("chatgpt:gpt-6.1-sol") == "SIWC GPT6.1So",
+          japanese.stripModel("chatgpt:gpt-6.1-sol") == "SIWC GPT6.1So",
           naming.modelShortName("chatgpt:gpt-6.1-sol") == "GPT-6.1-Sol",
           ProviderModelReference.resolve("gpt-6.1-sol", providers: [plan]).providerID == "nvidia" else {
         throw CheckFailure.message("Published ChatGPT plan model lost its display name or changed bare-reference routing")
     }
-    print("History model names passed: \(cases.count) current Web outputs, variants/sizes/quantization retained, Ollama Cloud distinguished. No provider calls.")
+    print("History model names passed: \(cases.count) current Web outputs, Sign in with ChatGPT named by core (ja/en, SIWC), variants/sizes/quantization retained, Ollama Cloud distinguished. No provider calls.")
 }

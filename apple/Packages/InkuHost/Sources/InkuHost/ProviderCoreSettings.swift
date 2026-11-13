@@ -178,9 +178,62 @@ public enum ProviderCoreSettings {
                 rateLimits: .init(requestsPerMinute: rate["rpm"], tokensPerMinute: rate["tpm"], requestsPerDay: rate["rpd"]),
                 label: row["label"] as? String, models: models, enabledModels: enabled, memo: row["memo"] as? String))
         }
-        host.providers = converted + original.providers.filter { $0.kind == .chatGPTPlan }
+        host.providers = orderedBySignIn(converted + original.providers.filter { $0.kind == .chatGPTPlan })
         host.inactiveBuiltinProviderIDs = inactive.sorted()
         host.providerDefaultsInstalled = true
         return host
+    }
+
+    // MARK: Sign-in connections ("Sign in with ChatGPT")
+
+    /// Core `provider_groups`: the sign-in connections first, in the order of core's service descriptor, then the
+    /// other services in the order given (an Ollama-first order is applied by the caller before this).
+    /// A list core refuses (an unknown sign-in id) keeps its given order.
+    public static func orderedBySignIn(_ providers: [ProviderSettings]) -> [ProviderSettings] {
+        let signIn = providers.filter { $0.kind == .chatGPTPlan }
+        guard !signIn.isEmpty else { return providers }
+        let others = providers.filter { $0.kind != .chatGPTPlan }
+        let groups: [[String: Any]] = others.map {
+            ["id": $0.id, "label": $0.label ?? $0.id, "kind": $0.kind.rawValue, "requires_api_key": $0.requiresAPIKey]
+        }
+        let rows: [[String: Any]] = signIn.map { plan in
+            ["service": plan.id, "models": (plan.models ?? []).map { ["id": $0.id, "label": $0.label] }]
+        }
+        guard let answer = try? call("provider_groups", ["groups": groups, "sign_in": rows]),
+              answer["outcome"] as? String == "ok", let ordered = answer["groups"] as? [[String: Any]] else { return providers }
+        var remaining = signIn + others
+        var result: [ProviderSettings] = []
+        for id in ordered.compactMap({ $0["id"] as? String }) {
+            if let index = remaining.firstIndex(where: { $0.id == id }) { result.append(remaining.remove(at: index)) }
+        }
+        return result + remaining
+    }
+
+    /// Core `sign_in_services`: one service's public descriptor (`label`, `labels`, `abbreviation`, `usage_url`, ...)
+    /// in `ja` or `en` (English for any other language).
+    public static func signInService(_ id: String, language: String) -> [String: Any]? {
+        signInServices(language: language).first { $0["id"] as? String == id }
+    }
+
+    public static func signInServices(language: String) -> [[String: Any]] {
+        let language = language == "ja" ? "ja" : "en"
+        return signInServiceCache.withLock { cache in
+            if let rows = cache[language] { return rows }
+            let rows = (try? call("sign_in_services", ["language": language]))?["services"] as? [[String: Any]] ?? []
+            cache[language] = rows
+            return rows
+        }
+    }
+
+    nonisolated(unsafe) private static let signInServiceCache = SignInServiceCache()
+}
+
+/// Core's sign-in descriptor is fixed for a build; each language is read once.
+private final class SignInServiceCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var rows: [String: [[String: Any]]] = [:]
+    func withLock<T>(_ body: (inout [String: [[String: Any]]]) -> T) -> T {
+        lock.lock(); defer { lock.unlock() }
+        return body(&rows)
     }
 }

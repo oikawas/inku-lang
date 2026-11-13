@@ -12,10 +12,10 @@ public struct ChatGPTPlanSettingsView: View {
     public init(model: AppModel, onOpenModelSettings: @escaping () -> Void) { app = model; self.onOpenModelSettings = onOpenModelSettings }
     public var body: some View {
         Group {
-            Section(app.display.webCopy("chatgptPlanLabel", "ChatGPTプラン")) {
+            Section(app.display.signInLabel()) {
                 Text(app.display.localized("本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこのMacの同じライブラリに残ります。"))
                     .foregroundStyle(.secondary)
-                Toggle(app.display.localized("個人ChatGPTプラン接続を有効にする"), isOn: Binding(
+                Toggle(app.display.localized("ChatGPT でサインインを有効にする"), isOn: Binding(
                     get: { controller.state?.enabled ?? false },
                     set: { value in Task { await controller.setEnabled(value, app: app) } }))
                     .disabled(controller.busy)
@@ -85,7 +85,7 @@ public struct ChatGPTPlanSettingsView: View {
             }
             if controller.connected {
                 Section {
-                    Text(app.display.webCopy("chatgptModelSettingsGuide", "接続が完了しました。モデル設定で「ChatGPTプラン」のモデル一覧を取得し、公開するモデルを選んで保存してください。その後、描画モデルを選択できます。"))
+                    Text(app.display.webCopy("chatgptModelSettingsGuide", "接続が完了しました。モデル一覧を取得します。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。"))
                         .foregroundStyle(.secondary)
                     Button(app.display.webCopy("chatgptOpenModelSettings", "モデル設定を開く"), action: onOpenModelSettings)
                 }

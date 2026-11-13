@@ -147,7 +147,7 @@ func runTooltipAndLeftoverChecks() async throws {
     let chatGPTSources = try lines("AppModel.swift") + lines("ChatGPTPlanSettingsModel.swift")
     guard ChatGPTStatusCopy.text("chatgpt_quota", language: "ja") == "プラン利用の上限に達しました。利用枠を確認してください。",
           ChatGPTStatusCopy.text("chatgpt_refused", language: "en") == "ChatGPT declined the request. Revise your description.",
-          ChatGPTStatusCopy.text("chatgpt_unknown", language: "ja") == "ChatGPT接続を確認してください。",
+          ChatGPTStatusCopy.text("chatgpt_unknown", language: "ja") == "ChatGPT でサインインの接続を確認してください。",
           !chatGPTSources.contains(where: { $0.contains("ChatGPTプラン: \\(") }) else {
         throw CheckFailure.message("ChatGPT failure wording differs from Web chatgptStatus")
     }

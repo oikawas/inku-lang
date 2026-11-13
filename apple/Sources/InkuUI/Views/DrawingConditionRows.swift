@@ -22,7 +22,7 @@ struct DrawingConditionRow: View {
                 Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle)
                     .inkuTooltip(display.tooltipValue(value))
                 if showsPlan {
-                    Link(display.webCopy("chatgptPlanLabel", "ChatGPTプラン"), destination: URL(string: "https://chatgpt.com/settings/usage")!)
+                    Link(display.webCopy("chatgptManageUsage", "利用枠を管理"), destination: display.signInUsageURL() ?? URL(string: "https://chatgpt.com/settings/usage")!)
                         .inkuFont(11).inkuTooltip(display.tooltip("ChatGPTプランの使用状況を開きます。", serverKey: "chatgptManageUsage"))
                 }
                 Spacer(minLength: 0)

@@ -20,7 +20,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: "表示と操作"; case .making: "バッチの再試行"; case .drawDefaults: "描くときのデフォルト"; case .models: "モデル設定"
         case .demo: "デモ"
         case .image: "画像"
-        case .personalPlan: "ChatGPTプラン"
+        case .personalPlan: "ChatGPT でサインイン"
         case .database: "DB設定"; case .clipboard: "クリップボード"; case .plugins: "プラグイン"
         case .export: "エクスポート"
         case .unread: "未読語台帳"
@@ -327,7 +327,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: model.display.webCopy("settingsCategoryDisplayOperation", item.title)
         case .making: model.display.webCopy("settingsBatchRetryLabel", item.title)
         case .drawDefaults: model.display.webCopy("drawDefaultsTitle", item.title)
-        case .personalPlan: model.display.webCopy("chatgptPlanLabel", item.title)
+        case .personalPlan: model.display.signInLabel()
         case .export: model.display.webCopy("settingsTabFileSaving", "ファイル保存")
         case .plugins: model.display.webCopy("settingsTabPlugins", item.title)
         case .other: model.display.label("その他", "Other")

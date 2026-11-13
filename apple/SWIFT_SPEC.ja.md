@@ -22,6 +22,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-11-14 ChatGPT でサインイン（step 1）
+
+作者の指示（2026-11-14「web/swift/androidのモデル設定、モデル選択で、chatGPTを先頭に変更。」）と、正式の名（日本語「ChatGPT でサインイン」、英語「Sign in with ChatGPT」、略称「SIWC」）。共通coreの`model_catalog_json`の`provider_groups`・`sign_in_services`・`resolve_display`を使う。
+
+- 並び：設定の保存の読み書き（`ProviderCoreSettings.fromCore`）、ChatGPTの公開の写し（`SettingsModel.mirroringPersonalPlan`）、接続を有効にした時の足し（`ChatGPTPlanSettingsModel.setEnabled`）は、ChatGPTの接続を末尾に足さず、coreの`provider_groups`の並び（サインインの接続が先頭、ほかのサービスは今の順）にする（`ProviderCoreSettings.orderedBySignIn`）。モデル設定のカード（`SettingsModel.serviceCardProviders`。Ollamaを前に出す並べ方はその後ろで今のまま）、モデル選択（`BatchModelPickerView`）、比べ（`ComparisonModel`）も同じ並び。
+- 名札：接続の名は、coreの記述の名札を表示の言語で使う（設定の節・ChatGPTの頁の見出し・モデル設定のカード・公開モデル選択の題）。保存したモデルの名（`ModelNaming`）は、coreの`resolve_display`に表示の言語を渡し、名札と略称を受け取る。直書きの「ChatGPT plan」は消した。履歴の帯の略称は「Ch」から「SIWC」になる。
+- 文言：接続の名を言う字を替えた（「ChatGPT でサインインを有効にする」、有効・無効にした知らせ、失敗の文の既定・無効・起動入口・未接続。未接続は「ChatGPT でサインインしてください。」）。利用者のプランそのものを言う字（「本人のChatGPTプランで描画できます。…」など）は替えない。記述タブのモデルの横の使用量の頁へのリンクは「利用枠を管理」（Webの`chatgptManageUsage`）にし、頁のURLはcoreの記述から読む。使われていなかった訳の2行（「個人ChatGPTプラン」「Personal ChatGPTのモデルは…」）を消した。
+- 変わらない物：id `chatgpt`、モデル名`chatgpt:…`、失敗の印、送信・保存・作品の記録。Webのコピー（`ui-reference.json`）の`chatgptPlanLabel`は名札に使わなくなった（Webの文言の写しは、WebのServerの変更と合わせて書き出し直す）。
+- 確かめ：共通の試験データ`sign-in-cases.json`の21行を、アプリと同じ口（`InkuCore.modelCatalog`）で通し、答えの全体を照らす（`InkuAppCheck --sign-in-only`）。
+
 ## 2026-11-13 iPhone のライブラリの全件スクロール
 
 作者の指示（2026-11-13「iphoneのライブラリは、写真アプリのように全件スクロール表示として」）。札の形は「写真アプリの形」、並びは「新しい作品が上」（作者の選択）。

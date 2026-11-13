@@ -165,7 +165,7 @@ enum DrawingFailureMessage {
 /// is copied here; a ChatGPT plan failure is worded with it in the drawing status and the plan settings.
 public enum ChatGPTStatusCopy {
     public static func text(_ code: String, language: String) -> String {
-        let entry = table[code] ?? ("ChatGPT接続を確認してください。", "Check the ChatGPT connection.")
+        let entry = table[code] ?? ("ChatGPT でサインインの接続を確認してください。", "Check the Sign in with ChatGPT connection.")
         return language == "en" ? entry.1 : entry.0
     }
 
@@ -182,12 +182,12 @@ public enum ChatGPTStatusCopy {
             "Connected. Plan usage needs your permission."),
         "chatgpt_mode_not_allowed": ("デベロッパーモードまたはシングルユーザーモードが必要です。",
             "Developer mode or single-user mode is required."),
-        "chatgpt_disabled": ("ChatGPT接続は無効です。",
-            "ChatGPT connection is disabled."),
+        "chatgpt_disabled": ("ChatGPT でサインインは無効です。",
+            "Sign in with ChatGPT is disabled."),
         "chatgpt_owner_not_allowed": ("このアカウントは接続の所有者ではありません。",
             "This account does not own the connection."),
-        "chatgpt_startup_unverified": ("ChatGPT対応の起動入口を使用してください。",
-            "Use the ChatGPT-enabled startup command."),
+        "chatgpt_startup_unverified": ("ChatGPT でサインインに対応した起動入口を使用してください。",
+            "Use the startup command that supports Sign in with ChatGPT."),
         "chatgpt_local_authorization_required": ("Macの専用アプリで認証し、保護された経路で登録を移送してください。",
             "Sign in with the Mac helper, then transfer the account through the protected connection."),
         "chatgpt_helper_requested": ("ブラウザの確認画面で「inku ChatGPT」を開いてください。開かない場合は下のリンクで再度開くか、このMacに専用アプリをセットアップしてください。",
@@ -200,8 +200,8 @@ public enum ChatGPTStatusCopy {
             "Sign in again with the saved account."),
         "chatgpt_session_changed": ("登録が変更されました。状態を確認してください。",
             "The account changed. Check the connection."),
-        "chatgpt_not_connected": ("ChatGPTへ接続してください。",
-            "Connect to ChatGPT."),
+        "chatgpt_not_connected": ("ChatGPT でサインインしてください。",
+            "Sign in with ChatGPT."),
         "chatgpt_quota": ("プラン利用の上限に達しました。利用枠を確認してください。",
             "Plan usage reached its limit. Check your usage."),
         "subscription_sharing_usage_limit_exceeded": ("プラン利用の上限に達しました。利用枠を確認してください。",

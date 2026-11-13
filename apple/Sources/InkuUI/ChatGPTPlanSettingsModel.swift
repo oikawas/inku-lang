@@ -36,10 +36,11 @@ public final class ChatGPTPlanSettingsModel {
             if enabled {
                 var settings = await app.hostSettings()
                 if !settings.providers.contains(where: { $0.kind == .chatGPTPlan }) {
-                    settings.providers.append(.personalPlan); try await app.updateHostSettings(settings)
+                    settings.providers = ProviderCoreSettings.orderedBySignIn(settings.providers + [.personalPlan])
+                    try await app.updateHostSettings(settings)
                 }
             }
-            self.status = enabled ? "ChatGPTプラン接続を有効にしました。接続は認証ボタンから開始します。" : "ChatGPTプラン接続を無効にしました。"
+            self.status = enabled ? "ChatGPT でサインインを有効にしました。接続は認証ボタンから開始します。" : "ChatGPT でサインインを無効にしました。"
         }
     }
     public func authorize(profileID: String? = nil, consent: Bool = false, app: AppModel,

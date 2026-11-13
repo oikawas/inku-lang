@@ -103,12 +103,12 @@ struct ModelSettingsView: View {
     private var serviceCards: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10, alignment: .leading)],
                   alignment: .leading, spacing: 10) {
-            ForEach(settings.orderedProviders) { provider in
-                serviceCard(provider, status: model.display.localized(credentialStatus(provider.id)))
-            }
-            // ModelAdministrationSettings.svelte: `chatgpt · 接続済み`, listed while the publication can be read.
-            if chatGPT != nil {
-                serviceCard(chatGPTProvider, status: ChatGPTStatusCopy.text("chatgpt_connected", language: model.display.preferences.language))
+            // ModelAdministrationSettings.svelte: `chatgpt · 接続済み`, listed while the publication can be read,
+            // first in the core `provider_groups` order.
+            ForEach(settings.serviceCardProviders(signIn: chatGPT == nil ? nil : chatGPTProvider)) { provider in
+                serviceCard(provider, status: provider.kind == .chatGPTPlan
+                    ? ChatGPTStatusCopy.text("chatgpt_connected", language: model.display.preferences.language)
+                    : model.display.localized(credentialStatus(provider.id)))
             }
         }
     }

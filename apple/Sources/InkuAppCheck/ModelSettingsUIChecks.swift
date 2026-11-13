@@ -32,6 +32,11 @@ func runModelSettingsUIChecks() async throws {
     let editor = SettingsModel(credentials: credentials)
     await editor.load(model: app)
     var expected = await app.hostSettings()
+    // Sign in with ChatGPT step 1: core `provider_groups` keeps the connection first, the services in their order.
+    guard expected.providers.map(\.id) == ["chatgpt", first.id, second.id] else {
+        throw CheckFailure.message("Saved services are not in the core sign-in order: \(expected.providers.map(\.id))")
+    }
+    let serviceA = 1  // Service A, after the sign-in connection
     @MainActor func expectSettings(_ message: String) async throws {
         guard await app.hostSettings() == expected,
               try JSONDecoder().decode(HostSettings.self, from: Data(contentsOf: settingsURL)) == expected else {
@@ -40,24 +45,24 @@ func runModelSettingsUIChecks() async throws {
     }
 
     try await editor.saveProviderLabel(providerID: first.id, label: "Renamed A", model: app)
-    expected.providers[0].label = "Renamed A"
+    expected.providers[serviceA].label = "Renamed A"
     try await expectSettings("Name save changed unrelated settings")
     try await editor.saveProviderMemo(providerID: first.id, memo: "Author memo", model: app)
-    expected.providers[0].memo = "Author memo"
+    expected.providers[serviceA].memo = "Author memo"
     try await expectSettings("Memo save changed unrelated settings")
     try await editor.saveProviderURL(providerID: first.id, value: "http://127.0.0.1:3/v1", model: app)
-    expected.providers[0].baseURL = URL(string: "http://127.0.0.1:3/v1")!
+    expected.providers[serviceA].baseURL = URL(string: "http://127.0.0.1:3/v1")!
     try await expectSettings("URL save changed unrelated settings")
     let rates = ProviderRateLimits(requestsPerMinute: 7, tokensPerMinute: 9000, requestsPerDay: 19)
     try await editor.saveProviderRateLimits(providerID: first.id, limits: rates, model: app)
-    expected.providers[0].rateLimits = rates
+    expected.providers[serviceA].rateLimits = rates
     try await expectSettings("Rate save changed unrelated settings")
     // The shared validator accepts a URL query; return to the fixture URL afterwards.
     try await editor.saveProviderURL(providerID: first.id, value: "https://example.invalid/v1?credential=fixture", model: app)
-    expected.providers[0].baseURL = URL(string: "https://example.invalid/v1?credential=fixture")!
+    expected.providers[serviceA].baseURL = URL(string: "https://example.invalid/v1?credential=fixture")!
     try await expectSettings("Shared URL validation changed other settings")
     try await editor.saveProviderURL(providerID: first.id, value: "http://127.0.0.1:3/v1", model: app)
-    expected.providers[0].baseURL = URL(string: "http://127.0.0.1:3/v1")!
+    expected.providers[serviceA].baseURL = URL(string: "http://127.0.0.1:3/v1")!
 
     let catalog: [ProviderModelSettings] = [
         .init(id: "ready", label: "Ready", purposes: ["llm"], recommendationLevel: 3),
@@ -113,10 +118,10 @@ func runModelSettingsUIChecks() async throws {
           firstNormalized.enabledModels?["hidden"] == false, firstNormalized.enabledModels?["ready"] == true else {
         throw CheckFailure.message("Core model normalization lost the saved values")
     }
-    expected.providers[0] = firstNormalized
+    expected.providers[serviceA] = firstNormalized
     try await expectSettings("Model save changed unrelated settings")
     app.selectNextDrawingModel("model-ui-a:ready")
-    guard editor.publishedModels(for: expected.providers[0], purpose: "llm").map(\.id) == ["ready"],
+    guard editor.publishedModels(for: expected.providers[serviceA], purpose: "llm").map(\.id) == ["ready"],
           !editor.isModelAvailable("model-ui-a:vision:local"), !editor.isModelAvailable("model-ui-a:retired"),
           !editor.isModelAvailable("model-ui-a:plan-only"), !editor.isModelAvailable("model-ui-a:hidden"),
           app.nextDrawingModelReference == "model-ui-a:ready" else {
@@ -127,12 +132,12 @@ func runModelSettingsUIChecks() async throws {
     let disabledSettings = await app.hostSettings()
     guard let disabledProvider = disabledSettings.providers.first(where: { $0.id == first.id }),
           disabledProvider.enabledModels?["ready"] == false else { throw CheckFailure.message("Core did not disable the model") }
-    expected.providers[0] = disabledProvider
+    expected.providers[serviceA] = disabledProvider
     app.inputMode = "description"
     app.descriptionText = "a green square"
     app.selectNextDrawingModel("model-ui-a:vision:local")
     guard app.nextDrawingModelReference == "model-ui-a:ready", !app.hasAvailableNextDrawingModel, !app.canGenerate,
-          editor.availableModels(for: expected.providers[0]).contains(where: { $0.id == "model-ui-a:ready" }) else {
+          editor.availableModels(for: expected.providers[serviceA]).contains(where: { $0.id == "model-ui-a:ready" }) else {
         throw CheckFailure.message("Disabling a model erased its saved reference or allowed new drawing")
     }
     do {
@@ -152,7 +157,7 @@ func runModelSettingsUIChecks() async throws {
     guard let added = afterAdd.providers.first(where: { $0.id == "custom-ui" }), added.label == "Custom", !added.requiresAPIKey else {
         throw CheckFailure.message("Keyless custom service not added")
     }
-    expected.providers.insert(added, at: expected.providers.firstIndex(where: { $0.kind == .chatGPTPlan }) ?? expected.providers.endIndex)
+    expected.providers.append(added)
     try await expectSettings("Keyless custom service changed another connection")
     try await editor.deleteProvider(providerID: "custom-ui", model: app)
     expected.providers.removeAll { $0.id == "custom-ui" }
@@ -198,11 +203,11 @@ func runModelSettingsUIChecks() async throws {
     let reopened = AppModel(databaseURL: databaseURL, transport: transport)
     await reopened.initialize()
     guard reopened.errorText == nil, await reopened.hostSettings() == expected, reopened.works.isEmpty,
-          expected.providers[0].models?.first?.commentEN == "Checked" else {
+          expected.providers[serviceA].models?.first?.commentEN == "Checked" else {
         throw CheckFailure.message("Restart lost model settings or changed works")
     }
     try await editor.deleteProvider(providerID: first.id, model: app)
-    expected.providers.removeFirst()
+    expected.providers.remove(at: serviceA)
     expected.models.stage1Model = ""
     expected.models.stage2Model = ""
     try await expectSettings("Deleting the selected service failed to clear only its model references")

@@ -983,7 +983,7 @@ struct CreationView: View {
         let recordedState = model.workActionState(for: work)
         let isImage = recordedState == .image || (!usesBatchWork && model.selectedWorkID == work.id && model.savedImageDDL != nil)
         let options = model.cachedRecordedOptions(workID: work.id, isImage: isImage) ?? [:]
-        let naming = ModelNaming(providers: savedProviders, stageProvider: model.stageDefaultProviderID)
+        let naming = ModelNaming(providers: savedProviders, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language)
         let unavailable = display.webCopy("drawOptionsUnavailable", "N/A")
         let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
         let created = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())

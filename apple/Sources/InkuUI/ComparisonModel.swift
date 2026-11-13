@@ -84,7 +84,7 @@ public final class ComparisonModel {
             sourceIsLocked = context.authority == "ddl_authoritative"
             contextAvailable = true
             let settings = await app.nextGenerationSettings()
-            modelProviders = settings.providers.filter { !SettingsModel.batchModels(for: $0).isEmpty }
+            modelProviders = ProviderCoreSettings.orderedBySignIn(settings.providers).filter { !SettingsModel.batchModels(for: $0).isEmpty }
             selectedCatalogIDs = Set(app.catalogs.filter { $0.id != (work.renderColorCatalogID ?? work.catalogID) }.map(\.id))
             status = "元の作品の条件を固定しました。比較する配色またはモデルを選択してください。"
         } catch {

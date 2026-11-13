@@ -145,7 +145,7 @@ Words of judgment or feeling, such as "beautifully" or "sadly", are not in the v
 
 **There are two modes.** The web default is direct (shown in the UI as "Draw with words"). The LLM infers the background of the sentence, composes the picture, and writes the DDL, including the numbers for position and size. The result is a more figurative picture. In structured mode ("Draw with types"), the sentence is taken more mechanically: the LLM returns JSON built only from vocabulary enums, and the DDL is generated from it mechanically. The result leans toward the abstract.
 
-The interpreting model can be chosen (OpenAI, Anthropic, Gemini, or a local LLM). No model is built into the app; each is called through an API. Your ChatGPT plan (its subscription allowance) can also be used. A different model changes the output a great deal.
+The interpreting model can be chosen (OpenAI, Anthropic, Gemini, or a local LLM). No model is built into the app; each is called through an API. Sign in with ChatGPT (painting with your own ChatGPT plan's allowance) can also be used. A different model changes the output a great deal.
 
 The compiler, the Score, the renderer, and the state machine of the drawing pipeline live in a **shared Rust core**. The server (Python), Android (Kotlin), and macOS (Swift) all call the same core, so the same DDL gives the same result everywhere.
 
@@ -355,7 +355,7 @@ Instead, the SVG that was output is saved as it is, so the original output can a
 
 The easiest way is the macOS app with your own ChatGPT plan.
 
-There is no native Windows app for now. On Windows, run the Docker container (WSL 2) and use the web UI (signing in with a ChatGPT plan on Windows is untested).
+There is no native Windows app for now. On Windows, run the Docker container (WSL 2) and use the web UI (Sign in with ChatGPT on Windows is untested).
 
 To run it with Docker Desktop, start like this:
 

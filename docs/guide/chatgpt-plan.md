@@ -1,4 +1,4 @@
-# ChatGPT plan connection
+# Sign in with ChatGPT
 
 Draw using the allowance granted when you sign in to ChatGPT. Its credentials and allowance are separate from the OpenAI API Platform key connection. Eligibility and models are established by actual authorization and the account's catalog. [Official overview](https://developers.openai.com/siwc/token-sharing-open-source)
 
@@ -6,11 +6,11 @@ Draw using the allowance granted when you sign in to ChatGPT. Its credentials an
 
 Explicitly set `INKU_CHATGPT_PLAN_ENABLED=1` and use developer mode, single-user mode, or explicit `INKU_CHATGPT_SELF_HOSTED=1` with verified self-hosted startup. The last option supports released containers with ordinary account sign-in and no developer mode. Administrators also need their own connection and `chatgpt.tokens.use.direct` permission. In single-user mode, only the fixed account owns it. A visible screen does not mean OAuth is complete.
 
-Initial local support covered source installations with the Web, API and browser on one PC. Server/Web also supports ChatGPT plan for colophons. Local callbacks inside Docker, demo instruction generation and model inspection remain outside scope. See the [Android specification](../../android/ANDROID_SPEC.md) for current Android connection behavior.
+Initial local support covered source installations with the Web, API and browser on one PC. Server/Web also supports Sign in with ChatGPT for colophons. Local callbacks inside Docker, demo instruction generation and model inspection remain outside scope. See the [Android specification](../../android/ANDROID_SPEC.md) for current Android connection behavior.
 
 ## Publish a Vision model
 
-In Settings → Models, open Select models for ChatGPT plan and save each model's LLM/Vision purposes and publication state. Models without saved purposes default to both; a model with no purpose cannot be published. The Vision filter shows the applicable models. Published Vision models appear as ChatGPT plan in colophon pickers. Model details are reference information from the catalog.
+In Settings → Models, open Select models for Sign in with ChatGPT and save each model's LLM/Vision purposes and publication state. Models without saved purposes default to both; a model with no purpose cannot be published. The Vision filter shows the applicable models. Published Vision models appear as Sign in with ChatGPT in colophon pickers. Model details are reference information from the catalog.
 
 Purposes are stored in the registration's `model_purposes`. Responses from `GET/PUT /api/me/chatgpt/models/settings` include each model's `purposes` and existing `enabled`/`enabled_models` fields. PUT accepts `profile_id`, `generation`, `published_models` and an optional `model_purposes` map. Omitting the map preserves existing purposes; supplying it updates only the named models.
 
@@ -25,11 +25,11 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
   uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
-Choose “Sign in to ChatGPT” in ChatGPT plan settings, sign in and grant permission. The callback is `http://127.0.0.1:<port>/auth/callback` on that PC. The return page follows the settings language and distinguishes completed authorization from failure. Declining, cancelling or exceeding five minutes fails. If a popup is blocked, open “Open the sign-in page again” on screen. Startup uses one worker without reload; direct uvicorn startup and local LAN binding do not enable it. After authorization, configure published models as described under Profiles, models and usage below, then select a shared Stage 1/2 drawing model. [Sign-in procedure](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+Choose “Sign in to ChatGPT” in Sign in with ChatGPT settings, sign in and grant permission. The callback is `http://127.0.0.1:<port>/auth/callback` on that PC. The return page follows the settings language and distinguishes completed authorization from failure. Declining, cancelling or exceeding five minutes fails. If a popup is blocked, open “Open the sign-in page again” on screen. Startup uses one worker without reload; direct uvicorn startup and local LAN binding do not enable it. After authorization, configure published models as described under Profiles, models and usage below, then select a shared Stage 1/2 drawing model. [Sign-in procedure](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 
 ## Connect a self-hosted installation on another host
 
-Choose Connect with inku ChatGPT on the independent ChatGPT plan tab to open the inku ChatGPT helper installed on this Mac. Chrome or Brave asks at the top of its window whether to open the application; choose Open inku ChatGPT. If it does not open, use Open inku ChatGPT again shown on screen. The operator must set up the dedicated helper on this Mac first.
+Choose Connect with inku ChatGPT on the independent Sign in with ChatGPT tab to open the inku ChatGPT helper installed on this Mac. Chrome or Brave asks at the top of its window whether to open the application; choose Open inku ChatGPT. If it does not open, use Open inku ChatGPT again shown on screen. The operator must set up the dedicated helper on this Mac first.
 
 The Mac confirmation shows the inku account name and ID and the destination host ID, obtained through the protected connection. Confirm the destination to open OpenAI sign-in and consent in the Chrome or Brave browser where setup began, then return to the callback in that browser. Failure to open the browser does not switch to another one. The helper seals and transfers the registration once after authorization. When you return to the Web page, it reads the connection state again; Check connection also reads it. Mac confirmation, completion and failure messages follow the settings language; OpenAI supplies its own sign-in page text. A failure shows a reason and stops without an automatic retry. A Mac already bound to another inku account rejects the connection.
 
@@ -108,11 +108,11 @@ Recipient/import verify the DB owner and configured mode; a CLI invocation does 
 
 ## Registrations, models and usage
 
-After connecting, follow the guide to Open Model settings. Select ChatGPT plan in Settings → Models, then Select models → Fetch model list. Check the retrieved count and names, select models to publish and Save. This is the same dialog as other providers, but publication applies only to the connected owner. No API key or endpoint URL is configured. Empty catalogs and failures show a reason. Existing connections also need to save this publication choice once.
+After connecting, follow the guide to Open Model settings. Select Sign in with ChatGPT in Settings → Models, then Select models → Fetch model list. Check the retrieved count and names, select models to publish and Save. This is the same dialog as other providers, but publication applies only to the connected owner. No API key or endpoint URL is configured. Empty catalogs and failures show a reason. Existing connections also need to save this publication choice once.
 
-Then open the drawing model picker and choose one ChatGPT plan model for Stage 1/2. Fetching alone neither publishes nor selects models. Ordinary users manage only their own ChatGPT models; administrators also retain shared provider administration.
+Then open the drawing model picker and choose one Sign in with ChatGPT model for Stage 1/2. Fetching alone neither publishes nor selects models. Ordinary users manage only their own ChatGPT models; administrators also retain shared provider administration.
 
-On the Description tab, the ChatGPT plan label to the right of the model name opens ChatGPT usage settings in a new tab. The separate Using ChatGPT plan notice and Manage usage link below the paint button are removed. An unavailable selected model still shows a warning.
+On the Description tab, the Manage usage link to the right of the model name opens ChatGPT usage settings in a new tab. The Using ChatGPT plan notice and the separate Manage usage link that sat below the paint button are removed. An unavailable selected model still shows a warning.
 
 After a drawing fails, select another model and draw again. Starting the new drawing clears the previous failure display without reloading the page.
 

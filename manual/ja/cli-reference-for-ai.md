@@ -4,18 +4,18 @@
 
 対象はinku v2.15.329（Web Build 1405）です。旗の全一覧は`inku-cli リファレンス`が持ちます。
 
-今後の実providerテスト・比較では、次のモデルを使います（接続はChatGPTプランとGemini API（Cloud）の2系統）。NVIDIA NIMは候補・既定・fallback・Vision評価から外します。
+今後の実providerテスト・比較では、次のモデルを使います（接続はChatGPT でサインインとGemini API（Cloud）の2系統）。NVIDIA NIMは候補・既定・fallback・Vision評価から外します。
 
 | 用途 | 接続とモデル | 明示するモデル参照 |
 |---|---|---|
-| Primary | ChatGPTプラン / GPT-6-Luna | `chatgpt:gpt-6-luna` |
+| Primary | ChatGPT でサインイン / GPT-6-Luna | `chatgpt:gpt-6-luna` |
 | Secondary | Gemini API（Cloud）/ Gemma 4 31B IT | `gemini:gemma-4-31b-it` |
-| Vision | ChatGPTプラン / GPT-6.1-Sol | `chatgpt:gpt-6.1-sol` |
-| Vision | ChatGPTプラン / GPT-6-Astra | `chatgpt:gpt-6-astra` |
+| Vision | ChatGPT でサインイン / GPT-6.1-Sol | `chatgpt:gpt-6.1-sol` |
+| Vision | ChatGPT でサインイン / GPT-6-Astra | `chatgpt:gpt-6-astra` |
 
 Visionの2つは、画像を読ませる試験に使います（出力画像の確認にVisionを併用する場合など）。
 
-実行前に本人の接続・公開モデル・利用枠を確認します。ChatGPTプランの接続条件は[接続ガイド](../../docs/guide/chatgpt-plan.ja.md)に従います。SecondaryはGemini APIの接続であり、NIMの`google/`付きIDやローカルGemmaへ読み替えません。モデルを明示できない入口や接続失敗では実行を止め、NIMへ切り替えません。比較では同じ記述とseed等の条件を固定し、実際のprovider・モデル・結果を記録します。
+実行前に本人の接続・公開モデル・利用枠を確認します。ChatGPT でサインインの接続条件は[接続ガイド](../../docs/guide/chatgpt-plan.ja.md)に従います。SecondaryはGemini APIの接続であり、NIMの`google/`付きIDやローカルGemmaへ読み替えません。モデルを明示できない入口や接続失敗では実行を止め、NIMへ切り替えません。比較では同じ記述とseed等の条件を固定し、実際のprovider・モデル・結果を記録します。
 
 ---
 

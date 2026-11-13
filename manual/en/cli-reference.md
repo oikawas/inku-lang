@@ -17,7 +17,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | Command | Purpose |
 |---|---|
 | login / logout / me | Start, discard, and inspect a session |
-| activity | Inspect live drawings, registered batches and autonomous refinement; administrators may use `--all` for all users and render slots |
+| activity | Inspect live drawings and registered batches; administrators may use `--all` for all users and render slots |
 | models | Configure the default drawing model (shared by writing the instructions and completion), Vision model and color catalog |
 | paint / batch | Paint one or many works from descriptions or instructions |
 | refine | Refine an existing work's composition or color |
@@ -47,7 +47,7 @@ Commands that call the server accept `--base-url` (default http://127.0.0.1:8100
 
 Settings live in `~/.config/inku-cli/config.json` (`INKU_CLI_CONFIG` names another path; `XDG_CONFIG_HOME` moves the directory) and hold the base URL, the login token, the default models and color catalog, and the timeout. When the file does not exist, `INKU_BASE_URL`, `INKU_CLI_TIMEOUT_SECONDS` and `INKU_COLOR_CATALOG` are read (when it exists, only `INKU_BASE_URL` is read, and only if the file holds no base URL). To keep separate Servers apart, point `INKU_CLI_CONFIG` at a different file for each (the token in the file is sent whatever `--base-url` names).
 
-`inku-cli activity` returns JSON. Batches include planned and completed counts, state and the last heartbeat. An expired lease does not prove the client stopped. Drawings are limited to the responding Server process; unregistered older batches and drawings in other processes are outside that observation. Autonomous refinement comes from the run database and includes intervals between moves; child drawings are linked only when tracked by the responding process. If an older Server omits the autonomous refinement field, its state is unknown.
+`inku-cli activity` returns JSON. Batches include planned and completed counts, state and the last heartbeat. An expired lease does not prove the client stopped. Drawings are limited to the responding Server process; unregistered older batches and drawings in other processes are outside that observation.
 
 ### login and models flags
 

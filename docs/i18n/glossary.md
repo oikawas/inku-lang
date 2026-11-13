@@ -84,7 +84,7 @@
 | 変奏（旧） | **Variation (retired)** | 2026-10-04 に廃止した（作者裁定）。古い系譜の辺の札と、古い作品の生成情報の行にだけ使う。強度の Subtle／Moderate／Sweeping も廃止した | — |
 | 作品（新しい作品として保存） | **work** | 名詞。pipeline の variation（記述や設定を変えて保存する新しい単位）を画面で言う語（2026-10-04 作者裁定）。変奏とは言わない | ~~variation~~ |
 | 候補・案 | **option** / **candidate** | 名詞 | ~~variation~~（pipeline の variation と紛れる） |
-| AI 自律推敲 | **autonomous refinement** | 名詞句。**AI を頭に付けない** | ~~AI refinement~~、~~AI-powered~~ |
+| AI 自律推敲（旧） | **autonomous refinement** | 名詞句。**AI を頭に付けない**。2026-11-13 に作品編集メニューの「AI自動推敲プロセス」と一緒に Web から外した（作者の決定）。古い系譜の辺と、系譜のカードの詳細の「AIの手」の行、まだ残る macOS・iPad・Android のアプリにだけ使う | ~~AI refinement~~、~~AI-powered~~ |
 | 配置・構図 | **composition** | 名詞。四操作でも provenance でも同語 | ~~layout~~（UI 文中） |
 | 系譜 | **lineage** | 名詞 | — |
 | 系譜全体図 | **lineage map**（ボタンは **Map**） | 名詞句 | ~~Overview~~ |

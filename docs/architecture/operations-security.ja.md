@@ -39,7 +39,6 @@ flowchart LR
 | pipeline worker pool | `max_workers`（既定4）のthread、保持run `max_retained_runs`（既定8）、1回の実行で進めるeffect `max_effect_steps`（既定32） | 保持runが全て実行中なら429 `pipeline_capacity_reached`。effect段数の上限は`pipeline_effect_limit`で止める（再試行の代わりではない） |
 | pipeline envelope | 入力16 MiB、snapshot 32 MiB、出力64 MiB、provider応答1 MiB | 上限超過はcoreがstate変更前に拒否 |
 | 画像の受取 | 1枚32 MiB、開始待ち15分、画素はrunが終わるまでworkerのメモリ | 超過は413 `image_too_large`、期限の後の開始は`image_missing` |
-| AI自動推敲のrunner | runごとに1 thread（pool既定4）、ownerごとに走るrunは1つ | 2つ目は409 `autonomous_run_running`、停止中は503 `autonomous_closing`。pipeline workerが満杯なら3秒ずつ待って続ける |
 | thumbnail pool | spawnした子processのpool（`INKU_THUMBNAIL_WORKERS`）とbounded queue | 受け付けられない・失敗した作品は焼かず、一覧は保存SVGで描く。書込みは親process |
 | artifact executor | file保存workersとbounded slots | DBを守り、file jobだけskip |
 
@@ -70,7 +69,7 @@ flowchart TD
 
 - schedulerはlifespanが所有し、粗いtickで`ensure_scheduled_db_backup`を呼ぶ。手動backupと自動世代は別扱い。
 - file DB以外ではreplica backupをunsupportedとして扱う。
-- AI自動推敲のrunの状態は、正本DBの隣の別のSQLite（`<name>-autonomous-runs.db`、`INKU_AUTONOMOUS_RUNS_DB_URL`で別の場所）に置く。作品の記録は持たず（子の手は各子のlineage edgeに残る）、DB backupが写すのは正本DBの1 fileだけである。Serverの停止で走っていたrunは、次の起動で中断として読む。
+- AI自動推敲のrunの状態を置いた別のSQLite（`<name>-autonomous-runs.db`）は、2026-11-13からServerが開かない。前の子の手は各子のlineage edgeに残り、DB backupが写すのは正本DBの1 fileだけである。
 - log retentionはapp自身が実行し、stdoutも残す。Composeのdaemon log上限は別層。
 - 共有pipelineのcompiler結果はlogへ`pipeline_compiler_outcome`として、診断の件数と、ASCIIの短い識別子に限った安全な投影だけを出す。source本文、provider応答、promptは書かない。
 - output保存は入力、DDL、Score+metadata、SVG、PNGを作る。絶対pathや実運用値は本書へ載せない。
@@ -90,7 +89,7 @@ flowchart TD
 
 | 分類 | 名前の例 |
 |---|---|
-| DB・backup | `INKU_DB_URL`, `INKU_DB_BACKUP_DIR`, `INKU_DB_BACKUP_SCHEDULER`, `INKU_AUTONOMOUS_RUNS_DB_URL` |
+| DB・backup | `INKU_DB_URL`, `INKU_DB_BACKUP_DIR`, `INKU_DB_BACKUP_SCHEDULER` |
 | output・log | `INKU_OUTPUT_DIR`, `INKU_OUTPUT_SAVE_WORKERS`, `INKU_LOG_DIR` |
 | plugin | `INKU_PLUGIN_PACKAGE_DIR` |
 | 容量 | `INKU_MAX_CONCURRENT_REQUESTS`, `INKU_RENDER_CONCURRENCY`, `INKU_THUMBNAIL_WORKERS`, `INKU_THUMBNAIL_QUEUE_LIMIT` |
@@ -100,4 +99,4 @@ flowchart TD
 
 ## 根拠対応
 
-`API-AUTH`, `API-LIMIT`, `PIPE-HOST`, `PIPE-LIMITS`, `PIPE-IMAGE`, `PIPE-REFINE`, `DATA-IMAGE`, `SYS-BACKUP`, `SYS-LOG`, `SYS-FILES`, `OPS-COMPOSE`。主な実装は `deps.py`, `auth.py`, `security.py`, `state.py`, `routers/users.py`, `pipeline_api.py`, `pipeline_defaults.py`, `pipeline_product.py`, `pipeline_images.py`, `provider_observation.py`, `autonomous_refine.py`, `db.py`, `logging_setup.py`, `compose.yaml`。
+`API-AUTH`, `API-LIMIT`, `PIPE-HOST`, `PIPE-LIMITS`, `PIPE-IMAGE`, `PIPE-REFINE`, `DATA-IMAGE`, `SYS-BACKUP`, `SYS-LOG`, `SYS-FILES`, `OPS-COMPOSE`。主な実装は `deps.py`, `auth.py`, `security.py`, `state.py`, `routers/users.py`, `pipeline_api.py`, `pipeline_defaults.py`, `pipeline_product.py`, `pipeline_images.py`, `provider_observation.py`, `db.py`, `logging_setup.py`, `compose.yaml`。

@@ -6,11 +6,11 @@
 
 `INKU_CHATGPT_PLAN_ENABLED=1`を明示し、デベロッパーモード、シングルユーザーモード、または明示した`INKU_CHATGPT_SELF_HOSTED=1`と検証済み自己ホスト起動を使います。通常ログインのリリース版コンテナも最後の条件で利用でき、developer modeは不要です。管理者にも本人の接続と`chatgpt.tokens.use.direct`の許可が必要です。single-user中は固定accountだけがownerです。画面表示はOAuth完了を意味しません。
 
-初版のlocal接続はWeb・API・ブラウザが同じPCで動くソース版を対象としました。Server/WebはVision推敲と奥書にもChatGPTプランを使えます。Docker内のlocal callback、デモ指示生成、モデル検査は対象外です。Androidの現行の接続は[Android仕様](../../android/ANDROID_SPEC.ja.md)を参照してください。
+初版のlocal接続はWeb・API・ブラウザが同じPCで動くソース版を対象としました。Server/Webは奥書にもChatGPTプランを使えます。Docker内のlocal callback、デモ指示生成、モデル検査は対象外です。Androidの現行の接続は[Android仕様](../../android/ANDROID_SPEC.ja.md)を参照してください。
 
 ## Visionのモデルを公開する
 
-設定「モデル」のChatGPTプランで「公開モデルを選択」を開き、LLM／Visionの用途と公開状態を保存します。用途の保存がないモデルは両用途で、用途なしのモデルは公開できません。「Vision」で絞り込むと対象を確認できます。公開したVisionモデルはVision推敲と奥書の選択肢に「ChatGPTプラン」として表示されます。モデルの詳細情報は取得元の参照表示です。
+設定「モデル」のChatGPTプランで「公開モデルを選択」を開き、LLM／Visionの用途と公開状態を保存します。用途の保存がないモデルは両用途で、用途なしのモデルは公開できません。「Vision」で絞り込むと対象を確認できます。公開したVisionモデルは奥書の選択肢に「ChatGPTプラン」として表示されます。モデルの詳細情報は取得元の参照表示です。
 
 用途は登録内の`model_purposes`へ保存します。`GET/PUT /api/me/chatgpt/models/settings`のresponseは各モデルの`purposes`と従来の`enabled`／`enabled_models`を返し、PUTは`profile_id`、`generation`、`published_models`とoptionalな`model_purposes` mapを受けます。mapを省くと既存用途を保持し、指定したモデルだけを更新します。
 

@@ -10,7 +10,6 @@ flowchart TB
     WEB_PROC["SvelteKit process"]
     API_PROC["FastAPI process"]
     PIPE_POOL["Pipeline worker pool\ninku-pipeline threads (default 4)"]
-    AUTO_POOL["Autonomous refinement runner\none thread a run (default 4)"]
     IMAGE_STORE["Temporary image store\nprocess memory (15-minute wait)"]
     NATIVE["inku-render-python wheel\nshared Rust pipeline + typed compiler + Render Engine 93"]
     SAVE_POOL["Artifact executor / bounded queue"]
@@ -19,7 +18,6 @@ flowchart TB
     MIGRATION["versioned startup\nregistry / snapshot / invariants"]
     PROVIDERS["LLM providers"]
     DB[("canonical SQLite")]
-    RUNS_DB[("autonomous-runs.db\nwhere runs stand")]
     THUMBS[("thumbs.db / derived")]
     OUTPUTS[("work files")]
     BACKUPS[("DB replicas")]
@@ -30,10 +28,6 @@ flowchart TB
     API_PROC -->|"start / command"| PIPE_POOL
     API_PROC -->|"image intake"| IMAGE_STORE
     PIPE_POOL -->|"resolve image references"| IMAGE_STORE
-    API_PROC -->|"start / stop runs"| AUTO_POOL
-    AUTO_POOL -->|"an ordinary run per child"| PIPE_POOL
-    AUTO_POOL -->|"turns, visible difference, edge record"| NATIVE
-    AUTO_POOL -->|"where runs stand"| RUNS_DB
     PIPE_POOL -->|"step(snapshot, input)"| NATIVE
     PIPE_POOL -->|"one effect = one transport attempt"| PROVIDERS
     PIPE_POOL -->|"CAS save, execution snapshot, history"| DB
@@ -57,7 +51,7 @@ Replay of an older Score (a Score below 0.10 on `/api/render-score` or `/api/ren
 
 For a work written from an image, `POST /api/pipeline/images` shrinks the received image (up to 32 MiB) and keeps it in process memory under an owner-scoped temporary ID. An image not painted within fifteen minutes is discarded, a successful start consumes the ID, and the image and the review PNG are released when the run ends. Neither the DB nor a snapshot holds the image, so a run whose worker changed and whose image is gone stops with `image_missing`.
 
-The Server drives autonomous refinement runs (they go on with no screen open). The runner uses one thread a run (default 4, one running run per owner) and draws and saves the children through ordinary pipeline runs; the shared core decides the turns, the visible difference between parent and child, and the edge record. Where each run stands is kept in a SQLite store beside the canonical DB (`<name>-autonomous-runs.db`, or the one `INKU_AUTONOMOUS_RUNS_DB_URL` names); a work's record stays on each child's lineage edge. A run the Server was taking when it stopped reads as interrupted at the next start.
+The autonomous refinement runner and the separate SQLite store that kept where its runs stood (`<name>-autonomous-runs.db`) were removed on 2026-11-13. The Server neither opens that file nor reads `INKU_AUTONOMOUS_RUNS_DB_URL`. The move record of earlier children stays on each child's lineage edge.
 
 ## Distribution Compose
 
@@ -102,7 +96,6 @@ FastAPI does not accept ordinary requests until versioned startup completes. A c
 | Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | Pipeline worker pool | `PIPE-HOST`, `API-LIMIT` | `pipeline_api.py:PipelineService`, `pipeline_runtime.py`, `pipeline_defaults.py` |
 | Temporary image store | `PIPE-IMAGE`, `API-LIMIT`, `DATA-IMAGE` | `pipeline_images.py` |
-| Autonomous refinement runner | `PIPE-REFINE`, `DATA-LINEAGE` | `autonomous_refine.py:AutonomousRunner`, `routers/autonomous.py` |
 | Native boundary | `PIPE-MACHINE`, `PIPE-RENDER` | `pipeline_candidate.py:PipelineBinding`, `inku-render-python`, `inku-pipeline-uniffi` |
 | Save/thumbnail pools | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py`, `api_core/thumbnails.py` |
 | Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`; `api.py:_db.init_db` (migration); `api.py:_lifespan` (backup scheduler); `logging_setup.py` |

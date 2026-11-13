@@ -8,15 +8,15 @@ Each route has the model pass these stages in order to make the instructions ([ 
 |---|---|
 | `In words` (default) | [sketch from life (reading), on by default] → [composition reading, laws] → writing → [review] → [colors] → compile → drawing |
 | `With a plan` | [sketch from life] → fill the plan → composition reading → laws → colors → (when holes remain) completion → compile → drawing |
-| Paint from an Image (§16) | [picture color catalog] → writing from a picture → picture review → compile → drawing |
+| Paint from an Image (§15) | [picture color catalog] → writing from a picture → picture review → compile → drawing |
 
 The review in `In words` runs only when the drawing model can read images. The picture review is skipped when the written instructions cannot be drawn. When the color catalog is set to `From the description`, every route first chooses the color catalog. Plugin writing-down and the Rust compile (including the intermediate filter) use no model; the compile makes JSON Score from the instructions, and that is drawn as SVG. In earlier documents and the records of older works, `Stage 0.5` is the sketch from life, `Stage 1` is the stage that writes the instructions (fill the plan, writing), `Stage 2` is completion and `Stage 1.5` is the intermediate filter.
 
 The description is the work's score; the SVG is one performance. The same description may produce a different work when its models, sketch, composition seed, or render seed change.
 
-You can also paint from an image file instead of a description (v2.15.241). On the `Image` tab a Vision model reads the image, writes the instructions directly, and those instructions are painted. The sketch, fill the plan, composition reading, laws stage and color stage are not used. See §16 for the steps.
+You can also paint from an image file instead of a description (v2.15.241). On the `Image` tab a Vision model reads the image, writes the instructions directly, and those instructions are painted. The sketch, fill the plan, composition reading, laws stage and color stage are not used. See §15 for the steps.
 
-In the laws stage after the composition, the model chooses the laws for the work (their number is not fixed) from 19 laws of painting, design and music (the golden section, equal repetition, principal and subordinate, patterns, jo-ha-kyū and others). Only the layers a law changes are rewritten in the instructions, in numbers (`at horizontal 0.381966, vertical 0.381966`, `from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5` and the like). The laws' names do not appear in the instructions. When no law can be laid, the work is settled as the composition left it. After the laws stage comes a color stage, which chooses the work's colors by laws of color (contrast of hue, harmony of analogous colors, masses of light and dark and others, 18 in all), a default since 2026-10-20. It keeps the colors of the layers the description names and a ground color the description names; where the description names none, the color stage may choose the ground's color too. Estimating how the drawing looks, it chooses again a color that would not show from the ground or with which the law would not hold. When no colors can be laid, the work is settled as the laws stage left it. A refinement drawn from a saved work (Change the description, Juxtapose and the like) follows the settings the work was drawn with, so a work saved before the color stage became a default does not take it.
+In the laws stage after the composition, the model chooses the laws for the work (their number is not fixed) from 19 laws of painting, design and music (the golden section, equal repetition, principal and subordinate, patterns, jo-ha-kyū and others). Only the layers a law changes are rewritten in the instructions, in numbers (`at horizontal 0.381966, vertical 0.381966`, `from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5` and the like). The laws' names do not appear in the instructions. When no law can be laid, the work is settled as the composition left it. After the laws stage comes a color stage, which chooses the work's colors by laws of color (contrast of hue, harmony of analogous colors, masses of light and dark and others, 18 in all), a default since 2026-10-20. It keeps the colors of the layers the description names and a ground color the description names; where the description names none, the color stage may choose the ground's color too. Estimating how the drawing looks, it chooses again a color that would not show from the ground or with which the law would not hold. When no colors can be laid, the work is settled as the laws stage left it. A refinement drawn from a saved work (Change the description, Change the model and the like) follows the settings the work was drawn with, so a work saved before the color stage became a default does not take it.
 
 Completion fills holes remaining in the visible instructions; the shared Rust compiler produces JSON Score. Relations come only from the author's instructions or explicit definitions. The old Stage 1.5 (intermediate filter) and coerce are not layers that invent relations, and the old `Auto-repair` switch is retired. Layer and fallback names retained in older works' provenance describe their historical execution.
 
@@ -70,7 +70,7 @@ The new password must be at least eight characters. **It does not change unless 
 
 1. Open the `Describe` tab.
 2. Write a short sentence in the description area.
-3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Lift the stroke limit`, and `Canvas` if needed. They start from `Drawing defaults` in `Settings` (§19); `New` clears the input and returns to them.
+3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Lift the stroke limit`, and `Canvas` if needed. They start from `Drawing defaults` in `Settings` (§18); `New` clears the input and returns to them.
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
 
@@ -171,7 +171,7 @@ With a plan passes the sketch (when lit), the plan, then the composition reading
 | Passed | The description is read before the instructions are written. Choosing `In words` lights the sketch |
 | Not passed | The instructions are written from the description alone, without a reading |
 
-Only the reading reads what the description's bracketed labels hold (such as `[Ki no Tomonori / Kokinshū]`). The choice is not kept as a setting. Opening a work from the history sets it to the way that work was drawn. A child drawn again by a pairing or by AI refinement takes its parent's way.
+Only the reading reads what the description's bracketed labels hold (such as `[Ki no Tomonori / Kokinshū]`). The choice is not kept as a setting. Opening a work from the history sets it to the way that work was drawn.
 
 While it waits, the display names the step at work.
 
@@ -270,13 +270,12 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 - The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new work from this description` appears: it draws the description as it stands as a new work (this work stays as it is, and the description can be changed in the new work).
 - In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason.
 - A child made by layout or color (or by touch, before it was removed) carries the DDL and is held as well. A child made by reading the description again is not.
-- A work painted from an image (§16) also follows its DDL, not a description, and is held in the same way.
+- A work painted from an image (§15) also follows its DDL, not a description, and is held in the same way.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
-- Autonomous refinement can take laws moves and chunk moves (a juxtaposition move adds a sentence to the description, so it cannot be taken).
 
 ## 7. Choose Model, Color Catalog, Sketch, Stroke Limit, and Canvas
 
-`Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe`, `Image`, and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`. See §16 for the Image tab's conditions. Describe, Image, the description batch and the picture folder each keep their own conditions. Where they start, and what `New` returns to, is set under `Settings` → `Drawing defaults` (§19). What you choose here is the input tab's current choice and is not saved as a setting.
+`Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe`, `Image`, and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`. See §15 for the Image tab's conditions. Describe, Image, the description batch and the picture folder each keep their own conditions. Where they start, and what `New` returns to, is set under `Settings` → `Drawing defaults` (§18). What you choose here is the input tab's current choice and is not saved as a setting.
 
 | Control | Contents |
 |---|---|
@@ -286,13 +285,13 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 | Lift the stroke limit | Removes the stroke limit |
 | Canvas | The aspect ratio |
 
-The drawing model is used for every stage that writes the instructions and for completion. Models measured separately for writing the instructions and for completion are ordered by the lower of the two ratings. The model for Vision, which reads images, is chosen separately. The Image tab (§16) paints with this Vision model.
+The drawing model is used for every stage that writes the instructions and for completion. Models measured separately for writing the instructions and for completion are ordered by the lower of the two ratings. The model for Vision, which reads images, is chosen separately. The Image tab (§15) paints with this Vision model.
 
 The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. When it cannot read the description, the painting uses `inku Default`. On the Image tab the same choice reads `Choose from image automatically`, and the model reads the image to choose the catalog.
 
 A work records the colors it was drawn in on its own row. **Redrawing an older work therefore draws it in those colors, not in today's definition of its catalog.** It still draws if the catalog has since been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries a note in those cases: `Retired` when the catalog is gone, and `No record of its colors` for an older work that has no recorded colors — that one is drawn from the current definition.
 
-`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). Set its default per input tab under `Settings` → `Drawing defaults`; it starts off. The input chip chooses for the current drawing and does not change the saved default. AI refinement and redrawing from the lineage start from the value recorded on the original work (off for an older work without the record), and you can choose again in the dialog. Instruction edits and `Another composition` use the value in the next work's conditions (they do not offer a choice). The choice applies to the whole work, is recorded on it, and is used when replaying the saved work as it stands. The Image tab and the picture folder do not use it.
+`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). Set its default per input tab under `Settings` → `Drawing defaults`; it starts off. The input chip chooses for the current drawing and does not change the saved default. Redrawing from the lineage starts from the value recorded on the original work (off for an older work without the record), and you can choose again in the dialog. Instruction edits and `Another composition` use the value in the next work's conditions (they do not offer a choice). The choice applies to the whole work, is recorded on it, and is used when replaying the saved work as it stands. The Image tab and the picture folder do not use it.
 
 There are eleven canvases.
 
@@ -324,7 +323,7 @@ The conditions of the displayed work and the conditions for the next work are se
 
 ## 8. Refine
 
-A refinement changes exactly one element at a time, chosen from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab). The menu runs lightest first in four groups: `Color and texture`, `Form and instructions`, `Redraw from the description`, and `Leave it to the AI`. The items that always call the LLM carry an `LLM` mark (they take time and tokens).
+A refinement changes exactly one element at a time, chosen from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab). The menu runs lightest first in three groups: `Color and texture`, `Form and instructions`, and `Redraw from the description`. The items that always call the LLM carry an `LLM` mark (they take time and tokens).
 
 | Element | What changes | Cost |
 |---|---|---|
@@ -337,6 +336,8 @@ In `Change the composition form`, choose one of seven forms and draw one or four
 Check the options you want to keep, then press `Make one option` or `Make four options` to save the unsaved options checked at that moment before drawing the requested number of new options. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain. Options already saved are not saved again.
 
 `Another performance` (changing the touch with words) and `Another reading` were removed on 2026-10-14: the touch's words were never read for their meaning and only made the drawing's seed. `Edit drawing parameters` in the work-editing menu, which drew them, and the `Touch` and `Reading` elements of autonomous refinement were removed with them. Works made by a touch or a reading before then keep their `Touch` or `Reading` edge in the lineage, and redraw from their saved instructions and seed.
+
+`Juxtapose` and `Autonomous refinement process` were removed on 2026-11-13. Children made by AI refinement before then keep their `Laws`, `Chunk move` and similar edges in the lineage, and `Details` on their lineage card still shows the AI move that made them (which move of the run, the move, what it did, the reason and the difference from the parent). Children of a laws move or a chunk move were drawn from instructions, so their description stays held.
 
 The color catalog is changed from the work-editing menu instead (8.3).
 
@@ -385,43 +386,7 @@ Pressing `Make four options` again first saves the options checked at that momen
 
 Choosing, saving, and discarding options work as in 8.2.
 
-### 8.7 Juxtapose
-
-Choosing `Juxtapose` (marked `LLM`) under `Redraw from the description` in the work-editing menu opens a dialog that adds a sentence from another work's description after this one. Opening it draws nothing.
-
-1. Choose the Vision model that picks the sentences (by default the account's Vision model) and press `Pick sentences`. From the first sentences of the descriptions of your other works, the AI picks four. Each is shown as its `Sentence` and its `Reason`, one sentence on how adding it moves the idea of the work.
-2. Once the four are shown, `Pick again` and `Draw with this description` take the place of `Pick sentences`. Choosing one shows `The description with the sentence`. `Draw with this description` draws a child of the selected work from the stage that writes the instructions and saves it to the lineage, as `Change the description` does. The color catalog, canvas and seeds come from the original work; choose `Lift the stroke limit` in this dialog.
-3. If none fits, press `Pick again`. The sentences shown earlier in this dialog are left out and four are picked again.
-
-Only the descriptions of works you own are candidates; shared works and other people's works are never read. Works in the trash, DDL-authored works, works whose comment says `test data`, and works whose description is held are not used either. Sentences that differ only in spacing or spelling count once. A sentence matching the description of this work or of its lineage, and one this lineage already added by a juxtaposition, is not offered. At most the administrator's `Most sentences to choose from` (in `Other (server)` of Settings, 400 by default) go to the AI; when there are more candidates, each request draws that many at random from all of them.
-
-Only sentences in the language of the current description are candidates: a description with even one kana or kanji counts as Japanese, any other as English. The request follows the screen's language, so with the screen in Japanese the `Reason` comes in Japanese even for an English work. When the sentence is added, a Japanese description that does not end with a stop such as 「。」 gets 「。」 first, with no space; an English description gets a space, or ". " when it ends without a stop.
-
-`Juxtapose` cannot be chosen for a work whose description is held or for a DDL-authored work, as with `Change the description`.
-
-## 9. Autonomous Refinement
-
-From `Autonomous refinement process` in the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab), the AI can take moves on a work one after another. The Server takes the refinement, so it goes on after the dialog is closed (since 2026-10-21; before, the browser took it and Vision chose between the color catalog and the composition).
-
-The AI takes three moves. The laws move and the juxtaposition move can be chosen together; the chunk move (since 2026-10-27) is chosen alone, without the other two.
-
-- **Laws move**: the work's laws stage again. The laws its parent used are left out so that others are chosen, and a card is invited as the main law. The child is drawn from the saved instructions, so its description is held. Its lineage edge reads `Laws`.
-- **Juxtaposition move**: as `Juxtapose` in the work-editing menu, a sentence is chosen from the descriptions of your other works and added after the description. A sentence the same refinement has shown, or one the lineage already added, is not offered again. It cannot be taken from a work whose description is held or from a DDL-authored work.
-- **Chunk move**: one of the chunks the title lines of the instructions divide the work into (DDL Reference, 3.1) is chosen, and one of these is taken toward the direction: **Omit** (remove the chunk; the last one cannot be removed), **Simplify** (redraw it with half its sentences or fewer), **Move or resize** (move it to a crossing of the golden section, a line of thirds or the center, or make it 0.618 or 1.618 times its size), **Break apart** (shift and turn its sentences against each other), **Repeat** (copy it into a row of 2 to 4) and **Merge** (redraw two chunks as one surface or mass). The AI chooses only the move, the chunk and a reason; a tool rewrites the numbers. For Simplify and Merge, the AI is asked once more to write the new title and sentences. The child is drawn from the instructions, so its description is held. Its lineage edge reads `Chunk move`. It can be taken from a work with title lines or with a composition record (a work drawn `In words` with the `Composition, laws, colors` chip lit), and from a work whose description is held.
-
-With the laws and juxtaposition moves, a turn makes at most two tries. The first turn starts with the juxtaposition move, and each later turn first tries the move its last kept child was not made by (a laws move's child takes no juxtaposition). A child is kept, and becomes the next turn's parent, only when it looks different from its parent (when a fifth or more of what is drawn changed). A child with too little change stays in the lineage too.
-
-With the chunk move, a turn makes one try. When the AI's answer or the drawn picture fails the checks (nothing leaves the canvas; a rewrite's number of sentences, place and size; no more diagnostics than the parent; and so on), the AI is asked once more with the reason, and if it fails again the turn keeps no child. The instructions a move made are checked before they are drawn too: when they have a line that would not be drawn and the parent has no such line (a sentence that gives one shape two colors, for example), they are not drawn, and the AI is asked again with the line and the reason (since 2026-10-27). No child is dropped for too little change (changes to thin lines and small shapes hardly show in the share that changed). A child that passes the checks becomes the next turn's parent.
-
-The refinement stops when its moves are done, when no move can start, and when two turns in a row keep no child.
-
-In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Lift the stroke limit and a direction. **The model you choose picks the sentences, takes the laws stage, chooses the chunk moves and writes their rewrites, and draws the children.** The direction (up to 1,000 characters) reaches the laws move and the chunk move, not the juxtaposition move's request. The chunk move needs a direction and does not start with the field empty; the empty field shows an example in grey ("Move from the figurative toward the abstract. …"). Choosing `Chunk move` among the moves to take clears the other two. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). Lift the stroke limit starts from the value recorded on the original work (off for an older work without the record).
-
-After `Start refining`, the progress appears every few seconds: for each turn, the move taken, its outcome (Kept, Too little change, Could not start, Not usable), how much changed, the sentence added or the law chosen (for a chunk move, the move and the chunk's title, and a rewrite's new title; for example `Simplify “Mount Fuji” → “Overlapping slopes”`), and a thumbnail of the child. `Stop` cancels the child being drawn and keeps the children so far. Closing the dialog does not stop the refinement, and opening the work again shows its progress. One refinement of yours runs at a time.
-
-Every drawn child enters the history, including those that did not pass the gate. When the refinement ends (or is stopped), `Open the last kept child` opens the last child kept as a parent. A refinement cut off by a Server restart reads as cut off. A lineage card's `Details` show the AI move that made the child (which move of the run, the move, what it did, the reason and the change from the parent; since 2026-10-27).
-
-## 10. Change the Model
+## 9. Change the Model
 
 Choose `Change the model` from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab) and a dialog of its own opens. Pick the models from those laid out across the top and press `Draw with the chosen models`: each chosen model redraws the work from its description, and the options are laid out side by side. Each chosen model runs every stage that writes the instructions and completion; no stage is held to a fixed model. The color catalog and the canvas are the target work's.
 
@@ -431,11 +396,11 @@ While the options are drawn, the mascots show each model's progress, as in Anoth
 
 Choosing, saving, and discarding options work as in 8.2: choose the ones to keep with `+` at their top right, then save them to history with `Save the chosen ones and close`. The dialog does not close while options are unsaved.
 
-## 11. Read the Provenance
+## 10. Read the Provenance
 
 Open the provenance drawer at the bottom of the work tab to see the record of the selected work. Its tabs are `Details`, `Prompts`, and `JSON`.
 
-`Details` has the following sections; sections such as Sketch and Origin depend on the work's records. The follow-selection setting in `Display and operation` is enabled by default: with the drawer open, selecting another work in the history strip switches its information to that work. For a work painted from an image (§16), `Details` begins with an `Image · Source note` section showing the source note written when it was painted.
+`Details` has the following sections; sections such as Sketch and Origin depend on the work's records. The follow-selection setting in `Display and operation` is enabled by default: with the drawer open, selecting another work in the history strip switches its information to that work. For a work painted from an image (§15), `Details` begins with an `Image · Source note` section showing the source note written when it was painted.
 
 | Section | Main contents |
 |---|---|
@@ -468,7 +433,7 @@ The stage that writes the instructions stops as a failure if its finite retries 
 
 **Choosing a marked work to refine asks you once before it runs.** That work's link to the words is broken, so you are asked whether to continue from it. The same work is not asked about twice.
 
-## 12. Follow the Lineage
+## 11. Follow the Lineage
 
 The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, model, language, instruction edits, description edits, repaints, canvas changes, fits, and changes of sketch-from-life grain are recorded as parent-child relations. Works made by an earlier variation keep a "Variation (retired)" edge.
 
@@ -477,13 +442,13 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 - From a lineage card you can comment, star, mark for revision, and move to trash.
 - Double-click a lineage card to show that work large in the Work tab.
 - You may also select a work from the lineage and repaint it from its description or instructions.
-- A work painted from an image starts a lineage. A child drawn from its edited instructions, or from `Instructions before review` (§16), is an instruction-edit child and, like color and composition children, keeps the source note.
+- A work painted from an image starts a lineage. A child drawn from its edited instructions, or from `Instructions before review` (§15), is an instruction-edit child and, like color and composition children, keeps the source note.
 - `Vertical` / `Horizontal` in the header's `View` group lays the lineage out either way, and `Map` shows the whole tree at once (zoom 40–140% with − / ＋; `Close map` returns).
 - A card with children carries `▸ N children`, which opens or closes the branch (not shown inside the map). `Details` on a card opens a dialog with the description, how it was derived, the AI move, the comment and the colophon.
-- Check cards (`Check for bulk actions`) to use `Export` and the bulk move-to-trash button under `Selected: N works`. `Export` under `Displayed work` and `Export` under `Origin to displayed: N works` are separate targets from the checked set (§15).
+- Check cards (`Check for bulk actions`) to use `Export` and the bulk move-to-trash button under `Selected: N works`. `Export` under `Displayed work` and `Export` under `Origin to displayed: N works` are separate targets from the checked set (§14).
 - `Start a new root` does not rewrite the saved lineage. It releases the link to the displayed work and returns to the Work tab, so the next work you paint starts a new root instead of becoming a child of the current one.
 
-## 13. Read the Colophon
+## 12. Read the Colophon
 
 `Colophon` recites the branch leading to the displayed work as a first-person reader. It reads the generations in order from the origin to the displayed work, recording what changed in each generation and what stayed invariant across all of them.
 
@@ -491,7 +456,7 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 - You choose the reader model. A reading is appended, never edited. It can be deleted, and deletion cannot be undone.
 - If the reading strays from the observational vocabulary, a warning is shown.
 
-## 14. Manage History
+## 13. Manage History
 
 The history strip at the bottom is for moving quickly back and forth in time. Opening history leads to the separate `Library`, which keeps the making screen's input and unsaved refinement state. `Return to making` also keeps the library's query, filters, display, page, selection, scroll position and reading preview.
 
@@ -544,7 +509,7 @@ In single-user mode, group-sharing buttons, the sharing dialog, sharing filters 
 
 `Save this performance as a child` keeps the source and saves the replay in ordinary history as its child, without increasing the generation count. A readable saved source and matching parent are required. Saving is unavailable if the managed work's authority and policy cannot be retained or the comparison result cannot be verified. Read the displayed reason and retry after a failure; the source is never overwritten.
 
-## 15. Export Images
+## 14. Export Images
 
 Open `Export` at the bottom of the Work tab, check that the target is `Displayed work`, then choose an SVG format or PNG size. When exporting from the Library or Lineage, check the selected count or path from the origin shown in the menu. The `?` by the menu's SVG heading opens the same explanation as the table below.
 
@@ -564,7 +529,7 @@ Only a saved work is exported. A picture that is not saved (one drawn by the dem
 
 Set the download folder under `Settings` → `Export`, page `File saving` → `Save location`. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
 
-### 15.1 Contact Sheets
+### 14.1 Contact Sheets
 
 Works selected in Library are laid out on a single PNG. `Review contact sheet` and `AI contact sheet` appear in the `Export` menu only when several checked works are its target.
 
@@ -573,7 +538,7 @@ Works selected in Library are laid out on a single PNG. `Review contact sheet` a
 | Review contact sheet | 7×4 works per sheet. The remainder goes to further files |
 | AI contact sheet | 3×4 works per sheet, 1568px on the long edge, captions numbered only. A companion md holding the numbers, descriptions, DDL, and provenance is saved alongside |
 
-### 15.2 Shareable Card
+### 14.2 Shareable Card
 
 A work is exported as a single card. The drawing, the headnote, the last four digits of the render seed, and the seal are composed into one sheet. A work with no headnote becomes a card of the drawing alone, and a work with no render seed shows no seed line.
 
@@ -597,7 +562,7 @@ The server composes the card and bakes it with a bundled font, so the characters
 
 The same card comes out of the CLI with `inku-cli export-card`.
 
-### 15.3 Animation
+### 14.3 Animation
 
 One saved work and several selected works export differently. For the displayed work or one checked work in the Library, choose `Line animation` from `Export`. For several checked works, choose `Transition animation` to move between works from oldest to newest. In Lineage, choose either the path from the origin to the displayed work or only the checked works.
 
@@ -620,11 +585,11 @@ For several works, choose the transition pattern and display hold for each work.
 
 From Library the order is oldest to newest; from the lineage it runs from the origin to the selected work.
 
-### 15.4 Copy to the Clipboard
+### 14.4 Copy to the Clipboard
 
 `Copy to clipboard` on the Work tab's canvas copies the displayed work as an image. Under `Settings` → `Export` → `Clipboard`, choose `Format` (`Picture only` / `Card`) and `Picture height (px)` (256 to 4096, default 1080); this is kept in this browser. `Card` uses the page shape and seal set for the share card under `Export` and can copy saved works only. A notice appears when the browser does not allow image copying over a non-https connection.
 
-## 16. Paint from an Image
+## 15. Paint from an Image
 
 On the `Image` tab you paint from an image file instead of a description (v2.15.241). A Vision model reads the image and writes instructions directly, and those instructions are painted. As with `In words`, it writes one tool word in each sentence that draws a shape (from 2026-11-04). The sketch, fill the plan, composition reading, laws stage and color stage are not used.
 
@@ -634,7 +599,7 @@ On the `Image` tab you paint from an image file instead of a description (v2.15.
 4. Under `Conditions for the next work`, choose `Model`, `Color catalog`, and `Canvas`.
 5. Press `Paint`.
 
-The first time you paint from a picture after signing in, a warning says that painting from a picture uploads the picture data to the AI and asks you not to upload sensitive data. `Understood, paint` starts painting; `Cancel` does not paint. Once you go on, it does not appear again until the next sign-in (in this browser, per account). The picture side of the Batch tab (§17.1) does the same. Administrators can turn it off for everyone with `Picture upload warning` in `Other (server)`.
+The first time you paint from a picture after signing in, a warning says that painting from a picture uploads the picture data to the AI and asks you not to upload sensitive data. `Understood, paint` starts painting; `Cancel` does not paint. Once you go on, it does not appear again until the next sign-in (in this browser, per account). The picture side of the Batch tab (§16.1) does the same. Administrators can turn it off for everyone with `Picture upload warning` in `Other (server)`.
 
 | Condition | Contents |
 |---|---|
@@ -665,7 +630,7 @@ The performance of the corrected instructions appears in the work tab and is sav
 
 **From the CLI.** The CLI paints from an image the same way with `inku-cli paint --image PATH` (the source note with `--provenance`, the Vision model with `--vision-model`). See "Drawing from an image (paint only)" in the [inku-cli Reference](cli-reference.md) for the flags.
 
-## 17. Batch
+## 16. Batch
 
 1. Open the `Batch` tab.
 2. Enter one description per line.
@@ -681,7 +646,7 @@ When a stopped batch or one that reached the end still has failed lines, `Retry 
 
 Set `Retry rounds` under `Batch retry` in the settings to 1–5 (this count is kept in this browser, not in the account) and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 
-### 17.1 A folder of pictures
+### 16.1 A folder of pictures
 
 Turn the switch at the right end of the Batch tab's heading line (`Batch` or `Picture folder`) from `Descriptions` to `Pictures` to paint the pictures of a folder one by one. This browser remembers the switch. The `Descriptions` side works as described above.
 
@@ -689,7 +654,7 @@ Turn the switch at the right end of the Batch tab's heading line (`Batch` or `Pi
 2. The folder name and the number of pictures appear. JPEG, PNG, GIF and TIFF are taken, including those in subfolders; files and folders whose names start with `.` are left out. They are painted in the order of their paths inside the folder, with numbers compared as numbers (`2.jpg` before `10.jpg`).
 3. Press `Paint (N)`.
 
-Each picture goes the same way as the Image tab in §16 and is saved. The conditions are the Image tab's too: its vision model, the color catalog, and the canvas (the picture's own aspect or a fixed ratio). The source note is the one the Image tab writes when that picture is chosen (its file name, and Exif when the setting asks for it). While it runs, the tab and the card show `n/total: path`.
+Each picture goes the same way as the Image tab in §15 and is saved. The conditions are the Image tab's too: its vision model, the color catalog, and the canvas (the picture's own aspect or a fixed ratio). The source note is the one the Image tab writes when that picture is chosen (its file name, and Exif when the setting asks for it). While it runs, the tab and the card show `n/total: path`.
 
 A browser cannot read a folder from a typed path, and cannot open a picked folder again later, so there is no path field.
 
@@ -699,7 +664,7 @@ A browser cannot read a folder from a typed path, and cannot open a picked folde
 
 **Folder history**: the ten most recent folders are kept in this browser with their name, progress (painted/total) and the time of the last run. Pressing one opens the folder dialog; choose the same folder to continue. The history is not sent to the Server, so another browser or computer does not show it.
 
-## 18. Demo
+## 17. Demo
 
 Open `Settings` → `Making` → `Demo`. It writes short descriptions from a seed phrase, then paints them repeatedly. Choose saving to DB, saving files, the description model, display interval in seconds, and timeout in minutes.
 
@@ -709,7 +674,7 @@ Starting Demo closes Settings so you can watch the canvas. While it runs, the ma
 
 Even with automatic saving disabled, the current work can be saved to history explicitly. The demo stops on its own when the configured time is reached. History actions are locked while a demo runs.
 
-## 19. Settings
+## 18. Settings
 
 Open it from `Settings` in the app rail. Settings are grouped as `Display and operation`, `Making`, `Image`, `Export`, `Connections and administration`, and `Extensions and details`, with a separate `ChatGPT plan` category where personal connections are enabled. In the list on the left, each category name is a small heading with its pages indented below it. `Display and operation`, `Image` and `ChatGPT plan` each hold one page of the same name, so they show only a dividing rule instead of the heading. The pages and controls visible depend on your role.
 
@@ -729,7 +694,7 @@ To choose one drawing model for both stages, open `Model selection` from the mak
 
 The stars at the edge of each drawing-model button summarize its rating. Ordinary drawing-model selection uses the lower of the available ratings for writing the instructions and for completion, or the LLM rating for an end-to-end measurement. Its detailed hover can show the strengths of each separately measured stage. Generic pickers show a single rating for the purpose in both button and hover; they do not select a model per stage. Hover also shows `LLM` and `Vision` badges (greyed where unavailable), three recommendation tiers (★★★, ★★☆, ★☆☆), approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model), and speed (measured mean seconds when present, otherwise the speed label).
 
-Administrators' `Models` settings manage shared connections and publication. Where personal ChatGPT is enabled, connect through the separate `ChatGPT plan` page and publish models in your personal `Models` settings, independently of API key connections. Published ChatGPT plan models become drawing candidates for LLM use, and Vision refinement, colophon and Image tab candidates for Vision use. See the [ChatGPT plan connection guide](../../docs/guide/chatgpt-plan.md).
+Administrators' `Models` settings manage shared connections and publication. Where personal ChatGPT is enabled, connect through the separate `ChatGPT plan` page and publish models in your personal `Models` settings, independently of API key connections. Published ChatGPT plan models become drawing candidates for LLM use, and colophon and Image tab candidates for Vision use. See the [ChatGPT plan connection guide](../../docs/guide/chatgpt-plan.md).
 
 The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
 
@@ -747,7 +712,7 @@ The nine values were introduced in v2.13.28 as three families: what the machine 
 
 The `Unread-word ledger` collects words whose direct counterpart could not be confirmed when the description was interpreted into DDL. Nothing is promoted from this ledger into the dictionary automatically. Administrators can also see the ledger for everyone.
 
-## 20. Paint from the CLI
+## 19. Paint from the CLI
 
 The CLI uses the same public HTTP API as the Web UI.
 
@@ -771,7 +736,7 @@ uv run inku-cli history --limit 20
 
 Flags you omit fall back to the server defaults. In the Web UI the Description tab starts with the sketch on as shipped (changeable under `Drawing defaults` in `Settings`); CLI and server requests default to off. See the `inku-cli Reference` for all flags and compatibility with older sketch values.
 
-## 21. When a Work Does Not Come Out
+## 20. When a Work Does Not Come Out
 
 | Symptom | What to do |
 |---|---|

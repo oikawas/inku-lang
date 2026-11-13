@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-13 — Removal of Juxtapose and the autonomous refinement process
+
+`Juxtapose` and `Autonomous refinement process` left the work-editing menu (the author's decision), so they were taken out of the Web operation and administration documents.
+
+- "Creating Images": "8.7 Juxtapose" and "9. Autonomous Refinement" were removed. With §9 gone, the sections from §10 on move up by one, and the section references in the text (§15, §18, §14, §16.1) were corrected. The work-editing menu in §8 now has three groups. §8 now says that children made by AI refinement before then keep their lineage edges, the AI move in `Details` on their lineage card, and their held description. Vision refinement was removed from where §18 says ChatGPT plan Vision models appear.
+- "Server Configuration": removed `INKU_AUTONOMOUS_RUNS_DB_URL`, the autonomous-refinement run DB among the backup targets, autonomous-refinement records among those execution-record retention deletes, `Most sentences to choose from` of `Juxtapose` in `Other (server)`, and Vision refinement from where ChatGPT plan Vision models appear.
+- "CLI Reference": `activity` no longer returns autonomous refinement, so its description was removed.
+
+Dated past records keep the wording of their time.
+
 ## 2026-11-07 — Align operation and administration guidance with the source
 
 Treating the source as authoritative, the operation and administration documents were brought in line with the current implementation. The target version is now v2.15.329 (Web Build 1405).

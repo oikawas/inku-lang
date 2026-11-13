@@ -118,7 +118,7 @@ flowchart LR
     DOMAIN --> DB
 ```
 
-`db.py`は既存のimportとcall shapeを保つfaçadeで、直接SQLやmigrationのownerではない。`persistence/`の27 owner module（これにpackage初期化を加える）が、設定・engine・schema・migration・backup・invariantと、access、account、group、session、identity、settings、history、search、lineage、奥書、feedback、variation authority、記述固定（`description_lock`）、取り合わせの設定（`juxtaposition`）、単一のDDL本文への手動移行（`ddl_migration`・`ddl_source`）、凍結v3の復元（`legacy_restore`・`legacy_v3_*`）、歳時記の移行（`saijiki_migration`）の変更理由ごとに分かれる。AI自動推敲のrunの位置は、正本の外の別のSQLite（`<name>-autonomous-runs.db`、`autonomous_refine.py`）に置き、正本のschemaを変えない。
+`db.py`は既存のimportとcall shapeを保つfaçadeで、直接SQLやmigrationのownerではない。`persistence/`の32 owner module（これにpackage初期化を加える。2026-11-13に数えた）が、設定・engine・schema・migration・backup・invariantと、access、account、group、session、identity、settings、history、search、lineage、奥書、feedback、variation authority、記述固定（`description_lock`）、単一のDDL本文への手動移行（`ddl_migration`・`ddl_source`）、凍結v3の復元（`legacy_restore`・`legacy_v3_*`）、歳時記の移行（`saijiki_migration`）の変更理由ごとに分かれる。取り合わせの設定（`juxtaposition`）と、AI自動推敲のrunの位置を置いた正本の外の別のSQLite（`<name>-autonomous-runs.db`）は、2026-11-13に外した。
 
 起動時の経路は次のとおりである。fresh DBはschemaとregistry v5 `image_input_provenance`を1 transactionで作る。v4 `single_history_ddl`のDBは、通常起動で確認済みsnapshot（`migration-backups/<stem>-pre-v5-<ns>.db`）を作ってから、nullableな`image_provenance`・`image_ddl`とv5行を一つのtransactionで足す。既存行はNULLのままで、失敗すれば列とregistryをrollbackし、snapshotを残す。current DBは版・checksum、由来列と旧列の不存在、FTSを検査して通常起動し、全件照合を繰り返さない。旧二本文DBは手動移行必須として通常起動を拒否する。手動移行は既知のv3 fingerprintとregistryを確認し、検証済みsnapshotがwriter lock下の移行前像と一致した場合だけ一つのtransactionで本文を選択・旧列を削除する。全persistent tableの保護値、history rowid、主キー、本文byte、保存link digest、FTS、quick/foreign-key checkを照合し、registry v3の記録を保持してv4を加える。未知・部分状態・未来版・checksum不一致は拒否する。受入済みの古いbackupは原本を保持した新しいコピーで凍結v3 adapterを通してから統合する。詳しくは[共通保存契約](../../persistence/README.ja.md)を参照。
 
@@ -151,7 +151,7 @@ flowchart TD
     SAME_VAR["同じvariation"] -.->|"自動edgeにしない"| EDGE
 ```
 
-`db.add_item` はparentがあるのにkindが無い場合、またはkindだけの場合を拒否する。parentがあれば同じuserの非tombstone nodeを確認し、history、node、edgeを1 transactionで書く。類似度、時刻、hash一致、同じvariationであることからedgeは作らない。共有pipelineの派生（記述fork、DDL fork、旧作品からのfork）は、元作品のlineage nodeを明示parentとして渡したときだけedgeになり、kindを明示しなければ`description_edit`または`ddl_edit`になる。保存作品の差し替え・はめ込み・法則の手・取り合わせ・まとまりの手（`chunk_move`）・見比べる前の指示書からの子も、明示したparentとkindでだけedgeになる。AI自動推敲の子は系譜にだけ保存され（`lineage_only`）、測った後に辺へ手の記録（`ai_move`）を書く。見える差のゲートを通った子（まとまりの手はゲートを当てず、確かめを通った子）が次の手番の親になり、最後に残った子をrunの終わりに通常履歴へ出す。まとまりの手で確かめを通らなかった子は、`ai_move`の無い辺で系譜に残る。
+`db.add_item` はparentがあるのにkindが無い場合、またはkindだけの場合を拒否する。parentがあれば同じuserの非tombstone nodeを確認し、history、node、edgeを1 transactionで書く。類似度、時刻、hash一致、同じvariationであることからedgeは作らない。共有pipelineの派生（記述fork、DDL fork、旧作品からのfork）は、元作品のlineage nodeを明示parentとして渡したときだけedgeになり、kindを明示しなければ`description_edit`または`ddl_edit`になる。保存作品の差し替え・はめ込み・見比べる前の指示書からの子も、明示したparentとkindでだけedgeになる。2026-11-13に外したAI自動推敲（法則の手・取り合わせの手・まとまりの手）の子は、辺の種類（`laws_change`・`chunk_move`など）と手の記録（`ai_move`）をそのまま残す。まとまりの手で確かめを通らなかった子は、`ai_move`の無い辺で系譜に残っている。
 
 ## 保存済みSVGと再描画
 

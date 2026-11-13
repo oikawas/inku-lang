@@ -17,7 +17,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | コマンド | 用途 |
 |---|---|
 | login / logout / me | セッションの開始、破棄、本人確認 |
-| activity | 実行中の描画、登録されたバッチ、自動推敲を確認。管理者は `--all` で全利用者と描画枠も表示 |
+| activity | 実行中の描画と登録されたバッチを確認。管理者は `--all` で全利用者と描画枠も表示 |
 | models | CLI既定の描画モデル（指示書を書く工程と補完に共通）・Visionモデルと色カタログの設定 |
 | paint / batch | 記述または指示書から単体・一括描画 |
 | refine | 既存作品から要素（構図・色）を推敲し派生を生成・保存 |
@@ -47,7 +47,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 
 設定は`~/.config/inku-cli/config.json`（`INKU_CLI_CONFIG`で別のパス、`XDG_CONFIG_HOME`で場所を変更）に、接続先、ログインのtoken、既定のモデル・色カタログ、タイムアウトを保存します。ファイルが無い時は`INKU_BASE_URL`・`INKU_CLI_TIMEOUT_SECONDS`・`INKU_COLOR_CATALOG`を読みます（ファイルがあるときに読むのは、ファイルに接続先が無い場合の`INKU_BASE_URL`だけです）。接続先のServerごとに設定を分けたい時は`INKU_CLI_CONFIG`を変えてください（tokenは接続先の`--base-url`に関わらず設定ファイルのものが送られます）。
 
-`inku-cli activity` は実行状態をJSONで返します。バッチには予定数・完了数・状態・最後の生存通知を示します。実行権の期限切れはクライアントが停止した証明ではありません。描画の一覧は応答したServer process内に限り、未登録の古いバッチや他processの描画は分かりません。自動推敲は手の合間も含む実行DBの状態で、子の描画との対応は応答processが把握するものに限ります。古いServerで自動推敲の欄が無い場合は状態不明です。
+`inku-cli activity` は実行状態をJSONで返します。バッチには予定数・完了数・状態・最後の生存通知を示します。実行権の期限切れはクライアントが停止した証明ではありません。描画の一覧は応答したServer process内に限り、未登録の古いバッチや他processの描画は分かりません。
 
 ### login と models の旗
 

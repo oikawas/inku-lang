@@ -331,7 +331,7 @@ The first output is a starting point. Edit the DDL, change the color catalog, re
 | Change the color catalog | Color assignment | DDL, placement, sway | Not called |
 | Redraw the placement | Tilt angles, corner positions | DDL, tools, colors, counts | Not called |
 
-Every operation runs only when the user asks for it. There is also an autonomous mode that leaves the iterations to the AI, and every generation of it stays in the derivation tree. → [Editing and derivation in detail](docs/guide/revision.md)
+Every operation runs only when the user asks for it. → [Editing and derivation in detail](docs/guide/revision.md)
 
 ---
 

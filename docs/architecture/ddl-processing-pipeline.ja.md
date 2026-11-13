@@ -6,7 +6,7 @@
 
 | 段階 | 入力 → 出力 | 契約 | 所有module |
 |---|---|---|---|
-| Host入力 | 記述、画像（Server・Webの画像タブ）、direct DDL、保存作品からの法則の手 → typed command | 記述起点と画像起点と法則の手だけLLM段を要求する。記述は行頭の連番と角括弧のコメントを切ってからcoreへ渡し、作品には書いたままを残す（Server）。Direct DDLは自然文へ戻さない | Server / Android / macOS pipeline host |
+| Host入力 | 記述、画像（Server・Webの画像タブ）、direct DDL、保存作品からの法則の手（Android・macOS。Serverは2026-11-13に外した） → typed command | 記述起点と画像起点と法則の手だけLLM段を要求する。記述は行頭の連番と角括弧のコメントを切ってからcoreへ渡し、作品には書いたままを残す（Server）。Direct DDLは自然文へ戻さない | Server / Android / macOS pipeline host |
 | Authoring state machine | snapshot + command/effect result → next snapshot + event + 最大1 effect | 決定的。provider transportと保存はtyped effectとして外出しし、再試行・fallback・authority遷移はcoreが決める | `core/crates/inku-pipeline` |
 | 色カタログ選択 effect（任意） | 記述 + カタログ候補 → カタログID | `catalog_mode=auto`の記述起点だけ。失敗・予算切れは`default`へ落とし`auto_fallback_default`を記録して続行する | `inku-pipeline` prompt/action; host provider adapter |
 | 写生 effect（任意） | 記述 → 場所と光の補足文 | 作者が「あり」を選んだときだけ。記述を書き換えず、失敗しても`fallback`として記述だけで続行する | `inku-pipeline` prompt/action; host provider adapter |
@@ -131,9 +131,9 @@ ServerのPython adapter、AndroidのKotlin/JNI adapter、macOSのSwift/UniFFI ad
 | catalog / canvas変更 | 元variationを変更しない | 現在optionsを持つ親付きnew variation |
 | てざわり・支持体・配色の差し替え | 保存Score、DDL、種、記述の扱い | 共有coreの`saved_variants`が保存Scoreの一部だけを替えて描き直し、子として保存する（runを作らない） |
 | はめ込み | 保存Score、版、指示書、種 | 宣言と違う比の紙へ、保存Scoreを版を変えずに枠へ描き直す（`fit_render`）。系譜は`はめ込み`の子 |
-| 法則の手（AI自動推敲、保存作品から） | 親の指示書と記述、設定・種・色・比・限り、補完の控え、法則の記録 | 入力`SavedLaws`で法則の段をやり直す。Stage 1と構図の読みはやり直さず、親の設定に配色の段があれば続けて行う |
-| 取り合わせ（推敲、AI自動推敲の手） | 元作品 | 共有coreの`juxtaposition`が選ばせた一文を記述の後ろに足し、`description_edit`の子を描く |
-| まとまりの手（AI自動推敲、保存作品から） | 親の題つきの指示書（題が無ければ構図の記録から印字）、色カタログ・描きの種・画面比・`render_wild` | 共有coreの`chunk_moves`が手を当てた指示書を、親付きのdirect DDLとして描く。派生は`chunk_move`。手を選ぶ回と描き直す回の送信はServerのrunが行い、pipelineのLLMのstageではない |
+| 法則の手（AI自動推敲、保存作品から。2026-11-13からAndroid・macOSだけ） | 親の指示書と記述、設定・種・色・比・限り、補完の控え、法則の記録 | 入力`SavedLaws`で法則の段をやり直す。Stage 1と構図の読みはやり直さず、親の設定に配色の段があれば続けて行う |
+| 取り合わせ（推敲、AI自動推敲の手。2026-11-13からAndroid・macOSだけ） | 元作品 | 共有coreの`juxtaposition`が選ばせた一文を記述の後ろに足し、`description_edit`の子を描く |
+| まとまりの手（AI自動推敲、保存作品から。2026-11-13に外した） | 親の題つきの指示書（題が無ければ構図の記録から印字）、色カタログ・描きの種・画面比・`render_wild` | 共有coreの`chunk_moves`が手を当てた指示書を、親付きのdirect DDLとして描いていた。前の子の派生は`chunk_move`のまま残る。手を選ぶ回と描き直す回の送信はServerのrunが行い、pipelineのLLMのstageではなかった |
 | 見比べる前の指示書から描く（画像起点の作品） | 元作品と記録の`image_ddl.before_review` | その本文を作品の親付きDDL編集（`ddl_edit`）として描く |
 | 旧作品からの派生 | 元history行を変更しない | `legacy/{history_id}/fork`で`legacy_description_fork` / `legacy_ddl_fork`の新variation |
 
@@ -179,7 +179,7 @@ ServerのPython adapter、AndroidのKotlin/JNI adapter、macOSのSwift/UniFFI ad
 | Typed compiler / 下絵 / Stage 1.5 / lowerer / 画面比の宣言 | `core/crates/inku-ddl`（`canvas_ratio.rs`、`completion_record.rs`を含む） |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |
 | SVG performance | `core/crates/inku-render` |
-| Server host | `server/src/inku_server/pipeline_runtime.py`, `pipeline_api.py`, `pipeline_candidate.py`, `pipeline_product.py`, `pipeline_provider.py`, `pipeline_compat.py`, `pipeline_images.py`, `autonomous_refine.py` |
+| Server host | `server/src/inku_server/pipeline_runtime.py`, `pipeline_api.py`, `pipeline_candidate.py`, `pipeline_product.py`, `pipeline_provider.py`, `pipeline_compat.py`, `pipeline_images.py` |
 | 旧Score互換 | `server/src/inku_server/saved_score_compat.py`, `render_engines/default/adapter.py` |
 | Android host | `android/.../pipeline/SharedAuthoringPipeline.kt`, `SharedPipelineHost.kt`, `AndroidWorkPipeline.kt`, `NativePipelineBridge.kt` |
 | macOS host | `apple/Packages/InkuHost/Sources/InkuHost/PipelineHost.swift`、`apple/Packages/InkuCore/` |

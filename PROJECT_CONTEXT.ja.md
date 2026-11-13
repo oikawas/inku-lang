@@ -191,7 +191,7 @@ macOSの作品域は、WebのChromeと同じ見え方にするため、表示専
 **`INKU_SINGLE_USER` を立てたサーバーでは利用者が 1 人に定まり自動的にログイン済みになるので、
 ログイン画面は現れず、ログアウトの導線も隠れる**（マルチユーザー機構はそのまま残る）。
 
-- 記述の入力と再現可能な推敲（タッチ・配置・読み取り・色カタログ）、AI による自律推敲。
+- 記述の入力と再現可能な推敲（タッチ・配置・読み取り・色カタログ）。AI による自律推敲と取り合わせは 2026-11-13 に Server・Web から外した。
 行頭の連番と角括弧のコメントは作品に残るが描画のどの層にも渡らず、入力欄では背景が灰色になる
 - 色カタログ 13 本（`color_catalogs.py`。全カタログが 9 色すべてを持つ）と「記述から自動選択」、
 キャンバス比率、表示モードの選択。カタログの選択はユーザーごとにサーバーへ保存する
@@ -238,7 +238,7 @@ localStorage への保存・server への永続・描画要求への同梱は、
 
 ### server（FastAPI）
 
-- エンドポイント 144 本は `server/src/inku_server/api_core/routers/` の 13 ファイル（`auth` `autonomous` `chatgpt` `description` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）と、共有pipelineの `pipeline_api.py`（`/api/pipeline/*` の 15 本）に在る。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
+- エンドポイント 149 本は `server/src/inku_server/api_core/routers/` の 12 ファイル（`auth` `chatgpt` `description` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）と、共有pipelineの `pipeline_api.py`（`/api/pipeline/*` の 15 本）に在る。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
 共有される定義は `api_core/{state,models,deps,common,rendering}.py` に置く。
 - `api.py` が持つのは `app` の組み立て・`_lifespan`・ミドルウェア・起動時の呼び出し・`include_router` だけである。
 **依存の向きは `api.py` → routers → 共有の一方向**で、router から `api.py` を import しない。

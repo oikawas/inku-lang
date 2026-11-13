@@ -1,17 +1,15 @@
 # Revision, in detail
 
-This continues "Pursuing the work through revision" in [README.md](../../README.md). The two
-ways of handing the work to the AI, and the handling of lineage and editions are collected here.
+This continues "Pursuing the work through revision" in [README.md](../../README.md). The retired
+ways, and the handling of lineage and editions are collected here.
 
 ## Variation (retired)
 
 Variation was retired on 2026-10-04. Once the focus reinterpretation was removed on 2026-09-27 it had nothing left to move, and the word was confusing next to refinement. Works made by an earlier variation keep a "Variation (retired)" edge in their lineage, and their provenance shows the variation seed and amplitude of that time.
 
-## Letting the AI carry it
+## Letting the AI carry it (retired)
 
-Instead of picking the axis yourself, you can hand the act of accumulating generations to the AI. AI Vision observes each image, and its advice chooses the next element to change; observations and the next direction are displayed and recorded. The mode that picked an axis at random for each generation was retired on 2026-10-18.
-
-You can give a direction of your own (a sentence such as "festive, and yet cool"), used for observational advice. Each generation is drawn from the parent's saved instructions without appending the direction to the drawing text or running the sketch again. Everything born while the AI runs is still recorded in the lineage, so you can pick a drawing from the middle of the run and go back to redrawing it by hand.
+The "Autonomous refinement process", which handed the act of accumulating generations to the AI, and "Juxtapose", which added a sentence from another work's description, left the Web on 2026-11-13 (the macOS, iPad and Android apps still have them). Works made earlier by AI refinement keep their edges and the record of the AI's move in the lineage, and the lineage card's details show it.
 
 ## Accumulating generations
 

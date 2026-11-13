@@ -10,7 +10,6 @@ flowchart TB
     WEB_PROC["SvelteKit process"]
     API_PROC["FastAPI process"]
     PIPE_POOL["Pipeline worker pool\ninku-pipeline threads（既定4）"]
-    AUTO_POOL["AI自動推敲のrunner\nrunごとに1 thread（既定4）"]
     IMAGE_STORE["画像の一時預かり\nprocessのメモリ（待機15分）"]
     NATIVE["inku-render-python wheel\n共有Rust pipeline + typed compiler + Render Engine 93"]
     SAVE_POOL["Artifact executor / bounded queue"]
@@ -19,7 +18,6 @@ flowchart TB
     MIGRATION["versioned startup\nregistry / snapshot / invariants"]
     PROVIDERS["LLM providers"]
     DB[("canonical SQLite")]
-    RUNS_DB[("autonomous-runs.db\nrunの位置")]
     THUMBS[("thumbs.db / 派生")]
     OUTPUTS[("作品ファイル")]
     BACKUPS[("DB replica")]
@@ -30,10 +28,6 @@ flowchart TB
     API_PROC -->|"start / command"| PIPE_POOL
     API_PROC -->|"画像の受取"| IMAGE_STORE
     PIPE_POOL -->|"画像の参照を解決"| IMAGE_STORE
-    API_PROC -->|"runの開始・停止"| AUTO_POOL
-    AUTO_POOL -->|"子ごとに通常のrun"| PIPE_POOL
-    AUTO_POOL -->|"手番・見える差・辺の記録"| NATIVE
-    AUTO_POOL -->|"runの位置"| RUNS_DB
     PIPE_POOL -->|"step(snapshot, input)"| NATIVE
     PIPE_POOL -->|"effect 1回 = transport 1回"| PROVIDERS
     PIPE_POOL -->|"CAS保存・実行snapshot・履歴"| DB
@@ -57,7 +51,7 @@ flowchart TB
 
 画像から書く作品では、`POST /api/pipeline/images`が受け取った画像（32 MiBまで）を縮めて、所有者別の一時IDでprocessのメモリに預ける。描き始めないまま15分たつと捨て、開始に成功するとIDを消費し、実行が終われば画像と見比べのPNGを解放する。DBにもsnapshotにも画像は入らないので、workerが替わって画像が無い実行は`image_missing`で止まる。
 
-AI自動推敲のrunはServerが進める（画面を閉じても続く）。runnerはrunごとに1 thread（既定4、所有者ごとに同時1 run）を使い、子を通常のpipeline runで描いて保存する。手番・親子の見える差・辺の記録は共有coreが決める。runの位置は正本のDBの横の別のSQLite（`<name>-autonomous-runs.db`、`INKU_AUTONOMOUS_RUNS_DB_URL`で変更）に置き、作品の記録は各子の系譜の辺に置く。Serverが止まったときに進んでいたrunは、次の起動で中断として読む。
+AI自動推敲のrunnerと、そのrunの位置を置いた別のSQLite（`<name>-autonomous-runs.db`）は、2026-11-13に外した。Serverはそのファイルを開かず、`INKU_AUTONOMOUS_RUNS_DB_URL`も読まない。前の子の手の記録は、各子の系譜の辺に残る。
 
 ## 配布時Compose
 
@@ -102,7 +96,6 @@ FastAPIはversioned startupが完了するまで通常requestを受け付けな�
 | Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | Pipeline worker pool | `PIPE-HOST`, `API-LIMIT` | `pipeline_api.py:PipelineService`, `pipeline_runtime.py`, `pipeline_defaults.py` |
 | 画像の一時預かり | `PIPE-IMAGE`, `API-LIMIT`, `DATA-IMAGE` | `pipeline_images.py` |
-| AI自動推敲のrunner | `PIPE-REFINE`, `DATA-LINEAGE` | `autonomous_refine.py:AutonomousRunner`, `routers/autonomous.py` |
 | native境界 | `PIPE-MACHINE`, `PIPE-RENDER` | `pipeline_candidate.py:PipelineBinding`, `inku-render-python`, `inku-pipeline-uniffi` |
 | save/thumbnail pool | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py`, `api_core/thumbnails.py` |
 | Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`、`api.py:_db.init_db`（migration）、`api.py:_lifespan`（backup scheduler）、`logging_setup.py` |

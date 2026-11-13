@@ -237,8 +237,8 @@ server could mix one person's state across requests. The boundary is stated as a
 so the sign-in screen never appears and the sign-out control is hidden** (the multi-user machinery stays
 in place).
 
-- Description entry and reproducible refinement (touch, placement, reading), plus AI autonomous
-refinement and variation. A leading number and a bracketed comment stay in the stored work, reach
+- Description entry and reproducible refinement (touch, placement, reading), plus variation. AI
+autonomous refinement and juxtaposition left the Server and the Web on 2026-11-13. A leading number and a bracketed comment stay in the stored work, reach
 no layer of the drawing, and are greyed in the editors
 - 13 color catalogs (`color_catalogs.py`; every catalog carries all 9 colors) plus "from the
 description", canvas ratios, and display mode. The catalog selection is stored per
@@ -306,8 +306,8 @@ so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 
-- The 144 endpoints live in the thirteen files under `server/src/inku_server/api_core/routers/` (`auth`,
-`autonomous`, `chatgpt`, `description`, `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`) and in
+- The 149 endpoints live in the twelve files under `server/src/inku_server/api_core/routers/` (`auth`,
+`chatgpt`, `description`, `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`) and in
 the shared pipeline's `pipeline_api.py` (the fifteen `/api/pipeline/*` routes).
 The count is owned by `EXPECTED_ROUTE_COUNT` in `server/tests/test_route_authorization.py`.
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.

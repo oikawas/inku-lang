@@ -17,8 +17,6 @@ flowchart TD
     LINEAGE["lineage router"]
     RENDER["render router"]
     FEEDBACK["feedback router"]
-    AUTONOMOUS["autonomous router\nautonomous refinement runs"]
-    AUTO_RUNNER["autonomous_refine.py\nAutonomousRunner"]
     PIPELINE["pipeline_api.py\n/api/pipeline router"]
     DEPS["api_core/deps.py\nsession and role guards"]
     SHARED["api_core state/models/common/rendering"]
@@ -36,11 +34,7 @@ flowchart TD
     API_PY -->|"include_router"| LINEAGE
     API_PY -->|"include_router"| RENDER
     API_PY -->|"include_router"| FEEDBACK
-    API_PY -->|"include_router"| AUTONOMOUS
     API_PY -->|"include_router(pipeline_router(...))"| PIPELINE
-    AUTONOMOUS --> DEPS
-    AUTONOMOUS --> AUTO_RUNNER
-    AUTO_RUNNER -->|"an ordinary run per child"| SERVICE
     AUTH --> DEPS
     ME --> DEPS
     PLUGINS --> DEPS
@@ -71,9 +65,9 @@ flowchart LR
     COMPAT["pipeline_compat.py\nrequest → options, result projection, idempotent resend"]
     SERVICE["PipelineService\nthread pool, retained runs, effect steps"]
     EXEC["CandidateExecution\nserializes one execution"]
-    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / colors / canvas / Macro catalog\nsaved_variants / juxtaposition / autonomous_refine / chunk_moves / image"]
+    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / colors / canvas / Macro catalog\nsaved_variants / chunk_moves / image"]
     IMAGES["pipeline_images.py\nimage intake and review drawing"]
-    VARIANT_ROUTE["render router\nreplacements, fit, juxtaposition, composition ranges"]
+    VARIANT_ROUTE["render router\nreplacements, fit, composition ranges"]
     CORE["Shared Rust core\ninku-pipeline + inku-ddl + inku-render"]
     EFFECTS["ProductPipelineEffects\nprepare / provider_for / render_options / save_result / replay"]
     SETTINGS_ADAPTER["pipeline_settings.py\ncanvas, resource limits, administrator settings"]
@@ -112,7 +106,7 @@ The canonical path is router → `pipeline_compat.py` (or HTTP `/api/pipeline`) 
 
 `ProductPipelineEffects` has five host responsibilities, none of which decides meaning. `prepare` validates options and resolves the instruction language, the Macro catalog, the canvas, seeds, the color catalog and its resolved colors, and the stage models (an image run adds the Vision model and the `image` configuration). `provider_for` sends each action the core requests once through `SingleAttemptProvider` and records elapsed time and provider failures in the execution context; the shared core's `provider_wire` builds the request body and reads the answer, and in an image run the image held in the run's memory is attached as its reference names it. `render_options` builds trusted render options from the saved snapshot. `save_result` saves a performance as a history row and a history link (and, for a work written from an image, its source note and `image_ddl`). `replay` performs a compact Score again under its saved policy. `pipeline_images.py` receives the image, keeps it in the run's memory, and answers the core's `draw_image_review` effect with the review drawing drawn under the actual drawing's settings (`pipeline_image_review_svg` → a resvg PNG).
 
-Replacing a saved work's touches, ground or color arrangement, and fitting it (`/api/render-tool-variant`, `/api/render-ground-variant`, `/api/render-color-arrangement` with their `plan` routes, `/api/render-canvas-fit`), call the shared core's rules in the native wheel (`saved_variants`) without a run. Juxtaposition (`/api/refine/juxtaposition`) gathers candidates and builds the request with the shared core's `juxtaposition` and returns the sentence the Vision model chose; the child is drawn by a `description_edit` run with that sentence added to the description. `autonomous_refine.py:AutonomousRunner` drives autonomous refinement runs: it draws the children through ordinary pipeline runs and asks the shared core's `autonomous_refine` for the turns, the visible difference and the edge record.
+Replacing a saved work's touches, ground or color arrangement, and fitting it (`/api/render-tool-variant`, `/api/render-ground-variant`, `/api/render-color-arrangement` with their `plan` routes, `/api/render-canvas-fit`), call the shared core's rules in the native wheel (`saved_variants`) without a run. Juxtaposition and autonomous refinement were removed on 2026-11-13. The move record on the edges of earlier autonomous-refinement children (`ai_move`) and the derivation kinds `laws_change` and `chunk_move` remain, and their held description still applies.
 
 Only replay of an older Score below 0.10 goes through the structural compatibility of `saved_score_compat.py` and then `api_core/rendering.py` → the `render_engines` registry → `default/adapter.py` → one `render` call in the native wheel. `renderer.py` is a compatibility façade for existing callers that need SVG only, and it delegates to the same registry. The old `interpreter.py`, `composer.py`, `ddl_expander.py`, `coerce/compose.py`, and `coerce/normalize.py` have been deleted; all that remains in `coerce/` is compatibility for saved observation records (`observability.py`).
 
@@ -216,26 +210,24 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `auth` | 4 | Auth config and login/logout | None; routes other than login have explicit guards |
 | `me` | 13 | Profile, user settings, per-user storage | `_current_user` |
 | `plugins` | 10 | Plugin read/validation/CRUD/enable; checking, installing, and exporting packages (JSON or zip) from the Web and replacing their Saijiki pictures | `_current_user`; mutation requires admin |
-| `settings` | 22 | Server-wide settings, backup, juxtaposition settings, and the picture upload warning | `_admin_user` |
+| `settings` | 21 | Server-wide settings, backup, and the picture upload warning | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
 | `history` | 17 | History, SVG, thumbnails, marks, trash, sharing, artifact rebuild, animation and card export | `_current_user` |
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
-| `render` | 15 | Compose, interpret, render-score/svg, paint, paint stream, composition ranges, candidates and replacements of touches, ground and color arrangement, fit, juxtaposition | `_current_user` |
+| `render` | 14 | Compose, interpret, render-score/svg, paint, paint stream, composition ranges, candidates and replacements of touches, ground and color arrangement, fit | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
 | `description` | 2 | Description mora and syllable counts | `_current_user` |
 | `chatgpt` | 12 | Personal connection state, authorization, profiles, and model publication settings | `_current_user`; actions also check the owner |
-| `autonomous` | 4 | Start, list, read and stop autonomous refinement runs | `_current_user` |
 | `pipeline` | 15 | Canvas formats; image intake; start and read variations and fork them from a description; the system prompts a variation sent; execution commands; author DDL; completion range states; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
 
 Total: 139. Refinement variation seed allocation and the Vision advice entry are retired. The public allowlist contains five paths: `/health`, `/api/info`, `/api/auth/login`, `/api/notices`, and `/api/notices/{notice_id}` (`test_route_authorization.py`). The two notice routes only read fixed distribution licenses and return neither arbitrary files nor personal data. The other public routes are limited to those needed for login.
 
-The per-router counts count the live app's routes by endpoint module the way `test_route_authorization.py` counts them (`iter_route_contexts`, 2026-10-25). The total's source of truth is `EXPECTED_ROUTE_COUNT` (139) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 139 operations (201 schemas). The OpenAPI (`/docs`) gives each router one tag (14) and carries a summary and a description for all 139 routes, and English descriptions for the parameters and the request and response fields (since v2.15.243).
+The per-router counts count the live app's routes by endpoint module the way `test_route_authorization.py` counts them (`iter_route_contexts`, 2026-10-25). On 2026-11-13 the six routes of juxtaposition and autonomous refinement (one in settings, one in render, four in the autonomous router) were removed, and only those rows of the table were corrected. The total's source of truth is `EXPECTED_ROUTE_COUNT` (149 as of 2026-11-13) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 149 operations (208 schemas). The OpenAPI (`/docs`) gives each router one tag (13) and carries a summary and a description for every route, and English descriptions for the parameters and the request and response fields (since v2.15.243).
 
 ## Main flows
 
 - `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose` go through `pipeline_compat.py` to the same `PipelineService`. The stream re-reads the execution, reports `sketch`, `stage1`, `score`, and `done` in order, and returns a failure after the first event as an in-band `error` event. When a completion proposal needs approval, the three other routes answer 409 with the current view, and the stream answers 409 before its first event or an `error` event after it. A description start hands only the label-cut description to the core and refuses a label-only description with 400.
 - `/api/pipeline/variations` starts a variation from a description, direct DDL or an image (`kind: image`, with the temporary ID `/api/pipeline/images` holds); `/executions/{id}/commands` accepts author commands (approve, decline, request completion, regenerate, perform, cancel), and `/executions/{id}/author-ddl` accepts DDL edits. A DDL edit that changes settings leaves the original intact and creates a parent-linked variation. `/variations/{id}/fork-description` makes a child with a changed description, and `/completion-range-states` returns the completion ranges' states the DDL editor shows.
-- `/api/refine/autonomous` starts, lists and stops autonomous refinement runs. The Server drives a run, and its children are drawn through ordinary pipeline runs. For the chunk move (`kinds: ["chunks"]`, alone), the run sends the provider the requests the shared core's `chunk_moves` makes to choose the move and rewrite the chunk, and draws the DDL the core applied the move to as direct DDL.
 - Replacing a saved work's parts (`/api/render-tool-variant` and the like) and fitting it (`/api/render-canvas-fit`) draw a child with the shared core's `saved_variants`, without a run.
 - `/api/pipeline/history/{id}` returns the variation and revision of a work saved through the shared pipeline, and `/history/{id}/fork` derives from that moment's configuration, host context, and Macro definitions. `/history/{id}/ddl-export` exports the work's visible DDL together with the plugin definitions it names. `/legacy/{id}` and `/legacy/{id}/fork` read an older work without a link and derive from it without changing the original row.
 - `/api/render-score` and `/api/render-svg` branch on the Score version: compact Scores go through `ProductPipelineEffects.replay`, and those below 0.10 through `saved_score_compat.py`.
@@ -247,7 +239,7 @@ The per-router counts count the live app's routes by endpoint module the way `te
 |---|---|---|
 | App/router/deps | `SYS-API`, `API-ROUTERS`, `API-AUTH` | `api.py`, `api_core/routers`, `pipeline_api.py:pipeline_router`, `deps.py` |
 | Pipeline host | `PIPE-HOST`, `PIPE-LIMITS`, `API-LIMIT`, `PIPE-IMAGE` | `pipeline_runtime.py`, `pipeline_api.py`, `pipeline_candidate.py`, `pipeline_product.py`, `pipeline_settings.py`, `pipeline_defaults.py`, `pipeline_images.py` |
-| Autonomous refinement and replacements | `PIPE-REFINE` | `autonomous_refine.py`, `routers/autonomous.py`, `routers/render.py` |
+| Replacements | `PIPE-REFINE` | `routers/render.py` |
 | Shared Rust core | `SYS-CORE`, `PIPE-MACHINE`, `PIPE-TYPED-DDL`, `PIPE-LOWER`, `PIPE-RENDER`, `PIPE-WIRE`, `PIPE-DISPLAY` | `core/Cargo.toml`, each crate's `lib.rs` |
 | Older Score compatibility | `PIPE-COMPAT` | `saved_score_compat.py`, `render_engines/default/adapter.py` |
 | Persistence | `PIPE-HISTORY`, `SYS-DB`, `DATA-MIGRATION`, `DATA-AUTHORITY` | `pipeline_product.py:save_result`, `db.py`, `persistence/*`, `provider_observation.py` |

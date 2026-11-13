@@ -95,6 +95,7 @@ tasks.withType<Test>().configureEach {
     systemProperty("inku.ddl3dFixture", rootProject.file("../experiments/ddl-3d/fixtures/solids.json").absolutePath)
     systemProperty("inku.modelCatalogSource", rootProject.file("../core/crates/inku-pipeline/data/model_catalog.json").absolutePath)
     systemProperty("inku.modelCatalogCases", rootProject.file("../core/crates/inku-pipeline/data/model-catalog-cases.json").absolutePath)
+    systemProperty("inku.signInCases", rootProject.file("../core/crates/inku-pipeline/data/sign-in-cases.json").absolutePath)
     systemProperty("inku.providerSettingsCases", rootProject.file("../server/tests/data/provider-settings-cases.json").absolutePath)
     systemProperty("inku.providerAdmissionCases", rootProject.file("../server/tests/data/provider-admission-cases.json").absolutePath)
     systemProperty("inku.providerAdmissionSequence", rootProject.file("../server/tests/data/provider-admission-sequence.json").absolutePath)

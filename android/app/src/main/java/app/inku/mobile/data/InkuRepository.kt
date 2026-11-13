@@ -214,12 +214,7 @@ class InkuRepository(
     fun providerSettings(): Flow<List<ProviderSettingEntity>> = kotlinx.coroutines.flow.combine(
         database.providerSettingDao().observeAll(), chatGptPlan.state,
     ) { providers, plan ->
-        providers.filter { it.providerId != "chatgpt" } + ProviderSettingEntity(
-            providerId = "chatgpt", displayName = "ChatGPT", kind = "chatgpt-responses",
-            baseUrl = "https://api.openai.com/v1", encryptedApiKey = null,
-            publishedModelsJson = JSONArray(plan.publishedModels).toString(),
-            isEnabled = plan.canUsePlan, isDefaultLocal = false, updatedAt = 0,
-        )
+        providers.filter { it.providerId != "chatgpt" } + SignInServices.chatGptProviderSetting(plan)
     }
 
     fun providerModelCandidates(): Flow<Map<String, List<String>>> =

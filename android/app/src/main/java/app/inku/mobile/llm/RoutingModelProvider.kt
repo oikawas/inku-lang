@@ -4,6 +4,7 @@ import app.inku.mobile.ui.i18n.InkuFailure
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.data.AndroidSecretBox
 import app.inku.mobile.data.ProviderSettingsCodec
+import app.inku.mobile.data.SignInServices
 import app.inku.mobile.data.catalogRequest
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.ProviderSettingEntity
@@ -83,11 +84,7 @@ class RoutingModelProvider(
         // Plan connections are owned by their manager, outside provider_settings.
         chatGptPlan?.invoke()?.state?.value?.let { plan ->
             providers.removeAll { it.providerId == "chatgpt" }
-            providers += ProviderSettingEntity(
-                providerId = "chatgpt", displayName = "ChatGPT", kind = "chatgpt-responses",
-                baseUrl = null, encryptedApiKey = null, publishedModelsJson = JSONArray(plan.publishedModels).toString(),
-                isEnabled = plan.canUsePlan, isDefaultLocal = false, updatedAt = 0,
-            )
+            providers += SignInServices.chatGptProviderSetting(plan)
         }
         val available = providers.associate { provider ->
             provider.providerId to if (provider.isDefaultLocal) ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson) else database.settingsDao().get("provider_model_candidates:${provider.providerId}")

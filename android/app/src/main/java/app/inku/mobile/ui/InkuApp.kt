@@ -1570,7 +1570,9 @@ private fun WebStyleModelStageEditor(
     // changed and no reason given. It gives way once a model is selected.
     var pickedProviderId by remember(title, selectedModelId) { mutableStateOf<String?>(null) }
     val selectedProviderId = pickedProviderId ?: providerOfModelId(selectedModelId, state)
-    val selectedProvider = providers.firstOrNull { it.providerId == selectedProviderId } ?: providers.firstOrNull()
+    // The fallback stays the host's first group (the on-device models), as before Sign in with ChatGPT went first.
+    val selectedProvider = providers.firstOrNull { it.providerId == selectedProviderId }
+        ?: providers.firstOrNull { !app.inku.mobile.data.SignInServices.isSignIn(it.providerId) } ?: providers.firstOrNull()
     val strings = S
     val models = modelOptionsForProvider(state, selectedProviderId, strings)
     var providerMenuOpen by remember(title, selectedProviderId) { mutableStateOf(false) }
@@ -1588,7 +1590,7 @@ private fun WebStyleModelStageEditor(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
-                    Text(selectedProvider?.displayName ?: selectedProviderId, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(selectedProvider?.let { providerGroupLabel(it, state.uiLanguage) } ?: selectedProviderId, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("▼", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -1601,7 +1603,7 @@ private fun WebStyleModelStageEditor(
                     DropdownMenuItem(
                         text = {
                             Column {
-                                Text(provider.displayName, style = MaterialTheme.typography.bodySmall)
+                                Text(providerGroupLabel(provider, state.uiLanguage), style = MaterialTheme.typography.bodySmall)
                                 Text(provider.providerId, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         },
@@ -5244,12 +5246,16 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                 )
                 }
             }
-            listed.filterNot { it.isDefaultLocal }.forEach { card(it) }
+            // Sign in with ChatGPT comes first of all, signed in or not
+            // (2026-11-14): the core's `provider_groups` order, and the
+            // card that starts the sign-in at the same place.
             if (state.chatGptPlan.active == null) {
                 SettingsCard(S.chatGptPlan, S.chatGptConnectionSubtitle, chatGptConnectionStatus(state.chatGptPlan, S)) {
                     SecondarySmallButton(S.chatGptContinue, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
                 }
             }
+            app.inku.mobile.data.SignInServices.order(listed.filterNot { it.isDefaultLocal }.distinctBy { it.providerId }) { it.providerId }
+                .forEach { card(it) }
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
             listed.filter { it.isDefaultLocal }.forEach { card(it) }
         }
@@ -6105,22 +6111,35 @@ private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true):
         buildModelChoices(state, includeChatGpt)
     }
 
+/**
+ * The choices by group: the on-device models, then the services, in the core's
+ * `provider_groups` order (a signed-in service such as Sign in with ChatGPT
+ * first of all, 2026-11-14).
+ */
 private fun buildModelChoices(state: InkuUiState, includeChatGpt: Boolean): List<ModelChoice> {
-    val choices = mutableListOf<ModelChoice>()
-    state.modelAssets.forEach { asset ->
-        choices += ModelChoice(asset.modelId, "${asset.displayName} ${asset.qualityTier}", "LiteRT-LM")
+    val groups = mutableListOf<Pair<String, List<ModelChoice>>>()
+    groups += "local-litert-lm" to state.modelAssets.map { asset ->
+        ModelChoice(asset.modelId, "${asset.displayName} ${asset.qualityTier}", "LiteRT-LM")
     }
     state.providerSettings
         .filter { it.isEnabled && !it.isDefaultLocal && !(!includeChatGpt && it.providerId == "chatgpt") }
+        .distinctBy { it.providerId }
         .forEach { provider ->
-            availablePublishedModels(provider, state).forEach { modelId ->
+            groups += provider.providerId to availablePublishedModels(provider, state).map { modelId ->
                 val qualified = qualifyModelId(provider.providerId, modelId, state)
                 val label = if (provider.providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == modelId }?.label ?: catalogModelFor(state, provider.providerId, modelId).name else catalogModelFor(state, provider.providerId, modelId).name
-                choices += ModelChoice(qualified, label, if (provider.providerId == "chatgpt") stringsFor(state.uiLanguage).chatGptPlan else provider.displayName)
+                ModelChoice(qualified, label, providerGroupLabel(provider, state.uiLanguage))
             }
         }
-    return choices.distinctBy { it.id }
+    return app.inku.mobile.data.SignInServices.order(groups.distinctBy { it.first }) { it.first }
+        .flatMap { it.second }.distinctBy { it.id }
 }
+
+/** A service's name on screen: a sign-in service's from the core, in the screen's language. */
+private fun providerGroupLabel(provider: app.inku.mobile.data.db.ProviderSettingEntity, language: UiLanguage): String =
+    if (app.inku.mobile.data.SignInServices.isSignIn(provider.providerId)) {
+        app.inku.mobile.data.SignInServices.label(provider.providerId, language.code)
+    } else provider.displayName
 
 private fun visionModelChoicesFor(state: InkuUiState): List<ModelChoice> = modelChoicesFor(
     state.copy(modelSelectionForCamera = false), includeChatGpt = true,
@@ -6142,7 +6161,8 @@ internal fun visionModelIds(state: InkuUiState): Set<String> =
 private fun modelProviderGroupsFor(state: InkuUiState): List<app.inku.mobile.data.db.ProviderSettingEntity> {
     val local = state.providerSettings.filter { it.isDefaultLocal }
     val remote = state.providerSettings.filter { it.isEnabled && !it.isDefaultLocal }
-    return (local + remote).distinctBy { it.providerId }
+    // The on-device models before the services; a signed-in service before both (core `provider_groups`).
+    return app.inku.mobile.data.SignInServices.order((local + remote).distinctBy { it.providerId }) { it.providerId }
 }
 
 /**

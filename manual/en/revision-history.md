@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-13 — Things joined to the drawing, instructions and caption
+
+- "Image Creation": §4's `Composition and laws` now describes that pointing at a thing in its row, on the drawing or in a line of the instructions shows it in the others, that pressing a row sends the instructions to its chunk, and how a thing with no position and a work fitted into its paper behave.
+
 ## 2026-11-13 — Refinement options name their composition
 
 - "Image Creation": the section on `Change the composition form` now describes the target's `Now` (form, main law and thesis) and the forms' figures, the chips and thesis on the option cards of the refinements that read the description again, that a pressed option sits beside the target, and that Lineage's `Derived by` names both forms.

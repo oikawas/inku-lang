@@ -29,10 +29,7 @@ test('the complete refinement-direction line is italic in both languages', () =>
 });
 
 test('the normal canvas and presentation render headnotes through the same formatter', () => {
-	for (const source of [
-		read('./features/canvas/CanvasArtworkWorkspace.svelte'),
-		read('./features/canvas/CanvasPresentationOverlay.svelte')
-	]) {
-		assert.match(source, /<CaptionText text=\{displayInstructionText\} \/>/);
-	}
+	// The canvas also lights the words of the thing pointed at (step 1c); the presentation does not.
+	assert.match(read('./features/canvas/CanvasArtworkWorkspace.svelte'), /<CaptionText text=\{displayInstructionText\} highlight=\{captionHighlight\} \/>/);
+	assert.match(read('./features/canvas/CanvasPresentationOverlay.svelte'), /<CaptionText text=\{displayInstructionText\} \/>/);
 });

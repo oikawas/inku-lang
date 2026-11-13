@@ -212,7 +212,7 @@ flowchart LR
 | `plugins` | 10 | plugin閲覧・検証・CRUD・enable、Webから入れるpackage（JSONかzip）の検査・追加・書き出し・歳時記の絵の差し替え | `_current_user`、変更はadmin |
 | `settings` | 21 | server-wide settings、backup、画像のアップロードの警告 | `_admin_user` |
 | `users` | 8 | user/group管理 | `_user_manager` |
-| `history` | 17 | 履歴、SVG、thumbnail、mark、trash、共有、artifact再作成、animation・card書き出し | `_current_user` |
+| `history` | 18 | 履歴、SVG、thumbnail、mark、trash、共有、artifact再作成、animation・card書き出し、作品の物の四角（2026-11-13） | `_current_user` |
 | `lineage` | 8 | lineage graph/group、promote、colophon | `_current_user` |
 | `render` | 14 | compose、interpret、render-score/svg、paint、paint stream、構図の範囲、てざわり・支持体・配色の候補と差し替え、はめ込み | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
@@ -222,7 +222,7 @@ flowchart LR
 
 合計139。推敲の変奏seed採番とVisionの助言の入口は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}` の5 pathである（`test_route_authorization.py`）。通知の2つは固定した配布ライセンスの読取りだけを提供し、任意ファイルや本人情報を返さない。それ以外はログインに必要な入口だけを公開する。
 
-router別の件数は、live appのrouteを`test_route_authorization.py`と同じ数え方（`iter_route_contexts`）でendpointのmoduleごとに数えたもの（2026-10-25）。2026-11-13に取り合わせとAI自動推敲の6本（settingsの1本、renderの1本、autonomous routerの4本）を外し、表のその行だけを直した。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（2026-11-13で149）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も149 operation（208 schema）を記録する。OpenAPI（`/docs`）はrouterごとに1つのtag（13）を付け、すべてのrouteに要約と説明を、引数と要求・応答の欄に英語の説明を持つ（v2.15.243から）。
+router別の件数は、live appのrouteを`test_route_authorization.py`と同じ数え方（`iter_route_contexts`）でendpointのmoduleごとに数えたもの（2026-10-25）。2026-11-13に取り合わせとAI自動推敲の6本（settingsの1本、renderの1本、autonomous routerの4本）を外し、表のその行だけを直した。同じ日に`GET /api/history/{item_id}/composition-boxes`をhistoryの行に足した。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（2026-11-13で150）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も150 operation（210 schema）を記録する。OpenAPI（`/docs`）はrouterごとに1つのtag（13）を付け、すべてのrouteに要約と説明を、引数と要求・応答の欄に英語の説明を持つ（v2.15.243から）。
 
 ## 主要flow
 

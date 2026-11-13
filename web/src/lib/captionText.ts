@@ -3,7 +3,27 @@ import { labelSegments } from './description-labels';
 export type CaptionPart = {
 	text: string;
 	italic: boolean;
+	/** The words of the thing pointed at (step 1c). */
+	lit?: boolean;
 };
+
+/** The parts with the characters from `start` to `end` of their joined text split out and lit. */
+export function withHighlight(parts: CaptionPart[], span: { start: number; end: number } | null): CaptionPart[] {
+	if (!span || span.end <= span.start) return parts;
+	const out: CaptionPart[] = [];
+	let at = 0;
+	for (const part of parts) {
+		const from = Math.max(span.start - at, 0), to = Math.min(span.end - at, part.text.length);
+		if (from >= to) out.push(part);
+		else {
+			if (from > 0) out.push({ ...part, text: part.text.slice(0, from) });
+			out.push({ ...part, text: part.text.slice(from, to), lit: true });
+			if (to < part.text.length) out.push({ ...part, text: part.text.slice(to) });
+		}
+		at += part.text.length;
+	}
+	return out;
+}
 
 const REFINEMENT_DIRECTION = /^[ \t　]*(?:推敲方針|Refinement direction)[ \t　]*[:：]/;
 

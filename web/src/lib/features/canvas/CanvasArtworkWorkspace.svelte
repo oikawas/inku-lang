@@ -6,6 +6,7 @@
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
 	import type { RangePreview } from '$lib/composition-ranges';
+	import type { ThingFrame } from '$lib/features/composition-record/things';
 	import type { CanvasStatusHistoryItem } from './view-types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import CaptionText from '$lib/components/CaptionText.svelte';
@@ -20,6 +21,12 @@
 		zoomControls?: Pick<CanvasViewport, 'zoom' | 'setZoom' | 'fit'>;
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
+		/** The box of the thing pointed at, with its label (step 1c). */
+		thingFrame?: ThingFrame | null;
+		/** Reports the point under the pointer as fractions of the paper, or null when it leaves. */
+		onPointCanvas?: ((point: { x: number; y: number } | null) => void) | null;
+		/** The caption's words the pointed thing quotes. */
+		captionHighlight?: { start: number; end: number } | null;
 		artworkUrl: string | null;
 		canvasContentEl: HTMLDivElement | null;
 		canvasAspectWidth: number;
@@ -73,6 +80,9 @@
 		zoomControls,
 		result,
 		rangePreview = null,
+		thingFrame = null,
+		onPointCanvas = null,
+		captionHighlight = null,
 		artworkUrl,
 		canvasContentEl = $bindable(null),
 		canvasAspectWidth,
@@ -171,6 +181,14 @@
 					<div
 						class="canvas-box"
 						style="width: {canvasBaseWidth}px; height: {canvasBaseHeight}px;"
+						role="presentation"
+						onpointermove={(event) => {
+							if (!onPointCanvas) return;
+							// The box's rectangle already carries the zoom and the pan.
+							const rect = event.currentTarget.getBoundingClientRect();
+							if (rect.width > 0 && rect.height > 0) onPointCanvas({ x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height });
+						}}
+						onpointerleave={() => onPointCanvas?.(null)}
 					>
 						{#if result}
 							{#if artworkUrl}
@@ -178,6 +196,10 @@
 								{#if rangePreview}
 									<div class="ddl-range-frame" class:invalid={rangePreview.invalid} aria-hidden="true"
 										style="left: {rangePreview.bounds[0] * 100}%; top: {rangePreview.bounds[1] * 100}%; width: {(rangePreview.bounds[2] - rangePreview.bounds[0]) * 100}%; height: {(rangePreview.bounds[3] - rangePreview.bounds[1]) * 100}%;"></div>
+								{/if}
+								{#if thingFrame}
+									<div class="thing-frame" aria-hidden="true"
+										style="left: {thingFrame.box[0] * 100}%; top: {thingFrame.box[1] * 100}%; width: {(thingFrame.box[2] - thingFrame.box[0]) * 100}%; height: {(thingFrame.box[3] - thingFrame.box[1]) * 100}%;"><span class="thing-frame-label">{thingFrame.label}</span></div>
 								{/if}
 							{/if}
 						{:else}
@@ -441,7 +463,7 @@
 					</Tooltip>
 				</div>
 				{#if instructionCaptionVisible && canShowInstructionCaption}
-					<div class="instruction-caption" class:vertical={instructionCaptionVertical} class:caption-right={instructionCaptionPosition === 'right'} aria-live="polite"><CaptionText text={displayInstructionText} /></div>
+					<div class="instruction-caption" class:vertical={instructionCaptionVertical} class:caption-right={instructionCaptionPosition === 'right'} aria-live="polite"><CaptionText text={displayInstructionText} highlight={captionHighlight} /></div>
 				{/if}
 </div>
 			<div class="zoom-controls">
@@ -460,6 +482,9 @@
 <style>
 	.ddl-range-frame { position: absolute; box-sizing: border-box; border: 2px dashed var(--accent); pointer-events: none; z-index: 1; }
 	.ddl-range-frame.invalid { border-style: dotted; }
+	/* The thing pointed at (step 1c): a solid frame, its number and name on top. */
+	.thing-frame { position: absolute; box-sizing: border-box; border: 2px solid var(--accent); pointer-events: none; z-index: 1; }
+	.thing-frame-label { position: absolute; left: -2px; bottom: 100%; padding: 1px 6px; background: var(--accent); color: var(--bg); font-size: var(--ui-font-size-11); line-height: 1.5; white-space: nowrap; }
 	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	/* The stack owns the corner; each badge only paints itself, so a second one
 	   sits under the first instead of on top of it. */

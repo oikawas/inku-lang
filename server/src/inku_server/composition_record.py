@@ -11,7 +11,31 @@ it on 2026-11-13; the reading it does is kept for the thesis-handle work.
 
 from __future__ import annotations
 
+import importlib
+import json
 from typing import Any
+
+
+class CompositionBoxesRefused(ValueError):
+    """The core could not measure the work's chunks (``reason``, ``detail``)."""
+
+    def __init__(self, reason: str, detail: str):
+        super().__init__(detail)
+        self.reason = reason
+        self.detail = detail
+
+
+def composition_boxes(config: dict[str, Any], ddl: str, composition: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """The core's chunks of a work (``chunk_moves.rs``, action ``boxes``): each chunk's title,
+    the record's thing, its lines in ``ddl``, its sentences, those with no readable place, and its box."""
+    native = importlib.import_module("inku_render")
+    request = {"action": "boxes", "config": config, "ddl": ddl, "composition": composition}
+    answer = json.loads(native.pipeline_chunk_moves(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+    if not isinstance(answer, dict) or answer.get("error"):
+        raise RuntimeError(f"chunk moves core (boxes): {answer!r}")
+    if answer.get("outcome") == "refused":
+        raise CompositionBoxesRefused(str(answer.get("reason")), str(answer.get("detail")))
+    return list(answer.get("units") or [])
 
 
 def composition_of(item: dict[str, Any]) -> dict[str, Any] | None:

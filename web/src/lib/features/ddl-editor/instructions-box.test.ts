@@ -37,6 +37,7 @@ test('box and modal settings choose line numbers and commit complete drafts', as
 		const isJapanese = true, disabled = false, visibleEntries = [], ranges = [], callSource = '', calls = [], reason = () => '';
 		const completionSource = value, completionStates = [], completionLabels = {};
 		const previewForWord = () => {}, previewForPlugin = () => {};
+		const onLineHover = undefined;
 		let activeSaijikiPreview = null;
 		const t = () => ({ ddlEditorInstructions: 'instructions', ddlEditPlaceholder: 'placeholder' });
 		${actualFunction('../../components/DdlEditor.svelte', 'configuration')}

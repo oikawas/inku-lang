@@ -20,9 +20,15 @@
 		/** Held by its DDL: the actions that read the description again are greyed. */
 		descriptionLocked: boolean;
 		onChangeForm: () => void | Promise<void>;
+		/** The thing pointed at anywhere on the page, and the reports of this list (step 1c). */
+		activeThing?: number | null;
+		onPointThing?: (thing: number | null) => void;
+		/** A pressed row sends the instructions to its thing's chunk. */
+		onRevealThing?: (thing: number) => void;
 	};
 
-	let { work, description, isJapanese, offersDescriptionActions, descriptionLocked, onChangeForm }: Props = $props();
+	let { work, description, isJapanese, offersDescriptionActions, descriptionLocked, onChangeForm,
+		activeThing = null, onPointThing = () => {}, onRevealThing = () => {} }: Props = $props();
 
 	const record = $derived(compositionOf(work));
 	const shown = $derived(compositionShown(record));
@@ -95,7 +101,10 @@
 					<div class="comp-things-head">{t().compositionThingsHead}</div>
 					<ol class="thing-list">
 						{#each things as thing (thing.thing)}
-							<li class="thing-row" data-thing={thing.thing}>
+							<li><button type="button" class="thing-row" class:active={activeThing === thing.thing} data-thing={thing.thing}
+								onmouseenter={() => onPointThing(thing.thing as number)} onmouseleave={() => onPointThing(null)}
+								onfocus={() => onPointThing(thing.thing as number)} onblur={() => onPointThing(null)}
+								onclick={() => onRevealThing(thing.thing as number)}>
 								<span class="thing-no">{thing.thing}</span>
 								<span class="thing-role">{thing.role ? roleName(thing.role, isJapanese) : ''}</span>
 								<span class="thing-main">
@@ -105,7 +114,7 @@
 										<span class="thing-quote">「{thing.quote}」{#if !quoteInDescription(thing.quote, description)}<span class="thing-from">{t().compositionFromReading}</span>{/if}</span>
 									{/if}
 								</span>
-							</li>
+							</button></li>
 						{/each}
 					</ol>
 				{/if}
@@ -141,7 +150,9 @@
 	.comp-things-head { margin-top: 2px; color: var(--fg3); font-size: var(--ui-font-size-11); }
 	.thing-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
 	/* Top-aligned: the things' names can wrap, and the number and role stay on their first line. */
-	.thing-row { display: grid; grid-template-columns: 18px 2.6em minmax(0, 1fr); gap: 2px 8px; align-items: start; padding: 5px 8px 5px 6px; border-left: 2px solid transparent; }
+	.thing-row { display: grid; grid-template-columns: 18px 2.6em minmax(0, 1fr); gap: 2px 8px; align-items: start; width: 100%; padding: 5px 8px 5px 6px; border: 0; border-left: 2px solid transparent; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+	/* The thing pointed at here, on the drawing or in the instructions (step 1c). */
+	.thing-row.active, .thing-row:hover { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 	.thing-no { display: grid; place-items: center; width: 16px; height: 16px; margin-top: 1px; border: 1px solid var(--border2); border-radius: 50%; color: var(--fg2); font-size: var(--ui-font-size-10); line-height: 1; }
 	.thing-role { color: var(--fg3); font-size: var(--ui-font-size-11); line-height: 1.7; white-space: nowrap; }
 	.thing-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; min-width: 0; }

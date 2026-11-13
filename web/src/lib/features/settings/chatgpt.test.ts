@@ -317,7 +317,8 @@ test('connected guide leads to personal model settings with explicit publication
 	administration.resetForLoggedOut();
 	owner = 'owner'; admin = true;
 	await administration.loadModelSettings();
-	assert.deepEqual(administration.modelCatalog.map((provider: any) => provider.id), ['openai', 'chatgpt']);
+	// Sign in with ChatGPT leads the list (the author, 2026-11-14).
+	assert.deepEqual(administration.modelCatalog.map((provider: any) => provider.id), ['chatgpt', 'openai']);
 	const before = requests.length;
 	assert.equal(await administration.saveModelProvider('chatgpt', { models: [
 		{ id: 'second-slug', label: 'First offered', purposes: ['vision'], recommendation_vision: 3, comment_ja: '共通の評価' },
@@ -341,6 +342,7 @@ test('personal publication picker exposes Vision use; the shared assessments are
 	const source = readFileSync(new URL('./ModelAdministrationSettings.svelte', import.meta.url), 'utf8')
 		.replace("import { t } from '$lib/i18n/index.svelte';", `import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; const t = () => ja;`)
 		.replace("from '$lib/modelMeta'", `from ${JSON.stringify(new URL('../../modelMeta.ts', import.meta.url).href)}`)
+		.replace(/(['"])\$lib\/models\1/g, JSON.stringify(new URL('../../models.ts', import.meta.url).href))
 		.replace("import './model-administration-settings.css';", '')
 		// Open the existing dialog in the SSR fixture, without changing production props.
 		.replace('</script>', "openModelPicker('chatgpt');\n</script>");

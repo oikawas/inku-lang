@@ -33,7 +33,7 @@ Use `--save-history` with `paint` or `batch` when benchmark outputs should be
 available later through the regular server history UI/API:
 
 For future real-provider tests and comparisons, explicitly select Primary,
-ChatGPT plan / GPT-6-Luna (`chatgpt:gpt-6-luna`), or Secondary, Gemini API
+Sign in with ChatGPT / GPT-6-Luna (`chatgpt:gpt-6-luna`), or Secondary, Gemini API
 (Cloud) / Gemma 4 31B IT (`gemini:gemma-4-31b-it`). Exclude NVIDIA NIM from
 targets, controls, fallbacks, and Vision evaluation. Stop if the chosen
 connection fails. The [AI testing reference](../manual/en/cli-reference-for-ai.md)

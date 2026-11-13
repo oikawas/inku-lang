@@ -1,4 +1,4 @@
-# ChatGPTプラン接続
+# ChatGPT でサインイン
 
 本人がChatGPTへサインインして許可した利用枠で描画します。OpenAI API PlatformのAPIキー接続とは認証・利用枠が別です。個別アカウントの利用可否とモデルは、実際の認可と本人catalogで確認します。[公式案内](https://developers.openai.com/siwc/token-sharing-open-source)
 
@@ -6,11 +6,11 @@
 
 `INKU_CHATGPT_PLAN_ENABLED=1`を明示し、デベロッパーモード、シングルユーザーモード、または明示した`INKU_CHATGPT_SELF_HOSTED=1`と検証済み自己ホスト起動を使います。通常ログインのリリース版コンテナも最後の条件で利用でき、developer modeは不要です。管理者にも本人の接続と`chatgpt.tokens.use.direct`の許可が必要です。single-user中は固定accountだけがownerです。画面表示はOAuth完了を意味しません。
 
-初版のlocal接続はWeb・API・ブラウザが同じPCで動くソース版を対象としました。Server/Webは奥書にもChatGPTプランを使えます。Docker内のlocal callback、デモ指示生成、モデル検査は対象外です。Androidの現行の接続は[Android仕様](../../android/ANDROID_SPEC.ja.md)を参照してください。
+初版のlocal接続はWeb・API・ブラウザが同じPCで動くソース版を対象としました。Server/Webは奥書にもChatGPT でサインインを使えます。Docker内のlocal callback、デモ指示生成、モデル検査は対象外です。Androidの現行の接続は[Android仕様](../../android/ANDROID_SPEC.ja.md)を参照してください。
 
 ## Visionのモデルを公開する
 
-設定「モデル」のChatGPTプランで「公開モデルを選択」を開き、LLM／Visionの用途と公開状態を保存します。用途の保存がないモデルは両用途で、用途なしのモデルは公開できません。「Vision」で絞り込むと対象を確認できます。公開したVisionモデルは奥書の選択肢に「ChatGPTプラン」として表示されます。モデルの詳細情報は取得元の参照表示です。
+設定「モデル」のChatGPT でサインインで「公開モデルを選択」を開き、LLM／Visionの用途と公開状態を保存します。用途の保存がないモデルは両用途で、用途なしのモデルは公開できません。「Vision」で絞り込むと対象を確認できます。公開したVisionモデルは奥書の選択肢に「ChatGPT でサインイン」として表示されます。モデルの詳細情報は取得元の参照表示です。
 
 用途は登録内の`model_purposes`へ保存します。`GET/PUT /api/me/chatgpt/models/settings`のresponseは各モデルの`purposes`と従来の`enabled`／`enabled_models`を返し、PUTは`profile_id`、`generation`、`published_models`とoptionalな`model_purposes` mapを受けます。mapを省くと既存用途を保持し、指定したモデルだけを更新します。
 
@@ -25,11 +25,11 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
   uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
-設定「ChatGPTプラン」の「ChatGPTにサインイン」から本人がサインイン・同意します。callbackは同じPCの`http://127.0.0.1:<port>/auth/callback`です。戻り画面は設定の表示言語に合わせ、認証の完了と失敗を区別します。拒否・中止・5分の期限切れは失敗として表示します。popupを遮断した場合は画面の「認証画面をもう一度開く」で開けます。1 worker・reloadなしで、通常の直uvicorn起動やlocal LAN bindでは有効にしません。認証後は下の「登録・モデル・利用枠」で公開モデルを設定し、Stage 1/2共通のモデルを選びます。[認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+設定「ChatGPT でサインイン」の「ChatGPTにサインイン」から本人がサインイン・同意します。callbackは同じPCの`http://127.0.0.1:<port>/auth/callback`です。戻り画面は設定の表示言語に合わせ、認証の完了と失敗を区別します。拒否・中止・5分の期限切れは失敗として表示します。popupを遮断した場合は画面の「認証画面をもう一度開く」で開けます。1 worker・reloadなしで、通常の直uvicorn起動やlocal LAN bindでは有効にしません。認証後は下の「登録・モデル・利用枠」で公開モデルを設定し、Stage 1/2共通のモデルを選びます。[認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 
 ## 別hostの自己ホストで接続する
 
-設定の独立した「ChatGPTプラン」タブで「inku ChatGPTで接続」を押すと、このMacにセットアップした専用アプリ「inku ChatGPT」を開きます。ChromeまたはBraveはウィンドウの上にアプリを開くかの確認を出すので、「inku ChatGPT を開く」を押します。開かない場合は画面の「inku ChatGPTをもう一度開く」で再度開けます。アプリ未導入の場合は、運用者がこのMacへセットアップしてから進めます。
+設定の独立した「ChatGPT でサインイン」タブで「inku ChatGPTで接続」を押すと、このMacにセットアップした専用アプリ「inku ChatGPT」を開きます。ChromeまたはBraveはウィンドウの上にアプリを開くかの確認を出すので、「inku ChatGPT を開く」を押します。開かない場合は画面の「inku ChatGPTをもう一度開く」で再度開けます。アプリ未導入の場合は、運用者がこのMacへセットアップしてから進めます。
 
 Macの確認画面には保護された接続で取得したinku本人の名前・IDと移送先host IDが表示されます。接続先を確認して「続ける」を押すと、設定を始めたChromeまたはBraveでOpenAI認証・利用同意へ進み、同じブラウザのcallbackへ戻ります。ブラウザを開けない場合に別のブラウザへ自動で切り替えません。認証後の封印と移送は専用アプリが一回ずつ行います。完了してWebのページへ戻ると、ページが接続状態を読み直します。「接続状態を確認」でも読み直せます。Macの確認・完了・失敗の理由は設定の表示言語に合わせます。OpenAI自身の認証画面の文言はOpenAIが提供します。失敗時は理由を表示して止まり、自動再試行しません。既に別のinku本人へ固定したMacではその接続を拒否します。
 
@@ -108,11 +108,11 @@ recipient/importはDBの本人とmodeを検証しますが、CLI実行をAPI起�
 
 ## 登録・モデル・利用枠
 
-接続完了後の案内から「モデル設定を開く」を押します。設定「モデル」で「ChatGPTプラン」を選び、「公開モデルを選択」→「モデル一覧を取得」の順に進みます。取得中の表示と件数・モデル名を確認し、描画に使うモデルへチェックを付けて「保存」します。他providerと同じ選択画面を使いますが、公開先は接続した本人だけです。APIキーや接続先URLの設定はありません。空の一覧やエラーは理由を表示します。既存の接続でも、この公開設定を一度保存します。
+接続完了後の案内から「モデル設定を開く」を押します。設定「モデル」で「ChatGPT でサインイン」を選び、「公開モデルを選択」→「モデル一覧を取得」の順に進みます。取得中の表示と件数・モデル名を確認し、描画に使うモデルへチェックを付けて「保存」します。他providerと同じ選択画面を使いますが、公開先は接続した本人だけです。APIキーや接続先URLの設定はありません。空の一覧やエラーは理由を表示します。既存の接続でも、この公開設定を一度保存します。
 
-保存後に描画の「モデル選択」を開き、ChatGPTプランからStage 1/2共通のモデルを選びます。一覧の取得だけではモデルを公開・自動選択しません。普通の利用者は本人のChatGPTモデルだけ、管理者は既存の共有providerも管理できます。
+保存後に描画の「モデル選択」を開き、ChatGPT でサインインからStage 1/2共通のモデルを選びます。一覧の取得だけではモデルを公開・自動選択しません。普通の利用者は本人のChatGPTモデルだけ、管理者は既存の共有providerも管理できます。
 
-記述タブでは、モデル名の右にある「ChatGPTプラン」ラベルからChatGPTの利用枠画面を別タブで開けます。描画ボタン下の「ChatGPTプランを使用中」と独立した「利用枠を管理」は表示しません。選択モデルが利用不可の場合の警告は表示します。
+記述タブでは、モデル名の右にある「利用枠を管理」リンクからChatGPTの利用枠画面を別タブで開けます。描画ボタン下の「ChatGPTプランを使用中」と、そこにあった独立の「利用枠を管理」は表示しません。選択モデルが利用不可の場合の警告は表示します。
 
 描画が失敗した後も、モデルを選び直してそのまま描画できます。新しい描画の開始時に前の失敗表示を消すため、ページの再読込みは不要です。
 

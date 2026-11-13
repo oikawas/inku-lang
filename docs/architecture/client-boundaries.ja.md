@@ -193,7 +193,7 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 - `InkuRepository` → `AndroidWorkPipeline` → `SharedAuthoringPipeline` / `SharedPipelineHost` → `NativePipelineBridge`（JNI）→ 共有`inku-pipeline` / `inku-ddl` / `inku-render` → Roomという端末内flow。
 - `SharedPipelineHost`は1 executionのcallを直列化し、coreが返したeffectを実行する。provider effectは`SingleAttemptModelEffectProvider`が1回だけ送り、再試行・fallback・応答の判定はRustに残す。可視DDLとauthorityのCAS保存、action ACK、実行snapshotは`RoomSharedPipelineStore`が持つ。
-- `RoutingModelProvider` はlocal LiteRT-LM、Gemini、OpenAI-compatible remote providerを選ぶ。OpenAI互換・Anthropic・Geminiの要求本文と応答の読み方（temperature、thinking量、schema変換、出力上限）はJNIの`providerWire`から共有coreの`provider_wire`（`inku.provider-wire.v1`）を呼ぶ。hostはcoreの本文bytesへ鍵を指定headerに足して送り、受けた本文をcoreへ返す。鍵・HTTP・流量・観測はhost、LiteRT-LMはhostに残る。ChatGPTプランの本文、SSEの流れの読み、失敗の分類、本人のモデル一覧の読みも、2026-10-17から同じ`provider_wire`（`chatgpt_request`等）を使う。推敲のVision助言はtoolなしのtext要求を使う。
+- `RoutingModelProvider` はlocal LiteRT-LM、Gemini、OpenAI-compatible remote providerを選ぶ。OpenAI互換・Anthropic・Geminiの要求本文と応答の読み方（temperature、thinking量、schema変換、出力上限）はJNIの`providerWire`から共有coreの`provider_wire`（`inku.provider-wire.v1`）を呼ぶ。hostはcoreの本文bytesへ鍵を指定headerに足して送り、受けた本文をcoreへ返す。鍵・HTTP・流量・観測はhost、LiteRT-LMはhostに残る。ChatGPT でサインインの本文、SSEの流れの読み、失敗の分類、本人のモデル一覧の読みも、2026-10-17から同じ`provider_wire`（`chatgpt_request`等）を使う。推敲のVision助言はtoolなしのtext要求を使う。
 - 端末内のVisionモデルでは構図を読まない（作者の決定 2026-10-17）。`composition.read`は`!isLocalVisionModel(modelId)`で、外部providerではtrueを保つ。Serverの常にtrueという設定との意図的な差であり、provider解決とVision助言の768×768 PNGはServerに揃えたままとする。
 - 保存済みScoreの再演は復元した資源policyの下で`renderSaved`を使う。端末専用の旧9:5形式だけ`AndroidRenderHost`（JNIの`render`）を使う。
 - engine identityとrenderer referenceは同梱Rust coreから取得し、Kotlinに版literalを持たない。
@@ -206,7 +206,7 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 ## macOS境界
 
 - `apple/Sources/InkuMac/`（SwiftUI）→ `PipelineHost.swift`（`InkuHost`）→ UniFFI（XCFramework）→ 共有`inku-pipeline` / `inku-ddl` / `inku-render` / `inku-display` → GRDB（`InkuPersistence`）という端末内flow。Server APIは呼ばない。
-- 作品の同一性（`dh1`・`rh3`・正準JSON）、指示言語、記述ラベル、保存作品のてざわり・支持体・配色（`inku.saved-variants.v1`）、取り合わせ（`inku.juxtaposition.v1`）、AI自動推敲（`inku.autonomous-refine.v1`）、providerの要求本文とChatGPTプランの要求・SSE・失敗の分類（`inku.provider-wire.v1`）は、UniFFIで共有coreを呼ぶ。Swiftには同じ規則を写さない。
+- 作品の同一性（`dh1`・`rh3`・正準JSON）、指示言語、記述ラベル、保存作品のてざわり・支持体・配色（`inku.saved-variants.v1`）、取り合わせ（`inku.juxtaposition.v1`）、AI自動推敲（`inku.autonomous-refine.v1`）、providerの要求本文とChatGPT でサインインの要求・SSE・失敗の分類（`inku.provider-wire.v1`）は、UniFFIで共有coreを呼ぶ。Swiftには同じ規則を写さない。
 - 記述からの実行は、構図の読みの後に法則の段と配色の段を持つ（Serverの既定と同じ）。
 - 通常の画面表示は`inku-display`のSkia。拡大の窓はApple siliconで`inku-display-gpu`を別processとして起動し、標準入出力で窓の要求とpixelを受け渡す（GPU driverがそのprocessを終わらせてもアプリは落ちない。100%の画はCPUのまま）。
 - Swiftが所有するのはUI、provider設定と通信（URLSession・Keychain）、GRDBの保存、host option、OSのlifecycleである。macOSアプリの版（`apple/VERSION`・`apple/BUILD_NUMBER`）はServer／Webと別に採番する。iPad／iPhoneのアプリは未完了。

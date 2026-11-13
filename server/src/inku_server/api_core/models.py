@@ -717,19 +717,27 @@ class ModelSettingsResponse(BaseModel):
         default_factory=list, description="The model providers and their models for drawing instructions (LLM purpose).",
     )
     vision_catalog: list[dict] = Field(
-        default_factory=list, description="The model providers and their models for reading images (vision purpose).",
+        default_factory=list,
+        description=(
+            "The model providers and their models for reading images (vision purpose). A signed-in "
+            "Sign in with ChatGPT group comes first, with `labels` (ja, en) and `abbreviation`."
+        ),
     )
     drawing_catalog: list[dict] = Field(
-        default_factory=list, description="The model providers and their models for drawing (LLM purpose).",
+        default_factory=list,
+        description=(
+            "The model providers and their models for drawing (LLM purpose). A signed-in "
+            "Sign in with ChatGPT group comes first, with `labels` (ja, en) and `abbreviation`."
+        ),
     )
     chatgpt_profile_id: str | None = Field(
-        default=None, description="The identifier of the caller's ChatGPT plan profile. Null when there is none.",
+        default=None, description="The identifier of the caller's Sign in with ChatGPT profile. Null when there is none.",
     )
     chatgpt_generation: int | None = Field(
-        default=None, description="The generation number of the ChatGPT plan profile. Null when there is none.",
+        default=None, description="The generation number of the Sign in with ChatGPT profile. Null when there is none.",
     )
     chatgpt_plan_available: bool = Field(
-        default=False, description="True when the caller can use a ChatGPT plan for models.",
+        default=False, description="True when the caller can use Sign in with ChatGPT for models.",
     )
     settings: dict = Field(
         default_factory=dict, description="The model settings, as a free-form object. On /api/models, model_defaults contains the shared-core user defaults.",

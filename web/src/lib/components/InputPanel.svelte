@@ -277,7 +277,7 @@
 				<span class="condition-inline-label">{t().modelButton}</span>
 				<span class="condition-value" title={conditionModelName}>{conditionModelName}</span>
 				{#if chatgptPlanSelected && inputMode === 'single'}
-					<a class="chatgpt-plan-label" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer" title={t().chatgptManageUsage}>{t().chatgptPlanLabel}</a>
+					<a class="chatgpt-plan-label" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
 				{/if}
 				<Tooltip text={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} placement="top-left">
 					<button class="ghost-btn condition-change" aria-label={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} onclick={pictureConditions ? onOpenImageModelSelection : onOpenModelSelection}>{t().editButton}</button>

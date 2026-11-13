@@ -1,6 +1,6 @@
 """Personal publication preferences, separate from the shared API-key registry.
 
-What a ChatGPT plan model is -- its recommendation, cost, speed, comments and
+What a Sign in with ChatGPT model is -- its recommendation, cost, speed, comments and
 the purposes it was measured not to answer -- is shared model settings, the same
 for every subscriber and kept in the same keys as every other provider's (the
 author, 2026-10-13). Which of the offered models a person publishes, and for
@@ -22,7 +22,7 @@ def purposes_for_model(profile: dict, model: str) -> list[str]:
 
 
 def shared_assessments() -> dict[str, dict]:
-    """The administration's assessments of ChatGPT plan models, read at each use."""
+    """The administration's assessments of Sign in with ChatGPT models, read at each use."""
     from . import db
     from .model_settings import chatgpt_assessments
     return chatgpt_assessments(db.get_model_settings())

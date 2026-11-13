@@ -42,6 +42,28 @@ test('clearing a ChatGPT registration drops its names but keeps unrelated refere
 	assert.equal(modelReference(privateRef), undefined);
 });
 
+test('the screen language is sent and each language keeps its own answer', async () => {
+	clearModelReferences();
+	let lang = 'ja';
+	const sent: string[] = [];
+	configureModelReferences(async (_path, init) => {
+		const body = JSON.parse(String(init?.body));
+		sent.push(body.language);
+		const label = body.language === 'ja' ? 'ChatGPT でサインイン' : 'Sign in with ChatGPT';
+		return Response.json({ results: [{outcome:'ok', provider:'chatgpt', model:'gpt-6.1-sol', provider_label:label, provider_abbreviation:'SIWC', model_label:'GPT-6.1 Sol'}] });
+	}, () => lang);
+	const query = {action:'resolve_display', ref:'chatgpt:gpt-6.1-sol'} as const;
+	await loadModelReferences([query]);
+	assert.equal(modelReference(query)?.provider_label, 'ChatGPT でサインイン');
+	lang = 'en';
+	assert.equal(modelReference(query), undefined);
+	await loadModelReferences([query]);
+	assert.equal(modelReference(query)?.provider_label, 'Sign in with ChatGPT');
+	assert.equal(modelReference(query)?.provider_abbreviation, 'SIWC');
+	assert.deepEqual([...new Set(sent)], ['ja', 'en']);
+	configureModelReferences(async () => Response.json({results:[]}), () => 'en');
+});
+
 test('signed-out lookups do not send a reference request', async () => {
 	let calls = 0;
 	configureModelReferences(async () => { calls++; return Response.json({results:[]}); });

@@ -14,7 +14,7 @@ Open the APK on your phone and, if required, allow installation of unknown apps 
 
 ## Start drawing
 
-For a ChatGPT plan, complete personal authorization in Chrome from the ChatGPT plan settings and acknowledge the usage notice. In Model settings, fetch your personal catalog, publish and save the models you want to use, then select a drawing model. Available models and limits depend on your plan. API-key providers remain available.
+For Sign in with ChatGPT, complete personal authorization in Chrome from the Sign in with ChatGPT settings and acknowledge the usage notice. In Model settings, fetch your personal catalog, publish and save the models you want to use, then select a drawing model. Available models and limits depend on your plan. API-key providers remain available.
 
 For an on-device Gemma model, accept its license and download it separately. On Pixel 9, Gemma 4 E2B assigns locations even to layers whose description gives no location, so on-device composition reading is disabled. Its output is not guaranteed to match cloud models.
 

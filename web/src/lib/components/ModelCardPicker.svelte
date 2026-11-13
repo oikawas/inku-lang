@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getContext, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
+	import { pickerSelection, providerGroupLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose } from '$lib/modelMeta';
 
 	type Props = {
@@ -75,7 +75,7 @@
 <div class="context-model-picker">
 	<span class="field-label">{label}</span>
 	<button class="picker-launch" type="button" {disabled} bind:this={launchButton} onclick={openPicker}>
-		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.id === 'chatgpt' ? t().chatgptPlanLabel : selected.group.label}</small>{:else if offer.notInList && (!catalogLoad || catalogLoad.status() === 'ready')}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
+		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{providerGroupLabel(selected.group, t().code)}</small>{:else if offer.notInList && (!catalogLoad || catalogLoad.status() === 'ready')}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
 		<span class="change-label">{t().modelSelectButton}</span>
 	</button>
 </div>
@@ -89,7 +89,7 @@
 		{#if selectionError}<p class="selection-error" role="alert">{selectionError}</p>{/if}
 		{#if !catalogLoad || catalogLoad.status() === 'ready'}<div class="picker-groups">
 			{#each configuredGroups as group (group.id)}
-				<section><h3>{group.id === 'chatgpt' ? t().chatgptPlanLabel : group.label}</h3><div class="model-grid">
+				<section><h3>{providerGroupLabel(group, t().code)}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} class:not-recommended={purposeUnsupported(model, purpose)} disabled={isModelUnselectable(model)} onclick={() => choose(group.id, model.id)}>
 							<div class="model-button-heading">

@@ -36,7 +36,7 @@ def serve_api(host: str, port: int, *, self_hosted: bool) -> None:
 
 def main() -> None:
     failed_profile_id = None
-    parser = argparse.ArgumentParser(description="inku ChatGPT plan connection")
+    parser = argparse.ArgumentParser(description="inku Sign in with ChatGPT connection")
     commands = parser.add_subparsers(dest="command", required=True)
     create = commands.add_parser("recipient")
     create.add_argument("--owner-id", required=True)

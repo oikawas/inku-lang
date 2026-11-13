@@ -1,10 +1,10 @@
-# Getting started with Docker Desktop (ChatGPT plan, single user)
+# Getting started with Docker Desktop (Sign in with ChatGPT, single user)
 
-This guide runs inku in containers on Docker Desktop on your own Mac (or Windows) and paints with your ChatGPT subscription's allowance (the [ChatGPT plan connection](chatgpt-plan.md)). It runs in single-user mode, so there is no login screen and no password: the setup belongs to the one person who owns the PC.
+This guide runs inku in containers on Docker Desktop on your own Mac (or Windows) and paints with your ChatGPT subscription's allowance ([Sign in with ChatGPT](chatgpt-plan.md)). It runs in single-user mode, so there is no login screen and no password: the setup belongs to the one person who owns the PC.
 
 The containers are built from your local source with the repository's top-level `compose.yaml`, where single-user mode is the default. The same source is also used on the PC side for the ChatGPT sign-in. To run the GHCR release images with an API key instead, see [`deploy/README.md`](../../deploy/README.md); that setup uses ordinary account sign-in.
 
-This guide applies to versions that support the ChatGPT plan in containers (v2.15.83 and later).
+This guide applies to versions that support Sign in with ChatGPT in containers (v2.15.83 and later).
 
 ## What you need
 
@@ -37,7 +37,7 @@ Run the following commands in this directory unless a step says otherwise.
 
 ## 2. Create `.env`
 
-The ChatGPT plan is off by default. To use it in containers, write two settings to `.env`.
+Sign in with ChatGPT is off by default. To use it in containers, write two settings to `.env`.
 
 ```sh
 cat > .env <<'EOF'
@@ -132,11 +132,11 @@ The import is done when it prints `"status":"imported"`. The two files have serv
 
 ## 5. Choose a model and paint
 
-1. In the web settings, open the "ChatGPT plan" tab and press "Check connection".
-2. In the "Models" tab of the settings, choose "ChatGPT plan". From "Select models", press "Fetch model list", tick the models to paint with, and save. They are visible only to you.
-3. In "Model selection" on the painting screen, choose a ChatGPT plan model as the model shared by Stage 1/2.
+1. In the web settings, open the "Sign in with ChatGPT" tab and press "Check connection".
+2. In the "Models" tab of the settings, choose "Sign in with ChatGPT". From "Select models", press "Fetch model list", tick the models to paint with, and save. They are visible only to you.
+3. In "Model selection" on the painting screen, choose a Sign in with ChatGPT model as the model shared by Stage 1/2.
 
-Write a short description and paint. If you run out of allowance, check your ChatGPT usage from "Manage usage" in the "ChatGPT plan" tab, and press "Check usage and retry" once it has recovered.
+Write a short description and paint. If you run out of allowance, check your ChatGPT usage from "Manage usage" in the "Sign in with ChatGPT" tab, and press "Check usage and retry" once it has recovered.
 
 ## Stop, update, remove
 
@@ -148,4 +148,4 @@ git pull && docker compose up -d --build # update to a newer version
 
 The works database and the ChatGPT sign-in (`/data/chatgpt`) both live in the `inku-data` volume. They survive stopping and recreating the containers. `docker compose down -v` deletes the volume, losing both your works and the ChatGPT connection; start again from step 4 if you do that.
 
-How the ChatGPT plan works, how to disconnect it, and how to read its errors are in [ChatGPT plan connection](chatgpt-plan.md).
+How Sign in with ChatGPT works, how to disconnect it, and how to read its errors are in [Sign in with ChatGPT](chatgpt-plan.md).

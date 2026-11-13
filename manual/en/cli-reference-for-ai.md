@@ -4,18 +4,18 @@ This document serves as a guideline for AI agents to operate the `inku-server` v
 
 It covers inku v2.15.329 (Web Build 1405). The full flag list lives in the `inku-cli Reference`.
 
-Future tests and comparisons that call a real provider use these models (two routes: ChatGPT plan and Gemini API (Cloud)). Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation.
+Future tests and comparisons that call a real provider use these models (two routes: Sign in with ChatGPT and Gemini API (Cloud)). Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation.
 
 | Role | Connection and model | Explicit model reference |
 |---|---|---|
-| Primary | ChatGPT plan / GPT-6-Luna | `chatgpt:gpt-6-luna` |
+| Primary | Sign in with ChatGPT / GPT-6-Luna | `chatgpt:gpt-6-luna` |
 | Secondary | Gemini API (Cloud) / Gemma 4 31B IT | `gemini:gemma-4-31b-it` |
-| Vision | ChatGPT plan / GPT-6.1-Sol | `chatgpt:gpt-6.1-sol` |
-| Vision | ChatGPT plan / GPT-6-Astra | `chatgpt:gpt-6-astra` |
+| Vision | Sign in with ChatGPT / GPT-6.1-Sol | `chatgpt:gpt-6.1-sol` |
+| Vision | Sign in with ChatGPT / GPT-6-Astra | `chatgpt:gpt-6-astra` |
 
 The two Vision models are for tests that read pictures, such as Vision-assisted inspection of the exported pictures.
 
-Before running, confirm the person's connection, published models, and available allowance. Follow the [connection guide](../../docs/guide/chatgpt-plan.md) for ChatGPT plan requirements. Secondary uses the Gemini API connection; do not substitute NIM's `google/`-prefixed ID or a local Gemma. Stop if an entry point cannot select the model explicitly or its connection fails; do not switch to NIM. Keep the description, seeds, and other comparison conditions fixed, and record the actual provider, model, and result.
+Before running, confirm the person's connection, published models, and available allowance. Follow the [connection guide](../../docs/guide/chatgpt-plan.md) for Sign in with ChatGPT requirements. Secondary uses the Gemini API connection; do not substitute NIM's `google/`-prefixed ID or a local Gemma. Stop if an entry point cannot select the model explicitly or its connection fails; do not switch to NIM. Keep the description, seeds, and other comparison conditions fixed, and record the actual provider, model, and result.
 
 ---
 

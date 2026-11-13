@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from inku_server.chatgpt_provider import SSEDecoder
 from inku_server.chatgpt_store import ChatGPTError, canonical
+from inku_server.verified_model_catalog import sign_in_service
 
 
 def _read(*events, limit=4096):
@@ -71,12 +72,12 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         assert [model["id"] for model in fetched["models"]] == ["luna", "other"]
         assert fetched["enabled_models"] == {"luna": False, "other": False}
         assert all(model["purposes"] == ["llm", "vision"] for model in fetched["models"])
-        assert public.api_models(actor).drawing_catalog[-1]["models"] == []
+        assert public.api_models(actor).drawing_catalog[0]["models"] == []
         body = {"profile_id": profile["id"], "generation": 1, "published_models": ["luna"]}
         assert client.put("/api/me/chatgpt/models/settings", json=body).json()["enabled_models"] == {"luna": True, "other": False}
         drawing = public.api_models(actor)
-        assert [entry["id"] for entry in drawing.drawing_catalog[-1]["models"]] == ["luna"]
-        assert [entry["id"] for entry in drawing.vision_catalog[-1]["models"]] == ["luna"]
+        assert [entry["id"] for entry in drawing.drawing_catalog[0]["models"]] == ["luna"]
+        assert [entry["id"] for entry in drawing.vision_catalog[0]["models"]] == ["luna"]
         assert all(provider["id"] != "chatgpt" for provider in drawing.catalog + drawing.llm_catalog)
         assert "chatgpt" not in shared_settings["providers"]
         assert offered("owner", "luna") and not offered("owner", "other")
@@ -97,10 +98,16 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         ]
         assert client.get("/api/me/chatgpt/models/settings").json() == published
         drawing = public.api_models(actor)
-        assert drawing.drawing_catalog[-1]["models"] == []
-        assert [entry["id"] for entry in drawing.vision_catalog[-1]["models"]] == ["luna"]
-        assert drawing.vision_catalog[-1]["id"] == "chatgpt"
-        assert drawing.vision_catalog[-1]["kind"] == "chatgpt_responses"
+        assert drawing.drawing_catalog[0]["models"] == []
+        assert [entry["id"] for entry in drawing.vision_catalog[0]["models"]] == ["luna"]
+        assert drawing.vision_catalog[0]["id"] == "chatgpt"
+        assert drawing.vision_catalog[0]["kind"] == "chatgpt_responses"
+        # The group leads both lists and carries the shared core's names (2026-11-14).
+        service = sign_in_service("chatgpt")
+        for group in (drawing.drawing_catalog[0], drawing.vision_catalog[0]):
+            assert (group["labels"], group["abbreviation"]) == (service["labels"], "SIWC")
+            assert group["label"] == "Sign in with ChatGPT"
+        assert published["service"] == service
         assert not offered("owner", "luna") and offered("owner", "luna", purpose="vision")
         assert not offered("owner", "other", purpose="vision")
         assert client.put("/api/me/chatgpt/models/settings", json=body).json() == published
@@ -114,7 +121,7 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         luna = assessed["models"][0]
         assert (luna["recommendation_vision"], luna["speed_vision_seconds"], luna["comment_ja"]) == (3, 6.5, "共通の評価")
         assert luna["purposes"] == ["vision"] and assessed["enabled_models"] == published["enabled_models"]
-        assert public.api_models(actor).vision_catalog[-1]["models"][0]["comment_en"] == "Shared assessment"
+        assert public.api_models(actor).vision_catalog[0]["models"][0]["comment_en"] == "Shared assessment"
         assert client.post("/api/me/chatgpt/models/refresh").json()["models"][0]["comment_ja"] == "共通の評価"
         assert store.profile("owner")["catalog"]["models"][0] == {"id": "luna", "label": "Luna", "purposes": ["llm", "vision"]}
         assert store.profile("owner").get("model_metadata", {}) == {}
@@ -122,7 +129,7 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         shared_settings["chatgpt_models"] = [{"id": "luna", "unsupported_purposes": ["vision"]}]
         silent = client.get("/api/me/chatgpt/models/settings").json()
         assert (silent["models"][0]["purposes"], silent["enabled_models"]["luna"]) == ([], False)
-        assert public.api_models(actor).vision_catalog[-1]["models"] == []
+        assert public.api_models(actor).vision_catalog[0]["models"] == []
         assert client.put("/api/me/chatgpt/models/settings", json=vision_only).status_code == 403
         shared_settings.pop("chatgpt_models")
         actor = {"id": "other-owner"}

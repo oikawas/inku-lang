@@ -459,11 +459,11 @@ class ModelSettingsPatch(BaseModel):
         default_factory=dict,
         description="Changes to model providers, keyed by provider id; only the providers sent are changed",
     )
-    # Shared assessments of ChatGPT plan models, by model id; each entry replaces
+    # Shared assessments of Sign in with ChatGPT models, by model id; each entry replaces
     # that model's stored assessment. Publication stays personal (/api/me/chatgpt).
     chatgpt_models: list[dict] | None = Field(
         default=None,
-        description="Shared assessments of ChatGPT plan models, by model id; each entry replaces that model's stored assessment, and null leaves them unchanged",
+        description="Shared assessments of Sign in with ChatGPT models, by model id; each entry replaces that model's stored assessment, and null leaves them unchanged",
     )
 
 

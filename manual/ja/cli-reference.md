@@ -414,7 +414,7 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
 ### 3. 多モデル比較 (inspect)
 同一の記述に対して、複数のモデルがどのように解釈（DDL）および描画するかを順に実行し、比較します。
 
-今後の実providerテスト・比較はPrimaryをChatGPTプラン / GPT-6-Luna、SecondaryをGemini API（Cloud）/ Gemma 4 31B ITとし、NVIDIA NIMを対象・対照・fallback・Vision評価へ含めません。[AI向けテスト手順](cli-reference-for-ai.md)に従い、接続失敗時は止めます。
+今後の実providerテスト・比較はPrimaryをChatGPT でサインイン / GPT-6-Luna、SecondaryをGemini API（Cloud）/ Gemma 4 31B ITとし、NVIDIA NIMを対象・対照・fallback・Vision評価へ含めません。[AI向けテスト手順](cli-reference-for-ai.md)に従い、接続失敗時は止めます。
 
 ```sh
 uv run inku-cli inspect "青い線を引く" --models "chatgpt:gpt-6-luna,gemini:gemma-4-31b-it" -o ./inspection --png

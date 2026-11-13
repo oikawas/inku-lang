@@ -24,7 +24,7 @@ def _item(history_id: str) -> dict:
     return db.get_items("owner", [history_id])[0]
 
 
-def test_a_child_that_keeps_the_ddl_shows_its_ancestors_composition(host, composed):
+def test_a_child_that_keeps_the_ddl_shows_its_ancestors_composition(host, composed):  # noqa: F811 - the pytest fixtures imported above
     client, service, _, _ = host
     view = _wait(service, _start(client, composition="on", composition_form="one_corner")["execution_id"])
     done = service.command("owner", view["execution_id"], {"tag": "perform"})

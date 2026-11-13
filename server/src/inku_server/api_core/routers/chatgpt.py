@@ -16,6 +16,7 @@ from ...chatgpt_auth import USAGE_URL, attempts, auth_policy, delete_profile, si
 from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin
 from ...chatgpt_store import ChatGPTError, CredentialStore
+from ...verified_model_catalog import sign_in_service
 from ..deps import _current_user
 
 router = APIRouter(prefix="/api/me/chatgpt")
@@ -33,9 +34,9 @@ def owner(actor: dict = Depends(_current_user)) -> str:
     return actor["id"]
 
 
-@router.get("", summary="Read ChatGPT plan connection state")
+@router.get("", summary="Read Sign in with ChatGPT connection state")
 def state(actor: dict = Depends(_current_user)) -> dict:
-    """Return the signed-in user's ChatGPT plan state.
+    """Return the signed-in user's Sign in with ChatGPT state.
 
     The result holds `available` and `reason` (set when the feature is unavailable), `self_hosted`,
     `usage_url`, `active_profile_id`, `profiles` and `pending_registrations`. A profile's `state` is
@@ -71,9 +72,9 @@ class AuthorizeBody(BaseModel):
     )
 
 
-@router.post("/authorize", summary="Start connecting a ChatGPT plan")
+@router.post("/authorize", summary="Start Sign in with ChatGPT")
 def authorize(body: AuthorizeBody, actor: str = Depends(owner)) -> dict:
-    """Begin connecting a ChatGPT plan and return the connection attempt to poll.
+    """Begin Sign in with ChatGPT and return the connection attempt to poll.
 
     On a self-hosted server this returns status `local_authorization_required` with action
     `local_helper`. The `helper_target` field is added when INKU_CHATGPT_HELPER_TARGET is `container`.
@@ -122,12 +123,12 @@ def cancel(
         raise _error(error) from None
 
 
-@router.post("/profiles/{profile_id}/select", summary="Make a ChatGPT plan the active one")
+@router.post("/profiles/{profile_id}/select", summary="Make a Sign in with ChatGPT profile the active one")
 def select(
-    profile_id: str = Path(..., description="Id of the ChatGPT plan profile to make active."),
+    profile_id: str = Path(..., description="Id of the Sign in with ChatGPT profile to make active."),
     actor: str = Depends(owner),
 ) -> dict:
-    """Make a registered ChatGPT plan the active one and return the updated plan state.
+    """Make a registered Sign in with ChatGPT profile the active one and return the updated connection state.
 
     Returns 403 with `chatgpt_not_connected` when the profile is not registered for the user.
     """
@@ -146,12 +147,12 @@ def select(
         raise _error(error) from None
 
 
-@router.post("/profiles/{profile_id}/sign-out", summary="Sign out a ChatGPT plan")
+@router.post("/profiles/{profile_id}/sign-out", summary="Sign out a Sign in with ChatGPT profile")
 def disconnect(
-    profile_id: str = Path(..., description="Id of the ChatGPT plan profile to sign out."),
+    profile_id: str = Path(..., description="Id of the Sign in with ChatGPT profile to sign out."),
     actor: str = Depends(owner),
 ) -> dict:
-    """Sign out one ChatGPT plan, removing its stored tokens and ending its session.
+    """Sign out one Sign in with ChatGPT profile, removing its stored tokens and ending its session.
 
     Returns the sign-out result, including whether revocation was confirmed. Returns 403 when the
     profile is not registered for the user.
@@ -162,12 +163,12 @@ def disconnect(
         raise _error(error) from None
 
 
-@router.post("/profiles/{profile_id}/delete", summary="Delete a ChatGPT plan registration")
+@router.post("/profiles/{profile_id}/delete", summary="Delete a Sign in with ChatGPT registration")
 def delete(
-    profile_id: str = Path(..., description="Id of the ChatGPT plan profile to delete."),
+    profile_id: str = Path(..., description="Id of the Sign in with ChatGPT profile to delete."),
     actor: str = Depends(owner),
 ) -> dict:
-    """Sign out one ChatGPT plan, then remove its registration and its saved model settings.
+    """Sign out one Sign in with ChatGPT profile, then remove its registration and its saved model settings.
 
     A connected plan is signed out first, as by sign-out. When the deleted plan was the active one,
     no plan is active afterwards. Returns the result, including whether revocation was confirmed.
@@ -180,15 +181,15 @@ def delete(
         raise _error(error) from None
 
 
-@router.post("/profiles/{profile_id}/retry",summary="Retry a ChatGPT plan paused by its usage limit")
+@router.post("/profiles/{profile_id}/retry",summary="Retry a Sign in with ChatGPT profile paused by its usage limit")
 def retry(
-    profile_id: str = Path(..., description="Id of the ChatGPT plan profile to resume."),
+    profile_id: str = Path(..., description="Id of the Sign in with ChatGPT profile to resume."),
     actor: str = Depends(owner),
 ) -> dict:
-    """Resume a ChatGPT plan that a usage limit had paused, returning it to `connected`.
+    """Resume a Sign in with ChatGPT profile that a usage limit had paused, returning it to `connected`.
 
     Only a profile in the `quota` state can be retried. Any other profile, or an unknown one, is
-    rejected with 403 and `chatgpt_not_connected`. Returns the updated plan state.
+    rejected with 403 and `chatgpt_not_connected`. Returns the updated connection state.
     """
     store = CredentialStore()
     try:
@@ -213,9 +214,9 @@ def models(actor: str, *, force: bool = False) -> dict:
         raise HTTPException(status_code=503, detail={"code": "chatgpt_transport_unavailable", "action": "retry"}) from None
 
 
-@router.get("/models", summary="Get the model list of the active ChatGPT plan")
+@router.get("/models", summary="Get the model list of the active Sign in with ChatGPT profile")
 def get_models(actor: str = Depends(owner)) -> dict:
-    """Return the model list of the active ChatGPT plan with its saved publication settings.
+    """Return the model list of the active Sign in with ChatGPT profile with its saved publication settings.
 
     The list is fetched from ChatGPT only when it is not already cached. Returns 403 for ownership
     or session errors, including an unreachable sign-in service (`chatgpt_auth_unavailable`). Returns
@@ -226,7 +227,7 @@ def get_models(actor: str = Depends(owner)) -> dict:
 
 @router.post("/models/refresh", summary="Refresh the ChatGPT model list")
 def refresh_models(actor: str = Depends(owner)) -> dict:
-    """Fetch the model list of the active ChatGPT plan from ChatGPT again, ignoring the cache.
+    """Fetch the model list of the active Sign in with ChatGPT profile from ChatGPT again, ignoring the cache.
 
     Returns the same result and error statuses as the model list: 403 for ownership or session
     errors, including an unreachable sign-in service, and 503 when the model list request itself
@@ -240,7 +241,7 @@ class PublishedModelsBody(BaseModel):
     profile_id: str = Field(
         min_length=1,
         max_length=128,
-        description="Id of the active ChatGPT plan profile the settings are saved for. Rejected with 403 when it is no longer the active plan.",
+        description="Id of the active Sign in with ChatGPT profile profile the settings are saved for. Rejected with 403 when it is no longer the active plan.",
     )
     generation: int = Field(
         ge=1,
@@ -259,26 +260,27 @@ class PublishedModelsBody(BaseModel):
 
 @router.get("/models/settings", summary="Get saved model publication settings")
 def model_settings(actor: str = Depends(owner)) -> dict:
-    """Return the saved model publication settings of the active ChatGPT plan.
+    """Return the saved model publication settings of the active Sign in with ChatGPT profile.
 
     This does not contact ChatGPT. Returns 403 for ownership or session errors.
     """
     try:
         profile_id, generation = pin(actor)
-        return saved_publication(actor, profile_id, generation)
+        return {**saved_publication(actor, profile_id, generation), "service": sign_in_service("chatgpt")}
     except ChatGPTError as error:
         raise _error(error) from None
 
 
-@router.put("/models/settings", summary="Save published models for the active ChatGPT plan")
+@router.put("/models/settings", summary="Save published models for the active Sign in with ChatGPT profile")
 def publish_models(body: PublishedModelsBody, actor: str = Depends(owner)) -> dict:
-    """Save which models are published for the active ChatGPT plan, and their purposes.
+    """Save which models are published for the active Sign in with ChatGPT profile, and their purposes.
 
     Returns the saved settings. Returns 403 when a model is not in the plan's offered list, when the
     profile is no longer the active plan, or when its sign-in generation has changed.
     """
     try:
         # Assessments are shared model settings now, saved through /api/settings/models.
-        return save_publication(actor, body.profile_id, body.generation, body.published_models, body.model_purposes)
+        saved = save_publication(actor, body.profile_id, body.generation, body.published_models, body.model_purposes)
+        return {**saved, "service": sign_in_service("chatgpt")}
     except ChatGPTError as error:
         raise _error(error) from None

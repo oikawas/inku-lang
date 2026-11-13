@@ -418,7 +418,7 @@ Attach an existing work as the parent node and produce a local option, saved int
 
 Runs several models on the same description one after another and compares how each interprets it as DDL and performs it.
 
-Future real-provider tests and comparisons use ChatGPT plan / GPT-6-Luna as Primary and Gemini API (Cloud) / Gemma 4 31B IT as Secondary. Exclude NVIDIA NIM from targets, controls, fallbacks, and Vision evaluation. Follow the [AI testing procedure](cli-reference-for-ai.md) and stop on connection failure.
+Future real-provider tests and comparisons use Sign in with ChatGPT / GPT-6-Luna as Primary and Gemini API (Cloud) / Gemma 4 31B IT as Secondary. Exclude NVIDIA NIM from targets, controls, fallbacks, and Vision evaluation. Follow the [AI testing procedure](cli-reference-for-ai.md) and stop on connection failure.
 
 ```sh
 uv run inku-cli inspect "draw a blue line" --models "chatgpt:gpt-6-luna,gemini:gemma-4-31b-it" -o ./inspection --png

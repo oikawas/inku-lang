@@ -45,8 +45,9 @@ const STRIP_MODEL_WORDS: Readonly<Record<string, string>> = {
 };
 
 /** Compact recognizable tokens, keeping numeric versions, sizes and variants. */
-export function abbreviateStripModel(owner: string, name: string): string {
-	const provider = /ollama.*cloud/i.test(owner) ? 'Oc' : owner.trim().slice(0, 2);
+export function abbreviateStripModel(owner: string, name: string, ownerAbbreviation?: string): string {
+	// A sign-in service names its own abbreviation in the core ("SIWC" for Sign in with ChatGPT).
+	const provider = ownerAbbreviation || (/ollama.*cloud/i.test(owner) ? 'Oc' : owner.trim().slice(0, 2));
 	let model = name.trim().replace(/^.*\//, '')
 		.replace(/^(?:anthropic|google|meta|mistral\s+ai)\s+/i, '')
 		.replace(/\s*\([\d.]+\s*[GM]B\)\s*$/i, '')

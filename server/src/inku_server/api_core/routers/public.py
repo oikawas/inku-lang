@@ -5,7 +5,7 @@ from __future__ import annotations
 import urllib.parse
 
 import httpx
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
@@ -18,7 +18,7 @@ from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
 from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model
-from ...verified_model_catalog import core_catalog
+from ...verified_model_catalog import core_catalog, sign_in_provider_groups
 from ...text_provider import send_text
 from ...request_timeout import request_timeout_seconds
 from ... import db as _db
@@ -55,11 +55,11 @@ class AppInfoResponse(BaseModel):
         description="True when this server belongs to one person. Clients use it to hide controls that lead nowhere.",
     )
     chatgpt_plan_available: bool = Field(
-        default=False, description="True when the ChatGPT plan can be used on this server.",
+        default=False, description="True when Sign in with ChatGPT can be used on this server.",
     )
     chatgpt_plan_unavailable_reason: str | None = Field(
         default=None,
-        description="Why the ChatGPT plan is unavailable, such as chatgpt_disabled, chatgpt_mode_not_allowed or chatgpt_startup_unverified. Null when it is available.",
+        description="Why Sign in with ChatGPT is unavailable, such as chatgpt_disabled, chatgpt_mode_not_allowed or chatgpt_startup_unverified. Null when it is available.",
     )
     # Whether this server keeps the second thumbnail size. The client asks for
     # it only where both this is on and the screen is dense enough to use it;
@@ -124,7 +124,7 @@ async def health() -> dict[str, bool]:
 def api_info() -> AppInfoResponse:
     """Return the server name, versions and feature flags that clients read at startup. Public: no sign-in is needed.
 
-    Reports whether the ChatGPT plan is available and, when it is not, why. Also
+    Reports whether Sign in with ChatGPT is available and, when it is not, why. Also
     reports the active render engine, the DDL versions and the single-user flag.
     """
     from ...chatgpt_runtime import availability
@@ -190,10 +190,10 @@ def api_notice_text(
 def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     """Return the model catalogs offered to the signed-in caller and the caller's model settings.
 
-    The drawing (llm) and vision catalogs are returned. When the caller's ChatGPT
-    plan is available, a ChatGPT entry is added to both, listing the plan's
-    models for each purpose. Requires a signed-in user;
-    responds 401 when there is no valid session.
+    The drawing (llm) and vision catalogs are returned. When the caller is signed in with
+    ChatGPT, its group comes first in both, listing the published models for each purpose,
+    with its labels in both languages and its abbreviation from the shared core. Requires a
+    signed-in user; responds 401 when there is no valid session.
     """
     settings = _db.get_model_settings()
     developer_mode = _env_flag("INKU_DEVELOPER_MODE")
@@ -210,9 +210,11 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
         chatgpt_available = True
         profile_id, generation = pin(actor["id"])
         models = [model for model in saved_publication(actor["id"], profile_id, generation)["models"] if model["enabled"]]
-        for purpose, target in (("llm", drawing), ("vision", vision)):
-            target.append({"id": "chatgpt", "label": "ChatGPT plan", "kind": "chatgpt_responses",
-                           "requires_api_key": False, "models": [model for model in models if purpose in model["purposes"]]})
+        drawing, vision = (
+            sign_in_provider_groups(target, [{"service": "chatgpt",
+                                              "models": [model for model in models if purpose in model["purposes"]]}])
+            for purpose, target in (("llm", drawing), ("vision", vision))
+        )
     except (ChatGPTError, ValueError, KeyError):
         profile_id = generation = None
     return ModelSettingsResponse(
@@ -239,6 +241,10 @@ class ModelReferenceQuery(BaseModel):
 
 class ModelReferencesRequest(BaseModel):
     queries: list[ModelReferenceQuery] = Field(max_length=2048, description="Model references to resolve in order")
+    language: Literal["ja", "en"] | None = Field(
+        default=None,
+        description="Language of the sign-in service labels in the results (ja or en); English when omitted",
+    )
 
 
 class ModelReferencesResponse(BaseModel):
@@ -247,7 +253,10 @@ class ModelReferencesResponse(BaseModel):
 
 @router.post("/api/model-references", response_model=ModelReferencesResponse, summary="Resolve model references")
 def api_model_references(body: ModelReferencesRequest, actor: dict = Depends(_current_user)) -> ModelReferencesResponse:
-    """Resolve model references against active services and the caller's published ChatGPT models."""
+    """Resolve model references against active services and the caller's published Sign in with ChatGPT models.
+
+    The sign-in service's label in each result follows `language`, with its abbreviation.
+    """
     clean = normalize_model_settings(_db.get_model_settings())
     groups = [{"id": provider["id"], "label": provider["label"], "active": provider["active"],
                "models": provider["models"]} for provider in clean["providers"].values()]
@@ -258,8 +267,9 @@ def api_model_references(body: ModelReferencesRequest, actor: dict = Depends(_cu
         models = {model["id"]: model for group in chatgpt_groups for model in group["models"]}
         groups.append({**chatgpt_groups[0], "models": list(models.values())})
     providers = {group["id"]: group for group in groups}
+    language = {"language": body.language} if body.language else {}
     results = core_catalog("reference_batch", providers=providers,
-                           queries=[query.model_dump() for query in body.queries])["results"]
+                           queries=[query.model_dump() for query in body.queries], **language)["results"]
     return ModelReferencesResponse(results=results)
 
 

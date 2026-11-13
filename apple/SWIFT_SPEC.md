@@ -22,6 +22,22 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-13 The iPhone library scrolls through every work
+
+The author's instruction (2026-11-13): the iPhone library shows every work in one scroll, as Photos does. The tiles take Photos' form and the newest works come first (the author's choices).
+
+- The iPhone library's timeline no longer pages; it scrolls through every work (`LibraryModel.continuous`). It reads 120 works from the newest and adds the next 120 as the scroll nears the end (`loadMore()`). A read again (after a star, for example) reads every listed work at once, so the scroll keeps its place. Opened from a work in Making, it reads down to that work and scrolls to it. The heading has no pager; the count is "listed / all".
+- The thumbnail view shows square tiles, three to a row with 2pt between (the picture fills the tile). No text: a star and the revision mark at the lower left, and a check at the upper right of a selected work. A tap opens the work's page as before; a long press gives the work's menu. "Select" in the tools row starts selecting (a tap toggles a work's selection), and "Done" drops the selection and ends it.
+- On iPhone the list view is no longer a table but one row a work (the picture at the left; the title, date, star, revision mark and models at the right; taps, the long press and "Select" as for the tiles). It also reads on through every work. At the iPhone's width the table (`Table`) showed its first column only (the selection check), so no title, picture or date was visible (found in the 2026-11-13 screen check; an earlier defect).
+- The lineage view still pages (eight lineages). The iPad's and the Mac's screens and behavior do not change.
+
+## 2026-11-13 Saving Drawing defaults on iPhone
+
+The author's report (2026-11-13): on iPhone, the model chosen in Drawing defaults was not saved. Reproduced on the simulator: before the page was scrolled to the bottom, a model row opened no sheet, which appeared late once the bottom was reached; values changed above (such as "Composition, laws and colors") also went back to the saved ones at the first scroll to the bottom.
+
+- Cause: the iPhone's form makes a section only once it is in view. The 2026-11-09 fix (a modifier on the group of sections went to every section, and a sheet opened and closed at once) put the first read, the services' names and the model sheet on the last section ("Save defaults") only. Until that section was made no sheet appeared, and when it was made its read put the saved values over the draft.
+- Fix: on iPhone every section (Description, Image, Description batch, Image folder, Save) carries the read (the first row in view reads once), and the model sheet and the services' names sit on the section's model row, the button that opens it (`pickerTab == tab`). A modifier on a section is handed to each of its rows, so a sheet on the section answered one press with about six sheets and the first press opened none (the Build 154 screen check). The pressed row is on screen, so its sheet is always in place. The Mac and the iPad are unchanged.
+
 ## 2026-11-13 The name of a layout child
 
 By the author's choice (2026-11-13, requested by 描画セッション-claude), as on the Web (product `3a90dea84`), the Japanese name of the derivation kind `layout_change` changes from 「構図」 to 「配置」 (in the generation details and on the lineage labels). Since step 3 this child moved one thing to another place. The English stays "Layout" (the Localizable.strings key 「配置」 reads "Composition" elsewhere, so the generation details give both words directly). The Web's display, added in the same commit, of the moved thing at its new place in a layout child's "parent composition" (Server `composition_inherited.places`) is not built on macOS.

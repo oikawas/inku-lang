@@ -114,6 +114,16 @@ public final class LibraryModel {
     /// the grid keeps the first work (Web `setPageSize`); the newer works before it are reached with ← newer. Filters
     /// start again at 0.
     public private(set) var startOffset = 0
+    /// The iPhone's library (author 2026-11-13, "写真アプリのように全件スクロール表示"): the timeline reads from the
+    /// newest on and `loadMore()` adds the next works as the scroll nears the end, instead of pages. A read again keeps
+    /// every work already listed. The lineage view still pages.
+    public var continuous = false {
+        didSet { if continuous != oldValue { page = 0; startOffset = 0; scheduleRefresh(refreshLineage: false) } }
+    }
+    /// How many timeline works the continuous listing reads: grows by `continuousChunk` with each `loadMore()`.
+    public private(set) var continuousLimit = LibraryModel.continuousChunk
+    public static let continuousChunk = 120
+    @ObservationIgnored private var loadingMore = false
     public private(set) var focusRequest: LibraryFocusRequest?
     /// The visit whose focus the view applied in the present grouping and layout (Web `focusedVisit`); a new
     /// grouping or layout applies it again.
@@ -379,7 +389,7 @@ public final class LibraryModel {
     /// pages by its own size.
     public func resizePageKeepingFirstWork(to value: Int) {
         let size = min(1000, max(1, value))
-        guard size != pageSize, !isGrouped else { return }
+        guard size != pageSize, !isGrouped, !continuous else { return }
         let first = startOffset + page * pageSize
         keepingPage = true
         pageSize = size
@@ -423,6 +433,9 @@ public final class LibraryModel {
             focusLineageRootID = nil
             if isGrouped {
                 timelinePlace = LibraryTimelinePlace(page: 0, startOffset: position, pageSize: timelinePlace?.pageSize)
+            } else if continuous {
+                // The continuous listing reads down to the work (and a little past it); the view scrolls to it.
+                continuousLimit = max(continuousLimit, position + 1 + Self.continuousChunk / 4)
             } else {
                 page = 0
                 startOffset = position
@@ -434,9 +447,34 @@ public final class LibraryModel {
         await refresh(refreshLineage: lineage)
     }
 
+    /// The continuous listing's next works, read when the scroll nears the end. A read again or a change of the
+    /// filters meanwhile wins: what this read brings is dropped.
+    public func loadMore() async {
+        guard continuous, !isGrouped, !loading, !loadingMore, works.count < total, let database else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        let token = refreshToken, offset = works.count, query = filter
+        do {
+            let result = try await database.libraryPage(query: query, limit: Self.continuousChunk, offset: offset,
+                                                         includeSVG: includeListSVG)
+            guard refreshToken == token, works.count == offset, !Task.isCancelled else { return }
+            let listed = try await database.lineageGenerations(nodeIDs: result.items.compactMap { $0.work.lineageNodeID })
+            await pageCompanions?(result.items.map(\.id))
+            guard refreshToken == token, works.count == offset, !Task.isCancelled else { return }
+            works += result.items.map(\.work)
+            for item in result.items { annotations[item.id] = item.annotation; svgSizes[item.id] = item.svgBytes }
+            generations.merge(listed) { $1 }
+            total = result.total
+            continuousLimit = max(continuousLimit, works.count)
+        } catch {
+            guard refreshToken == token else { return }
+            errorText = error.localizedDescription
+        }
+    }
+
     /// Thumbnails of the page that ← older shows next, read while this one is looked at.
     private func prefetchNextPage(token: UUID) {
-        guard prefetchesThumbnails, let thumbnails, let database, !isGrouped else { return }
+        guard prefetchesThumbnails, let thumbnails, let database, !isGrouped, !continuous else { return }
         let offset = startOffset + (page + 1) * pageSize
         guard offset < total else { return }
         let (query, size, shown) = (filter, pageSize, works)
@@ -457,8 +495,9 @@ public final class LibraryModel {
         let requestedFilter = filter
         let requestedGrouping = isGrouped
         let requestedMinimum = layout == .grid ? 2 : 1
-        let requestedSize = pageSize
-        let requestedOffset = startOffset + page * pageSize
+        let continuousTimeline = continuous && !requestedGrouping
+        let requestedSize = continuousTimeline ? continuousLimit : pageSize
+        let requestedOffset = continuousTimeline ? 0 : startOffset + page * pageSize
         pageGenerations = nil
         loading = true
         // An unchanged write still redraws every view that reads the error.
@@ -550,6 +589,10 @@ public final class LibraryModel {
             }
             trashTotal = count
             loading = false
+            if continuousTimeline {
+                if refreshLineage, lineageFocusID != nil { await reloadLineage() }
+                return
+            }
             // Deletions can leave the kept first work past the end; the pages then begin at the newest again.
             if startOffset > 0, startOffset >= total { startOffset = 0; page = 0; await refresh(refreshLineage: refreshLineage); return }
             if page >= pageCount { page = pageCount - 1; await refresh(refreshLineage: refreshLineage); return }

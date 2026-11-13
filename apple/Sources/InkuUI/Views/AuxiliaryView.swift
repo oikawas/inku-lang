@@ -12,19 +12,17 @@ public struct AuxiliaryView: View {
     @State private var showModels = false
     @Environment(\.dismiss) private var dismiss
 
-    public init(model: AppModel, mode: AuxiliaryMode = .advice, work: SavedWork? = nil) { self.model = model; self.mode = mode; self.work = work }
+    public init(model: AppModel, mode: AuxiliaryMode = .colophon, work: SavedWork? = nil) { self.model = model; self.mode = mode; self.work = work }
 
-    public var body: some View {
-        if mode == .advice { AutonomousRefinementView(model: model, work: work) }
-        else { colophonBody }
-    }
+    /// The colophon only: the AI refinement process that shared this view is gone (author 2026-11-13).
+    public var body: some View { colophonBody }
 
     private var colophonBody: some View {
         @Bindable var auxiliary = auxiliary
         return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Text(model.display.localized(mode == .colophon ? "系譜の奥書" : "AI自動推敲プロセス")).inkuFont(16, weight: .semibold)
+                    Text(model.display.localized("系譜の奥書")).inkuFont(16, weight: .semibold)
                     Spacer()
                     Button(model.display.localized("閉じる")) {
                         Task {
@@ -37,10 +35,8 @@ public struct AuxiliaryView: View {
                 if let work = auxiliary.sourceWork ?? work {
                     HStack(spacing: 14) {
                         ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 110, height: 95)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(work.effectiveSourceText).lineLimit(3)
-                            Text(model.display.localized("元の作品は保持し、新しい子を系譜に保存します。")).inkuFont(12).foregroundStyle(.secondary)
-                        }
+                        // A colophon is appended to the lineage; it draws no child (the advice note that said so is gone).
+                        Text(work.effectiveSourceText).lineLimit(3)
                     }
                 } else {
                     ContentUnavailableView(model.display.localized("保存作品を選択"), systemImage: "photo", description: Text(model.display.localized("ライブラリか制作画面で元の作品を選択してください。")))
@@ -58,7 +54,7 @@ public struct AuxiliaryView: View {
                 } else if !auxiliary.status.isEmpty { Text(model.display.message(auxiliary.status)).inkuFont(13).foregroundStyle(.secondary) }
                 if let error = auxiliary.errorText { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
                 if !auxiliary.draftText.isEmpty { draftEditor }
-                if mode == .colophon { savedColophons }
+                savedColophons
             }.padding(20)
         }
         .inkuWideFrame(minWidth: 460, idealWidth: 700, minHeight: 520)
@@ -115,23 +111,15 @@ public struct AuxiliaryView: View {
 
     private var draftEditor: some View {
         @Bindable var auxiliary = auxiliary
-        return GroupBox(model.display.localized(mode == .colophon ? "生成した奥書" : "編集して採用する次の方針")) {
+        return GroupBox(model.display.localized("生成した奥書")) {
             VStack(alignment: .leading, spacing: 10) {
-                if mode == .colophon {
-                    Text(auxiliary.draftText).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    TextEditor(text: $auxiliary.draftText).inkuFont(14).frame(minHeight: 100).disabled(auxiliary.running || auxiliary.selectingSource)
-                }
+                Text(auxiliary.draftText).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 if let draft = auxiliary.colophonDraft, !draft.warnings.isEmpty {
                     Text(model.display.localized("確認が必要な表現: ") + draft.warnings.joined(separator: model.display.preferences.language == "en" ? ", " : "、")).inkuFont(12).foregroundStyle(.orange)
                 }
                 HStack {
                     Button(model.display.localized("コピー"), systemImage: "doc.on.doc") { auxiliary.copyDraft() }
                     Spacer()
-                    if mode != .colophon {
-                        Button(model.display.localized("この方針で子を描く")) { Task { await auxiliary.adoptAdvice(app: model) } }
-                            .disabled(auxiliary.sourceIsLocked)
-                    }
                 }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
             }.padding(6)
         }

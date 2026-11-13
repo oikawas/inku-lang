@@ -22,7 +22,6 @@ struct AppCheck {
             try await runReadAndDrawBaselineReplay(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
         }
         if CommandLine.arguments.contains("--read-and-draw-only") { try await runReadAndDrawChecks(); return }
-        if CommandLine.arguments.contains("--chunk-move-only") { try await runChunkMoveChecks(); return }
         if CommandLine.arguments.contains("--lineage-migration-only") { try await runLineageMigrationReplayChecks(); return }
         if let index = CommandLine.arguments.firstIndex(of: "--chatgpt-policy-only") {
             guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected ChatGPT wire and addendum cases") }
@@ -58,13 +57,6 @@ struct AppCheck {
         if CommandLine.arguments.contains("--canvas-ratio-authoring-only") {
             try await runCanvasRatioAuthoringChecks(); return
         }
-        if let index = CommandLine.arguments.firstIndex(of: "--shared-autonomous-refine-only") {
-            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected the shared autonomous refinement cases") }
-            try runSharedAutonomousRefineChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
-        }
-        if CommandLine.arguments.contains("--saved-laws-stages-only") {
-            try await runSavedLawsStageChecks(); return
-        }
         if CommandLine.arguments.contains("--colors-ground-host-only") {
             try await runColorsGroundHostCheck(); return
         }
@@ -77,11 +69,6 @@ struct AppCheck {
             try await runSharedSavedVariantChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
                 folder: URL(fileURLWithPath: CommandLine.arguments[index + 2])); return
         }
-        if let index = CommandLine.arguments.firstIndex(of: "--shared-juxtaposition-only") {
-            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected the shared juxtaposition cases") }
-            try runSharedJuxtapositionChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
-        }
-        if CommandLine.arguments.contains("--juxtaposition-only") { try await runJuxtapositionChecks(); return }
         if let index = CommandLine.arguments.firstIndex(of: "--saved-variants-inventory") {
             guard CommandLine.arguments.indices.contains(index + 3) else { throw CheckFailure.message("Expected disposable database, product root and fresh output") }
             try await runSavedVariantsInventory(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
@@ -308,10 +295,6 @@ struct AppCheck {
         }
         if CommandLine.arguments.contains("--replay-comparison-only") {
             try await runReplayComparisonChecks()
-            return
-        }
-        if CommandLine.arguments.contains("--auxiliary-provenance-only") {
-            try await runAuxiliaryProvenanceChecks()
             return
         }
         if CommandLine.arguments.contains("--provider-progress-only") {

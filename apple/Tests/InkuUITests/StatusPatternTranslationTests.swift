@@ -6,7 +6,6 @@ final class StatusPatternTranslationTests: XCTestCase {
         let samples = [
             "画像をコピーしました（Y軸 42px）",
             "モデルの応答待ち（期限 sample）",
-            "モデルの答えを2回とも使えませんでした（sample）。",
             "応答を受信中（42 bytes）",
             "比較候補のモデル応答待ち（期限 sample）",
             "比較候補を受信中（42 bytes）",
@@ -46,7 +45,6 @@ final class StatusPatternTranslationTests: XCTestCase {
         let expected: [String] = [
             "Image copied (height 42 px)",
             "Waiting for the model (deadline sample)",
-            "The model's choices could not be used, twice (sample).",
             "Receiving response (42 bytes)",
             "Waiting for the comparison model (deadline sample)",
             "Receiving comparison candidate (42 bytes)",

@@ -38,7 +38,6 @@ public struct DrawingAdjustmentPlan: Sendable {
 @MainActor
 @Observable
 public final class AppModel {
-    public let autonomousRefinement = AutonomousRefinementModel()
     public private(set) var canvasFitQuestion: CanvasFitQuestion?
     @ObservationIgnored public var canvasFitChoiceHandler: (@MainActor (CanvasFitQuestion) async -> CanvasFitChoice)?
     @ObservationIgnored private var canvasFitContinuation: CheckedContinuation<CanvasFitChoice, Never>?
@@ -469,7 +468,6 @@ public final class AppModel {
             let bootstrap = try Bootstrap(pluginDataDirectory: url.deletingLastPathComponent())
             let settings = try await store.loadNormalized()
             self.database = database
-            await autonomousRefinement.restore(database: database)
             // A derived store: without it thumbnails are drawn and kept in memory, and nothing else stops.
             await thumbnails.connect(store: try? ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url)), database: database)
             await thumbnails.synchronize()
@@ -1647,159 +1645,6 @@ public final class AppModel {
         let pinned = try await pinPersonalPlanRequests([request])[0]
         try Task.checkCancellation()
         return pinned
-    }
-
-    /// Only the start payload differs from a saved DDL child. The shared pipeline decides whether its laws can run.
-    public func makeSavedLawsRequest(work: SavedWork, direction: ExactJSON, settings: HostSettings,
-                                     wild: Bool?) async throws -> GenerationRequest {
-        let chosen = currentDrawOptions
-        let saved = try await savedConfiguration(workID: work.id)
-        var configuration = try ExactJSON(data: saved.configuration)
-        var options = try ExactJSON(data: saved.renderOptions)
-        if let wild { options["wild"] = .bool(wild) }
-        guard let bootstrap, let canvas = options["canvas_aspect_id"].string,
-              let seed = options["render_seed"].string ?? options["render_seed"].number else {
-            throw HostError("saved_refinement_options_unavailable")
-        }
-        let selected = try bootstrap.request(inputMode: "ddl", source: work.ddl ?? "", description: work.effectiveSourceText,
-            language: work.instructionLangResolved ?? "ja", catalogID: chosen.catalog.id, canvasID: canvas, seed: seed,
-            wild: wild ?? work.renderWild ?? false, settings: settings, parentWorkID: work.id,
-            derivationKind: "laws_change", catalogMode: "fixed", savedConfiguration: saved.configuration)
-        let selectedConfiguration = try ExactJSON(data: selected.configuration)
-        let selectedOptions = try ExactJSON(data: selected.renderOptions)
-        configuration["compiler"]["host"] = selectedConfiguration["compiler"]["host"]
-        options["catalog_id"] = selectedOptions["catalog_id"]
-        options["resolved_color_map"] = selectedOptions["resolved_color_map"]
-        configuration["catalogs"] = .array([])
-        var request = GenerationRequest(authoring: .directDDL(work.ddl ?? ""), configuration: configuration.data,
-            renderOptions: options.data, clipPolicy: saved.clipPolicy, models: settings.models, providers: settings.providers,
-            renderColorMaps: selected.renderColorMaps, description: work.effectiveSourceText,
-            parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "normal")
-        request.savedLawsDirection = direction.data
-        request.completionRanges = saved.completionRanges
-        request.lawsRecords = saved.lawsRecords
-        return try await pinPersonalPlanRequests([request])[0]
-    }
-
-    /// A run owns this serialized operation, but does not replace the canvas with each lineage-only attempt.
-    public func runAutonomousMove(request: GenerationRequest) async throws -> SavedWork {
-        guard let host, let database else { throw HostError("pipeline_unavailable") }
-        var child: SavedWork?
-        var failure: Error?
-        let ran = await performSerialized(status: "生成中", background: true) { [self] token in
-            do {
-                try await validatePinnedRequest(request)
-                let view = try await host.generate(request) { [weak self] progress in
-                    Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
-                }
-                if let id = view.savedWorkID { child = try await database.work(id: id) }
-                if child == nil {
-                    let events = try ExactJSON(data: view.eventsJSON).array ?? []
-                    let reason = events.last { $0["tag"].string == "failed" }?["payload"]["reason"].string
-                    throw HostError(reason ?? "autonomous_generation_failed")
-                }
-                await notifyCommittedWork(view)
-                try await reloadWorks()
-            } catch { failure = error; throw error }
-        }
-        if let child { return child }
-        try Task.checkCancellation()
-        if let failure { throw failure }
-        throw HostError(ran ? "autonomous_generation_failed" : "authoring_busy_or_unavailable")
-    }
-
-    func sendChunkPrompt(_ asked: ExactJSON, png: Data?, request: GenerationRequest) async throws -> String {
-        guard let transport = managedTransport ?? transport else { throw HostError("pipeline_unavailable") }
-        var prompt: ExactJSON = .object(["system": asked["system"], "message": asked["text"],
-            "response_schema": asked["response_schema"], "action_name": .string("generate_normalized_ddl")])
-        var images: [ExactJSON] = []
-        if let png {
-            let hash = SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined()
-            prompt["images"] = .array([.object(["media_type": .string("image/png"), "byte_len": .integer(png.count), "sha256": .string(hash)])])
-            images = [.string("data:image/png;base64," + png.base64EncodedString())]
-        }
-        let digest = SHA256.hash(data: prompt.data).map { String(format: "%02x", $0) }.joined()
-        prompt["prompt_id"] = .string("inku.chunk-moves-\(asked["purpose"].string ?? "choose").v1")
-        prompt["prompt_digest"] = .string("sha256:" + digest)
-        let config = try ExactJSON(data: request.configuration)
-        prompt["instruction_language"] = config["language"]
-        var action: ExactJSON = .object(["tag": .string("generate_normalized_ddl"), "timeout_ms": .string("300000"), "delay_ms": .string("0"),
-            "payload": .object(["prompt": prompt]), "_transient_images": .array(images),
-            "identity": .object(["action_id": .string(UUID().uuidString), "attempt": .integer(1), "request_digest": .string(digest)])])
-        for attempt in 1...2 {
-            action["identity"]["attempt"] = .integer(attempt)
-            let result: Data
-            if let personal = transport as? any ChatGPTPlanEffectTransport {
-                let limit = (config["prompt_limits"]["max_response_bytes"].number ?? config["prompt_limits"]["max_response_bytes"].string).flatMap(Int.init) ?? 1_048_576
-                result = try await personal.performPersonalPlan(action: action.data, models: request.models, providers: request.providers,
-                    session: request.chatGPTSession, argumentLimit: limit, credentials: credentials, onBytes: { _ in }, onDiagnostic: { _ in })
-            } else {
-                result = try await transport.perform(action: action.data, models: request.models, providers: request.providers, credentials: credentials, onBytes: { _ in })
-            }
-            let response = try ExactJSON(data: result)
-            if response["tag"].string == "provider_failed" {
-                let failure = response["failure"].string ?? "provider_failed"
-                if attempt == 1 && ["rate_limited", "transport_timeout", "transport_unavailable"].contains(failure) {
-                    try await Task.sleep(for: .seconds(2)); continue
-                }
-                throw HostError(failure)
-            }
-            guard let text = response["response"].string else { throw HostError("unusable_answer") }
-            return text
-        }
-        throw HostError("provider_failed")
-    }
-
-    /// SPEC §7.8 juxtaposition: what the shared core reads for this work (Server `api_juxtaposition`). `written` is the
-    /// description as the work keeps it, labels and all; the others are read without labels. The sources are the
-    /// author's other works that may lend a sentence: not in the trash or kept only in a lineage, not labelled DDL or
-    /// demo, no `test data` comment, a description, and not held by their DDL (the menu's own judgement).
-    public func juxtapositionInputs(work: SavedWork) async throws -> JuxtapositionInputs {
-        guard let database, let host else { throw HostError("pipeline_unavailable") }
-        _ = try await savedWorkEditContext(work)
-        let written = work.effectiveSourceText
-        let description = try Self.unlabelled(written)
-        guard !description.isEmpty else { throw HostError("juxtaposition_source_has_no_description") }
-        guard !work.svg.isEmpty else { throw HostError("juxtaposition_source_has_no_image") }
-        var lineage: [String] = []
-        var added: [String] = []
-        if let nodeID = work.lineageNodeID, let branch = try await database.lineage(focusNodeID: nodeID, pathOnly: true) {
-            for node in branch.nodes {
-                let text = try Self.unlabelled(node.work?.effectiveSourceText ?? "")
-                if !text.isEmpty, lineage.last != text { lineage.append(text) }
-            }
-            for edge in branch.edges {
-                let recorded = (try? ExactJSON(data: Data(edge.metadataJSON.utf8)))?["juxtaposition"]["sentence"].string
-                let sentence = recorded?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                if !sentence.isEmpty { added.append(sentence) }
-            }
-        }
-        try Task.checkCancellation()
-        let rows = try await database.juxtapositionSources()
-        let ids = rows.map(\.id)
-        let summaries = try await host.savedAuthoringSummaries(workIDs: ids)
-        let labels = try await host.savedDisplayLabels(workIDs: ids)
-        let sources = Self.juxtapositionSources(rows: rows, labels: labels, summaries: summaries, excluding: work.id)
-        return JuxtapositionInputs(description: description, written: written, lineage: lineage, added: added, sources: sources)
-    }
-
-    /// The stored works that may lend a sentence, labels removed (Server `owned_description_sources` and the
-    /// current work left out). A work counts as held by its DDL by the menu's own judgement of its saved authority.
-    nonisolated public static func juxtapositionSources(rows: [(id: String, text: String, note: String?)], labels: [String: String],
-                                            summaries: [String: SavedAuthoringSummary],
-                                            excluding workID: String) -> [(id: String, text: String)] {
-        rows.compactMap { row in
-            let label = labels[row.id]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard row.id != workID, !["DDL", "[demo]"].contains(label), !(row.note ?? "").lowercased().contains("test data"),
-                  !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let summary = summaries[row.id],
-                  SavedWorkActionState(origin: summary.origin, authority: summary.authority) == .description else { return nil }
-            guard let text = try? InkuCore.descriptionWithoutLabels(row.text) else { return nil }
-            return (row.id, text)
-        }
-    }
-
-    private static func unlabelled(_ text: String) throws -> String {
-        try InkuCore.descriptionWithoutLabels(text).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Menu availability is read from saved authority, never inferred from a model label or DDL contents.

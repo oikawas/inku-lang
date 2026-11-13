@@ -28,7 +28,6 @@ func runInputAidChecks() async throws {
     fresh.preferences.libraryLayout = "list"
     fresh.preferences.libraryGrouped = true
     fresh.preferences.comparisonModels = ["a:one", "b:two"]
-    fresh.preferences.autonomousRefine = AutonomousRefineChoices(moves: 7, kinds: ["laws"], note: "夜へ")
     var expectedPreferences = fresh.preferences
     expectedPreferences.nextCanvasID = nil; expectedPreferences.nextWild = nil
     var persisted = false
@@ -48,16 +47,15 @@ func runInputAidChecks() async throws {
     let existing = DisplaySettings()
     existing.connect(directory: older)
     guard existing.preferences.theme == "system", existing.preferences.language == "en",
-          existing.preferences.nextCatalogID == nil, existing.preferences.autonomousRefine == nil,
+          existing.preferences.nextCatalogID == nil,
           existing.preferences.historyStripFields == ["generation", "model", "engine"] else {
         throw CheckFailure.message("An older interface.json must keep its values, add no choices, and print fields in the Web order")
     }
 
-    // Old Vision choices must not become laws/juxtaposition choices.
-    let keptMethod = try DisplayPreferences.decodeInterfaceFile(
-        Data(#"{"aiRefine":{"visionMode":false,"generations":3,"kinds":["layout_change"],"direction":"夜へ"}}"#.utf8))
-    guard keptMethod.autonomousRefine == nil else {
-        throw CheckFailure.message("Old Vision choices must be discarded")
+    // The retired AI refinement's saved choices (and the older Vision ones) stay in the file, unread (2026-11-13).
+    let retired = try DisplayPreferences.decodeInterfaceFile(Data(#"{"theme":"dark","autonomousRefine":{"moves":7,"kinds":["laws"],"note":"夜へ"},"aiRefine":{"visionMode":false,"generations":3,"kinds":["layout_change"],"direction":"夜へ"}}"#.utf8))
+    guard retired.theme == "dark" else {
+        throw CheckFailure.message("An interface.json with the retired AI refinement choices must still be read")
     }
 
     // Legacy auto catalog is read; old paper and wild defaults are not migrated.

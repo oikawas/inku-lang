@@ -37,7 +37,8 @@ func runRefinementChecks() async throws {
     let initialRows = try await database.list().count
     let initialCalls = await provider.calls
 
-    // Failure: retired reading/touch still reaches either the manual or autonomous generation path.
+    // Failure: retired reading/touch still reaches either the plan or the saved-work request path (the refinement
+    // dialogs' `makeRefinementRequest`; the AI refinement process that also used it is gone, 2026-11-13).
     guard RefinementKind.availableKinds == [.layout] else { throw CheckFailure.message("Retired parameters are still offered") }
     for kind in ["touch_change", "reinterpretation"] {
         do {
@@ -46,7 +47,7 @@ func runRefinementChecks() async throws {
         } catch let error as HostError where error.code == "unknown_refinement_kind" { }
         do {
             _ = try await app.makeRefinementRequest(work: parent, kind: kind)
-            throw CheckFailure.message("Retired autonomous \(kind) accepted a request")
+            throw CheckFailure.message("Retired saved-work \(kind) accepted a request")
         } catch let error as HostError where error.code == "unknown_refinement_kind" { }
     }
     guard await provider.calls == initialCalls, try await database.list().count == initialRows,
@@ -63,7 +64,9 @@ func runRefinementChecks() async throws {
           layout.slots.allSatisfy({ $0.state == .ready }),
           layout.capturedStage1Model == "check:layout", layout.capturedStage2Model == "check:layout",
           Set(layout.candidates.compactMap { $0.work.compositionSeed }).count == 4,
-          layout.candidates.allSatisfy({ $0.work.renderSeed == "0" && $0.work.ddl == parent.ddl
+          // Each option's instructions are the ranges it chose again from the saved DDL (the parent's when unchanged).
+          layout.candidates.contains(where: { $0.recomposition?.source != nil }),
+          layout.candidates.allSatisfy({ $0.work.renderSeed == "0" && $0.work.ddl == ($0.recomposition?.source ?? parent.ddl)
               && $0.work.renderColorCatalogID == app.catalogID && $0.work.renderWild == false
               && $0.work.stage1Model == "check:layout" && $0.work.stage2Model == "check:layout"
               && $0.work.interpretationSeed == nil }),
@@ -87,16 +90,18 @@ func runRefinementChecks() async throws {
           try await app.savedConfiguration(workID: parent.id).document == context.document else {
         throw CheckFailure.message("Layout adoption lost parent/locks/provenance: \(layout.errorText ?? layout.status)")
     }
-    print(String(format: "Refinement passed in %.3fs: retired manual/autonomous reading and touch refused without provider or save; layout-only dialog draws four saved-DDL previews with zero additional Stage 1 calls and adopts one layout edge; parent remains unchanged. Mock transport + isolated SQLite + real Rust only.", Date().timeIntervalSince(began)))
+    print(String(format: "Refinement passed in %.3fs: retired reading and touch refused on the plan and saved-work request paths without provider or save; layout-only dialog draws four saved-DDL previews with zero additional Stage 1 calls and adopts one layout edge; parent remains unchanged. Mock transport + isolated SQLite + real Rust only.", Date().timeIntervalSince(began)))
 }
 
+/// Answers each stage as the laws-and-colors fake does, counting every send. The older answer here,
+/// `{"normalized_ddl": "place one red circle at center."}` for every action, no longer reads as a plan: the parent kept
+/// only its paper, so every layout option kept the parent's instructions unchanged and recorded its instruction model.
 private actor RefinementProvider: ProviderTransport {
     private(set) var calls = 0
+    private let base = LawsColorsCheckProvider(refuseColors: true)
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         calls += 1
-        let input = try ExactJSON(data: action)
-        return ExactJSON.object(["tag": .string("normalized_ddl_generated"), "identity": input["identity"],
-            "response": .string(#"{"normalized_ddl":"place one red circle at center."}"#), "elapsed_ms": .string("1")]).data
+        return try await base.perform(action: action, models: models, providers: providers, credentials: credentials, onBytes: onBytes)
     }
 }

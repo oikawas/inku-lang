@@ -70,8 +70,6 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var libraryGrouped: Bool?
     /// Dialog choices (Web `model_inspection_selected_models`, `inku-ai-refine-settings`).
     public var comparisonModels: [String]?
-    /// The laws/juxtaposition process has its own choices; old Vision selections are never reinterpreted.
-    public var autonomousRefine: AutonomousRefineChoices?
     /// Web `inku-result-log-open`: the result log under the input starts closed.
     public var resultLogOpen: Bool?
     public init() {}
@@ -142,16 +140,6 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
         options.pixelHeight = height
         if options.format == .png { options.pngAlphaWhite = true }
         return options
-    }
-}
-
-/// Web `ai-refine-settings.ts`: the last moves, kinds and direction, without a wild override.
-public struct AutonomousRefineChoices: Codable, Sendable, Equatable {
-    public var moves: Int
-    public var kinds: [String]
-    public var note: String
-    public init(moves: Int, kinds: [String], note: String) {
-        self.moves = moves; self.kinds = kinds; self.note = note
     }
 }
 

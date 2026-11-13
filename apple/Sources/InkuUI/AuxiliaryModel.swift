@@ -6,7 +6,9 @@ import InkuPersistence
 import Observation
 import UniformTypeIdentifiers
 
-public enum AuxiliaryMode: String, CaseIterable, Sendable { case advice, colophon }
+/// The colophon only; the image advice (no caller since the AI refinement process replaced it) and that process are
+/// gone (author 2026-11-13).
+public enum AuxiliaryMode: String, CaseIterable, Sendable { case colophon }
 
 @MainActor
 @Observable
@@ -24,7 +26,6 @@ public final class AuxiliaryModel {
     public var wildOverride = false
     public var enabledKinds: Set<String> = Set(AuxiliaryProvider.allowedKinds)
     public var draftText = ""
-    public private(set) var advice: AuxiliaryAdvice?
     public private(set) var colophonDraft: ColophonDraft?
     public private(set) var storedColophons: [ColophonDraft] = []
     public private(set) var running = false
@@ -46,7 +47,7 @@ public final class AuxiliaryModel {
 
     public init(provider: AuxiliaryProvider? = nil) { self.provider = provider }
 
-    public func initialize(app: AppModel, work: SavedWork? = nil, mode: AuxiliaryMode = .advice) async {
+    public func initialize(app: AppModel, work: SavedWork? = nil, mode: AuxiliaryMode = .colophon) async {
         guard !running, !selectingSource else { return }
         if provider == nil {
             do { provider = try app.auxiliaryProvider() }
@@ -54,7 +55,7 @@ public final class AuxiliaryModel {
         }
         let work = work ?? app.selectedWork
         if sourceWorkID != work?.id {
-            advice = nil; colophonDraft = nil; draftText = ""; errorText = nil
+            colophonDraft = nil; draftText = ""; errorText = nil
             colophonPathToken = UUID(); colophonPath = nil; colophonPathCount = nil; loadingColophonPath = false
         }
         sourceWorkID = work?.id
@@ -137,34 +138,6 @@ public final class AuxiliaryModel {
         else { app.display.preferences.auxiliaryVisionModelReference = reference }
     }
 
-    public func requestAdvice(app: AppModel) async {
-        guard !selectingSource else { return }
-        guard let provider else { errorText = "補助モデルの接続がありません。"; return }
-        guard let work = sourceWork, !work.trashed else {
-            errorText = "画像助言には保存作品が必要です。"; return
-        }
-        let direction = self.direction
-        let reference = modelReference
-        let language = language
-        let kinds = orderedKinds
-        guard SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: await app.hostSettings()) else {
-            errorText = "画像を扱える登録モデルを選択してください。"; return
-        }
-        await run(app: app, message: "モデルが作品を観察しています") { [self] runToken in
-            let settings = await app.hostSettings()
-            guard let png = try await Self.png(svgs: [work.svg], visionAdvice: true) else {
-                throw HostError("refinement_source_has_no_image")
-            }
-            let result = try await provider.refineAdvice(instruction: Self.adviceInstruction(work),
-                direction: direction, enabledKinds: kinds, png: png, modelReference: reference,
-                language: language, settings: settings)
-            try Task.checkCancellation()
-            guard token == runToken else { return }
-            advice = result; draftText = result.nextDirection
-            status = "助言を受け取りました。次の方針を編集して採用できます。"
-        }
-    }
-
     public func generateColophon(app: AppModel) async {
         guard let provider else { errorText = "補助モデルの接続がありません。"; return }
         guard let work = sourceWork, let nodeID = work.lineageNodeID else {
@@ -192,24 +165,6 @@ public final class AuxiliaryModel {
             await reloadStored(app: app)
             status = "奥書を追記しました。"
         }
-    }
-
-    /// Adopting advice changes an allowed drawing dimension while retaining the parent's saved DDL.
-    public func adoptAdvice(app: AppModel) async {
-        guard let work = sourceWork, !app.isBusy, !running, !selectingSource, !draftText.isEmpty else { return }
-        do {
-            let suggestedKind = advice?.suggestedKind ?? ""
-            let kind = orderedKinds.contains(suggestedKind) ? suggestedKind : (orderedKinds.first ?? AuxiliaryProvider.allowedKinds[0])
-            let catalog = kind == "catalog_change" ? randomCatalog(app: app, parent: work) : nil
-            var request = try await app.makeRefinementRequest(work: work, kind: kind,
-                modelReference: modelReference.isEmpty ? nil : modelReference,
-                catalogIDOverride: catalog,
-                wildOverride: inheritWild ? nil : wildOverride)
-            request = try await app.pinPersonalPlanRequests([request])[0]
-            let result = await app.runAutomation(request: request)
-            if result == nil { errorText = app.errorText ?? "子の作品を生成できませんでした。" }
-            else { status = "この方針で子の作品を保存しました。" }
-        } catch { errorText = error.localizedDescription }
     }
 
     public func saveColophon(app: AppModel) async {
@@ -259,18 +214,6 @@ public final class AuxiliaryModel {
         task = work
         await work.value
         if token == runToken { token = nil; running = false; stopping = false; task = nil }
-    }
-
-    private var orderedKinds: [String] { AuxiliaryProvider.allowedKinds.filter(enabledKinds.contains) }
-
-    /// A direct-DDL work may have no description. Its saved instructions still give Vision context.
-    private static func adviceInstruction(_ work: SavedWork) -> String {
-        work.effectiveSourceText.isEmpty ? (work.ddl ?? "") : work.effectiveSourceText
-    }
-
-    private func randomCatalog(app: AppModel, parent: SavedWork) -> String? {
-        let current = parent.renderColorCatalogID ?? parent.catalogID
-        return app.catalogs.filter { $0.id != current }.randomElement()?.id ?? current ?? app.catalogs.first?.id
     }
 
     /// The thumbnail is an observation input; the saved SVG is never rewritten.

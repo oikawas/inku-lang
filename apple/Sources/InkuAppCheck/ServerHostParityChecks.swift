@@ -74,7 +74,7 @@ func runServerHostParityChecks() async throws {
     // Web's pipelineAttentionText; the native diagnosis must stay as details.
     app.catalogMode = "fixed"; app.catalogID = "default"
     app.display.preferences.language = "ja"
-    // The automation path (batch, demo, autonomous refinement) is where the native message is composed today.
+    // The automation path (batch, demo) is where the native message is composed today.
     _ = await app.runAutomation(request: try app.requestForCurrentInput())
     let network = app.automationFailureMessage
     let expectedNetwork = "処理の結果を確認してください。 理由: 記述の解釈を完了できませんでした（モデルに接続できませんでした。4回試しました）"

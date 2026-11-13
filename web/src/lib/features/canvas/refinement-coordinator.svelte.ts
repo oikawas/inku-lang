@@ -791,7 +791,10 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				markSaved: (id) => refinementSession.markSaved(id),
 				isCurrentResult: (candidateResult) => work.result === candidateResult,
 				adoptSavedIdentity: (candidateResult, saved) => {
-					work.result = { ...candidateResult, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
+					// The parent's composition the save answers for a child that keeps it (step 3): the
+					// canvas shows this result until another work is opened.
+					work.result = { ...candidateResult, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id,
+						...(saved.composition_inherited ? { composition_inherited: saved.composition_inherited } : {}) };
 					work.displayedHistoryItem = saved;
 					void deps.history.syncToItem(saved);
 				}

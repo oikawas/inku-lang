@@ -32,6 +32,8 @@ test('T-312/T-313: page and panel share one typed refinement session owner', () 
 	const returnStart = coordinator.indexOf('\n\treturn {', saveStart);
 	assert.ok(saveStart >= 0 && returnStart > saveStart);
 	assert.doesNotMatch(coordinator.slice(saveStart, returnStart), /pushHistory\(\{/);
+	// The saved child on the canvas keeps the parent's composition the save answers (step 3).
+	assert.match(coordinator.slice(saveStart, returnStart), /work\.result = \{[^;]*composition_inherited: saved\.composition_inherited/);
 
 	assert.match(panel, /refinementSession:\s*RefinementSession/);
 	assert.match(panel, /<CanvasRefinementWorkspace[\s\S]*\{refinementSession\}/);

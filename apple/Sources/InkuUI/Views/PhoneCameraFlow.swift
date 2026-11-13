@@ -29,6 +29,7 @@ struct PhoneCameraFlow: ViewModifier {
 
     @State private var notice: Notice?
     @State private var capturing = false
+    @State private var cameraAfterNotice = false
 
     private var display: DisplaySettings { model.display }
     private var otherRunActive: Bool { blocked || automation.isOccupied || automation.imageFolderBatch.running }
@@ -36,6 +37,16 @@ struct PhoneCameraFlow: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onChange(of: request) { _, _ in Task { await start() } }
+            // What the notice leads to opens once the notice has gone: shown from the button, the next window was
+            // dropped while the notice was still closing (screen check 2026-11-13, step 8).
+            .onChange(of: notice == nil) { _, closed in
+                guard closed, cameraAfterNotice else { return }
+                cameraAfterNotice = false
+                Task {
+                    try? await Task.sleep(for: .milliseconds(450))
+                    openCamera()
+                }
+            }
             .inkuCameraCapture(isPresented: $capturing) { data in Task { await draw(data) } }
             .alert(title(notice), isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } }),
                    presenting: notice) { shown in
@@ -43,7 +54,7 @@ struct PhoneCameraFlow: ViewModifier {
                 case .upload:
                     Button(display.webCopy("imageUploadNoticeContinue", "了解して描画する")) {
                         model.imageWarningAcknowledged = true
-                        openCamera()
+                        cameraAfterNotice = true
                     }
                     Button(display.localized("キャンセル"), role: .cancel) {}
                 case .refusal(let refusal):
@@ -85,6 +96,7 @@ struct PhoneCameraFlow: ViewModifier {
                 if !model.isBusy {
                     model.setImageInput(prepared.image, fileName: display.localized("写真"), automaticProvenance: prepared.provenance)
                 }
+                await afterCameraCloses()
                 notice = .refusal(refusal)
                 return
             }
@@ -93,8 +105,14 @@ struct PhoneCameraFlow: ViewModifier {
             ui.scrollToImageRun = true
             await model.generate()
         } catch {
+            await afterCameraCloses()
             model.errorText = model.failureMessage(error)
         }
+    }
+
+    /// A window shown while the camera's cover is still closing is dropped, as one shown from the notice's button was.
+    private func afterCameraCloses() async {
+        try? await Task.sleep(for: .milliseconds(450))
     }
 
     private func title(_ notice: Notice?) -> String {

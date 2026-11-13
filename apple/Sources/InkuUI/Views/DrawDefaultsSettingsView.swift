@@ -120,16 +120,20 @@ import InkuHost
                         Image(systemName: "chevron.right").inkuFont(12).foregroundStyle(.tertiary)
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain)
+                // The sheet sits on the row that opens it: a modifier on a section is handed to each of its rows, and
+                // six sheets on one press left the first press unanswered (screen check, Build 154). The row is on
+                // screen when pressed, so its sheet is in place.
+                .sheet(isPresented: Binding(get: { pickerTab == tab }, set: { if !$0 && pickerTab == tab { pickerTab = nil } })) {
+                    modelPicker(tab)
+                }
+                .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
             } header: {
                 Text(tabTitle(tab))
             } footer: {
                 Text(hint(tab))
             }
-            .modifier(loader)
-            // This tab's sheet only: one sheet per section, each watching its own tab, so no two answer one press.
-            .sheet(isPresented: Binding(get: { pickerTab == tab }, set: { if !$0 && pickerTab == tab { pickerTab = nil } })) {
-                modelPicker(tab)
-            }
+            // The first read, on whichever row shows first (handed to every row; it reads once).
+            .onAppear { if !loaded { draft = model.drawDefaults; loaded = true } }
         }
     }
 

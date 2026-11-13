@@ -20,6 +20,8 @@ test('step 2: a main-law change names both laws, and the kind reads "composition
 	assert.equal(derivationDetail('composition_form_change', { main_law_from: null, main_law_to: 'B10', form: null }, true), null);
 	assert.equal(derivationKindLabel('composition_form_change', true), '構図と法則');
 	assert.equal(derivationKindLabel('composition_form_change', false), 'Composition and laws');
+	// A moved thing's child is named by what it changed: the place, not the composition (step 3).
+	assert.equal(derivationKindLabel('layout_change', true), '配置');
 });
 
 test('a form change names both forms; other kinds and a half-recorded change add nothing', () => {

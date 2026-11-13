@@ -479,6 +479,12 @@ def test_a_moved_thing_is_a_ddl_fork_saved_as_a_layout_change_and_held(host, com
     assert item["derivation_metadata"] == {"place": {"title": "波", "thing": 1, "at_from": None, "at": "center"}}
     # The child was drawn from its DDL, so its description is held (step 3).
     assert item["description_locked"] is True
+    # It keeps the parent's composition with the moved thing's new place, and
+    # the save answers it as the listing does (step 3, 2026-11-13).
+    inherited = item["composition_inherited"]
+    assert inherited["history_id"] == history_id and inherited["via"] == ["layout_change"]
+    assert inherited["places"] == [{"thing": 1, "at": "center"}]
+    assert saved.json()["composition_inherited"] == inherited
 
 
 def test_model_candidate_saves_its_execution_with_its_composition(host, composed, monkeypatch):

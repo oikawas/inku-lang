@@ -1124,7 +1124,14 @@ class PipelineService:
             context = deepcopy(run.context)
             context["host_options"] = {**settings, "save_history": True, "save_artifacts": True, "count_generation": False,
                                        "derivation_kind": body.derivation_kind, "derivation_metadata": metadata}
-            return self.project_result(owner, snapshot, context, run._rendered)
+            result = self.project_result(owner, snapshot, context, run._rendered)
+        # The saved child as listings read it: one that keeps its parent's
+        # composition shows it at once, as after a reload (step 3, 2026-11-13).
+        saved_id = result.get("history_id") if isinstance(result, dict) else None
+        saved = db.get_items(owner, [saved_id]) if saved_id else []
+        if saved and saved[0].get("composition_inherited") is not None:
+            result = {**result, "composition_inherited": saved[0]["composition_inherited"]}
+        return result
 
 
 def linked_source_work(linked) -> dict:

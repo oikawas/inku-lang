@@ -25,7 +25,7 @@ export type DerivationKind =
 
 const JA: Record<string, string> = {
 	touch_change: 'タッチ',
-	layout_change: '構図',
+	layout_change: '配置',
 	catalog_change: '色',
 	color_arrangement_change: '配色',
 	ground_change: '支持体',

@@ -1362,7 +1362,31 @@ class HistoryListProjector:
             for requested in ("requested_form", "requested_main_law"):
                 if record.get(requested) is not None:
                     inherited[requested] = record[requested]
+            places = _moved_places(edges, starts[row.id], len(via))
+            if places:
+                inherited["places"] = places
             item["composition_inherited"] = inherited
+
+
+def _moved_places(edges, start: str, steps: int) -> list[dict]:
+    """The things "change the layout" moved on the edges walked from a work up to
+    the ancestor whose composition it keeps, each at its latest place (step 3,
+    2026-11-13): the ancestor's record still names where the thing was."""
+    found: dict[int, dict] = {}
+    current = start
+    for _ in range(steps):
+        edge = edges.get(current)
+        if edge is None:
+            break
+        if edge.derivation_kind == "layout_change":
+            try:
+                place = (json.loads(edge.metadata_json or "{}") or {}).get("place")
+            except (TypeError, ValueError):
+                place = None
+            if isinstance(place, dict) and isinstance(place.get("thing"), int) and isinstance(place.get("at"), str):
+                found.setdefault(place["thing"], {"thing": place["thing"], "at": place["at"]})
+        current = edge.parent_node_id
+    return sorted(found.values(), key=lambda moved: moved["thing"])
 
 
 @dataclass(frozen=True)

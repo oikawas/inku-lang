@@ -20,6 +20,7 @@
 // Server's and CLI's default stays 'stages', and a work with no record of a
 // route was drawn by the stages (`SAVED_WORK_ROUTE`).
 import type { SketchMode } from './sketch';
+import { formName, kindName, roleName } from './features/composition-record/composition-names';
 
 export type DrawRoute = 'stages' | 'read_and_draw';
 export const DRAW_ROUTES: DrawRoute[] = ['read_and_draw', 'stages'];
@@ -192,22 +193,6 @@ export function compositionColorsChanges(record: CompositionColorsRecord | null 
 	return [...counts.entries()];
 }
 
-const FORM_LABELS: Record<string, [string, string]> = {
-	one_corner: ['一角', 'one corner'],
-	all_over: ['全面', 'all over'],
-	bands: ['横の帯', 'bands'],
-	dividing_line: ['場を分ける線', 'dividing line'],
-	grid: ['格子', 'grid'],
-	flock_and_stray: ['群れと一つの逸脱', 'flock and a stray'],
-	unequal_triangle: ['不等辺の三角', 'unequal triangle'],
-};
-const ROLE_LABELS: Record<string, [string, string]> = {
-	field: ['場', 'field'], focal: ['主', 'focal'], secondary: ['従', 'secondary'],
-	scattered: ['散在', 'scattered'], accent: ['添え', 'accent'],
-};
-const KIND_LABELS: Record<string, [string, string]> = {
-	cluster: ['1か所の形', 'cluster'], row: ['列', 'row'], surface: ['面', 'surface'], line: ['線', 'line'],
-};
 const MEASURE_LABELS: Record<string, [string, string]> = {
 	ok: ['合う', 'fits'], off: ['少しずれ', 'a little off'], far: ['大きくずれ', 'far off'],
 	fitted: ['合わせた', 'fitted'], clamped: ['範囲の端に合わせた', 'clamped'], off_canvas: ['画の外', 'off the canvas'],
@@ -219,9 +204,13 @@ function labelOf(table: Record<string, [string, string]>, value: unknown, isJapa
 	return pair ? pair[isJapanese ? 0 : 1] : typeof value === 'string' ? value : '';
 }
 
-export const compositionFormLabel = (form: unknown, isJapanese: boolean) => labelOf(FORM_LABELS, form, isJapanese);
-export const compositionRoleLabel = (role: unknown, isJapanese: boolean) => labelOf(ROLE_LABELS, role, isJapanese);
-export const compositionKindLabel = (kind: unknown, isJapanese: boolean) => labelOf(KIND_LABELS, kind, isJapanese);
+// The form, role and kind names come from the composition names table
+// (2026-11-13: one table, the forms by their short names).
+const nameOf = (lookup: (id: string, isJapanese: boolean) => string) =>
+	(value: unknown, isJapanese: boolean) => typeof value === 'string' ? lookup(value, isJapanese) : '';
+export const compositionFormLabel = nameOf(formName);
+export const compositionRoleLabel = nameOf(roleName);
+export const compositionKindLabel = nameOf(kindName);
 export const compositionMeasureLabel = (state: unknown, isJapanese: boolean) => labelOf(MEASURE_LABELS, state, isJapanese);
 
 export function compositionStateNote(record: CompositionRecord | null | undefined, isJapanese: boolean): string {

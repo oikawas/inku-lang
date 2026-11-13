@@ -12,6 +12,7 @@ import { en } from './i18n/en.ts';
 import type { LangPack } from './i18n/types.ts';
 import { paintStageHandlers, paintStageLabel, providerAttemptText, readPaintStream, runningStageLabel } from './paintStream.ts';
 import { currentWork, finishedText, localWork, stageName, tokenCount } from './runProgress.ts';
+import { colorLawName, lawName } from './features/composition-record/composition-names.ts';
 
 const DONE = { event: 'done', ddl: '黒い円を中心に置く。', svg: '<svg/>' };
 
@@ -49,6 +50,12 @@ test('progress events reach the indicator with localized details and token count
 	await readPaintStream(streamOf([progress, DONE]), { describeError, onProgress: (event) => { received = event as typeof progress; } });
 	assert.deepEqual(received, progress);
 	assert.equal(finishedText(progress.run_progress.finished[0], ja), '構図：物 3 つ・主の法則 B3');
+	// With the names table (2026-11-13) the law reads by name; the colors stage names a color law.
+	const names = { law: (code: string) => lawName(code, true), colorLaw: (code: string) => colorLawName(code, true) };
+	assert.equal(finishedText(progress.run_progress.finished[0], ja, names), `構図：物 3 つ・主の法則 ${lawName('B3', true)}`);
+	assert.notEqual(lawName('B3', true), 'B3');
+	assert.equal(finishedText({ action: 'choose_colors', outcome: 'ready', facts: { main_law: 'C7' } }, ja, names),
+		ja.runFinishedLaw(ja.runStageColors, colorLawName('C7', true)));
 	assert.equal(localWork(progress.run_progress.current.action, en), 'Drawing for review…');
 	assert.equal(stageName('compose_description', ja), '構図');
 	assert.equal(tokenCount(progress.stage_tokens.compose_description.input_tokens), '7,252');

@@ -53,6 +53,22 @@ def test_a_stored_fold_is_kept(value):
     assert normalize_user_model_settings({"sketch_open": value})["sketch_open"] is value
 
 
+def test_the_composition_section_starts_folded():
+    # Unlike the sketch, the composition and laws section is folded until the
+    # user opens it; only a stored true opens it.
+    assert default_user_model_settings()["composition_open"] is False
+    assert normalize_user_model_settings({})["composition_open"] is False
+    assert normalize_user_model_settings({"composition_open": 1})["composition_open"] is False
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_a_stored_composition_fold_is_kept(value):
+    clean = normalize_user_model_settings({"composition_open": value})
+    assert clean["composition_open"] is value
+    patched = update_user_model_settings({"composition_open": not value}, {"composition_open": value})
+    assert patched["composition_open"] is value
+
+
 def test_a_retired_fold_is_ignored_without_resetting_current_settings():
     stored = {"sketch_open": False, "ddl_expanded_open": True, "color_catalog_id": "auto"}
     clean = normalize_user_model_settings(stored)
@@ -79,6 +95,27 @@ def test_the_fold_survives_a_round_trip_through_the_api(auth_headers):
     assert current.status_code == 200
     assert current.json()["model_settings"]["sketch_open"] is False
     assert "ddl_expanded_open" not in current.json()["model_settings"]
+
+
+def test_the_composition_fold_survives_a_round_trip_through_the_api(auth_headers):
+    patched = client.patch(
+        "/api/auth/me/settings",
+        headers=auth_headers,
+        json={"model_settings": {"composition_open": True}},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["model_settings"]["composition_open"] is True
+
+    other = client.patch(
+        "/api/auth/me/settings",
+        headers=auth_headers,
+        json={"model_settings": {"sketch_open": False}},
+    )
+    assert other.json()["model_settings"]["composition_open"] is True
+
+    current = client.get("/api/auth/me", headers=auth_headers)
+    assert current.status_code == 200
+    assert current.json()["model_settings"]["composition_open"] is True
 
 
 def test_unfolding_again_is_stored_too(auth_headers):

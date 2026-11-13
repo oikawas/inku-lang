@@ -510,7 +510,8 @@ fn user_defaults() -> Value {
         "model_inspection_selected_models":[], "instruction_caption_visible":true,
         "instruction_caption_writing_mode":"horizontal", "instruction_caption_position":"left",
         "ui_text_size":1, "sketch_open":true,
-        "generation_info_follows_selection":true, "generation_info_token_detail":false});
+        "generation_info_follows_selection":true, "generation_info_token_detail":false,
+        "composition_open":false});
     // The drawing and vision models and the catalog a user has not chosen
     // come from the release's drawing defaults (one file decides them).
     if let (Some(settings), Some(legacy)) = (
@@ -594,8 +595,9 @@ fn normalize_user(
     ] {
         clean[key] = json!(input.get(key) != Some(&Value::Bool(false)));
     }
-    clean["generation_info_token_detail"] =
-        json!(input.get("generation_info_token_detail") == Some(&Value::Bool(true)));
+    for key in ["generation_info_token_detail", "composition_open"] {
+        clean[key] = json!(input.get(key) == Some(&Value::Bool(true)));
+    }
     for (key, valid, fallback) in [
         (
             "instruction_caption_writing_mode",
@@ -676,6 +678,7 @@ fn update_user(
         "sketch_open",
         "generation_info_follows_selection",
         "generation_info_token_detail",
+        "composition_open",
     ] {
         if let Some(value) = patch.get(key) {
             stored[key] = json!(truthy(value));

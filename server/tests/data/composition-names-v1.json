@@ -1,0 +1,778 @@
+{
+  "schema": "inku.composition-names.v1",
+  "forms": [
+    {
+      "id": "one_corner",
+      "name": {
+        "ja": "一角",
+        "en": "One corner"
+      },
+      "description": {
+        "ja": "主を片隅や片側に寄せて広く空ける",
+        "en": "Push the focal thing to one side and leave wide space"
+      }
+    },
+    {
+      "id": "all_over",
+      "name": {
+        "ja": "全面",
+        "en": "All over"
+      },
+      "description": {
+        "ja": "全面に均して中心を消す",
+        "en": "Spread evenly and erase the center"
+      }
+    },
+    {
+      "id": "bands",
+      "name": {
+        "ja": "帯",
+        "en": "Bands"
+      },
+      "description": {
+        "ja": "横の帯を重ねる",
+        "en": "Stack horizontal bands"
+      }
+    },
+    {
+      "id": "dividing_line",
+      "name": {
+        "ja": "分ける線",
+        "en": "Dividing line"
+      },
+      "description": {
+        "ja": "場を分ける線",
+        "en": "Divide the field with a line"
+      }
+    },
+    {
+      "id": "grid",
+      "name": {
+        "ja": "格子",
+        "en": "Grid"
+      },
+      "description": {
+        "ja": "格子",
+        "en": "Grid"
+      }
+    },
+    {
+      "id": "flock_and_stray",
+      "name": {
+        "ja": "群れと逸れ",
+        "en": "Flock and stray"
+      },
+      "description": {
+        "ja": "群れと一つの逸脱",
+        "en": "A flock and one that strays"
+      }
+    },
+    {
+      "id": "unequal_triangle",
+      "name": {
+        "ja": "不等辺の三角",
+        "en": "Unequal triangle"
+      },
+      "description": {
+        "ja": "主・従・添えの不等辺の三角",
+        "en": "An unequal triangle of focal, secondary and accent"
+      }
+    }
+  ],
+  "laws": [
+    {
+      "code": "B1",
+      "name": {
+        "ja": "黄金分割",
+        "en": "Golden section"
+      },
+      "family": {
+        "ja": "比例",
+        "en": "proportion"
+      },
+      "summary": {
+        "ja": "画面の辺を 0.382 : 0.618 で分ける線と、その 4 つの交点に、主な物と線を置く。",
+        "en": "Place the main things and lines on the lines that divide the canvas's sides 0.382 : 0.618 and on their four crossings."
+      },
+      "main": true
+    },
+    {
+      "code": "B2",
+      "name": {
+        "ja": "白銀分割",
+        "en": "Silver section"
+      },
+      "family": {
+        "ja": "比例",
+        "en": "proportion"
+      },
+      "summary": {
+        "ja": "辺を 1 : √2 で分ける線（0.414・0.586）と交点に置く。",
+        "en": "Place on the lines that divide the sides 1 : √2 (0.414 and 0.586) and on their crossings."
+      },
+      "main": true
+    },
+    {
+      "code": "B3",
+      "name": {
+        "ja": "三分割",
+        "en": "Rule of thirds"
+      },
+      "family": {
+        "ja": "比例",
+        "en": "proportion"
+      },
+      "summary": {
+        "ja": "辺を三つに分ける線（1/3・2/3）と交点に置く。",
+        "en": "Place on the lines that divide the sides in three (1/3 and 2/3) and on their crossings."
+      },
+      "main": true
+    },
+    {
+      "code": "B4",
+      "name": {
+        "ja": "調和の比",
+        "en": "Harmonic ratio"
+      },
+      "family": {
+        "ja": "比例",
+        "en": "proportion"
+      },
+      "summary": {
+        "ja": "辺を音の協和の比 2:3（0.4・0.6）か 3:4（0.429・0.571）で分ける線と交点に置く。",
+        "en": "Place on the lines that divide the sides by a consonant ratio of sound, 2:3 (0.4 and 0.6) or 3:4 (0.429 and 0.571), and on their crossings."
+      },
+      "main": true
+    },
+    {
+      "code": "B5",
+      "name": {
+        "ja": "骨組み",
+        "en": "Armature"
+      },
+      "family": {
+        "ja": "比例",
+        "en": "proportion"
+      },
+      "summary": {
+        "ja": "画面の対角線・中心の縦の線・中心の横の線を骨組みにして、線の物と、いくつかの形を並べた物を、その上に置く。",
+        "en": "Take the canvas's diagonals, its central vertical line and its central horizontal line as the armature, and place line things and things of several shapes in a row on them."
+      },
+      "main": true
+    },
+    {
+      "code": "B6",
+      "name": {
+        "ja": "主従",
+        "en": "Subordination"
+      },
+      "family": {
+        "ja": "均衡",
+        "en": "balance"
+      },
+      "summary": {
+        "ja": "基準の物を一つ選び、従と添えの物の大きさを、基準を 1 として 0.618・0.382 にする。",
+        "en": "Choose one base thing; the secondary and accent things are 0.618 and 0.382 of the base's size."
+      },
+      "main": true
+    },
+    {
+      "code": "B7",
+      "name": {
+        "ja": "天秤の均衡",
+        "en": "Steelyard balance"
+      },
+      "family": {
+        "ja": "均衡",
+        "en": "balance"
+      },
+      "summary": {
+        "ja": "大きな相手は中心寄りに、小さな物は中心をはさんだ反対側の遠くに置き、重さ×距離を釣り合わせる。",
+        "en": "Keep a large partner near the center and place a small thing far away on the other side of the center, balancing weight × distance."
+      },
+      "main": true
+    },
+    {
+      "code": "B8",
+      "name": {
+        "ja": "対称の均衡",
+        "en": "Symmetrical balance"
+      },
+      "family": {
+        "ja": "均衡",
+        "en": "balance"
+      },
+      "summary": {
+        "ja": "中心線に対して対に置く。物の中心を軸に置き、二つでなる物は軸の両側に鏡に置く。",
+        "en": "Place in pairs about a central line. The thing's center goes on the axis, and a thing of two parts is mirrored on either side of it."
+      },
+      "main": true
+    },
+    {
+      "code": "B9",
+      "name": {
+        "ja": "等間隔の反復",
+        "en": "Equal repetition"
+      },
+      "family": {
+        "ja": "律動",
+        "en": "rhythm"
+      },
+      "summary": {
+        "ja": "同じ形を同じ間隔で並べる。",
+        "en": "Repeat the same shape at equal intervals."
+      },
+      "main": true
+    },
+    {
+      "code": "B10",
+      "name": {
+        "ja": "漸進",
+        "en": "Progression"
+      },
+      "family": {
+        "ja": "律動",
+        "en": "rhythm"
+      },
+      "summary": {
+        "ja": "物の形を一つずつの列にし、大きさか間隔を、隣どうし同じ比で変える。",
+        "en": "Line the thing's shapes up one by one and change their size or their spacing by the same ratio between neighbours."
+      },
+      "main": true
+    },
+    {
+      "code": "B12",
+      "name": {
+        "ja": "拍の群",
+        "en": "Beat groups"
+      },
+      "family": {
+        "ja": "律動",
+        "en": "rhythm"
+      },
+      "summary": {
+        "ja": "物の形を 2・3・4 個ずつの群にして、群の間に間をおいて列に並べる。",
+        "en": "Group the thing's shapes by 2, 3 or 4 and line them up with a rest between the groups."
+      },
+      "main": true
+    },
+    {
+      "code": "B15",
+      "name": {
+        "ja": "空気遠近",
+        "en": "Aerial perspective"
+      },
+      "family": {
+        "ja": "階調",
+        "en": "gradation"
+      },
+      "summary": {
+        "ja": "遠くの物を、地との明るさの差が小さい寒色か灰に替え、小さくする。",
+        "en": "Turn distant things to the cool color or gray closest to the ground in lightness and make them smaller."
+      },
+      "main": true
+    },
+    {
+      "code": "B21",
+      "name": {
+        "ja": "統一と変化",
+        "en": "Unity and variety"
+      },
+      "family": {
+        "ja": "統一と変化",
+        "en": "unity and variety"
+      },
+      "summary": {
+        "ja": "法則が位置・間隔・大きさ・色を決め、手の揺らぎはその規則を壊さない幅に収める。主の法則にはしない。",
+        "en": "The laws decide places, spacing, sizes and colors, and the hand's sway stays within what keeps their rules. Never the main law."
+      },
+      "main": false
+    },
+    {
+      "code": "C1",
+      "name": {
+        "ja": "疎密",
+        "en": "Sparse and dense"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      },
+      "summary": {
+        "ja": "画面の中に、物が隙間なく詰まる密の所を一つ作り、ほかを大きく空ける。",
+        "en": "Make one dense place in the picture where things crowd without a gap, and leave the rest wide open."
+      },
+      "main": true
+    },
+    {
+      "code": "C2",
+      "name": {
+        "ja": "文様",
+        "en": "Patterns"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      },
+      "summary": {
+        "ja": "一つの単位の形を、規則で敷き詰める（青海波・七宝・市松・鱗・亀甲）。",
+        "en": "Tile the canvas with one unit shape by a rule (seigaiha, shippo, ichimatsu, uroko, kikko)."
+      },
+      "main": true
+    },
+    {
+      "code": "C3",
+      "name": {
+        "ja": "ポリリズム",
+        "en": "Polyrhythm"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      },
+      "summary": {
+        "ja": "二つの声部を、同じ長さに違う数で等間隔に並べて重ねる。",
+        "en": "Lay two voices over each other, each lined up at equal spacing along the same length with a different count."
+      },
+      "main": true
+    },
+    {
+      "code": "C4",
+      "name": {
+        "ja": "動機と変奏",
+        "en": "Motif and variation"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      },
+      "summary": {
+        "ja": "一つの形（動機）を、大きさ・向き・鏡映・ずらした重ねを順に変えながら繰り返す。",
+        "en": "Repeat one shape (the motif), changing its size, its turn, its mirror image and a staggered overlap in turn."
+      },
+      "main": true
+    },
+    {
+      "code": "C5",
+      "name": {
+        "ja": "序破急",
+        "en": "Jo-ha-kyū"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      },
+      "summary": {
+        "ja": "一つの流れを三段にする。まばら→変化→密になる。",
+        "en": "Make one flow in three stages: from sparse to changing to dense."
+      },
+      "main": true
+    },
+    {
+      "code": "C6",
+      "name": {
+        "ja": "真・行・草",
+        "en": "Shin, gyō and sō"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      },
+      "summary": {
+        "ja": "同じ形を、厳格（真）・半ば崩す（行）・自在（草）の三つの度合いで描き分ける。",
+        "en": "Draw the same shape in three degrees: strict (shin), half loosened (gyo) and free (so)."
+      },
+      "main": true
+    }
+  ],
+  "color_laws": [
+    {
+      "code": "B11",
+      "name": {
+        "ja": "交替",
+        "en": "Alternation"
+      },
+      "family": {
+        "ja": "律動",
+        "en": "rhythm"
+      }
+    },
+    {
+      "code": "B13",
+      "name": {
+        "ja": "一方向の推移",
+        "en": "Gradation in one direction"
+      },
+      "family": {
+        "ja": "階調",
+        "en": "gradation"
+      }
+    },
+    {
+      "code": "B14",
+      "name": {
+        "ja": "中心からの推移",
+        "en": "Gradation from the center"
+      },
+      "family": {
+        "ja": "階調",
+        "en": "gradation"
+      }
+    },
+    {
+      "code": "B16",
+      "name": {
+        "ja": "色の推移",
+        "en": "Color shift"
+      },
+      "family": {
+        "ja": "階調",
+        "en": "gradation"
+      }
+    },
+    {
+      "code": "B17",
+      "name": {
+        "ja": "主調・従調・強調",
+        "en": "Dominant, subordinate and accent"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "B18",
+      "name": {
+        "ja": "量の対比",
+        "en": "Contrast of extension"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "B19",
+      "name": {
+        "ja": "明暗の対比",
+        "en": "Light-dark contrast"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "B20",
+      "name": {
+        "ja": "寒暖の対比",
+        "en": "Warm-cool contrast"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "C7",
+      "name": {
+        "ja": "襲の色目",
+        "en": "Kasane no irome"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      }
+    },
+    {
+      "code": "C8",
+      "name": {
+        "ja": "色の和音",
+        "en": "Color chord"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      }
+    },
+    {
+      "code": "C9",
+      "name": {
+        "ja": "強い色の面積",
+        "en": "Area of the strong color"
+      },
+      "family": {
+        "ja": "カード",
+        "en": "card"
+      }
+    },
+    {
+      "code": "D1",
+      "name": {
+        "ja": "色相の対比",
+        "en": "Contrast of hue"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "D2",
+      "name": {
+        "ja": "彩度の対比",
+        "en": "Contrast of saturation"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "D3",
+      "name": {
+        "ja": "補色の対比・同時対比",
+        "en": "Complementary and simultaneous contrast"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "D4",
+      "name": {
+        "ja": "濃淡の調和",
+        "en": "Harmony of shades"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "D5",
+      "name": {
+        "ja": "類似色の調和",
+        "en": "Harmony of analogous colors"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "D6",
+      "name": {
+        "ja": "視覚混合",
+        "en": "Optical mixing"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    },
+    {
+      "code": "D7",
+      "name": {
+        "ja": "明暗の塊",
+        "en": "Masses of light and dark"
+      },
+      "family": {
+        "ja": "配色",
+        "en": "color scheme"
+      }
+    }
+  ],
+  "roles": [
+    {
+      "id": "field",
+      "name": {
+        "ja": "場",
+        "en": "field"
+      }
+    },
+    {
+      "id": "focal",
+      "name": {
+        "ja": "主",
+        "en": "focal"
+      }
+    },
+    {
+      "id": "secondary",
+      "name": {
+        "ja": "従",
+        "en": "secondary"
+      }
+    },
+    {
+      "id": "scattered",
+      "name": {
+        "ja": "散在",
+        "en": "scattered"
+      }
+    },
+    {
+      "id": "accent",
+      "name": {
+        "ja": "添え",
+        "en": "accent"
+      }
+    }
+  ],
+  "kinds": [
+    {
+      "id": "cluster",
+      "name": {
+        "ja": "1か所の形",
+        "en": "cluster"
+      }
+    },
+    {
+      "id": "row",
+      "name": {
+        "ja": "列",
+        "en": "row"
+      }
+    },
+    {
+      "id": "surface",
+      "name": {
+        "ja": "面",
+        "en": "surface"
+      }
+    },
+    {
+      "id": "line",
+      "name": {
+        "ja": "線",
+        "en": "line"
+      }
+    }
+  ],
+  "at": [
+    {
+      "id": "point_ul",
+      "name": {
+        "ja": "左上の交点",
+        "en": "Upper left crossing"
+      }
+    },
+    {
+      "id": "point_ur",
+      "name": {
+        "ja": "右上の交点",
+        "en": "Upper right crossing"
+      }
+    },
+    {
+      "id": "point_ll",
+      "name": {
+        "ja": "左下の交点",
+        "en": "Lower left crossing"
+      }
+    },
+    {
+      "id": "point_lr",
+      "name": {
+        "ja": "右下の交点",
+        "en": "Lower right crossing"
+      }
+    },
+    {
+      "id": "line_left",
+      "name": {
+        "ja": "左の縦の線",
+        "en": "Left vertical line"
+      }
+    },
+    {
+      "id": "line_right",
+      "name": {
+        "ja": "右の縦の線",
+        "en": "Right vertical line"
+      }
+    },
+    {
+      "id": "line_top",
+      "name": {
+        "ja": "上の横の線",
+        "en": "Upper horizontal line"
+      }
+    },
+    {
+      "id": "line_bottom",
+      "name": {
+        "ja": "下の横の線",
+        "en": "Lower horizontal line"
+      }
+    }
+  ],
+  "places": [
+    {
+      "id": "golden_ul",
+      "name": {
+        "ja": "黄金分割・左上の交点",
+        "en": "Golden section, upper left crossing"
+      }
+    },
+    {
+      "id": "golden_ur",
+      "name": {
+        "ja": "黄金分割・右上の交点",
+        "en": "Golden section, upper right crossing"
+      }
+    },
+    {
+      "id": "golden_ll",
+      "name": {
+        "ja": "黄金分割・左下の交点",
+        "en": "Golden section, lower left crossing"
+      }
+    },
+    {
+      "id": "golden_lr",
+      "name": {
+        "ja": "黄金分割・右下の交点",
+        "en": "Golden section, lower right crossing"
+      }
+    },
+    {
+      "id": "third_left",
+      "name": {
+        "ja": "三分割・左の縦の線",
+        "en": "Rule of thirds, left vertical line"
+      }
+    },
+    {
+      "id": "third_right",
+      "name": {
+        "ja": "三分割・右の縦の線",
+        "en": "Rule of thirds, right vertical line"
+      }
+    },
+    {
+      "id": "third_top",
+      "name": {
+        "ja": "三分割・上の横の線",
+        "en": "Rule of thirds, upper horizontal line"
+      }
+    },
+    {
+      "id": "third_bottom",
+      "name": {
+        "ja": "三分割・下の横の線",
+        "en": "Rule of thirds, lower horizontal line"
+      }
+    },
+    {
+      "id": "center",
+      "name": {
+        "ja": "中心",
+        "en": "Center"
+      }
+    }
+  ]
+}

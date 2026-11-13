@@ -1130,7 +1130,7 @@ fn pick<'a>(table: &[(&str, &'a str, &'a str)], key: &str, ja: bool) -> &'a str 
     )
 }
 
-const AT_WORDS: [(&str, &str, &str); 8] = [
+pub(crate) const AT_WORDS: [(&str, &str, &str); 8] = [
     ("point_ul", "左上の交点", "the upper left crossing"),
     ("point_ur", "右上の交点", "the upper right crossing"),
     ("point_ll", "左下の交点", "the lower left crossing"),

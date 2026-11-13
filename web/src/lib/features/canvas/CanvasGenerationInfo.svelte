@@ -10,6 +10,8 @@
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { t } from '$lib/i18n/index.svelte';
 	import { normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchStateNote } from '$lib/sketch';
+	// Laws by name, their codes after them (2026-11-13: the codes stay only here, in the details).
+	import { colorLawNameWithCode, lawNameWithCode } from '$lib/features/composition-record/composition-names';
 	import {
 		compositionColorsChangeLabel, compositionColorsChanges, compositionColorsStateNote,
 		compositionFormLabel, compositionKindLabel, compositionMeasureLabel, compositionMeasureSummary, compositionRoleLabel,
@@ -443,8 +445,8 @@
 							{#if detailComposition.answer}
 								{@render term(isJapanese ? '命題' : 'Thesis', t().provenanceHintComposition)}<dd>{detailComposition.answer.thesis ?? '-'}</dd>
 								{@render term(isJapanese ? '画の型' : 'Form', t().provenanceHintComposition)}<dd>{compositionFormLabel(detailComposition.answer.form, isJapanese) || '-'}</dd>
-								{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintComposition)}<dd>{detailComposition.answer.main_law ?? '-'}</dd>
-								{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintComposition)}<dd>{Object.keys(detailComposition.answer.laws ?? {}).join(isJapanese ? '、' : ', ') || '-'}</dd>
+								{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintComposition)}<dd>{detailComposition.answer.main_law ? lawNameWithCode(detailComposition.answer.main_law, isJapanese) : '-'}</dd>
+								{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintComposition)}<dd>{Object.keys(detailComposition.answer.laws ?? {}).map((code) => lawNameWithCode(code, isJapanese)).join(isJapanese ? '、' : ', ') || '-'}</dd>
 							{/if}
 							{#if detailCompositionMeasure.counts.length}
 								{@render term(isJapanese ? '最後の測り' : 'Last measure', t().provenanceHintCompositionMeasure)}<dd>{detailCompositionMeasure.counts.map(([state, count]) => `${compositionMeasureLabel(state, isJapanese)} ${count}`).join(isJapanese ? '、' : ', ')}</dd>
@@ -471,7 +473,7 @@
 							<p class="detail-note">{isJapanese ? '合わなかった組' : 'Pairs that did not fit'}</p>
 							<ul class="detail-read-list">
 								{#each detailCompositionMeasure.misses as miss, index (index)}
-									<li>{miss.law} · {isJapanese ? '物' : 'thing'} {detailCompositionThing(Number(miss.thing))} · {compositionMeasureLabel(miss.state, isJapanese)}</li>
+									<li>{miss.law ? lawNameWithCode(miss.law, isJapanese) : ''} · {isJapanese ? '物' : 'thing'} {detailCompositionThing(Number(miss.thing))} · {compositionMeasureLabel(miss.state, isJapanese)}</li>
 								{/each}
 							</ul>
 						{/if}
@@ -479,7 +481,7 @@
 							<p class="detail-note">{isJapanese ? 'カード' : 'Cards'}</p>
 							<ul class="detail-read-list">
 								{#each detailComposition.cards as card, index (index)}
-									<li>{card.law} · {card.built ? (isJapanese ? '作った' : 'built') : `${isJapanese ? '作らなかった' : 'not built'}${card.reason ? `（${card.reason}）` : ''}`}{card.motif ? ` · ${card.motif}` : ''}</li>
+									<li>{card.law ? lawNameWithCode(card.law, isJapanese) : ''} · {card.built ? (isJapanese ? '作った' : 'built') : `${isJapanese ? '作らなかった' : 'not built'}${card.reason ? `（${card.reason}）` : ''}`}{card.motif ? ` · ${card.motif}` : ''}</li>
 								{/each}
 							</ul>
 						{/if}
@@ -488,10 +490,10 @@
 							<dl>
 								{@render term(isJapanese ? '状態' : 'State', t().provenanceHintCompositionColors)}<dd>{compositionColorsStateNote(detailCompositionColors, isJapanese)}</dd>
 								{#if detailCompositionColors.main_law}
-									{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintCompositionColors)}<dd>{detailCompositionColors.main_law}</dd>
+									{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintCompositionColors)}<dd>{colorLawNameWithCode(detailCompositionColors.main_law, isJapanese)}</dd>
 								{/if}
 								{#if detailCompositionColors.laws?.length}
-									{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintCompositionColors)}<dd>{detailCompositionColors.laws.join(isJapanese ? '、' : ', ')}</dd>
+									{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintCompositionColors)}<dd>{detailCompositionColors.laws.map((code) => colorLawNameWithCode(code, isJapanese)).join(isJapanese ? '、' : ', ')}</dd>
 								{/if}
 								{#if detailCompositionColors.ground}
 									{@render term(isJapanese ? '地' : 'Ground', t().provenanceHintCompositionColors)}<dd>{colorWordLabel(detailCompositionColors.ground, isJapanese)}</dd>

@@ -72,7 +72,7 @@ const MOVES: [&str; 6] = ["omit", "simplify", "place", "break", "repeat", "merge
 const REWRITES: [&str; 2] = ["simplify", "merge"];
 /// Where `place` moves a chunk: a point, or a line where one coordinate is
 /// kept (`None`).
-const AT: [(&str, Option<f64>, Option<f64>); 10] = [
+pub(crate) const AT: [(&str, Option<f64>, Option<f64>); 10] = [
     ("golden_ul", Some(GOLDEN.0), Some(GOLDEN.0)),
     ("golden_ur", Some(GOLDEN.1), Some(GOLDEN.0)),
     ("golden_ll", Some(GOLDEN.0), Some(GOLDEN.1)),

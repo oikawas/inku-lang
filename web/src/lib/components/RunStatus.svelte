@@ -14,11 +14,12 @@
 	import IncuMascot from './IncuMascot.svelte';
 	import YuragiMascot from './YuragiMascot.svelte';
 	import StopButton from './StopButton.svelte';
-	import { t } from '$lib/i18n/index.svelte';
+	import { getLang, t } from '$lib/i18n/index.svelte';
 	import { getMascot } from '$lib/mascot.svelte';
 	import { providerAttemptText, type ProviderAttemptCount } from '$lib/paintStream';
 	import type { PaintProgressEvent } from '$lib/paintStream';
-	import { currentWork, finishedText, tokenCount } from '$lib/runProgress';
+	import { currentWork, finishedText, tokenCount, type LawNamer } from '$lib/runProgress';
+	import { colorLawName, lawName } from '$lib/features/composition-record/composition-names';
 
 	type Props = {
 		label: string;
@@ -61,6 +62,12 @@
 		children
 	}: Props = $props();
 
+	// The finished stages name their main law by name (2026-11-13).
+	const lawNamer = $derived.by((): LawNamer => {
+		const isJapanese = getLang() === 'ja';
+		return { law: (code) => lawName(code, isJapanese), colorLaw: (code) => colorLawName(code, isJapanese) };
+	});
+
 	const modelLine = $derived.by(() => {
 		if (model) return model;
 		if (stage1Model && stage2Model) {
@@ -98,7 +105,7 @@
 			{#each progress.run_progress.finished as item}
 				{@const tokens = progress.stage_tokens[item.action]}
 				<span class="run-stage">
-					<span class="run-ellipsis">✓ {finishedText(item, t())}</span>
+					<span class="run-ellipsis">✓ {finishedText(item, t(), lawNamer)}</span>
 					{#if tokens}<span class="run-stage-tokens">{t().runStatusStageTokens(tokenCount(tokens.input_tokens), tokenCount(tokens.output_tokens))}</span>{/if}
 				</span>
 			{/each}

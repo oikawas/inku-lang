@@ -374,6 +374,8 @@ def test_only_read_and_draw_with_the_composition_on_asks_the_core_for_it():
 
     assert fields(route="read_and_draw", composition="on")["composition"] == {"mode": "on"}
     assert fields(route="read_and_draw", composition="on", composition_form="bands")["composition"] == {"mode": "on", "form": "bands"}
+    assert fields(route="read_and_draw", composition="on", composition_main_law="B10")["composition"] == {
+        "mode": "on", "main_law": "B10"}
     assert "composition" not in fields(route="read_and_draw", composition="off")
     assert "composition" not in fields(route="read_and_draw")
     assert fields(route="stages", composition="on") == {}
@@ -416,6 +418,34 @@ def test_composition_form_candidate_saves_its_actual_execution_once(host, compos
     assert client.post(path, json=body, headers={"x-owner": "owner"}).status_code == 409
 
 
+def test_main_law_candidate_saves_with_the_laws_it_changed(host, composed):
+    client, service, _, sent = host
+    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
+    node = parent["result"]["lineage_node_id"]
+    # The fixture's composer answers B1 in one_corner, so the named law is kept.
+    fork = client.post(f"/api/pipeline/variations/{parent['variation_id']}/fork-description", headers={"x-owner": "owner"},
+        json={"expected_revision": parent["authority"]["revision"], "description": POEM, "options": {
+            "route": "read_and_draw", "composition": "on", "composition_form": "one_corner", "composition_main_law": "B1",
+            "save_history": False, "save_artifacts": False, "count_generation": True,
+            "lineage_parent_node_id": node, "derivation_kind": "composition_form_change"}})
+    assert fork.status_code == 200, fork.text
+    candidate = _wait(service, fork.json()["execution_id"])
+    record = candidate["description_ddl"]["composition"]
+    assert record["requested_main_law"] == "B1" and record["requested_form"] == "one_corner"
+    message = json.loads(next(row["message"] for row in reversed(sent) if row["tag"] == "compose_description"))
+    assert message["composition_main_law"] == "B1" and message["composition_form"] == "one_corner"
+    service.command("owner", candidate["execution_id"], {"tag": "perform"})
+    saved = client.post(f"/api/pipeline/executions/{candidate['execution_id']}/save", headers={"x-owner": "owner"},
+                        json={"lineage_parent_node_id": node, "derivation_kind": "composition_form_change",
+                              "derivation_metadata": {"ignored": True}})
+    assert saved.status_code == 200, saved.text
+    item = db.get_items("owner", [saved.json()["history_id"]])[0]
+    assert item["derivation_kind"] == "composition_form_change"
+    assert item["derivation_metadata"] == {"main_law_from": "B1", "main_law_to": "B1", "form": "one_corner"}
+    assert item["description_ddl"]["composition"]["requested_main_law"] == "B1"
+
+
 def test_model_candidate_saves_its_execution_with_its_composition(host, composed, monkeypatch):
     client, service, _, _ = host
     parent = _wait(service, _start(client, composition="on")["execution_id"])
@@ -456,6 +486,10 @@ def test_model_candidate_saves_its_execution_with_its_composition(host, composed
     {"route": "stages", "composition": "on", "composition_form": "bands"},
     {"route": "read_and_draw", "composition": "off", "composition_form": "bands"},
     {"route": "read_and_draw", "composition": "on", "composition_form": "not_a_form"},
+    {"route": "stages", "composition": "on", "composition_main_law": "B10"},
+    {"route": "read_and_draw", "composition": "off", "composition_main_law": "B10"},
+    {"route": "read_and_draw", "composition": "on", "composition_main_law": "B21"},
+    {"route": "read_and_draw", "composition": "on", "composition_main_law": "B99"},
 ])
 def test_composition_form_rejects_invalid_route_or_value(host, options):
     client, _, _, _ = host

@@ -490,7 +490,8 @@ class HistoryItem(HistoryPostBody):
             "Read-only. For a work without its own composition record, the nearest ancestor's record reached through "
             "derivations that keep the parent's DDL (touch, tools, ground, colors, paper fit, layout, one chunk, or a "
             "replay of the same DDL): history_id and at of that work, via (the derivation kinds walked, from this work "
-            "up), answer (the composition's answer) and requested_form when the author asked for one. Absent when the "
+            "up), answer (the composition's answer), and requested_form and requested_main_law when the author asked for "
+            "them. Absent when the "
             "work keeps its own record or no readable ancestor gives one."
         ),
     )

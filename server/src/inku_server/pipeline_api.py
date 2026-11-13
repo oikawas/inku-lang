@@ -111,6 +111,8 @@ def _route_fields(context: dict, text: str) -> dict:
         fields["composition"] = {"mode": "on"}
         if options.get("composition_form") is not None:
             fields["composition"]["form"] = options["composition_form"]
+        if options.get("composition_main_law") is not None:
+            fields["composition"]["main_law"] = options["composition_main_law"]
     return fields
 
 
@@ -1075,7 +1077,8 @@ class PipelineService:
                 raise HTTPException(409, "candidate_not_ready")
             if settings.get("derivation_kind") != body.derivation_kind:
                 raise HTTPException(422, "invalid_candidate")
-            if body.derivation_kind == "composition_form_change" and settings.get("composition_form") is None:
+            if body.derivation_kind == "composition_form_change" and settings.get("composition_form") is None \
+                    and settings.get("composition_main_law") is None:
                 raise HTTPException(422, "invalid_candidate")
             if settings.get("lineage_parent_node_id") != body.lineage_parent_node_id:
                 raise HTTPException(422, "candidate_parent_mismatch")
@@ -1098,8 +1101,13 @@ class PipelineService:
                             "stage1_model": settings.get("stage1_model"), "stage2_model": settings.get("stage2_model")}
             else:
                 description = parents[0].get("description_ddl") or {}
-                form_from = (description.get("composition") or {}).get("answer") or {}
-                metadata = {"form_from": form_from.get("form"), "form_to": settings["composition_form"]}
+                answer = (description.get("composition") or {}).get("answer") or {}
+                if settings.get("composition_main_law") is not None:
+                    # A main-law child keeps its parent's form when it has one (step 2).
+                    metadata = {"main_law_from": answer.get("main_law"), "main_law_to": settings["composition_main_law"],
+                                "form": settings.get("composition_form")}
+                else:
+                    metadata = {"form_from": answer.get("form"), "form_to": settings["composition_form"]}
             context = deepcopy(run.context)
             context["host_options"] = {**settings, "save_history": True, "save_artifacts": True, "count_generation": False,
                                        "derivation_kind": body.derivation_kind, "derivation_metadata": metadata}

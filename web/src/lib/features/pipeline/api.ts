@@ -91,6 +91,8 @@ export type PipelineOptions = {
 	/** The composition and laws inside read and draw; left out, a fork takes its parent's. */
 	composition?: CompositionMode;
 	composition_form?: string;
+	/** The main law the author names for this run (any law but B21); not inherited. */
+	composition_main_law?: string;
 	save_history?: boolean;
 	save_artifacts?: boolean;
 	sketch?: 'off' | 'on';

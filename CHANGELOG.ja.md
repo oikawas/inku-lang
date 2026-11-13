@@ -8,6 +8,7 @@
 
 ## 未リリース
 
+- 共通core・Server：言葉で描く＋構図ありの実行で、主の法則を作者が名指せるようにしました（推敲の「構図と法則を変える」の下ごしらえ。画面は後のstepで足します）。Serverの実行の選択肢`composition_main_law`（B21を除く18の法則の記号。親からは継ぎません）は、coreの`composition`の`main_law`になります。構図の回は、本文に`composition_main_law`を足し、答えの`main_law`をその1値に絞り、決まり3と決まり9を差し替えます。名指さない実行の頼む文は今と同じです。違う法則の答えは1回だけ聞き直し、だめなら構図なしで描きます。記録は`requested_main_law`で、主の法則の候補は`composition_form_change`として`main_law_from`・`main_law_to`・`form`を記録して保存します。
 - Android：作品編集メニューから「取り合わせ」と「AIに自律推敲させる」を削除しました（作者の決定。Web・Serverと同じ）。推敲の項目は9つになります。実行中の行の「AIに自律推敲させる」と、その2つだけが使ったVisionのモデルの選び、法則のstageだけをやり直す道、保存の画をPNGにしてVisionへ送る道も外しました。前に作った子の札と系譜の記録は今までどおり読めます。端末に保存した自律推敲の記録と設定は消さず、読まなくなります。
 - macOS・iOS：作品編集メニューから「取り合わせ」と「AI自動推敲プロセス」を削除しました（作者の決定。Webと同じ3つの群の10項目）。取り合わせの窓、AI自動推敲の実行と画面、奥書の窓に残っていた画像助言の道と、それらの確かめも削除しました。前の作品の記録（系譜の詳細の「AIの手」の行、派生の種類の札、記述固定）はそのまま読めます。アプリの保存物（`<DB名>.autonomous-runs.json`、設定の`autonomousRefine`）は消さず、読まなくなります。奥書の窓から、子を描くと読める古い文を外しました。前から落ちていた確かめ2つ（`--lineage-migration-only`・`--refinement-only`）を、今のDBの版と今の指示書の答えの形に合わせて直しました。
 - iOS：`apple/scripts/build-ios.sh --device`が入れる前にアプリのデータをコピーする先を、作業木の外にしました。`INKU_IOS_DEVICE_BACKUPS`（絶対パス）か、無ければ`~/Library/Application Support/Inku Development/ios-device-backups`の下の、機器のUDIDごとのフォルダです。前は`apple/build/iOS/device-backups/`で、作業木を消すと一緒に消えていました。相対パスや作業木の中を指すと、buildの前に止まります。

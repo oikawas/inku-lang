@@ -1359,8 +1359,9 @@ class HistoryListProjector:
                 continue  # the ancestor's composition fell back: there is no answer to show
             inherited = {"history_id": ancestor, "at": getattr(node_of_history.get(ancestor), "at", None),
                          "via": via, "answer": record["answer"]}
-            if record.get("requested_form") is not None:
-                inherited["requested_form"] = record["requested_form"]
+            for requested in ("requested_form", "requested_main_law"):
+                if record.get(requested) is not None:
+                    inherited[requested] = record[requested]
             item["composition_inherited"] = inherited
 
 

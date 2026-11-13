@@ -449,6 +449,9 @@ pub struct DescriptionCompositionRecord {
     /// The author's requested composition form, when specified.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requested_form: Option<String>,
+    /// The author's requested main law, when specified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_main_law: Option<String>,
     /// Why the run wrote without its composition.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fallback: Option<String>,
@@ -604,6 +607,9 @@ pub enum CompositionRequest {
     On {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         form: Option<String>,
+        /// The main law the author chose (any law but B21).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        main_law: Option<String>,
     },
 }
 
@@ -2965,8 +2971,18 @@ impl PipelineSnapshot {
         if route == DescriptionRoute::Stages && composition != CompositionRequest::Off {
             return Err(ProtocolError::InvalidPolicy);
         }
-        if let CompositionRequest::On { form: Some(form) } = &composition
+        if let CompositionRequest::On {
+            form: Some(form), ..
+        } = &composition
             && !crate::description_composition::FORMS.contains(&form.as_str())
+        {
+            return Err(ProtocolError::InvalidPolicy);
+        }
+        if let CompositionRequest::On {
+            main_law: Some(main_law),
+            ..
+        } = &composition
+            && (main_law == "B21" || !crate::laws::LAWS.contains(&main_law.as_str()))
         {
             return Err(ProtocolError::InvalidPolicy);
         }

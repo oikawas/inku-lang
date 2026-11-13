@@ -25,7 +25,7 @@ use crate::description_colors::{
     plan_of_with_definitions, with_layer_things,
 };
 use crate::description_composition::{
-    build_description_composition_prompt_with_form, check_composition_with_form,
+    FixedComposition, build_description_composition_prompt_fixed, check_composition_fixed,
     composition_plugin_words, composition_targets, laws_text, with_composition_plugins,
     with_description_composition_feedback,
 };
@@ -41,10 +41,11 @@ use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptImage};
 use crate::protocol::{PipelineEvent, ProtocolError, ProviderFailure};
 
 impl DescriptionCompositionRecord {
-    fn pending(requested_form: Option<String>) -> Self {
+    fn pending(requested_form: Option<String>, requested_main_law: Option<String>) -> Self {
         Self {
             state: CompositionState::Pending,
             requested_form,
+            requested_main_law,
             fallback: None,
             answer: None,
             targets: Vec::new(),
@@ -55,6 +56,14 @@ impl DescriptionCompositionRecord {
             drawn: Vec::new(),
             things: Vec::new(),
             colors: None,
+        }
+    }
+
+    /// What the author fixed for the composer.
+    fn fixed(&self) -> FixedComposition<'_> {
+        FixedComposition {
+            form: self.requested_form.as_deref(),
+            main_law: self.requested_main_law.as_deref(),
         }
     }
 
@@ -143,8 +152,8 @@ impl PipelineSnapshot {
             dropped: Vec::new(),
             composition: match composition {
                 CompositionRequest::Off => None,
-                CompositionRequest::On { form } => {
-                    Some(DescriptionCompositionRecord::pending(form))
+                CompositionRequest::On { form, main_law } => {
+                    Some(DescriptionCompositionRecord::pending(form, main_law))
                 }
             },
         });
@@ -276,14 +285,15 @@ impl PipelineSnapshot {
         let prompt = if pending {
             let record = self.description_record()?;
             let context = self.description_context(record)?;
-            let prompt = build_description_composition_prompt_with_form(
+            let prompt = build_description_composition_prompt_fixed(
                 &context,
                 self.config.language,
                 self.config.prompt_limits,
                 record
                     .composition
                     .as_ref()
-                    .and_then(|composition| composition.requested_form.as_deref()),
+                    .map(DescriptionCompositionRecord::fixed)
+                    .unwrap_or_default(),
             )
             .map_err(|_| ProtocolError::SchemaViolation)?;
             with_composition_plugins(
@@ -328,7 +338,7 @@ impl PipelineSnapshot {
             self.config.language,
             self.config.prompt_limits,
         );
-        let checked = check_composition_with_form(
+        let checked = check_composition_fixed(
             response,
             &record.description,
             record.reading.as_ref(),
@@ -338,7 +348,8 @@ impl PipelineSnapshot {
             record
                 .composition
                 .as_ref()
-                .and_then(|composition| composition.requested_form.as_deref()),
+                .map(DescriptionCompositionRecord::fixed)
+                .unwrap_or_default(),
         );
         let action = self.action.as_ref().ok_or(ProtocolError::InvalidState)?;
         let asked_again = message_names(&action.payload, "composition_feedback");
@@ -1704,7 +1715,10 @@ mod tests {
                 sketch,
                 route,
                 source_labels,
-                composition: CompositionRequest::On { form: None },
+                composition: CompositionRequest::On {
+                    form: None,
+                    main_law: None,
+                },
             },
         )
     }
@@ -1760,7 +1774,10 @@ mod tests {
                     false,
                 );
                 if let AuthoringInput::Description { composition, .. } = &mut request {
-                    *composition = CompositionRequest::On { form: None };
+                    *composition = CompositionRequest::On {
+                        form: None,
+                        main_law: None,
+                    };
                 }
                 let state = start_with(config, request).snapshot;
                 let p = prompt(&state);
@@ -1811,6 +1828,7 @@ mod tests {
         if let AuthoringInput::Description { composition, .. } = &mut request {
             *composition = CompositionRequest::On {
                 form: Some(form.into()),
+                main_law: None,
             };
         }
         start_with(config, request).snapshot
@@ -1907,12 +1925,17 @@ mod tests {
             }
         }
         assert_eq!(
-            serde_json::to_string(&CompositionRequest::On { form: None }).unwrap(),
+            serde_json::to_string(&CompositionRequest::On {
+                form: None,
+                main_law: None,
+            })
+            .unwrap(),
             r#"{"mode":"on"}"#
         );
         assert_eq!(
             serde_json::to_string(&CompositionRequest::On {
-                form: Some("bands".into())
+                form: Some("bands".into()),
+                main_law: None,
             })
             .unwrap(),
             r#"{"mode":"on","form":"bands"}"#
@@ -1976,6 +1999,156 @@ mod tests {
         );
     }
 
+    fn requested_main_law_start(
+        language: ResolvedInstructionLanguage,
+        read: bool,
+        form: Option<&str>,
+        main_law: &str,
+    ) -> PipelineSnapshot {
+        let mut config = read_config(false);
+        config.language = language;
+        let mut request = authoring(
+            if read {
+                SketchRequest::Supplied { text: "妹".into() }
+            } else {
+                SketchRequest::Off
+            },
+            false,
+        );
+        if let AuthoringInput::Description { composition, .. } = &mut request {
+            *composition = CompositionRequest::On {
+                form: form.map(str::to_owned),
+                main_law: Some(main_law.into()),
+            };
+        }
+        start_with(config, request).snapshot
+    }
+
+    #[test]
+    fn selected_main_law_changes_only_rules_3_and_9_the_message_and_the_schema() {
+        let rule = |system: &str, head: &str| -> String {
+            system
+                .lines()
+                .skip_while(|line| !line.starts_with("# 決まり") && !line.starts_with("# Rules"))
+                .find(|line| line.starts_with(head))
+                .unwrap()
+                .to_owned()
+        };
+        for language in [
+            ResolvedInstructionLanguage::Ja,
+            ResolvedInstructionLanguage::En,
+        ] {
+            let ja = language == ResolvedInstructionLanguage::Ja;
+            for read in [false, true] {
+                for form in [None, Some("bands")] {
+                    let state = requested_main_law_start(language, read, form, "B10");
+                    let prompt = prompt(&state);
+                    let message: Value =
+                        serde_json::from_str(prompt["message"].as_str().unwrap()).unwrap();
+                    assert_eq!(message["composition_main_law"], "B10");
+                    assert_eq!(
+                        prompt["response_schema"]["properties"]["main_law"]["enum"],
+                        json!(["B10"])
+                    );
+                    let record = state.description_ddl.as_ref().unwrap();
+                    let composition = record.composition.as_ref().unwrap();
+                    assert_eq!(composition.requested_main_law.as_deref(), Some("B10"));
+                    assert_eq!(composition.requested_form.as_deref(), form);
+                    // The same run with only the form fixed (or nothing) is the
+                    // baseline: rules 3 and 9, the message's key and the
+                    // schema's enum are all that differ.
+                    let context = state.description_context(record).unwrap();
+                    let baseline =
+                        crate::description_composition::build_description_composition_prompt_fixed(
+                            &context,
+                            language,
+                            state.config.prompt_limits,
+                            crate::description_composition::FixedComposition {
+                                form,
+                                main_law: None,
+                            },
+                        )
+                        .unwrap();
+                    let system = prompt["system"].as_str().unwrap();
+                    let rule_3 = rule(system, "3. ");
+                    let rule_9 = rule(system, "9. ");
+                    let expected_3 = if ja {
+                        "3. 主の法則（main_law）は本文の composition_main_law に決めてある。その法則を、画を見た人が最初に読み取る、画の骨組みにして組む。ほかの法則を主にしない。"
+                    } else {
+                        "3. The main law (main_law) is fixed by composition_main_law in the message. Compose so that it is the law a viewer reads first, the bones of the picture; do not make another law the main law."
+                    };
+                    let expected_9 = match (ja, form.is_some()) {
+                        (true, true) => {
+                            "9. reason には、記述の言葉を「」で引いて、決めてある画の型と主の法則のもとで、物をどう組んだかを 1〜2 行で書く。型と主の法則を選んだ理由は書かない（作者が決めた）。下の答えの例の reason は、型と主の法則を決めていない時の書き方である。"
+                        }
+                        (true, false) => {
+                            "9. reason には、記述の言葉を「」で引いて、画の型を選んだ理由を 1〜2 行で書く。主の法則を選んだ理由は書かない（作者が決めた）。下の答えの例の reason は、型と主の法則を決めていない時の書き方である。"
+                        }
+                        (false, true) => {
+                            "9. In reason, quote the description's words in quotation marks and say in one or two lines how the things are composed under the fixed form and main law. Do not say why they were chosen (the author chose them). The reason in the example answer below is written for a run where neither is fixed."
+                        }
+                        (false, false) => {
+                            "9. In reason, quote the description's words in quotation marks and say in one or two lines why you chose the form. Do not say why the main law was chosen (the author chose it). The reason in the example answer below is written for a run where neither is fixed."
+                        }
+                    };
+                    assert_eq!(rule_3, expected_3);
+                    assert_eq!(rule_9, expected_9);
+                    let restored = system
+                        .replacen(&rule_3, &rule(&baseline.system, "3. "), 1)
+                        .replacen(&rule_9, &rule(&baseline.system, "9. "), 1);
+                    assert_eq!(restored, baseline.system, "{language:?} read={read}");
+                    let mut baseline_message = message.clone();
+                    baseline_message
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("composition_main_law");
+                    assert_eq!(
+                        baseline_message,
+                        serde_json::from_str::<Value>(&baseline.message).unwrap()
+                    );
+                    let mut baseline_schema = prompt["response_schema"].clone();
+                    baseline_schema["properties"]["main_law"]["enum"] =
+                        baseline.response_schema["properties"]["main_law"]["enum"].clone();
+                    assert_eq!(baseline_schema, baseline.response_schema);
+                }
+            }
+        }
+        assert_eq!(
+            serde_json::to_string(&CompositionRequest::On {
+                form: None,
+                main_law: Some("B10".into()),
+            })
+            .unwrap(),
+            r#"{"mode":"on","main_law":"B10"}"#
+        );
+    }
+
+    #[test]
+    fn wrong_selected_main_law_is_asked_again_then_falls_back() {
+        // golden() answers B1; the author fixed B10.
+        let first = requested_main_law_start(ResolvedInstructionLanguage::Ja, false, None, "B10");
+        let wrong = composition(golden()).to_string();
+        let retry = answer_text(&first, &wrong).snapshot;
+        assert_eq!(tag(&retry), "compose_description");
+        assert_eq!(message(&retry)["composition_main_law"], "B10");
+        assert_eq!(
+            prompt(&retry)["response_schema"]["properties"]["main_law"]["enum"],
+            json!(["B10"])
+        );
+        let fallback = answer_text(&retry, &wrong).snapshot;
+        assert_eq!(tag(&fallback), "write_description_ddl");
+        let record = fallback
+            .description_ddl
+            .as_ref()
+            .unwrap()
+            .composition
+            .as_ref()
+            .unwrap();
+        assert_eq!(record.state, CompositionState::Fallback);
+        assert_eq!(record.requested_main_law.as_deref(), Some("B10"));
+        assert_eq!(record.rounds.len(), 2);
+    }
+
     #[test]
     fn plugin_schema_keeps_the_selected_form_on_initial_and_retry_requests() {
         let asset: Value = serde_json::from_str(include_str!(
@@ -1996,9 +2169,14 @@ mod tests {
             source_labels: vec![],
             composition: CompositionRequest::On {
                 form: Some("bands".into()),
+                main_law: Some("B10".into()),
             },
         };
         let first = start_with(config, request).snapshot;
+        assert_eq!(
+            prompt(&first)["response_schema"]["properties"]["main_law"]["enum"],
+            json!(["B10"])
+        );
         assert_eq!(
             prompt(&first)["response_schema"]["properties"]["form"]["enum"],
             json!(["bands"])
@@ -2011,22 +2189,36 @@ mod tests {
             prompt(&retry)["response_schema"]["properties"]["form"]["enum"],
             json!(["bands"])
         );
+        assert_eq!(
+            prompt(&retry)["response_schema"]["properties"]["main_law"]["enum"],
+            json!(["B10"])
+        );
         assert_eq!(message(&retry)["composition_form"], "bands");
+        assert_eq!(message(&retry)["composition_main_law"], "B10");
     }
 
     #[test]
     fn invalid_form_and_stage_route_are_refused_for_start_and_regeneration() {
         let invalid = CompositionRequest::On {
             form: Some("other".into()),
+            main_law: None,
+        };
+        let law = |main_law: &str| CompositionRequest::On {
+            form: None,
+            main_law: Some(main_law.into()),
         };
         for (route, composition) in [
             (DescriptionRoute::ReadAndDraw, invalid),
+            (DescriptionRoute::ReadAndDraw, law("B21")),
+            (DescriptionRoute::ReadAndDraw, law("B99")),
             (
                 DescriptionRoute::Stages,
                 CompositionRequest::On {
                     form: Some("bands".into()),
+                    main_law: None,
                 },
             ),
+            (DescriptionRoute::Stages, law("B10")),
         ] {
             let mut request = authoring(SketchRequest::Off, false);
             if let AuthoringInput::Description {
@@ -2102,7 +2294,10 @@ mod tests {
         config.catalogs = vec![candidate("default")];
         let mut input = authoring(SketchRequest::On, true);
         if let AuthoringInput::Description { composition, .. } = &mut input {
-            *composition = CompositionRequest::On { form: None };
+            *composition = CompositionRequest::On {
+                form: None,
+                main_law: None,
+            };
         }
         let initial = start_with(config, input).snapshot;
         let choice = reply(
@@ -2222,7 +2417,10 @@ mod tests {
                     sketch: SketchRequest::Off,
                     route: DescriptionRoute::ReadAndDraw,
                     source_labels: Vec::new(),
-                    composition: CompositionRequest::On { form: None },
+                    composition: CompositionRequest::On {
+                        form: None,
+                        main_law: None,
+                    },
                 },
             )
             .snapshot
@@ -2329,7 +2527,10 @@ mod tests {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::ReadAndDraw,
                 source_labels: Vec::new(),
-                composition: CompositionRequest::On { form: None },
+                composition: CompositionRequest::On {
+                    form: None,
+                    main_law: None,
+                },
             },
         )
         .snapshot;
@@ -2486,7 +2687,10 @@ mod tests {
                         sketch: SketchRequest::Off,
                         route: DescriptionRoute::Stages,
                         source_labels: Vec::new(),
-                        composition: CompositionRequest::On { form: None },
+                        composition: CompositionRequest::On {
+                            form: None,
+                            main_law: None,
+                        },
                     },
                 },
             ),
@@ -2589,7 +2793,10 @@ mod tests {
                 sketch,
                 route,
                 source_labels,
-                composition: CompositionRequest::On { form: None },
+                composition: CompositionRequest::On {
+                    form: None,
+                    main_law: None,
+                },
             },
         )
         .snapshot

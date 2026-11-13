@@ -146,6 +146,9 @@ class RunOptions(BaseModel):
     # out, a child takes its parent's, like the route.
     composition: Literal["off", "on"] | None = None
     composition_form: Literal["one_corner", "all_over", "bands", "dividing_line", "grid", "flock_and_stray", "unequal_triangle"] | None = None
+    # The main law the author names (step 2, 2026-11-13): any law but B21.
+    composition_main_law: Literal["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B12", "B15",
+                                  "C1", "C2", "C3", "C4", "C5", "C6"] | None = None
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
@@ -369,8 +372,10 @@ class ProductPipelineEffects:
                 options[key] = ""
         requested_limits = options.pop("limits", None)
         previous = deepcopy((work or {}).get("host_options", {}))
-        # The form is a choice for this execution, not a setting inherited by children.
+        # The form and the main law are choices for this execution, not
+        # settings inherited by children.
         previous.pop("composition_form", None)
+        previous.pop("composition_main_law", None)
         for retired in ("variation_amplitude", "variation_seed"):
             previous.pop(retired, None)
         metadata = (work or {}).get("metadata", {})
@@ -385,7 +390,7 @@ class ProductPipelineEffects:
         if imported_plugins and work and "saved_config" in work:
             raise CandidateHostError("imported_plugins_require_new_work")
         selected = {**previous, **options}
-        if selected.get("composition_form") is not None and (
+        if (selected.get("composition_form") is not None or selected.get("composition_main_law") is not None) and (
             kind != "description" or selected.get("route") != "read_and_draw" or selected.get("composition") != "on"
         ):
             raise CandidateHostError("invalid_authoring_options")

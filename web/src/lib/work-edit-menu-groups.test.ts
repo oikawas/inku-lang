@@ -8,22 +8,23 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 const MENU = fs.readFileSync(path.join(here, 'components/WorkActionMenu.svelte'), 'utf8');
 const markup = MENU.slice(MENU.indexOf('role="menu"'));
 
-test('the work edit menu runs lightest first, in four groups', () => {
+// The juxtaposition and the AI refinement left the menu on 2026-11-13 (the
+// author: ten items), and the AI group with them.
+test('the work edit menu runs lightest first, in three groups', () => {
 	const actions = [...markup.matchAll(/select\('([a-z-]+)', event\)/g)].map((m) => m[1]);
 	assert.deepEqual(actions, [
 		'color-catalog', 'color-arrangement', 'ground', 'tool',
 		'layout', 'instructions',
-		'description', 'composition-form', 'sketch-grain', 'models', 'juxtapose',
-		'autonomous',
+		'description', 'composition-form', 'sketch-grain', 'models',
 	]);
 	const groups = [...markup.matchAll(/role="group" aria-label=\{t\(\)\.(workActionGroup\w+)\}/g)].map((m) => m[1]);
-	assert.deepEqual(groups, ['workActionGroupLook', 'workActionGroupForm', 'workActionGroupDescription', 'workActionGroupAi']);
+	assert.deepEqual(groups, ['workActionGroupLook', 'workActionGroupForm', 'workActionGroupDescription']);
 });
 
 test('the items that call the LLM carry its mark, and only those', () => {
 	const items = [...markup.matchAll(/select\('([a-z-]+)', event\)\}>\{t\(\)\.\w+\}(\{@render llmMark\(\)\})?<\/button>/g)];
-	assert.equal(items.length, 12);
-	assert.deepEqual(items.filter((m) => m[2]).map((m) => m[1]), ['description', 'composition-form', 'sketch-grain', 'models', 'juxtapose', 'autonomous']);
+	assert.equal(items.length, 10);
+	assert.deepEqual(items.filter((m) => m[2]).map((m) => m[1]), ['description', 'composition-form', 'sketch-grain', 'models']);
 });
 
 test('a DDL work hides the description group with its heading', () => {

@@ -1,13 +1,11 @@
 <script lang="ts">
-	import { aiMoveOf, chunkMoveText, sharePercent, type AiMoveRecord, type AutonomousRunsApi } from '$lib/features/autonomous/runs';
+	import { aiMoveOf, chunkMoveText, sharePercent, type AiMoveRecord } from '$lib/features/history/ai-move';
 	import { hashDigest, hashSchemeLabel } from '$lib/hashIdentity';
 	import { onMount, tick, untrack } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import SavedWorkExportMenu from './SavedWorkExportMenu.svelte';
 	import WorkEditDialog from './WorkEditDialog.svelte';
-	import JuxtaposeDialog from './JuxtaposeDialog.svelte';
-	import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
 	import type { SketchMode } from '$lib/sketch';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
@@ -38,7 +36,7 @@
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: RefinementView) => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, metadata?: Record<string, unknown>) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
 		stage1ModelLabel: string;
@@ -53,14 +51,8 @@
 		onDetach: () => void;
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
-		/** The AI refinement's runs, which the Server takes (2026-10-21). */
-		autonomousRuns: AutonomousRunsApi;
-		/** Open a child an AI refinement run kept. */
-		onOpenAutonomousChild: (historyId: string, nodeId: string | null) => void | Promise<void>;
 		/** Redraw a work with the sketch off or on, as its child. */
 		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean) => Promise<void>;
-		onJuxtapose: (historyId: string, model: string, exclude: string[], signal: AbortSignal) => Promise<JuxtapositionResult>;
-		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		visionModel: string;
 		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
@@ -96,7 +88,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, runProgress = null, onSaveOkugakiModel, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, autonomousRuns, onOpenAutonomousChild, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, runProgress = null, onSaveOkugakiModel, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let handledFocusRequest = 0;
 	$effect(() => {
@@ -126,8 +118,6 @@
 	let panSession: { pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null = null;
 	let activeMenuNodeId = $state<string | null>(null);
 	let headerWorkMenuOpen = $state(false);
-	let activeAIRefineNode = $state<LineageNode | null>(null);
-	let activeJuxtaposeNode = $state<LineageNode | null>(null);
 	let activeEditNode = $state<LineageNode | null>(null);
 	// Sketch from life (Stage 0.5): the grain lives on the edit shelf beside
 	// description and the instructions -- not on the refinement radio, because
@@ -470,8 +460,6 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			case 'sketch-grain': openSketchDialog(node); break;
 			case 'models': await onOpenRefinement(node, 'compare'); break;
 			case 'composition-form': await onOpenRefinement(node, 'composition-form'); break;
-			case 'juxtapose': activeJuxtaposeNode = node; break;
-			case 'autonomous': activeAIRefineNode = node; break;
 		}
 	}
 
@@ -998,24 +986,6 @@ $effect(() => {
 			</div>
 		</div>
 	</div>
-{/if}
-
-{#if activeJuxtaposeNode}
-	<JuxtaposeDialog node={activeJuxtaposeNode} {visionModel} {visionProviderGroups} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeJuxtaposeNode = null)} {onSaveVisionModel} {onJuxtapose} {onDrawDescription} />
-{/if}
-
-{#if activeAIRefineNode}
-	{#await import('./AIRefineModal.svelte') then { default: AIRefineModal }}
-		<AIRefineModal
-			node={activeAIRefineNode}
-			onClose={() => (activeAIRefineNode = null)}
-			{autonomousRuns}
-			onOpenChild={onOpenAutonomousChild}
-			{onSaveVisionModel}
-			{visionModel}
-			{visionProviderGroups}
-		/>
-	{/await}
 {/if}
 
 <style>

@@ -731,31 +731,6 @@
 		}
 	}
 
-	async function persistVisionModel(provider: Provider, model: string): Promise<void> {
-		if (!provider || !model) return;
-		if (provider === visionProvider && model === visionModel) return;
-		const prevProvider = visionProvider;
-		const prevModel = visionModel;
-		visionProvider = provider;
-		visionModel = model;
-		if (!session.currentUser) return;
-		const token = session.beginSettingsUpdate();
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ model_settings: { vision_provider: provider, vision_model: model } })
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			session.acceptSettingsUpdate(token, await r.json() as UserItem);
-		} catch (e) {
-			visionProvider = prevProvider;
-			visionModel = prevModel;
-			console.warn('failed to save vision model', e);
-			throw e;
-		}
-	}
-
 	/** Put back the conditions the last work of the stopped run was drawn under. */
 	async function applyBatchRunConditions(conditions: BatchRunConditions) {
 		const choices = work.batchTextOptions;
@@ -1701,7 +1676,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	});
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, metadata?: Record<string, unknown>): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history?.id) return;
 	// Ask before the words are carried into a child (contract § stage 4).
@@ -1718,8 +1693,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 			canvasAspectId: lineageCanvasAspectId(node),
 			lineageParentNodeId: node.id,
 			derivationKind: 'description_edit',
-			// A juxtaposition adds what it added, so the lineage can leave it out next time.
-			derivationMetadata: { edited_from_history_id: node.history.id ?? null, ...(metadata ?? {}) },
+			derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 			// The dialog supplies its own choice; otherwise the parent's recorded one
 			// (not recorded reads as off, as opening the work reads it).
 			renderOverrides: {
@@ -3236,15 +3210,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				refineWildValue={effectiveRefineWild}
 				onSetRefineWild={setRefineWild}
 				onSaveOkugakiModel={persistOkugakiModel}
-				onSaveVisionModel={persistVisionModel}
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
 				onDetachLineage={detachLineage}
 				onLoadLineageOverview={() => lineageState.loadOverview(currentLineageNodeId)}
 				onLoadLineageBranch={lineageState.loadBranch}
-				autonomousRuns={work.autonomousRuns}
-				onOpenAutonomousChild={showNewLineageChild}
-				onJuxtapose={work.requestJuxtaposition}
 				pngTemplates={exportTemplates}
 				animationExportSettings={exportSettings.selectedAnimation}
 				{apiFetch}

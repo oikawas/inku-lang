@@ -102,12 +102,12 @@ test('the work keeps its shape when it is a PNG', () => {
 // new grid of works drawn by hand -- which would keep carrying whole SVGs --
 // shows up as a failure rather than as a listing that is quietly still slow.
 // 2026-09-22: the Library preview became the eighth, through this component.
+// 2026-11-13: the AI refinement dialog left with its one, seven.
 test('the listings that show works side by side all use this component', () => {
 	const CALL_SITES: Record<string, number> = {
 		'components/HistoryStrip.svelte': 1,
 		'components/HistoryManager.svelte': 5,
-		'components/LineagePanel.svelte': 1,
-		'components/AIRefineModal.svelte': 1
+		'components/LineagePanel.svelte': 1
 	};
 	let total = 0;
 	for (const [file, expected] of Object.entries(CALL_SITES)) {
@@ -116,7 +116,7 @@ test('the listings that show works side by side all use this component', () => {
 		assert.equal(found, expected, `${file} draws ${found} thumbnails, expected ${expected}`);
 		total += found;
 	}
-	assert.equal(total, 8);
+	assert.equal(total, 7);
 });
 
 // ── Stage 6: who asks the listing for what ──────────────────────────────────

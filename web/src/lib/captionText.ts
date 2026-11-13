@@ -17,9 +17,10 @@ function pushPart(parts: CaptionPart[], text: string, italic: boolean): void {
 /** Split a displayed headnote into safely renderable text and emphasis.
  *
  * Comment boundaries come from the same UI parser that shades them in the
- * editor. The complete bracketed comment is italic. A refinement direction is
- * appended as its own line by AIRefineModal, so the whole labelled line is
- * italic in either UI language.
+ * editor. The complete bracketed comment is italic. A refinement direction (a
+ * line the AI refinement appended to works it kept, before it was removed on
+ * 2026-11-13) is its own line, so the whole labelled line is italic in either
+ * UI language.
  */
 export function captionParts(text: string): CaptionPart[] {
 	const parts: CaptionPart[] = [];

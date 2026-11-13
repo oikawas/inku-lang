@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { AutonomousRunsApi } from '$lib/features/autonomous/runs';
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -30,8 +29,6 @@
 	import Tooltip from './Tooltip.svelte';
 	import WorkActionMenu, { type WorkAction } from './WorkActionMenu.svelte';
 	import WorkEditDialog from './WorkEditDialog.svelte';
-	import JuxtaposeDialog from './JuxtaposeDialog.svelte';
-	import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue, interpretFallbackReason as interpretReason } from '$lib/composeFallback';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
@@ -174,7 +171,7 @@
 		onFocusLatestRefinementChild: (parentNodeId: string, knownChildNodeIds: Set<string>) => boolean | Promise<boolean>;
 		onToggleLineageStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleLineageForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
-		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, metadata?: Record<string, unknown>) => void | Promise<void>;
+		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
 		onDrawLineageSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
 		onToggleSaijiki: () => void;
@@ -190,17 +187,11 @@
 		refineWildValue: boolean;
 		onSetRefineWild: (value: boolean | null) => void;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
-		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrashLineage: (historyIds: string[]) => void;
 		onDetachLineage: () => void;
 		onLoadLineageOverview: () => void | Promise<void>;
 		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
-		/** The AI refinement's runs, which the Server takes (2026-10-21). */
-		autonomousRuns: AutonomousRunsApi;
-		/** Open a child an AI refinement run kept. */
-		onOpenAutonomousChild: (historyId: string, nodeId: string | null) => void | Promise<void>;
-		onJuxtapose: (historyId: string, model: string, exclude: string[], signal: AbortSignal) => Promise<JuxtapositionResult>;
 	};
 
 	let {
@@ -315,15 +306,11 @@
 		refineWildValue,
 		onSetRefineWild,
 		onSaveOkugakiModel,
-		onSaveVisionModel,
 		onSaveLineageNote,
 		onAskTrashLineage,
 		onDetachLineage,
 		onLoadLineageOverview,
-		onLoadLineageBranch,
-		autonomousRuns,
-		onOpenAutonomousChild,
-		onJuxtapose
+		onLoadLineageBranch
 	}: Props = $props();
 
 	let canvasContentEl = $state<HTMLDivElement | null>(null);
@@ -442,8 +429,6 @@
 	let directActionMenuOpen = $state(false);
 	let directEditNode = $state<LineageNode | null>(null);
 	let directEditMode = $state<'description' | 'sketch-grain' | null>(null);
-	let directAIRefineNode = $state<LineageNode | null>(null);
-	let directJuxtaposeNode = $state<LineageNode | null>(null);
 	// A result just saved is not in the history list yet, so its generation is
 	// not known for a moment; it is not called standalone meanwhile.
 	const statusGenerationPending = $derived(!statusHistoryItem && !!result?.history_id);
@@ -537,8 +522,6 @@
 				startDirectRefinement(node, 'compare');
 				break;
 			case 'composition-form': startDirectRefinement(node, 'composition-form'); break;
-			case 'juxtapose': directJuxtaposeNode = node; break;
-			case 'autonomous': directAIRefineNode = node; break;
 		}
 	}
 
@@ -939,9 +922,9 @@
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
 						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={runStage1ModelLabel}
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} {runProgress} onSaveOkugakiModel={onSaveOkugakiModel}
-						{onSaveVisionModel} onSaveNote={onSaveLineageNote}
+						onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
-						onLoadBranch={onLoadLineageBranch} {autonomousRuns} {onOpenAutonomousChild} {onJuxtapose} {visionModel} {okugakiModel}
+						onLoadBranch={onLoadLineageBranch} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}
 						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
@@ -1029,39 +1012,6 @@
 		onDrawDescription={onDrawLineageDescription}
 		onDrawSketchGrain={onDrawLineageSketchGrain}
 	/>
-{/if}
-
-{#if directJuxtaposeNode}
-	<JuxtaposeDialog
-		node={directJuxtaposeNode}
-		{visionModel}
-		{visionProviderGroups}
-		{stageLabel}
-		stage1ModelLabel={runStage1ModelLabel}
-		stage2ModelLabel={runStage2ModelLabel}
-		tokensIn={runTokensIn}
-		tokensOut={runTokensOut}
-		attempt={runAttempt}
-		progress={runProgress}
-		onClose={() => (directJuxtaposeNode = null)}
-		{onSaveVisionModel}
-		{onJuxtapose}
-		onDrawDescription={onDrawLineageDescription}
-	/>
-{/if}
-
-{#if directAIRefineNode}
-	{#await import('./AIRefineModal.svelte') then { default: AIRefineModal }}
-		<AIRefineModal
-			node={directAIRefineNode}
-			onClose={() => (directAIRefineNode = null)}
-			{autonomousRuns}
-			onOpenChild={onOpenAutonomousChild}
-			{onSaveVisionModel}
-			{visionModel}
-			{visionProviderGroups}
-		/>
-	{/await}
 {/if}
 
 {#if presentationMode && result}

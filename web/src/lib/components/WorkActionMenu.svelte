@@ -1,5 +1,5 @@
 <script module lang="ts">
-	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'tool' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'juxtapose' | 'autonomous' | 'composition-form';
+	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'tool' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'composition-form';
 
 	let lastWorkActionTrigger: HTMLButtonElement | null = null;
 
@@ -28,7 +28,7 @@
 	};
 
 	let { node, isJapanese, variant, open, available = undefined, unavailableReason, onRequestOpen, onOpenChange, onAction }: Props = $props();
-	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models', 'juxtapose', 'composition-form']);
+	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models', 'composition-form']);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
@@ -123,7 +123,7 @@
 				{#if descriptionLocked}<span class="work-action-origin">{t().descriptionLockedMark}</span>{/if}
 			</div>
 			<!-- Lightest first: the saved Score redrawn without the LLM, then the
-			     instructions, then a new reading of the description, then the AI.
+			     instructions, then a new reading of the description.
 			     The mark goes on the items that always call the LLM; layout and the
 			     instruction editor call it only to fill a hole left in the text. -->
 			<div class="work-action-group" role="group" aria-label={t().workActionGroupLook}>
@@ -145,14 +145,9 @@
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('composition-form', event)}>{t().workActionCompositionForm}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('models', event)}>{t().workActionModels}{@render llmMark()}</button>
-					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('juxtapose', event)}>{t().workActionJuxtapose}{@render llmMark()}</button>
 					{#if descriptionLocked}<p class="work-action-held-note">{t().descriptionLockedReason}</p>{/if}
 				</div>
 			{/if}
-			<div class="work-action-group" role="group" aria-label={t().workActionGroupAi}>
-				<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupAi}</div>
-				<button type="button" role="menuitem" onclick={(event) => select('autonomous', event)}>{t().workActionAutonomous}{@render llmMark()}</button>
-			</div>
 		</div>
 	{/if}
 </div>

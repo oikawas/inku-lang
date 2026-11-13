@@ -114,6 +114,13 @@ export interface LangPack {
 	pipelineForkDescription: string;
 	descriptionLockedMark: string;
 	descriptionLockedShort: string;
+	// The Web lost the AI refinement and the juxtaposition on 2026-11-13; the
+	// apps read their words through ui-reference.json until they lose them too.
+	// Kept for the apps, removed with the core's part (step 0d): this key, the
+	// aiRefine* keys below other than the six the lineage reads (aiRefineKindLaws,
+	// aiRefineKindJuxtaposition, aiRefineKindChunks, aiRefineTurn,
+	// aiRefineChunkMoveName, aiRefineChunkMove), workActionAutonomous,
+	// workActionJuxtapose, juxtapose*, workActionGroupAi and settingsJuxtaposition*.
 	aiRefineHeldNote: string;
 	tooltipForkDescription: string;
 	descriptionLockedReason: string;

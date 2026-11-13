@@ -116,7 +116,9 @@ PUBLIC = {  # every entry needs a reason
 #   (2026-11-13).
 #   +1 for POST /api/history/{item_id}/chunk-place, one thing of a work moved to a
 #   place for the refinement "Change the layout" (step 3, 2026-11-13).
-EXPECTED_ROUTE_COUNT = 153
+#   +1 for POST /api/composition/theses, four theses the composer proposes for a
+#   work's description (step 4, 2026-11-14).
+EXPECTED_ROUTE_COUNT = 154
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

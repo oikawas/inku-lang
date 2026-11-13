@@ -93,6 +93,11 @@ export type PipelineOptions = {
 	composition_form?: string;
 	/** The main law the author names for this run (any law but B21); not inherited. */
 	composition_main_law?: string;
+	/** The thesis the author fixes for this run (1 to 400 characters, no form or main law with it); not inherited. */
+	composition_thesis?: string;
+	/** Who wrote the fixed thesis; a proposed one names the request that proposed it. */
+	composition_thesis_source?: 'author' | 'proposed';
+	composition_thesis_prompt_digest?: string;
 	save_history?: boolean;
 	save_artifacts?: boolean;
 	sketch?: 'off' | 'on';

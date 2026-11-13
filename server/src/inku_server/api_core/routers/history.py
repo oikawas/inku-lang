@@ -636,6 +636,54 @@ def api_history_chunk_place(
     return ChunkPlaceResponse(ddl=ddl, place=ChunkPlaced.model_validate(place))
 
 
+class CompositionThesesBody(BaseModel):
+    """The work whose description the theses are for, and the model that writes them (step 4)."""
+
+    model_config = ConfigDict(extra="forbid")
+    history_id: str = Field(min_length=1, max_length=200, description="Id of the work.")
+    model: str = Field(min_length=1, max_length=200, description="The model that writes the theses, as the model "
+                                                                  "catalog names it; sent under the work's connection.")
+
+
+class CompositionThesesResponse(BaseModel):
+    """Four theses, each building the work's picture another way; nothing is drawn or saved."""
+
+    theses: list[str] = Field(min_length=4, max_length=4, description="Four theses, different from each other and "
+                                                                       "from the work's own.")
+    prompt_digest: str = Field(description="The digest of the request whose answer gave them. A drawing with one "
+                                           "of them fixed sends it as composition_thesis_prompt_digest.")
+    model: str = Field(description="The model that wrote them.")
+    current_thesis: str | None = Field(description="The work's thesis the theses differ from, or null.")
+
+
+@router.post(
+    "/api/composition/theses",
+    response_model=CompositionThesesResponse,
+    summary="Propose four theses for a work's composition",
+    responses={
+        409: {"description": "The work's description is fixed by its DDL (description_locked)."},
+        422: {"description": "The work is not a read-and-draw work, or the model cannot be used; detail names why."},
+        502: {"description": "The model failed or answered twice what the check refused; detail names why."},
+    },
+)
+def api_composition_theses(body: CompositionThesesBody, actor: dict = Depends(_current_user)) -> CompositionThesesResponse:
+    """Ask the model for four theses for one work's description (step 4, "Change the composition and laws").
+
+    The shared core builds the request from the description, its reading and the work's thesis, and checks the
+    answer: four sentences, none empty or longer than 400 characters, different from each other and from the
+    work's thesis. A refused answer is asked once more with the problems. One send (two when asked again) counts
+    against the work's connection. Returns 404 when the work is not found for the caller.
+    """
+    from ...composition_theses import propose_theses_http
+
+    items = _db.get_items(actor["id"], [body.history_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="history item not found")
+    if _db.history_description_locked(body.history_id):
+        raise HTTPException(status_code=409, detail=DESCRIPTION_LOCKED_DETAIL)
+    return CompositionThesesResponse(**propose_theses_http(actor["id"], items[0], body.model))
+
+
 @router.get("/api/history/{item_id}/svg", summary="Get a work's SVG", responses={500: {"description": "Unexpected server failure"}})
 def api_history_svg(
     item_id: Annotated[str, Path(description="Id of the work.")],

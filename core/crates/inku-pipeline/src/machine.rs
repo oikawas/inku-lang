@@ -452,6 +452,13 @@ pub struct DescriptionCompositionRecord {
     /// The author's requested main law, when specified.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requested_main_law: Option<String>,
+    /// The author's fixed thesis, when specified (step 4, 2026-11-14).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_thesis: Option<String>,
+    /// The composer's own thesis when it differed from the fixed one; the
+    /// tool kept the fixed one in the answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answered_thesis: Option<String>,
     /// Why the run wrote without its composition.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fallback: Option<String>,
@@ -610,8 +617,15 @@ pub enum CompositionRequest {
         /// The main law the author chose (any law but B21).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         main_law: Option<String>,
+        /// The thesis the author fixed (1 to 400 characters, trimmed); it
+        /// takes neither a form nor a main law with it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thesis: Option<String>,
     },
 }
+
+/// The longest thesis the author may fix, in characters.
+pub const MAX_THESIS_CHARS: usize = 400;
 
 impl CompositionRequest {
     fn is_off(&self) -> bool {
@@ -2985,6 +2999,22 @@ impl PipelineSnapshot {
             && (main_law == "B21" || !crate::laws::LAWS.contains(&main_law.as_str()))
         {
             return Err(ProtocolError::InvalidPolicy);
+        }
+        // A fixed thesis is the one thing a refinement changes: it takes no
+        // form or main law with it.
+        let mut composition = composition;
+        if let CompositionRequest::On {
+            form,
+            main_law,
+            thesis: Some(thesis),
+        } = &mut composition
+        {
+            let trimmed = thesis.trim();
+            let chars = trimmed.chars().count();
+            if chars == 0 || chars > MAX_THESIS_CHARS || form.is_some() || main_law.is_some() {
+                return Err(ProtocolError::InvalidPolicy);
+            }
+            *thesis = trimmed.to_owned();
         }
         // A run keeps no record of the run before it in the same execution.
         self.config.plugin_offers.clear();

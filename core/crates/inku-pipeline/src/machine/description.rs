@@ -41,11 +41,17 @@ use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptImage};
 use crate::protocol::{PipelineEvent, ProtocolError, ProviderFailure};
 
 impl DescriptionCompositionRecord {
-    fn pending(requested_form: Option<String>, requested_main_law: Option<String>) -> Self {
+    fn pending(
+        requested_form: Option<String>,
+        requested_main_law: Option<String>,
+        requested_thesis: Option<String>,
+    ) -> Self {
         Self {
             state: CompositionState::Pending,
             requested_form,
             requested_main_law,
+            requested_thesis,
+            answered_thesis: None,
             fallback: None,
             answer: None,
             targets: Vec::new(),
@@ -64,6 +70,7 @@ impl DescriptionCompositionRecord {
         FixedComposition {
             form: self.requested_form.as_deref(),
             main_law: self.requested_main_law.as_deref(),
+            thesis: self.requested_thesis.as_deref(),
         }
     }
 
@@ -152,9 +159,13 @@ impl PipelineSnapshot {
             dropped: Vec::new(),
             composition: match composition {
                 CompositionRequest::Off => None,
-                CompositionRequest::On { form, main_law } => {
-                    Some(DescriptionCompositionRecord::pending(form, main_law))
-                }
+                CompositionRequest::On {
+                    form,
+                    main_law,
+                    thesis,
+                } => Some(DescriptionCompositionRecord::pending(
+                    form, main_law, thesis,
+                )),
             },
         });
         Ok(())
@@ -363,7 +374,7 @@ impl PipelineSnapshot {
             asked_again,
             problems: problems.clone(),
         });
-        let answer = match checked {
+        let mut answer = match checked {
             Ok(answer) => answer,
             Err(problems) => {
                 if !asked_again
@@ -401,6 +412,18 @@ impl PipelineSnapshot {
             }
         };
         self.action = None;
+        // A fixed thesis is kept as the author wrote it; the composer's own
+        // sentence, when it differs, is kept beside it.
+        let mut answered_thesis = None;
+        if let Some(fixed) = self
+            .description_record()?
+            .composition
+            .as_ref()
+            .and_then(|composition| composition.requested_thesis.clone())
+            && answer.thesis != fixed
+        {
+            answered_thesis = Some(std::mem::replace(&mut answer.thesis, fixed));
+        }
         let targets = composition_targets(&answer, self.config.language);
         let payload = json!({
             "state": CompositionState::Used,
@@ -410,6 +433,7 @@ impl PipelineSnapshot {
         });
         let composition = self.composition_mut()?;
         composition.state = CompositionState::Used;
+        composition.answered_thesis = answered_thesis;
         composition.answer = Some(answer);
         composition.targets = targets;
         self.event(events, "description_composition_ready", payload)?;
@@ -470,6 +494,7 @@ impl PipelineSnapshot {
                 answer,
                 laws_text: &laws_text,
                 targets: &composition.targets,
+                thesis_fixed: composition.requested_thesis.is_some(),
             };
             match review {
                 None => {
@@ -1718,6 +1743,7 @@ mod tests {
                 composition: CompositionRequest::On {
                     form: None,
                     main_law: None,
+                    thesis: None,
                 },
             },
         )
@@ -1777,6 +1803,7 @@ mod tests {
                     *composition = CompositionRequest::On {
                         form: None,
                         main_law: None,
+                        thesis: None,
                     };
                 }
                 let state = start_with(config, request).snapshot;
@@ -1829,6 +1856,7 @@ mod tests {
             *composition = CompositionRequest::On {
                 form: Some(form.into()),
                 main_law: None,
+                thesis: None,
             };
         }
         start_with(config, request).snapshot
@@ -1928,6 +1956,7 @@ mod tests {
             serde_json::to_string(&CompositionRequest::On {
                 form: None,
                 main_law: None,
+                thesis: None,
             })
             .unwrap(),
             r#"{"mode":"on"}"#
@@ -1936,6 +1965,7 @@ mod tests {
             serde_json::to_string(&CompositionRequest::On {
                 form: Some("bands".into()),
                 main_law: None,
+                thesis: None,
             })
             .unwrap(),
             r#"{"mode":"on","form":"bands"}"#
@@ -2019,6 +2049,7 @@ mod tests {
             *composition = CompositionRequest::On {
                 form: form.map(str::to_owned),
                 main_law: Some(main_law.into()),
+                thesis: None,
             };
         }
         start_with(config, request).snapshot
@@ -2065,7 +2096,7 @@ mod tests {
                             state.config.prompt_limits,
                             crate::description_composition::FixedComposition {
                                 form,
-                                main_law: None,
+                                ..Default::default()
                             },
                         )
                         .unwrap();
@@ -2117,6 +2148,7 @@ mod tests {
             serde_json::to_string(&CompositionRequest::On {
                 form: None,
                 main_law: Some("B10".into()),
+                thesis: None,
             })
             .unwrap(),
             r#"{"mode":"on","main_law":"B10"}"#
@@ -2149,6 +2181,174 @@ mod tests {
         assert_eq!(record.rounds.len(), 2);
     }
 
+    fn requested_thesis_start(
+        language: ResolvedInstructionLanguage,
+        read: bool,
+        review: bool,
+        thesis: &str,
+    ) -> PipelineSnapshot {
+        let mut config = read_config(review);
+        config.language = language;
+        let mut request = authoring(
+            if read {
+                SketchRequest::Supplied { text: "妹".into() }
+            } else {
+                SketchRequest::Off
+            },
+            false,
+        );
+        if let AuthoringInput::Description { composition, .. } = &mut request {
+            *composition = CompositionRequest::On {
+                form: None,
+                main_law: None,
+                thesis: Some(thesis.into()),
+            };
+        }
+        start_with(config, request).snapshot
+    }
+
+    const FIXED_THESIS: &str = "女の姿を画面の中心に大きく置き、紫の影を四隅に散らす。";
+
+    #[test]
+    fn selected_thesis_changes_only_rules_1_and_9_and_the_message() {
+        let rule = |system: &str, head: &str| -> String {
+            system
+                .lines()
+                .skip_while(|line| !line.starts_with("# 決まり") && !line.starts_with("# Rules"))
+                .find(|line| line.starts_with(head))
+                .unwrap()
+                .to_owned()
+        };
+        for language in [
+            ResolvedInstructionLanguage::Ja,
+            ResolvedInstructionLanguage::En,
+        ] {
+            let ja = language == ResolvedInstructionLanguage::Ja;
+            for read in [false, true] {
+                // The author's thesis is trimmed.
+                let state =
+                    requested_thesis_start(language, read, false, &format!("  {FIXED_THESIS}\n"));
+                let prompt = prompt(&state);
+                let message: Value =
+                    serde_json::from_str(prompt["message"].as_str().unwrap()).unwrap();
+                assert_eq!(message["composition_thesis"], FIXED_THESIS);
+                let record = state.description_ddl.as_ref().unwrap();
+                let composition = record.composition.as_ref().unwrap();
+                assert_eq!(composition.requested_thesis.as_deref(), Some(FIXED_THESIS));
+                let context = state.description_context(record).unwrap();
+                let baseline =
+                    crate::description_composition::build_description_composition_prompt_fixed(
+                        &context,
+                        language,
+                        state.config.prompt_limits,
+                        crate::description_composition::FixedComposition::default(),
+                    )
+                    .unwrap();
+                // The schema is the baseline's: thesis stays free.
+                assert_eq!(prompt["response_schema"], baseline.response_schema);
+                let system = prompt["system"].as_str().unwrap();
+                let rule_1 = rule(system, "1. ");
+                let rule_9 = rule(system, "9. ");
+                let (expected_1, expected_9) = if ja {
+                    (
+                        "1. thesis（構図の命題）は本文の composition_thesis に決めてある。その文を thesis にそのまま書き、その命題のとおりに画面を組む。命題が、記述が書いた物・数・色・位置を変えることや、記述が名指す物を描かないことを言っていても、決まり 6 と 11 を守る。",
+                        "9. reason には、記述の言葉を「」で引いて、決めてある命題を、どの画の型と主の法則で組んだかを 1〜2 行で書く。下の答えの例の reason は、命題を決めていない時の書き方である。",
+                    )
+                } else {
+                    (
+                        "1. The thesis (the composition's proposition) is fixed by composition_thesis in the message. Write that sentence as thesis as it stands, and build the canvas as it says. Even if it says to change the things, counts, colors or places the description writes, or not to draw a thing the description names, keep rules 6 and 11.",
+                        "9. In reason, quote the description's words in quotation marks and say in one or two lines which form and main law you built the fixed thesis with. The reason in the example answer below is written for a run where the thesis is not fixed.",
+                    )
+                };
+                assert_eq!(rule_1, expected_1);
+                assert_eq!(rule_9, expected_9);
+                let restored = system
+                    .replacen(&rule_1, &rule(&baseline.system, "1. "), 1)
+                    .replacen(&rule_9, &rule(&baseline.system, "9. "), 1);
+                assert_eq!(restored, baseline.system, "{language:?} read={read}");
+                let mut baseline_message = message.clone();
+                baseline_message
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("composition_thesis");
+                assert_eq!(
+                    baseline_message,
+                    serde_json::from_str::<Value>(&baseline.message).unwrap()
+                );
+            }
+        }
+        assert_eq!(
+            serde_json::to_string(&CompositionRequest::On {
+                form: None,
+                main_law: None,
+                thesis: Some("命題".into()),
+            })
+            .unwrap(),
+            r#"{"mode":"on","thesis":"命題"}"#
+        );
+    }
+
+    #[test]
+    fn a_different_thesis_is_kept_as_fixed_and_every_thing_is_still_drawn() {
+        const NOTE: &str = "composition の thesis は作者が決めた文である。thesis が物を描かないことを言っていても、things の物は全て描く。";
+        let first =
+            requested_thesis_start(ResolvedInstructionLanguage::Ja, false, true, FIXED_THESIS);
+        // The composer wrote its own thesis: kept as fixed, not asked again.
+        let answered = composition(golden());
+        let state = answer_text(&first, &answered.to_string()).snapshot;
+        assert_eq!(tag(&state), "write_description_ddl");
+        let record = composition_record(&state);
+        assert_eq!(record.state, CompositionState::Used);
+        assert_eq!(record.rounds.len(), 1);
+        assert_eq!(record.answer.as_ref().unwrap().thesis, FIXED_THESIS);
+        assert_eq!(
+            record.answered_thesis.as_deref(),
+            answered["thesis"].as_str()
+        );
+        assert_eq!(message(&state)["composition"]["thesis"], FIXED_THESIS);
+        // The writing's composition section ends with the note, once.
+        let system = prompt(&state)["system"].as_str().unwrap();
+        assert_eq!(system.matches(NOTE).count(), 1);
+        let rule_29 = system
+            .lines()
+            .find(|line| line.starts_with("29. "))
+            .unwrap();
+        assert!(
+            system.contains(&format!("{rule_29}\n{NOTE}\n\n# 答え")),
+            "{system}"
+        );
+        let written = sentences(&state, &[(0, "背景を白で埋める。"), (1, WOMAN), (2, SHADE)]);
+        let reviewing = reply(&written.snapshot, drawn(&written.snapshot)).snapshot;
+        assert_eq!(tag(&reviewing), "review_description_ddl");
+        let review = prompt(&reviewing)["system"].as_str().unwrap();
+        assert_eq!(review.matches(NOTE).count(), 1);
+        assert!(review.contains("# 構図と法則を見る"));
+
+        // The composer that copies the thesis leaves nothing beside it.
+        let mut same = composition(golden());
+        same["thesis"] = json!(FIXED_THESIS);
+        let first =
+            requested_thesis_start(ResolvedInstructionLanguage::Ja, false, true, FIXED_THESIS);
+        let state = answer_text(&first, &same.to_string()).snapshot;
+        assert_eq!(composition_record(&state).answered_thesis, None);
+
+        // Without a thesis the writing has no note.
+        let plain = start_with(read_config(true), {
+            let mut request = authoring(SketchRequest::Off, false);
+            if let AuthoringInput::Description { composition, .. } = &mut request {
+                *composition = CompositionRequest::On {
+                    form: None,
+                    main_law: None,
+                    thesis: None,
+                };
+            }
+            request
+        })
+        .snapshot;
+        let state = answer_text(&plain, &composition(golden()).to_string()).snapshot;
+        assert!(!prompt(&state)["system"].as_str().unwrap().contains(NOTE));
+    }
+
     #[test]
     fn plugin_schema_keeps_the_selected_form_on_initial_and_retry_requests() {
         let asset: Value = serde_json::from_str(include_str!(
@@ -2170,6 +2370,7 @@ mod tests {
             composition: CompositionRequest::On {
                 form: Some("bands".into()),
                 main_law: Some("B10".into()),
+                thesis: None,
             },
         };
         let first = start_with(config, request).snapshot;
@@ -2202,20 +2403,53 @@ mod tests {
         let invalid = CompositionRequest::On {
             form: Some("other".into()),
             main_law: None,
+            thesis: None,
         };
         let law = |main_law: &str| CompositionRequest::On {
             form: None,
             main_law: Some(main_law.into()),
+            thesis: None,
         };
+        let thesis =
+            |form: Option<&str>, main_law: Option<&str>, thesis: String| CompositionRequest::On {
+                form: form.map(str::to_owned),
+                main_law: main_law.map(str::to_owned),
+                thesis: Some(thesis),
+            };
         for (route, composition) in [
             (DescriptionRoute::ReadAndDraw, invalid),
             (DescriptionRoute::ReadAndDraw, law("B21")),
             (DescriptionRoute::ReadAndDraw, law("B99")),
             (
+                DescriptionRoute::ReadAndDraw,
+                thesis(None, None, " \n ".into()),
+            ),
+            (
+                DescriptionRoute::ReadAndDraw,
+                thesis(
+                    None,
+                    None,
+                    "命".repeat(crate::machine::MAX_THESIS_CHARS + 1),
+                ),
+            ),
+            (
+                DescriptionRoute::ReadAndDraw,
+                thesis(Some("bands"), None, "女を中心に置く。".into()),
+            ),
+            (
+                DescriptionRoute::ReadAndDraw,
+                thesis(None, Some("B10"), "女を中心に置く。".into()),
+            ),
+            (
+                DescriptionRoute::Stages,
+                thesis(None, None, "女を中心に置く。".into()),
+            ),
+            (
                 DescriptionRoute::Stages,
                 CompositionRequest::On {
                     form: Some("bands".into()),
                     main_law: None,
+                    thesis: None,
                 },
             ),
             (DescriptionRoute::Stages, law("B10")),
@@ -2297,6 +2531,7 @@ mod tests {
             *composition = CompositionRequest::On {
                 form: None,
                 main_law: None,
+                thesis: None,
             };
         }
         let initial = start_with(config, input).snapshot;
@@ -2420,6 +2655,7 @@ mod tests {
                     composition: CompositionRequest::On {
                         form: None,
                         main_law: None,
+                        thesis: None,
                     },
                 },
             )
@@ -2530,6 +2766,7 @@ mod tests {
                 composition: CompositionRequest::On {
                     form: None,
                     main_law: None,
+                    thesis: None,
                 },
             },
         )
@@ -2690,6 +2927,7 @@ mod tests {
                         composition: CompositionRequest::On {
                             form: None,
                             main_law: None,
+                            thesis: None,
                         },
                     },
                 },
@@ -2796,6 +3034,7 @@ mod tests {
                 composition: CompositionRequest::On {
                     form: None,
                     main_law: None,
+                    thesis: None,
                 },
             },
         )

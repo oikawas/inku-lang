@@ -9,9 +9,9 @@ import secrets
 import time
 import uuid
 from copy import deepcopy
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, ValidationError
 
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .macro_catalog import explain_plugin_diagnostics, resolve_new_work_macro_catalog
@@ -118,6 +118,11 @@ class ImportedPlugin(BaseModel):
     note: str = Field(default="", max_length=100)
 
 
+#: The composition choices of one execution: never inherited by a child.
+COMPOSITION_CHOICES = ("composition_form", "composition_main_law", "composition_thesis", "composition_thesis_source",
+                       "composition_thesis_prompt_digest")
+
+
 class RunOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
     stage1_model: str | None = None
@@ -149,6 +154,13 @@ class RunOptions(BaseModel):
     # The main law the author names (step 2, 2026-11-13): any law but B21.
     composition_main_law: Literal["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B12", "B15",
                                   "C1", "C2", "C3", "C4", "C5", "C6"] | None = None
+    # The thesis the author fixes (step 4, 2026-11-14): one sentence of 1 to
+    # 400 characters, with no form or main law. Where it came from: written by
+    # the author, or one of the theses the composer proposed (with the digest
+    # of the request that proposed it).
+    composition_thesis: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=400)] | None = None
+    composition_thesis_source: Literal["author", "proposed"] | None = None
+    composition_thesis_prompt_digest: str | None = Field(default=None, max_length=100)
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
@@ -372,10 +384,10 @@ class ProductPipelineEffects:
                 options[key] = ""
         requested_limits = options.pop("limits", None)
         previous = deepcopy((work or {}).get("host_options", {}))
-        # The form and the main law are choices for this execution, not
-        # settings inherited by children.
-        previous.pop("composition_form", None)
-        previous.pop("composition_main_law", None)
+        # The form, the main law and the thesis are choices for this
+        # execution, not settings inherited by children.
+        for chosen in COMPOSITION_CHOICES:
+            previous.pop(chosen, None)
         for retired in ("variation_amplitude", "variation_seed"):
             previous.pop(retired, None)
         metadata = (work or {}).get("metadata", {})
@@ -390,9 +402,18 @@ class ProductPipelineEffects:
         if imported_plugins and work and "saved_config" in work:
             raise CandidateHostError("imported_plugins_require_new_work")
         selected = {**previous, **options}
-        if (selected.get("composition_form") is not None or selected.get("composition_main_law") is not None) and (
+        if any(selected.get(chosen) is not None for chosen in COMPOSITION_CHOICES) and (
             kind != "description" or selected.get("route") != "read_and_draw" or selected.get("composition") != "on"
         ):
+            raise CandidateHostError("invalid_authoring_options")
+        if selected.get("composition_thesis") is None:
+            if selected.get("composition_thesis_source") is not None or \
+                    selected.get("composition_thesis_prompt_digest") is not None:
+                raise CandidateHostError("invalid_authoring_options")
+        elif selected.get("composition_form") is not None or selected.get("composition_main_law") is not None or (
+                (selected.get("composition_thesis_source") == "proposed")
+                != (selected.get("composition_thesis_prompt_digest") is not None)):
+            # A refinement changes one thing; a proposed thesis names its request.
             raise CandidateHostError("invalid_authoring_options")
         # Request save metadata belongs to this operation, not to its parent.
         for key in ("request_idempotency_key", "history_at", "history_input", "history_source_text"):

@@ -376,6 +376,8 @@ def test_only_read_and_draw_with_the_composition_on_asks_the_core_for_it():
     assert fields(route="read_and_draw", composition="on", composition_form="bands")["composition"] == {"mode": "on", "form": "bands"}
     assert fields(route="read_and_draw", composition="on", composition_main_law="B10")["composition"] == {
         "mode": "on", "main_law": "B10"}
+    assert fields(route="read_and_draw", composition="on", composition_thesis="女を中心に置く。")["composition"] == {
+        "mode": "on", "thesis": "女を中心に置く。"}
     assert "composition" not in fields(route="read_and_draw", composition="off")
     assert "composition" not in fields(route="read_and_draw")
     assert fields(route="stages", composition="on") == {}
@@ -487,6 +489,95 @@ def test_a_moved_thing_is_a_ddl_fork_saved_as_a_layout_change_and_held(host, com
     assert saved.json()["composition_inherited"] == inherited
 
 
+def _thesis_fork(client, service, parent, node, **thesis):
+    fork = client.post(f"/api/pipeline/variations/{parent['variation_id']}/fork-description", headers={"x-owner": "owner"},
+        json={"expected_revision": parent["authority"]["revision"], "description": POEM, "options": {
+            "route": "read_and_draw", "composition": "on", **thesis,
+            "save_history": False, "save_artifacts": False, "count_generation": True,
+            "lineage_parent_node_id": node, "derivation_kind": "composition_form_change"}})
+    assert fork.status_code == 200, fork.text
+    candidate = _wait(service, fork.json()["execution_id"])
+    service.command("owner", candidate["execution_id"], {"tag": "perform"})
+    return candidate
+
+
+def test_thesis_candidate_saves_with_the_thesis_it_fixed(host, composed):
+    client, service, _, sent = host
+    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
+    node = parent["result"]["lineage_node_id"]
+    fixed = "女の姿を画面の中心に大きく置き、紫の影を四隅に散らす。"
+    candidate = _thesis_fork(client, service, parent, node, composition_thesis=f"  {fixed}\n")
+    record = candidate["description_ddl"]["composition"]
+    # The composer answered its own thesis; the fixed one is kept, and the composer's beside it.
+    assert record["requested_thesis"] == fixed and record["answer"]["thesis"] == fixed
+    assert record["answered_thesis"] == COMPOSITION["thesis"]
+    assert "requested_form" not in record and "requested_main_law" not in record
+    message = json.loads(next(row["message"] for row in reversed(sent) if row["tag"] == "compose_description"))
+    assert message["composition_thesis"] == fixed and "composition_form" not in message
+    saved = client.post(f"/api/pipeline/executions/{candidate['execution_id']}/save", headers={"x-owner": "owner"},
+                        json={"lineage_parent_node_id": node, "derivation_kind": "composition_form_change"})
+    assert saved.status_code == 200, saved.text
+    item = db.get_items("owner", [saved.json()["history_id"]])[0]
+    assert item["derivation_metadata"] == {"thesis_from": COMPOSITION["thesis"], "thesis_to": fixed,
+                                           "thesis_source": "author"}
+    # A proposed thesis names the request that proposed it.
+    proposed = _thesis_fork(client, service, parent, node, composition_thesis=fixed,
+                            composition_thesis_source="proposed", composition_thesis_prompt_digest="sha256:ab")
+    saved = client.post(f"/api/pipeline/executions/{proposed['execution_id']}/save", headers={"x-owner": "owner"},
+                        json={"lineage_parent_node_id": node, "derivation_kind": "composition_form_change"})
+    assert saved.status_code == 200, saved.text
+    item = db.get_items("owner", [saved.json()["history_id"]])[0]
+    assert item["derivation_metadata"] == {"thesis_from": COMPOSITION["thesis"], "thesis_to": fixed,
+                                           "thesis_source": "proposed", "thesis_prompt_digest": "sha256:ab"}
+
+
+def test_theses_are_proposed_under_the_works_connection_and_asked_again_once(host, composed, monkeypatch):
+    from inku_server import pipeline_runtime
+    from inku_server.api_core.deps import _current_user
+    from inku_server.api_core.routers.history import router as history_router
+    from inku_server.typed_send import TYPED_SEND_ACTION
+
+    client, service, _, _ = host
+    client.app.include_router(history_router)
+    client.app.dependency_overrides[_current_user] = lambda: {"id": "owner", "role": "user"}
+    monkeypatch.setattr(pipeline_runtime, "get_service", lambda: service)
+    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
+    history_id = parent["result"]["history_id"]
+    asked = []
+    answers = iter([{"theses": ["一つ目。", "二つ目。", "二つ目。", "四つ目。"]},
+                    {"theses": ["一つ目。", "二つ目。", "三つ目。", "四つ目。"]}])
+    fallback = service.provider_with_context
+
+    def provider(owner, context, images=()):
+        if context.get("execution_id", "").startswith("theses:"):
+            def perform(action):
+                assert action["tag"] == TYPED_SEND_ACTION
+                assert context["host_options"]["stage1_model"] == "openai:fixture-text"
+                asked.append(action["payload"]["prompt"])
+                return {"tag": "normalized_ddl_generated", "identity": action["identity"],
+                        "response": json.dumps(next(answers), ensure_ascii=False), "elapsed_ms": "1"}
+            return perform
+        return fallback(owner, context, images)
+
+    service.provider_with_context = provider
+    response = client.post("/api/composition/theses", json={"history_id": history_id, "model": "openai:fixture-text"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["theses"] == ["一つ目。", "二つ目。", "三つ目。", "四つ目。"]
+    assert body["current_thesis"] == COMPOSITION["thesis"] and body["model"] == "openai:fixture-text"
+    assert [prompt["prompt_id"] for prompt in asked] == ["inku.description-theses-prompt.v1"] * 2
+    first, again = (json.loads(prompt["message"]) for prompt in asked)
+    assert first["current_thesis"] == COMPOSITION["thesis"] and first.get("reading") is None
+    assert "theses_feedback" not in first
+    assert again["theses_feedback"]["problems"] == ["3 つ目の命題が、2 つ目と同じである。"]
+    # The digest is the accepted request's, as typed_send sent it.
+    assert body["prompt_digest"] == asked[1]["prompt_digest"]
+    missing = client.post("/api/composition/theses", json={"history_id": "nothing", "model": "openai:fixture-text"})
+    assert missing.status_code == 404
+
+
 def test_model_candidate_saves_its_execution_with_its_composition(host, composed, monkeypatch):
     client, service, _, _ = host
     parent = _wait(service, _start(client, composition="on")["execution_id"])
@@ -531,6 +622,17 @@ def test_model_candidate_saves_its_execution_with_its_composition(host, composed
     {"route": "read_and_draw", "composition": "off", "composition_main_law": "B10"},
     {"route": "read_and_draw", "composition": "on", "composition_main_law": "B21"},
     {"route": "read_and_draw", "composition": "on", "composition_main_law": "B99"},
+    {"route": "stages", "composition": "on", "composition_thesis": "女を中心に置く。"},
+    {"route": "read_and_draw", "composition": "off", "composition_thesis": "女を中心に置く。"},
+    {"route": "read_and_draw", "composition": "on", "composition_thesis": "  "},
+    {"route": "read_and_draw", "composition": "on", "composition_thesis": "命" * 401},
+    {"route": "read_and_draw", "composition": "on", "composition_thesis": "女を中心に置く。", "composition_form": "bands"},
+    {"route": "read_and_draw", "composition": "on", "composition_thesis": "女を中心に置く。", "composition_main_law": "B10"},
+    {"route": "read_and_draw", "composition": "on", "composition_thesis_source": "author"},
+    {"route": "read_and_draw", "composition": "on", "composition_thesis": "女を中心に置く。",
+     "composition_thesis_source": "proposed"},
+    {"route": "read_and_draw", "composition": "on", "composition_thesis": "女を中心に置く。",
+     "composition_thesis_source": "author", "composition_thesis_prompt_digest": "sha256:00"},
 ])
 def test_composition_form_rejects_invalid_route_or_value(host, options):
     client, _, _, _ = host

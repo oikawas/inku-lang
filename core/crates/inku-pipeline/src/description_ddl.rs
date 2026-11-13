@@ -292,6 +292,10 @@ pub struct ComposedContext<'a> {
     pub answer: &'a CompositionAnswer,
     pub laws_text: &'a BTreeMap<String, String>,
     pub targets: &'a [String],
+    /// Whether the author fixed the composition's thesis: the writing's
+    /// composition section (which the review's system also carries) then
+    /// says that every thing is still drawn.
+    pub thesis_fixed: bool,
 }
 
 /// Build the `write_description_ddl` request of a composed run: the writing
@@ -313,7 +317,7 @@ pub fn build_composed_description_ddl_prompt(
         DESCRIPTION_DDL_PROMPT_ID,
         LlmStage::WriteDescriptionDdl,
         language,
-        composed_writing_system(context, language)?,
+        composed_writing_system(context, composed, language)?,
         message,
         sentences_response_schema(),
         Vec::new(),
@@ -343,7 +347,7 @@ pub fn build_composed_description_ddl_review_prompt(
         DESCRIPTION_DDL_REVIEW_PROMPT_ID,
         LlmStage::ReviewDescriptionDdl,
         language,
-        composed_writing_system(context, language)?,
+        composed_writing_system(context, composed, language)?,
         message,
         sentences_response_schema(),
         vec![drawing.clone()],
@@ -499,6 +503,7 @@ fn composed_message(
 
 fn composed_writing_system(
     context: &DescriptionDdlContext<'_>,
+    composed: &ComposedContext<'_>,
     language: ResolvedInstructionLanguage,
 ) -> Result<String, PromptError> {
     let header = match (language, context.reading.is_some()) {
@@ -509,9 +514,14 @@ fn composed_writing_system(
     };
     let at = composition_index(language);
     Ok(format!(
-        "{header}\n\n{}{}\n\n{}",
+        "{header}\n\n{}{}{}\n\n{}",
         writing_tail(language)?,
         composition::WRITE_RULES[at],
+        if composed.thesis_fixed {
+            composition::THESIS_FIXED_NOTE[at]
+        } else {
+            ""
+        },
         composition::ANSWER[at]
     ))
 }

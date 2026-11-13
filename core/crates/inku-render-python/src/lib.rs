@@ -487,6 +487,21 @@ fn pipeline_chunk_moves<'py>(
     })
 }
 
+/// The composition's theses to choose from (step 4): request, answer.
+#[pyfunction]
+fn pipeline_composition_theses<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::composition_theses(input));
+            PyBytes::new(py, &output)
+        })
+    })
+}
+
 /// Inspect plugin packages through the shared host-neutral JSON boundary.
 #[pyfunction]
 fn pipeline_plugin_package(py: Python<'_>, input_bytes: &Bound<'_, PyBytes>) -> PyResult<String> {
@@ -933,6 +948,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_saved_variants, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_chunk_moves, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_composition_theses, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_plugin_package, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_model_catalog, module)?)?;

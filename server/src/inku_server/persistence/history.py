@@ -1359,7 +1359,7 @@ class HistoryListProjector:
                 continue  # the ancestor's composition fell back: there is no answer to show
             inherited = {"history_id": ancestor, "at": getattr(node_of_history.get(ancestor), "at", None),
                          "via": via, "answer": record["answer"]}
-            for requested in ("requested_form", "requested_main_law"):
+            for requested in ("requested_form", "requested_main_law", "requested_thesis"):
                 if record.get(requested) is not None:
                     inherited[requested] = record[requested]
             places = _moved_places(edges, starts[row.id], len(via))

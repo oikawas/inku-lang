@@ -276,12 +276,13 @@ fn rule_line(system: &str, head: &str) -> String {
         .to_owned()
 }
 
-/// What the author fixed for a composition: the form, the main law, or both
-/// (none is the composer's own choice).
+/// What the author fixed for a composition: the form, the main law, or both,
+/// or the thesis alone (none is the composer's own choice).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct FixedComposition<'a> {
     pub form: Option<&'a str>,
     pub main_law: Option<&'a str>,
+    pub thesis: Option<&'a str>,
 }
 
 /// Build the same request with what the author fixed.
@@ -295,7 +296,7 @@ pub(crate) fn build_description_composition_prompt_fixed(
     let mut system = composition_system(language, context.reading.is_some());
     let mut schema = composition_response_schema();
     let at = index(language);
-    if fixed.form.is_some() || fixed.main_law.is_some() {
+    if fixed.form.is_some() || fixed.main_law.is_some() || fixed.thesis.is_some() {
         let mut value: Value =
             serde_json::from_str(&message).map_err(|_| PromptError::Serialization)?;
         if let Some(form) = fixed.form {
@@ -303,6 +304,9 @@ pub(crate) fn build_description_composition_prompt_fixed(
         }
         if let Some(main_law) = fixed.main_law {
             value["composition_main_law"] = json!(main_law);
+        }
+        if let Some(thesis) = fixed.thesis {
+            value["composition_thesis"] = json!(thesis);
         }
         message = value.to_string();
     }
@@ -334,6 +338,21 @@ pub(crate) fn build_description_composition_prompt_fixed(
         };
         system = system.replacen(&old, &format!("{reason}{}", RULE_9_EXAMPLE_NOTE[at]), 1);
         schema["properties"]["main_law"]["enum"] = json!([main_law]);
+    }
+    // The schema keeps thesis free: an answer that writes another sentence
+    // is kept with the fixed one (step 4).
+    if fixed.thesis.is_some() {
+        let old = rule_line(&system, "1. ");
+        system = system.replacen(&old, RULE_1_THESIS_FIXED[at], 1);
+        let old = rule_line(&system, "9. ");
+        system = system.replacen(
+            &old,
+            &format!(
+                "{}{}",
+                RULE_9_THESIS_FIXED[at], RULE_9_THESIS_EXAMPLE_NOTE[at]
+            ),
+            1,
+        );
     }
     require_within(
         "description_message",
@@ -1961,6 +1980,31 @@ const RULE_9_MAIN_LAW_FIXED: [&str; 2] = [
 const RULE_9_EXAMPLE_NOTE: [&str; 2] = [
     "下の答えの例の reason は、型と主の法則を決めていない時の書き方である。",
     " The reason in the example answer below is written for a run where neither is fixed.",
+];
+
+/// Rule 1 when the author fixed the thesis.
+const RULE_1_THESIS_FIXED: [&str; 2] = [
+    "1. thesis（構図の命題）は本文の composition_thesis に決めてある。その文を thesis にそのまま書き、その命題のとおりに画面を組む。命題が、記述が書いた物・数・色・位置を変えることや、記述が名指す物を描かないことを言っていても、決まり 6 と 11 を守る。",
+    "1. The thesis (the composition's proposition) is fixed by composition_thesis in the message. Write that sentence as thesis as it stands, and build the canvas as it says. Even if it says to change the things, counts, colors or places the description writes, or not to draw a thing the description names, keep rules 6 and 11.",
+];
+
+/// Rule 9 when the author fixed the thesis.
+const RULE_9_THESIS_FIXED: [&str; 2] = [
+    "9. reason には、記述の言葉を「」で引いて、決めてある命題を、どの画の型と主の法則で組んだかを 1〜2 行で書く。",
+    "9. In reason, quote the description's words in quotation marks and say in one or two lines which form and main law you built the fixed thesis with.",
+];
+
+/// What follows rule 9 replaced for a fixed thesis.
+const RULE_9_THESIS_EXAMPLE_NOTE: [&str; 2] = [
+    "下の答えの例の reason は、命題を決めていない時の書き方である。",
+    " The reason in the example answer below is written for a run where the thesis is not fixed.",
+];
+
+/// What follows the composition section of the writing and the review
+/// requests when the author fixed the thesis.
+pub(crate) const THESIS_FIXED_NOTE: [&str; 2] = [
+    "\ncomposition の thesis は作者が決めた文である。thesis が物を描かないことを言っていても、things の物は全て描く。",
+    "\nThe thesis in composition was fixed by the author. Even if it says not to draw a thing, draw every thing in things.",
 ];
 
 const RULE_7_UNREAD: [&str; 2] = [

@@ -113,6 +113,8 @@ def _route_fields(context: dict, text: str) -> dict:
             fields["composition"]["form"] = options["composition_form"]
         if options.get("composition_main_law") is not None:
             fields["composition"]["main_law"] = options["composition_main_law"]
+        if options.get("composition_thesis") is not None:
+            fields["composition"]["thesis"] = options["composition_thesis"]
     return fields
 
 
@@ -1080,7 +1082,7 @@ class PipelineService:
             if settings.get("derivation_kind") != body.derivation_kind:
                 raise HTTPException(422, "invalid_candidate")
             if body.derivation_kind == "composition_form_change" and settings.get("composition_form") is None \
-                    and settings.get("composition_main_law") is None:
+                    and settings.get("composition_main_law") is None and settings.get("composition_thesis") is None:
                 raise HTTPException(422, "invalid_candidate")
             place = (settings.get("derivation_metadata") or {}).get("place")
             if body.derivation_kind == "layout_change" and (
@@ -1115,7 +1117,14 @@ class PipelineService:
             else:
                 description = parents[0].get("description_ddl") or {}
                 answer = (description.get("composition") or {}).get("answer") or {}
-                if settings.get("composition_main_law") is not None:
+                if settings.get("composition_thesis") is not None:
+                    # A thesis child (step 4): the parent's thesis, the fixed one, and who wrote it.
+                    source = settings.get("composition_thesis_source") or "author"
+                    metadata = {"thesis_from": answer.get("thesis"), "thesis_to": settings["composition_thesis"],
+                                "thesis_source": source}
+                    if source == "proposed":
+                        metadata["thesis_prompt_digest"] = settings.get("composition_thesis_prompt_digest")
+                elif settings.get("composition_main_law") is not None:
                     # A main-law child keeps its parent's form when it has one (step 2).
                     metadata = {"main_law_from": answer.get("main_law"), "main_law_to": settings["composition_main_law"],
                                 "form": settings.get("composition_form")}

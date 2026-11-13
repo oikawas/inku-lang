@@ -37,6 +37,18 @@ class SendStopped(Exception):
     """The caller's stop was set before the answer was taken."""
 
 
+def _prompt(request: dict[str, Any]) -> dict[str, Any]:
+    return {"system": request["system"], "message": request["text"],
+            "response_schema": request["response_schema"], "action_name": TYPED_SEND_ACTION}
+
+
+def typed_request_digest(request: dict[str, Any]) -> str:
+    """The digest ``send_typed`` sends ``request`` under (and records as its prompt's digest)."""
+    prompt = _prompt(request)
+    return "sha256:" + hashlib.sha256(json.dumps(prompt, ensure_ascii=False, sort_keys=True,
+                                                 separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def send_typed(owner: str, context: dict[str, Any], request: dict[str, Any], *, execution_id: str,
                prompt_id: str, action_id: str, language: str,
                stop: threading.Event | None = None) -> tuple[str | None, str | None]:
@@ -46,10 +58,8 @@ def send_typed(owner: str, context: dict[str, Any], request: dict[str, Any], *, 
     from .pipeline_runtime import get_service
 
     stop = stop if stop is not None else threading.Event()
-    prompt = {"system": request["system"], "message": request["text"],
-              "response_schema": request["response_schema"], "action_name": TYPED_SEND_ACTION}
-    digest = hashlib.sha256(json.dumps(prompt, ensure_ascii=False, sort_keys=True,
-                                       separators=(",", ":")).encode("utf-8")).hexdigest()
+    prompt = _prompt(request)
+    digest = typed_request_digest(request).removeprefix("sha256:")
     prompt.update(prompt_id=prompt_id, prompt_digest=f"sha256:{digest}", instruction_language=language)
     execution_cancel(owner, execution_id, chatgpt=bool(context.get("host_options", {}).get("chatgpt_profile")))
     perform = get_service().provider_with_context(owner, {**context, "execution_id": execution_id}, None)

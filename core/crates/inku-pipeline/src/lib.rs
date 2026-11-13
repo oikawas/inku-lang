@@ -13,6 +13,7 @@ pub mod completion_ranges;
 pub mod composition;
 pub mod composition_names;
 pub mod composition_reading;
+pub mod composition_theses;
 pub mod core_boundary;
 pub mod ddl3d;
 pub mod description_colors;

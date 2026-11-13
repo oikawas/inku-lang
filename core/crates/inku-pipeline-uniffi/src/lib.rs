@@ -246,6 +246,19 @@ pub fn chunk_moves(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// The composition's theses to choose from (step 4 of the thesis handle,
+/// 2026-11-14): one JSON request with an `action` (`request`, `answer`), one
+/// JSON answer (`inku.composition-theses.v1`). The host sends the request and
+/// passes the answer back. The binding version is unchanged: this only adds a
+/// call. A panic answers `{"error": "internal_invariant"}`.
+#[uniffi::export]
+pub fn composition_theses(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::composition_theses::composition_theses_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// A provider request's bytes and what its answer says: one JSON request with
 /// an `action` (`pipeline_request`, `pipeline_response`, `text_request`,
 /// `text_response`), one JSON answer (`inku.provider-wire.v1`). The host adds

@@ -1,0 +1,1047 @@
+{
+ "schema": "inku.sign-in-cases.v1",
+ "about": "Shared rows for the sign-in services (Sign in with ChatGPT). Each host sends request to model_catalog_json and compares the whole answer with answer.",
+ "cases": [
+  {
+   "name": "services in English (no language)",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_services"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "services": [
+     {
+      "id": "chatgpt",
+      "label": "Sign in with ChatGPT",
+      "labels": {
+       "ja": "ChatGPT でサインイン",
+       "en": "Sign in with ChatGPT"
+      },
+      "abbreviation": "SIWC",
+      "usage_url": "https://chatgpt.com/settings/usage",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "services in Japanese",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_services",
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "services": [
+     {
+      "id": "chatgpt",
+      "label": "ChatGPT でサインイン",
+      "labels": {
+       "ja": "ChatGPT でサインイン",
+       "en": "Sign in with ChatGPT"
+      },
+      "abbreviation": "SIWC",
+      "usage_url": "https://chatgpt.com/settings/usage",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "services refuse another language",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_services",
+    "language": "fr"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "invalid_language"
+   }
+  },
+  {
+   "name": "no sign-in keeps the host order",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ],
+    "sign_in": [],
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "absent sign-in keeps the host order",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "llm group goes first",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ],
+    "sign_in": [
+     {
+      "service": "chatgpt",
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       },
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    ],
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "chatgpt",
+      "label": "ChatGPT でサインイン",
+      "labels": {
+       "ja": "ChatGPT でサインイン",
+       "en": "Sign in with ChatGPT"
+      },
+      "abbreviation": "SIWC",
+      "usage_url": "https://chatgpt.com/settings/usage",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       },
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     },
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "vision group goes first in English",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ],
+    "sign_in": [
+     {
+      "service": "chatgpt",
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    ],
+    "language": "en"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "chatgpt",
+      "label": "Sign in with ChatGPT",
+      "labels": {
+       "ja": "ChatGPT でサインイン",
+       "en": "Sign in with ChatGPT"
+      },
+      "abbreviation": "SIWC",
+      "usage_url": "https://chatgpt.com/settings/usage",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "signed in with no models still goes first",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ],
+    "sign_in": [
+     {
+      "service": "chatgpt",
+      "models": []
+     }
+    ],
+    "language": "en"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "chatgpt",
+      "label": "Sign in with ChatGPT",
+      "labels": {
+       "ja": "ChatGPT でサインイン",
+       "en": "Sign in with ChatGPT"
+      },
+      "abbreviation": "SIWC",
+      "usage_url": "https://chatgpt.com/settings/usage",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": []
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "a host group with the same id is replaced",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     },
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     }
+    ],
+    "sign_in": [
+     {
+      "service": "chatgpt",
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    ],
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "chatgpt",
+      "label": "ChatGPT でサインイン",
+      "labels": {
+       "ja": "ChatGPT でサインイン",
+       "en": "Sign in with ChatGPT"
+      },
+      "abbreviation": "SIWC",
+      "usage_url": "https://chatgpt.com/settings/usage",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     {
+      "id": "ollama",
+      "label": "Ollama",
+      "kind": "openai_compatible",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma4",
+        "label": "gemma4"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "a host group with the same id stays without sign-in",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    ],
+    "sign_in": [],
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "goes before the on-device group",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [
+     {
+      "id": "on_device",
+      "label": "On device",
+      "kind": "on_device",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma-4-e2b",
+        "label": "Gemma 4 E2B"
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ],
+    "sign_in": [
+     {
+      "service": "chatgpt",
+      "models": [
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    ],
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "groups": [
+     {
+      "id": "chatgpt",
+      "label": "ChatGPT でサインイン",
+      "labels": {
+       "ja": "ChatGPT でサインイン",
+       "en": "Sign in with ChatGPT"
+      },
+      "abbreviation": "SIWC",
+      "usage_url": "https://chatgpt.com/settings/usage",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     },
+     {
+      "id": "on_device",
+      "label": "On device",
+      "kind": "on_device",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gemma-4-e2b",
+        "label": "Gemma 4 E2B"
+       }
+      ]
+     },
+     {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "unknown sign-in service",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [],
+    "sign_in": [
+     {
+      "service": "claude",
+      "models": []
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "unknown_sign_in_service"
+   }
+  },
+  {
+   "name": "duplicate sign-in service",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [],
+    "sign_in": [
+     {
+      "service": "chatgpt",
+      "models": []
+     },
+     {
+      "service": "chatgpt",
+      "models": []
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "duplicate_sign_in_service"
+   }
+  },
+  {
+   "name": "sign-in without models",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [],
+    "sign_in": [
+     {
+      "service": "chatgpt"
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "invalid_sign_in"
+   }
+  },
+  {
+   "name": "groups must be a list",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "sign_in": []
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "invalid_groups"
+   }
+  },
+  {
+   "name": "groups refuse another language",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "provider_groups",
+    "groups": [],
+    "language": "de"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "invalid_language"
+   }
+  },
+  {
+   "name": "display Japanese label and abbreviation",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "resolve_display",
+    "ref": "chatgpt:gpt-6.1-sol",
+    "providers": {
+     "chatgpt": {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    },
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "provider": "chatgpt",
+    "model": "gpt-6.1-sol",
+    "provider_label": "ChatGPT でサインイン",
+    "provider_abbreviation": "SIWC",
+    "model_label": "GPT-6.1-Sol"
+   }
+  },
+  {
+   "name": "display English label without language",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "resolve_display",
+    "ref": "chatgpt:gpt-6.1-sol",
+    "providers": {
+     "chatgpt": {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "provider": "chatgpt",
+    "model": "gpt-6.1-sol",
+    "provider_label": "Sign in with ChatGPT",
+    "provider_abbreviation": "SIWC",
+    "model_label": "GPT-6.1-Sol"
+   }
+  },
+  {
+   "name": "display another provider is unchanged",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "resolve_display",
+    "ref": "anthropic:claude-opus-5-5",
+    "providers": {
+     "anthropic": {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     "chatgpt": {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    },
+    "language": "ja"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "provider_label": "Anthropic",
+    "model_label": "Claude Opus 5.5"
+   }
+  },
+  {
+   "name": "display refuses another language",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "resolve_display",
+    "ref": "chatgpt:gpt-6.1-sol",
+    "providers": {
+     "anthropic": {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "kind": "anthropic",
+      "requires_api_key": true,
+      "models": [
+       {
+        "id": "claude-opus-5-5",
+        "label": "Claude Opus 5.5"
+       }
+      ]
+     },
+     "chatgpt": {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6-Luna",
+        "purposes": [
+         "llm"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    },
+    "language": "fr"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "invalid_language"
+   }
+  },
+  {
+   "name": "reference batch passes the language",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "reference_batch",
+    "providers": {
+     "chatgpt": {
+      "id": "chatgpt",
+      "label": "ChatGPT plan",
+      "kind": "chatgpt_responses",
+      "requires_api_key": false,
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1-Sol",
+        "purposes": [
+         "llm",
+         "vision"
+        ],
+        "enabled": true
+       }
+      ]
+     }
+    },
+    "language": "ja",
+    "queries": [
+     {
+      "action": "resolve_display",
+      "ref": "chatgpt:gpt-6.1-sol"
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "results": [
+     {
+      "schema": "inku.model-catalog.v1",
+      "outcome": "ok",
+      "provider": "chatgpt",
+      "model": "gpt-6.1-sol",
+      "provider_label": "ChatGPT でサインイン",
+      "provider_abbreviation": "SIWC",
+      "model_label": "GPT-6.1-Sol"
+     }
+    ]
+   }
+  }
+ ]
+}

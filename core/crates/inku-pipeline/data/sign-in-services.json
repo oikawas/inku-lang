@@ -1,0 +1,10 @@
+[
+  {
+    "id": "chatgpt",
+    "label": {"ja": "ChatGPT でサインイン", "en": "Sign in with ChatGPT"},
+    "abbreviation": "SIWC",
+    "usage_url": "https://chatgpt.com/settings/usage",
+    "kind": "chatgpt_responses",
+    "requires_api_key": false
+  }
+]

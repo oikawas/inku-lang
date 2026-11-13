@@ -7,6 +7,7 @@ mod chatgpt_auth_policy;
 mod chatgpt_policy;
 mod model_refresh;
 mod provider_settings;
+mod sign_in;
 
 const SOURCE: &str = include_str!("../data/model_catalog.json");
 const PROVIDERS: &str = include_str!("../data/provider-definitions.json");
@@ -1057,6 +1058,7 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             "metadata":&provider_settings::METADATA[..17], "catalog":provider_settings::METADATA})
         }
         Some("retired_providers") => json!({"providers":retired_providers()}),
+        Some("sign_in_services" | "provider_groups") => sign_in::run(&request),
         Some(
             "chatgpt_publication"
             | "chatgpt_publication_update"
@@ -1117,6 +1119,9 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
                     let mut input = query.as_object().cloned().unwrap_or_default();
                     input.insert("schema".into(), json!("inku.model-catalog-request.v1"));
                     input.insert("providers".into(), request["providers"].clone());
+                    if !input.contains_key("language") && !request["language"].is_null() {
+                        input.insert("language".into(), request["language"].clone());
+                    }
                     serde_json::from_slice(&model_catalog_json(
                         &serde_json::to_vec(&input).expect("reference query"),
                     ))
@@ -1373,6 +1378,10 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         Some("resolve_display") => {
             let reference = request["ref"].as_str().unwrap_or("");
             let providers = &request["providers"];
+            let language = match sign_in::language(&request) {
+                Ok(language) => language,
+                Err(refused) => return finish(refused),
+            };
             let defaults = user_defaults();
             let fallback = request["default_provider"]
                 .as_str()
@@ -1415,7 +1424,14 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
                 .and_then(|m| m["label"].as_str())
                 .filter(|s| !s.is_empty())
                 .unwrap_or(model);
-            json!({"provider":provider,"model":model,"provider_label":provider_label,"model_label":model_label})
+            match sign_in::service(provider) {
+                Some(service) => json!({"provider":provider,"model":model,
+                    "provider_label":sign_in::label(service, language),
+                    "provider_abbreviation":service["abbreviation"],"model_label":model_label}),
+                None => {
+                    json!({"provider":provider,"model":model,"provider_label":provider_label,"model_label":model_label})
+                }
+            }
         }
         Some("internal") => json!({"model": internal(&request["model"])}),
         Some("label") => json!({"model": labelled(&request["model"], source)}),
@@ -1452,6 +1468,10 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         }
         _ => json!({"outcome":"refused", "reason":"unknown_action"}),
     };
+    finish(result)
+}
+
+fn finish(result: Value) -> Vec<u8> {
     let mut output = result.as_object().cloned().unwrap_or_default();
     output.insert("schema".into(), json!("inku.model-catalog.v1"));
     output.entry("outcome").or_insert(json!("ok"));
@@ -1724,5 +1744,19 @@ mod tests {
             assert_eq!(json!(problems(&row["catalog"], &order)), row["problems"]);
         }
         assert!(problems(source, &[]).is_empty());
+    }
+
+    #[test]
+    fn shared_sign_in_cases_answer_through_the_json_entry() {
+        let cases: Value =
+            serde_json::from_str(include_str!("../data/sign-in-cases.json")).unwrap();
+        assert_eq!(array(cases.get("cases")).len(), 21);
+        for row in array(cases.get("cases")) {
+            let actual: Value = serde_json::from_slice(&model_catalog_json(
+                &serde_json::to_vec(&row["request"]).unwrap(),
+            ))
+            .unwrap();
+            assert_eq!(actual, row["answer"], "{}", row["name"]);
+        }
     }
 }

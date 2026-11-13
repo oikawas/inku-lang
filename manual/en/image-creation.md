@@ -340,6 +340,12 @@ In `Another composition` you may choose `Make one option` or `Make four options`
 
 In `Change the composition form`, choose one of seven forms and draw one or four options. The options share the parent's reading if it has one; otherwise a new reading is made. Drawing switches to `In words` with composition enabled, and the chosen option is saved as a child. This is unavailable when the description is held. Save or discard unsaved options before making new ones.
 
+Below the target on the left, the current work's form, main law and thesis appear as `Now`. Each of the seven forms has a small figure. On the option cards of `Change the composition form` and `Change the model`, chips for the option's form and main law appear beside its number, with its thesis (up to two lines) below. A chip that differs from the target's changes color, and hovering it names the target's value. Hovering a card shows the full thesis, the reason and the instructions. An option that fell back without a composition shows a `No composition` chip.
+
+In every refinement, pressing an option sets the target and the option side by side at the same size. Under the option are its catalog or model name and, in the refinements that read the description again, the chips, thesis and reason. Press it again, or `Back to all options`, to return to the grid.
+
+In Lineage, the `Derived by` row of a work's `Details` names both forms for a child whose composition form was changed, as in `Composition form (Form: Bands → Grid)`.
+
 Check the options you want to keep, then press `Make one option` or `Make four options` to save the unsaved options checked at that moment before drawing the requested number of new options. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain. Options already saved are not saved again.
 
 `Another performance` (changing the touch with words) and `Another reading` were removed on 2026-10-14: the touch's words were never read for their meaning and only made the drawing's seed. `Edit drawing parameters` in the work-editing menu, which drew them, and the `Touch` and `Reading` elements of autonomous refinement were removed with them. Works made by a touch or a reading before then keep their `Touch` or `Reading` edge in the lineage, and redraw from their saved instructions and seed.

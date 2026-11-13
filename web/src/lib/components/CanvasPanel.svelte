@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import WorkThesisLine from '$lib/features/composition-record/WorkThesisLine.svelte';
+	import { compositionOf, compositionSummary } from '$lib/features/composition-record/record';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import { modelShortName, type Provider, type ProviderGroup } from '$lib/models';
@@ -440,6 +441,7 @@
 				: (isJapanese ? '独立作品' : 'Standalone')
 	);
 	const statusWork = $derived(statusHistoryItem ?? result);
+	const statusComposition = $derived(compositionSummary(compositionOf(statusWork)));
 	// One source for the strip: the saved work on screen, else the result on
 	// screen (a finished run carries its recorded choices before the history
 	// list is read again, and during a run the previous picture keeps its own).
@@ -912,6 +914,7 @@
 					{statusDescriptionLocked}
 					compositionForm={statusWork?.description_ddl?.composition?.answer?.form ?? null}
 					compositionFormSwitch={!statusWork?.description_ddl?.composition}
+					targetComposition={statusComposition}
 					{statusStage1Model}
 					{statusStage2Model}
 					{refineWildValue}

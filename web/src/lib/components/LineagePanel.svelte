@@ -7,7 +7,7 @@
 	import SavedWorkExportMenu from './SavedWorkExportMenu.svelte';
 	import WorkEditDialog from './WorkEditDialog.svelte';
 	import type { SketchMode } from '$lib/sketch';
-	import { derivationKindLabel } from '$lib/derivation';
+	import { derivationDetail, derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
 	import { groupDigits } from '$lib/formatNumber';
 	import { modelDisplayName, modelShortName, qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
@@ -312,6 +312,15 @@
 	// says that more quietly than a bare slash.
 	function operationLabel(kind?: string): string {
 		return derivationKindLabel(kind, isJapanese);
+	}
+
+	// The kind with what its edge recorded (2026-11-13: a form change names both
+	// forms). The card's own label above the picture stays the kind alone.
+	function operationDetailLabel(edge?: { derivation_kind?: string; metadata?: Record<string, unknown> }): string {
+		const label = operationLabel(edge?.derivation_kind);
+		const detail = derivationDetail(edge?.derivation_kind, edge?.metadata, isJapanese);
+		if (!detail) return label;
+		return isJapanese ? `${label}（${detail}）` : `${label} (${detail})`;
 	}
 
 	// The AI refinement's move a child's edge records, shown since 2026-10-27:
@@ -864,7 +873,7 @@ $effect(() => {
 {/if}
 </div>
 
-								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${workText(node)}` : withheldWorkLabel(node)} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
+								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationDetailLabel(edge)}: ${workText(node)}` : withheldWorkLabel(node)} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
 										<!-- Both stages only when they differ: naming the same model twice
@@ -942,7 +951,7 @@ $effect(() => {
 				<dt>{t().historyModelInterpretation}</dt><dd>{detailsNode.history.stage1_model ? modelDisplayName(detailsNode.history.stage1_model) : '—'}</dd>
 				<dt>{t().historyModelCompletion}</dt><dd>{detailsNode.history.stage2_model ? modelDisplayName(detailsNode.history.stage2_model) : '—'}</dd>
 				<dt>seed</dt><dd>{detailsNode.history.render_seed ?? '—'} / {detailsNode.history.composition_seed ?? '—'} / {detailsNode.history.interpretation_seed ?? '—'}</dd>
-				<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(detailEdge?.derivation_kind)}</dd>
+				<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationDetailLabel(detailEdge)}</dd>
 				{#if detailMove}
 					<dt>{isJapanese ? 'AIの手' : 'AI move'}</dt><dd>{aiMoveText(detailMove)}</dd>
 					{#if detailMove.reason}<dt>{isJapanese ? '手の理由' : 'Why this move'}</dt><dd>{detailMove.reason}</dd>{/if}

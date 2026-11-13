@@ -35,6 +35,38 @@ export function compositionShown(record: CompositionRecord | null | undefined): 
 	return { kind: 'none' };
 }
 
+/** What a card says about a drawn work or option: its record's state, thesis, form, main law and reason. */
+export type CompositionSummary = {
+	state: 'used' | 'fallback' | 'none';
+	thesis: string | null;
+	form: string | null;
+	mainLaw: string | null;
+	reason: string | null;
+};
+
+function textOrNull(value: unknown): string | null {
+	return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/** The summary of a record (2026-11-13: the refinement's option cards and the target beside them). */
+export function compositionSummary(record: CompositionRecord | null | undefined): CompositionSummary {
+	const shown = compositionShown(record);
+	if (shown.kind !== 'used') return { state: shown.kind, thesis: null, form: null, mainLaw: null, reason: null };
+	const answer = shown.record.answer;
+	return {
+		state: 'used',
+		thesis: textOrNull(answer?.thesis),
+		form: textOrNull(answer?.form),
+		mainLaw: textOrNull(answer?.main_law),
+		reason: textOrNull(answer?.reason)
+	};
+}
+
+/** The summary of an option the refinement drew (its result carries the run's record). */
+export function candidateComposition(result: { description_ddl?: unknown } | null | undefined): CompositionSummary {
+	return compositionSummary(compositionOf(result));
+}
+
 function fieldsOf(value: unknown): Record<string, unknown> {
 	return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }

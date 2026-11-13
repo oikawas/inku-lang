@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-13 — Refinement options name their composition
+
+- "Image Creation": the section on `Change the composition form` now describes the target's `Now` (form, main law and thesis) and the forms' figures, the chips and thesis on the option cards of the refinements that read the description again, that a pressed option sits beside the target, and that Lineage's `Derived by` names both forms.
+
 ## 2026-11-13 — Where the composition and laws can be read
 
 - "Image Creation": §4 now describes the `Thesis` line on the Work tab and the left panel's section `Composition and laws` on the Description tab (the thesis and names shown folded, what opens, `No composition` and `No record`, and that the fold is kept), and that laws are shown by name with their codes only inside the `Details` of Generation Info. The left panel is headed "Sketch from life, composition and instructions of the displayed work".

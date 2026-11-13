@@ -7,6 +7,7 @@
 	import RefinementCompositionFormView from './RefinementCompositionFormView.svelte';
 	import './refinement-workspace.css';
 	import { t } from '$lib/i18n/index.svelte';
+	import type { CompositionSummary } from '$lib/features/composition-record/record';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import type {
 		RefinementSession,
@@ -29,6 +30,8 @@
 		statusDescriptionLocked: boolean;
 		compositionForm: string | null;
 		compositionFormSwitch: boolean;
+		/** The target's composition, beside the options that read the description again (2026-11-13). */
+		targetComposition: CompositionSummary | null;
 		statusStage1Model: string;
 		statusStage2Model: string;
 		/** The model comparison's stroke limit switch. */
@@ -62,6 +65,7 @@
 		statusDescriptionLocked,
 		compositionForm,
 		compositionFormSwitch,
+		targetComposition,
 		statusStage1Model,
 		statusStage2Model,
 		refineWildValue,
@@ -171,7 +175,7 @@
 		<p class="refine-held-note">{t().descriptionLockedReason}</p>
 	{:else if view === 'composition-form'}
 		<RefinementCompositionFormView {isJapanese} {resultAvailable} {artworkUrl} {canvasAspectWidth} {canvasAspectHeight}
-			{refinementSession} {compositionForm} {compositionFormSwitch}
+			{refinementSession} {compositionForm} {compositionFormSwitch} {targetComposition}
 			onGenerateCandidates={onGenerateCompositionFormCandidates} {onSaveAndClose} {onDiscardAndClose} />
 	{:else}
 		<RefinementModelCompareView
@@ -183,6 +187,7 @@
 			{canvasAspectHeight}
 			{refinementSession}
 			{modelInspection}
+			{targetComposition}
 			{refineWildValue}
 			{onSetRefineWild}
 			{onGenerateModelCandidates}

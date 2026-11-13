@@ -1,6 +1,8 @@
 // Derivation kinds (the operation that made a work from its parent). Single
 // source for the labels, shared by the lineage panel and the provenance drawer.
 // A work with no kind recorded is the origin of its lineage.
+import { formName } from './features/composition-record/composition-names.ts';
+
 export type DerivationKind =
 	| 'touch_change'
 	| 'layout_change'
@@ -68,6 +70,17 @@ const EN: Record<string, string> = {
 
 export function derivationKindLabel(kind: string | null | undefined, isJapanese: boolean): string {
 	return (isJapanese ? JA : EN)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Origin'));
+}
+
+/** What an edge's metadata adds to its kind's label, if anything (2026-11-13).
+ *  A form change that recorded both forms reads "画の型: 分ける線 → 帯"; a
+ *  form a newer core named and this table does not have reads as its id. */
+export function derivationDetail(kind: string | null | undefined, metadata: unknown, isJapanese: boolean): string | null {
+	if (kind !== 'composition_form_change' || !metadata || typeof metadata !== 'object') return null;
+	const { form_from: from, form_to: to } = metadata as { form_from?: unknown; form_to?: unknown };
+	if (typeof from !== 'string' || !from || typeof to !== 'string' || !to) return null;
+	const term = isJapanese ? '画の型: ' : 'Form: ';
+	return `${term}${formName(from, isJapanese)} → ${formName(to, isJapanese)}`;
 }
 
 /** Which edge a redraw from the describe tab writes.

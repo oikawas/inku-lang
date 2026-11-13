@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { atName, lawName, placeName } from './composition-names.ts';
-import { compositionOf, compositionShown, quoteInDescription, thesisOf, thingPlaces } from './record.ts';
+import { candidateComposition, compositionOf, compositionShown, quoteInDescription, thesisOf, thingPlaces } from './record.ts';
 
 // The shape of a saved read-and-draw work's record (the 11-06 work drawn from 大海の, abridged).
 const USED = {
@@ -45,4 +45,13 @@ test('a quote is in the description when its words are, spaces aside', () => {
 	assert.equal(quoteInDescription('寄する波　割れて', '大海の　磯もとどろに　寄する波　割れて砕けて'), true);
 	assert.equal(quoteInDescription('白い破片', '大海の　磯もとどろに'), false);
 	assert.equal(quoteInDescription('', '大海の'), false);
+});
+
+test('an option names its record: form, main law, thesis and reason; a fallback and no record name nothing', () => {
+	const used = candidateComposition({ description_ddl: { composition: { ...USED, answer: { ...USED.answer, reason: '割れる所を主に。' } } } });
+	assert.deepEqual(used, { state: 'used', thesis: USED.answer.thesis, form: 'dividing_line', mainLaw: 'B1', reason: '割れる所を主に。' });
+	assert.deepEqual(candidateComposition({ description_ddl: { composition: { state: 'fallback', fallback: 'refused' } } }),
+		{ state: 'fallback', thesis: null, form: null, mainLaw: null, reason: null });
+	assert.equal(candidateComposition({ description_ddl: null }).state, 'none');
+	assert.equal(candidateComposition(null).state, 'none');
 });

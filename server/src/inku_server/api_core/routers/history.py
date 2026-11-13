@@ -7,7 +7,7 @@ from copy import deepcopy
 import json
 from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ...animation_export import build_animation, build_layer_animation
 from ...card_export import build_card
 from ...limits import limits_as_dict
@@ -486,6 +486,43 @@ class CompositionBoxUnit(BaseModel):
         description="The union of the placed sentences' boxes as canvas fractions [x0, y0, x1, y1], or null when none is "
                     "placed or the work was fitted onto another paper.",
     )
+    places: dict[str, str] = Field(
+        default_factory=dict,
+        description="Each of the nine places (golden_ul, golden_ur, golden_ll, golden_lr, third_left, third_right, "
+                    "third_top, third_bottom, center) with what moving the chunk there would do: ok, clamped (stops at "
+                    "the canvas edge), or the reason it is refused (unchanged, too_large, leaves_canvas, scene_word, "
+                    "no_numeric_place, fitted).",
+    )
+
+
+class ChunkPlaceBody(BaseModel):
+    """One chunk of a work and the place to move it to (step 3)."""
+
+    model_config = ConfigDict(extra="forbid")
+    chunk: str = Field(min_length=1, max_length=200, description="The chunk's title, as composition-boxes names it.")
+    at: Literal["golden_ul", "golden_ur", "golden_ll", "golden_lr", "third_left", "third_right", "third_top",
+                "third_bottom", "center"] = Field(description="The place to move the chunk to.")
+
+
+class ChunkPlaced(BaseModel):
+    """What moved: the chunk, its thing, where it was and where it went."""
+
+    title: str = Field(description="The chunk's title.")
+    thing: int | None = Field(description="The composition record's thing this chunk is, or null.")
+    at: str = Field(description="The place asked for.")
+    at_from: str | None = Field(description="The place the chunk's center was at (within 0.02), or null.")
+    from_: list[float] = Field(alias="from", description="The chunk's center before, as canvas fractions [x, y].")
+    to: list[float] = Field(description="The chunk's center after, as canvas fractions [x, y].")
+    clamped: bool = Field(description="Whether the chunk stopped short of the place to stay on the canvas.")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ChunkPlaceResponse(BaseModel):
+    """The child instructions with one chunk moved; nothing is drawn or saved."""
+
+    ddl: str = Field(description="The child's instructions, titled, with only the chunk's numbers changed.")
+    place: ChunkPlaced = Field(description="What moved.")
 
 
 class CompositionBoxesResponse(BaseModel):
@@ -528,15 +565,29 @@ def api_history_composition_boxes(
     ancestor it keeps its composition from (composition_inherited). Returns 404 when the work is not found for
     the caller, and 422 when no configuration can be made to read the work's instructions.
     """
-    from ...composition_record import CompositionBoxesRefused, composition_boxes, composition_of
+    from ...composition_record import CompositionBoxesRefused, composition_boxes
+
+    item, config, composition = _chunk_input(actor, item_id)
+    try:
+        units = composition_boxes(config, item.get("ddl") or "", composition)
+    except CompositionBoxesRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
+    if _fitted_onto_another_paper(item):
+        # Its numbers are the declared ratio's: no box, and no place to move to.
+        units = [{**unit, "box": None, "places": {at: "fitted" for at in unit.get("places") or {}}} for unit in units]
+    return CompositionBoxesResponse(units=units)
+
+
+def _chunk_input(actor: dict, item_id: str) -> tuple[dict, dict, dict | None]:
+    """A work, the config its instructions are read with, and the composition record that titles them."""
+    from ...composition_record import composition_of
     from ...pipeline_runtime import get_service
 
     items = _db.get_items(actor["id"], [item_id])
     if not items:
         raise HTTPException(status_code=404, detail="history item not found")
     item = items[0]
-    ddl = item.get("ddl") or ""
-    config = get_service().retouch_config(actor["id"], item["id"], ddl)
+    config = get_service().retouch_config(actor["id"], item["id"], item.get("ddl") or "")
     if config is None:
         raise HTTPException(status_code=422, detail="composition boxes cannot be read: binding_unavailable")
     composition = composition_of(item)
@@ -548,13 +599,36 @@ def api_history_composition_boxes(
         # lines as the ancestor's; another DDL is left untitled, as before.
         ancestors = _db.get_items(actor["id"], [inherited["history_id"]])
         composition = composition_of(ancestors[0]) if ancestors else None
-    try:
-        units = composition_boxes(config, ddl, composition)
-    except CompositionBoxesRefused as error:
-        raise HTTPException(status_code=422, detail=error.detail) from error
+    return item, config, composition
+
+
+@router.post(
+    "/api/history/{item_id}/chunk-place",
+    response_model=ChunkPlaceResponse,
+    response_model_by_alias=True,
+    summary="Move one chunk of a work to a place",
+    responses={422: {"description": "The chunk cannot move there; detail names the reason."}},
+)
+def api_history_chunk_place(
+    item_id: Annotated[str, Path(description="Id of the work.")], body: ChunkPlaceBody, actor: dict = Depends(_current_user)
+) -> ChunkPlaceResponse:
+    """Return the work's instructions with one chunk moved to one of nine places (step 3, "Change the layout").
+
+    Only the numbers of the chunk's sentences change, and never its size. Nothing is drawn or saved: the caller
+    draws the instructions as a DDL fork of the work and saves the drawn option. Returns 404 when the work is not
+    found for the caller, and 422 with the reason when the chunk cannot move there (no_chunk, scene_word,
+    no_numeric_place, too_large, leaves_canvas, unchanged, fitted, binding_unavailable).
+    """
+    from ...composition_record import CompositionBoxesRefused, chunk_place
+
+    item, config, composition = _chunk_input(actor, item_id)
     if _fitted_onto_another_paper(item):
-        units = [{**unit, "box": None} for unit in units]
-    return CompositionBoxesResponse(units=units)
+        raise HTTPException(status_code=422, detail="fitted")
+    try:
+        ddl, place = chunk_place(config, item.get("ddl") or "", composition, body.chunk, body.at)
+    except CompositionBoxesRefused as error:
+        raise HTTPException(status_code=422, detail=error.reason) from error
+    return ChunkPlaceResponse(ddl=ddl, place=ChunkPlaced.model_validate(place))
 
 
 @router.get("/api/history/{item_id}/svg", summary="Get a work's SVG", responses={500: {"description": "Unexpected server failure"}})

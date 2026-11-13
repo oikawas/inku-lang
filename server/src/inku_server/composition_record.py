@@ -38,6 +38,20 @@ def composition_boxes(config: dict[str, Any], ddl: str, composition: dict[str, A
     return list(answer.get("units") or [])
 
 
+def chunk_place(config: dict[str, Any], ddl: str, composition: dict[str, Any] | None, chunk: str,
+                at: str) -> tuple[str, dict[str, Any]]:
+    """The core's child DDL with one chunk moved to a place (``chunk_moves.rs``, action ``place``, step 3),
+    and what moved (title, thing, at, at_from, from, to, clamped)."""
+    native = importlib.import_module("inku_render")
+    request = {"action": "place", "config": config, "ddl": ddl, "composition": composition, "chunk": chunk, "at": at}
+    answer = json.loads(native.pipeline_chunk_moves(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+    if not isinstance(answer, dict) or answer.get("error"):
+        raise RuntimeError(f"chunk moves core (place): {answer!r}")
+    if answer.get("outcome") == "refused":
+        raise CompositionBoxesRefused(str(answer.get("reason")), str(answer.get("detail")))
+    return str(answer["ddl"]), dict(answer["place"])
+
+
 def composition_of(item: dict[str, Any]) -> dict[str, Any] | None:
     """A read-and-draw work's composition record as the core titles a DDL from it: each line's thing, and the things."""
     record = item.get("description_ddl")

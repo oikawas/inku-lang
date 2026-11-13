@@ -1,5 +1,14 @@
 # inku Android 実装メモ
 
+## 2026-11-14 「ChatGPT でサインイン」を一覧の先頭に、名札を共通 core から
+
+作者の指示（「web/swift/androidのモデル設定、モデル選択で、chatGPTを先頭に変更」。先頭は端末内のモデルより前の全ての先頭）と正式の名（日本語「ChatGPT でサインイン」、英語「Sign in with ChatGPT」、略称「SIWC」）で、Web・Server・Swift と同じく直した。
+
+- 並び：設定のモデル選択（接続の選び）・モデル設定・描くモデルの選びの一覧の 3 つで、「ChatGPT でサインイン」の群を先頭に置く。並べ方は共通 core の `provider_groups`（`model_catalog_json`）。ほかの群の並び（端末内のモデルを前に出す並べ方、モデル設定の「サービスを追加」と端末内の LiteRT を下に置く並べ方）は変えない。サインインしていない時の接続の案内のカードも、モデル設定の先頭に置く。
+- 名札：接続の名は共通 core のサインインのサービスの記述（`sign_in_services`）から言語ごとに読む。画面の文言 `chatGptPlan` と、2 つあった ChatGPT の仮の provider の行（`displayName = "ChatGPT"`）を 1 つの作り方（`SignInServices.chatGptProviderSetting`）に揃えた。
+- 文言：未接続の失敗（`chatgpt_not_connected`・`chatgpt_session_required`）は「ChatGPT でサインインしてください。」、`chatgpt_reserved_provider` と「切断する」の確認の文は接続の名を「ChatGPT でサインイン」にした。利用者のサブスクのプランそのもの（「ChatGPTプランの利用枠」「ChatGPTプランを使用中」など）は替えない。
+- 変えないもの：id `chatgpt`、モデル名 `chatgpt:…`、失敗の印、送信・保存。下の節の「ChatGPTプラン」は、その時の画面の名で書いた記録として残す。
+
 ## 2026-11-13 作品編集メニューから「取り合わせ」と「AIに自律推敲させる」を消す
 
 作者の決定（「メニューについては10種類に削減」「3 つのアプリとも消す」）で、Web・Server と同じく 2 つを消した。推敲の項目は 11 から 9 になる（Android に「構図の形を変える」は無い）。

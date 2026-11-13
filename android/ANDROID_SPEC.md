@@ -1,5 +1,14 @@
 # inku Android Implementation Notes
 
+## 2026-11-14 "Sign in with ChatGPT" first in the lists, its name from the shared core
+
+The author's instruction ("put ChatGPT first in model settings and model selection on web, Swift and Android"; first of all, before the on-device models) and the official name (Japanese 「ChatGPT でサインイン」, English "Sign in with ChatGPT", abbreviation "SIWC") change Android as Web, Server and Swift.
+
+- Order: the "Sign in with ChatGPT" group comes first in model selection (the service chooser), model settings and the drawing-model choice list. The shared core's `provider_groups` (`model_catalog_json`) sets the order. The other groups keep theirs (the on-device models before the services; "Add a service" and the on-device LiteRT at the bottom of model settings). The card that starts the sign-in, shown while not signed in, also comes first in model settings.
+- Name: the connection's name is read per language from the core's sign-in service descriptor (`sign_in_services`). The `chatGptPlan` string and the two provisional ChatGPT provider rows (`displayName = "ChatGPT"`) now share one construction (`SignInServices.chatGptProviderSetting`).
+- Wording: the not-connected failures (`chatgpt_not_connected`, `chatgpt_session_required`) read "Sign in with ChatGPT."; `chatgpt_reserved_provider` and the sign-out confirmation name the connection "Sign in with ChatGPT". Text about the user's subscription plan itself ("your ChatGPT plan allowance", "Using ChatGPT plan") is unchanged.
+- Unchanged: the id `chatgpt`, model names `chatgpt:…`, failure codes, sending and saving. "ChatGPT plan" in the sections below stays as the records of the screen names of their day.
+
 ## 2026-11-13 "Juxtapose" and "Autonomous refinement" leave the work-editing menu
 
 The author's decision ("reduce the menu to ten items", "remove them from all three apps") removes both, as on Web and Server. The refinement items go from 11 to 9 (Android has no "Change the composition shape").

@@ -105,6 +105,7 @@
 		</section></div>
 	</div>
 	<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} maxColumns={3}
+		placeholder={t().placeEmpty}
 		target={{ artworkUrl, aspectWidth: canvasAspectWidth, aspectHeight: canvasAspectHeight, composition: null }} />
 </div></div>
 
@@ -113,6 +114,8 @@
 	.refine-target-column.wide .refine-target-card { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 12px; }
 	.refine-target-column.wide .refine-target-card > :global(.comparison-label) { grid-column: 1 / -1; margin: 0; }
 	.refine-target-column.wide .target-now { margin-top: 0; align-content: start; }
+	/* The frame is placed in fractions of the drawing, so the drawing holds it. */
+	.comparison-art { position: relative; overflow: hidden; }
 	.thing-frame { position: absolute; border: 1.5px solid var(--accent); border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.35); pointer-events: none; }
 	.thing-frame span { position: absolute; left: -1.5px; bottom: 100%; margin-bottom: 2px; padding: 1px 7px; border-radius: 3px; background: var(--accent); color: var(--accent-fg); font-size: var(--ui-font-size-11); white-space: nowrap; }
 	.what-head { display: flex; align-items: baseline; gap: 10px; color: var(--fg); font-size: var(--ui-font-size-12); font-weight: 600; }

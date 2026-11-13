@@ -45,8 +45,8 @@
 	const redecides = $derived(what === 'form' ? t().compositionFormRedecides : t().compositionMainLawRedecides(currentForm !== null));
 </script>
 
-<div class="refine-panel"><div class="refine-stage">
-	<div class="refine-target-column">
+<div class="refine-panel"><div class="refine-stage wide">
+	<div class="refine-target-column wide">
 		<div class="refine-target-card"><div class="comparison-label">{t().refineTargetTitle}</div>
 			<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight}">{#if artworkUrl}<img class="canvas-art" src={artworkUrl} alt="" />{/if}</div>
 			{#if targetComposition && targetComposition.state !== 'none'}
@@ -111,6 +111,12 @@
 </div></div>
 
 <style>
+	/* The mock's wide left column: the target sits beside its "Now", so the
+	   list, what stays and the draw buttons fit below it (section 6). */
+	.refine-stage.wide { grid-template-columns: 388px minmax(0, 1fr); }
+	.refine-target-column.wide .refine-target-card { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 12px; }
+	.refine-target-column.wide .refine-target-card > :global(.comparison-label) { grid-column: 1 / -1; margin: 0; }
+	.refine-target-column.wide .target-now { margin-top: 0; align-content: start; }
 	.what-head { color: var(--fg); font-size: var(--ui-font-size-12); font-weight: 600; }
 	.segmented { display: inline-flex; padding: 2px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg); }
 	.segmented button { padding: 4px 14px; border: 0; border-radius: 4px; background: none; color: var(--fg2); font-size: var(--ui-font-size-12); cursor: pointer; white-space: nowrap; }

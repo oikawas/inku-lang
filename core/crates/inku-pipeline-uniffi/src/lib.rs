@@ -411,6 +411,16 @@ pub fn description_label_spans_export(text: String) -> Result<String, CoreCallFa
     guarded_core_call(|| description_label_spans(text))
 }
 
+/// The library's "by description" key (`dg1:…`), or "" when nothing is left.
+pub fn description_group_key(text: String) -> String {
+    description_labels::description_group_key(&text)
+}
+
+#[uniffi::export(name = "description_group_key")]
+pub fn description_group_key_export(text: String) -> Result<String, CoreCallFailure> {
+    guarded_core_call(|| description_group_key(text))
+}
+
 /// Title lines in Unicode scalar offsets, as JSON.
 pub fn ddl_title_lines(source: String) -> String {
     let mut byte_cursor = 0;

@@ -15,6 +15,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
+from .description_labels import description_group_key
 from .identity import description_hash, render_hash
 from .limits import normalize_render_limit_settings
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
@@ -1730,6 +1731,80 @@ def list_lineage_group_items(
     return _history_lineage_group_reader().list_lineage_group_items(
         user_id,
         root_node_id,
+        offset,
+        limit,
+        trashed,
+        query_text,
+        starred,
+        for_revision,
+        for_share,
+        include_svg,
+    )
+
+
+def _history_description_group_reader() -> _history.HistoryDescriptionGroupReader:
+    return _history.HistoryDescriptionGroupReader(
+        SessionLocal,
+        _actor_of,
+        _rows_to_dicts_with_lineage,
+        _history_search_clause,
+        description_group_key,
+    )
+
+
+def list_description_groups(
+    user_id: str,
+    offset: int = 0,
+    limit: int = 12,
+    trashed: bool = False,
+    query_text: str = "",
+    starred: bool = False,
+    for_revision: bool = False,
+    for_share: bool = False,
+    min_item_count: int = 1,
+    include_svg: bool = True,
+    include_item_id: str | None = None,
+) -> tuple[list[dict], int]:
+    return _history_description_group_reader().list_description_groups(
+        user_id,
+        offset,
+        limit,
+        trashed,
+        query_text,
+        starred,
+        for_revision,
+        for_share,
+        min_item_count,
+        include_svg,
+        **({"include_item_id": include_item_id} if include_item_id else {}),
+    )
+
+
+def description_group_position(
+    user_id: str, item_id: str, trashed: bool = False, query_text: str = "",
+    starred: bool = False, for_revision: bool = False, for_share: bool = False,
+    min_item_count: int = 1,
+) -> int | None:
+    return _history_description_group_reader().description_group_position(
+        user_id, item_id, trashed, query_text, starred, for_revision, for_share, min_item_count
+    )
+
+
+def list_description_group_items(
+    user_id: str,
+    key: str,
+    offset: int = 0,
+    limit: int = 100,
+    trashed: bool = False,
+    query_text: str = "",
+    starred: bool = False,
+    for_revision: bool = False,
+    for_share: bool = False,
+    include_svg: bool = True,
+) -> tuple[list[dict], int]:
+    return _history_description_group_reader().list_description_group_items(
+        user_id,
+        key,
         offset,
         limit,
         trashed,

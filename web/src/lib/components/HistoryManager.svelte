@@ -19,6 +19,11 @@
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
 	import { libraryArrowDestination, libraryPageTargetIndex } from '$lib/features/library/arrow-navigation';
 	import { LINEAGE_CHUNK_SIZE, visibleLineageCount } from '$lib/features/library/lineage-pagination';
+	import { groupedDisplayMode, type HistoryDisplayMode } from '$lib/historyManagerState.svelte';
+	import { descriptionColumns, workComposition } from '$lib/features/library/description-columns';
+	import CompositionFigure from '$lib/features/composition-record/CompositionFigure.svelte';
+	import { formName, lawName } from '$lib/features/composition-record/composition-names';
+	import { derivationKindLabel } from '$lib/derivation';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -76,8 +81,8 @@
 	type Props = {
 		/** Kept mounted between library visits so its list, scroll, and preview survive. */
 		active: boolean;
-		historyDisplayMode?: 'chronological' | 'lineage';
-		onDisplayModeChange?: (mode: 'chronological' | 'lineage') => void;
+		historyDisplayMode?: HistoryDisplayMode;
+		onDisplayModeChange?: (mode: HistoryDisplayMode) => void;
 		singleUserMode?: boolean;
 		historyManagerView: 'active' | 'trash';
 		historyManagerTab: 'thumbs' | 'list';
@@ -362,9 +367,9 @@
 	function focusWork(element: HTMLElement, id: string | undefined) {
 		$effect(() => {
 			const request = focusRequest;
-			if (!active || historyManagerLoading || (historyDisplayMode === 'lineage' && lineageGroupLoading) || !request || id !== request.id || focusedVisit === request.visit) return;
+			if (!active || historyManagerLoading || (groupedDisplayMode(historyDisplayMode) && lineageGroupLoading) || !request || id !== request.id || focusedVisit === request.visit) return;
 			void tick().then(() => {
-				if (!active || historyManagerLoading || (historyDisplayMode === 'lineage' && lineageGroupLoading) || !element.isConnected || focusRequest !== request || focusedVisit === request.visit) return;
+				if (!active || historyManagerLoading || (groupedDisplayMode(historyDisplayMode) && lineageGroupLoading) || !element.isConnected || focusRequest !== request || focusedVisit === request.visit) return;
 				focusedVisit = request.visit;
 				element.focus({ preventScroll: true });
 				element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -385,7 +390,11 @@
 		};
 	});
 
-	function setHistoryDisplayMode(mode: 'chronological' | 'lineage') {
+	function setHistoryDisplayMode(mode: HistoryDisplayMode) {
+		// The groups of the other grouped mode are keyed differently; never show them under this one.
+		lineageGroups = [];
+		lineageGroupItems = {};
+		lineageIncludeId = null;
 		focusedVisit = -1;
 		onDisplayModeChange(mode);
 		lineageGroupPage = 0;
@@ -402,7 +411,7 @@
 		if (tab === historyManagerTab) return;
 		focusedVisit = -1;
 		historyManagerTab = tab;
-		if (historyDisplayMode === 'lineage') {
+		if (groupedDisplayMode(historyDisplayMode)) {
 			lineageGroupPage = 0;
 			lineageStartOffset = 0;
 			lineageAnchorVisit = -1;
@@ -426,9 +435,18 @@
 		];
 	}
 
+	// The thumbnail tab of either grouped mode (lineage, or description since step 1e).
 	const lineageThumbsMode = $derived(
-		historyDisplayMode === 'lineage' && historyManagerTab === 'thumbs',
+		groupedDisplayMode(historyDisplayMode) && historyManagerTab === 'thumbs',
 	);
+	const byDescription = $derived(historyDisplayMode === 'description');
+	// The groups' route: the lineage groups, or the description groups (step 1e).
+	const groupsRoute = $derived(byDescription ? '/api/history/description-groups' : '/api/history/lineage-groups');
+	// The description of the displayed work is whichever group holds it once loaded.
+	function isCurrentGroup(group: LineageHistoryGroup): boolean {
+		if (!byDescription) return currentLineageRootId === group.root_node_id;
+		return !!currentHistoryId && (group.representative.id === currentHistoryId || !!lineageGroupItems[group.root_node_id]?.some((item) => item.id === currentHistoryId));
+	}
 
 	// Generation order, not time order: the point of laying a lineage out is to
 	// show what came from what, and a sibling made later than its cousin would
@@ -469,7 +487,9 @@
 		// A card draws from its thumbnail and a preview reads its one SVG when opened.
 		const params = new URLSearchParams({ offset: String(lineageStartOffset + lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim(), include_svg: 'false' });
 		const anchor = focusRequest && focusRequest.visit !== lineageAnchorVisit ? focusRequest : null;
-		const anchorRootId = focusRequest?.rootId ?? currentLineageRootId;
+		// A description's key is the Server's; the group that holds the anchor is the one it puts first.
+		const anchorRootId = byDescription ? null : focusRequest?.rootId ?? currentLineageRootId;
+		const route = groupsRoute;
 		if (anchor) params.set('anchor_id', anchor.id);
 		if (anchor?.id ?? lineageIncludeId) params.set('include_id', (anchor?.id ?? lineageIncludeId)!);
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
@@ -481,14 +501,19 @@
 		// dropping them here would leave short pages and a total that disagrees.
 		if (lineageThumbsMode) params.set('min_items', '2');
 		try {
-			const response = await apiFetch('/api/history/lineage-groups?' + params.toString(), { cache: 'no-store', signal: controller.signal });
+			const response = await apiFetch(route + '?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
-			const data = await response.json() as { groups: LineageHistoryGroup[]; total: number; offset: number };
-			if (!active || requestId !== lineageRequestId) return;
+			const raw = await response.json() as { groups: (LineageHistoryGroup & { key?: string })[]; total: number; offset: number };
+			if (!active || requestId !== lineageRequestId || route !== groupsRoute) return;
+			// A description group is keyed by its key; the rest of the view keys every group by root_node_id.
+			const data = { ...raw, groups: raw.groups.map((group) => (byDescription ? { ...group, root_node_id: group.key ?? '' } : group)) };
 			if (anchor) {
 				lineageAnchorVisit = anchor.visit;
 				lineageIncludeId = anchor.id;
-				if (data.groups[0]?.root_node_id === anchorRootId) {
+				const anchorFirst = byDescription
+					? !!data.groups[0] && data.offset !== lineageStartOffset + lineageGroupPage * lineageGroupPageSize
+					: data.groups[0]?.root_node_id === anchorRootId;
+				if (anchorFirst) {
 					lineageStartOffset = data.offset;
 					lineageGroupPage = 0;
 				}
@@ -506,6 +531,10 @@
 			} else if (focusRequest && anchorRootId && data.groups.some((group) => group.root_node_id === anchorRootId)) {
 				expandedRootIds = [anchorRootId];
 				await loadLineageMembers(anchorRootId);
+			} else if (byDescription && anchor && data.groups[0]) {
+				// The anchor's description comes first; open it so the work can be focused.
+				expandedRootIds = [data.groups[0].root_node_id];
+				await loadLineageMembers(data.groups[0].root_node_id);
 			}
 		} catch (error) {
 			if (!(error instanceof DOMException && error.name === 'AbortError') && requestId === lineageRequestId) {
@@ -548,7 +577,7 @@
 		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
 		if (historyManagerForShareOnly) params.set('for_share', 'true');
 		try {
-			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
+			const response = await apiFetch(groupsRoute + '/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
 			const data = await response.json() as { items: HistoryItem[] };
 			if (active && requestId === lineageRequestId && !controller.signal.aborted) {
@@ -674,7 +703,8 @@
 
 	function openThumbnail(item: HistoryItem): void {
 		if (!active || historyManagerView !== 'active' || item.trashed) return;
-		if (historyDisplayMode === 'lineage') onOpenLineage(item);
+		// Either grouped mode opens a work's lineage on a second press, as the lineage view always has.
+		if (groupedDisplayMode(historyDisplayMode)) onOpenLineage(item);
 		else onOpenArtwork(item);
 	}
 
@@ -825,8 +855,8 @@
 	}
 
 	$effect(() => {
-		if (!active || historyDisplayMode !== 'lineage') return;
-		const queryKey = JSON.stringify([historyManagerView, historySearch, historyManagerStarredOnly, historyManagerForRevisionOnly, historyManagerForShareOnly]);
+		if (!active || !groupedDisplayMode(historyDisplayMode)) return;
+		const queryKey = JSON.stringify([historyDisplayMode, historyManagerView, historySearch, historyManagerStarredOnly, historyManagerForRevisionOnly, historyManagerForShareOnly]);
 		if (lineageQueryKey && lineageQueryKey !== queryKey) {
 			lineageStartOffset = 0;
 			lineageIncludeId = null;
@@ -944,10 +974,16 @@
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryLineageGrouped}>
 					<button class:active={historyDisplayMode === 'lineage'} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
 				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryDescriptionGrouped}>
+					<button class:active={historyDisplayMode === 'description'} onclick={() => setHistoryDisplayMode('description')}>{t().historyDescriptionMode}</button>
+				</Tooltip>
 				</div>
 			</div>
 			<span class="history-manager-count">
-				{#if historyDisplayMode === 'lineage'}
+				{#if byDescription}
+					{groupDigits(lineageGroupTotal)} {t().historyDescriptionGroups}
+					{#if lineageThumbsMode}{t().historyDescriptionGroupsDerivedOnly}{/if}
+				{:else if historyDisplayMode === 'lineage'}
 					{groupDigits(lineageGroupTotal)} {t().historyLineageGroups}
 					<!-- The thumbnail tab lists only lineages that have a derivation
 					     (min_items=2); without saying so, every single work seemed gone. -->
@@ -967,7 +1003,7 @@
 					<button class="history-search-active" type="button" title={t().historySearchClear}
 						onclick={() => { historySearch = ''; }}>{t().historySearchActive(historySearch.trim())} ×</button>
 				{/if}
-				{#if historyDisplayMode === 'lineage'}
+				{#if groupedDisplayMode(historyDisplayMode)}
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
 						<button class="ghost-btn history-latest-btn" onclick={latestLineagePage} disabled={(lineageGroupPage <= 0 && lineageStartOffset === 0) || lineageGroupLoading}>{t().historyLatest}</button>
 					</Tooltip>
@@ -1207,7 +1243,7 @@
 			<p>{t().historyLibraryLoadFailed}</p>
 			<button class="ghost-btn" type="button" onclick={onRetryLoad}>{t().historyLibraryRetry}</button>
 		</div>
-	{:else if historyDisplayMode === 'lineage'}
+	{:else if groupedDisplayMode(historyDisplayMode)}
 		<div class="lineage-history-list" class:list-mode={historyManagerTab === 'list'} class:thumbs-mode={lineageThumbsMode}>
 			{#if lineageGroupLoading}
 				<div class="lineage-history-message">{t().historyLoading}</div>
@@ -1217,10 +1253,10 @@
 					<button class="ghost-btn" type="button" onclick={() => void fetchLineageGroups()}>{t().historyLibraryRetry}</button>
 				</div>
 			{:else if lineageGroups.length === 0}
-				<div class="lineage-history-message">{t().historyLineageEmpty}</div>
+				<div class="lineage-history-message">{byDescription ? t().historyDescriptionEmpty : t().historyLineageEmpty}</div>
 			{:else}
 				{#each lineageGroups as group (group.root_node_id)}
-					<article class="lineage-history-group" class:current-lineage={currentLineageRootId === group.root_node_id}>
+					<article class="lineage-history-group" class:current-lineage={isCurrentGroup(group)}>
 						<div class="lineage-group-head">
 							{#if !lineageThumbsMode}
 								<button class="lineage-representative" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(group.representative)} ondblclick={() => openThumbnail(group.representative)}>
@@ -1232,7 +1268,7 @@
 								     thumbnail grid shows for it, so the group names it the same way. -->
 								<strong>{thumbnailPromptText(group.representative.image_provenance ?? group.representative.source_text ?? group.representative.input) || group.representative.display_label || ''}</strong>
 								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {t().historyLineageForRevisionCount(group.for_revision_count)} · {formatHistoryDate(group.latest_at)}</span>
-								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
+								{#if isCurrentGroup(group)}<span class="current-lineage-badge">{byDescription ? t().historyCurrentDescription : t().historyCurrentLineage}</span>{/if}
 							</div>
 							{#if !lineageThumbsMode}
 								<button class="ghost-btn" type="button" title={t().historyLineageExpandTitle} onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
@@ -1241,20 +1277,45 @@
 							{/if}
 						</div>
 						{#if lineageThumbsMode || expandedRootIds.includes(group.root_node_id)}
-							<div class="lineage-group-tools"><button class="ghost-btn" type="button" title={t().historySelectLineageTitle} disabled={!lineageGroupItems[group.root_node_id]} onclick={() => selectLineageGroup(group.root_node_id)}>{t().historySelectLineage}</button></div>
+							<div class="lineage-group-tools"><button class="ghost-btn" type="button" title={byDescription ? t().historySelectDescriptionTitle : t().historySelectLineageTitle} disabled={!lineageGroupItems[group.root_node_id]} onclick={() => selectLineageGroup(group.root_node_id)}>{byDescription ? t().historySelectDescription : t().historySelectLineage}</button></div>
 							{#if lineageMemberLoadingIds.includes(group.root_node_id)}
 								<div class="lineage-history-message">{t().historyLoading}</div>
 							{:else}
+								{#if byDescription}
+									<!-- By description (step 1e): one column per form, in the names table's order, then the works without a record. -->
+									<div class="description-columns">
+										{#each descriptionColumns(lineageGroupItems[group.root_node_id] ?? []) as column (column.form ?? '')}
+											<section class="description-column">
+												<h4 class="description-column-head">
+													{#if column.form}<CompositionFigure figure={column.form} size={16} />{formName(column.form, isJapanese)}{:else}{t().historyDescriptionNoRecord}{/if}
+												</h4>
+												<div class="lineage-member-grid">
+													{#each column.items as it (it.id ?? it.at)}{@render memberCard(it)}{/each}
+												</div>
+											</section>
+										{/each}
+									</div>
+								{:else}
 								<div class="lineage-member-grid">
-									{#each lineageThumbsMode ? visibleLineageItems(group) : membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
+									{#each lineageThumbsMode ? visibleLineageItems(group) : membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}{@render memberCard(it)}{/each}
+								</div>
+								{/if}
+								{#snippet memberCard(it: HistoryItem)}
+										{@const composition = byDescription ? workComposition(it) : null}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
-											{#if lineageThumbsMode && it.id && currentHistoryId === it.id}<span class="lineage-current-badge">{t().historyCurrentBadge}</span>{:else if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
+											{#if lineageThumbsMode && it.id && currentHistoryId === it.id}<span class="lineage-current-badge">{t().historyCurrentBadge}</span>{:else if lineageThumbsMode && !byDescription && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
 											<div class="lineage-member-content">
 												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)}>
 													<HistoryThumbnail item={it} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
 													<span>{thumbnailPromptText(it.image_provenance ?? it.source_text ?? it.input)}</span>
 												</button>
+												{#if composition?.mainLaw || composition?.inheritedVia}
+													<div class="description-member-meta">
+														{#if composition.mainLaw}<span class="description-member-law"><CompositionFigure figure={composition.mainLaw} size={12} />{lawName(composition.mainLaw, isJapanese)}</span>{/if}
+														{#if composition.inheritedVia}<span class="description-member-child">{t().historyDescriptionChildOf(derivationKindLabel(composition.inheritedVia, isJapanese))}</span>{/if}
+													</div>
+												{/if}
 												{@render shareStatus(it)}
 											</div>
 											<div class="lineage-member-actions">
@@ -1269,9 +1330,8 @@
 												{/if}
 											</div>
 										</div>
-									{/each}
-								</div>
-								{#if lineageThumbsMode && visibleLineageItems(group).length < lineageLaneItems(group).length}
+								{/snippet}
+								{#if !byDescription && lineageThumbsMode && visibleLineageItems(group).length < lineageLaneItems(group).length}
 									<button class="ghost-btn" type="button" onclick={() => showMoreLineage(group.root_node_id)}>{t().historyLineageShowMore}</button>
 								{/if}
 							{/if}
@@ -1475,6 +1535,16 @@
 	.lineage-group-summary > span { color: var(--fg3); font-size: var(--ui-font-size-10); }
 	.current-lineage-badge { align-self: flex-start; padding: 2px 6px; border-radius: 999px; background: var(--accent-light); color: var(--accent) !important; }
 	.lineage-group-tools { display: flex; justify-content: flex-end; padding: 6px 10px; border-top: 1px solid var(--border); background: var(--bg); }
+	/* By description (step 1e): the form columns side by side, each scrolling on its own. */
+	.description-columns { display: flex; gap: 10px; overflow-x: auto; padding: 0 10px 12px; border-top: 1px solid var(--border); background: var(--bg); }
+	.description-column { flex: 0 0 160px; min-width: 0; }
+	.description-column-head { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 500; white-space: nowrap; }
+	/* A column stacks its works top to bottom, oldest first, in both tabs (the lineage lane's row does not apply). */
+	.lineage-history-list .description-column .lineage-member-grid { display: flex; flex-direction: column; gap: 8px; overflow: visible; padding: 6px 0 0; border-top: 0; background: none; }
+	.lineage-history-list .description-column .lineage-member { flex: 0 0 auto; }
+	.description-member-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 2px 4px 0; color: var(--fg3); font-size: var(--ui-font-size-11); }
+	.description-member-law { display: inline-flex; align-items: center; gap: 3px; }
+	.description-member-child { padding: 0 5px; border: 1px solid var(--border2); border-radius: 999px; }
 	.lineage-member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; padding: 8px 10px 12px; border-top: 1px solid var(--border); background: var(--bg); }
 	.lineage-member { position: relative; min-width: 0; padding: 5px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 	.lineage-member.selected, .lineage-member.current-work { border-color: var(--accent); }

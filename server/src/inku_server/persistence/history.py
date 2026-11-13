@@ -457,6 +457,197 @@ class HistoryLineageGroupReader:
             ), total
 
 
+# description_hash -> library "by description" key. The same hash is the same
+# canonical description, so its key is made once per process.
+_DESCRIPTION_GROUP_KEYS: dict[str, str] = {}
+_DESCRIPTION_TEXT_CHUNK = 500
+
+
+@dataclass(frozen=True)
+class _DescriptionGroup:
+    key: str
+    member_ids: list[str]
+    starred_count: int
+    for_revision_count: int
+    latest_at: int
+
+
+@dataclass(frozen=True)
+class HistoryDescriptionGroupReader(HistoryLineageGroupReader):
+    """Read history cards grouped by their description (the library's "by description").
+
+    The key (`dg1:` from the shared core) is not a column. Every call reads all
+    visible rows once -- id, description_hash, time and marks -- and groups them
+    here, so the work grows with the number of works. Works painted from a
+    picture (`image_provenance`) and works whose description leaves nothing to
+    group by are not grouped. The visibility, search and marks are the lineage
+    groups' (`_visible_query`), and so are the order, `min_item_count` and the
+    work that keeps its group listed.
+    """
+
+    description_group_key_fn: Callable[[str], str]
+
+    def _keys_for(self, session, rows) -> dict[str, str]:
+        """Each row id's key; "" for a row with nothing to group by."""
+        keys: dict[str, str] = {}
+        texts_needed: list[str] = []
+        for row in rows:
+            cached = _DESCRIPTION_GROUP_KEYS.get(row.description_hash) if row.description_hash else None
+            if cached is None:
+                texts_needed.append(row.id)
+            else:
+                keys[row.id] = cached
+        hash_by_id = {row.id: row.description_hash for row in rows}
+        for start in range(0, len(texts_needed), _DESCRIPTION_TEXT_CHUNK):
+            chunk = texts_needed[start:start + _DESCRIPTION_TEXT_CHUNK]
+            for history_id, source_text, input_text in session.query(
+                HistoryRow.id, HistoryRow.source_text, HistoryRow.input
+            ).filter(HistoryRow.id.in_(chunk)):
+                text = source_text if source_text is not None else (input_text or "")
+                key = self.description_group_key_fn(text)
+                keys[history_id] = key
+                if hash_by_id.get(history_id):
+                    _DESCRIPTION_GROUP_KEYS[hash_by_id[history_id]] = key
+        return keys
+
+    def _groups(
+        self, session, actor, trashed, query_text, starred, for_revision, for_share,
+        min_item_count, include_item_id=None,
+    ) -> list[_DescriptionGroup]:
+        rows = (
+            self._visible_query(session, actor, trashed, query_text, starred, for_revision, for_share)
+            .filter(HistoryRow.image_provenance.is_(None))
+            .with_entities(
+                HistoryRow.id, HistoryRow.description_hash, HistoryRow.at,
+                HistoryRow.starred, HistoryRow.for_revision,
+            )
+            .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
+            .all()
+        )
+        keys = self._keys_for(session, rows)
+        members: dict[str, list] = {}
+        for row in rows:
+            key = keys.get(row.id) or ""
+            if key:
+                members.setdefault(key, []).append(row)
+        kept_key = keys.get(include_item_id or "") or None
+        groups = [
+            _DescriptionGroup(
+                key=key,
+                member_ids=[row.id for row in group_rows],
+                starred_count=sum(1 for row in group_rows if row.starred == 1),
+                for_revision_count=sum(1 for row in group_rows if row.for_revision == 1),
+                latest_at=int(group_rows[0].at or 0),
+            )
+            for key, group_rows in members.items()
+            if len(group_rows) >= min_item_count or key == kept_key
+        ]
+        groups.sort(key=lambda group: (-group.latest_at, group.key))
+        return groups
+
+    def _items(self, session, actor, ids: list[str], include_svg: bool) -> list[dict]:
+        if not ids:
+            return []
+        query = session.query(HistoryRow).options(
+            defer(HistoryRow.score_pre_coerce), defer(HistoryRow.coerce_trace)
+        ).filter(HistoryRow.id.in_(ids)).order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
+        if include_svg:
+            items = self.rows_to_dicts_with_lineage_fn(session, query.all(), actor)
+        else:
+            projected = query.options(defer(HistoryRow.svg)).add_columns(
+                func.length(func.cast(HistoryRow.svg, LargeBinary)).label("svg_bytes")
+            ).all()
+            items = self.rows_to_dicts_with_lineage_fn(
+                session,
+                [row for row, _svg_bytes in projected],
+                actor,
+                include_svg=False,
+                svg_bytes_by_id={row.id: int(svg_bytes or 0) for row, svg_bytes in projected},
+            )
+        order = {history_id: index for index, history_id in enumerate(ids)}
+        return sorted(items, key=lambda item: order.get(item["id"], len(order)))
+
+    def description_group_position(
+        self, user_id: str, item_id: str, trashed: bool = False,
+        query_text: str = "", starred: bool = False, for_revision: bool = False,
+        for_share: bool = False, min_item_count: int = 1,
+    ) -> int | None:
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            groups = self._groups(
+                session, actor, trashed, query_text, starred, for_revision, for_share,
+                min_item_count, include_item_id=item_id,
+            )
+            for position, group in enumerate(groups):
+                if item_id in group.member_ids:
+                    return position
+            return None
+
+    def list_description_groups(
+        self,
+        user_id: str,
+        offset: int = 0,
+        limit: int = 12,
+        trashed: bool = False,
+        query_text: str = "",
+        starred: bool = False,
+        for_revision: bool = False,
+        for_share: bool = False,
+        min_item_count: int = 1,
+        include_svg: bool = True,
+        include_item_id: str | None = None,
+    ) -> tuple[list[dict], int]:
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            groups = self._groups(
+                session, actor, trashed, query_text, starred, for_revision, for_share,
+                min_item_count, include_item_id=include_item_id if min_item_count > 1 else None,
+            )
+            page = groups[offset:offset + limit]
+            representatives = self._items(session, actor, [group.member_ids[0] for group in page], include_svg)
+            representative_by_id = {item["id"]: item for item in representatives}
+            listed = []
+            for group in page:
+                representative = representative_by_id.get(group.member_ids[0])
+                if representative is None:
+                    continue
+                listed.append({
+                    "key": group.key,
+                    "representative": representative,
+                    "item_count": len(group.member_ids),
+                    "starred_count": group.starred_count,
+                    "for_revision_count": group.for_revision_count,
+                    "latest_at": group.latest_at,
+                })
+            return listed, len(groups)
+
+    def list_description_group_items(
+        self,
+        user_id: str,
+        key: str,
+        offset: int = 0,
+        limit: int = 100,
+        trashed: bool = False,
+        query_text: str = "",
+        starred: bool = False,
+        for_revision: bool = False,
+        for_share: bool = False,
+        include_svg: bool = True,
+    ) -> tuple[list[dict], int]:
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            groups = self._groups(
+                session, actor, trashed, query_text, starred, for_revision, for_share, 1,
+            )
+            group = next((group for group in groups if group.key == key), None)
+            if group is None:
+                return [], 0
+            return (
+                self._items(session, actor, group.member_ids[offset:offset + limit], include_svg),
+                len(group.member_ids),
+            )
+
+
 @dataclass(frozen=True)
 class HistoryThumbnailSourceReader:
     session_factory: Callable[[], object]

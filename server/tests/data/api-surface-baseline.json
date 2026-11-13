@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 150,
-  "operation_count": 150,
-  "schema_count": 210,
+  "endpoint_count": 152,
+  "operation_count": 152,
+  "schema_count": 212,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -508,6 +508,54 @@
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}",
         "500": "{\"description\":\"Unexpected server failure\"}"
+      }
+    },
+    {
+      "path": "/api/history/description-groups",
+      "method": "GET",
+      "operationId": "api_history_description_groups_api_history_description_groups_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "query:anchor_id:opt",
+        "query:for_revision:opt",
+        "query:for_share:opt",
+        "query:include_id:opt",
+        "query:include_svg:opt",
+        "query:limit:opt",
+        "query:min_items:opt",
+        "query:offset:opt",
+        "query:q:opt",
+        "query:starred:opt",
+        "query:trashed:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryDescriptionGroupListResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/history/description-groups/{key}/items",
+      "method": "GET",
+      "operationId": "api_history_description_group_items_api_history_description_groups__key__items_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:key:req",
+        "query:for_revision:opt",
+        "query:for_share:opt",
+        "query:include_svg:opt",
+        "query:limit:opt",
+        "query:offset:opt",
+        "query:q:opt",
+        "query:starred:opt",
+        "query:trashed:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryListResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
     {
@@ -2282,6 +2330,8 @@
     "HistoryAclBody": "{\"description\":\"The whole list, not a patch.\\n\\nSending the complete list is what makes revoking expressible: a subject the\\ncaller leaves out loses its access. A patch shape would need a separate\\ndelete verb, and a client that never learned it would never revoke anything.\",\"properties\":{\"entries\":{\"description\":\"The complete guest list for the work. An empty list removes every guest.\",\"items\":{\"$ref\":\"#/components/schemas/HistoryAclEntry\"},\"maxItems\":200,\"title\":\"Entries\",\"type\":\"array\"}},\"title\":\"HistoryAclBody\",\"type\":\"object\"}",
     "HistoryAclEntry": "{\"description\":\"One guest on one work's list.\",\"properties\":{\"permission\":{\"description\":\"What the guest may do with the work: read or write.\",\"enum\":[\"read\",\"write\"],\"title\":\"Permission\",\"type\":\"string\"},\"subject_id\":{\"description\":\"Id of the guest user or user group.\",\"maxLength\":100,\"minLength\":1,\"title\":\"Subject Id\",\"type\":\"string\"},\"subject_type\":{\"description\":\"Kind of guest: user for one person, or org_group for a user group.\",\"enum\":[\"user\",\"org_group\"],\"title\":\"Subject Type\",\"type\":\"string\"}},\"required\":[\"subject_type\",\"subject_id\",\"permission\"],\"title\":\"HistoryAclEntry\",\"type\":\"object\"}",
     "HistoryAclEntryOut": "{\"properties\":{\"at\":{\"description\":\"Time the entry was recorded, in milliseconds since the Unix epoch.\",\"title\":\"At\",\"type\":\"integer\"},\"history_id\":{\"description\":\"Id of the work the entry applies to.\",\"title\":\"History Id\",\"type\":\"string\"},\"id\":{\"description\":\"Id of this access entry.\",\"title\":\"Id\",\"type\":\"string\"},\"permission\":{\"description\":\"What the guest may do with the work: read or write.\",\"enum\":[\"read\",\"write\"],\"title\":\"Permission\",\"type\":\"string\"},\"subject_id\":{\"description\":\"Id of the guest user or user group.\",\"maxLength\":100,\"minLength\":1,\"title\":\"Subject Id\",\"type\":\"string\"},\"subject_type\":{\"description\":\"Kind of guest: user for one person, or org_group for a user group.\",\"enum\":[\"user\",\"org_group\"],\"title\":\"Subject Type\",\"type\":\"string\"}},\"required\":[\"subject_type\",\"subject_id\",\"permission\",\"id\",\"history_id\",\"at\"],\"title\":\"HistoryAclEntryOut\",\"type\":\"object\"}",
+    "HistoryDescriptionGroup": "{\"properties\":{\"for_revision_count\":{\"description\":\"Number of works in the group marked for revision.\",\"title\":\"For Revision Count\",\"type\":\"integer\"},\"item_count\":{\"description\":\"Number of works in the group.\",\"title\":\"Item Count\",\"type\":\"integer\"},\"key\":{\"description\":\"The group's description key, dg1: and 64 hex digits. Works whose descriptions differ only in bracketed comments, leading numbers, spaces and line breaks share it.\",\"title\":\"Key\",\"type\":\"string\"},\"latest_at\":{\"description\":\"Save time of the newest work in the group, in milliseconds since the Unix epoch.\",\"title\":\"Latest At\",\"type\":\"integer\"},\"representative\":{\"$ref\":\"#/components/schemas/HistoryItem\",\"description\":\"The newest work in the group, as a history item.\"},\"starred_count\":{\"description\":\"Number of starred works in the group.\",\"title\":\"Starred Count\",\"type\":\"integer\"}},\"required\":[\"key\",\"representative\",\"item_count\",\"starred_count\",\"for_revision_count\",\"latest_at\"],\"title\":\"HistoryDescriptionGroup\",\"type\":\"object\"}",
+    "HistoryDescriptionGroupListResponse": "{\"properties\":{\"groups\":{\"description\":\"The groups on this page.\",\"items\":{\"$ref\":\"#/components/schemas/HistoryDescriptionGroup\"},\"title\":\"Groups\",\"type\":\"array\"},\"limit\":{\"description\":\"Maximum number of groups per page that was used.\",\"title\":\"Limit\",\"type\":\"integer\"},\"offset\":{\"description\":\"Offset used for this page.\",\"title\":\"Offset\",\"type\":\"integer\"},\"total\":{\"description\":\"Number of groups that match the filters, across all pages.\",\"title\":\"Total\",\"type\":\"integer\"}},\"required\":[\"groups\",\"total\",\"offset\",\"limit\"],\"title\":\"HistoryDescriptionGroupListResponse\",\"type\":\"object\"}",
     "HistoryForRevisionBody": "{\"properties\":{\"for_revision\":{\"default\":false,\"description\":\"True to mark the work for revision, false to clear the mark.\",\"title\":\"For Revision\",\"type\":\"boolean\"}},\"title\":\"HistoryForRevisionBody\",\"type\":\"object\"}",
     "HistoryForShareBody": "{\"description\":\"Whether a work is open to a user group, and optionally which group.\",\"properties\":{\"for_share\":{\"default\":false,\"description\":\"True to open the work to a user group, false to close it again.\",\"title\":\"For Share\",\"type\":\"boolean\"},\"share_group_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Id of the user group to open the work to. Omit to keep the group the work already has, or the owner's group if it has none. Naming a group other than your own needs administrator rights.\",\"title\":\"Share Group Id\"}},\"title\":\"HistoryForShareBody\",\"type\":\"object\"}",
     "HistoryIdsBody": "{\"properties\":{\"ids\":{\"description\":\"Ids of the works to act on. Ids that are not found for the caller are skipped. Empty by default.\",\"items\":{\"type\":\"string\"},\"maxItems\":1000,\"title\":\"Ids\",\"type\":\"array\"}},\"title\":\"HistoryIdsBody\",\"type\":\"object\"}",
@@ -2413,5 +2463,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "dc6ede4b33ea644255676bfae73671628bbb232beb79198df7f451527bfc0b97"
+  "digest": "8b84edcf865c652c0982959d30380561f700fa691725669e631a2c30fdc50272"
 }

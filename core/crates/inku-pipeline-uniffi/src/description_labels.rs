@@ -107,12 +107,89 @@ pub fn pipeline_description(text: &str) -> String {
         .join("\n")
 }
 
+/// The library's "by description" key: works whose descriptions differ only
+/// in their labels and spacing share it.
+///
+/// Per line, bracketed comments are cut and then a leading number: `#` or `＃`
+/// with digits (and an optional separator), digits with a separator, or digits
+/// with a space. Digits followed by a letter (`3羽の鳥`, `2026年`) are words.
+/// Every whitespace character and line break is then removed and the rest is
+/// NFC-normalized. Round brackets such as `(AI)` stay. The label rule above
+/// (`byte_spans`, what drawing skips) is a different, narrower rule.
+///
+/// An empty string means nothing is left to group by.
+pub fn description_group_key(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    static NUMBER: LazyLock<Regex> = LazyLock::new(|| {
+        regex(
+            r"^[ \t　]*(?:[#＃][0-9０-９]+[.．、,，)）:：]?|[0-9０-９]+[.．、,，)）:：]|[0-9０-９]+[ \t　])",
+        )
+    });
+    static COMMENT: LazyLock<Regex> = LazyLock::new(|| regex(r"\[[^\[\]\n]*\]|［[^［］\n]*］"));
+    let mut squeezed = String::new();
+    for line in text.split('\n') {
+        let without_comments = COMMENT.replace_all(line, "");
+        let body = match NUMBER.find(&without_comments) {
+            Some(found) => &without_comments[found.end()..],
+            None => &without_comments[..],
+        };
+        squeezed.extend(
+            body.chars()
+                .filter(|&character| !inku_pipeline::identity::is_python_space(character)),
+        );
+    }
+    // With no whitespace left, the description identity's canonical form is
+    // exactly NFC (its line-break folding and strip have nothing to touch).
+    let normalized = inku_pipeline::identity::canonicalize_description(&squeezed);
+    if normalized.is_empty() {
+        return String::new();
+    }
+    let digest = Sha256::digest(normalized.as_bytes());
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("dg1:{hex}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        description_label_spans, description_rewords, description_source_labels,
-        pipeline_description,
+        description_group_key, description_label_spans, description_rewords,
+        description_source_labels, pipeline_description,
     };
+
+    #[test]
+    fn every_shared_group_case_keys_as_server_groups() {
+        let table: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../server/tests/data/description-group-cases.json"
+        ))
+        .expect("shared group cases");
+        let groups = table["groups"].as_array().expect("groups");
+        assert!(groups.len() >= 2);
+        let mut keys = Vec::new();
+        for group in groups {
+            let why = group["why"].as_str().expect("why");
+            let texts = group["texts"].as_array().expect("texts");
+            let first = description_group_key(texts[0].as_str().expect("text"));
+            assert!(first.starts_with("dg1:") && first.len() == 4 + 64, "{why}");
+            for text in texts {
+                assert_eq!(
+                    description_group_key(text.as_str().expect("text")),
+                    first,
+                    "{why}: {text}"
+                );
+            }
+            if let Some(key) = group.get("key").and_then(|key| key.as_str()) {
+                assert_eq!(first, key, "{why}");
+            }
+            keys.push(first);
+        }
+        let distinct: std::collections::BTreeSet<_> = keys.iter().collect();
+        assert_eq!(distinct.len(), keys.len(), "every group has its own key");
+        for case in table["empty"].as_array().expect("empty") {
+            assert_eq!(description_group_key(case.as_str().unwrap()), "", "{case}");
+        }
+        eprintln!("compared {} shared group cases", groups.len());
+    }
 
     #[test]
     fn every_shared_case_cuts_what_server_cuts() {

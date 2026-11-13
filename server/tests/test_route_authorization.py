@@ -111,7 +111,10 @@ PUBLIC = {  # every entry needs a reason
 #   PUT /api/settings/juxtaposition and the four /api/refine/autonomous routes (2026-11-13).
 #   +1 for GET /api/history/{item_id}/composition-boxes, a work's chunks tied to its
 #   composition record's things and to the picture (2026-11-13).
-EXPECTED_ROUTE_COUNT = 150
+#   +2 for GET /api/history/description-groups and
+#   GET /api/history/description-groups/{key}/items, the library's "by description"
+#   (2026-11-13).
+EXPECTED_ROUTE_COUNT = 152
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

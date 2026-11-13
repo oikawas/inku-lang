@@ -485,13 +485,15 @@ With the keyboard focus on a thumbnail in the history strip, ← opens the next 
 
 A work painted from an image has no description, so the history strip, the Library and the reading preview show its source note in the description's place (the history strip's tooltip labels it `Source note`).
 
-In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). A single click on an image opens its reading preview without changing the next-work conditions. Double-clicking opens and focuses that work in Work for `Timeline` or in Lineage for `By lineage`. You can also use `Open work`, `Open lineage`, or `Refine`.
+In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline`, `By lineage` or `By description`). A single click on an image opens its reading preview without changing the next-work conditions. Double-clicking opens and focuses that work in Work for `Timeline` or in Lineage for `By lineage`. You can also use `Open work`, `Open lineage`, or `Refine`.
 
 In the Web `Timeline`, use the arrow keys to move between works and change the preview in thumbnails or list view. At a page edge, navigation continues to the adjacent page. The arrow keys do nothing in the trash view, in the `By lineage` arrangement, with a modifier key held, or while loading.
 
 Combine `Thumbnails` with `By lineage` to show lineages with at least two works matching the current search and filters, arranged horizontally from the origin in generation order. A lineage with only one matching work is omitted, except for the work selected when opening the Library if it matches the conditions. The lineage `List` view has no such two-work minimum. Scroll vertically between lineage groups and horizontally through a long row of related works. The thumbnail of the work shown on the canvas carries the same `Current` badge as the history strip (at the picture's lower right in `Timeline`, and in place of the generation number at the upper right in `By lineage`).
 
 Each lineage initially shows 200 works. `Show more` adds 200 at a time.
+
+`By description` puts the works of the same description in one group. A leading number (`#1 `, `1. `, `01 ` and the like) and a bracketed note (`[Kinkai Wakashū…]` and the like) make no difference; `(AI)` does. Inside a group the works stand in columns by form, oldest first, and the works without a composition record stand in the last column, `No composition record`. A child that shows its parent's composition stands in its parent's column, marked like `Touches child`. Each card shows its main law's name. Works drawn from a picture are left out. In `Thumbnails`, only descriptions drawn two or more times are listed, plus the selected work's. No shares or ranks are shown.
 
 **What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to three** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A fourth choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 

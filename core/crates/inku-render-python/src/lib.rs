@@ -657,6 +657,13 @@ fn pipeline_description_label_spans(text: &str) -> PyResult<String> {
     })
 }
 
+/// The library's "by description" key (`dg1:…`), or "" when the description
+/// has nothing left once labels and whitespace are removed.
+#[pyfunction]
+fn pipeline_description_group_key(text: &str) -> PyResult<String> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::description_group_key(text.to_owned())))
+}
+
 #[pyfunction]
 fn pipeline_description_source_labels(text: &str) -> PyResult<String> {
     catch_python_panic(|| {
@@ -939,6 +946,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(pipeline_description_label_spans, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_description_group_key, module)?)?;
     module.add_function(wrap_pyfunction!(
         pipeline_description_source_labels,
         module

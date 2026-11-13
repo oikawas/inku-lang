@@ -6,6 +6,12 @@ export const HISTORY_MANAGER_DEFAULT_PAGE_SIZE = 24;
 
 export type HistoryManagerView = 'active' | 'trash';
 export type HistoryManagerTab = 'thumbs' | 'list';
+/** How the library groups the works: by time, by lineage, or by description (step 1e, 2026-11-13). */
+export type HistoryDisplayMode = 'chronological' | 'lineage' | 'description';
+/** The modes whose groups the Server forms; the chronological pages are not fetched in them. */
+export function groupedDisplayMode(mode: HistoryDisplayMode): boolean {
+	return mode === 'lineage' || mode === 'description';
+}
 
 export type Score = { instructions: unknown[]; canvas?: string | null; version?: string | null };
 
@@ -162,7 +168,7 @@ export class HistoryManagerState {
 	selectionResetReason = $state<'query' | 'filter' | 'trash' | null>(null);
 	view = $state<HistoryManagerView>('active');
 	tab = $state<HistoryManagerTab>('thumbs');
-	displayMode = $state<'chronological' | 'lineage'>('chronological');
+	displayMode = $state<HistoryDisplayMode>('chronological');
 	page = $state(0);
 	startOffset = $state(0);
 	focusRequest = $state<{ id: string; visit: number; rootId?: string | null } | null>(null);
@@ -214,10 +220,13 @@ export class HistoryManagerState {
 	constructor(apiFetch: ApiFetch, syncTrashPage: TrashPageSync) {
 		this.apiFetch = apiFetch;
 		this.syncTrashPage = syncTrashPage;
-		try { if (typeof localStorage !== 'undefined' && localStorage.getItem('inku-history-display-mode') === 'lineage') this.displayMode = 'lineage'; } catch {}
+		try {
+			const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('inku-history-display-mode') : null;
+			if (stored === 'lineage' || stored === 'description') this.displayMode = stored;
+		} catch {}
 	}
 
-	setDisplayMode = (mode: 'chronological' | 'lineage'): void => {
+	setDisplayMode = (mode: HistoryDisplayMode): void => {
 		if (mode === this.displayMode) return;
 		this.displayMode = mode;
 		this.requestId++;
@@ -270,7 +279,8 @@ export class HistoryManagerState {
 	}
 
 	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number, anchorId: string | null = null) {
-		if (this.displayMode === 'lineage') {
+		// The grouped modes fetch their own groups; the chronological pages are not read.
+		if (groupedDisplayMode(this.displayMode)) {
 			this.open = true;
 			this.libraryInitialized = true;
 			this.activeTotal = activeTotal;
@@ -376,7 +386,7 @@ export class HistoryManagerState {
 	}
 
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
-		if (this.displayMode === 'lineage') return;
+		if (groupedDisplayMode(this.displayMode)) return;
 		const view = options.view ?? this.view;
 		const page = options.page ?? this.page;
 		const search = options.search ?? this.search.trim();

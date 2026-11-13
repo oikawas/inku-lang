@@ -94,6 +94,8 @@
 | 配置・構図 | **composition** | 名詞。四操作でも provenance でも同語 | ~~layout~~（UI 文中） |
 | 系譜 | **lineage** | 名詞 | — |
 | 系譜全体図 | **lineage map**（ボタンは **Map**） | 名詞句 | ~~Overview~~ |
+| 記述ごと（ライブラリのまとめ方） | **By description** | ボタンの句。同じ記述（番号と出典の違いは見ない）の作品を画の型の列に並べる（2026-11-13） | ~~By prompt~~、~~By text~~ |
+| 〈種類〉の子 | **〈kind〉 child** | 名詞句。記述ごとのカードで、親の構図を出す子の印（例 Touches child） | — |
 | 世代 | **generation**（略 **Gen.**） | 名詞。**世代の意味のときだけ generation を使ってよい** | — |
 | 派生種別 | **derivation kind** | 名詞。DB/API 識別子 `derivation_kind` と一致 | — |
 | 経年（派生種別） | **Age** | 名詞。系譜の辺の札 | ~~Aging~~（進行形は工程に読める）、~~Patina~~（比喩を増やす） |

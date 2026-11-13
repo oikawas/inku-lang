@@ -34,6 +34,18 @@ def pipeline_description(text: str | None) -> str:
     return importlib.import_module("inku_render").pipeline_description_without_labels(text)
 
 
+def description_group_key(text: str | None) -> str:
+    """The library's "by description" key (``dg1:…``), or "" with nothing to group by.
+
+    Brackets and leading numbers are cut line by line, then every space and
+    line break; the shared core's ``description_group_key`` holds the rule and
+    ``server/tests/data/description-group-cases.json`` pins it.
+    """
+    if not text:
+        return ""
+    return importlib.import_module("inku_render").pipeline_description_group_key(text)
+
+
 def source_labels(text: str | None) -> list[str]:
     """The bracketed comments' contents, brackets and outer spaces cut, in order.
 

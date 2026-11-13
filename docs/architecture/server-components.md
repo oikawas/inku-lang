@@ -213,7 +213,7 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `settings` | 21 | Server-wide settings, backup, and the picture upload warning | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
 | `history` | 18 | History, SVG, thumbnails, marks, trash, sharing, artifact rebuild, animation and card export, the boxes of a work's things (2026-11-13) | `_current_user` |
-| `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
+| `lineage` | 10 | Lineage graph/group, description groups (2026-11-13), promote, colophon | `_current_user` |
 | `render` | 14 | Compose, interpret, render-score/svg, paint, paint stream, composition ranges, candidates and replacements of touches, ground and color arrangement, fit | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
 | `description` | 2 | Description mora and syllable counts | `_current_user` |
@@ -222,7 +222,7 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 
 Total: 139. Refinement variation seed allocation and the Vision advice entry are retired. The public allowlist contains five paths: `/health`, `/api/info`, `/api/auth/login`, `/api/notices`, and `/api/notices/{notice_id}` (`test_route_authorization.py`). The two notice routes only read fixed distribution licenses and return neither arbitrary files nor personal data. The other public routes are limited to those needed for login.
 
-The per-router counts count the live app's routes by endpoint module the way `test_route_authorization.py` counts them (`iter_route_contexts`, 2026-10-25). On 2026-11-13 the six routes of juxtaposition and autonomous refinement (one in settings, one in render, four in the autonomous router) were removed, and only those rows of the table were corrected; the same day `GET /api/history/{item_id}/composition-boxes` was added to the history row. The total's source of truth is `EXPECTED_ROUTE_COUNT` (150 as of 2026-11-13) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 150 operations (210 schemas). The OpenAPI (`/docs`) gives each router one tag (13) and carries a summary and a description for every route, and English descriptions for the parameters and the request and response fields (since v2.15.243).
+The per-router counts count the live app's routes by endpoint module the way `test_route_authorization.py` counts them (`iter_route_contexts`, 2026-10-25). On 2026-11-13 the six routes of juxtaposition and autonomous refinement (one in settings, one in render, four in the autonomous router) were removed, and only those rows of the table were corrected; the same day `GET /api/history/{item_id}/composition-boxes` was added to the history row, and the two description-group routes to the lineage row. The total's source of truth is `EXPECTED_ROUTE_COUNT` (152 as of 2026-11-13) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 152 operations (212 schemas). The OpenAPI (`/docs`) gives each router one tag (13) and carries a summary and a description for every route, and English descriptions for the parameters and the request and response fields (since v2.15.243).
 
 ## Main flows
 

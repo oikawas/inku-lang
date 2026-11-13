@@ -36,6 +36,26 @@ class HistoryLineageGroupListResponse(BaseModel):
     limit: int = Field(description="Maximum number of groups per page that was used.")
 
 
+class HistoryDescriptionGroup(BaseModel):
+    key: str = Field(
+        description="The group's description key, dg1: and 64 hex digits. Works whose descriptions differ only in bracketed comments, leading numbers, spaces and line breaks share it."
+    )
+    representative: HistoryItem = Field(description="The newest work in the group, as a history item.")
+    item_count: int = Field(description="Number of works in the group.")
+    starred_count: int = Field(description="Number of starred works in the group.")
+    for_revision_count: int = Field(description="Number of works in the group marked for revision.")
+    latest_at: int = Field(
+        description="Save time of the newest work in the group, in milliseconds since the Unix epoch."
+    )
+
+
+class HistoryDescriptionGroupListResponse(BaseModel):
+    groups: list[HistoryDescriptionGroup] = Field(description="The groups on this page.")
+    total: int = Field(description="Number of groups that match the filters, across all pages.")
+    offset: int = Field(description="Offset used for this page.")
+    limit: int = Field(description="Maximum number of groups per page that was used.")
+
+
 class OkugakiGenerateBody(BaseModel):
     model: str | None = Field(
         default=None,
@@ -161,6 +181,95 @@ def api_history_lineage_group_items(
         root = _db.get_lineage(actor["id"], root_node_id, descendant_depth=0, node_limit=1)
         if root is None:
             raise HTTPException(status_code=404, detail="lineage not found")
+    return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
+
+
+@router.get(
+    "/api/history/description-groups",
+    response_model=HistoryDescriptionGroupListResponse,
+    response_model_exclude_none=True,
+    summary="List works grouped by description",
+)
+def api_history_description_groups(
+    offset: int = Query(default=0, ge=0, description="Number of groups to skip before the first one returned."),
+    limit: int = Query(default=12, ge=1, le=100, description="Maximum number of groups to return, from 1 to 100."),
+    trashed: bool = Query(default=False, description="When true, group the works in the trash instead of the live works."),
+    starred: bool = Query(default=False, description="When true, count only starred works in each group."),
+    for_revision: bool = Query(default=False, description="When true, count only works marked for revision in each group."),
+    for_share: bool = Query(default=False, description="When true, count only works opened to a user group in each group."),
+    q: str = Query(default="", max_length=200, description="Text to search the works for, up to 200 characters. Empty applies no text filter."),
+    min_items: int = Query(default=1, ge=1, le=1000, description="Smallest number of works a group must hold to be listed, from 1 to 1000. A group that holds the anchor_id or include_id work is listed in any case."),
+    anchor_id: str | None = Query(
+        default=None,
+        max_length=100,
+        description="Id of a work to bring into view. When its group is found, offset moves to that group's position.",
+    ),
+    include_id: str | None = Query(
+        default=None,
+        max_length=100,
+        description="Id of a work whose group is listed even when it has fewer works than min_items. Has an effect only when min_items is above 1. Ignored when anchor_id is sent.",
+    ),
+    include_svg: bool = Query(
+        default=True,
+        description="Send each representative work's whole SVG. Clients that draw from thumbnails send false.",
+    ),
+    actor: dict = Depends(_current_user),
+) -> HistoryDescriptionGroupListResponse:
+    """Return one page of description groups among the works the caller may read.
+
+    Works painted from a picture, and works whose description has nothing left
+    once its comments, leading numbers and spaces are removed, are not grouped.
+    Groups are ordered by their newest work, newest first. Every call reads all
+    visible works, so it grows with the number of works.
+    """
+    if anchor_id:
+        position = _db.description_group_position(
+            actor["id"], anchor_id, trashed=trashed, query_text=q, starred=starred,
+            for_revision=for_revision, for_share=for_share, min_item_count=min_items,
+        )
+        if position is not None:
+            offset = position
+    groups, total = _db.list_description_groups(
+        actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred,
+        for_revision=for_revision, for_share=for_share, min_item_count=min_items, include_svg=include_svg,
+        **({"include_item_id": anchor_id or include_id} if include_id or anchor_id else {}),
+    )
+    return HistoryDescriptionGroupListResponse(groups=groups, total=total, offset=offset, limit=limit)
+
+
+@router.get(
+    "/api/history/description-groups/{key}/items",
+    response_model=HistoryListResponse,
+    response_model_exclude_none=True,
+    summary="List the works of a description group",
+)
+def api_history_description_group_items(
+    key: Annotated[str, Path(
+        pattern="^dg1:[0-9a-f]{64}$",
+        description="The group's description key, as the group listing gives it.",
+    )],
+    offset: int = Query(default=0, ge=0, description="Number of works to skip before the first one returned."),
+    limit: int = Query(default=100, ge=1, le=10_000, description="Maximum number of works to return, from 1 to 10,000."),
+    trashed: bool = Query(default=False, description="When true, list works in the trash instead of the live works."),
+    starred: bool = Query(default=False, description="When true, list only starred works."),
+    for_revision: bool = Query(default=False, description="When true, list only works marked for revision."),
+    for_share: bool = Query(default=False, description="When true, list only works opened to a user group."),
+    q: str = Query(default="", max_length=200, description="Text to search the works for, up to 200 characters. Empty applies no text filter."),
+    include_svg: bool = Query(
+        default=True,
+        description="Send each work's whole SVG. Clients that draw from thumbnails send false.",
+    ),
+    actor: dict = Depends(_current_user),
+) -> HistoryListResponse:
+    """Return one page of the works in one description group, newest first.
+
+    A key with no matching works the caller may read returns an empty page, not
+    404: a key names a description, not a stored record.
+    """
+    items, total = _db.list_description_group_items(
+        actor["id"], key, offset=offset, limit=limit, trashed=trashed, query_text=q,
+        starred=starred, for_revision=for_revision, for_share=for_share, include_svg=include_svg,
+    )
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 

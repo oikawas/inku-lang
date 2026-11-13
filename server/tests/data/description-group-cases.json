@@ -1,0 +1,78 @@
+{
+  "note": "Read by core's description_labels tests and by server/tests/test_history_description_groups.py. Every text in a group has the same library 'by description' key; different groups have different keys; every text in 'empty' has no key. 'key', where present, pins dg1: + SHA-256 of the squeezed NFC text.",
+  "groups": [
+    {
+      "why": "one poem with every numbering form, with and without its source, with ideographic spaces between the phrases, and split over two lines",
+      "key": "dg1:79f17081004063e02ee43b7e71f91e67be80ed74f95ad0c922d33d4d2cb7aa12",
+      "texts": [
+        "ちはやぶる神代も聞かず竜田川からくれなゐに水くくるとは",
+        "#1 ちはやぶる 神代も聞かず 竜田川 からくれなゐに 水くくるとは",
+        "＃１２．ちはやぶる神代も聞かず竜田川からくれなゐに水くくるとは",
+        "#7ちはやぶる神代も聞かず竜田川からくれなゐに水くくるとは",
+        "1. ちはやぶる　神代も聞かず　竜田川　からくれなゐに　水くくるとは [在原業平]",
+        "2,ちはやぶる神代も聞かず竜田川からくれなゐに水くくるとは［古今和歌集］",
+        "01 ちはやぶる神代も聞かず竜田川からくれなゐに水くくるとは",
+        "１　ちはやぶる神代も聞かず竜田川からくれなゐに水くくるとは",
+        "[百人一首 17] 3) ちはやぶる神代も聞かず竜田川\nからくれなゐに水くくるとは\r\n"
+      ]
+    },
+    {
+      "why": "a number on every line of a multi-line description is cut line by line",
+      "texts": [
+        "天つ風雲の通ひ路吹きとぢよ",
+        "1. 天つ風\n2. 雲の通ひ路\n3. 吹きとぢよ",
+        "#1 天つ風 [僧正遍昭]\n#2 雲の通ひ路\n#3 吹きとぢよ"
+      ]
+    },
+    {
+      "why": "digits followed by a letter are words, not a number",
+      "texts": [
+        "3羽の鳥が飛ぶ",
+        "#2 3羽の鳥が飛ぶ",
+        "3羽の 鳥が 飛ぶ"
+      ]
+    },
+    {
+      "why": "without the 3 it is another description",
+      "texts": [
+        "羽の鳥が飛ぶ",
+        "3 羽の鳥が飛ぶ"
+      ]
+    },
+    {
+      "why": "a year is a word",
+      "texts": [
+        "2026年の春",
+        "4. 2026年の春"
+      ]
+    },
+    {
+      "why": "round brackets such as (AI) stay in the key",
+      "texts": [
+        "花の色はうつりにけりな(AI)",
+        "1. 花の色はうつりにけりな (AI)"
+      ]
+    },
+    {
+      "why": "the same poem without (AI) is another description",
+      "texts": [
+        "花の色はうつりにけりな",
+        "花の色は うつりにけりな ［小野小町］"
+      ]
+    },
+    {
+      "why": "NFC: a decomposed voiced mark is the composed letter",
+      "texts": [
+        "がっこうの庭",
+        "がっこうの庭"
+      ]
+    }
+  ],
+  "empty": [
+    "",
+    "  \n　\t",
+    "[出典]",
+    "#1 [出典]",
+    "12. "
+  ]
+}

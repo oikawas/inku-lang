@@ -1402,6 +1402,17 @@ export interface LangPack {
 	historyListTab: string;
 	historyChronologicalMode: string;
 	historyLineageMode: string;
+	/** The library grouped by description (step 1e, 2026-11-13). */
+	historyDescriptionMode: string;
+	tooltipHistoryDescriptionGrouped: string;
+	historyDescriptionGroups: string;
+	historyDescriptionGroupsDerivedOnly: string;
+	historyDescriptionEmpty: string;
+	historyCurrentDescription: string;
+	historySelectDescription: string;
+	historySelectDescriptionTitle: string;
+	historyDescriptionNoRecord: string;
+	historyDescriptionChildOf: (kind: string) => string;
 	historyLineageGroups: string;
 	historyLineageGroupsDerivedOnly: string;
 	historyLineageEmpty: string;

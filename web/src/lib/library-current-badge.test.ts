@@ -29,9 +29,10 @@ test('a time-ordered Library card marks the work shown on the canvas', () => {
 });
 
 test('in a lineage lane the work shown takes the generation number badge place', () => {
+	// The description columns (step 1e) carry no generation number: their works are not one lineage.
 	assert.match(
 		MANAGER,
-		/\{#if lineageThumbsMode && it\.id && currentHistoryId === it\.id\}<span class="lineage-current-badge">\{t\(\)\.historyCurrentBadge\}<\/span>\{:else if lineageThumbsMode && it\.lineage_generation != null\}<span class="lineage-generation-badge"/
+		/\{#if lineageThumbsMode && it\.id && currentHistoryId === it\.id\}<span class="lineage-current-badge">\{t\(\)\.historyCurrentBadge\}<\/span>\{:else if lineageThumbsMode && !byDescription && it\.lineage_generation != null\}<span class="lineage-generation-badge"/
 	);
 });
 

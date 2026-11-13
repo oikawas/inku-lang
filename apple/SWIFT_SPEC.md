@@ -22,6 +22,19 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-13 The iPhone camera
+
+The author's instruction (2026-11-13): on iPhone, as on Android, take a photo from an icon at the bottom of the screen and draw from the image; remove the Image tab's camera; give the camera no model choice and use the model set as the default.
+
+- The tab bar (`PhoneShellView`) is "Making", "Camera", "Library" and "Settings". The camera is second, as on Android, and is a button rather than a page: pressing it does not change the chosen tab (`ContentView.phoneTab` takes tag 3 as the start of a capture). The tab shows even on a device without a camera.
+- Conditions: the Image values in Settings > Drawing defaults (the model that reads images, the color catalog and the canvas). The camera has no model choice.
+- Checks on a press (`PhoneCameraFlow`, in this order; as on Android, the model is checked before the photo): while a drawing, a batch or another window is open, "You can't take a photo while a drawing is running"; it also refuses while an unsaved candidate is shown. When the default image model is empty, unavailable or has no API key, "Not ready to capture" with the reason and "Open Settings" (Drawing defaults, or Model settings for a key). The first image sent after launch shows the same upload notice as the Image tab. A device that cannot use the camera (the simulator, or one where Screen Time turns it off) shows "The camera is not available on this device." Otherwise the standard camera screen (`UIImagePickerController`) covers the screen.
+- After the photo it draws at once: it goes to the Making tab's work, switches the input to Image, puts the Image tab's choices back to the defaults (`AppModel.prepareCameraDraw`), puts the photo in the image field and draws with `generate()`. The input panel scrolls to the run row (with Stop). Progress and the result show as an Image tab drawing does (the author's choice 2026-11-13; Android's "development" screen is not built). The photo's provenance is as before (Exif, no file name). If drawing became impossible while the camera was open, the photo stays in the image field undrawn and the reason shows.
+- The Image tab's "Take Photo" is not shown on iPhone. The iPad keeps it (the author's choice 2026-11-13; the iPad has no tab bar).
+- The photo is still not kept (neither with the work nor in Photos; Android keeps the original photo inside the app).
+- The Mac's screens and behavior do not change.
+- The 2026-11-07 section's step 6 "Take Photo" and step 7 shell text ("Making", "Library", "Settings") are records of their time.
+
 ## 2026-11-13 The AI refinement process and the juxtaposition are removed
 
 By the author's decision (2026-11-13, "cut the menu to ten items", and in the choice UI "remove it from all three apps"), they are removed from macOS and iPad after the Web (product `a3a2ef002`). Requested by 描画セッション-claude (step 0, part 0c).

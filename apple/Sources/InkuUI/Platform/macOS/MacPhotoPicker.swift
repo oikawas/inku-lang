@@ -18,4 +18,13 @@ struct InkuCameraButton: View {
 
     var body: some View { EmptyView() }
 }
+
+/// The iPhone tab bar's camera; the Mac has none.
+enum InkuCamera {
+    static var isAvailable: Bool { false }
+}
+
+extension View {
+    func inkuCameraCapture(isPresented: Binding<Bool>, onCapture: @escaping (Data) -> Void) -> some View { self }
+}
 #endif

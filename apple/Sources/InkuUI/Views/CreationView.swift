@@ -247,12 +247,21 @@ struct CreationView: View {
                         .frame(height: max(150, geometry.size.height * 0.4))
                         .simultaneousGesture(phoneSwipe)
                     phoneWorkRow
-                    ScrollView {
-                        leftPanelContent(width: max(0, geometry.size.width - 32))
-                            .padding(.vertical, 14).padding(.horizontal, 16)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            leftPanelContent(width: max(0, geometry.size.width - 32))
+                                .padding(.vertical, 14).padding(.horizontal, 16)
+                        }
+                        .scrollDismissesKeyboard(.interactively)
+                        .background(InkuColor.bg)
+                        // A photo from the tab bar's camera: its run row (and stop) sits under the photo, below the
+                        // panel's first screen, so the panel goes down to it once it shows.
+                        .onChange(of: model.singleRunStatusVisible(in: "image")) { _, visible in
+                            guard visible, ui.scrollToImageRun else { return }
+                            ui.scrollToImageRun = false
+                            withAnimation { proxy.scrollTo(Self.imageRunStatusID, anchor: .bottom) }
+                        }
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .background(InkuColor.bg)
                 }
             }
             .onAppear { rightPanelWidth = geometry.size.width; rightPanelHeight = geometry.size.height }
@@ -608,8 +617,12 @@ struct CreationView: View {
             HStack {
                 Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
                 Spacer()
-                InkuCameraButton(title: display.localized("撮影"), disabled: controlsDisabled) { data in
-                    loadImage(data: data, fileName: nil)
+                // The iPhone takes photos from the camera in the tab bar (author 2026-11-13); the iPad, which has no
+                // tab bar, keeps this button.
+                if !phoneLayout {
+                    InkuCameraButton(title: display.localized("撮影"), disabled: controlsDisabled) { data in
+                        loadImage(data: data, fileName: nil)
+                    }
                 }
                 InkuPhotoPickerButton(title: display.localized("写真から選ぶ"), disabled: controlsDisabled) { data in
                     loadImage(data: data, fileName: nil)
@@ -650,6 +663,7 @@ struct CreationView: View {
                     model.providerProgress.flatMap { $0.outcome == .running ? display.localized($0.stageTitleKey) : nil }
                     ?? display.webCopy("imageWritingDdl", "画像から指示書を書いています…")
                 runStatus(label: label, onStop: { Task { await model.cancel() } }, stopping: false)
+                    .id(Self.imageRunStatusID)
             } else {
                 Button(display.webCopy("generateButton", "描画する")) {
                     if model.imageWarningAcknowledged { Task { await model.generate() } }
@@ -663,6 +677,8 @@ struct CreationView: View {
             return true
         }
     }
+
+    static let imageRunStatusID = "image-run-status"
 
     private var imagePaperCondition: some View {
         let value = model.imageCanvasID == "image" ? display.localized("画像の縦横比を使う") :
@@ -689,10 +705,7 @@ struct CreationView: View {
     /// A chosen file (`fileName`) or a photo, which has no file name and shows as one.
     private func loadImage(data: Data, fileName: String?) {
         do {
-            let image = try ImageInput.prepare(data)
-            let provenance = ImageProvenance.text(data: data, fileName: fileName,
-                                                  includeFileName: display.preferences.imageIncludeFileName ?? true,
-                                                  includeExif: display.preferences.imageIncludeExif ?? true, language: display.preferences.language)
+            let (image, provenance) = try model.preparedImage(data: data, fileName: fileName)
             model.setImageInput(image, fileName: fileName ?? display.localized("写真"), automaticProvenance: provenance)
             imageLoadError = nil
         } catch { imageLoadError = model.failureMessage(error) }

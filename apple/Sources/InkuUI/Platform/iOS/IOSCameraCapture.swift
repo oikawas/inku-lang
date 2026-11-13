@@ -28,6 +28,25 @@ struct InkuCameraButton: View {
     }
 }
 
+/// The iPhone tab bar's camera (author 2026-11-13): whether this device can take a photo now. False on the simulator
+/// and where Screen Time turns the camera off.
+enum InkuCamera {
+    static var isAvailable: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
+}
+
+extension View {
+    /// The camera over the whole screen, as the iPad's "Take Photo" opens it. `onCapture` gets the photo's JPEG with
+    /// the camera's metadata; a cancel or a failed photo gets nothing.
+    func inkuCameraCapture(isPresented: Binding<Bool>, onCapture: @escaping (Data) -> Void) -> some View {
+        fullScreenCover(isPresented: isPresented) {
+            InkuCameraPicker { data in
+                isPresented.wrappedValue = false
+                if let data { onCapture(data) }
+            }.ignoresSafeArea()
+        }
+    }
+}
+
 private struct InkuCameraPicker: UIViewControllerRepresentable {
     let onFinish: (Data?) -> Void
 

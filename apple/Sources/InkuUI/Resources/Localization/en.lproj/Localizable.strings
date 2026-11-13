@@ -1573,3 +1573,12 @@
 "写真" = "Photo";
 "ダブルタップで作品を開く" = "Double-tap to open the work";
 "inkuで描画しています" = "Drawing in inku";
+"カメラ" = "Camera";
+"撮影の準備ができていません" = "Not ready to capture";
+"設定を開く" = "Open Settings";
+"この機器ではカメラを使えません。" = "The camera is not available on this device.";
+"描いている間は撮影できません。描き終わるか、停止してから押してください。" = "You can't take a photo while a drawing is running. Wait until it finishes, or stop it, then try again.";
+"保存していない候補を表示している間は撮影できません。" = "You can't take a photo while an unsaved candidate is shown.";
+"「描くときのデフォルト」の「画像」で、画像を読むモデルを選んでください。" = "Choose the model that reads images under Image in Drawing defaults.";
+"このモデルを使えません。「描くときのデフォルト」の「画像」で、画像を読むモデルを選び直してください。" = "This model is not available. Choose the model that reads images again under Image in Drawing defaults.";
+"このモデルのAPIキーがありません。「モデル設定」でキーを入れてください。" = "This model has no API key. Enter the key in Model settings.";

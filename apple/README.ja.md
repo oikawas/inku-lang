@@ -241,7 +241,7 @@ UI差分の限定確認は`--library-browsing-only`、`--lineage-presentation-on
 
 ### iPadとiPhoneのアプリ
 
-iOSのアプリ（target `InkuIOS`、bundle ID `app.inku.ios`、iOS 18以降）は、iPadとiPhoneに入ります。iPadではMacと同じ画面とメニューを1枚の窓で全画面に出します。iPhoneでは下のタブで「制作」「ライブラリ」「設定」を切り替え、シートは画面いっぱいに出します。iPhoneは縦に留め、作品の頁とプレゼンテーションだけ横にも回ります（[Swift仕様](SWIFT_SPEC.ja.md)の「2026-11-07 iOS（iPad）のアプリ」の節のstep 7）。product repository rootから次を実行すると、署名せずにiOSシミュレータ向けにbuildします。Apple account、Team、証明書は使いません。先に上の`rustup target add`でiOSのtargetを入れておいてください。
+iOSのアプリ（target `InkuIOS`、bundle ID `app.inku.ios`、iOS 18以降）は、iPadとiPhoneに入ります。iPadではMacと同じ画面とメニューを1枚の窓で全画面に出します。iPhoneでは下のタブで「制作」「ライブラリ」「設定」を切り替え、シートは画面いっぱいに出します。下のタブの「カメラ」を押すと撮影へ進み、撮った写真から「描くときのデフォルト」の「画像」の条件で描きます（iPhoneの画像タブには「撮影」がありません。iPadの画像タブには残ります）。iPhoneは縦に留め、作品の頁とプレゼンテーションだけ横にも回ります（[Swift仕様](SWIFT_SPEC.ja.md)の「2026-11-07 iOS（iPad）のアプリ」の節のstep 7）。product repository rootから次を実行すると、署名せずにiOSシミュレータ向けにbuildします。Apple account、Team、証明書は使いません。先に上の`rustup target add`でiOSのtargetを入れておいてください。
 
 ```sh
 apple/scripts/build-ios.sh Release

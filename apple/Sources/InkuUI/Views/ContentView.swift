@@ -101,6 +101,8 @@ public struct ContentView: View {
     @State private var windowSize = CGSize.zero
     /// The iPhone layout, read in the shell and handed into the sheets presented from here (ios-app step 7c).
     @State private var phoneLayout = false
+    /// Bumped by the iPhone tab bar's camera (`PhoneCameraFlow`).
+    @State private var cameraRequest = 0
     /// The window's file dialogs, which the menu's "open DDL" also asks.
     @State private var fileDialogs = InkuFileDialogs()
     @State private var importer = DDLImportController()
@@ -308,16 +310,30 @@ public struct ContentView: View {
                 .disabled(importing)
                 .background(InkuColor.bg)
         }
+        .modifier(phoneCameraFlow)
     }
 
     private var phoneTab: Binding<Int> {
-        Binding(get: { ui.settingsOpen ? 2 : ui.libraryOpen ? 1 : 0 }, set: { tab in
+        Binding(get: { ui.settingsOpen ? PhoneShellTab.settings : ui.libraryOpen ? PhoneShellTab.library : PhoneShellTab.creation },
+                set: { tab in
             switch tab {
-            case 1: if !ui.libraryOpen || ui.settingsOpen { openLibrary() }
-            case 2: if !ui.settingsOpen { ui.libraryOpen = false; openSettings(nil) }
+            case PhoneShellTab.library: if !ui.libraryOpen || ui.settingsOpen { openLibrary() }
+            case PhoneShellTab.settings: if !ui.settingsOpen { ui.libraryOpen = false; openSettings(nil) }
+            // The camera starts and the chosen tab stays (`PhoneCameraFlow`).
+            case PhoneShellTab.camera: cameraRequest += 1
             default: showCreation(tab: nil)
             }
         })
+    }
+
+    private var phoneCameraFlow: PhoneCameraFlow {
+        PhoneCameraFlow(model: model, automation: automation, ui: ui, request: cameraRequest, blocked: !canNavigateSections,
+                        onOpenSettings: { section in ui.libraryOpen = false; openSettings(section) },
+                        onShowCreation: {
+                            batchWorkspace.showHistory()
+                            ui.exitCanvasFullScreen()
+                            showCreation(tab: "artwork")
+                        })
     }
 
     private func creationView(phone: Bool) -> some View {

@@ -19,6 +19,8 @@ final class WorkspaceUIState {
     var leftPanelCollapsed = false
     /// CanvasPanel `outputTab`: "artwork" or "lineage".
     var workspaceTab = "artwork"
+    /// The iPhone's camera started a drawing: the 制作 tab's panel goes down to the image run row once it shows.
+    var scrollToImageRun = false
     /// `+page.svelte` canvasViewMode: the work tab shows the experimental 3D view instead of the picture. For the
     /// session only, as on the Web; it starts in 2D.
     var canvasThreeDimensional = false

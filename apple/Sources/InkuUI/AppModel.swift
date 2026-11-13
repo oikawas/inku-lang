@@ -14,6 +14,11 @@ public enum PromptAvailability: Sendable, Equatable {
     case loading, recorded, notRecorded, unavailable
 }
 
+/// Why the iPhone's camera does not open (`AppModel.cameraDrawRefusal`). The model ones carry the default's reference.
+public enum CameraDrawRefusal: Sendable, Equatable {
+    case busy, previewOpen, noModel, modelUnavailable(String), keyMissing(String)
+}
+
 public struct OutputSnapshot: Sendable {
     public let prompt: String
     public let promptAvailability: PromptAvailability
@@ -1167,6 +1172,43 @@ public final class AppModel {
         imageProvenance = typed ?? automaticProvenance
         imageProvenanceTyped = typed != nil
         imageInput = image; imageFileName = fileName
+    }
+
+    /// An image's bytes as the image tab reads them: the prepared input, and the provenance its file name (when it has
+    /// one) and Exif give under the display choices. A photo has no file name.
+    public func preparedImage(data: Data, fileName: String?) throws -> (image: PreparedImageInput, provenance: String) {
+        let image = try ImageInput.prepare(data)
+        let provenance = ImageProvenance.text(data: data, fileName: fileName,
+                                              includeFileName: display.preferences.imageIncludeFileName ?? true,
+                                              includeExif: display.preferences.imageIncludeExif ?? true,
+                                              language: display.preferences.language)
+        return (image, provenance)
+    }
+
+    /// Why the iPhone's camera cannot draw now (nil when it can). The camera draws with the image defaults (設定「描く
+    /// ときのデフォルト」の「画像」, the author's instruction 2026-11-13) and has no model choice of its own, so its model
+    /// is checked before the photo is taken, as Android checks before its capture.
+    public func cameraDrawRefusal(otherRunActive: Bool) async -> CameraDrawRefusal? {
+        guard initialized, database != nil, host != nil, !isBusy, !otherRunActive else { return .busy }
+        // An unsaved candidate on screen stops the image tab's drawing too (`canGenerate`).
+        guard !isPreview else { return .previewOpen }
+        let vision = drawDefaults["image"]?.models.vision ?? ""
+        guard !vision.isEmpty else { return .noModel }
+        guard SettingsModel.isRegisteredModelAvailable(vision, purpose: "vision", settings: settings) else {
+            return .modelUnavailable(vision)
+        }
+        if let provider = settings.providers.first(where: { vision.hasPrefix($0.id + ":") }), provider.requiresAPIKey,
+           (try? await credentials.isConfigured(for: provider.credentialID)) == false {
+            return .keyMissing(vision)
+        }
+        return nil
+    }
+
+    /// The camera's photo in the image tab, with the tab's choices back at the image defaults: the tab then shows the
+    /// model, catalog and paper the camera draws with (`generate()` reads them).
+    public func prepareCameraDraw(_ image: PreparedImageInput, provenance: String) {
+        resetDrawOptions(tab: "image")
+        setImageInput(image, fileName: display.localized("写真"), automaticProvenance: provenance)
     }
 
     public func requestForImage(_ image: PreparedImageInput, provenance: String, canvasID: String? = nil, options: DrawOptions? = nil) throws -> GenerationRequest {

@@ -1,7 +1,12 @@
 import SwiftUI
 
-/// The iPhone shell (ios-app step 7, the author's choice 2026-11-09 "案 1 タブで分ける"): 制作, ライブラリ and 設定 in
-/// the tab bar. The tabs show the same views as the Mac's workspace, library and settings; `ContentView` owns their
+/// The iPhone tab bar's tags. The camera's is a start, never a selection (`ContentView.phoneTab`).
+enum PhoneShellTab {
+    static let creation = 0, library = 1, settings = 2, camera = 3
+}
+
+/// The iPhone shell (ios-app step 7, the author's choice 2026-11-09 "案 1 タブで分ける"): 制作, カメラ, ライブラリ and
+/// 設定 in the tab bar. The tabs show the same views as the Mac's workspace, library and settings; `ContentView` owns their
 /// state, so a tab is the Mac's "library open" or "settings open".
 @MainActor
 struct PhoneShellView<Creation: View, Library: View, Settings: View>: View {
@@ -20,6 +25,11 @@ struct PhoneShellView<Creation: View, Library: View, Settings: View>: View {
             NavigationStack { creation() }
                 .tabItem { Label(display.localized("制作"), systemImage: "paintbrush") }
                 .tag(0)
+            // The camera, second as on Android (author 2026-11-13), is a button rather than a page: `ContentView`'s
+            // selection takes this tag as the camera's start and keeps the tab that was chosen.
+            Color.clear
+                .tabItem { Label(display.localized("カメラ"), systemImage: "camera") }
+                .tag(PhoneShellTab.camera)
             library()
                 .tabItem { Label(display.webCopy("historyLibraryTitle", "ライブラリ"), systemImage: "square.grid.3x3") }
                 .tag(1)

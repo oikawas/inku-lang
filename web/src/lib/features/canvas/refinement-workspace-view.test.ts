@@ -110,3 +110,22 @@ test('unsaved options hide × while discard-and-close and save-and-close are the
 	assert.match(grid, /onclick=\{onDiscardAndClose\}/);
 	assert.match(grid, /onclick=\{onSaveAndClose\}/);
 });
+
+test('2026-11-13: option cards name their composition and a pressed option sits beside the target', () => {
+	const grid = read('./RefinementCandidateGrid.svelte');
+	const form = read('./RefinementCompositionFormView.svelte');
+	const panel = read('../../components/CanvasPanel.svelte');
+	assert.match(grid, /candidateComposition\(/);
+	// The color, ground, touch and placement views pass no composition: their options keep the parent's record.
+	assert.match(grid, /const named = \$derived\(!!target\?\.composition\)/);
+	for (const view of ['./RefinementColorCatalogView.svelte', './RefinementToolView.svelte', './RefinementGroundView.svelte', './RefinementAdjustView.svelte']) {
+		assert.match(read(view), /composition: null/, view);
+	}
+	assert.match(grid, /<CompositionChips \{summary\} target=/);
+	assert.match(grid, /class="cand-thesis"/);
+	assert.match(grid, /class="compare-grid"/);
+	assert.match(grid, /refinementSession\.previewId/);
+	assert.match(form, /class="target-now"/);
+	assert.match(form, /<CompositionFigure figure=\{form\.id\}/);
+	assert.match(panel, /targetComposition=\{statusComposition\}/);
+});

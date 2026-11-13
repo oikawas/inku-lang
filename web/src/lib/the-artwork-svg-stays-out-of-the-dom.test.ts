@@ -12,7 +12,8 @@ const CONSUMERS: Record<string, number> = {
 	'components/HistoryThumbnail.svelte': 1,
 	'components/LineagePanel.svelte': 0,
 	'components/ReplayComparisonModal.svelte': 2,
-	'features/canvas/RefinementCandidateGrid.svelte': 1,
+	// The card's image, and since 2026-11-13 the pressed option beside the target.
+	'features/canvas/RefinementCandidateGrid.svelte': 2,
 	'features/canvas/RefinementModelCompareView.svelte': 0
 };
 

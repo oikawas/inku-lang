@@ -449,6 +449,12 @@ export interface LangPack {
 	compositionNoRecord: string;
 	compositionNoRecordNote: string;
 	compositionFallback: string;
+	/** A chip's title against the refinement target: "画の型（対象: 分ける線）". */
+	compositionChipVersusTarget: (term: string, value: string) => string;
+	compositionDdlTerm: string;
+	compositionTargetNow: string;
+	refineCompareTarget: string;
+	refineCompareOption: (n: number) => string;
 	sketchLabel: string;
 	readDrawReadingLabel: string;
 	sketchGrainLabel: string;

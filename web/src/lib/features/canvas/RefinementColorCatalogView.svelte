@@ -95,6 +95,7 @@
 				</section>
 			</div>
 		</div>
-		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} maxColumns={4} placeholder={mode === 'arrangement' ? t().colorArrangementPlaceholder : t().colorCatalogChangePlaceholder} />
+		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} maxColumns={4} placeholder={mode === 'arrangement' ? t().colorArrangementPlaceholder : t().colorCatalogChangePlaceholder}
+			target={{ artworkUrl, aspectWidth: canvasAspectWidth, aspectHeight: canvasAspectHeight, composition: null }} />
 	</div>
 </div>

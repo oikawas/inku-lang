@@ -8,6 +8,7 @@
 	import RefinementCandidateGrid from './RefinementCandidateGrid.svelte';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import type { RefinementSession } from '$lib/features/canvas/refinement-session.svelte';
+	import type { CompositionSummary } from '$lib/features/composition-record/record';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
 	type Props = {
@@ -25,6 +26,8 @@
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
+		/** The target's composition, for the options' chips and the side-by-side (2026-11-13). */
+		targetComposition: CompositionSummary | null;
 	};
 
 	let {
@@ -36,6 +39,7 @@
 		canvasAspectHeight,
 		refinementSession,
 		modelInspection,
+		targetComposition,
 		refineWildValue,
 		onSetRefineWild,
 		onGenerateModelCandidates,
@@ -108,6 +112,7 @@
 				</div>
 			</div>
 		</div>
-		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} placeholder={t().modelChangePlaceholder} />
+		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} placeholder={t().modelChangePlaceholder}
+			target={{ artworkUrl, aspectWidth: canvasAspectWidth, aspectHeight: canvasAspectHeight, composition: targetComposition }} />
 	</div>
 </div>

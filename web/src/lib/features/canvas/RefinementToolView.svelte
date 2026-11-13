@@ -88,6 +88,7 @@
 				</section>
 			</div>
 		</div>
-		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} maxColumns={4} placeholder={t().toolChangePlaceholder} />
+		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} maxColumns={4} placeholder={t().toolChangePlaceholder}
+			target={{ artworkUrl, aspectWidth: canvasAspectWidth, aspectHeight: canvasAspectHeight, composition: null }} />
 	</div>
 </div>

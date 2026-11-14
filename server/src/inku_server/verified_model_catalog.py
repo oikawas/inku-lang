@@ -28,6 +28,15 @@ def core_catalog(action, **fields):
     return result
 
 
+def sign_in(action, **fields):
+    """A Sign in with ChatGPT action of the shared core.
+
+    The core takes only ``sign_in_<action>`` with the service it serves; the
+    old ``chatgpt_*`` names are refused there (step 6, 2026-11-15).
+    """
+    return core_catalog("sign_in_" + action, service="chatgpt", **fields)
+
+
 _info = catalog_info()
 MODEL_CATALOG = _info["catalog"]
 MODEL_CONFIG_VERSION = _info["version"]

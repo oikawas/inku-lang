@@ -46,17 +46,6 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
     return core_catalog("normalize_models", models=models)["models"]
 
 
-def normalize_chatgpt_models(entries: Any) -> list[dict[str, Any]]:
-    """The shared assessments of Sign in with ChatGPT models (the author, 2026-10-13).
-
-    A model's measurements are the same for every subscriber, so they are kept
-    with the other providers' instead of in each person's registration, in the
-    same keys. Which models a person publishes, and for what, stays personal, so
-    the purposes are not kept here; the purposes it was measured not to answer are.
-    """
-    return [{key: value for key, value in model.items() if key != "purposes"} for model in _normalize_models(entries)]
-
-
 def chatgpt_assessments(settings: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
     """The shared assessment of each Sign in with ChatGPT model, by model id.
 

@@ -694,6 +694,11 @@ def _model_assessment_keys() -> list[str]:
     return list(ASSESSMENT_KEYS)
 
 
+def _sign_in_services() -> list[dict]:
+    from ..verified_model_catalog import core_catalog
+    return core_catalog("sign_in_services")["services"]
+
+
 class ModelSettingsResponse(BaseModel):
     """The model catalog and the model settings the interface needs."""
 
@@ -709,6 +714,9 @@ class ModelSettingsResponse(BaseModel):
     )
     assessment_keys: list[str] = Field(default_factory=_model_assessment_keys,
         description="Model assessment fields shared by the model administration screen.")
+    sign_in_services: list[dict] = Field(default_factory=_sign_in_services,
+        description=("The shared core's sign-in services, signed in or not: each `id`, `label`, `labels`, "
+                     "`abbreviation`, `usage_url` (the subscriber's usage page), `kind` and `requires_api_key`."))
     catalog: list[dict] = Field(
         default_factory=list,
         description="The model providers and their models, as the model settings page lists them.",

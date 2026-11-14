@@ -24,6 +24,7 @@ from . import provider_wire
 from .chatgpt_store import ChatGPTError
 from .model_settings import connection_for
 from .text_provider import send_text
+from .verified_model_catalog import sign_in, sign_in_service
 from .request_timeout import request_timeout_seconds
 
 _logger = logging.getLogger(__name__)
@@ -33,7 +34,8 @@ def vision_connection(provider: str, settings: dict[str, Any]) -> dict[str, Any]
     if provider != "chatgpt":
         return connection_for(provider, settings)
     try:
-        return {"id": "chatgpt", "kind": "chatgpt_responses", "base_url": "https://api.openai.com/v1",
+        # The kind and where it is sent are the service's descriptor's.
+        return {"id": "chatgpt", "kind": sign_in_service("chatgpt")["kind"], "base_url": sign_in("auth_constants")["resource"],
                 "owner_id": settings["chatgpt_owner_id"], "profile_id": settings["chatgpt_profile_id"],
                 "generation": settings["chatgpt_generation"]}
     except KeyError:
@@ -45,10 +47,9 @@ def check_vision_access(connection: dict[str, Any], model_id: str) -> None:
     if connection.get("kind") != "chatgpt_responses":
         return
     from .chatgpt_runtime import check_session
-    from .chatgpt_models import publication
+    from .chatgpt_models import offered, publication
     profile = check_session(connection["owner_id"], connection["profile_id"], connection["generation"])
-    if not any(model["id"] == model_id and model["enabled"] and "vision" in model["purposes"]
-               for model in publication(profile)["models"]):
+    if not offered(publication(profile)["models"], model_id, "vision"):
         raise ChatGPTError("chatgpt_model_not_offered")
 
 

@@ -136,20 +136,21 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
     compared = Counter()
     for row in CASES["chatgpt"]:
         request, expect = row["request"], row["expect"]
-        action = request["action"]
+        # The rows name the actions as a host sends them, `sign_in_<name>` with the service (step 6).
+        action = request["action"].removeprefix("sign_in_")
         if request.get("schema") == "inku.model-catalog-request.v1":
             import inku_render
             answer = json.loads(inku_render.pipeline_provider_wire(json.dumps(request).encode()))
             assert {key: answer.get(key) for key in expect} == expect, row["why"]
             continue
-        if action in {"chatgpt_request", "chatgpt_vision_request"}:
+        if action in {"request", "vision_request"}:
             if expect.get("outcome") == "refused":
                 with pytest.raises(provider_wire.ProviderWireRefused, match=expect["detail"]):
                     provider_wire.chatgpt_vision_request(request["model"], system=request["system"], text=request["text"],
                                                          images=request["images"], answer_limit=request["answer_limit"])
             else:
                 built = (provider_wire.chatgpt_request(request["model"], request["prompt"], request["answer_limit"])
-                         if action == "chatgpt_request" else
+                         if action == "request" else
                          provider_wire.chatgpt_vision_request(request["model"], system=request["system"], text=request["text"],
                                                               images=request["images"], answer_limit=request["answer_limit"]))
                 if "body" in expect:
@@ -161,12 +162,10 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
                     # Prediction 3 (PLAN-STEP4 §6): the headers that went out before, and Accept.
                     assert provider_wire.headers(built, "TOKEN") == {
                         "Accept": "text/event-stream", "Content-Type": "application/json", "Authorization": "Bearer TOKEN"}, row["why"]
-        elif action == "chatgpt_models_request":
-            assert {key: value for key, value in provider_wire.chatgpt_models_request().items() if key != "schema"} == expect, row["why"]
-        elif action == "chatgpt_transport":
+        elif action == "transport":
             error = transport_error(request["kind"])
             assert (error.code, error.failure, error.action) == (expect["code"], expect["failure"], expect["action"]), row["why"]
-        elif action == "chatgpt_stream":
+        elif action == "stream":
             decoder = (TextSSEDecoder if request["mode"] == "text" else SSEDecoder)(request["answer_limit"])
             decoder.feed(base64.b64decode(request["wire_base64"]))
             if expect["outcome"] == "answer":
@@ -188,12 +187,12 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
                 assert isinstance(raised.value, ResponseFailure) is bool(expect.get("reported")), row["why"]
             if "completed" in expect:
                 assert (decoder.completed, decoder.terminal) == (expect["completed"], expect["terminal"]), row["why"]
-        elif action == "chatgpt_error":
+        elif action == "error":
             failure = (response_error(status=request["status"], request_id=request["request_id"], body=request["body"])
                        if "body" in request else response_error(request["value"], request["status"], request["request_id"]))
             assert (failure.code, failure.failure, failure.action, failure.status, failure.request_id, failure.param) == (
                 expect["code"], expect["failure"], expect["action"], expect["status"], expect["request_id"], expect["param"]), row["why"]
-        elif action == "chatgpt_failure":
+        elif action == "failure":
             # A code Server raises itself takes the same table.
             error = ChatGPTError(request["code"]) if "temporary" not in request else None
             named = provider_wire.chatgpt_failure(request["code"], request.get("temporary"))
@@ -201,11 +200,9 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
             if error is not None:
                 assert (error.failure, error.action) == (expect["failure"], expect["action"]), row["why"]
         else:
-            listed = (provider_wire.chatgpt_catalog(body=request["body"]) if "body" in request
-                      else provider_wire.chatgpt_catalog(request["value"]))
-            # A list that cannot be read also names its failure (step 4); older rows name only the outcome.
-            assert {key: listed[key] for key in expect} == expect, row["why"]
+            # The model list and where it is asked for are parts the core's procedures use (step 6);
+            # their rows are the core's (sign-in-part-cases.json).
+            raise AssertionError(f"a row the Server does not send: {row['request']['action']}")
         compared[action] += 1
-    assert dict(compared) == {"chatgpt_request": 9, "chatgpt_vision_request": 9, "chatgpt_stream": 59,
-                              "chatgpt_error": 11, "chatgpt_catalog": 8, "chatgpt_failure": 75,
-                              "chatgpt_models_request": 1, "chatgpt_transport": 3}
+    assert dict(compared) == {"request": 9, "vision_request": 9, "stream": 59,
+                              "error": 11, "failure": 75, "transport": 3}

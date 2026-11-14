@@ -29,6 +29,7 @@
 	};
 	type Props = {
 		chatgptPlanSelected?: boolean;
+		chatgptUsageUrl?: string | null;
 		chatgptModelAvailable?: boolean;
 		inputMode: 'single' | 'image' | 'batch';
 		imageProvenance: string;
@@ -129,6 +130,7 @@
 
 	let {
 		chatgptPlanSelected = false,
+		chatgptUsageUrl = null,
 		chatgptModelAvailable = false,
 		inputMode = $bindable('single'),
 		imageProvenance = $bindable(''), uploadedImage, imageFileName, imageUploading, imageRunning,
@@ -276,8 +278,8 @@
 			<div class="condition-selection">
 				<span class="condition-inline-label">{t().modelButton}</span>
 				<span class="condition-value" title={conditionModelName}>{conditionModelName}</span>
-				{#if chatgptPlanSelected && inputMode === 'single'}
-					<a class="chatgpt-plan-label" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
+				{#if chatgptPlanSelected && inputMode === 'single' && chatgptUsageUrl}
+					<a class="chatgpt-plan-label" href={chatgptUsageUrl} target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
 				{/if}
 				<Tooltip text={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} placement="top-left">
 					<button class="ghost-btn condition-change" aria-label={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} onclick={pictureConditions ? onOpenImageModelSelection : onOpenModelSelection}>{t().editButton}</button>

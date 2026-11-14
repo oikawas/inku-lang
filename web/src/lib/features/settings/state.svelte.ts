@@ -157,6 +157,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		get modelSettingsStatus() { return modelAdministration.modelSettingsStatus; },
 		get modelFetchResults() { return modelAdministration.modelFetchResults; },
 		get modelSettingsLoading() { return modelAdministration.modelSettingsLoading; },
+		get chatgptState() { return modelAdministration.chatgptState; },
 		get modelCatalog(): ProviderGroup[] { return modelAdministration.modelCatalog; },
 		modelAdministration,
 		userAdministration,

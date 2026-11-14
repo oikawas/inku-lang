@@ -51,6 +51,8 @@ export type ModelAdministration = {
 	readonly modelSettingsStatus: string | null;
 	readonly modelFetchResults: Record<string, ModelFetchResult>;
 	readonly modelSettingsLoading: boolean;
+	// The Sign in with ChatGPT registration's state, as the Server answered with the publication.
+	readonly chatgptState: string | null;
 	readonly modelCatalog: ProviderGroup[];
 	updateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
 	addModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => Promise<void>;
@@ -70,13 +72,18 @@ export type ModelAdministration = {
 type ChatGPTPublication = {
 	profile_id: string;
 	generation: number;
-	models: ModelOption[];
+	// The shared core gives every published model its purposes.
+	models: (ModelOption & { purposes: ('llm' | 'vision')[] })[];
 	enabled_models: Record<string, boolean>;
 	model_labels?: ModelLabel[];
 	assessment_keys?: (keyof ModelOption)[];
 	// The shared core's descriptor of the sign-in service (Sign in with ChatGPT).
 	service?: { id: string; label: string; labels: { ja: string; en: string }; abbreviation: string;
 		usage_url: string; kind: string; requires_api_key: boolean };
+	// The group the core builds from the descriptor with these models, and the registration's state
+	// (Sign in with ChatGPT step 6, 2026-11-15).
+	group: ProviderGroup;
+	state: string;
 };
 
 export type ChatGPTDraftEdit =
@@ -129,16 +136,11 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	function acceptChatGPT(data: ChatGPTPublication): void {
 		setModelLabelTable(data.model_labels);
 		if (data.assessment_keys) assessmentKeys = data.assessment_keys;
-		const models = data.models.map((model) => ({ ...model, purposes: model.purposes ?? ['llm', 'vision'] as ('llm' | 'vision')[] }));
-		chatgptPublication = { ...data, models };
-		// The group is the core's sign-in service descriptor with this plan's models; like the
-		// core's provider_groups it replaces a same-id group and leads the list (2026-11-14).
-		const service = data.service;
-		const provider: ProviderGroup = service
-			? { id: 'chatgpt', label: service.label, labels: service.labels, abbreviation: service.abbreviation,
-				usage_url: service.usage_url, kind: service.kind, requires_api_key: service.requires_api_key, models }
-			: { id: 'chatgpt', label: t().chatgptPlanLabel, kind: 'chatgpt_responses', requires_api_key: false, models };
-		modelCatalog = [provider, ...modelCatalog.filter((group) => group.id !== 'chatgpt')];
+		const models = data.models;
+		chatgptPublication = data;
+		// The group is the Server's answer (the core's provider_groups with this plan's models);
+		// it replaces a same-id group and leads the list.
+		modelCatalog = [data.group, ...modelCatalog.filter((group) => group.id !== data.group.id)];
 		modelSettings = { providers: { ...modelSettings?.providers, chatgpt: {
 			base_url: '', api_key_set: false, api_key_hint: null, models,
 			enabled_models: data.enabled_models
@@ -151,7 +153,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	async function chatgptDraft(request: { draft?: ChatGPTDraft['draft'] | null; edit?: ChatGPTDraftEdit | null;
 		assessment_drafts?: Record<string, ModelOption> }): Promise<ChatGPTDraft> {
 		if (!chatgptPublication) throw new Error('chatgpt_not_connected');
-		const { service: _service, ...publication } = chatgptPublication;
+		const { service: _service, group: _group, state: _state, ...publication } = chatgptPublication;
 		const response = await deps.apiFetch('/api/me/chatgpt/models/draft', {
 			method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ publication, draft: request.draft ?? null, edit: request.edit ?? null,
@@ -455,7 +457,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 					draft: {
 						selected: Object.fromEntries(chatgptPublication.models.map((model) => [model.id, selected[model.id] === true])),
 						purposes: Object.fromEntries(chatgptPublication.models.map((model) => [model.id,
-							draftModels.find((draft) => draft.id === model.id)?.purposes ?? model.purposes ?? ['llm', 'vision']]))
+							draftModels.find((draft) => draft.id === model.id)?.purposes ?? model.purposes]))
 					},
 					assessment_drafts: Object.fromEntries(draftModels.map((model) => [model.id, model]))
 				});
@@ -527,6 +529,8 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		get modelFetchResults() {
 			return deps.currentUser()?.id === boundOwner ? Object.fromEntries(Object.entries(modelFetchResults).filter(([id]) => visibleProvider(id))) : {};
 		},
+		// The registration's state, as the Server answered with the publication.
+		get chatgptState() { return deps.currentUser()?.id === boundOwner ? chatgptPublication?.state ?? null : null; },
 		get modelSettingsLoading() { return deps.currentUser()?.id === boundOwner && modelSettingsLoading; },
 		get modelCatalog() { return deps.currentUser()?.id === boundOwner ? modelCatalog.filter((provider) => visibleProvider(provider.id)) : []; },
 		updateModelProvider,

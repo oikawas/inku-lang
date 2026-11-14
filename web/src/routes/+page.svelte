@@ -257,6 +257,8 @@
 	// password) is deliberately kept.
 	let singleUserMode = $state(false);
 	let chatgptPlanAvailable = $state(false);
+	// The subscriber's usage page, from the Server's sign-in services (the core's descriptor).
+	let chatgptUsageUrl = $state<string | null>(null);
 	let modelCatalogOwner = $state<string | undefined>();
 	let modelCatalogRequest = 0;
 	// The work whose guest list is open, if any. Sharing is offered only when
@@ -1110,7 +1112,7 @@
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; model_labels?: ModelLabel[]; settings: { model_settings?: UserModelSettings; model_defaults?: UserModelSettings } };
+			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; sign_in_services?: { id: string; usage_url: string }[]; model_labels?: ModelLabel[]; settings: { model_settings?: UserModelSettings; model_defaults?: UserModelSettings } };
 			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
 			const groups = [data.catalog, data.llm_catalog, data.drawing_catalog, data.vision_catalog].flatMap((catalog) => catalog ?? []);
 			const queries: ReferenceQuery[] = groups.flatMap((group) => group.models.flatMap((model): ReferenceQuery[] => [
@@ -1128,6 +1130,7 @@
 			await loadModelReferences(groups.flatMap((group) => group.models.map((model): ReferenceQuery => ({action: 'split_ref', ref: model.qualified_id ?? ''}))));
 			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
 			chatgptPlanAvailable = data.chatgpt_plan_available === true;
+			chatgptUsageUrl = data.sign_in_services?.find((service) => service.id === 'chatgpt')?.usage_url ?? null;
 			setModelLabelTable(data.model_labels);
 			modelCatalogOwner = userId;
 			availableModelCatalog = data.drawing_catalog ?? data.llm_catalog ?? data.catalog;
@@ -2863,6 +2866,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{/if}
 					<InputPanel
 						chatgptPlanSelected={(work.drawOptions.models.stage1 ?? '').startsWith('chatgpt:')}
+						{chatgptUsageUrl}
 						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.qualified_id === work.drawOptions.models.stage1))}
 						sketchMode={work.sketchMode}
 						wild={work.drawOptions.wild === 'on'}
@@ -2981,6 +2985,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						busy={work.pipelineBusy}
 						reason={pipelineAttentionReason(work.pipelineView?.phase)}
 						providerFailure={work.pipelineView?.provider_failure ?? null}
+						usageUrl={chatgptUsageUrl}
 						completionIssues={holeCompletionIssues(work.pipelineView, t())}
 						onApprove={work.approvePipelinePatch}
 						onDecline={work.declinePipelinePatch}

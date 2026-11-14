@@ -26,6 +26,12 @@ export type ChatGPTViewInput = {
 	revocation_confirmed: boolean | null;
 };
 
+/** The core's sign-in deadline in the Server's /authorize answer, in milliseconds. */
+function deadlineMs(answer: { deadline_seconds?: unknown }): number {
+	if (typeof answer.deadline_seconds !== 'number' || !(answer.deadline_seconds > 0)) throw new Error('chatgpt_operation_failed');
+	return answer.deadline_seconds * 1000;
+}
+
 async function helperBrowser(): Promise<'brave' | 'chrome'> {
 	const brave = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { brave?: { isBrave: () => Promise<boolean> } }).brave;
 	if (brave && typeof brave.isBrave === 'function') {
@@ -186,6 +192,8 @@ export function createChatGPTSettings(deps: {
 			if (!current(owner, stamp)) return;
 			if (result.action === 'local_helper') {
 				if (result.helper_target !== undefined && result.helper_target !== 'container') throw new Error('chatgpt_operation_failed');
+				// How long to wait is the core's sign-in deadline, which the Server answers.
+				const wait = deadlineMs(result);
 				const identifier = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 				if (!identifier.test(owner)) throw new Error('chatgpt_owner_not_allowed');
 				const url = new URL('inku-chatgpt://connect');
@@ -200,7 +208,7 @@ export function createChatGPTSettings(deps: {
 				helperBefore = state;
 				code = 'chatgpt_helper_requested'; busy = false;
 				window.location.assign(url.href);
-				const deadline = Date.now() + 300_000;
+				const deadline = Date.now() + wait;
 				const watch = async () => {
 					if (!current(owner, stamp) || !helperUrl || Date.now() >= deadline) return;
 					await recheck();
@@ -211,11 +219,12 @@ export function createChatGPTSettings(deps: {
 			}
 			// A sign-in again carries the kept id token as `id_token_hint` (OpenAI's advice, the
 			// author 2026-11-14); the URL is opened, never logged or stored.
+			// The URL is opened only at the core's authorization endpoint, which the Server answers.
 			const url = new URL(result.authorization_url);
-			if (url.origin !== 'https://auth.openai.com' || url.pathname !== '/api/accounts/authorize') throw new Error('chatgpt_operation_failed');
+			if (typeof result.authorization_endpoint !== 'string' || url.origin + url.pathname !== result.authorization_endpoint) throw new Error('chatgpt_operation_failed');
 			authorizationUrl = url.href; attemptId = result.attempt_id;
 			window.open(url.href, '_blank', 'noopener,noreferrer');
-			timer = setTimeout(() => void poll(owner, stamp, Date.now() + 300_000), 1000);
+			timer = setTimeout(() => void poll(owner, stamp, Date.now() + deadlineMs(result)), 1000);
 		} catch (error) { if (current(owner, stamp)) { code = error instanceof Error ? error.message : 'chatgpt_operation_failed'; busy = false; } }
 	}
 

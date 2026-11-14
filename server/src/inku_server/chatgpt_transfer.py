@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import math
 import os
 import time
 import uuid
@@ -14,9 +13,10 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-from .chatgpt_auth import ISSUER, validate_identity
+from .chatgpt_auth import validate_identity
 from .chatgpt_runtime import check_owner
 from .chatgpt_store import ChatGPTError, CredentialStore, b64, canonical, unb64
+from .verified_model_catalog import sign_in
 
 PUBLIC_FIELDS = {"version", "request_id", "owner_id", "owner_label", "host_id", "recipient_key", "expires_at"}
 ENVELOPE_FIELDS = {"version", "request_id", "owner_id", "host_id", "ephemeral_key", "nonce", "ciphertext"}
@@ -120,49 +120,25 @@ async def import_profile(envelope: dict) -> dict:
             private = X25519PrivateKey.from_private_bytes(unb64(entry["private"]))
             profile = json.loads(AESGCM(_key(private, envelope["ephemeral_key"], request_id)).decrypt(
                 unb64(envelope["nonce"]), unb64(envelope["ciphertext"]), _aad(envelope)))
-            if uuid.UUID(profile["id"]).version != 4 or profile["issuer"] != ISSUER:
-                raise ValueError
-            if any(not isinstance(profile.get(key), str) or not 0 < len(profile[key]) <= 65536
-                   for key in ("client_id", "sub", "oidc_nonce", "access_token", "refresh_token", "id_token")):
-                raise ValueError
-            if profile["client_id"] == "dynamic_agent_client" or profile.get("state") != "connected" or profile.get("refresh_owner") != "runtime":
-                raise ValueError
-            if not isinstance(profile["scopes"], list) or len(profile["scopes"]) > 32 or any(not isinstance(scope, str) or len(scope) > 256 for scope in profile["scopes"]):
-                raise ValueError
-            if any(not math.isfinite(float(profile[key])) for key in ("expires_at", "earliest_refresh_at")):
-                raise ValueError
-            if profile["id"] not in value["profiles"] and len(value["profiles"]) >= 8:
-                raise ChatGPTError("chatgpt_profile_limit")
+            # The registration's form and the room for a new one are the core's (step 6).
+            checked = sign_in("transfer_check", profile=profile, profiles=value["profiles"])
+            if "error" in checked:
+                raise ChatGPTError(checked["error"])
             def check():
                 check_owner(owner, cli=True)
                 validate_request(request)
             # The identity check is the core's `identity` procedure (discovery, keys, signature, claims).
             claims = await validate_identity(profile["id_token"], profile["client_id"], profile["oidc_nonce"], check, deadline)
-            if claims["sub"] != profile["sub"]:
-                raise ValueError
-            # The id token kept for the next sign-in's id_token_hint (OpenAI's advice) stays when it came.
-            retained = profile.get("retained_id_token")
-            profile = {key: profile[key] for key in ("id", "issuer", "sub", "client_id", "oidc_nonce", "access_token", "refresh_token", "id_token", "scopes", "expires_at", "earliest_refresh_at")}
-            if isinstance(retained, str) and 0 < len(retained) <= 65536:
-                profile["retained_id_token"] = retained
-            profile["email"] = str(claims.get("email", ""))[:254]
-            profile["label"] = str(claims.get("email", "ChatGPT"))[:254] + " / " + profile["client_id"][-8:]
             with store.lock("edit:" + owner, deadline, check):
                 check()
-                value = store.read(owner)
-                old = value["profiles"].get(profile["id"])
-                if old and any(old[key] != profile[key] for key in ("issuer", "sub", "client_id")):
-                    raise ChatGPTError("chatgpt_identity_mismatch")
-                profile.update(state="connected", refresh_owner="runtime", generation=(old or {}).get("generation", 0) + 1)
-                # Publication is owned by the receiving installation, not the envelope.
-                profile["published_models"] = (old or {}).get("published_models", [])
-                profile["model_purposes"] = (old or {}).get("model_purposes", {})
-                profile["model_metadata"] = (old or {}).get("model_metadata", {})
-                profile.pop("catalog", None)
-                result = {"version": 1, "status": "imported", "owner_id": owner, "profile_id": profile["id"],
+                # How it joins the store (its kept fields, label, generation and the
+                # publication of the registration it replaces) is the core's.
+                imported = sign_in("transfer_import", profile=profile, claims=claims, value=store.read(owner))
+                if "error" in imported:
+                    raise ChatGPTError(imported["error"])
+                value = imported["value"]
+                result = {"version": 1, "status": "imported", "owner_id": owner, "profile_id": imported["profile_id"],
                           "host_id": host_id, "request_id": request_id, "replayed": False}
-                value["profiles"][profile["id"]] = profile
-                value["active"] = profile["id"]
                 value["requests"].pop(request_id)
                 value["receipts"][request_id] = {"digest": digest, "result": result}
                 if len(value["receipts"]) > 100:

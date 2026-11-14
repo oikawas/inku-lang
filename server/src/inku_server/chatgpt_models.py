@@ -13,12 +13,7 @@ import time
 
 from .chatgpt_runtime import check_session
 from .chatgpt_store import ChatGPTError, CredentialStore
-from .verified_model_catalog import core_catalog
-
-
-def purposes_for_model(profile: dict, model: str) -> list[str]:
-    # Catalogs describe availability; personal purposes remain profile-local.
-    return core_catalog("chatgpt_usable", profile=profile, model=model, assessment={})["purposes"]
+from .verified_model_catalog import sign_in
 
 
 def shared_assessments() -> dict[str, dict]:
@@ -28,13 +23,13 @@ def shared_assessments() -> dict[str, dict]:
     return chatgpt_assessments(db.get_model_settings())
 
 
-def usable_purposes(profile: dict, model: str, assessment: dict) -> list[str]:
-    # A purpose the model was measured not to answer is not offered, whatever was ticked.
-    return core_catalog("chatgpt_usable", profile=profile, model=model, assessment=assessment)["purposes"]
+def offered(models: list[dict], model: str, purpose: str) -> bool:
+    """Whether a published model may be used for a purpose: the core's answer."""
+    return sign_in("offered", models=models, model=model, purpose=purpose)["offered"]
 
 
 def publication(profile: dict, models: list[dict] | None = None) -> dict:
-    return core_catalog("chatgpt_publication", profile=profile, models=models,
+    return sign_in("publication", profile=profile, models=models,
                         assessments=shared_assessments())["publication"]
 
 
@@ -43,7 +38,7 @@ def saved_publication(owner: str, profile_id: str, generation: int) -> dict:
     store = CredentialStore()
     with store.lock("edit:" + owner, time.monotonic() + 5):
         profile = check_session(owner, profile_id, generation)
-        result = core_catalog("chatgpt_auth_publication_active", active=store.read(owner)["active"], profile_id=profile_id)
+        result = sign_in("auth_publication_active", active=store.read(owner)["active"], profile_id=profile_id)
         if "error" in result:
             raise ChatGPTError(result["error"])
         return publication(profile)
@@ -51,7 +46,7 @@ def saved_publication(owner: str, profile_id: str, generation: int) -> dict:
 
 def save_publication(owner: str, profile_id: str, generation: int, selected: list[str] | None,
                      model_purposes: dict[str, list[str]] | None = None) -> dict:
-    checked = core_catalog("chatgpt_auth_publication_input", profile_id=profile_id, generation=generation,
+    checked = sign_in("auth_publication_input", profile_id=profile_id, generation=generation,
                            selected=selected, model_purposes=model_purposes)
     if "error" in checked:
         raise ChatGPTError(checked["error"])
@@ -59,15 +54,15 @@ def save_publication(owner: str, profile_id: str, generation: int, selected: lis
     with store.lock("edit:" + owner, time.monotonic() + 5):
         profile = check_session(owner, profile_id, generation)
         saved = store.read(owner)
-        result = core_catalog("chatgpt_auth_publication_active", active=saved["active"], profile_id=profile_id)
+        result = sign_in("auth_publication_active", active=saved["active"], profile_id=profile_id)
         if "error" in result:
             raise ChatGPTError(result["error"])
-        result = core_catalog("chatgpt_publication_update", profile=profile, selected=selected,
+        result = sign_in("publication_update", profile=profile, selected=selected,
                               model_purposes=model_purposes, assessments={})
         if "error" in result:
             raise ChatGPTError(result["error"])
         if selected is not None:
-            result = core_catalog("chatgpt_publication_update", profile=profile, selected=selected,
+            result = sign_in("publication_update", profile=profile, selected=selected,
                                   model_purposes=model_purposes, assessments=shared_assessments())
             if "error" in result:
                 raise ChatGPTError(result["error"])

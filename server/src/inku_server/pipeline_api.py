@@ -1405,7 +1405,9 @@ def _host_error_status(code: str) -> int:
     if code == "image_model_not_vision":
         return 403
     if code.startswith("chatgpt_"):
-        return 503 if code in {"chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_refresh_not_ready"} else 403
+        # A failure the shared core holds temporary is 503; any other is 403.
+        from .provider_wire import chatgpt_failure
+        return 503 if chatgpt_failure(code, False)["failure"] == "transport_unavailable" else 403
     if code == "model_not_offered":
         return 403
     # A saved record the retired Saijiki (v1) wrote is refused until the one-time

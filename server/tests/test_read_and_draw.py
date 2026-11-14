@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from inku_server import db
+from inku_server.verified_model_catalog import sign_in
 from inku_server.persistence.schema import Base, UserAccountRow
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_api import PipelineService, pipeline_router, register_pipeline_errors
@@ -661,7 +662,7 @@ def test_a_child_keeps_its_parents_composition(host, composed):
 
 def test_the_composition_is_sent_with_the_limit_and_recorded_as_read_and_draw(host, monkeypatch):
     _, _, effects, _ = host
-    from inku_server import chatgpt_provider, pipeline_product, provider_wire
+    from inku_server import pipeline_product, provider_wire
     from inku_server.pipeline_candidate import _ACTION_STAGES
     from inku_server.pipeline_provider import provider_stage_record
     limits = []
@@ -680,5 +681,5 @@ def test_the_composition_is_sent_with_the_limit_and_recorded_as_read_and_draw(ho
     assert provider_stage_record("compose_description") == "read_and_draw"
     assert _ACTION_STAGES["compose_description"] == "read_and_draw"
     assert "compose_description" in provider_wire.READ_AND_DRAW_EFFECTS
-    assert "compose_description" in chatgpt_provider.EFFECTS
+    assert "compose_description" in sign_in("auth_constants")["effects"]
     assert "compose_description" not in provider_wire.IMAGE_EFFECTS

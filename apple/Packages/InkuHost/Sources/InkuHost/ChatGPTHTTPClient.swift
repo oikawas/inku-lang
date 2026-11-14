@@ -8,13 +8,15 @@ public struct ChatGPTHTTPResponse: Sendable {
 }
 
 /// Injectable for offline checks. The concrete client accepts only fixed OpenAI hosts and no redirects.
+/// `maximumBytes` bounds a 2xx answer and `errorBytes` any other; both are the core's limits for that request.
 public protocol ChatGPTHTTPClient: Sendable {
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int,
+              onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse
 }
 
 /// Additive response observation. Existing authentication clients remain compatible.
 protocol ObservedChatGPTHTTPClient: ChatGPTHTTPClient {
-    func sendObserved(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+    func sendObserved(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
                       onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse
 }
 
@@ -27,17 +29,17 @@ public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable 
         configuration.urlCache = nil; configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: configuration, delegate: ChatGPTRedirectPolicy(), delegateQueue: nil)
     }
-    public func send(_ request: URLRequest, maximumBytes: Int,
+    public func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int,
                      onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
-        try await read(request, maximumBytes: maximumBytes, onBytes: onBytes, observed: false, onResponse: { _ in })
+        try await read(request, maximumBytes: maximumBytes, errorBytes: errorBytes, onBytes: onBytes, observed: false, onResponse: { _ in })
     }
-    func sendObserved(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+    func sendObserved(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
                       onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse {
-        try await read(request, maximumBytes: maximumBytes, onBytes: onBytes, observed: true, onResponse: onResponse)
+        try await read(request, maximumBytes: maximumBytes, errorBytes: errorBytes, onBytes: onBytes, observed: true, onResponse: onResponse)
     }
-    private func read(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+    private func read(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
                       observed: Bool, onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse {
-        guard let url = request.url, maximumBytes > 0 else { throw HostError("chatgpt_endpoint_invalid") }
+        guard let url = request.url, maximumBytes > 0, errorBytes > 0 else { throw HostError("chatgpt_endpoint_invalid") }
         try ChatGPTEndpoints.validate(url)
         var data = Data(), status: Int?, complete = false, truncated = false
         defer { onResponse(ProviderHTTPRead(status: status, data: data, sent: true, complete: complete, truncated: truncated)) }
@@ -47,7 +49,7 @@ public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable 
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else { throw ChatGPTWire.transport(.unavailable) }
         status = response.statusCode
-        let maximum = (200...299).contains(response.statusCode) ? maximumBytes : min(maximumBytes, 65_536)
+        let maximum = (200...299).contains(response.statusCode) ? maximumBytes : errorBytes
         if !observed, response.expectedContentLength > Int64(maximum) { truncated = true; throw ChatGPTWire.transport(.tooLarge) }
         for try await byte in bytes {
             try Task.checkCancellation()
@@ -61,18 +63,20 @@ public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable 
     }
 }
 
+/// The host's own guard on where anything is sent, kept beside the core's answer (the author's choice, step 6):
+/// sign-in addresses go to the core's `sign_in_auth_endpoint`; requests only to these two API paths.
 enum ChatGPTEndpoints {
-    private static let constants = try! ChatGPTPolicy.call("chatgpt_auth_constants")
-    static let issuer = try! constants.requiredString("issuer")
-    static let resource = try! constants.requiredString("resource")
+    static let authenticationHost = "auth.openai.com"
+    static let apiHost = "api.openai.com"
+    static let apiPaths = ["/v1/models", "/v1/responses"]
     static func validate(_ url: URL, authenticationOnly: Bool = false) throws {
-        if authenticationOnly || url.host == "auth.openai.com" {
-            _ = try ChatGPTPolicy.call("chatgpt_auth_endpoint", ["url": .string(url.absoluteString)])
+        if authenticationOnly || url.host == authenticationHost {
+            _ = try ChatGPTPolicy.call("sign_in_auth_endpoint", ["url": .string(url.absoluteString)])
             return
         }
         guard let value = URLComponents(url: url, resolvingAgainstBaseURL: false), value.scheme == "https",
               value.user == nil, value.password == nil, value.port == nil, value.fragment == nil,
-              value.host == "api.openai.com", ["/v1/models", "/v1/responses"].contains(value.path), value.query == nil
+              value.host == apiHost, apiPaths.contains(value.path), value.query == nil
         else { throw HostError("chatgpt_endpoint_invalid") }
     }
 }

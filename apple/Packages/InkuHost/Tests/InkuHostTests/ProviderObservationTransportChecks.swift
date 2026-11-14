@@ -267,13 +267,14 @@ private actor ObservationSSEHTTP: ObservedChatGPTHTTPClient {
     let partial: Bool
     private(set) var calls = 0
     init(recordURL: URL, partial: Bool) { self.recordURL = recordURL; self.partial = partial }
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
-        try await sendObserved(request, maximumBytes: maximumBytes, onBytes: onBytes, onResponse: { _ in })
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+        try await sendObserved(request, maximumBytes: maximumBytes, errorBytes: errorBytes, onBytes: onBytes, onResponse: { _ in })
     }
-    func sendObserved(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+    func sendObserved(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
                       onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse {
         calls += 1
-        guard request.url == URL(string: ChatGPTEndpoints.resource + "/responses") else { throw HostError("fixture_unexpected_auth_or_discovery_http") }
+        let resource = try ChatGPTPolicy.call("sign_in_auth_constants").requiredString("resource")
+        guard request.url == URL(string: resource + "/responses") else { throw HostError("fixture_unexpected_auth_or_discovery_http") }
         let durable = try JSONDecoder().decode(ProviderAttemptObservation.self, from: Data(contentsOf: recordURL))
         guard durable.metric.outcome == .requestSaved, durable.raw?.requestBody != nil else { throw HostError("fixture_missing_durable_request") }
         let body = try ExactJSON(data: request.httpBody!)

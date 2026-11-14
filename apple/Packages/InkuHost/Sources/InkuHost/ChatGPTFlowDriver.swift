@@ -1,6 +1,6 @@
 import Foundation
 
-/// Sign in with ChatGPT step 5: the core answers each procedure (`chatgpt_flow_start`, `chatgpt_flow_next`) as one
+/// Sign in with ChatGPT step 5: the core answers each procedure (`sign_in_flow_start`, `sign_in_flow_next`) as one
 /// thing to do next. The runtime does it — a lock, the vault, random bytes, the callback socket, an HTTP request, a
 /// signature, a local offset — and hands the result back, until the core says `done` or `failed`.
 struct ChatGPTFlowContext: Sendable {
@@ -17,7 +17,7 @@ struct ChatGPTFlowContext: Sendable {
 
 extension ChatGPTPlanRuntime {
     static func flowStart(_ flow: String, input: [String: ExactJSON]) throws -> ExactJSON {
-        try ChatGPTPolicy.call("chatgpt_flow_start", ["flow": .string(flow), "input": .object(input), "now": ChatGPTPolicy.number(Date().timeIntervalSince1970)])
+        try ChatGPTPolicy.call("sign_in_flow_start", ["flow": .string(flow), "input": .object(input), "now": ChatGPTPolicy.number(Date().timeIntervalSince1970)])
     }
 
     /// Answers each todo until `done` (returned) or `failed` (thrown), or until a todo named `stop` (its answer is
@@ -34,7 +34,7 @@ extension ChatGPTPlanRuntime {
                 }
                 try await context.check()
                 let result = try await perform(todo, &context)
-                answer = try ChatGPTPolicy.call("chatgpt_flow_next", ["state": answer["state"], "result": result,
+                answer = try ChatGPTPolicy.call("sign_in_flow_next", ["state": answer["state"], "result": result,
                     "now": ChatGPTPolicy.number(Date().timeIntervalSince1970)])
             }
         } catch {
@@ -114,11 +114,17 @@ extension ChatGPTPlanRuntime {
         request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
         for (name, value) in todo["headers"].object ?? [:] { request.setValue(value.string, forHTTPHeaderField: name) }
         if let body = todo["body"].string { request.httpBody = Data(body.utf8) }
-        let limit = todo["answer_limit"].number.flatMap(Double.init).map { Int($0) } ?? 1_048_576
+        // The core gives both limits with every request; one without them is not sent.
+        func limit(_ name: String) throws -> Int {
+            guard let value = todo[name].number.flatMap(Double.init), value.isFinite, value >= 1, value <= Double(Int.max)
+            else { throw HostError("chatgpt_flow_invalid") }
+            return Int(value)
+        }
+        let answerLimit = try limit("answer_limit"), errorLimit = try limit("error_limit")
         let bounded = request
         do {
             let response = try await guarded(deadline: deadline, check: check) {
-                try await self.http.send(bounded, maximumBytes: limit, onBytes: { _ in })
+                try await self.http.send(bounded, maximumBytes: answerLimit, errorBytes: errorLimit, onBytes: { _ in })
             }
             var result: [String: ExactJSON] = ["status": .integer(response.status), "body": .string(String(decoding: response.data, as: UTF8.self))]
             if let id = response.requestID { result["request_id"] = .string(id) }

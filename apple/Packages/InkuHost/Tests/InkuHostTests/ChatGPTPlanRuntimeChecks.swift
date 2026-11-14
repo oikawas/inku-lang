@@ -473,7 +473,7 @@ private final class RuntimeKeyStore: ChatGPTVaultKeyStore, @unchecked Sendable {
 }
 
 private actor SuccessfulRevocationHTTP: ChatGPTHTTPClient {
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         if request.url?.path == "/.well-known/openid-configuration" {
             return .init(status: 200, data: Data(#"{"issuer":"https://auth.openai.com","jwks_uri":"https://auth.openai.com/jwks","revocation_endpoint":"https://auth.openai.com/api/accounts/oauth/revoke"}"#.utf8))
         }
@@ -488,7 +488,7 @@ private actor BlockingRevocationHTTP: ChatGPTHTTPClient {
     private var gate: CheckedContinuation<Void, Never>?
     func waitForDiscovery() async { if !entered { await withCheckedContinuation { waiters.append($0) } } }
     func resume() { gate?.resume(); gate = nil }
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         entered = true
         let pending = waiters; waiters = []; pending.forEach { $0.resume() }
         await withCheckedContinuation { gate = $0 }
@@ -508,7 +508,7 @@ private actor RuntimeHTTP: ChatGPTHTTPClient {
     func responseCount() -> Int { responses }
     func requestCount() -> Int { requests }
     func lastResponseRequest() -> URLRequest? { responseRequest }
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         requests += 1
         switch request.url!.path {
         case "/api/accounts/oauth/token":
@@ -538,7 +538,7 @@ private actor VisionHTTP: ChatGPTHTTPClient {
     private var sent: [URLRequest] = []
     init(answer: String?) { self.answer = answer }
     func requests() -> [URLRequest] { sent }
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         guard request.url?.path == "/v1/responses" else { throw HostError("unexpected_fixture_route") }
         sent.append(request)
         func frame(_ value: ExactJSON) -> String { "data: " + value.text + "\n\n" }

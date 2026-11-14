@@ -14,9 +14,9 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
             let request = row["request"], expected = row["expect"]
             let name = row["why"].string ?? "chatgpt"
             let action = try request.requiredString("action")
-            // The 59 authentication/publication rows have their own policy check.
-            guard ["chatgpt_request", "chatgpt_vision_request", "chatgpt_stream", "chatgpt_error", "chatgpt_catalog", "chatgpt_failure",
-                   "chatgpt_models_request", "chatgpt_transport"].contains(action) else { continue }
+            // The 21 authentication/publication rows have their own policy check.
+            guard ["sign_in_request", "sign_in_vision_request", "sign_in_stream", "sign_in_error", "sign_in_failure",
+                   "sign_in_transport"].contains(action) else { continue }
             counts[action, default: 0] += 1
             // The core itself, field by field.
             let result = try ProviderWire.evaluate(input)
@@ -24,13 +24,13 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
             // The Swift receiver the runtime calls.
             let limit = request["answer_limit"].number.flatMap { Int($0) } ?? 0
             switch action {
-            case "chatgpt_request":
-                let effect = Data(("{\"payload\":{\"prompt\":" + String(decoding: try ExactJSON.rawMember("prompt", in: input), as: UTF8.self) + "}}").utf8)
-                let prepared = try ChatGPTPlanRuntime.request(action: effect, model: request.requiredString("model"), argumentLimit: limit)
+            case "sign_in_request":
+                let prompt = try ExactJSON.rawMember("prompt", in: input)
+                let prepared = try ChatGPTWire.request(model: request.requiredString("model"), prompt: prompt, answerLimit: limit)
                 if expected["body"] != .null { XCTAssertEqual(prepared.body, Data(try expected.requiredString("body").utf8), name) }
                 XCTAssertEqual(String(prepared.wireLimit), result["wire_limit"].number, name)
                 try checkEndpoint(prepared.endpoint, result, name)
-            case "chatgpt_vision_request":
+            case "sign_in_vision_request":
                 let images = request["images"].array?.compactMap(\.string) ?? []
                 let prepare = { try ChatGPTWire.visionRequest(model: request.requiredString("model"), system: request.requiredString("system"),
                                                               text: request.requiredString("text"), images: images, answerLimit: limit) }
@@ -41,7 +41,7 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
                     if expected["body"] != .null { XCTAssertEqual(prepared.body, Data(try expected.requiredString("body").utf8), name) }
                     try checkEndpoint(prepared.endpoint, result, name)
                 }
-            case "chatgpt_stream":
+            case "sign_in_stream":
                 let wire = try XCTUnwrap(Data(base64Encoded: request.requiredString("wire_base64")), name)
                 let stream = try ChatGPTWire.read(text: request["mode"].string == "text", answerLimit: limit, wire: wire)
                 XCTAssertEqual(stream.terminal ?? .null, expected["terminal"], name)
@@ -58,41 +58,22 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
                     XCTAssertEqual(failure.diagnostic.action, result["action"].string, name)
                 default: XCTFail(name + ": the Swift receiver answered differently")
                 }
-            case "chatgpt_error":
+            case "sign_in_error":
+                // The runtime hands the core the answer's text; a row given as a value is sent as that value's text.
                 let status = request["status"].number.flatMap { Int($0) }
-                let failure = try (request["body"].string.map {
-                    try ChatGPTWire.httpFailure(body: Data($0.utf8), status: status, requestID: request["request_id"].string)
-                } ?? ChatGPTWire.httpFailure(value: request["value"], status: status, requestID: request["request_id"].string)).diagnostic
+                let body = request["body"].string.map { Data($0.utf8) } ?? request["value"].data
+                let failure = try ChatGPTWire.httpFailure(body: body, status: status, requestID: request["request_id"].string).diagnostic
                 XCTAssertEqual(failure.code, expected["code"].string, name)
                 XCTAssertEqual(failure.pipelineFailure, expected["failure"].string, name)
                 XCTAssertEqual(failure.action, expected["action"].string, name)
                 XCTAssertEqual(failure.status.map { String($0) }, expected["status"].number, name)
                 XCTAssertEqual(failure.requestID, expected["request_id"].string, name)
                 XCTAssertEqual(failure.parameter, expected["param"].string, name)
-            case "chatgpt_catalog":
-                let read = { try request["body"].string.map { try ChatGPTWire.catalog(body: Data($0.utf8)) } ?? ChatGPTWire.catalog(request["value"]) }
-                guard expected["outcome"].string == "ok" else {
-                    XCTAssertThrowsError(try read(), name) { error in
-                        guard expected["outcome"].string == "malformed" else { return }
-                        let diagnostic = ChatGPTPlanRuntime.diagnostic(error)
-                        XCTAssertEqual(diagnostic.code, result["code"].string, name)
-                        XCTAssertEqual(diagnostic.pipelineFailure, result["failure"].string, name)
-                        XCTAssertEqual(diagnostic.action, result["action"].string, name)
-                    }
-                    continue
-                }
-                let models = try read()
-                XCTAssertEqual(models.map(\.id), expected["models"].array?.compactMap { $0["id"].string }, name)
-                XCTAssertEqual(models.map(\.label), expected["models"].array?.compactMap { $0["label"].string }, name)
-            case "chatgpt_failure":
+            case "sign_in_failure":
                 let diagnostic = ChatGPTPlanDiagnostic(code: try request.requiredString("code"), temporary: request["temporary"].bool)
                 XCTAssertEqual(diagnostic.pipelineFailure, expected["failure"].string, name)
                 XCTAssertEqual(diagnostic.action, expected["action"].string, name)
-            case "chatgpt_models_request":
-                let endpoint = try ChatGPTWire.modelsEndpoint()
-                try checkEndpoint(endpoint, result, name)
-                XCTAssertEqual(endpoint.answerLimit.map { String($0) }, result["answer_limit"].number, name)
-            case "chatgpt_transport":
+            case "sign_in_transport":
                 let kind = try XCTUnwrap(ChatGPTWire.Transport(rawValue: request.requiredString("kind")), name)
                 let diagnostic = ChatGPTWire.transport(kind).diagnostic
                 XCTAssertEqual(diagnostic.code, expected["code"].string, name)
@@ -101,9 +82,27 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
             default: XCTFail(name + ": unknown action")
             }
         }
-        XCTAssertEqual(counts, ["chatgpt_request": 9, "chatgpt_vision_request": 9, "chatgpt_stream": 59, "chatgpt_error": 11, "chatgpt_catalog": 8,
-                                "chatgpt_failure": 75, "chatgpt_models_request": 1, "chatgpt_transport": 3])
-        print("Shared ChatGPT rows checked: \(counts.values.reduce(0, +)) (requests=9, vision=9, streams=59, errors=11, catalogs=8, failures=75, models request=1, transport=3) through core and the Swift receivers; HTTP=0")
+        XCTAssertEqual(counts, ["sign_in_request": 9, "sign_in_vision_request": 9, "sign_in_stream": 59, "sign_in_error": 11,
+                                "sign_in_failure": 75, "sign_in_transport": 3])
+        print("Shared ChatGPT rows checked: \(counts.values.reduce(0, +)) (requests=9, vision=9, streams=59, errors=11, failures=75, transport=3) through core and the Swift receivers; HTTP=0")
+    }
+
+    /// Step 6: the host's own guard on where anything is sent (kept by the author's choice) names the same places as
+    /// the core's descriptor — the sign-in issuer's host and the resource's host and paths.
+    func testHostSendGuardAgreesWithTheCoreDescriptor() throws {
+        let constants = try ChatGPTPolicy.call("sign_in_auth_constants")
+        let issuer = try XCTUnwrap(URL(string: try constants.requiredString("issuer")))
+        let resource = try XCTUnwrap(URL(string: try constants.requiredString("resource")))
+        XCTAssertEqual(issuer.host, ChatGPTEndpoints.authenticationHost)
+        XCTAssertEqual(resource.host, ChatGPTEndpoints.apiHost)
+        XCTAssertEqual(Set(ChatGPTEndpoints.apiPaths), [resource.path + "/models", resource.path + "/responses"])
+        for suffix in ["/models", "/responses"] {
+            XCTAssertNoThrow(try ChatGPTEndpoints.validate(try XCTUnwrap(URL(string: resource.absoluteString + suffix))), suffix)
+        }
+        // Every sign-in address goes to the core, which accepts the issuer's own.
+        for name in ["token", "authorize"] {
+            XCTAssertNoThrow(try ChatGPTEndpoints.validate(try XCTUnwrap(URL(string: try constants.requiredString(name))), authenticationOnly: true), name)
+        }
     }
 
     /// Step 4: the request Swift sends goes where the core says, with its headers and token.

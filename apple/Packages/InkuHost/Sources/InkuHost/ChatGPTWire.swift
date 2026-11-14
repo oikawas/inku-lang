@@ -2,9 +2,16 @@ import Foundation
 import OSLog
 
 /// The plan's wire rules live in the shared core (provider_wire): the request bodies, the reading of the whole
-/// SSE stream, what an HTTP failure says and the model list. The host receives the stream whole, holding it to
-/// `wireLimit`; the token, cancellation, the quota pause and the observation record stay with the runtime.
+/// SSE stream and what an HTTP failure says. The host receives the stream whole, holding it to `wireLimit`; the
+/// token, cancellation, the quota pause and the observation record stay with the runtime.
 enum ChatGPTWire {
+    /// The core's sign-in names (`sign_in_<name>` for the `chatgpt` service).
+    private static func evaluate(_ name: String, _ fields: [String: ExactJSON]) throws -> ExactJSON {
+        var input = fields
+        input["action"] = .string("sign_in_" + name); input["service"] = .string("chatgpt")
+        return try ProviderWire.evaluate(ExactJSON.object(input).data)
+    }
+
     struct Request: Sendable {
         let body: Data
         let wireLimit: Int
@@ -45,24 +52,17 @@ enum ChatGPTWire {
         }
     }
 
-    /// The model list's endpoint (core `chatgpt_models_request`).
-    static func modelsEndpoint() throws -> Endpoint {
-        let result = try ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_models_request")]).data)
-        guard result["outcome"].string == "ok" else { throw HostError("chatgpt_endpoint_invalid") }
-        return try Endpoint(result)
-    }
-
     enum Transport: String { case timeout, unavailable, tooLarge = "too_large" }
 
     /// A time limit, a failed or cut connection, or an answer past its limit, classified by the core
-    /// (`chatgpt_transport`) with its code, pipeline failure and next action.
+    /// (`sign_in_transport`) with its code, pipeline failure and next action.
     static func transport(_ kind: Transport) -> ChatGPTPlanFailure {
         let fallback: String = switch kind {
         case .timeout: "chatgpt_transport_timeout"
         case .unavailable: "chatgpt_transport_unavailable"
         case .tooLarge: "chatgpt_response_too_large"
         }
-        guard let result = try? ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_transport"), "kind": .string(kind.rawValue)]).data),
+        guard let result = try? evaluate("transport", ["kind": .string(kind.rawValue)]),
               result["outcome"].string == "ok" else { return ChatGPTPlanFailure(diagnostic: ChatGPTPlanDiagnostic(code: fallback)) }
         return failure(result)
     }
@@ -77,21 +77,22 @@ enum ChatGPTWire {
 
     /// `prompt` is the effect's original JSON, so the schema keeps its member order.
     static func request(model: String, prompt: Data, answerLimit: Int, images: [String] = []) throws -> Request {
-        let envelope: ExactJSON = .object(["action": .string("chatgpt_request"), "model": .string(model), "answer_limit": .integer(answerLimit)])
+        let envelope: ExactJSON = .object(["action": .string("sign_in_request"), "service": .string("chatgpt"), "model": .string(model),
+            "answer_limit": .integer(answerLimit)])
         let imageMember = images.isEmpty ? "" : ",\"images\":" + ExactJSON.array(images.map(ExactJSON.string)).text
         let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + imageMember + "}").utf8)
         return try prepared(ProviderWire.evaluate(input))
     }
 
     static func visionRequest(model: String, system: String, text: String, images: [String], answerLimit: Int) throws -> Request {
-        try prepared(ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_vision_request"), "model": .string(model),
+        try prepared(evaluate("vision_request", ["model": .string(model),
             "system": .string(system), "text": .string(text), "images": .array(images.map(ExactJSON.string)),
-            "answer_limit": .integer(answerLimit)]).data))
+            "answer_limit": .integer(answerLimit)]))
     }
 
     static func read(text: Bool, answerLimit: Int, wire: Data) throws -> Stream {
-        let result = try ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_stream"), "mode": .string(text ? "text" : "pipeline"),
-            "answer_limit": .integer(answerLimit), "wire_base64": .string(wire.base64EncodedString())]).data)
+        let result = try evaluate("stream", ["mode": .string(text ? "text" : "pipeline"),
+            "answer_limit": .integer(answerLimit), "wire_base64": .string(wire.base64EncodedString())])
         let terminal = result["terminal"] == .null ? nil : result["terminal"]
         switch result["outcome"].string {
         case "answer":
@@ -120,34 +121,13 @@ enum ChatGPTWire {
         try httpFailure(["body": .string(String(decoding: body, as: UTF8.self))], status: status, requestID: requestID)
     }
 
-    static func httpFailure(value: ExactJSON, status: Int?, requestID: String?) throws -> ChatGPTPlanFailure {
-        try httpFailure(["value": value], status: status, requestID: requestID)
-    }
-
     private static func httpFailure(_ answer: [String: ExactJSON], status: Int?, requestID: String?) throws -> ChatGPTPlanFailure {
         var input = answer
-        input["action"] = .string("chatgpt_error")
         input["status"] = status.map { .integer($0) } ?? .null
         input["request_id"] = requestID.map(ExactJSON.string) ?? .null
-        let result = try ProviderWire.evaluate(ExactJSON.object(input).data)
+        let result = try evaluate("error", input)
         guard result["outcome"].string == "failed" else { throw HostError("chatgpt_response_invalid") }
         return failure(result)
-    }
-
-    /// The model list as the backend answered it: the core reads the text (one that is not JSON is malformed).
-    static func catalog(body: Data) throws -> [ChatGPTPlanModel] {
-        try catalog(["action": .string("chatgpt_catalog"), "body": .string(String(decoding: body, as: UTF8.self))])
-    }
-
-    static func catalog(_ value: ExactJSON) throws -> [ChatGPTPlanModel] {
-        try catalog(["action": .string("chatgpt_catalog"), "value": value])
-    }
-
-    private static func catalog(_ input: [String: ExactJSON]) throws -> [ChatGPTPlanModel] {
-        let result = try ProviderWire.evaluate(ExactJSON.object(input).data)
-        if result["outcome"].string == "malformed" { throw failure(result) }
-        guard result["outcome"].string == "ok", let models = result["models"].array else { throw HostError("chatgpt_response_invalid") }
-        return try models.map { ChatGPTPlanModel(id: try $0.requiredString("id"), label: try $0.requiredString("label")) }
     }
 
     fileprivate static func int(_ value: ExactJSON) -> Int? { value.number.flatMap { Int($0) } }
@@ -161,9 +141,9 @@ enum ChatGPTWire {
     /// The next action and whether the pipeline may retry, from the core's one failure table. A table the core
     /// cannot answer leaves the failure rejected, for the user to diagnose.
     static func classify(code: String, temporary: Bool?) -> (failure: String, action: String) {
-        var input: ExactJSON = .object(["action": .string("chatgpt_failure"), "code": .string(code)])
+        var input: [String: ExactJSON] = ["code": .string(code)]
         if let temporary { input["temporary"] = .bool(temporary) }
-        guard let result = try? ProviderWire.evaluate(input.data), result["outcome"].string == "ok",
+        guard let result = try? evaluate("failure", input), result["outcome"].string == "ok",
               let failure = result["failure"].string, let action = result["action"].string else { return ("provider_rejected", "diagnose") }
         return (failure, action)
     }

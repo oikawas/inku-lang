@@ -118,7 +118,7 @@ private actor ReauthHTTP: ChatGPTHTTPClient {
     private(set) var modelCalls = 0
     init(failure: Failure) throws { self.failure = failure; key = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0, count: 31) + Data([1])) }
     func setNonce(_ value: String) { nonce = value }
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         switch request.url?.path {
         case "/api/accounts/oauth/token":
             if failure == .login { return .init(status: 500, data: Data(#"{"error":"fixture"}"#.utf8)) }

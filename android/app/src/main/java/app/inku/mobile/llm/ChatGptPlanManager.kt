@@ -3,7 +3,6 @@ package app.inku.mobile.llm
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketTimeoutException
-import java.nio.charset.CharacterCodingException
 import java.util.UUID
 import android.util.Log
 import app.inku.mobile.data.catalogRequest
@@ -23,7 +22,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
-import org.json.JSONException
 import org.json.JSONObject
 
 /** How often the session and publication are checked again while an answer streams. */
@@ -351,11 +349,15 @@ class ChatGptPlanManager internal constructor(
         }
         catch (error: Exception) {
             if (logFailure) logFailure(DiagnosticTrace().apply { enter("catalog") }, error)
-            val safe = error as? ChatGptException ?: ChatGptException("chatgpt_transport_unavailable")
+            val safe = error as? ChatGptException ?: chatGptTransportFailure(error)
             invalidateForFailure(ref, safe.code)
             reportFailure(ref, safe.code); throw safe
         }
     }
+
+    /** A connection's own failure as the core names it: a timeout, else unavailable (any other I/O or unknown failure). */
+    private fun chatGptTransportFailure(error: Exception): ChatGptException =
+        chatGptTransport(if (error is SocketTimeoutException) "timeout" else "unavailable")
 
     /** 「接続状態を確認」: reads the saved registrations again and clears the last failure (Web `load`). */
     fun reload() = updateView()
@@ -394,13 +396,15 @@ class ChatGptPlanManager internal constructor(
             .put("force", force).put("now", now() / 1000.0))
         val entries = if (cachePolicy.getBoolean("fresh") && cache != null) cache.getJSONArray("models") else {
             val token = accessToken(ref)
-            val response = http.request("$CHATGPT_RESOURCE/models", token = token, check = { checkSession(ref); Unit })
-            val json = JSONObject(response.body)
-            if (response.status !in 200..299) throw chatGptResponseError(json, response.status)
-            // The shared core reads which models are listed (provider_wire): it
-            // drops an empty, overlong or repeated row rather than the whole list.
-            val listed = SharedProviderWire.call(JSONObject().put("action", "chatgpt_catalog").put("value", json))
-            if (listed.getString("outcome") != "ok") throw JSONException("chatgpt model list is malformed")
+            // Where, with which headers and bounds: the core's (`chatgpt_models_request`).
+            val send = chatGptModelsSend()
+            val response = http.request(send.url, send.method, token, check = { checkSession(ref); Unit }, send = send)
+            if (response.status !in 200..299) throw chatGptHttpError(response)
+            // The shared core reads the body and which models are listed (provider_wire):
+            // it drops an empty, overlong or repeated row rather than the whole list,
+            // and names a list it cannot read.
+            val listed = SharedProviderWire.call(JSONObject().put("action", "chatgpt_catalog").put("body", response.body))
+            if (listed.getString("outcome") != "ok") throw chatGptFailure(listed)
             val raw = listed.getJSONArray("models")
             val models = (0 until raw.length()).map { raw.getJSONObject(it) }
                 .map { ChatGptModel(it.getString("id"), it.getString("label")) }
@@ -477,9 +481,10 @@ class ChatGptPlanManager internal constructor(
                 // Refinement advice reads Server's Vision text stream; drawing
                 // effects still require their completed namespace function.
                 val stream = ChatGptStream(built, request.onReceivedBytes)
-                val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, built.body, timeoutMs = request.timeoutMs ?: 60_000,
-                    check = ::streamCheck, onChunk = stream::feed)
-                if (response.status !in 200..299) throw chatGptResponseError(runCatching { JSONObject(response.body) }.getOrDefault(JSONObject()), response.status)
+                // Where, with which headers and bounds: the core's answer for this body.
+                val response = http.request(built.send.url, built.send.method, token, built.body, timeoutMs = request.timeoutMs ?: 60_000,
+                    check = ::streamCheck, onChunk = stream::feed, send = built.send)
+                if (response.status !in 200..299) throw chatGptHttpError(response)
                 val text = stream.finish(); check()
                 ModelResponse(text, request.modelId, stream.usage?.optInt("input_tokens")?.takeIf { it > 0 },
                     stream.usage?.optInt("output_tokens")?.takeIf { it > 0 }, (System.nanoTime() - started) / 1_000_000)
@@ -490,16 +495,10 @@ class ChatGptPlanManager internal constructor(
             // throws an IOException rather than the cancellation. Reported, it
             // showed a red "could not complete" beside 「停止しました」.
             if (!currentCoroutineContext().isActive) throw CancellationException("stopped").apply { initCause(error) }
-            // Public codes only, but the class the server gives the cause:
-            // a read timeout, an answer that is not JSON, and bytes that are
-            // not UTF-8 are not the same failure as a dropped connection.
-            val safe = when (error) {
-                is ChatGptException -> error
-                is SocketTimeoutException -> ChatGptException("chatgpt_transport_unavailable", "transport_timeout")
-                is JSONException -> ChatGptException("chatgpt_response_invalid", "malformed_payload")
-                is CharacterCodingException -> ChatGptException("chatgpt_response_invalid", "provider_rejected")
-                else -> ChatGptException("chatgpt_transport_unavailable")
-            }
+            // Public codes only. The core names what the answer was (an error
+            // body, a stream it could not read); the connection's own failure is
+            // its `chatgpt_transport`: a timeout is not a dropped connection.
+            val safe = error as? ChatGptException ?: chatGptTransportFailure(error)
             invalidateForFailure(ref, safe.code)
             reportFailure(ref, safe.code)
             throw safe

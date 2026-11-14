@@ -31,9 +31,12 @@ class ChatGptPlanBoundaryTest {
         /** Streamed instead of a 200 body's UTF-8, for bytes no String holds. */
         var streamBytes: ByteArray? = null
         var handler: (String, String?, String?) -> ChatGptHttpResponse = { _, _, _ -> error("Unexpected request") }
+        /** What the core said for each request sent through [ChatGptSend] (none for sign-in). */
+        val sends = java.util.Collections.synchronizedList(mutableListOf<ChatGptSend>())
         override suspend fun request(url: String, method: String, token: String?, body: String?, formBody: Boolean,
-                                     timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?): ChatGptHttpResponse {
-            check(); calls.add(url)
+                                     timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?,
+                                     send: ChatGptSend?): ChatGptHttpResponse {
+            check(); calls.add(url); send?.let(sends::add)
             val result = handler(url, token, body)
             check()
             if (onChunk != null && result.status == 200) {
@@ -86,7 +89,8 @@ class ChatGptPlanBoundaryTest {
     private fun stream(mode: String = "pipeline"): ChatGptStream {
         val limit = if (mode == "text") 512 * 1024 else MAX_PROVIDER_RESPONSE_BYTES
         val wire = SharedProviderWire.call(JSONObject().put("action", "chatgpt_limits").put("answer_limit", limit)).getLong("wire_limit")
-        return ChatGptStream(ChatGptRequest("", mode, limit, wire))
+        // Only the stream is read here; where it would be sent does not matter.
+        return ChatGptStream(ChatGptRequest("", mode, limit, wire, chatGptModelsSend()))
     }
 
     private fun rejected(code: String, block: () -> Unit) {
@@ -416,6 +420,14 @@ class ChatGptPlanBoundaryTest {
             manager.publishModels(ref, listOf("personal-model"))
             val response = manager.generate(request(ref))
             assertEquals("赤い円。", JSONObject(response.text).getString("ddl")); assertEquals(12, response.completionTokens)
+            // Step 4: the core says where and how; the same URLs, headers and bounds as this client's constants before.
+            val models = http.sends.first { it.url.endsWith("/models") }
+            assertEquals(ChatGptSend("$CHATGPT_RESOURCE/models", "GET", mapOf("Accept" to "application/json"), "Authorization", "Bearer ",
+                1024 * 1024, 64 * 1024, "x-request-id"), models)
+            val responses = http.sends.first { it.url.endsWith("/responses") }
+            assertEquals(ChatGptSend("$CHATGPT_RESOURCE/responses", "POST",
+                mapOf("Accept" to "text/event-stream", "Content-Type" to "application/json"), "Authorization", "Bearer ",
+                1024 * 1024, 64 * 1024, "x-request-id"), responses)
             val calls = http.calls.size
             try { manager.generate(request(ref).copy(imageJpeg = byteArrayOf(1))); fail("Vision must not use this route") }
             catch (error: ChatGptException) { assertEquals("chatgpt_operation_not_supported", error.code) }
@@ -543,9 +555,28 @@ class ChatGptPlanBoundaryTest {
         // Arguments that are not JSON are malformed; JSON that is not an object is refused.
         assertEquals("malformed_payload", failureOf(generated({ completedStream("{") })))
         assertEquals("provider_rejected", failureOf(generated({ completedStream("[1]") })))
-        assertEquals("transport_timeout", failureOf(generated({ throw java.net.SocketTimeoutException("read timed out") })))
+        val timedOut = generated({ throw java.net.SocketTimeoutException("read timed out") }) as ChatGptException
+        assertEquals("transport_timeout", failureOf(timedOut))
+        // Step 4: the core's transport timeout, not an unavailable connection; it says to try again.
+        assertEquals("chatgpt_transport_timeout", timedOut.code); assertEquals("retry", timedOut.action)
+        val cut = generated({ throw java.io.IOException("connection reset") }) as ChatGptException
+        assertEquals("chatgpt_transport_unavailable", cut.code); assertEquals("transport_unavailable", cut.failure)
         val badUtf8 = completedStream().toByteArray().let { it.copyOf(40) + byteArrayOf(0xC3.toByte(), 0x28) + it.copyOfRange(40, it.size) }
-        assertEquals("provider_rejected", failureOf(generated({ completedStream() }, badUtf8)))
+        val unreadable = generated({ completedStream() }, badUtf8) as ChatGptException
+        assertEquals("provider_rejected", failureOf(unreadable))
+        assertEquals("chatgpt_response_invalid", unreadable.code); assertEquals("diagnose", unreadable.action)
+    }
+
+    /** Step 4: an error body goes to the core as it came, with the request's ID; one that is not JSON is as none. */
+    @Test
+    fun anHttpErrorBodyAndItsRequestIdGoToTheCore() {
+        val gateway = chatGptHttpError(ChatGptHttpResponse(502, "<html>Bad gateway</html>", "req_1"))
+        assertEquals("chatgpt_transport_unavailable", gateway.code); assertEquals("retry", gateway.action)
+        val limit = chatGptHttpError(ChatGptHttpResponse(429,
+            "{\"error\": {\"code\": \"subscription_sharing_usage_limit_exceeded\", \"param\": \"model\"}}", "req_123"))
+        assertEquals("subscription_sharing_usage_limit_exceeded", limit.code); assertEquals("usage", limit.action)
+        assertEquals("chatgpt_transport_timeout", chatGptTransport("timeout").code)
+        assertEquals("retry", ChatGptException("chatgpt_transport_unavailable").action)
     }
 
     @Test

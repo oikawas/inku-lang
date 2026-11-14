@@ -1,5 +1,16 @@
 # inku Android Implementation Notes
 
+## 2026-11-14 "Sign in with ChatGPT": the request route and I/O failures from the shared core
+
+Step 4, following the author's answers (add the timeout text, send `Accept` on both, retry an unreadable stream).
+
+- The URL, method, headers, where the token goes and the bounds of an answer and of an error body are the shared core's answers. `/responses` uses the `chatgpt_request` answer and `/models` the new `chatgpt_models_request`. The host check before sending (https to `api.openai.com` and `auth.openai.com` only) stays. Sign-in (token exchange, refresh, revocation) is unchanged (step 5).
+- An error answer's `x-request-id` is read, and its body goes to `chatgpt_error` as text (a body that is not JSON gives the code the status decides). The `/models` answer goes to `chatgpt_catalog` as text too, and a list that cannot be read is the core's `chatgpt_response_invalid`.
+- I/O failures are named by the new `chatgpt_transport`. A read or connection timeout and the whole deadline running out are `chatgpt_transport_timeout` (`transport_timeout`, retry); other I/O failures are `chatgpt_transport_unavailable`; an answer past its bound is `chatgpt_response_too_large`. A malformed stream uses the core's code, class and next action (`provider_rejected` for bytes that are not UTF-8, `malformed_payload` otherwise).
+- `ChatGptException` carries the next action (`retry`, `diagnose`, `usage`, …) besides the code and class.
+- The timeout text "ChatGPT did not answer within the time limit. Try again later." is added (before, "the connection was interrupted").
+- The bytes sent (body, `Authorization`, `Accept`, `Content-Type`) and the URLs are the same as before. Android still sends no ChatGPT Vision request.
+
 ## 2026-11-14 "Sign in with ChatGPT": the connection view and the publishing draft from the shared core
 
 The author's decision (show the connection state as Web does; the wording tables stay in the hosts) makes this step 2.

@@ -1841,7 +1841,8 @@ mod tests {
                 "image_effects":["select_image_catalog","write_image_ddl","review_image_ddl","review_description_ddl"],
                 "effects":["generate_sketch","select_description_catalog","generate_normalized_ddl","read_composition",
                     "choose_laws","choose_colors","complete_visible_ddl_holes","read_description","compose_description",
-                    "write_description_ddl"]})
+                    "write_description_ddl"],
+                "registrations":8,"callback_header_bytes":16384})
         );
     }
 }

@@ -701,7 +701,8 @@ pub(super) fn run(r: &Value) -> Value {
             }
         }
         "chatgpt_auth_constants" => {
-            json!({"issuer":issuer(),"authorize":authorize_url(),"token":format!("{}{}",issuer(),text(&login()["token_path"])),"resource":resource(),"scopes":scopes(),"image_effects":image_effects(),"effects":chatgpt_effects()})
+            json!({"issuer":issuer(),"authorize":authorize_url(),"token":format!("{}{}",issuer(),text(&login()["token_path"])),"resource":resource(),"scopes":scopes(),"image_effects":image_effects(),"effects":chatgpt_effects(),
+                "registrations":limit("registrations"),"callback_header_bytes":count(&login()["callback_head"]["header_bytes"])})
         }
         "chatgpt_auth_callback_client" => {
             let issued = r["issued"].as_str().unwrap_or("");

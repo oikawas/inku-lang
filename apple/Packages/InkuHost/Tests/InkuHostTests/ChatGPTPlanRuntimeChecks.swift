@@ -26,7 +26,7 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertEqual(first.profileID, fixture.activeID)
         do { _ = try await runtime.beginAuthorization(profileID: fixture.activeID)
             XCTFail("A second local authorization started")
-        } catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_attempt_busy") }
+        } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_attempt_busy") }
         await runtime.cancelAuthorization(first.id)
         let restarted = try await runtime.beginAuthorization(profileID: fixture.activeID)
         await runtime.cancelAuthorization(restarted.id)
@@ -113,7 +113,7 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         try fixture.store.write(value)
         await client.resume()
         do { _ = try await task.value; XCTFail("Deleted a newer connection") }
-        catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_session_changed") }
+        catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_session_changed") }
         XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.generation, profile.generation)
         XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.state, "connected")
     }
@@ -546,7 +546,7 @@ private final class RuntimeKeyStore: ChatGPTVaultKeyStore, @unchecked Sendable {
 private actor SuccessfulRevocationHTTP: ChatGPTHTTPClient {
     func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         if request.url?.path == "/.well-known/openid-configuration" {
-            return .init(status: 200, data: Data(#"{"revocation_endpoint":"https://auth.openai.com/api/accounts/oauth/revoke"}"#.utf8))
+            return .init(status: 200, data: Data(#"{"issuer":"https://auth.openai.com","jwks_uri":"https://auth.openai.com/jwks","revocation_endpoint":"https://auth.openai.com/api/accounts/oauth/revoke"}"#.utf8))
         }
         guard request.url?.path == "/api/accounts/oauth/revoke" else { throw HostError("unexpected_fixture_route") }
         return .init(status: 200, data: Data())

@@ -65,8 +65,6 @@ enum ChatGPTEndpoints {
     private static let constants = try! ChatGPTPolicy.call("chatgpt_auth_constants")
     static let issuer = try! constants.requiredString("issuer")
     static let resource = try! constants.requiredString("resource")
-    static let token = URL(string: try! constants.requiredString("token"))!
-    static let discovery = URL(string: issuer + "/.well-known/openid-configuration")!
     static func validate(_ url: URL, authenticationOnly: Bool = false) throws {
         if authenticationOnly || url.host == "auth.openai.com" {
             _ = try ChatGPTPolicy.call("chatgpt_auth_endpoint", ["url": .string(url.absoluteString)])
@@ -76,12 +74,6 @@ enum ChatGPTEndpoints {
               value.user == nil, value.password == nil, value.port == nil, value.fragment == nil,
               value.host == "api.openai.com", ["/v1/models", "/v1/responses"].contains(value.path), value.query == nil
         else { throw HostError("chatgpt_endpoint_invalid") }
-    }
-    static func form(_ fields: [String: String]) -> Data {
-        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
-        return Data(fields.sorted { $0.key < $1.key }.map {
-            $0.key.addingPercentEncoding(withAllowedCharacters: allowed)! + "=" + $0.value.addingPercentEncoding(withAllowedCharacters: allowed)!
-        }.joined(separator: "&").utf8)
     }
 }
 

@@ -94,6 +94,9 @@ struct ChatGPTStoredProfile: Codable, Sendable {
     var publishedModels: [String]?
     /// The purposes chosen per model (`llm`, `vision`); a model without an entry serves both.
     var modelPurposes: [String: [String]]?
+    /// The members core keeps that Swift does not read (`oidc_nonce`, `model_metadata`, ...), as a JSON object, so a
+    /// sign-in flow's write keeps them (step 5).
+    var coreExtras: String?
     var publicValue: ChatGPTPlanProfile {
         .init(id: id, label: label, email: email, clientID: clientID, state: state,
               generation: generation, scopes: scopes, expiresAt: expiresAt)

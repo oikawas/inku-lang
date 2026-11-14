@@ -57,7 +57,8 @@ public final class ChatGPTPlanSettingsModel {
             do {
                 try await self.enable(app: app)
                 let runtime = try app.personalPlanRuntime()
-                let attempt = try await runtime.beginAuthorization(profileID: profileID, consent: consent)
+                let attempt = try await runtime.beginAuthorization(profileID: profileID, consent: consent,
+                                                                    language: app.display.preferences.language)
                 self.attemptID = attempt.id
                 try Task.checkCancellation()
                 self.authorizationURL = attempt.authorizationURL

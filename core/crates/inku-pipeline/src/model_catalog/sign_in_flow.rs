@@ -163,6 +163,15 @@ fn page(language: &str, kind: &str) -> (u64, Value, String) {
     )
 }
 
+/// A registration signed out or waiting to sign in again keeps its last
+/// id token as the hint its next sign-in sends (OpenAI's account
+/// registrations: "a retained id_token" as `id_token_hint`).
+fn retain_hint(next: &mut Value, previous: &Value) {
+    if let Some(token) = previous["id_token"].as_str().filter(|t| !t.is_empty()) {
+        next["retained_id_token"] = json!(token);
+    }
+}
+
 /// A procedure in progress.
 struct Flow {
     state: Value,
@@ -575,11 +584,12 @@ impl Flow {
             "ac_reauth_got" => self.todo("ac_reauth_read", json!({"todo":"read"})),
             "ac_reauth_read" => {
                 let mut store = result["value"].clone();
-                let profile = check!(part(
+                let mut profile = check!(part(
                     "transition",
                     json!({"profile":self.get("profile"),"state":"reauthentication_required"})
                 ))["profile"]
                     .clone();
+                retain_hint(&mut profile, self.get("profile"));
                 let generation = self.input("generation").clone();
                 check!(Self::save(&mut store, profile, generation, false));
                 self.todo("ac_reauth_saved", json!({"todo":"write","value":store}))
@@ -740,11 +750,12 @@ impl Flow {
                 if profile["state"] == "signed_out" {
                     return Ok(self.release("so_released", "edit"));
                 }
-                let next = check!(part(
+                let mut next = check!(part(
                     "transition",
                     json!({"profile":profile,"state":"signed_out"})
                 ))["profile"]
                     .clone();
+                retain_hint(&mut next, &profile);
                 let id = self.input("profile_id").as_str().unwrap_or("").to_owned();
                 store["profiles"][id] = next;
                 self.todo("so_saved", json!({"todo":"write","value":store}))
@@ -799,30 +810,12 @@ impl Flow {
             }
             "so_done" => {
                 let confirmed = self.get("revocation_confirmed").clone();
-                if self.state["flow"] == "delete" {
-                    let deadline = self.now + flow_limit("edit_lock_seconds");
-                    return Ok(self.acquire("del_got", "edit", deadline));
-                }
                 return Ok(
                     self.done(json!({"status":"signed_out","revocation_confirmed":confirmed}))
                 );
             }
-            "del_got" => self.todo("del_read", json!({"todo":"read"})),
-            "del_read" => {
-                let value = check!(part(
-                    "delete",
-                    json!({"value":result["value"],"profile_id":self.input("profile_id")})
-                ))["value"]
-                    .clone();
-                self.todo("del_saved", json!({"todo":"write","value":value}))
-            }
-            "del_saved" => self.release("del_done", "edit"),
-            "del_done" => {
-                let confirmed = self.get("revocation_confirmed").clone();
-                return Ok(self.done(json!({"status":"deleted","revocation_confirmed":confirmed})));
-            }
 
-            // ---- select, pause and resume ----
+            // ---- tidying to one registration, pause and resume ----
             "edit_begin" => {
                 let deadline = self
                     .input("deadline")
@@ -836,17 +829,55 @@ impl Flow {
                 let id = self.input("profile_id").as_str().unwrap_or("").to_owned();
                 let profile = self.profile_of(&store);
                 let answer = match self.state["flow"].as_str().unwrap_or("") {
-                    "select" => {
-                        let ids: Vec<Value> = store["profiles"]
+                    "tidy" => {
+                        // The author's choice (11-14): keep the chosen
+                        // registration, else the newest connected one.
+                        let profiles: Vec<Value> = store["profiles"]
                             .as_object()
-                            .map_or_else(Vec::new, |p| p.keys().map(|k| json!(k)).collect());
-                        let active = check!(part(
-                            "select",
-                            json!({"profile_ids":ids,"profile_id":id})
-                        ))["active"]
-                            .clone();
-                        store["active"] = active.clone();
-                        json!({"active":active})
+                            .map_or_else(Vec::new, |p| p.values().cloned().collect());
+                        let kept =
+                            super::sign_in_view::kept_registration(&profiles, &store["active"])
+                                .and_then(|p| p["id"].as_str().map(str::to_owned));
+                        let pending_kept = if kept.is_none() {
+                            store["registrations_pending"]
+                                .as_object()
+                                .and_then(|pending| {
+                                    store["active"]
+                                        .as_str()
+                                        .filter(|id| pending.contains_key(*id))
+                                        .map(str::to_owned)
+                                        .or_else(|| pending.keys().next().cloned())
+                                })
+                        } else {
+                            None
+                        };
+                        let mut removed = Vec::new();
+                        if let Some(rows) = store["profiles"].as_object_mut() {
+                            rows.retain(|key, _| {
+                                let keep = Some(key) == kept.as_ref();
+                                if !keep {
+                                    removed.push(json!(key));
+                                }
+                                keep
+                            });
+                        }
+                        if let Some(rows) = store["registrations_pending"].as_object_mut() {
+                            rows.retain(|key, _| {
+                                let keep = Some(key) == pending_kept.as_ref();
+                                if !keep {
+                                    removed.push(json!(key));
+                                }
+                                keep
+                            });
+                        }
+                        let kept = kept.or(pending_kept);
+                        store["active"] = kept.clone().map_or(Value::Null, Value::String);
+                        let answer = json!({"kept":kept,"removed":removed});
+                        if removed.is_empty() {
+                            self.set("answer", answer);
+                            return Ok(self.release("edit_done", "edit"));
+                        }
+                        answer
                     }
                     "resume" => {
                         let next =
@@ -881,6 +912,27 @@ impl Flow {
             "li_begin" => self.todo("li_read", json!({"todo":"read"})),
             "li_read" => {
                 let store = &result["value"];
+                // The host's one registration, signed in again with its own
+                // client id; a new one only when there is none, or when the
+                // author asks for a new registration after an account change.
+                let chosen = if self.input("new_registration") == true {
+                    None
+                } else {
+                    let profiles: Vec<Value> = store["profiles"]
+                        .as_object()
+                        .map_or_else(Vec::new, |p| p.values().cloned().collect());
+                    super::sign_in_view::kept_registration(&profiles, &store["active"])
+                        .and_then(|p| p["id"].as_str().map(str::to_owned))
+                        .or_else(|| {
+                            let pending = store["registrations_pending"].as_object()?;
+                            store["active"]
+                                .as_str()
+                                .filter(|id| pending.contains_key(*id))
+                                .map(str::to_owned)
+                                .or_else(|| pending.keys().next().cloned())
+                        })
+                };
+                self.state["input"]["profile_id"] = chosen.map_or(Value::Null, Value::String);
                 let id = self.input("profile_id").clone();
                 let key = id.as_str().unwrap_or("");
                 let previous = check!(part(
@@ -1001,6 +1053,13 @@ impl Flow {
                 }
                 self.set("respond_failed", json!(true));
                 let expected = self.get("state").clone();
+                if matches!(
+                    first("error").as_str(),
+                    Some("invalid_client" | "unauthorized_client")
+                ) && self.get("previous").is_object()
+                {
+                    return Err((self, code_failure("chatgpt_account_changed")));
+                }
                 if query.get("error").is_some() {
                     check!(part(
                         "callback",
@@ -1085,6 +1144,17 @@ impl Flow {
                 )
             }
             "li_exchanged" => {
+                // A client id ChatGPT's settings removed is refused: the
+                // registration has to be made again.
+                let refused_client = result["body"]
+                    .as_str()
+                    .and_then(|b| serde_json::from_str::<Value>(b).ok())
+                    .is_some_and(|v| {
+                        v["error"] == "invalid_client" || v["error"]["code"] == "invalid_client"
+                    });
+                if refused_client && self.get("previous").is_object() {
+                    return Err((self, code_failure("chatgpt_account_changed")));
+                }
                 let value = check!(Self::auth_json(result));
                 let Some(token) = value["id_token"].as_str().map(str::to_owned) else {
                     return Err((self, code_failure("chatgpt_auth_unavailable")));
@@ -1097,10 +1167,14 @@ impl Flow {
             }
             "li_identity" => {
                 let sub = self.get("claims")["sub"].clone();
-                check!(part(
+                if part(
                     "identity",
-                    json!({"previous":self.get("previous"),"sub":sub})
-                ));
+                    json!({"previous":self.get("previous"),"sub":sub}),
+                )
+                .is_err()
+                {
+                    return Err((self, code_failure("chatgpt_account_changed")));
+                }
                 self.set("tokens_after", json!("li_tokens"));
                 return Ok(self.resume("tokens_begin", &Value::Null));
             }
@@ -1147,10 +1221,12 @@ impl Flow {
                     expected,
                     true
                 ));
+                // One registration for the host: the one just signed in.
                 let id = self.input("profile_id").as_str().unwrap_or("").to_owned();
-                if let Some(pending) = store["registrations_pending"].as_object_mut() {
-                    pending.remove(&id);
+                if let Some(profiles) = store["profiles"].as_object_mut() {
+                    profiles.retain(|key, _| *key == id);
                 }
+                store["registrations_pending"] = json!({});
                 self.todo("li_saved", json!({"todo":"write","value":store}))
             }
             "li_saved" => self.release("li_save_released", "edit"),
@@ -1197,13 +1273,12 @@ fn part_policy(action: &str, mut fields: Value) -> Step {
     }
 }
 
-const FLOWS: [(&str, &str); 10] = [
+const FLOWS: [(&str, &str); 9] = [
     ("login", "li_begin"),
     ("access", "ac_begin"),
     ("catalog", "ca_begin"),
     ("sign_out", "so_begin"),
-    ("delete", "so_begin"),
-    ("select", "edit_begin"),
+    ("tidy", "edit_begin"),
     ("pause", "edit_begin"),
     ("resume", "edit_begin"),
     ("identity", "id_begin"),
@@ -1737,10 +1812,8 @@ mod tests {
         assert_eq!(done["revocation_confirmed"], false);
         assert_eq!(host.store["profiles"]["p1"]["generation"], 4);
 
-        let done = host.run("delete", json!({"profile_id":"p1"}));
-        assert_eq!(done["status"], "deleted");
-        assert_eq!(host.store["profiles"], json!({}));
-        assert_eq!(host.store["active"], Value::Null);
+        assert_eq!(host.store["profiles"]["p1"]["client_id"], "client-1");
+        assert_eq!(host.store["profiles"]["p1"]["retained_id_token"], "old");
     }
 
     #[test]
@@ -1753,22 +1826,123 @@ mod tests {
         assert_eq!(host.store["profiles"]["p1"]["state"], "signed_out");
     }
 
+    fn opened_url(host: &Host) -> String {
+        host.log
+            .iter()
+            .find_map(|row| {
+                (row["expect"]["todo"]["todo"] == "open")
+                    .then(|| row["expect"]["todo"]["url"].as_str().unwrap().to_owned())
+            })
+            .unwrap()
+    }
+
     #[test]
-    fn a_registration_is_selected_and_a_missing_one_refused() {
+    fn a_sign_in_after_signing_out_keeps_the_registration() {
         let mut host = Host::new(store(connected()));
-        assert_eq!(
-            host.run("select", json!({"profile_id":"p1"}))["active"],
-            "p1"
+        host.http = vec![discovery(), json!({"status":200,"body":""})];
+        host.run("sign_out", json!({"profile_id":"p1"}));
+        host.log.clear();
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-1"));
+        host.http = vec![
+            tokens(&id_token(Some(&state_value()), "client-1")),
+            discovery(),
+            keys(),
+        ];
+        let done = host.run(
+            "login",
+            json!({"language":"ja","pending_count":0,"owner_count":0}),
         );
-        let failed = host.run("select", json!({"profile_id":"p9"}));
-        assert_eq!(failed["code"], "chatgpt_not_connected");
+        assert_eq!(done["profile_id"], "p1", "{done}");
+        let url = opened_url(&host);
+        assert!(url.contains("client_id=client-1&"), "{url}");
+        assert!(url.contains("&id_token_hint=old&"), "{url}");
+        assert!(!url.contains("agent_name_hint"), "{url}");
+        let profile = &host.store["profiles"]["p1"];
+        assert_eq!(profile["state"], "connected");
+        assert_eq!(profile["generation"], 5);
+        assert_eq!(profile["published_models"], json!(["gpt-6.1-sol"]));
+        assert_eq!(host.store["profiles"].as_object().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn tidying_keeps_the_chosen_registration_only() {
+        let mut other = connected();
+        other["id"] = json!("p2");
+        other["generation"] = json!(9);
+        let mut host = Host::new(json!({"profiles":{"p1":connected(),"p2":other},
+            "registrations_pending":{"p3":{"client_id":"client-3"}},"active":"p1"}));
+        let done = host.run("tidy", json!({}));
+        assert_eq!(done["kept"], "p1", "{done}");
+        assert_eq!(done["removed"], json!(["p2", "p3"]));
+        assert_eq!(host.store["profiles"].as_object().unwrap().len(), 1);
+        assert_eq!(host.store["registrations_pending"], json!({}));
+        let again = host.run("tidy", json!({}));
+        assert_eq!(again["removed"], json!([]));
+        assert_eq!(host.writes, 1);
+    }
+
+    #[test]
+    fn another_account_asks_for_a_new_registration() {
+        let mut signed_out = connected();
+        signed_out["state"] = json!("signed_out");
+        let mut host = Host::new(store(signed_out));
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-1"));
+        let mut token = id_token(Some(&state_value()), "client-1");
+        let claims = token.split('.').nth(1).unwrap().to_owned();
+        let mut other: Value =
+            serde_json::from_slice(&URL_SAFE_NO_PAD.decode(&claims).unwrap()).unwrap();
+        other["sub"] = json!("user-2");
+        token = token.replace(&claims, &b64(&other));
+        host.http = vec![tokens(&token), discovery(), keys()];
+        let failed = host.run(
+            "login",
+            json!({"language":"en","pending_count":0,"owner_count":0}),
+        );
+        assert_eq!(failed["code"], "chatgpt_account_changed", "{failed}");
+
+        host.log.clear();
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-7"));
+        host.http = vec![
+            tokens(&id_token(Some(&state_value()), "client-7")),
+            discovery(),
+            keys(),
+        ];
+        let done = host.run(
+            "login",
+            json!({"language":"en","pending_count":0,"owner_count":0,"new_registration":true}),
+        );
+        assert_eq!(done["todo"], "done", "{done}");
+        assert!(opened_url(&host).contains("client_id=dynamic_agent_client&"));
+        let id = done["profile_id"].as_str().unwrap();
+        assert_ne!(id, "p1");
+        assert_eq!(host.store["profiles"].as_object().unwrap().len(), 1);
+        assert_eq!(host.store["profiles"][id]["client_id"], "client-7");
+        assert_eq!(host.store["active"], id);
+    }
+
+    #[test]
+    fn a_client_removed_in_chatgpt_asks_for_a_new_registration() {
+        let mut signed_out = connected();
+        signed_out["state"] = json!("signed_out");
+        let mut host = Host::new(store(signed_out));
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-1"));
+        host.http = vec![json!({"status":401,"body":"{\"error\":\"invalid_client\"}"})];
+        let failed = host.run(
+            "login",
+            json!({"language":"en","pending_count":0,"owner_count":0}),
+        );
+        assert_eq!(failed["code"], "chatgpt_account_changed", "{failed}");
     }
 
     #[test]
     fn the_flows_answer_under_the_general_name() {
         let start = |action: &str, service: Option<&str>| {
-            let mut request = json!({"schema":"inku.model-catalog-request.v1","action":action,"flow":"select",
-                "input":{"profile_id":"p1"},"now":NOW});
+            let mut request = json!({"schema":"inku.model-catalog-request.v1","action":action,"flow":"tidy",
+                "input":{},"now":NOW});
             if let Some(service) = service {
                 request["service"] = json!(service);
             }
@@ -1843,13 +2017,27 @@ mod tests {
         let mut host = Host::new(store(connected()));
         host.http = vec![discovery(), json!({"status":200,"body":""})];
         host.run("sign_out", json!({"profile_id":"p1"}));
-        host.run("delete", json!({"profile_id":"p1"}));
-        keep("sign_out and delete", host);
-        let mut host = Host::new(store(connected()));
-        host.run("select", json!({"profile_id":"p1"}));
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-1"));
+        host.http = vec![
+            tokens(&id_token(Some(&state_value()), "client-1")),
+            discovery(),
+            keys(),
+        ];
+        host.run(
+            "login",
+            json!({"language":"en","pending_count":0,"owner_count":0}),
+        );
+        keep("sign_out and sign in again", host);
+        let mut other = connected();
+        other["id"] = json!("p2");
+        let mut host = Host::new(
+            json!({"profiles":{"p1":connected(),"p2":other},"registrations_pending":{},"active":"p1"}),
+        );
+        host.run("tidy", json!({}));
         host.run("pause", json!({"profile_id":"p1","generation":3,"code":"subscription_sharing_usage_limit_exceeded"}));
         host.run("resume", json!({"profile_id":"p1"}));
-        keep("select, pause and resume", host);
+        keep("tidy, pause and resume", host);
         rows
     }
 

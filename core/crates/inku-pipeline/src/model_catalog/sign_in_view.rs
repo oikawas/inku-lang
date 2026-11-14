@@ -11,87 +11,115 @@ fn action(name: &str, enabled: bool) -> Value {
     json!({"action": name, "enabled": enabled})
 }
 
-fn confirmed(name: &str, enabled: bool) -> Value {
-    json!({"action": name, "enabled": enabled, "confirm": true})
-}
-
-fn profile_status(profile: &Value, scope: &str) -> String {
-    let state = profile["state"]
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("reauthentication_required");
-    if state == "connected" && !array(profile.get("scopes")).contains(&json!(scope)) {
-        "chatgpt_scope_required".into()
-    } else {
-        format!("chatgpt_{state}")
+/// The one registration a host keeps: the chosen one, else the newest
+/// connected one, else the newest of any (the author's choice, 11-14).
+pub(super) fn kept_registration(profiles: &[Value], active: &Value) -> Option<Value> {
+    if let Some(chosen) = profiles
+        .iter()
+        .find(|p| !active.is_null() && &p["id"] == active)
+    {
+        return Some(chosen.clone());
     }
+    let newest = |rows: Vec<&Value>| {
+        rows.into_iter()
+            .max_by_key(|p| p["generation"].as_u64().unwrap_or(0))
+            .cloned()
+    };
+    newest(
+        profiles
+            .iter()
+            .filter(|p| p["state"] == "connected")
+            .collect(),
+    )
+    .or_else(|| newest(profiles.iter().collect()))
 }
 
+/// What a host shows for its one sign-in connection (the author, 11-14:
+/// one registration, and one action for each state). Signing out stands
+/// apart, for a registration that holds tokens, with the note that ChatGPT's
+/// settings can remove inku's connection; nothing is deleted here.
 fn connection_view(request: &Value, service: &Value) -> Value {
     let scope = service["use_scope"].as_str().unwrap_or("");
     let connection = &request["connection"];
     let busy = truthy(&request["busy"]);
     let attempt = &request["attempt"];
-    let active_id = &connection["active_profile_id"];
-    let status = match request["code"].as_str().filter(|s| !s.is_empty()) {
-        Some(code) => json!(code),
-        None => {
-            let operation = request["last_operation"].as_str().unwrap_or("");
-            if (operation == "sign_out" || operation == "delete")
-                && request["revocation_confirmed"] == json!(false)
-            {
-                json!("chatgpt_revocation_unconfirmed")
-            } else {
-                Value::Null
-            }
+    let profiles = array(connection.get("profiles"));
+    let profile = kept_registration(profiles, &connection["active_profile_id"]);
+    let state = profile
+        .as_ref()
+        .and_then(|p| p["state"].as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(if profile.is_some() {
+            "reauthentication_required"
+        } else {
+            "signed_out"
+        });
+    let allowed = profile
+        .as_ref()
+        .is_some_and(|p| array(p.get("scopes")).contains(&json!(scope)));
+    let code = request["code"].as_str().filter(|s| !s.is_empty());
+    let changed = matches!(
+        code,
+        Some("chatgpt_identity_mismatch" | "chatgpt_account_changed")
+    );
+    let revocation_unconfirmed =
+        request["last_operation"] == "sign_out" && request["revocation_confirmed"] == json!(false);
+    let own_status = if state == "connected" && !allowed {
+        "chatgpt_scope_required".to_owned()
+    } else {
+        format!("chatgpt_{state}")
+    };
+    let status = if changed {
+        "chatgpt_account_changed".to_owned()
+    } else if let Some(code) = code {
+        code.to_owned()
+    } else if revocation_unconfirmed {
+        "chatgpt_revocation_unconfirmed".to_owned()
+    } else {
+        own_status.clone()
+    };
+    let signing_in = truthy(&attempt["active"]);
+    let primary = if signing_in {
+        Value::Null
+    } else if changed {
+        action("new_sign_in", !busy)
+    } else {
+        match own_status.as_str() {
+            "chatgpt_scope_required" => action("grant_plan", !busy),
+            "chatgpt_quota" => action("retry", !busy),
+            "chatgpt_connected" | "chatgpt_exported" => Value::Null,
+            _ => action("sign_in", !busy),
         }
     };
-    let mut actions = vec![
-        action("sign_in", !busy),
-        action("check_connection", !busy),
-        json!({"action":"manage_usage","enabled":true,"url":service["usage_url"]}),
-    ];
-    if truthy(&attempt["can_reopen"]) {
-        actions.push(action("reopen_sign_in", true));
+    let mut attempt_actions = Vec::new();
+    if signing_in && !truthy(&attempt["helper"]) {
+        attempt_actions.push(action("cancel", true));
     }
-    if truthy(&attempt["active"]) && !truthy(&attempt["helper"]) {
-        actions.push(action("cancel", true));
+    if truthy(&attempt["can_reopen"]) {
+        attempt_actions.push(action("reopen_sign_in", true));
     }
     if truthy(&attempt["helper"]) {
-        actions.push(action("reopen_helper", true));
+        attempt_actions.push(action("reopen_helper", true));
     }
-    let pending: Vec<Value> = array(connection.get("pending_registrations"))
-        .iter()
-        .map(|row| {
-            json!({"id": row["id"], "client_id": row.get("client_id").cloned().unwrap_or(Value::Null),
-                "actions": [action("reconnect", !busy)]})
-        })
-        .collect();
-    let profiles: Vec<Value> = array(connection.get("profiles"))
-        .iter()
-        .map(|profile| {
-            let allowed = array(profile.get("scopes")).contains(&json!(scope));
-            let mut row = vec![action("select", !busy), action("reauthenticate", !busy)];
-            if !allowed {
-                row.push(action("grant_plan", !busy));
-            }
-            if profile["state"] == "quota" {
-                row.push(action("retry", !busy));
-            }
-            row.push(confirmed("sign_out", !busy));
-            row.push(confirmed("delete", !busy));
-            json!({"id": profile["id"], "label": profile["label"],
-                "active": !active_id.is_null() && &profile["id"] == active_id,
-                "status": profile_status(profile, scope), "actions": row})
-        })
-        .collect();
-    let guide = array(connection.get("profiles")).iter().any(|profile| {
-        !active_id.is_null()
-            && &profile["id"] == active_id
-            && profile["state"] == "connected"
-            && array(profile.get("scopes")).contains(&json!(scope))
-    });
-    json!({"status": status, "actions": actions, "pending": pending, "profiles": profiles, "guide": guide})
+    let holds_tokens = matches!(state, "connected" | "quota");
+    let sign_out = if holds_tokens && !signing_in {
+        json!({"action":"sign_out","enabled":!busy,"confirm":true})
+    } else {
+        Value::Null
+    };
+    let notice = if holds_tokens || revocation_unconfirmed || changed {
+        json!("chatgpt_disconnect_in_settings")
+    } else {
+        Value::Null
+    };
+    json!({"status": status,
+        "label": profile.as_ref().map_or(Value::Null, |p| p["label"].clone()),
+        "primary": primary,
+        "attempt_actions": attempt_actions,
+        "sign_out": sign_out,
+        "notice": notice,
+        "manage_usage": {"url": service["usage_url"]},
+        "guide": state == "connected" && allowed && !changed})
 }
 
 fn unselectable(row: &Value) -> bool {

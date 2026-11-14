@@ -1068,52 +1068,20 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_connected",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": true
+    "attempt_actions": [],
+    "guide": true,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": null,
+    "sign_out": {
+     "action": "sign_out",
+     "confirm": true,
+     "enabled": true
+    },
+    "status": "chatgpt_connected"
    }
   },
   {
@@ -1140,56 +1108,23 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_scope_required",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "grant_plan",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": {
+     "action": "grant_plan",
+     "enabled": true
+    },
+    "sign_out": {
+     "action": "sign_out",
+     "confirm": true,
+     "enabled": true
+    },
+    "status": "chatgpt_scope_required"
    }
   },
   {
@@ -1217,56 +1152,23 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_quota",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "retry",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": {
+     "action": "retry",
+     "enabled": true
+    },
+    "sign_out": {
+     "action": "sign_out",
+     "confirm": true,
+     "enabled": true
+    },
+    "status": "chatgpt_quota"
    }
   },
   {
@@ -1294,52 +1196,19 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_reauthentication_required",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": {
+     "action": "sign_in",
+     "enabled": true
+    },
+    "sign_out": null,
+    "status": "chatgpt_reauthentication_required"
    }
   },
   {
@@ -1364,56 +1233,57 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_signed_out",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "grant_plan",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": {
+     "action": "sign_in",
+     "enabled": true
+    },
+    "sign_out": null,
+    "status": "chatgpt_signed_out"
+   }
+  },
+  {
+   "name": "view: another account signed in",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "signed_out",
+       "scopes": []
+      }
+     ],
+     "pending_registrations": []
+    },
+    "code": "chatgpt_identity_mismatch"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": {
+     "action": "new_sign_in",
+     "enabled": true
+    },
+    "sign_out": null,
+    "status": "chatgpt_account_changed"
    }
   },
   {
@@ -1441,52 +1311,16 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_exported",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": null,
+    "sign_out": null,
+    "status": "chatgpt_exported"
    }
   },
   {
@@ -1520,82 +1354,20 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_connected",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     },
-     {
-      "id": "profile-bbbb2222",
-      "label": "me@example.com / bbbb2222",
-      "active": false,
-      "status": "chatgpt_signed_out",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "grant_plan",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": true
+    "attempt_actions": [],
+    "guide": true,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": null,
+    "sign_out": {
+     "action": "sign_out",
+     "confirm": true,
+     "enabled": true
+    },
+    "status": "chatgpt_connected"
    }
   },
   {
@@ -1624,52 +1396,20 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": false
-     },
-     {
-      "action": "check_connection",
-      "enabled": false
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_connected",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": false
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": false
-       },
-       {
-        "action": "sign_out",
-        "enabled": false,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": false,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": true
+    "attempt_actions": [],
+    "guide": true,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": null,
+    "sign_out": {
+     "action": "sign_out",
+     "confirm": true,
+     "enabled": false
+    },
+    "status": "chatgpt_connected"
    }
   },
   {
@@ -1700,64 +1440,25 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
+    "attempt_actions": [
      {
-      "action": "sign_in",
-      "enabled": false
-     },
-     {
-      "action": "check_connection",
-      "enabled": false
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
+      "action": "cancel",
+      "enabled": true
      },
      {
       "action": "reopen_sign_in",
       "enabled": true
-     },
-     {
-      "action": "cancel",
-      "enabled": true
      }
     ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_signed_out",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": false
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": false
-       },
-       {
-        "action": "grant_plan",
-        "enabled": false
-       },
-       {
-        "action": "sign_out",
-        "enabled": false,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": false,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": null,
+    "sign_out": null,
+    "status": "chatgpt_signed_out"
    }
   },
   {
@@ -1788,60 +1489,21 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": false
-     },
-     {
-      "action": "check_connection",
-      "enabled": false
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     },
+    "attempt_actions": [
      {
       "action": "cancel",
       "enabled": true
      }
     ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_signed_out",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": false
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": false
-       },
-       {
-        "action": "grant_plan",
-        "enabled": false
-       },
-       {
-        "action": "sign_out",
-        "enabled": false,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": false,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": null,
+    "sign_out": null,
+    "status": "chatgpt_signed_out"
    }
   },
   {
@@ -1864,36 +1526,19 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [
-     {
-      "id": "pending-1",
-      "client_id": "app_1234",
-      "actions": [
-       {
-        "action": "reconnect",
-        "enabled": true
-       }
-      ]
-     }
-    ],
-    "profiles": [],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": null,
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": {
+     "action": "sign_in",
+     "enabled": true
+    },
+    "sign_out": null,
+    "status": "chatgpt_signed_out"
    }
   },
   {
@@ -1920,56 +1565,19 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": "chatgpt_revocation_unconfirmed",
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_signed_out",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "grant_plan",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": {
+     "action": "sign_in",
+     "enabled": true
+    },
+    "sign_out": null,
+    "status": "chatgpt_revocation_unconfirmed"
    }
   },
   {
@@ -1996,56 +1604,19 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_signed_out",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "grant_plan",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": {
+     "action": "sign_in",
+     "enabled": true
+    },
+    "sign_out": null,
+    "status": "chatgpt_signed_out"
    }
   },
   {
@@ -2074,52 +1645,20 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": "chatgpt_transport_unavailable",
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [
-     {
-      "id": "profile-aaaa1111",
-      "label": "me@example.com / aaaa1111",
-      "active": true,
-      "status": "chatgpt_connected",
-      "actions": [
-       {
-        "action": "select",
-        "enabled": true
-       },
-       {
-        "action": "reauthenticate",
-        "enabled": true
-       },
-       {
-        "action": "sign_out",
-        "enabled": true,
-        "confirm": true
-       },
-       {
-        "action": "delete",
-        "enabled": true,
-        "confirm": true
-       }
-      ]
-     }
-    ],
-    "guide": true
+    "attempt_actions": [],
+    "guide": true,
+    "label": "me@example.com / aaaa1111",
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": "chatgpt_disconnect_in_settings",
+    "primary": null,
+    "sign_out": {
+     "action": "sign_out",
+     "confirm": true,
+     "enabled": true
+    },
+    "status": "chatgpt_transport_unavailable"
    }
   },
   {
@@ -2137,25 +1676,19 @@
    "answer": {
     "schema": "inku.model-catalog.v1",
     "outcome": "ok",
-    "status": null,
-    "actions": [
-     {
-      "action": "sign_in",
-      "enabled": true
-     },
-     {
-      "action": "check_connection",
-      "enabled": true
-     },
-     {
-      "action": "manage_usage",
-      "enabled": true,
-      "url": "https://chatgpt.com/settings/usage"
-     }
-    ],
-    "pending": [],
-    "profiles": [],
-    "guide": false
+    "attempt_actions": [],
+    "guide": false,
+    "label": null,
+    "manage_usage": {
+     "url": "https://chatgpt.com/settings/usage"
+    },
+    "notice": null,
+    "primary": {
+     "action": "sign_in",
+     "enabled": true
+    },
+    "sign_out": null,
+    "status": "chatgpt_signed_out"
    }
   },
   {

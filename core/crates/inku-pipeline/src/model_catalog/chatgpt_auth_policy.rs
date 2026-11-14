@@ -191,6 +191,14 @@ fn authorization(request: &Value) -> Value {
         ("code_challenge_method", "S256"),
         ("code_challenge", challenge.as_str()),
     ];
+    // A sign-in again sends the identity it keeps as a hint, as OpenAI's
+    // account registrations ask (the author's choice, 11-14).
+    if let Some(hint) = [&previous["id_token"], &previous["retained_id_token"]]
+        .into_iter()
+        .find_map(|token| token.as_str().filter(|v| !v.is_empty()))
+    {
+        pairs.push(("id_token_hint", hint));
+    }
     if let Some(email) = previous["email"].as_str().filter(|v| !v.is_empty()) {
         pairs.push(("login_hint", email));
     }

@@ -2003,6 +2003,19 @@ fn limit_of(request: &Value) -> Result<usize, Refusal> {
     }
 }
 
+/// The answer a ChatGPT action reads: `value` as the host read it, or `body`,
+/// the answer's text as it came (step 4), read here. A body that is not JSON
+/// reads as nothing; the two are not sent together.
+fn answer_value(request: &Value) -> Result<Value, Refusal> {
+    match (get(request, "value"), get(request, "body")) {
+        (Some(_), Some(_)) => Err(Refusal::invalid("value and body are not sent together")),
+        (Some(value), None) => Ok(value.clone()),
+        (None, Some(Value::String(body))) => Ok(python_loads(body).unwrap_or(Value::Null)),
+        (None, Some(_)) => Err(Refusal::invalid("body must be a string")),
+        (None, None) => Ok(Value::Null),
+    }
+}
+
 fn answer(request: &Value) -> Result<Value, Refusal> {
     let action = as_str(get(request, "action"))
         .ok_or_else(|| Refusal::invalid("action must be a string"))?;
@@ -2175,9 +2188,9 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 ),
                 Some(_) => return Err(Refusal::invalid("status must be an integer")),
             };
-            let empty = Value::Null;
+            let value = answer_value(request)?;
             Ok(chatgpt::error_answer(
-                get(request, "value").unwrap_or(&empty),
+                &value,
                 status,
                 get(request, "request_id"),
             ))
@@ -2192,11 +2205,13 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
             };
             Ok(chatgpt::failure_answer(code, temporary))
         }
-        "chatgpt_catalog" => {
-            let empty = Value::Null;
-            Ok(chatgpt::catalog_answer(
-                get(request, "value").unwrap_or(&empty),
-            ))
+        "chatgpt_catalog" => Ok(chatgpt::catalog_answer(&answer_value(request)?)),
+        "chatgpt_models_request" => Ok(chatgpt::models_request_answer()),
+        "chatgpt_transport" => {
+            let kind = as_str(get(request, "kind"))
+                .ok_or_else(|| Refusal::invalid("kind must be a string"))?;
+            chatgpt::transport_answer(kind)
+                .ok_or_else(|| Refusal::invalid("kind must be timeout, unavailable or too_large"))
         }
         action
             if action.starts_with("chatgpt_auth_")
@@ -2284,7 +2299,7 @@ mod tests {
         for row in cases()["chatgpt"].as_array().unwrap() {
             rows.push(row["request"].clone());
         }
-        assert_eq!(rows.len(), 289);
+        assert_eq!(rows.len(), 302);
         let run = |request: &serde_json::Value| -> Vec<u8> {
             let bytes = serde_json::to_vec(request).unwrap();
             if request["schema"] == "inku.model-catalog-request.v1" {
@@ -2435,7 +2450,7 @@ mod tests {
             }
             compared += 1;
         }
-        assert_eq!(compared, 221);
+        assert_eq!(compared, 234);
     }
 
     #[test]

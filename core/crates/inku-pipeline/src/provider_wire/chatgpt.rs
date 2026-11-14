@@ -7,8 +7,10 @@
 //! the whole stream, holding it to the wire limit this module names, and the
 //! stream is read once: event for event as Server's `SSEDecoder` and
 //! `TextSSEDecoder` read it, which gives the same answer however the bytes had
-//! arrived. The token, the registration, its locks, cancellation and the pause
-//! on a usage limit stay with the host.
+//! arrived. Where each request goes, its headers and where the token goes are
+//! answered here too, and so is the failure of a send that never gave a whole
+//! answer (step 4). The token, the registration, its locks, the time limits,
+//! cancellation and the pause on a usage limit stay with the host.
 
 use sha2::{Digest, Sha256};
 
@@ -172,16 +174,106 @@ pub(super) fn limits_answer(answer_limit: usize) -> Value {
 // ---------------------------------------------------------------------------
 // Requests.
 
+/// Where a request goes (step 4): the resource and the path, the method, the
+/// headers that carry no secret, the header the token goes under and the text
+/// before it, how much of a failure's body is read, and the header that names
+/// the backend's request id.
+fn endpoint(name: &str) -> Vec<(String, Value)> {
+    let send = &chatgpt()["send"];
+    let place = &send[name];
+    let headers = place["headers"]
+        .as_object()
+        .expect("the descriptor headers")
+        .iter()
+        .map(|(header, item)| (header.clone(), string(text(item))))
+        .collect();
+    vec![
+        (
+            "url".to_owned(),
+            Value::String(format!(
+                "{}{}",
+                text(&chatgpt()["login"]["resource"]),
+                text(&place["path"])
+            )),
+        ),
+        ("method".to_owned(), string(text(&place["method"]))),
+        ("headers".to_owned(), Value::Object(headers)),
+        (
+            "auth".to_owned(),
+            object(vec![
+                ("header", string(text(&send["auth"]["header"]))),
+                ("prefix", string(text(&send["auth"]["prefix"]))),
+            ]),
+        ),
+        (
+            "error_limit".to_owned(),
+            super::integer(count(&send["error_limit"]) as i64),
+        ),
+        (
+            "request_id_header".to_owned(),
+            string(text(&send["request_id_header"])),
+        ),
+    ]
+}
+
 fn request_answer(body: &Value, limits: &Limits) -> Value {
     let text = dumps(body);
     let canonical = canonical_json(&text).expect("a body this module wrote reads back");
-    object(vec![
-        ("body", Value::String(text)),
+    let mut members = vec![
+        ("body".to_owned(), Value::String(text)),
         // The observation record keeps the canonical form, as it did.
-        ("canonical", Value::String(canonical)),
-        ("wire_limit", super::integer(limits.wire as i64)),
-        ("event_limit", super::integer(limits.event as i64)),
-    ])
+        ("canonical".to_owned(), Value::String(canonical)),
+        ("wire_limit".to_owned(), super::integer(limits.wire as i64)),
+        (
+            "event_limit".to_owned(),
+            super::integer(limits.event as i64),
+        ),
+    ];
+    members.extend(endpoint("responses"));
+    Value::Object(members)
+}
+
+/// The answer to `chatgpt_models_request`: where the model list is asked for,
+/// and how much of its answer is read.
+pub(super) fn models_request_answer() -> Value {
+    let mut members = endpoint("models_list");
+    members.push((
+        "answer_limit".to_owned(),
+        super::integer(count(&chatgpt()["send"]["models_list"]["answer_limit"]) as i64),
+    ));
+    Value::Object(members)
+}
+
+/// The answer to `chatgpt_transport`: the failure of a send that never gave a
+/// whole answer. `timeout` is a read, a connection or the whole deadline
+/// running out; `unavailable` a connection that failed or was cut, or any other
+/// input or output failure; `too_large` an answer past its limit.
+pub(super) fn transport_answer(kind: &str) -> Option<Value> {
+    let code = match kind {
+        "timeout" => "chatgpt_transport_timeout",
+        "unavailable" => "chatgpt_transport_unavailable",
+        "too_large" => "chatgpt_response_too_large",
+        _ => return None,
+    };
+    Some(Value::Object(Failure::plain(code).answer()))
+}
+
+/// What an answer that could not be read says (step 4): bytes that are not
+/// UTF-8 are rejected; text that is not JSON, or JSON of another shape, is a
+/// malformed payload the pipeline may ask again for.
+fn malformed(kind: &str) -> Vec<(String, Value)> {
+    let code = "chatgpt_response_invalid";
+    let (rejected, action) = classify(code, false);
+    let failure = if kind == "utf8" {
+        rejected
+    } else {
+        "malformed_payload"
+    };
+    vec![
+        ("code".to_owned(), string(code)),
+        ("failure".to_owned(), string(failure)),
+        ("action".to_owned(), string(action)),
+    ]
 }
 
 /// The Responses API's cache routing hint: the digest of the system text and
@@ -1066,6 +1158,7 @@ pub(super) fn stream_answer(text: bool, answer_limit: usize, wire: &[u8]) -> Val
         Err(Stop::Malformed(kind)) => {
             members.push(("outcome".to_owned(), string("malformed")));
             members.push(("kind".to_owned(), string(kind)));
+            members.extend(malformed(kind));
         }
     }
     // The observation keeps the last response and whether an answer completed.
@@ -1089,7 +1182,9 @@ pub(super) fn stream_answer(text: bool, answer_limit: usize, wire: &[u8]) -> Val
 /// `dropped` counts the listed rows left out.
 pub(super) fn catalog_answer(value: &Value) -> Value {
     let Some(Value::Array(entries)) = get(value, text(listing("field"))) else {
-        return object(vec![("outcome", string("malformed"))]);
+        let mut members = vec![("outcome".to_owned(), string("malformed"))];
+        members.extend(malformed("shape"));
+        return Value::Object(members);
     };
     let mut models = Vec::new();
     let mut slugs: Vec<&str> = Vec::new();

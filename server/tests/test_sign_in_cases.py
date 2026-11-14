@@ -24,7 +24,7 @@ def test_the_core_answers_each_shared_sign_in_case(case):
 
 
 def test_the_shared_cases_are_all_read():
-    assert len(CASES) == 49
+    assert len(CASES) == 50
 
 
 # The sign-in's procedures, step for step (SIWC step 5): each request a host sends and the
@@ -39,7 +39,7 @@ def test_the_core_answers_each_step_of_the_shared_procedures(case):
 
 
 def test_the_shared_procedure_steps_are_all_read():
-    assert len(FLOW_CASES) == 106
+    assert len(FLOW_CASES) == 122
 
 
 # The two routes of step 2 pass what the screen holds to the core and return its answer.

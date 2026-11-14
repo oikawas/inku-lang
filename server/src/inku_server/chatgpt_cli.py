@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from .chatgpt_auth import attempts
+from .chatgpt_auth import attempts, tidy
 from .chatgpt_runtime import configure_startup, enabled, mode_allowed
 from .chatgpt_store import ChatGPTError, canonical, protected_read
 from .chatgpt_transfer import export_profile, import_profile, recipient, validate_request
@@ -43,7 +43,8 @@ def main() -> None:
     commands.add_parser("import")
     authorize = commands.add_parser("authorize")
     authorize.add_argument("--recipient", type=Path, required=True)
-    authorize.add_argument("--profile-id")
+    # The host's one registration signs in again; --new-registration replaces it.
+    authorize.add_argument("--new-registration", action="store_true")
     authorize.add_argument("--consent", action="store_true")
     authorize.add_argument("--no-browser", action="store_true")
     authorize.add_argument("--browser", choices=BROWSER_IDS, default="chrome")
@@ -85,7 +86,9 @@ def main() -> None:
                 result = {"status": "exported", "profile_id": args.profile_id, "request_id": request["request_id"]}
             else:
                 print(("ChatGPTで続ける: " if args.language == "ja" else "Continue with ChatGPT: ") + request["owner_label"] + " / " + request["host_id"], file=sys.stderr)
-                start = attempts.begin(request["owner_id"], args.profile_id, args.consent, lambda: _local_gate(request),
+                tidy(request["owner_id"])
+                start = attempts.begin(request["owner_id"], args.consent, lambda: _local_gate(request),
+                                       new_registration=args.new_registration,
                                        registration_host_id=request["host_id"], language=args.language)
                 failed_profile_id = start["profile_id"]
                 try:

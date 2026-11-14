@@ -132,7 +132,7 @@ The import is done when it prints `"status":"imported"`. The two files have serv
 
 ## 5. Choose a model and paint
 
-1. In the web settings, open the "Sign in with ChatGPT" tab and press "Check connection".
+1. In the web settings, open the "Sign in with ChatGPT" tab and check that it says connected (it reads the connection each time it opens).
 2. In the "Models" tab of the settings, choose "Sign in with ChatGPT". From "Select models", press "Fetch model list", tick the models to paint with, and save. They are visible only to you.
 3. In "Model selection" on the painting screen, choose a Sign in with ChatGPT model as the model shared by Stage 1/2.
 

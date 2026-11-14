@@ -150,11 +150,15 @@ def test_pipeline_admission_distinguishes_catalog_failure_from_refusal(isolated,
         engine.dispose()
 
 
-def test_cli_opens_only_the_selected_brave_and_passes_japanese_to_callback(monkeypatch, capsys):
+def test_cli_opens_only_the_selected_brave_and_passes_japanese_to_callback(monkeypatch, capsys, tmp_path):
     from inku_server import chatgpt_cli as cli
     from unittest.mock import Mock
     request = {"owner_id": "owner", "owner_label": "Fixture", "host_id": "fixture-host"}
     start = {"profile_id": "profile", "attempt_id": "attempt", "authorization_url": auth.AUTHORIZE + "?state=fixture"}
+    # Never the author's own store.
+    monkeypatch.setenv("INKU_CHATGPT_AUTH_DIR", str(tmp_path / "auth"))
+    tidied = []
+    monkeypatch.setattr(cli, "tidy", tidied.append)
     monkeypatch.setattr(cli, "protected_read", lambda _: json.dumps(request))
     monkeypatch.setattr(cli, "_local_gate", lambda _: None)
     monkeypatch.setattr(cli.sys, "platform", "darwin")
@@ -167,6 +171,7 @@ def test_cli_opens_only_the_selected_brave_and_passes_japanese_to_callback(monke
     monkeypatch.setattr(cli.sys, "argv", ["inku-chatgpt", "authorize", "--recipient", "fixture.json", "--browser", "brave", "--language", "ja"])
     cli.main()
     assert begin.call_args.kwargs["language"] == "ja"
+    assert begin.call_args.kwargs["new_registration"] is False and tidied == ["owner"]
     opened.assert_called_once_with(["/usr/bin/open", "-b", "com.brave.Browser", start["authorization_url"]], check=True, capture_output=True, timeout=30)
     assert "ChatGPTで続ける" in capsys.readouterr().err
     monkeypatch.setattr(cli.sys, "argv", ["inku-chatgpt", "authorize", "--recipient", "fixture.json", "--browser", "/fixture/app"])
@@ -200,7 +205,7 @@ def signing_server(monkeypatch):
 def test_japanese_callback_explains_success_and_failure_without_echoing_code(isolated, monkeypatch):
     nonce, _calls = signing_server(monkeypatch)
     coordinator = auth.AuthorizationAttempts()
-    started = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"), language="ja")
+    started = coordinator.begin("owner", False,lambda: runtime.check_owner("owner"), language="ja")
     params = parse_qs(urlsplit(started["authorization_url"]).query)
     nonce["value"] = params["nonce"][0]
     with httpx.Client() as client:
@@ -212,7 +217,8 @@ def test_japanese_callback_explains_success_and_failure_without_echoing_code(iso
         assert completed.status_code == 200
         assert 'lang="ja"' in completed.text
         assert "認証が完了しました" in completed.text
-        assert "接続状態を確認" in completed.text
+        # No "Check connection" button any more (the core's page, 2026-11-14).
+        assert "inkuへ戻ってください" in completed.text and "接続状態を確認" not in completed.text
         assert "private-code" not in completed.text
         assert completed.headers["cache-control"] == "no-store"
         assert completed.headers["connection"] == "close"
@@ -265,7 +271,7 @@ def test_sealed_handoff_rejects_changed_owner_and_is_one_time(isolated, tmp_path
 def test_callback_wrong_state_does_not_consume_and_oidc_nonce_is_checked(isolated, monkeypatch):
     nonce, issued_calls = signing_server(monkeypatch)
     coordinator = auth.AuthorizationAttempts()
-    started = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"))
+    started = coordinator.begin("owner", False,lambda: runtime.check_owner("owner"))
     params = parse_qs(urlsplit(started["authorization_url"]).query)
     nonce["value"] = params["nonce"][0]
     callback = params["redirect_uri"][0]
@@ -362,10 +368,36 @@ def test_refresh_serializes_across_threads_and_signout_invalidates_late_result(i
 
 
 
-def test_delete_signs_out_then_removes_the_registration(isolated, monkeypatch):
+def test_the_first_read_after_a_start_keeps_the_one_chosen_registration(isolated, monkeypatch):
+    # The host keeps one registration (the author, 2026-11-14): the chosen one stays.
     connected, other = profile(), profile(client_id="oaiapp_other", sub="other")
     seed(isolated, other)
     seed(isolated, connected)
+    with isolated.lock("edit:owner"):
+        value = isolated.read("owner")
+        value.setdefault("registrations_pending", {})[str(uuid.uuid4())] = {"client_id": "oaiapp_pending"}
+        isolated.write("owner", value)
+    monkeypatch.setattr(auth, "_tidied", set())
+    from fastapi.testclient import TestClient
+    from inku_server.api import app
+    from inku_server.api_core.deps import _current_user
+    app.dependency_overrides[_current_user] = lambda: {"id": "owner"}
+    try:
+        with TestClient(app) as client:
+            state = client.get("/api/me/chatgpt").json()
+    finally:
+        app.dependency_overrides.clear()
+    assert [entry["id"] for entry in state["profiles"]] == [connected["id"]]
+    assert state["active_profile_id"] == connected["id"] and state["pending_registrations"] == []
+    # Once per start: a later registration is not tidied away by the next read.
+    seed(isolated, other)
+    auth.tidy("owner")
+    assert len(isolated.read("owner")["profiles"]) == 2
+
+
+def test_sign_out_keeps_the_registration_for_the_next_sign_in(isolated, monkeypatch):
+    value = profile()
+    seed(isolated, value)
     revoked = []
     real_client = httpx.AsyncClient
     def handle(request):
@@ -374,21 +406,11 @@ def test_delete_signs_out_then_removes_the_registration(isolated, monkeypatch):
         revoked.append(parse_qs(request.content.decode())["token"])
         return httpx.Response(200)
     monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
-    with isolated.lock("edit:owner"):
-        value = isolated.read("owner")
-        value.setdefault("registrations_pending", {})[connected["id"]] = {"client_id": "oaiapp_fixture"}
-        isolated.write("owner", value)
-    result = asyncio.run(auth.delete_profile("owner", connected["id"]))
-    assert result == {"status": "deleted", "revocation_confirmed": True}
+    assert asyncio.run(auth.sign_out("owner", value["id"])) == {"status": "signed_out", "revocation_confirmed": True}
     assert revoked == [["fixture-refresh"]]
-    state = isolated.public_state("owner")
-    assert state["active_profile_id"] is None
-    assert [entry["id"] for entry in state["profiles"]] == [other["id"]]
-    assert state["pending_registrations"] == []
-    with pytest.raises(ChatGPTError, match="chatgpt_not_connected"):
-        asyncio.run(auth.delete_profile("owner", connected["id"]))
-    asyncio.run(auth.delete_profile("owner", other["id"]))
-    assert isolated.public_state("owner")["profiles"] == []
+    kept = isolated.profile("owner", value["id"])
+    assert kept["state"] == "signed_out" and kept["client_id"] == value["client_id"]
+    assert "refresh_token" not in kept and kept["retained_id_token"] == "fixture-id"
 
 
 def stream_bytes(*, failed=False):
@@ -679,7 +701,7 @@ def test_failed_initial_exchange_retains_issued_client_for_explicit_retry(isolat
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
     coordinator = auth.AuthorizationAttempts()
     remote_host = "urn:uuid:" + str(uuid.uuid4())
-    start = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"), registration_host_id=remote_host)
+    start = coordinator.begin("owner", False,lambda: runtime.check_owner("owner"), registration_host_id=remote_host)
     params = parse_qs(urlsplit(start["authorization_url"]).query)
     assert params["ext_agent_host_id"] == [remote_host]
     with httpx.Client() as client:
@@ -687,7 +709,9 @@ def test_failed_initial_exchange_retains_issued_client_for_explicit_retry(isolat
     assert len(calls) == 1
     pending = isolated.public_state("owner")["pending_registrations"]
     assert pending == [{"id": start["profile_id"], "client_id": "oaiapp_issued"}]
-    again = coordinator.begin("owner", start["profile_id"], False, lambda: runtime.check_owner("owner"), registration_host_id=remote_host)
+    # The core signs in the host's one (pending) registration again, with its issued client id.
+    again = coordinator.begin("owner", False, lambda: runtime.check_owner("owner"), registration_host_id=remote_host)
+    assert again["profile_id"] == start["profile_id"]
     assert parse_qs(urlsplit(again["authorization_url"]).query)["client_id"] == ["oaiapp_issued"]
     coordinator.stop("owner")
 
@@ -820,7 +844,7 @@ def test_an_unhashable_oauth_error_code_is_an_unavailable_sign_in_server(isolate
 def test_a_cancelled_sign_in_stops_listening_and_stays_cancelled(isolated, monkeypatch):
     signing_server(monkeypatch)
     coordinator = auth.AuthorizationAttempts()
-    started = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"))
+    started = coordinator.begin("owner", False,lambda: runtime.check_owner("owner"))
     callback = parse_qs(urlsplit(started["authorization_url"]).query)["redirect_uri"][0]
     assert coordinator.cancel("owner", started["attempt_id"])["status"] == "cancelled"
     listener = next(thread for thread in threading.enumerate() if thread.name == "inku-chatgpt-callback")

@@ -56,7 +56,7 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
                 temperature: float, max_tokens: int, transport: httpx.BaseTransport | None = None) -> str:
     """Ask once and return the answer's text, stripped. A timeout is a TimeoutError."""
     if connection.get("kind") == "chatgpt_responses":
-        from .chatgpt_provider import request_vision
+        from .chatgpt_provider import request_vision, transport_error
         # Every image must be a base64 data URL; the core refuses any other
         # before a token or the model list is asked for.
         provider_wire.chatgpt_vision_request(model_id, system=system, text=text, images=images, answer_limit=512 * 1024)
@@ -69,8 +69,11 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
             )).strip()
         except ChatGPTError:
             raise
-        except (httpx.HTTPError, TimeoutError):
-            raise ChatGPTError("chatgpt_transport_unavailable") from None
+        # The shared core names a time limit and a broken connection (step 4, 2026-11-14).
+        except (TimeoutError, httpx.TimeoutException):
+            raise transport_error("timeout") from None
+        except httpx.HTTPError:
+            raise transport_error("unavailable") from None
         except (ValueError, KeyError, TypeError):
             raise ChatGPTError("chatgpt_response_invalid") from None
     if connection.get("requires_api_key") and not connection.get("api_key"):

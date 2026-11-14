@@ -116,9 +116,25 @@ def chatgpt_stream(mode: str, answer_limit: int, wire: bytes) -> dict:
                 wire_base64=base64.b64encode(wire).decode("ascii"))
 
 
-def chatgpt_error(value: Any, status: int | None, request_id: str | None) -> dict:
-    """What an HTTP error from the ChatGPT backend says: code, failure, action, status, request_id, param."""
+def chatgpt_error(value: Any = None, status: int | None = None, request_id: str | None = None, *, body: str | None = None) -> dict:
+    """What an HTTP error from the ChatGPT backend says: code, failure, action, status, request_id, param.
+
+    ``body`` is the error's text as received; text that is not JSON reads as no body (the status decides).
+    """
+    if body is not None:
+        return _ask("chatgpt_error", body=body, status=status, request_id=request_id)
     return _ask("chatgpt_error", value=value, status=status, request_id=request_id)
+
+
+def chatgpt_models_request() -> dict:
+    """Where the model list is asked for: url, method, headers, auth, error_limit, request_id_header, answer_limit."""
+    return _ask("chatgpt_models_request")
+
+
+@lru_cache(maxsize=8)
+def chatgpt_transport(kind: str) -> dict:
+    """What a failure of the transport itself means (``timeout``, ``unavailable``, ``too_large``): code, failure, action."""
+    return _ask("chatgpt_transport", kind=kind)
 
 
 @lru_cache(maxsize=256)
@@ -127,8 +143,13 @@ def chatgpt_failure(code: str, temporary: bool | None = None) -> dict:
     return _ask("chatgpt_failure", code=code, temporary=temporary)
 
 
-def chatgpt_catalog(value: Any) -> dict:
-    """The models the backend lists for the subscriber: ``ok`` with ``models``, or ``malformed``."""
+def chatgpt_catalog(value: Any = None, *, body: str | None = None) -> dict:
+    """The models the backend lists for the subscriber: ``ok`` with ``models``, or ``malformed`` with code, failure, action.
+
+    ``body`` is the list's text as received; text that is not JSON is ``malformed``.
+    """
+    if body is not None:
+        return _ask("chatgpt_catalog", body=body)
     return _ask("chatgpt_catalog", value=value)
 
 

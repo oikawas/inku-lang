@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 private const val MIGRATION_LOG_TAG = "InkuMigration"
 
@@ -32,7 +33,14 @@ class InkuApplication : Application() {
                     val records = app.inku.mobile.data.ModelCatalogObservation.read(settings.get("model_catalog_observations:chatgpt")?.valueJson).records
                     app.inku.mobile.llm.ChatGptModelPolicy(purposes, app.inku.mobile.data.SignInServices.chatGptAssessments(records))
                 }
-            })
+            }).also { manager ->
+                // One registration per device: once at start-up, the others and any unfinished one go.
+                applicationScope.launch {
+                    try { manager.tidy() }
+                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (error: Exception) { android.util.Log.w("InkuProvider", "chatgpt_tidy_failed ${error.javaClass.simpleName}") }
+                }
+            }
     }
     private val databaseLock = Any()
 

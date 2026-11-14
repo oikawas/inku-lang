@@ -248,15 +248,19 @@ class ChatGptPlanManager internal constructor(
      * Starts the core's `login` and answers the URL to open in Chrome. The rest
      * runs on: the callback is answered as soon as it is taken (the core's
      * `respond_before_exchange`), and the code is exchanged once inku is in front.
+     *
+     * There is one registration per device: the core signs in with it (its
+     * saved `client_id`), and registers anew only with [newRegistration]
+     * (「新しい登録でサインイン」 after another account signed in).
      */
-    suspend fun authorize(profileId: String? = null, consent: Boolean = false, japanese: Boolean = true): String {
+    suspend fun authorize(consent: Boolean = false, newRegistration: Boolean = false, japanese: Boolean = true): String {
         val attempt = Authorization(ChatGptCallbackServer(), authorizationTimeoutMs?.let { now() + it })
         val count = edit.withLock {
             val busy = if (authorization != null) 1 else 0
             if (busy == 0) { authorization = attempt; updateView() }
             busy
         }
-        val input = JSONObject().put("profile_id", profileId ?: JSONObject.NULL).put("consent", consent)
+        val input = JSONObject().put("consent", consent).put("new_registration", newRegistration)
             .put("language", if (japanese) "ja" else "en").put("pending_count", count).put("owner_count", count)
             .put("respond_before_exchange", true)
         val opened = CompletableDeferred<String>()
@@ -295,9 +299,14 @@ class ChatGptPlanManager internal constructor(
     // -----------------------------------------------------------------------
     // Registrations.
 
-    suspend fun selectProfile(id: String) {
-        cancelAuthorization()
-        runFlow("select", JSONObject().put("profile_id", id))
+    /**
+     * Once at start-up: keeps the one registration (the chosen one, else the
+     * newest connected) and drops the others and any unfinished one (the core's
+     * `tidy`; it writes only when there is something to drop). The entries on
+     * OpenAI's side stay until they are removed in ChatGPT's settings.
+     */
+    suspend fun tidy() {
+        runFlow("tidy", JSONObject())
         updateView()
     }
 
@@ -315,8 +324,8 @@ class ChatGptPlanManager internal constructor(
         profile
     }
 
-    /** 「接続状態を確認」: reads the saved registrations again and clears the last failure (Web `load`). */
-    fun reload() = updateView()
+    /** A failure of an action on the connection, shown as its status (the core's `status`) until the next change. */
+    fun showFailure(code: String) = updateView(code)
 
     /** 「利用枠を確認して再試行」: a registration a usage limit paused goes back to `connected` (the core's `resume`). */
     suspend fun retryQuota(id: String) {
@@ -376,12 +385,6 @@ class ChatGptPlanManager internal constructor(
         } catch (cancelled: CancellationException) { updateView(revocationUnconfirmed = true); throw cancelled }
     }
 
-    suspend fun deleteProfile(id: String) {
-        cancelAuthorization()
-        val done = runFlow("delete", JSONObject().put("profile_id", id))
-        http.cancelAll()
-        updateView(revocationUnconfirmed = !done.optBoolean("revocation_confirmed"))
-    }
 
     // -----------------------------------------------------------------------
     // Drawing.

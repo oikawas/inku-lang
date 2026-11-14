@@ -1952,60 +1952,43 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(settingsPane = panel, message = null)
     }
 
-    fun authorizeChatGpt(profileId: String? = null, consent: Boolean = false) {
+    /**
+     * The connection's one action that signs in (the core's `primary`):
+     * `sign_in`, `grant_plan` ([consent]) or `new_sign_in` ([newRegistration]).
+     * A failure is the connection's status, not a message kept on screen.
+     */
+    fun authorizeChatGpt(consent: Boolean = false, newRegistration: Boolean = false) {
         guardedScope.launch {
             try {
-                val url = withContext(Dispatchers.IO) { repository.chatGptPlan.authorize(profileId, consent, !state.value.uiLanguage.isEnglish) }
+                val url = withContext(Dispatchers.IO) {
+                    repository.chatGptPlan.authorize(consent, newRegistration, !state.value.uiLanguage.isEnglish)
+                }
                 mutableChatGptAuthorizationRequests.emit(url)
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { localState.value = localState.value.copy(message = strings().chatGptError((error as? app.inku.mobile.llm.ChatGptException)?.code ?: "chatgpt_auth_unavailable")) }
+            catch (error: Exception) { repository.chatGptPlan.showFailure((error as? app.inku.mobile.llm.ChatGptException)?.code ?: "chatgpt_auth_unavailable") }
         }
     }
 
     fun cancelChatGptAuthorization() = repository.chatGptPlan.cancelAuthorization()
     fun chatGptBrowserUnavailable() = repository.chatGptPlan.browserUnavailable()
-    /** 「接続状態を確認」 (Web `load`). */
-    fun checkChatGptConnection() {
-        repository.chatGptPlan.reload()
-        localState.value = localState.value.copy(message = null)
-    }
 
-    /** 「利用枠を確認して再試行」 for a registration a usage limit paused (Web `retry`). */
-    fun retryChatGptQuota(id: String) {
+    /** 「利用枠を確認して再試行」 (the core's `retry`: its `resume`). */
+    fun retryChatGptQuota() {
+        val id = state.value.chatGptPlan.activeProfileId ?: return
         guardedScope.launch {
             try { withContext(Dispatchers.IO) { repository.chatGptPlan.retryQuota(id) } }
-            catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: app.inku.mobile.llm.ChatGptException) { repository.chatGptPlan.showFailure(error.code) }
         }
     }
 
-    fun selectChatGptProfile(id: String) {
-        guardedScope.launch {
-            try {
-                withContext(Dispatchers.IO) { repository.chatGptPlan.selectProfile(id) }
-                localState.value = localState.value.copy(providerModelFetchStates = localState.value.providerModelFetchStates - "chatgpt", message = null)
-            } catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
-        }
-    }
-
-    fun signOutChatGpt(id: String) {
+    /** 「接続を解除」, asked first: revokes and drops the tokens, keeping the registration (its `client_id`). */
+    fun signOutChatGpt() {
+        val id = state.value.chatGptPlan.activeProfileId ?: return
         guardedScope.launch {
             try { withContext(Dispatchers.IO) { repository.chatGptPlan.signOut(id) } }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
-        }
-    }
-
-    fun deleteChatGptProfile(id: String) {
-        guardedScope.launch {
-            try {
-                val active = state.value.chatGptPlan.activeProfileId == id
-                withContext(Dispatchers.IO) { repository.chatGptPlan.deleteProfile(id) }
-                localState.value = localState.value.copy(
-                    providerModelFetchStates = if (active) localState.value.providerModelFetchStates - "chatgpt" else localState.value.providerModelFetchStates,
-                    message = null,
-                )
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
+            catch (error: app.inku.mobile.llm.ChatGptException) { repository.chatGptPlan.showFailure(error.code) }
         }
     }
 

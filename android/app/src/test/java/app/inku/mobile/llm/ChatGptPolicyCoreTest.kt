@@ -54,6 +54,11 @@ class ChatGptPolicyCoreTest {
         val legacy = JSONObject(profile.toString()).put("refresh_owner", "runtime").put("issuer", "https://auth.openai.com")
         assertEquals(canonical(legacy), canonical(restored))
         assertEquals("exported", ChatGptCore.toCore(JSONObject(profile.toString()).put("refresh_owner", "exported")).getString("refresh_owner"))
+        // The id token kept for `id_token_hint` after sign-out goes through both ways and the store's shape.
+        val signedOut = JSONObject(profile.toString()).put("sub", "person").put("retained_id_token", "kept-token")
+        assertEquals("kept-token", ChatGptCore.fromCore(ChatGptCore.toCore(signedOut)).getString("retained_id_token"))
+        val store = JSONObject().put("profiles", JSONObject().put("fixture", signedOut))
+        assertEquals("kept-token", hostStore(coreStore(store)).getJSONObject("profiles").getJSONObject("fixture").getString("retained_id_token"))
     }
 
     @Test fun directScopeAloneAllowsThePlan() {

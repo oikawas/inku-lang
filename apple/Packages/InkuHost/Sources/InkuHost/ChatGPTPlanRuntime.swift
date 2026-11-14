@@ -78,10 +78,16 @@ public actor ChatGPTPlanRuntime {
         _ = try checkedProfile(session); return session
     }
     public func validate(_ session: ChatGPTPlanSession) throws { _ = try checkedProfile(session) }
-    public func selectProfile(_ id: String) async throws { _ = try await profileFlow("select", id) }
     /// The core saves the resumed registration (step 5, the table's 8).
     public func retryQuota(_ id: String) async throws { _ = try await profileFlow("resume", id) }
-    /// Select, resume, sign out and delete: one registration's procedure, answered by the core.
+    /// One connection per host (the author, 2026-11-14): the core keeps the chosen registration and removes the
+    /// others and unfinished ones, writing only when there is something to remove. Run once at start.
+    public func tidy() async throws {
+        try checkOpen()
+        var context = ChatGPTFlowContext(check: { try await self.checkOpen() })
+        _ = try await drive(Self.flowStart("tidy", input: [:]), &context)
+    }
+    /// Resume and sign out: the registration's procedure, answered by the core.
     private func profileFlow(_ flow: String, _ id: String) async throws -> ExactJSON {
         try checkOpen()
         var context = ChatGPTFlowContext(profileID: id, check: { try await self.checkOpen() })
@@ -89,8 +95,9 @@ public actor ChatGPTPlanRuntime {
     }
 
     /// The core's login flow runs until it asks to open the sign-in page; that URL is returned, and
-    /// `finishAuthorization` goes on from there. `language` is the callback page's (`ja` or `en`).
-    public func beginAuthorization(profileID: String? = nil, consent: Bool = false, language: String = "en") async throws -> ChatGPTAuthorization {
+    /// `finishAuthorization` goes on from there. The core signs in again with the host's one registration and its
+    /// saved client id; `newRegistration` replaces it (another account). `language` is the callback page's.
+    public func beginAuthorization(consent: Bool = false, newRegistration: Bool = false, language: String = "en") async throws -> ChatGPTAuthorization {
         _ = try checkedState()
         // The true number of sign-ins in progress (step 5, the table's 2); one local owner holds them all.
         let count = attempts.count + (startingAuthorization ? 1 : 0)
@@ -98,7 +105,7 @@ public actor ChatGPTPlanRuntime {
         defer { startingAuthorization = false }
         var input: [String: ExactJSON] = ["consent": .bool(consent), "language": .string(language == "ja" ? "ja" : "en"),
                                           "pending_count": .integer(count), "owner_count": .integer(count)]
-        if let profileID { input["profile_id"] = .string(profileID) }
+        if newRegistration { input["new_registration"] = .bool(true) }
         let id = UUID().uuidString, beginEpoch = epoch
         var context = ChatGPTFlowContext(check: { try await self.checkStarting(beginEpoch) })
         do {
@@ -135,11 +142,6 @@ public actor ChatGPTPlanRuntime {
         return try await profileFlow("sign_out", id)["revocation_confirmed"].bool == true
     }
 
-    /// The core signs out, then removes the registration and its pending entry.
-    public func deleteProfile(_ id: String) async throws -> Bool {
-        for attempt in Array(attempts.values) where attempt.profileID == id { await cancelAuthorization(attempt.id) }
-        return try await profileFlow("delete", id)["revocation_confirmed"].bool == true
-    }
 
     public func models(session: ChatGPTPlanSession? = nil, force: Bool = false) async throws -> [ChatGPTPlanModel] {
         let session = try session ?? pin()

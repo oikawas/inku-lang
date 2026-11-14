@@ -125,6 +125,13 @@ enum InkuPlatform {
     static let defaultBackupGenerations = 1
     #endif
 
+    /// The Sign in with ChatGPT page's introduction, naming where saved works stay.
+    #if os(macOS)
+    static let chatGPTPlanIntro = "本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこのMacの同じライブラリに残ります。"
+    #else
+    static let chatGPTPlanIntro = "本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこの端末の同じライブラリに残ります。"
+    #endif
+
     /// The settings page of this system's own extras (appearance, local records), named after the system.
     #if os(macOS)
     static let nativeSettingsTitle = (ja: "macOS補助", en: "Additional macOS settings")

@@ -486,6 +486,8 @@ public final class AppModel {
             else { ordinary = transport ?? URLSessionProviderTransport(database: database) }
             let routed = PersonalPlanRoutingTransport(ordinary: ordinary, runtime: personalRuntime)
             self.personalRuntime = personalRuntime
+            // One connection per host (the author, 2026-11-14): the core keeps the chosen registration once at start.
+            Task { try? await personalRuntime.tidy() }
             self.managedTransport = routed
             self.host = PipelineHost(database: database, transport: routed, credentials: credentials,
                                      svgLimitBytes: { try await store.svgLimitBytes() })

@@ -14,7 +14,7 @@ import XCTest
             await model.load(app: fixture.app)
             let before = await fixture.http.modelCalls
             XCTAssertEqual(before, 0, "Opening settings must not fetch the catalog")
-            await model.authorize(profileID: mode == "new" ? nil : fixture.profileID, consent: mode == "consent", app: fixture.app) { url in
+            await model.authorize(consent: mode == "consent", app: fixture.app) { url in
                 fixture.accept(url)
             }
             XCTAssertTrue(model.connected, mode)
@@ -36,7 +36,7 @@ import XCTest
         defer { fixture.remove() }
         await fixture.app.initialize()
         let model = ChatGPTPlanSettingsModel()
-        await model.authorize(profileID: fixture.profileID, app: fixture.app) { fixture.accept($0) }
+        await model.authorize(app: fixture.app) { fixture.accept($0) }
         XCTAssertTrue(model.connected)
         XCTAssertEqual(model.code, "chatgpt_transport_unavailable")
         let calls = await fixture.http.modelCalls
@@ -53,7 +53,7 @@ import XCTest
             defer { fixture.remove() }
             await fixture.app.initialize()
             let model = ChatGPTPlanSettingsModel()
-            await model.authorize(profileID: fixture.profileID, app: fixture.app) { url in
+            await model.authorize(app: fixture.app) { url in
                 if cancelled { Task { @MainActor in await model.cancel(app: fixture.app) } }
                 else { fixture.accept(url) }
             }

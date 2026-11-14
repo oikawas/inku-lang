@@ -158,7 +158,7 @@ fn page(language: &str, kind: &str) -> (u64, Value, String) {
         json!({"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store",
             "Referrer-Policy":"no-referrer","Connection":"close"}),
         format!(
-            r#"<!doctype html><html lang="{language}"><head><meta charset="utf-8"><title>{title}</title></head><body><main><h1>{title}</h1><p>{message}</p></main></body></html>"#
+            r#"<!doctype html><html lang="{language}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{title}</title></head><body><main><h1>{title}</h1><p>{message}</p></main></body></html>"#
         ),
     )
 }
@@ -1549,6 +1549,13 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("ChatGPTでの許可を受け取りました")
+        );
+        // A phone lays the page out at its own width (the author, 11-14: the
+        // text was small in Chrome on Pixel 9).
+        assert!(
+            host.responses[0]["body"].as_str().unwrap().contains(
+                r#"<meta name="viewport" content="width=device-width, initial-scale=1">"#
+            )
         );
 
         let mut host = Host::new(json!({"profiles":{},"registrations_pending":{}}));

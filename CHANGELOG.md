@@ -8,6 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Shared core: the "Sign in with ChatGPT" callback pages (received, completed, failed) now declare a viewport, so a phone browser no longer shrinks their text.
 - Swift (macOS, iOS): Sign in with ChatGPT sign-in, token refresh, model list refresh, sign-out, deletion, selection and usage-limit pause and resume now follow procedures answered by the shared core. The page the browser shows after signing in changes from one English sentence to a Japanese or English page.
 - Android: "Sign in with ChatGPT" sign-in, token refresh, refreshing the model list, sign-out, deletion, selection and pausing and resuming at a usage limit now follow the shared core's `chatgpt_flow_start` and `chatgpt_flow_next` answers (Android keeps Chrome, the listener, sending and receiving, the signature check, the store and the locks). Refreshing the model list waits 15 seconds instead of 30. As before, the callback page says "Return to inku to finish connecting." as soon as it is received, and the code is exchanged once inku is in front.
 - Swift (macOS, iOS): Sign in with ChatGPT requests now take their destination, headers and token header from the shared core, and time limits, failed connections and unreadable answers are classified by the core. The model list request gains `Accept: application/json`, and a stream that cannot be read as JSON is retried. A time limit and an answer that cannot be used as drawing data now have their own text.

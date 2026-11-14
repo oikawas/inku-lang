@@ -54,6 +54,8 @@ export type ModelAdministration = {
 	readonly modelCatalog: ProviderGroup[];
 	updateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
 	addModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => Promise<void>;
+	chatgptDraft: (request: { draft?: ChatGPTDraft['draft'] | null; edit?: ChatGPTDraftEdit | null;
+		assessment_drafts?: Record<string, ModelOption> }) => Promise<ChatGPTDraft>;
 	askDeleteModelProvider: (provider: Provider) => void;
 	fetchProviderModels: (provider: Provider) => Promise<void>;
 	askClearModelApiKey: (provider: Provider) => void;
@@ -75,6 +77,20 @@ type ChatGPTPublication = {
 	// The shared core's descriptor of the sign-in service (Sign in with ChatGPT).
 	service?: { id: string; label: string; labels: { ja: string; en: string }; abbreviation: string;
 		usage_url: string; kind: string; requires_api_key: boolean };
+};
+
+export type ChatGPTDraftEdit =
+	| { kind: 'toggle_model'; id: string; selected: boolean }
+	| { kind: 'toggle_purpose'; id: string; purpose: 'llm' | 'vision' }
+	| { kind: 'select_all'; ids: string[]; selected: boolean };
+export type ChatGPTDraft = {
+	draft: { selected: Record<string, boolean>; purposes: Record<string, ('llm' | 'vision')[]> };
+	rows: { id: string; selected: boolean; can_toggle: boolean; purposes: ('llm' | 'vision')[]; locked_purposes: ('llm' | 'vision')[] }[];
+	dirty: boolean;
+	can_refresh: boolean;
+	can_save: boolean;
+	save: { profile_id: string; generation: number; published_models: string[]; model_purposes: Record<string, ('llm' | 'vision')[]> };
+	assessments: Record<string, unknown>[];
 };
 
 export function createModelAdministration<TActor extends SettingsActor>(
@@ -127,6 +143,23 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			base_url: '', api_key_set: false, api_key_hint: null, models,
 			enabled_models: data.enabled_models
 		} } };
+	}
+
+	// One edit of the publication draft, answered by the shared core through the Server:
+	// the draft after it, each row's state, whether it changed, the save body and the
+	// changed shared assessments (Sign in with ChatGPT step 2, 2026-11-14).
+	async function chatgptDraft(request: { draft?: ChatGPTDraft['draft'] | null; edit?: ChatGPTDraftEdit | null;
+		assessment_drafts?: Record<string, ModelOption> }): Promise<ChatGPTDraft> {
+		if (!chatgptPublication) throw new Error('chatgpt_not_connected');
+		const { service: _service, ...publication } = chatgptPublication;
+		const response = await deps.apiFetch('/api/me/chatgpt/models/draft', {
+			method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ publication, draft: request.draft ?? null, edit: request.edit ?? null,
+				administrator: isAdministrator(), assessment_drafts: request.assessment_drafts ?? {} })
+		});
+		const value = await response.json();
+		if (!response.ok) throw new Error(typeof value?.detail?.code === 'string' ? value.detail.code : `HTTP ${response.status}`);
+		return value as ChatGPTDraft;
 	}
 
 	async function personalResponse(response: Response): Promise<ChatGPTPublication> {
@@ -412,19 +445,21 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			const owner = deps.currentUser()?.id, version = revision;
 			const selected = patch.enabled_models ?? modelSettings?.providers.chatgpt?.enabled_models ?? {};
 			const draftModels = patch.models ?? modelSettings?.providers.chatgpt?.models ?? chatgptPublication.models;
-			const modelPurposes = Object.fromEntries(chatgptPublication.models.map((model) => [model.id,
-				draftModels.find((draft) => draft.id === model.id)?.purposes ?? model.purposes ?? ['llm', 'vision']]));
-			// The assessments are shared model settings (the author, 2026-10-13): an
-			// administrator saves a changed model's whole assessment there, before the
-			// person's publication, whose answer then carries it.
-			const assessments = isAdministrator() ? chatgptPublication.models.flatMap((model) => {
-				const draft = draftModels.find((item) => item.id === model.id);
-				if (!draft || assessmentKeys.every((key) => JSON.stringify(draft[key] ?? null) === JSON.stringify(model[key] ?? null))) return [];
-				return [{ id: model.id, label: model.label, ...Object.fromEntries(assessmentKeys
-					.filter((key) => draft[key] !== undefined && draft[key] !== '').map((key) => [key, draft[key]])) }];
-			}) : [];
 			modelSettingsLoading = true;
 			try {
+				// The save body and the changed shared assessments are the shared core's answer
+				// (Sign in with ChatGPT step 2, 2026-11-14). The assessments are shared model
+				// settings (the author, 2026-10-13): an administrator saves a changed model's
+				// assessment there, before the person's publication, whose answer then carries it.
+				const answer = await chatgptDraft({
+					draft: {
+						selected: Object.fromEntries(chatgptPublication.models.map((model) => [model.id, selected[model.id] === true])),
+						purposes: Object.fromEntries(chatgptPublication.models.map((model) => [model.id,
+							draftModels.find((draft) => draft.id === model.id)?.purposes ?? model.purposes ?? ['llm', 'vision']]))
+					},
+					assessment_drafts: Object.fromEntries(draftModels.map((model) => [model.id, model]))
+				});
+				const assessments = answer.assessments;
 				if (assessments.length) {
 					const shared = await deps.apiFetch('/api/settings/models', {
 						method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -434,11 +469,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 					if (!shared.ok) throw new Error(`HTTP ${shared.status}`);
 				}
 				const data = await personalResponse(await deps.apiFetch('/api/me/chatgpt/models/settings', {
-					method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-						profile_id: chatgptPublication.profile_id, generation: chatgptPublication.generation,
-						published_models: chatgptPublication.models.filter((model) => selected[model.id] === true).map((model) => model.id),
-						model_purposes: modelPurposes
-					})
+					method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(answer.save)
 				}));
 				if (!sameOwner(owner, version) || !personalModelsAllowed()) return false;
 				acceptChatGPT(data);
@@ -500,6 +531,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		get modelCatalog() { return deps.currentUser()?.id === boundOwner ? modelCatalog.filter((provider) => visibleProvider(provider.id)) : []; },
 		updateModelProvider,
 		addModelProvider,
+		chatgptDraft,
 		askDeleteModelProvider,
 		fetchProviderModels,
 		askClearModelApiKey,

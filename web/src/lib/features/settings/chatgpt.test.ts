@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { compile, compileModule } from 'svelte/compiler';
 import { render } from 'svelte/server';
@@ -15,6 +15,31 @@ const generated = compileModule(source, { filename: 'chatgpt.svelte.js', generat
 const { createChatGPTSettings } = await import('data:text/javascript;base64,' + Buffer.from(generated).toString('base64'));
 
 const response = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
+// The shared core's answers (Sign in with ChatGPT), which the Server returns from /view and /models/draft.
+const SIGN_IN_CASES = (JSON.parse(readFileSync(new URL('../../../../../core/crates/inku-pipeline/data/sign-in-cases.json', import.meta.url), 'utf8')) as {
+	cases: { name: string; request: Record<string, unknown>; answer: Record<string, unknown> }[];
+}).cases;
+// /models/draft answers recorded from the shared core for the exact requests these tests send
+// (server/tests/test_sign_in_cases.py checks that the core still gives them).
+const DRAFT_ANSWERS = JSON.parse(readFileSync(new URL('./chatgpt-draft-answers.json', import.meta.url), 'utf8')) as
+	{ request: Record<string, unknown>; answer: Record<string, unknown> }[];
+const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
+	? Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : item);
+// INKU_RECORD_DRAFT_REQUESTS=<file> writes the requests out, to record their answers again.
+const recordedRequests: unknown[] = [];
+process.on('exit', () => {
+	if (process.env.INKU_RECORD_DRAFT_REQUESTS) writeFileSync(process.env.INKU_RECORD_DRAFT_REQUESTS, JSON.stringify(recordedRequests));
+});
+const coreDraftAnswer = (request: unknown): any => {
+	recordedRequests.push(request);
+	const row = DRAFT_ANSWERS.find((entry) => canonical(entry.request) === canonical(request));
+	if (!row) throw new Error('no recorded core answer for ' + JSON.stringify(request));
+	return row.answer;
+};
+const signInCase = (name: string): any => {
+	const { schema: _schema, outcome: _outcome, ...answer } = SIGN_IN_CASES.find((row) => row.name === name)!.answer;
+	return answer;
+};
 const state = (label: string) => ({ available: true, reason: null, self_hosted: true, active_profile_id: 'profile', profiles: [{ id: 'profile', label, state: 'connected' }] });
 
 test('completed authorization refreshes the catalog once and keeps login successful on refresh failure', async () => {
@@ -196,11 +221,14 @@ test('owner changes hide saved profiles and discard a late response; unconfirmed
 	slow = false;
 	await connection.load();
 	await connection.signOut('profile');
-	assert.equal(connection.code, 'chatgpt_revocation_unconfirmed');
+	// The shared core reports the unconfirmed revocation from what the screen passes it.
+	assert.equal(connection.code, null);
+	assert.deepEqual([connection.viewInput.last_operation, connection.viewInput.revocation_confirmed], ['sign_out', false]);
 	assert.equal(changes, 1);
 	available = false;
 	assert.equal(connection.state, null);
 	assert.equal(connection.code, null);
+	assert.deepEqual([connection.viewInput.last_operation, connection.viewInput.revocation_confirmed], [null, null]);
 	connection.reset();
 });
 
@@ -219,10 +247,12 @@ test('connected guide leads to personal model settings with explicit publication
 		apiFetch: async () => response(connected)
 	});
 	// Rendering a snapshot keeps SSR's destroy hook from cancelling the controller under test.
+	// What it shows is the shared core's answer for a connected registration with the plan scope.
+	const connectedView = signInCase('view: connected with the plan scope');
 	const body = () => render(view, { props: { connection: {
-		state: connection.state, code: connection.code, busy: connection.busy,
-		load() {}, cancel() {}
-	}, onOpenModelSettings() {} } }).body;
+		state: connection.state, code: connection.code, busy: connection.busy, viewInput: connection.viewInput,
+		view: async () => connectedView, load() {}, cancel() {}
+	}, initialView: connectedView, onOpenModelSettings() {} } }).body;
 	await connection.load();
 	assert.match(body(), new RegExp(ja.chatgptModelSettingsGuide));
 	assert.match(body(), new RegExp(ja.chatgptOpenModelSettings));
@@ -230,7 +260,8 @@ test('connected guide leads to personal model settings with explicit publication
 	// The self-hosted button names the Mac helper it opens; the same-PC one signs in.
 	assert.match(body(), new RegExp('>' + ja.chatgptConnectHelper + '<'));
 	assert.doesNotMatch(body(), new RegExp(ja.chatgptSignIn));
-	const samePc = render(view, { props: { connection: { state: { ...connection.state, self_hosted: false }, code: null, busy: false, load() {}, cancel() {} }, onOpenModelSettings() {} } }).body;
+	const samePc = render(view, { props: { connection: { state: { ...connection.state, self_hosted: false }, code: null, busy: false,
+		viewInput: connection.viewInput, view: async () => connectedView, load() {}, cancel() {} }, initialView: connectedView, onOpenModelSettings() {} } }).body;
 	assert.match(samePc, new RegExp('>' + ja.chatgptSignIn + '<'));
 	assert.doesNotMatch(samePc, new RegExp(ja.chatgptConnectHelper));
 
@@ -267,6 +298,7 @@ test('connected guide leads to personal model settings with explicit publication
 				} });
 			}
 			assert.ok(path.startsWith('/api/me/chatgpt/'));
+			if (path.endsWith('/models/draft')) return response(coreDraftAnswer(JSON.parse(String(init!.body))));
 			if (path.endsWith('/refresh')) return new Promise<Response>((resolve) => { deferred = resolve; });
 			if (init?.method === 'PUT') {
 				const body = JSON.parse(String(init.body));
@@ -324,7 +356,8 @@ test('connected guide leads to personal model settings with explicit publication
 		{ id: 'second-slug', label: 'First offered', purposes: ['vision'], recommendation_vision: 3, comment_ja: '共通の評価' },
 		{ id: 'first-slug', label: 'Second offered', purposes: [] }
 	], enabled_models: { 'second-slug': true, 'first-slug': false } }), true);
-	assert.deepEqual(requests.slice(before).map((request) => request.path), ['/api/settings/models', '/api/me/chatgpt/models/settings']);
+	// The shared core works out the save body and the changed assessment first (step 2, 2026-11-14).
+	assert.deepEqual(requests.slice(before).map((request) => request.path), ['/api/me/chatgpt/models/draft', '/api/settings/models', '/api/me/chatgpt/models/settings']);
 	await administration.saveModelSettings();
 	assert.equal(administration.modelSettings.providers.chatgpt.enabled_models['second-slug'], true);
 	assert.equal(changes, 4);

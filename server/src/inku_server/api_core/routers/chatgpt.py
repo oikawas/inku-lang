@@ -16,7 +16,7 @@ from ...chatgpt_auth import USAGE_URL, attempts, auth_policy, delete_profile, si
 from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin
 from ...chatgpt_store import ChatGPTError, CredentialStore
-from ...verified_model_catalog import sign_in_service
+from ...verified_model_catalog import core_catalog, sign_in_service
 from ..deps import _current_user
 
 router = APIRouter(prefix="/api/me/chatgpt")
@@ -284,3 +284,52 @@ def publish_models(body: PublishedModelsBody, actor: str = Depends(owner)) -> di
         return {**saved, "service": sign_in_service("chatgpt")}
     except ChatGPTError as error:
         raise _error(error) from None
+
+
+# What the settings screens show for the connection, and how editing the published models
+# goes, are the shared core's answers (Sign in with ChatGPT step 2, 2026-11-14). Both are
+# pure: the host passes the state it holds and nothing is read or written here.
+
+class ConnectionViewBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connection: dict | None = Field(default=None, description="The connection state as GET /api/me/chatgpt returned it; null before it is read.")
+    attempt: dict = Field(default_factory=dict, description="The sign-in attempt in progress: `active`, `can_reopen` and `helper`.")
+    busy: bool = Field(default=False, description="True while an operation of this screen is running.")
+    code: str | None = Field(default=None, description="The last status or failure code the screen holds.")
+    last_operation: Literal["sign_out", "delete"] | None = Field(default=None, description="The last sign-out or delete, if any.")
+    revocation_confirmed: bool | None = Field(default=None, description="Whether that operation's revocation was confirmed.")
+
+
+@router.post("/view", summary="Read what the Sign in with ChatGPT settings show", dependencies=[Depends(owner)])
+def connection_view(body: ConnectionViewBody) -> dict:
+    """Return the status line, the actions and each profile's status and actions from the shared core.
+
+    Sign-out and delete carry `confirm: true`: the screen asks before running them.
+    """
+    request = body.model_dump()
+    request["connection"] = request["connection"] or {}
+    return core_catalog("sign_in_connection_view", service="chatgpt", **request)
+
+
+class PublicationDraftBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    publication: dict = Field(description="The publication settings as GET /api/me/chatgpt/models/settings returned them.")
+    draft: dict | None = Field(default=None, description="The draft (`selected`, `purposes`) the previous answer returned; null opens from the publication.")
+    edit: dict | None = Field(default=None, description="One edit: `toggle_model`, `toggle_purpose` or `select_all`; null applies none.")
+    administrator: bool = Field(default=False, description="True when the caller may change the shared assessments.")
+    assessment_drafts: dict = Field(default_factory=dict, description="An administrator's assessment drafts, by model id.")
+
+
+@router.post("/models/draft", summary="Apply an edit to the Sign in with ChatGPT model publication draft", dependencies=[Depends(owner)])
+def publication_draft(body: PublicationDraftBody) -> dict:
+    """Return the shared core's draft, rows, whether it changed, the save body and the changed assessments.
+
+    Nothing is saved: PUT /api/me/chatgpt/models/settings saves the body it returns.
+    """
+    request = {key: value for key, value in body.model_dump().items() if value is not None}
+    try:
+        return core_catalog("sign_in_publication_draft", service="chatgpt", **request)
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"code": "chatgpt_invalid_draft"}) from None

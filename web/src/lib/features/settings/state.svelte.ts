@@ -193,6 +193,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		updateRenderLimits: serverAdministration.updateRenderLimits,
 		updateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => modelAdministration.updateModelProvider(provider, patch),
 		addModelProvider: modelAdministration.addModelProvider,
+		chatgptDraft: modelAdministration.chatgptDraft,
 		askDeleteModelProvider: modelAdministration.askDeleteModelProvider,
 		fetchProviderModels: modelAdministration.fetchProviderModels,
 		askClearModelApiKey: modelAdministration.askClearModelApiKey,

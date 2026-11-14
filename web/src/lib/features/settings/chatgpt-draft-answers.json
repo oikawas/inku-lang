@@ -1,0 +1,245 @@
+[
+ {
+  "request": {
+   "publication": {
+    "profile_id": "profile",
+    "generation": 1,
+    "models": [
+     {
+      "id": "second-slug",
+      "label": "First offered",
+      "speed_label": "Old speed",
+      "purposes": [
+       "llm",
+       "vision"
+      ]
+     },
+     {
+      "id": "first-slug",
+      "label": "Second offered",
+      "purposes": [
+       "llm",
+       "vision"
+      ]
+     }
+    ],
+    "enabled_models": {
+     "second-slug": false,
+     "first-slug": false
+    },
+    "assessment_keys": [
+     "recommendation_vision",
+     "recommendation_stage1",
+     "speed_label",
+     "comment_ja"
+    ]
+   },
+   "draft": {
+    "selected": {
+     "second-slug": true,
+     "first-slug": false
+    },
+    "purposes": {
+     "second-slug": [
+      "vision"
+     ],
+     "first-slug": []
+    }
+   },
+   "edit": null,
+   "administrator": false,
+   "assessment_drafts": {
+    "second-slug": {
+     "id": "second-slug",
+     "label": "First offered",
+     "purposes": [
+      "vision"
+     ],
+     "recommendation_stage1": 4,
+     "speed_label": "",
+     "comment_ja": "実測の評価"
+    },
+    "first-slug": {
+     "id": "first-slug",
+     "label": "Second offered",
+     "purposes": []
+    }
+   }
+  },
+  "answer": {
+   "assessments": [],
+   "can_refresh": false,
+   "can_save": true,
+   "dirty": true,
+   "draft": {
+    "purposes": {
+     "first-slug": [],
+     "second-slug": [
+      "vision"
+     ]
+    },
+    "selected": {
+     "first-slug": false,
+     "second-slug": true
+    }
+   },
+   "outcome": "ok",
+   "rows": [
+    {
+     "can_toggle": true,
+     "id": "second-slug",
+     "locked_purposes": [],
+     "purposes": [
+      "vision"
+     ],
+     "selected": true
+    },
+    {
+     "can_toggle": false,
+     "id": "first-slug",
+     "locked_purposes": [],
+     "purposes": [],
+     "selected": false
+    }
+   ],
+   "save": {
+    "generation": 1,
+    "model_purposes": {
+     "first-slug": [],
+     "second-slug": [
+      "vision"
+     ]
+    },
+    "profile_id": "profile",
+    "published_models": [
+     "second-slug"
+    ]
+   },
+   "schema": "inku.model-catalog.v1"
+  }
+ },
+ {
+  "request": {
+   "publication": {
+    "profile_id": "profile",
+    "generation": 1,
+    "models": [
+     {
+      "id": "second-slug",
+      "label": "First offered",
+      "purposes": [
+       "vision"
+      ],
+      "enabled": true,
+      "recommendation_stage1": 4,
+      "comment_ja": "実測の評価"
+     },
+     {
+      "id": "first-slug",
+      "label": "Second offered",
+      "purposes": [],
+      "enabled": false
+     }
+    ],
+    "enabled_models": {
+     "second-slug": true,
+     "first-slug": false
+    },
+    "assessment_keys": [
+     "recommendation_vision",
+     "recommendation_stage1",
+     "speed_label",
+     "comment_ja"
+    ]
+   },
+   "draft": {
+    "selected": {
+     "second-slug": true,
+     "first-slug": false
+    },
+    "purposes": {
+     "second-slug": [
+      "vision"
+     ],
+     "first-slug": []
+    }
+   },
+   "edit": null,
+   "administrator": true,
+   "assessment_drafts": {
+    "second-slug": {
+     "id": "second-slug",
+     "label": "First offered",
+     "purposes": [
+      "vision"
+     ],
+     "recommendation_vision": 3,
+     "comment_ja": "共通の評価"
+    },
+    "first-slug": {
+     "id": "first-slug",
+     "label": "Second offered",
+     "purposes": []
+    }
+   }
+  },
+  "answer": {
+   "assessments": [
+    {
+     "comment_ja": "共通の評価",
+     "id": "second-slug",
+     "label": "First offered",
+     "recommendation_vision": 3
+    }
+   ],
+   "can_refresh": true,
+   "can_save": true,
+   "dirty": false,
+   "draft": {
+    "purposes": {
+     "first-slug": [],
+     "second-slug": [
+      "vision"
+     ]
+    },
+    "selected": {
+     "first-slug": false,
+     "second-slug": true
+    }
+   },
+   "outcome": "ok",
+   "rows": [
+    {
+     "can_toggle": true,
+     "id": "second-slug",
+     "locked_purposes": [],
+     "purposes": [
+      "vision"
+     ],
+     "selected": true
+    },
+    {
+     "can_toggle": false,
+     "id": "first-slug",
+     "locked_purposes": [],
+     "purposes": [],
+     "selected": false
+    }
+   ],
+   "save": {
+    "generation": 1,
+    "model_purposes": {
+     "first-slug": [],
+     "second-slug": [
+      "vision"
+     ]
+    },
+    "profile_id": "profile",
+    "published_models": [
+     "second-slug"
+    ]
+   },
+   "schema": "inku.model-catalog.v1"
+  }
+ }
+]

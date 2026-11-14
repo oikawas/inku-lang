@@ -29,7 +29,8 @@ usage() {
     printf 'the team in INKU_IOS_TEAM (Xcode must be\n' >&2
     printf 'signed in to that team), copy the installed app'"'"'s Library/Application Support to\n' >&2
     printf '$INKU_IOS_DEVICE_BACKUPS/<UDID>/<time> (an absolute path outside the checkout; default\n' >&2
-    printf '~/Library/Application Support/Inku Development/ios-device-backups), then install and launch it with devicectl.\n' >&2
+    printf '~/Library/Application Support/Inku Development/ios-device-backups; once a day for each device, the newest two\n' >&2
+    printf 'kept), then install and launch it with devicectl.\n' >&2
     printf 'Default: Release application and release Rust archives, for the iOS Simulator, signed to run locally.\n' >&2
     printf 'Set INKU_APPLE_PROFILE=debug to explicitly select debug Rust archives.\n' >&2
     printf 'With --run, boot the simulator device (default: %s) without opening Simulator.app,\n' "$DEVICE_NAME" >&2
@@ -194,14 +195,21 @@ if [[ "$PHYSICAL" == true ]]; then
         library="$(xcrun devicectl device info files --device "$PHYSICAL_UDID" --domain-type appDataContainer \
             --domain-identifier "$BUNDLE_ID" --subdirectory Library --no-recurse 2>/dev/null || true)"
     fi
-    if grep -q '^Application Support ' <<< "$library"; then
+    # The author's rule (2026-11-15): one copy a day for each device, and at most two kept (device_backups.py).
+    DEVICE_BACKUPS="$BACKUP_ROOT/$PHYSICAL_UDID"
+    if ! grep -q '^Application Support ' <<< "$library"; then
+        :
+    elif today_copy="$(python3 "$APPLE/scripts/device_backups.py" taken-today "$DEVICE_BACKUPS")"; then
+        printf 'Not copied: %s already has a copy taken today (%s).\n' "$PHYSICAL_UDID" "$today_copy"
+    else
         # Outside the checkout (2026-11-13): copies under apple/build/ went with removed worktrees, taken for a cache.
-        BACKUP="$BACKUP_ROOT/$PHYSICAL_UDID/$(date +%Y%m%d-%H%M%S)"
+        BACKUP="$DEVICE_BACKUPS/$(date +%Y%m%d-%H%M%S)"
         mkdir -p "$BACKUP"
         xcrun devicectl device copy from --device "$PHYSICAL_UDID" --domain-type appDataContainer \
             --domain-identifier "$BUNDLE_ID" --source "Library/Application Support" --destination "$BACKUP" \
             || { printf 'Could not copy the installed app data from %s; nothing was installed.\n' "$PHYSICAL_UDID" >&2; exit 1; }
         printf 'Copied the installed app data to %s\n' "$BACKUP"
+        python3 "$APPLE/scripts/device_backups.py" prune "$DEVICE_BACKUPS"
     fi
     xcrun devicectl device install app --device "$PHYSICAL_UDID" "$APP"
     xcrun devicectl device process launch --device "$PHYSICAL_UDID" --terminate-existing "$BUNDLE_ID"

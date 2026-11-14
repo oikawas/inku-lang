@@ -202,6 +202,13 @@ public enum ChatGPTStatusCopy {
             "The account changed. Check the connection."),
         "chatgpt_not_connected": ("ChatGPT でサインインしてください。",
             "Sign in with ChatGPT."),
+        // Sign in with ChatGPT step 4 (the author's answer): a time limit, and an answer that cannot be drawing data.
+        "chatgpt_transport_timeout": ("ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。",
+            "ChatGPT did not answer within the time limit. Try again later."),
+        "chatgpt_response_invalid": ("ChatGPTの応答を描画のデータとして受け取れませんでした。形式の診断が必要です。",
+            "The ChatGPT response could not be used as drawing data. A protocol diagnosis is needed."),
+        "chatgpt_response_too_large": ("ChatGPTの応答を描画のデータとして受け取れませんでした。形式の診断が必要です。",
+            "The ChatGPT response could not be used as drawing data. A protocol diagnosis is needed."),
         "chatgpt_quota": ("プラン利用の上限に達しました。利用枠を確認してください。",
             "Plan usage reached its limit. Check your usage."),
         "subscription_sharing_usage_limit_exceeded": ("プラン利用の上限に達しました。利用枠を確認してください。",

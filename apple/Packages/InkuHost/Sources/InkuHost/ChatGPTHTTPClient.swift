@@ -45,13 +45,13 @@ public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable 
         defer { session.invalidateAndCancel() }
         let (bytes, response) = try await session.bytes(for: request)
         defer { bytes.task.cancel() }
-        guard let response = response as? HTTPURLResponse else { throw HostError("chatgpt_transport_unavailable") }
+        guard let response = response as? HTTPURLResponse else { throw ChatGPTWire.transport(.unavailable) }
         status = response.statusCode
         let maximum = (200...299).contains(response.statusCode) ? maximumBytes : min(maximumBytes, 65_536)
-        if !observed, response.expectedContentLength > Int64(maximum) { truncated = true; throw HostError("chatgpt_response_too_large") }
+        if !observed, response.expectedContentLength > Int64(maximum) { truncated = true; throw ChatGPTWire.transport(.tooLarge) }
         for try await byte in bytes {
             try Task.checkCancellation()
-            guard data.count < maximum else { truncated = true; throw HostError("chatgpt_response_too_large") }
+            guard data.count < maximum else { truncated = true; throw ChatGPTWire.transport(.tooLarge) }
             data.append(byte)
             if data.count % 4096 == 0 { onBytes(data.count) }
         }
@@ -67,8 +67,6 @@ enum ChatGPTEndpoints {
     static let resource = try! constants.requiredString("resource")
     static let token = URL(string: try! constants.requiredString("token"))!
     static let discovery = URL(string: issuer + "/.well-known/openid-configuration")!
-    static let models = URL(string: resource + "/models")!
-    static let responses = URL(string: resource + "/responses")!
     static func validate(_ url: URL, authenticationOnly: Bool = false) throws {
         if authenticationOnly || url.host == "auth.openai.com" {
             _ = try ChatGPTPolicy.call("chatgpt_auth_endpoint", ["url": .string(url.absoluteString)])

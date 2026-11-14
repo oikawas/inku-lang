@@ -22,6 +22,16 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-14 Sign in with ChatGPT (step 4, the sending path)
+
+Where a request goes, its headers and how the token is sent, and how transport failures are classified, come from the shared core's `provider_wire` answers (the author's answers: add the time-limit text, send `Accept` on both, and retry a stream that cannot be read). The `provider_wire` actions of the 2026-10-17 section gain `chatgpt_models_request` and `chatgpt_transport`.
+
+- Sending: `/responses` (drawing and Vision) uses the `url`, `method`, `headers` and `auth` of the `chatgpt_request` and `chatgpt_vision_request` answers, and the model list those of `chatgpt_models_request` (`ChatGPTWire.Endpoint`). `/models` gains `Accept: application/json`. The URL check before sending (`ChatGPTEndpoints.validate`) remains. The model list's answer limit is the core's `answer_limit`.
+- Transport failures: a time limit (the processing deadline, the credential lock, `URLError.timedOut`), a failed connection (other `URLError`s, other errors, an answer that is not HTTP), and an answer past its limit carry the code, failure and next action of the core's `chatgpt_transport`.
+- Answers that cannot be read: a stream or model list that cannot be read keeps the core's `code`, `failure` and `action`. A stream that is not JSON or has another shape is `malformed_payload` (the pipeline retries; it was `provider_rejected` without a retry), and one that is not UTF-8 stays `provider_rejected`. Failure bodies and the model list go to the core as text (`body`).
+- Text: the failure table (`ChatGPTStatusCopy`) gains the time limit ("ChatGPT did not answer within the time limit. Try again later.") and the answer-shape failures (`chatgpt_response_invalid`, `chatgpt_response_too_large`: "The ChatGPT response could not be used as drawing data. A protocol diagnosis is needed."). They used to fall back to "Check the Sign in with ChatGPT connection."
+- Check: the 175 request, stream, failure, list, `chatgpt_failure`, `chatgpt_models_request` and `chatgpt_transport` rows of the shared fixture's `chatgpt` section are read through the core itself and through the Swift receivers, and the destination and headers are compared on the `URLRequest`.
+
 ## 2026-11-14 Sign in with ChatGPT (step 2)
 
 The connection's state and the publication editing come from the shared core's `sign_in_connection_view` and `sign_in_publication_draft` (the author's decision: shown as the Web shows them, with the wording tables kept in the host).

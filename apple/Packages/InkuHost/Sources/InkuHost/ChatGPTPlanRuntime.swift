@@ -343,7 +343,7 @@ public actor ChatGPTPlanRuntime {
         guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite,
               argumentLimit > 0, argumentLimit <= (Int.max - 524_288) / 6 else { throw HostError("pipeline_schema_violation") }
         // Server raises TimeoutError for a non-positive attempt timeout before the ChatGPT request.
-        guard timeout > 0 else { throw HostError("chatgpt_transport_timeout") }
+        guard timeout > 0 else { throw ChatGPTWire.transport(.timeout) }
         let deadline = Date().addingTimeInterval(timeout / 1000)
         let operationEpoch = epoch
         try validate(session)
@@ -369,11 +369,8 @@ public actor ChatGPTPlanRuntime {
                 recorder.addSecrets([token, profile.refreshToken, profile.idToken].compactMap { $0 })
             }
             let sent = try body ?? Self.request(parsed: parsed, model: model, argumentLimit: argumentLimit)
-            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = sent.body
-            request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-            request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
-            let boundedRequest = request
+            // The core answers where it goes, the headers and how the token is sent (step 4).
+            let boundedRequest = sent.endpoint.request(token: token, body: sent.body, deadline: deadline)
             let result = try await guarded(deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) }) {
                 if let recorder {
                     recorder.receive(ProviderHTTPRead(status: nil, data: nil, sent: true, complete: false, truncated: false))
@@ -406,7 +403,7 @@ public actor ChatGPTPlanRuntime {
     public func visionText(session: ChatGPTPlanSession, model: String, system: String, message: String, images: [String],
                            timeoutSeconds: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         _ = try ChatGPTPolicy.call("chatgpt_auth_operation", ["purpose": .string("vision"), "tag": .string("vision")])
-        guard timeoutSeconds.isFinite, timeoutSeconds > 0 else { throw HostError("chatgpt_transport_timeout") }
+        guard timeoutSeconds.isFinite, timeoutSeconds > 0 else { throw ChatGPTWire.transport(.timeout) }
         let prepared = try ChatGPTWire.visionRequest(model: model, system: system, text: message, images: images, answerLimit: Self.visionTextLimit)
         let deadline = Date().addingTimeInterval(timeoutSeconds)
         let operationEpoch = epoch
@@ -416,11 +413,7 @@ public actor ChatGPTPlanRuntime {
         do {
             try await checkOffered(model, purpose: "vision", session: session, deadline: deadline, operationEpoch: operationEpoch)
             let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
-            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = prepared.body
-            request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-            request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
-            let boundedRequest = request
+            let boundedRequest = prepared.endpoint.request(token: token, body: prepared.body, deadline: deadline)
             let result = try await guarded(deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) }) {
                 try await self.http.send(boundedRequest, maximumBytes: prepared.wireLimit, onBytes: onBytes)
             }
@@ -451,19 +444,18 @@ public actor ChatGPTPlanRuntime {
         let cache = try ChatGPTPolicy.call("chatgpt_cache", ["force": .bool(force), "cache": profile.models == nil ? .null : ChatGPTPolicy.profile(profile)["catalog"], "now": ChatGPTPolicy.number(Date().timeIntervalSince1970)])
         if cache["fresh"].bool == true, let models = profile.models { return models }
         let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
-        var request = URLRequest(url: ChatGPTEndpoints.models); request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
-        request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
-        let boundedRequest = request
+        let endpoint = try ChatGPTWire.modelsEndpoint()
+        let boundedRequest = endpoint.request(token: token, body: nil, deadline: deadline)
+        let limit = endpoint.answerLimit ?? 1_048_576
         let result = try await guarded(deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) }) {
-            try await self.http.send(boundedRequest, maximumBytes: 1_048_576, onBytes: { _ in })
+            try await self.http.send(boundedRequest, maximumBytes: limit, onBytes: { _ in })
         }
         if !(200...299).contains(result.status) {
             let error = try ChatGPTWire.httpFailure(result)
             if try Self.shouldPause(error.diagnostic.code) { try await pauseQuota(session) }
             throw error
         }
-        guard let value = try? ExactJSON(data: result.data) else { throw HostError("chatgpt_response_invalid") }
-        let models = try ChatGPTWire.catalog(value)
+        let models = try ChatGPTWire.catalog(body: result.data)
         try await mutate { value in
             try self.validate(session, operationEpoch: operationEpoch)
             _ = try self.checkedProfile(session, value: value)
@@ -593,12 +585,12 @@ public actor ChatGPTPlanRuntime {
             group.addTask {
                 while true {
                     try Task.checkCancellation(); try await check()
-                    guard Date() < deadline else { throw HostError("chatgpt_transport_timeout") }
+                    guard Date() < deadline else { throw ChatGPTWire.transport(.timeout) }
                     try await Task.sleep(for: .milliseconds(100))
                 }
             }
             defer { group.cancelAll() }
-            guard let value = try await group.next() else { throw HostError("chatgpt_transport_unavailable") }
+            guard let value = try await group.next() else { throw ChatGPTWire.transport(.unavailable) }
             try await check(); return value
         }
     }
@@ -627,8 +619,9 @@ public actor ChatGPTPlanRuntime {
     public static func diagnostic(_ error: Error) -> ChatGPTPlanDiagnostic {
         if let failure = error as? ChatGPTPlanFailure { return failure.diagnostic }
         if let error = error as? HostError { return .init(code: error.code) }
-        if let error = error as? URLError { return .init(code: error.code == .timedOut ? "chatgpt_transport_timeout" : "chatgpt_transport_unavailable") }
-        return .init(code: "chatgpt_transport_unavailable")
+        // A transport failure is classified by the core (`chatgpt_transport`, step 4).
+        if let error = error as? URLError { return ChatGPTWire.transport(error.code == .timedOut ? .timeout : .unavailable).diagnostic }
+        return ChatGPTWire.transport(.unavailable).diagnostic
     }
     private func safeError(_ error: Error) -> Error {
         if error is CancellationError { return CancellationError() }; return HostError(Self.diagnostic(error).code)

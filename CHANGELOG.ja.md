@@ -8,6 +8,7 @@
 
 ## 未リリース
 
+- Swift（macOS・iOS）：ChatGPT でサインインの送信先・header・鍵の付け方と、時間切れ・接続の失敗・読めない答えの分けを、共通coreの答えで作るようにしました。モデル一覧の要求に`Accept: application/json`が加わり、JSONとして読めない流れは再試行されるようになりました。時間切れと、応答を描画のデータとして受け取れない時に、専用の文が出ます。
 - 共通core：「ChatGPT でサインイン」の送信の道を core が答えるようにしました（step 4）。`chatgpt_request`・`chatgpt_vision_request` の答えに送信先・method・header（`Accept: text/event-stream` を含む）・鍵の付け方・失敗の本文の上限・request id の header を足し、新しい action `chatgpt_models_request`（モデルの一覧の送信先。`Accept: application/json`）と `chatgpt_transport`（時間切れは `chatgpt_transport_timeout`、接続の失敗・切断は `chatgpt_transport_unavailable`、大きすぎる答えは `chatgpt_response_too_large`）を足しました。`chatgpt_error`・`chatgpt_catalog` は答えの本文を `body` の文字列でも受け、JSON でない本文も読みます。読めない流れと一覧の答えは `chatgpt_response_invalid` の印と種類・次の行動を返します（JSON でない・形が違う時は `malformed_payload` で再試行され、UTF-8 でない時は `provider_rejected`）。
 - 共通core：「ChatGPT でサインイン」のサービスの記述（`sign-in-services.json`）に、ログイン（issuer・道・resource・scope・仮の client id・戻りの道・署名の方式・再認証の印・数の上限）、使える操作、モデルの一覧（欄の名・キャッシュの秒数・用途の既定・bytes の上限）、送信（方言・道具の名・キャッシュの鍵の頭の字）、相手の失敗の印を移し、core はこれらを記述から読むようにしました（step 3。答えは変わりません）。`chatgpt_*` の action は、一般の名 `sign_in_<残り>` と `service` でも同じ答えを返します（`chatgpt_*` は別名として残します）。共通の試験データ `sign-in-cases.json` は 49 行。
 - Swift（macOS・iOS）：ChatGPT でサインインの接続の頁と公開するモデルの選びを、共通coreの答えで出すようにしました（Webと同じ見せ方）。Macでは認証の最中に認証画面を開き直せ、未完了の登録はclient idを添えて一覧の前に出ます。接続の解除は確かめてから行います。「ChatGPT でサインインを有効にする」のトグルと、登録8件で新しい接続を止める所は無くなりました（サインインで有効になります）。公開の選びは、用途を外して空になったモデルを公開から外し、保存は変更が無くても押せます。

@@ -1,5 +1,20 @@
 # inku Android Implementation Notes
 
+## 2026-11-14 "Sign in with ChatGPT": the procedures follow the shared core's next steps
+
+Step 5, following the author's answers (build it at once; settle each difference by the recommended table).
+
+- Sign-in, using and refreshing the token, refreshing the model list, sign-out, deletion, selection, and pausing and resuming at a usage limit do the `todo` that the shared core's `chatgpt_flow_start` and `chatgpt_flow_next` answer, one at a time (`ChatGptPlanManager.runFlow`). Android keeps:
+  - the locks: `edit` (reading and writing the store), `refresh` and `wire`;
+  - reading and writing the encrypted store (milliseconds against seconds);
+  - sending and receiving with `UrlConnectionChatGptHttp` (the deadline and bounds as the `todo` gives them; I/O failures as `timeout`, `unavailable` or `too_large`);
+  - the signature check with JCA (including the key's shape), randomness and the offset at a local date or time;
+  - the `127.0.0.1` listener (the bytes of the request head go to the core, and its answer is written as given) and Chrome.
+- The token exchange (`purpose: token_exchange`) is still sent once inku is in front (Android 17 stops background networking). The callback page uses the core's `respond_before_exchange`: when the callback is received it answers "ChatGPT authorization received" and "Return to inku to finish connecting."
+- The store's shape: a registration whose sign-in has not finished is kept under `registrations_pending` (before, it was a profile without `sub`; it moves on the next write). `refresh_owner` and `issuer` go to the core as saved (an older registration has neither, so `runtime` and the core's issuer are added).
+- What changes by the table of differences: the verifier is 64 bytes (32 before), the callback page is the core's Japanese and English HTML, refreshing the model list waits 15 seconds (30 before), a date-only refresh time is given that day's offset, and finished and unfinished registrations are counted apart.
+- Reading the callback request's head, checking the state and client ID, the attempt count, the registration limit, and discovery, JWKS, claims, the label, the generation and saving are the core's. The copies `CHATGPT_ISSUER`, `CHATGPT_TOKEN`, `CHATGPT_RESOURCE`, `CHATGPT_USAGE` and `CHATGPT_SCOPE` are gone.
+
 ## 2026-11-14 "Sign in with ChatGPT": the request route and I/O failures from the shared core
 
 Step 4, following the author's answers (add the timeout text, send `Accept` on both, retry an unreadable stream).

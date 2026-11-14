@@ -94,12 +94,6 @@ private fun chatGptFailureRow(code: String): JSONObject =
     SharedProviderWire.call(JSONObject().put("action", "chatgpt_failure").put("code", code))
 
 internal const val CHATGPT_PROVIDER = "chatgpt"
-internal const val CHATGPT_ISSUER = "https://auth.openai.com"
-/** The token's resource for sign-in (step 5). Requests go where the core's `url` says. */
-internal const val CHATGPT_RESOURCE = "https://api.openai.com/v1"
-internal const val CHATGPT_TOKEN = "$CHATGPT_ISSUER/api/accounts/oauth/token"
-internal const val CHATGPT_USAGE = "https://chatgpt.com/settings/usage"
-internal const val CHATGPT_SCOPE = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
 
 /** A store's monitor serializes adoption, sign-out and generation checks. */
 internal interface ChatGptCredentialStore {

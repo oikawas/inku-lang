@@ -1,8 +1,9 @@
 """Sign in with ChatGPT's procedures, run as the shared core answers them.
 
 The core holds each procedure step for step (SIWC step 5, 2026-11-14): sign-in,
-using or refreshing the token, the model list, sign-out, delete, select, the
-pause on a usage limit and the identity check of an imported registration. It
+using or refreshing the token, the model list, sign-out, the pause on a usage
+limit and its resume, tidying the store to its one registration, and the
+identity check of an imported registration. It
 answers one thing to do (`todo`) at a time; this module does it and gives back
 what came of it. What stays here: the store and its locks, HTTP, the signature
 check, randomness, the callback's socket, the attempts' bookkeeping and the
@@ -171,8 +172,9 @@ class Procedure:
         self.result, self.stopping = None, False
 
     def _lock_name(self, lock: str) -> str:
-        return {"edit": "edit:" + self.owner, "refresh": self.owner,
-                "wire": f"wire:{self.owner}:{self.answer['state']['input']['profile_id']}"}[lock]
+        if lock == "wire":
+            return f"wire:{self.owner}:{self.answer['state']['input']['profile_id']}"
+        return {"edit": "edit:" + self.owner, "refresh": self.owner}[lock]
 
     async def until(self, stop: str | None = None) -> dict:
         """Do each todo until the procedure ends, or until one named `stop` (left undone)."""
@@ -353,11 +355,22 @@ async def sign_out(owner: str, profile_id: str) -> dict:
     return {"status": result["status"], "revocation_confirmed": result["revocation_confirmed"]}
 
 
-async def delete_profile(owner: str, profile_id: str) -> dict:
-    # Signed out first, so a connected registration's tokens are revoked, then dropped.
-    check_owner(owner)
-    result = await run_flow("delete", {"profile_id": profile_id}, owner, check=lambda: check_owner(owner), soft_http=True)
-    return {"status": result["status"], "revocation_confirmed": result["revocation_confirmed"]}
+_tidied: set[str] = set()
+_tidy_lock = threading.Lock()
+
+
+def tidy(owner: str) -> None:
+    """Once per owner and start, the core's `tidy`: the store down to its one registration.
+
+    The host keeps one registration (the author, 2026-11-14). OpenAI has no way to
+    remove a registration; the author removes the others in ChatGPT's settings.
+    """
+    with _tidy_lock:
+        if owner in _tidied:
+            return
+        if CredentialStore().root.exists():
+            asyncio.run(run_flow("tidy", {}, owner))
+        _tidied.add(owner)
 
 
 class AuthorizationAttempts:
@@ -389,7 +402,10 @@ class AuthorizationAttempts:
                 attempt["cancel"].set()
         return self.public(owner, attempt_id)
 
-    def begin(self, owner: str, profile_id: str | None, consent: bool, guard, *, registration_host_id: str | None = None, language: str = "en") -> dict:
+    def begin(self, owner: str, consent: bool, guard, *, new_registration: bool = False,
+              registration_host_id: str | None = None, language: str = "en") -> dict:
+        # The core signs in the host's one registration with its own client id;
+        # `new_registration` replaces it, after the account changed.
         if language not in {"ja", "en"}:
             raise ChatGPTError("chatgpt_language_invalid")
         guard()
@@ -397,7 +413,7 @@ class AuthorizationAttempts:
             self.attempts = {key: value for key, value in self.attempts.items() if time.monotonic() < value["retain_until"]}
             pending = [value for value in self.attempts.values() if value["status"] == "pending"]
             counts = {"pending_count": len(pending), "owner_count": sum(value["owner"] == owner for value in pending)}
-            attempt = {"id": str(uuid.uuid4()), "owner": owner, "profile_id": profile_id, "status": "pending",
+            attempt = {"id": str(uuid.uuid4()), "owner": owner, "profile_id": None, "status": "pending",
                        "code": None, "cancel": threading.Event()}
 
             def check():
@@ -414,7 +430,7 @@ class AuthorizationAttempts:
                         attempt.update(status="completed", code=None)
 
             callback = Callback(registration_host_id)
-            procedure = Procedure("login", {"profile_id": profile_id, "consent": consent, "language": language, **counts},
+            procedure = Procedure("login", {"consent": consent, "new_registration": new_registration, "language": language, **counts},
                                   owner, check=check, callback=callback, on_write=write,
                                   on_end=lambda todo: self._settle(attempt, None if todo["todo"] == "done" else todo["code"]))
             try:

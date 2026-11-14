@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from ... import chatgpt_runtime as runtime
-from ...chatgpt_auth import USAGE_URL, attempts, delete_profile, run_flow, sign_out
+from ...chatgpt_auth import USAGE_URL, attempts, run_flow, sign_out, tidy
 from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin, transport_error
 from ...chatgpt_store import ChatGPTError, CredentialStore
@@ -29,6 +29,7 @@ def _error(error: ChatGPTError) -> HTTPException:
 def owner(actor: dict = Depends(_current_user)) -> str:
     try:
         runtime.check_owner(actor["id"])
+        tidy(actor["id"])
     except ChatGPTError as error:
         raise _error(error) from None
     return actor["id"]
@@ -40,13 +41,15 @@ def state(actor: dict = Depends(_current_user)) -> dict:
 
     The result holds `available` and `reason` (set when the feature is unavailable), `self_hosted`,
     `usage_url`, `active_profile_id`, `profiles` and `pending_registrations`. A profile's `state` is
-    `connected`, `quota` (paused by a usage limit) or `signed_out`. An ownership failure is reported
+    `connected`, `quota` (paused by a usage limit) or `signed_out`. There is at most one profile: the
+    first read after a start keeps only the host's one registration. An ownership failure is reported
     as `available: false` with the error code in `reason`, not as an HTTP error.
     """
     available, reason = runtime.availability()
     try:
         if available:
             runtime.check_owner(actor["id"])
+            tidy(actor["id"])
         value = CredentialStore().public_state(actor["id"]) if available else {"active_profile_id": None, "profiles": [], "pending_registrations": []}
     except ChatGPTError as error:
         available, reason = False, error.code
@@ -57,10 +60,9 @@ def state(actor: dict = Depends(_current_user)) -> dict:
 
 class AuthorizeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    profile_id: str | None = Field(
-        default=None,
-        max_length=128,
-        description="Id of an existing plan to reconnect, or null to connect a new plan. An id not registered for the user is rejected with 403.",
+    new_registration: bool = Field(
+        default=False,
+        description="True to sign in with a new registration, replacing the host's one registration (after the account changed). Otherwise the saved registration signs in again with its own client id, or a first one is registered.",
     )
     consent: bool = Field(
         default=False,
@@ -79,15 +81,16 @@ def authorize(body: AuthorizeBody, actor: str = Depends(owner)) -> dict:
     On a self-hosted server this returns status `local_authorization_required` with action
     `local_helper`. The `helper_target` field is added when INKU_CHATGPT_HELPER_TARGET is `container`.
     Returns 403 with an error code when another connection attempt is pending
-    (`chatgpt_attempt_busy`) or the profile is not registered (`chatgpt_not_connected`). A declined
-    consent is reported later, as status `failed` with code `chatgpt_consent_declined`, by
+    (`chatgpt_attempt_busy`). A declined consent is reported later, as status `failed` with code
+    `chatgpt_consent_declined`, and another ChatGPT account, as `chatgpt_account_changed`, by
     GET /attempts/{attempt_id}.
     """
     if runtime._startup and runtime._startup.self_hosted:
         return {"status": "local_authorization_required", "action": "local_helper",
                 **({"helper_target": "container"} if os.getenv("INKU_CHATGPT_HELPER_TARGET") == "container" else {})}
     try:
-        return attempts.begin(actor, body.profile_id, body.consent, lambda: runtime.check_owner(actor), language=body.language)
+        return attempts.begin(actor, body.consent, lambda: runtime.check_owner(actor),
+                              new_registration=body.new_registration, language=body.language)
     except ChatGPTError as error:
         raise _error(error) from None
 
@@ -123,52 +126,19 @@ def cancel(
         raise _error(error) from None
 
 
-@router.post("/profiles/{profile_id}/select", summary="Make a Sign in with ChatGPT profile the active one")
-def select(
-    profile_id: str = Path(..., description="Id of the Sign in with ChatGPT profile to make active."),
-    actor: str = Depends(owner),
-) -> dict:
-    """Make a registered Sign in with ChatGPT profile the active one and return the updated connection state.
-
-    Returns 403 with `chatgpt_not_connected` when the profile is not registered for the user.
-    """
-    try:
-        asyncio.run(run_flow("select", {"profile_id": profile_id}, actor))
-        return state({"id": actor})
-    except ChatGPTError as error:
-        raise _error(error) from None
-
-
 @router.post("/profiles/{profile_id}/sign-out", summary="Sign out a Sign in with ChatGPT profile")
 def disconnect(
     profile_id: str = Path(..., description="Id of the Sign in with ChatGPT profile to sign out."),
     actor: str = Depends(owner),
 ) -> dict:
-    """Sign out one Sign in with ChatGPT profile, removing its stored tokens and ending its session.
+    """Sign out the Sign in with ChatGPT profile, revoking and removing its stored tokens.
 
-    Returns the sign-out result, including whether revocation was confirmed. Returns 403 when the
-    profile is not registered for the user.
+    The registration, its client id and its model settings are kept, so the next sign-in uses
+    the same registration. Returns the sign-out result, including whether revocation was
+    confirmed. Returns 403 when the profile is not registered for the user.
     """
     try:
         return asyncio.run(sign_out(actor, profile_id))
-    except ChatGPTError as error:
-        raise _error(error) from None
-
-
-@router.post("/profiles/{profile_id}/delete", summary="Delete a Sign in with ChatGPT registration")
-def delete(
-    profile_id: str = Path(..., description="Id of the Sign in with ChatGPT profile to delete."),
-    actor: str = Depends(owner),
-) -> dict:
-    """Sign out one Sign in with ChatGPT profile, then remove its registration and its saved model settings.
-
-    A connected plan is signed out first, as by sign-out. When the deleted plan was the active one,
-    no plan is active afterwards. Returns the result, including whether revocation was confirmed.
-    Returns 403 when the profile is not registered for the user, or with `chatgpt_session_changed`
-    when it was reconnected while being deleted.
-    """
-    try:
-        return asyncio.run(delete_profile(actor, profile_id))
     except ChatGPTError as error:
         raise _error(error) from None
 
@@ -292,15 +262,17 @@ class ConnectionViewBody(BaseModel):
     attempt: dict = Field(default_factory=dict, description="The sign-in attempt in progress: `active`, `can_reopen` and `helper`.")
     busy: bool = Field(default=False, description="True while an operation of this screen is running.")
     code: str | None = Field(default=None, description="The last status or failure code the screen holds.")
-    last_operation: Literal["sign_out", "delete"] | None = Field(default=None, description="The last sign-out or delete, if any.")
-    revocation_confirmed: bool | None = Field(default=None, description="Whether that operation's revocation was confirmed.")
+    last_operation: Literal["sign_out"] | None = Field(default=None, description="The last sign-out, if any.")
+    revocation_confirmed: bool | None = Field(default=None, description="Whether that sign-out's revocation was confirmed.")
 
 
 @router.post("/view", summary="Read what the Sign in with ChatGPT settings show", dependencies=[Depends(owner)])
 def connection_view(body: ConnectionViewBody) -> dict:
-    """Return the status line, the actions and each profile's status and actions from the shared core.
+    """Return what the shared core shows for the one connection.
 
-    Sign-out and delete carry `confirm: true`: the screen asks before running them.
+    The answer holds `status`, `label`, `primary` (the one action of that state: `sign_in`,
+    `grant_plan`, `retry` or `new_sign_in`, or null), `attempt_actions`, `sign_out` (with
+    `confirm: true`: the screen asks first), `notice`, `manage_usage` and `guide`.
     """
     request = body.model_dump()
     request["connection"] = request["connection"] or {}

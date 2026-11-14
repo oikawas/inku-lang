@@ -31,9 +31,9 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
 
 設定の独立した「ChatGPT でサインイン」タブで「inku ChatGPTで接続」を押すと、このMacにセットアップした専用アプリ「inku ChatGPT」を開きます。ChromeまたはBraveはウィンドウの上にアプリを開くかの確認を出すので、「inku ChatGPT を開く」を押します。開かない場合は画面の「inku ChatGPTをもう一度開く」で再度開けます。アプリ未導入の場合は、運用者がこのMacへセットアップしてから進めます。
 
-Macの確認画面には保護された接続で取得したinku本人の名前・IDと移送先host IDが表示されます。接続先を確認して「続ける」を押すと、設定を始めたChromeまたはBraveでOpenAI認証・利用同意へ進み、同じブラウザのcallbackへ戻ります。ブラウザを開けない場合に別のブラウザへ自動で切り替えません。認証後の封印と移送は専用アプリが一回ずつ行います。完了してWebのページへ戻ると、ページが接続状態を読み直します。「接続状態を確認」でも読み直せます。Macの確認・完了・失敗の理由は設定の表示言語に合わせます。OpenAI自身の認証画面の文言はOpenAIが提供します。失敗時は理由を表示して止まり、自動再試行しません。既に別のinku本人へ固定したMacではその接続を拒否します。
+Macの確認画面には保護された接続で取得したinku本人の名前・IDと移送先host IDが表示されます。接続先を確認して「続ける」を押すと、設定を始めたChromeまたはBraveでOpenAI認証・利用同意へ進み、同じブラウザのcallbackへ戻ります。ブラウザを開けない場合に別のブラウザへ自動で切り替えません。認証後の封印と移送は専用アプリが一回ずつ行います。完了してWebのページへ戻ると、ページが接続状態を読み直します。Macの確認・完了・失敗の理由は設定の表示言語に合わせます。OpenAI自身の認証画面の文言はOpenAIが提供します。失敗時は理由を表示して止まり、自動再試行しません。既に別のinku本人へ固定したMacではその接続を拒否します。
 
-起動リンクの`inku-chatgpt://connect`には本人ID・選択登録ID・同意指定に加え、固定のブラウザ指定（`chrome`／`brave`）と表示言語（`ja`／`en`）を載せます。任意のアプリやcommandは指定できません。Braveは公開の`navigator.brave.isBrave()`で識別します。[Braveの公式案内](https://github.com/brave/brave-browser/wiki/Detecting-Brave-(for-Websites))。OAuth URL/code/tokenや転送する登録の本文をリンクへ含めません。「表示・操作」「描画」「その他（サーバー）」などの既存設定は元のページに残ります。以下は運用者向けの同じ接続手順です。
+起動リンクの`inku-chatgpt://connect`には本人ID・同意指定・新しい登録の指定（`new_registration=1`、アカウントが替わった時だけ）に加え、固定のブラウザ指定（`chrome`／`brave`）と表示言語（`ja`／`en`）を載せます。任意のアプリやcommandは指定できません。Braveは公開の`navigator.brave.isBrave()`で識別します。[Braveの公式案内](https://github.com/brave/brave-browser/wiki/Detecting-Brave-(for-Websites))。OAuth URL/code/tokenや転送する登録の本文をリンクへ含めません。「表示・操作」「描画」「その他（サーバー）」などの既存設定は元のページに残ります。以下は運用者向けの同じ接続手順です。
 
 Macで認証し、自己ホストだけが更新を所有します。Web全体のHTTPS化は前提条件にしません。code/tokenはLAN HTTPへ送らず、OpenAI通信は固定HTTPS、callbackはMacのHTTP loopback、選択登録の移送は運用者の保護された専用SSH経路です。[公式手順](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)
 
@@ -63,7 +63,7 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
 
 専用SSH経路は封印JSONだけを自己ホストの`inku-chatgpt import`の標準入力へ渡します。一般source配備やLAN API uploadには含めません。recipientは30分有効です。同じ封印の再送は同じ受領結果を返し、内容の違う再送は拒否します。
 
-exportはMacのtokenを消し、更新所有権を手放してから完了します。importは受信hostのinstallation IDを保ち、そのhost専用鍵で再暗号化します。Macの鍵を共有せず、export後の失敗を理由に旧refresh tokenを復活させません。再認証は保存した`profile_id`、利用許可の追加は明示`--consent`を使います。初回交換失敗でも発行済みclient IDを保存し、失敗結果の`profile_id`で再試行できます。
+exportはMacのtokenを消し、更新所有権を手放してから完了します。importは受信hostのinstallation IDを保ち、そのhost専用鍵で再暗号化します。Macの鍵を共有せず、export後の失敗を理由に旧refresh tokenを復活させません。登録はhostごとに1つです。authorizeはその登録を、保存したclient IDと、残したID tokenの`id_token_hint`でサインインし直します（OpenAI側に新しい項目は増えません）。登録が無い時だけ新しく登録します。利用許可の追加は明示`--consent`、別のChatGPTアカウントへ替える時は`--new-registration`（前の登録を置き換えます）を使います。初回交換失敗でも発行済みclient IDを保存し、次のauthorizeがそのclient IDで再試行します。
 
 ## リリース版・ソースbuildのコンテナで接続する
 
@@ -104,7 +104,7 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
 docker compose exec -T --user 10001:10001 api inku-chatgpt import < sealed.json
 ```
 
-recipient/importはDBの本人とmodeを検証しますが、CLI実行をAPI起動済みとは扱いません。import後のrefreshはコンテナだけが所有します。Webの「接続状態を確認」後に公開モデルを選択・保存し、描画モデルを明示選択します。
+recipient/importはDBの本人とmodeを検証しますが、CLI実行をAPI起動済みとは扱いません。import後のrefreshはコンテナだけが所有します。Webの「ChatGPT でサインイン」の画面を開き直して接続を読み直した後に、公開モデルを選択・保存し、描画モデルを明示選択します。
 
 ## 登録・モデル・利用枠
 
@@ -116,9 +116,9 @@ recipient/importはDBの本人とmodeを検証しますが、CLI実行をAPI起�
 
 描画が失敗した後も、モデルを選び直してそのまま描画できます。新しい描画の開始時に前の失敗表示を消すため、ページの再読込みは不要です。
 
-画面は本人の登録ラベル、状態、scope、選択中profileを表示します。token、PKCE verifier、ID tokenを画面・log・browser storageへ出しません。最大8 profile、認可はownerごとに1件・全体4件です。保存先は既定`~/.config/ddl-server/chatgpt`（`INKU_CHATGPT_AUTH_DIR`で変更）、0700 directoryと0600 fileです。専用`credential.key`による`enc:v1:`暗号化を使い、平文互換や復号失敗の黙認はありません。既存APIキーの鍵は変更しません。
+画面は1つの接続の登録ラベルと状態を表示し、その状態の操作を1つだけ出します（サインイン、プラン利用の許可、利用枠の上限からの再開、アカウントが替わった時の新しい登録でのサインイン）。token、PKCE verifier、ID token、認可URLを画面・log・browser storageへ出しません。登録はhostごとに1つで、起動の後に最初に読む時、ほかの登録と未完了の登録を片付けます。認可はownerごとに1件・全体4件です。保存先は既定`~/.config/ddl-server/chatgpt`（`INKU_CHATGPT_AUTH_DIR`で変更）、0700 directoryと0600 fileです。専用`credential.key`による`enc:v1:`暗号化を使い、平文互換や復号失敗の黙認はありません。既存APIキーの鍵は変更しません。
 
-本人の`models[].visibility=list`をOpenAIの順序と`display_name`で表示し、公開したモデルを`chatgpt:<slug>`として選びます。inkuの公開設定はOpenAIのvisibilityとは別で、owner/profileごとに暗号化保存します。同一identityの再認証・受信hostでの再importは公開設定を保持します。共有APIキーproviderやbare名の所有者へ混ぜません。外部catalogのcacheはowner/profile/generationごとに5分で、設定・描画候補を開くだけでは外部取得せず、保存した一覧を読みます。接続解除・profile切替・モード変更で候補を破棄し、消えた指定や未公開の指定は利用不可として保持します。別providerへの変更は明示選択が必要です。
+本人の`models[].visibility=list`をOpenAIの順序と`display_name`で表示し、公開したモデルを`chatgpt:<slug>`として選びます。inkuの公開設定はOpenAIのvisibilityとは別で、owner/profileごとに暗号化保存します。同一identityの再認証・受信hostでの再importは公開設定を保持します。共有APIキーproviderやbare名の所有者へ混ぜません。外部catalogのcacheはowner/profile/generationごとに5分で、設定・描画候補を開くだけでは外部取得せず、保存した一覧を読みます。接続解除・再認証の世代の変化・モード変更で候補を破棄し、消えた指定や未公開の指定は利用不可として保持します。別providerへの変更は明示選択が必要です。
 
 応答に補助的なメッセージが含まれていても、正しい完了関数呼出しの引数だけを採用します。メッセージ本文からJSONを推測しません。「描画用の関数呼出し形式と一致しませんでした」は応答形式の診断で、再認証の指示ではありません。
 
@@ -128,7 +128,7 @@ quota時は同じ登録の後続送信を止めます。「利用枠を確認」
 
 写生文、色カタログ選択、記述からのDDL、構図の読み、法則の段、配色の段、可視holeの補完へ同じ描画モデルを使います。構図の読みは`read_composition`を、法則の段は`choose_laws`を、配色の段は`choose_colors`を受け、観測の時間とusageはStage 1から分けてそれぞれ`composition`・`laws`・`colors`へ記録します。読み・法則・配色が使えないときの既定fallbackは共有Rustが決めます。Rustのprompt/schema・検証・再試行・Score/SVGは継承します。Responsesは`store:false`・SSEで、温度や出力tokenの旧パラメータを流用せず、必要なJSONを一つのnamespaced function callで受け取ります。正しい`response.completed`だけを採用し、途中切断、refusal、未知tool、サイズ超過、後続quotaでは部分JSONがあっても失敗です。
 
-実行は開始時profile/generationへ固定し、別profile選択は次の実行に適用します。cancel、sign-out、inku logout、モード変更、Server終了は新規通信と遅い結果の採用を止めます。profileごとに一通信slot、owner単位でrefresh排他を持ちます。sign-outはローカルtokenを直ちに消し、登録identity・host IDを残します。各登録の「削除」は、その場の確かめの後に、接続中ならsign-outと同じ解除をしてから登録とその公開設定を消します（`POST /api/me/chatgpt/profiles/{profile_id}/delete`）。選択中の登録を消すと、選択中の登録は無くなります。remote revocation失敗は未確認と表示します。[セッション](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
+実行は開始時profile/generationへ固定し、再認証は次の実行に適用します。cancel、sign-out、inku logout、モード変更、Server終了は新規通信と遅い結果の採用を止めます。profileごとに一通信slot、owner単位でrefresh排他を持ちます。sign-outは、離れた所のボタンをその場で確かめてから行い、ローカルtokenを直ちに消し、登録identity・client ID・host ID・公開設定を残します。OpenAIには登録を消すAPIが無いため、inkuに削除はありません。ChatGPTの設定でinkuの接続を外せ、外した後のサインインは新しい登録になります。remote revocation失敗は未確認と表示します。[セッション](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
 
 ## 確認結果の読み方
 

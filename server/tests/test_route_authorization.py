@@ -121,7 +121,10 @@ PUBLIC = {  # every entry needs a reason
 #   +2 for POST /api/me/chatgpt/view and POST /api/me/chatgpt/models/draft, the shared
 #   core's view of the Sign in with ChatGPT settings and its publication draft
 #   (Sign in with ChatGPT step 2, 2026-11-14).
-EXPECTED_ROUTE_COUNT = 156
+#   -2 for retiring POST /api/me/chatgpt/profiles/{profile_id}/select and
+#   POST /api/me/chatgpt/profiles/{profile_id}/delete: the host keeps one
+#   registration and OpenAI has no way to delete one (the author, 2026-11-14).
+EXPECTED_ROUTE_COUNT = 154
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

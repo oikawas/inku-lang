@@ -140,7 +140,11 @@ async def import_profile(envelope: dict) -> dict:
             claims = await validate_identity(profile["id_token"], profile["client_id"], profile["oidc_nonce"], check, deadline)
             if claims["sub"] != profile["sub"]:
                 raise ValueError
+            # The id token kept for the next sign-in's id_token_hint (OpenAI's advice) stays when it came.
+            retained = profile.get("retained_id_token")
             profile = {key: profile[key] for key in ("id", "issuer", "sub", "client_id", "oidc_nonce", "access_token", "refresh_token", "id_token", "scopes", "expires_at", "earliest_refresh_at")}
+            if isinstance(retained, str) and 0 < len(retained) <= 65536:
+                profile["retained_id_token"] = retained
             profile["email"] = str(claims.get("email", ""))[:254]
             profile["label"] = str(claims.get("email", "ChatGPT"))[:254] + " / " + profile["client_id"][-8:]
             with store.lock("edit:" + owner, deadline, check):

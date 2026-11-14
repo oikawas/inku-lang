@@ -58,7 +58,8 @@ test('completed authorization refreshes the catalog once and keeps login success
 				owner: () => 'owner', available: () => true, invalidate() {}, changed() { available = cached ? ['previously-published'] : []; finish(); },
 				apiFetch: async (url: string) => {
 					requests.push(url);
-					if (url.endsWith('/authorize')) return response({ attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize' });
+					// A sign-in again carries the kept id token as id_token_hint (the author, 2026-11-14).
+					if (url.endsWith('/authorize')) return response({ attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize?id_token_hint=kept' });
 					if (url.endsWith('/attempts/attempt')) return response({ status: 'completed', profile_id: 'profile', code: null });
 					if (url.endsWith('/models/refresh')) { cached = !failed; return failed ? new Response(JSON.stringify({ detail: { code: 'chatgpt_auth_unavailable' } }), { status: 403 }) : response({ models: [{ id: 'previously-published' }], enabled_models: { 'previously-published': true } }); }
 					return response(state('Account'));
@@ -66,7 +67,7 @@ test('completed authorization refreshes the catalog once and keeps login success
 			});
 			await connection.load();
 			assert.equal(requests.filter((url) => url.endsWith('/models/refresh')).length, 0);
-			await connection.authorize('profile', true);
+			await connection.authorize(true);
 			scheduled!();
 			await finished;
 			assert.equal(requests.filter((url) => url.endsWith('/models/refresh')).length, 1);
@@ -129,7 +130,7 @@ test('helper completion is detected by generation and refreshes only once', asyn
 	});
 	try {
 		await connection.load();
-		await connection.authorize(profile);
+		await connection.authorize();
 		await connection.recheck();
 		assert.equal(fetches, 0);
 		generation = 2;
@@ -144,7 +145,6 @@ test('helper completion is detected by generation and refreshes only once', asyn
 
 test('self-hosted authorization keeps Brave and Japanese in the public Mac helper action', async () => {
 	const owner = '00000000-0000-4000-8000-000000000001';
-	const profile = '00000000-0000-4000-8000-000000000002';
 	const launched: string[] = [];
 	const previous = globalThis.window;
 	const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
@@ -155,12 +155,13 @@ test('self-hosted authorization keeps Brave and Japanese in the public Mac helpe
 			owner: () => owner, available: () => true, invalidate() {}, changed() {},
 			apiFetch: async (url: string) => response(url.endsWith('/authorize') ? { action: 'local_helper' } : state('Account'))
 		});
-		await connection.authorize(profile, true);
+		await connection.authorize(true);
 		assert.equal(launched.length, 1);
 		const url = new URL(launched[0]);
 		assert.equal(url.protocol, 'inku-chatgpt:');
 		assert.equal(url.hostname, 'connect');
-		assert.deepEqual([...url.searchParams], [['owner_id', owner], ['consent', '1'], ['profile_id', profile], ['browser', 'brave'], ['language', 'ja']]);
+		// No registration id: the helper's server signs in its one registration.
+		assert.deepEqual([...url.searchParams], [['owner_id', owner], ['consent', '1'], ['browser', 'brave'], ['language', 'ja']]);
 		assert.equal(ja.chatgptConnectHelper, 'inku ChatGPTで接続');
 		assert.match(ja.chatgptLocalHelperHint, new RegExp(ja.chatgptConnectHelper));
 		assert.doesNotMatch(ja.chatgptLocalHelperHint, /Chrome|helper|Continue with/);
@@ -168,6 +169,11 @@ test('self-hosted authorization keeps Brave and Japanese in the public Mac helpe
 		assert.equal(connection.busy, false);
 		connection.reset();
 		assert.equal(connection.helperUrl, null);
+		// After the account changed, a new registration (the core's `new_sign_in`).
+		await connection.authorize(false, true);
+		assert.deepEqual([...new URL(launched[1]).searchParams],
+			[['owner_id', owner], ['consent', '0'], ['new_registration', '1'], ['browser', 'brave'], ['language', 'ja']]);
+		connection.reset();
 	} finally {
 		(globalThis as any).window = previous;
 		if (previousNavigator) Object.defineProperty(globalThis, 'navigator', previousNavigator);
@@ -220,7 +226,7 @@ test('owner changes hide saved profiles and discard a late response; unconfirmed
 	assert.equal(connection.state, null);
 	slow = false;
 	await connection.load();
-	await connection.signOut('profile');
+	await connection.signOut();
 	// The shared core reports the unconfirmed revocation from what the screen passes it.
 	assert.equal(connection.code, null);
 	assert.deepEqual([connection.viewInput.last_operation, connection.viewInput.revocation_confirmed], ['sign_out', false]);
@@ -257,13 +263,26 @@ test('connected guide leads to personal model settings with explicit publication
 	assert.match(body(), new RegExp(ja.chatgptModelSettingsGuide));
 	assert.match(body(), new RegExp(ja.chatgptOpenModelSettings));
 	assert.doesNotMatch(body(), new RegExp(ja.chatgptRefreshModels));
-	// The self-hosted button names the Mac helper it opens; the same-PC one signs in.
-	assert.match(body(), new RegExp('>' + ja.chatgptConnectHelper + '<'));
-	assert.doesNotMatch(body(), new RegExp(ja.chatgptSignIn));
-	const samePc = render(view, { props: { connection: { state: { ...connection.state, self_hosted: false }, code: null, busy: false,
-		viewInput: connection.viewInput, view: async () => connectedView, load() {}, cancel() {} }, initialView: connectedView, onOpenModelSettings() {} } }).body;
-	assert.match(samePc, new RegExp('>' + ja.chatgptSignIn + '<'));
-	assert.doesNotMatch(samePc, new RegExp(ja.chatgptConnectHelper));
+	// Connected: no action of its own; sign-out stands apart with its notice.
+	assert.doesNotMatch(body(), new RegExp('>' + ja.chatgptConnectHelper + '<'));
+	assert.match(body(), new RegExp('>' + ja.chatgptSignOut + '<'));
+	assert.match(body(), new RegExp(ja.chatgptStatus('chatgpt_disconnect_in_settings')));
+	// Signed out: the self-hosted button names the Mac helper it opens; the same-PC one signs in.
+	const signedOutView = signInCase('view: signed out');
+	const signedOut = (selfHosted: boolean) => render(view, { props: { connection: {
+		state: { ...connection.state, self_hosted: selfHosted }, code: null, busy: false, viewInput: connection.viewInput,
+		view: async () => signedOutView, load() {}, cancel() {} }, initialView: signedOutView, onOpenModelSettings() {} } }).body;
+	assert.match(signedOut(true), new RegExp('>' + ja.chatgptConnectHelper + '<'));
+	assert.doesNotMatch(signedOut(true), new RegExp(ja.chatgptSignIn));
+	assert.match(signedOut(false), new RegExp('>' + ja.chatgptSignIn + '<'));
+	assert.doesNotMatch(signedOut(false), new RegExp(ja.chatgptConnectHelper));
+	assert.doesNotMatch(signedOut(false), new RegExp('>' + ja.chatgptSignOut + '<'));
+	// Another account: the one action is a sign-in with a new registration.
+	const changedView = signInCase('view: another account signed in');
+	const changed = render(view, { props: { connection: { state: connection.state, code: null, busy: false, viewInput: connection.viewInput,
+		view: async () => changedView, load() {}, cancel() {} }, initialView: changedView, onOpenModelSettings() {} } }).body;
+	assert.match(changed, new RegExp('>' + ja.chatgptNewSignIn + '<'));
+	assert.match(changed, new RegExp(ja.chatgptStatus('chatgpt_account_changed')));
 
 	const adminSource = ts.transpileModule(readFileSync(new URL('./model-administration.svelte.ts', import.meta.url), 'utf8')
 		.replace("import { t } from '$lib/i18n/index.svelte';", `import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; const t = () => ja;`)
@@ -407,7 +426,7 @@ test('personal publication picker exposes Vision use; the shared assessments are
 	assert.match(administrator, /平均秒数 Vision/);
 });
 
-test('delete posts to the registration, and a return from the Mac helper re-reads the state', async () => {
+test('sign-out posts to the one registration, and a return from the Mac helper re-reads the state', async () => {
 	const owner = '00000000-0000-4000-8000-000000000001';
 	const id = '00000000-0000-4000-8000-000000000002';
 	const calls: string[] = [];
@@ -421,14 +440,14 @@ test('delete posts to the registration, and a return from the Mac helper re-read
 			apiFetch: async (url: string) => {
 				calls.push(url);
 				if (url.endsWith('/authorize')) return response({ action: 'local_helper' });
-				if (url.endsWith('/delete')) { current = { ...state('Account'), active_profile_id: null, profiles: [] }; return response({ status: 'deleted', revocation_confirmed: true }); }
+				if (url.endsWith('/sign-out')) { current = { ...state('Account'), active_profile_id: id, profiles: [{ id, label: 'Account', state: 'signed_out', generation: 3, scopes: [] }] }; return response({ status: 'signed_out', revocation_confirmed: true }); }
 				return response(current);
 			}
 		});
 		await connection.load();
 		await connection.recheck();
 		assert.equal(calls.length, 1, 'no helper was opened, so a return does not re-read');
-		await connection.authorize(id);
+		await connection.authorize();
 		assert.equal(connection.code, 'chatgpt_helper_requested');
 		current = { ...state('Account'), profiles: [{ id, label: 'Account', state: 'connected', generation: 3, scopes: ['chatgpt.tokens.use.direct'] }] };
 		await connection.recheck();
@@ -438,9 +457,10 @@ test('delete posts to the registration, and a return from the Mac helper re-read
 		assert.equal(changes, 1);
 		await connection.recheck();
 		assert.equal(changes, 1, 'an unchanged state does not reload the model lists');
-		await connection.remove(id);
-		assert.ok(calls.some((url) => url === '/api/me/chatgpt/profiles/' + id + '/delete'));
-		assert.deepEqual(connection.state.profiles, []);
+		await connection.signOut();
+		// The one registration: the active one, or else the only one.
+		assert.ok(calls.some((url) => url === '/api/me/chatgpt/profiles/' + id + '/sign-out'));
+		assert.equal(connection.state.profiles[0].state, 'signed_out');
 		assert.equal(connection.code, null);
 	} finally { (globalThis as any).window = previous; }
 });

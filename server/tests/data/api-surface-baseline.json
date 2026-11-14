@@ -1,6 +1,6 @@
 {
-  "endpoint_count": 156,
-  "operation_count": 156,
+  "endpoint_count": 154,
+  "operation_count": 154,
   "schema_count": 219,
   "operations": [
     {
@@ -1078,21 +1078,6 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/profiles/{profile_id}/delete",
-      "method": "POST",
-      "operationId": "delete_api_me_chatgpt_profiles__profile_id__delete_post",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt",
-        "path:profile_id:req"
-      ],
-      "requestBody": "null",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Delete Api Me Chatgpt Profiles  Profile Id  Delete Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
       "path": "/api/me/chatgpt/profiles/{profile_id}/retry",
       "method": "POST",
       "operationId": "retry_api_me_chatgpt_profiles__profile_id__retry_post",
@@ -1104,21 +1089,6 @@
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Retry Api Me Chatgpt Profiles  Profile Id  Retry Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
-      "path": "/api/me/chatgpt/profiles/{profile_id}/select",
-      "method": "POST",
-      "operationId": "select_api_me_chatgpt_profiles__profile_id__select_post",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt",
-        "path:profile_id:req"
-      ],
-      "requestBody": "null",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Select Api Me Chatgpt Profiles  Profile Id  Select Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -2317,7 +2287,7 @@
     "AtRegion": "{\"additionalProperties\":false,\"properties\":{\"region\":{\"description\":\"[x0,y0,x1,y1] の正規化領域。Renderer が render_seed で実座標へ解決する\",\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Region\",\"type\":\"array\"}},\"required\":[\"region\"],\"title\":\"AtRegion\",\"type\":\"object\"}",
     "AuthSettingsBody": "{\"properties\":{\"google_enabled\":{\"description\":\"Stored switch for Google sign-in. The server does not sign anyone in through it yet.\",\"title\":\"Google Enabled\",\"type\":\"boolean\"},\"local_enabled\":{\"description\":\"Whether username and password sign-in is enabled. Must be true; false is rejected with 409.\",\"title\":\"Local Enabled\",\"type\":\"boolean\"}},\"required\":[\"google_enabled\",\"local_enabled\"],\"title\":\"AuthSettingsBody\",\"type\":\"object\"}",
     "AuthorDdlBody": "{\"additionalProperties\":false,\"properties\":{\"expected_revision\":{\"description\":\"Authority revision of the execution the caller last read. A different saved revision is refused with 409 (authority_conflict).\",\"title\":\"Expected Revision\",\"type\":\"string\"},\"options\":{\"additionalProperties\":true,\"default\":{},\"description\":\"Run options for the edited DDL, with the same keys as the options of POST /api/pipeline/variations. When they leave the run's settings unchanged, the source is committed to the same variation; otherwise a new direct-DDL variation is started.\",\"title\":\"Options\",\"type\":\"object\"},\"source\":{\"description\":\"The edited DDL source to commit.\",\"title\":\"Source\",\"type\":\"string\"}},\"required\":[\"expected_revision\",\"source\"],\"title\":\"AuthorDdlBody\",\"type\":\"object\"}",
-    "AuthorizeBody": "{\"additionalProperties\":false,\"properties\":{\"consent\":{\"default\":false,\"description\":\"Whether ChatGPT's sign-in page shows its consent prompt. Defaults to false.\",\"title\":\"Consent\",\"type\":\"boolean\"},\"language\":{\"default\":\"en\",\"description\":\"Language of the sign-in page, `ja` or `en`. Defaults to `en`.\",\"enum\":[\"ja\",\"en\"],\"title\":\"Language\",\"type\":\"string\"},\"profile_id\":{\"anyOf\":[{\"maxLength\":128,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Id of an existing plan to reconnect, or null to connect a new plan. An id not registered for the user is rejected with 403.\",\"title\":\"Profile Id\"}},\"title\":\"AuthorizeBody\",\"type\":\"object\"}",
+    "AuthorizeBody": "{\"additionalProperties\":false,\"properties\":{\"consent\":{\"default\":false,\"description\":\"Whether ChatGPT's sign-in page shows its consent prompt. Defaults to false.\",\"title\":\"Consent\",\"type\":\"boolean\"},\"language\":{\"default\":\"en\",\"description\":\"Language of the sign-in page, `ja` or `en`. Defaults to `en`.\",\"enum\":[\"ja\",\"en\"],\"title\":\"Language\",\"type\":\"string\"},\"new_registration\":{\"default\":false,\"description\":\"True to sign in with a new registration, replacing the host's one registration (after the account changed). Otherwise the saved registration signs in again with its own client id, or a first one is registered.\",\"title\":\"New Registration\",\"type\":\"boolean\"}},\"title\":\"AuthorizeBody\",\"type\":\"object\"}",
     "BatchPromptHistoryBody": "{\"properties\":{\"items\":{\"description\":\"Batch prompts to store, replacing the saved list. Each item is trimmed, and blank or repeated items are dropped. Only the first 50 are kept, and an item longer than 20,000 characters among them is rejected with 400.\",\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryBody\",\"type\":\"object\"}",
     "BatchPromptHistoryResponse": "{\"properties\":{\"items\":{\"description\":\"The saved batch prompts after normalization, in the order they are kept.\",\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryResponse\",\"type\":\"object\"}",
     "BatchStartBody": "{\"additionalProperties\":false,\"properties\":{\"conditions\":{\"additionalProperties\":true,\"title\":\"Conditions\",\"type\":\"object\"},\"kind\":{\"enum\":[\"web\",\"cli\",\"image\"],\"title\":\"Kind\",\"type\":\"string\"},\"prompt\":{\"default\":\"\",\"maxLength\":20000,\"title\":\"Prompt\",\"type\":\"string\"},\"run_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"Run Id\",\"type\":\"string\"},\"total\":{\"maximum\":100000.0,\"minimum\":1.0,\"title\":\"Total\",\"type\":\"integer\"}},\"required\":[\"run_id\",\"kind\",\"total\"],\"title\":\"BatchStartBody\",\"type\":\"object\"}",
@@ -2348,7 +2318,7 @@
     "CompositionRanges": "{\"description\":\"The composition ranges the server offers for a work.\",\"properties\":{\"ranges\":{\"description\":\"The composition ranges, in the order the server lists them.\",\"items\":{\"$ref\":\"#/components/schemas/CompositionRange\"},\"title\":\"Ranges\",\"type\":\"array\"},\"schema\":{\"const\":\"inku.composition-ranges.v1\",\"description\":\"The schema identifier of this payload. Always inku.composition-ranges.v1.\",\"title\":\"Schema\",\"type\":\"string\"}},\"required\":[\"schema\",\"ranges\"],\"title\":\"CompositionRanges\",\"type\":\"object\"}",
     "CompositionThesesBody": "{\"additionalProperties\":false,\"description\":\"The work whose description the theses are for, and the model that writes them (step 4).\",\"properties\":{\"history_id\":{\"description\":\"Id of the work.\",\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"model\":{\"description\":\"The model that writes the theses, as the model catalog names it; sent under the work's connection.\",\"maxLength\":200,\"minLength\":1,\"title\":\"Model\",\"type\":\"string\"}},\"required\":[\"history_id\",\"model\"],\"title\":\"CompositionThesesBody\",\"type\":\"object\"}",
     "CompositionThesesResponse": "{\"description\":\"Four theses, each building the work's picture another way; nothing is drawn or saved.\",\"properties\":{\"current_thesis\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The work's thesis the theses differ from, or null.\",\"title\":\"Current Thesis\"},\"model\":{\"description\":\"The model that wrote them.\",\"title\":\"Model\",\"type\":\"string\"},\"prompt_digest\":{\"description\":\"The digest of the request whose answer gave them. A drawing with one of them fixed sends it as composition_thesis_prompt_digest.\",\"title\":\"Prompt Digest\",\"type\":\"string\"},\"theses\":{\"description\":\"Four theses, different from each other and from the work's own.\",\"items\":{\"type\":\"string\"},\"maxItems\":4,\"minItems\":4,\"title\":\"Theses\",\"type\":\"array\"}},\"required\":[\"theses\",\"prompt_digest\",\"model\",\"current_thesis\"],\"title\":\"CompositionThesesResponse\",\"type\":\"object\"}",
-    "ConnectionViewBody": "{\"additionalProperties\":false,\"properties\":{\"attempt\":{\"additionalProperties\":true,\"description\":\"The sign-in attempt in progress: `active`, `can_reopen` and `helper`.\",\"title\":\"Attempt\",\"type\":\"object\"},\"busy\":{\"default\":false,\"description\":\"True while an operation of this screen is running.\",\"title\":\"Busy\",\"type\":\"boolean\"},\"code\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The last status or failure code the screen holds.\",\"title\":\"Code\"},\"connection\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"The connection state as GET /api/me/chatgpt returned it; null before it is read.\",\"title\":\"Connection\"},\"last_operation\":{\"anyOf\":[{\"enum\":[\"sign_out\",\"delete\"],\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The last sign-out or delete, if any.\",\"title\":\"Last Operation\"},\"revocation_confirmed\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"description\":\"Whether that operation's revocation was confirmed.\",\"title\":\"Revocation Confirmed\"}},\"title\":\"ConnectionViewBody\",\"type\":\"object\"}",
+    "ConnectionViewBody": "{\"additionalProperties\":false,\"properties\":{\"attempt\":{\"additionalProperties\":true,\"description\":\"The sign-in attempt in progress: `active`, `can_reopen` and `helper`.\",\"title\":\"Attempt\",\"type\":\"object\"},\"busy\":{\"default\":false,\"description\":\"True while an operation of this screen is running.\",\"title\":\"Busy\",\"type\":\"boolean\"},\"code\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The last status or failure code the screen holds.\",\"title\":\"Code\"},\"connection\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"The connection state as GET /api/me/chatgpt returned it; null before it is read.\",\"title\":\"Connection\"},\"last_operation\":{\"anyOf\":[{\"const\":\"sign_out\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The last sign-out, if any.\",\"title\":\"Last Operation\"},\"revocation_confirmed\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"description\":\"Whether that sign-out's revocation was confirmed.\",\"title\":\"Revocation Confirmed\"}},\"title\":\"ConnectionViewBody\",\"type\":\"object\"}",
     "CoordinatedFillGroupOwner": "{\"additionalProperties\":false,\"properties\":{\"group_index\":{\"description\":\"Index of the coordinated group that owns this fill. Zero or greater.\",\"minimum\":0.0,\"title\":\"Group Index\",\"type\":\"integer\"},\"kind\":{\"const\":\"coordinated_group\",\"description\":\"Always \\\"coordinated_group\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"group_index\"],\"title\":\"CoordinatedFillGroupOwner\",\"type\":\"object\"}",
     "CoordinatedPlacementGroupOwner": "{\"additionalProperties\":false,\"properties\":{\"group_index\":{\"description\":\"Index of the coordinated group that owns this placement. Zero or greater.\",\"minimum\":0.0,\"title\":\"Group Index\",\"type\":\"integer\"},\"kind\":{\"const\":\"coordinated_group\",\"description\":\"Always \\\"coordinated_group\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"group_index\"],\"title\":\"CoordinatedPlacementGroupOwner\",\"type\":\"object\"}",
     "CycleMembersV1": "{\"additionalProperties\":false,\"properties\":{\"occurrence_count\":{\"description\":\"Number of occurrences in the cycle. Must equal the resolved logical count of the group it belongs to.\",\"exclusiveMinimum\":0.0,\"title\":\"Occurrence Count\",\"type\":\"integer\"}},\"required\":[\"occurrence_count\"],\"title\":\"CycleMembersV1\",\"type\":\"object\"}",
@@ -2529,5 +2499,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "6ae0e6b61a860bc24a0040f88422b9baeaa34600f7cea96ef5b8ec6ebbe8f1b4"
+  "digest": "24cd0a2f91fe269440dd78b9cd8f93c03d9828e058fd6cff62d697493adfa0e6"
 }

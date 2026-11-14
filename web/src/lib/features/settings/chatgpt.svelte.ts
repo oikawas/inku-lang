@@ -4,13 +4,17 @@ export type ChatGPTProfile = { id: string; label: string; email: string; state: 
 export type ChatGPTState = { available: boolean; reason: string | null; self_hosted: boolean; active_profile_id: string | null; profiles: ChatGPTProfile[]; pending_registrations?: { id: string; client_id: string }[] };
 
 // What the settings show is the shared core's answer (Sign in with ChatGPT step 2,
-// 2026-11-14): this screen keeps only the words and the windows.
-export type ChatGPTViewAction = { action: string; enabled: boolean; url?: string; confirm?: boolean };
+// 2026-11-14): this screen keeps only the words and the windows. There is one
+// connection, with the one action of its state (the author, 2026-11-14).
+export type ChatGPTViewAction = { action: string; enabled: boolean; confirm?: boolean };
 export type ChatGPTView = {
 	status: string | null;
-	actions: ChatGPTViewAction[];
-	pending: { id: string; client_id: string | null; actions: ChatGPTViewAction[] }[];
-	profiles: { id: string; label: string; active: boolean; status: string; actions: ChatGPTViewAction[] }[];
+	label: string | null;
+	primary: ChatGPTViewAction | null;
+	attempt_actions: ChatGPTViewAction[];
+	sign_out: ChatGPTViewAction | null;
+	notice: string | null;
+	manage_usage: { url: string } | null;
 	guide: boolean;
 };
 export type ChatGPTViewInput = {
@@ -18,7 +22,7 @@ export type ChatGPTViewInput = {
 	attempt: { active: boolean; can_reopen: boolean; helper: boolean };
 	busy: boolean;
 	code: string | null;
-	last_operation: 'sign_out' | 'delete' | null;
+	last_operation: 'sign_out' | null;
 	revocation_confirmed: boolean | null;
 };
 
@@ -45,14 +49,13 @@ export function createChatGPTSettings(deps: {
 	let authorizationUrl = $state<string | null>(null);
 	let helperUrl = $state<string | null>(null);
 	let boundOwner = $state<string | undefined>();
-	let lastOperation = $state<'sign_out' | 'delete' | null>(null);
+	let lastOperation = $state<'sign_out' | null>(null);
 	let revocationConfirmed = $state<boolean | null>(null);
 	let attemptId: string | null = null;
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let epoch = 0;
 	let abort: AbortController | null = null;
 	let helperBefore: ChatGPTState | null = null;
-	let helperProfile: string | undefined;
 	let helperChecking = false;
 	let catalogFailure = false;
 	let finishingAuthorization = false;
@@ -66,13 +69,13 @@ export function createChatGPTSettings(deps: {
 		authorizationUrl = null;
 		helperUrl = null;
 		helperBefore = null;
-		helperProfile = undefined;
 		busy = false;
 	}
 
 	function reset() { stop(); state = null; code = null; lastOperation = null; revocationConfirmed = null; catalogFailure = false; boundOwner = undefined; }
 	const current = (owner: string | undefined, stamp: number) => Boolean(owner && owner === deps.owner() && stamp === epoch && deps.available());
 	const visible = () => boundOwner === deps.owner() && deps.available();
+	const kept = () => (state?.profiles.find((profile) => profile.id === state?.active_profile_id) ?? state?.profiles[0])?.id;
 
 	async function call(path: string, body?: unknown) {
 		const response = await deps.apiFetch('/api/me/chatgpt' + path, {
@@ -85,7 +88,7 @@ export function createChatGPTSettings(deps: {
 	}
 
 	async function refresh(owner: string, stamp: number, preserveCode: string | null = null,
-		operation: { name: 'sign_out' | 'delete'; revocationConfirmed: boolean } | null = null) {
+		operation: { name: 'sign_out'; revocationConfirmed: boolean } | null = null) {
 		const value = await call('');
 		if (!current(owner, stamp)) return;
 		state = value; code = preserveCode ?? value.reason;
@@ -127,7 +130,7 @@ export function createChatGPTSettings(deps: {
 		}
 	}
 
-	async function mutate(path: string, operation: 'sign_out' | 'delete' | null = null) {
+	async function mutate(path: string, operation: 'sign_out' | null = null) {
 		stop(); deps.invalidate();
 		catalogFailure = false;
 		const stamp = epoch, owner = deps.owner();
@@ -139,7 +142,7 @@ export function createChatGPTSettings(deps: {
 			const result = await call(path, {});
 			if (!current(owner, stamp)) return;
 			// The core says whether an unconfirmed revocation is reported (sign_in_connection_view).
-			await refresh(owner, stamp, null, operation && (result.status === 'signed_out' || result.status === 'deleted')
+			await refresh(owner, stamp, null, operation && result.status === 'signed_out'
 				? { name: operation, revocationConfirmed: result.revocation_confirmed !== false } : null);
 			if (current(owner, stamp)) await deps.changed();
 		} catch (error) {
@@ -163,7 +166,9 @@ export function createChatGPTSettings(deps: {
 		} catch (error) { if (current(owner, stamp)) { code = error instanceof Error ? error.message : 'chatgpt_operation_failed'; stop(); } }
 	}
 
-	async function authorize(profileId?: string, consent = false) {
+	// The server signs in the host's one registration again; `newRegistration` replaces it
+	// after the account changed (the core's `new_sign_in`).
+	async function authorize(consent = false, newRegistration = false) {
 		await cancel();
 		catalogFailure = false;
 		const stamp = epoch, owner = deps.owner();
@@ -177,23 +182,22 @@ export function createChatGPTSettings(deps: {
 				if (!current(owner, stamp)) return;
 			}
 			const language = deps.language?.() === 'en' ? 'en' : 'ja';
-			const result = await call('/authorize', { profile_id: profileId ?? null, consent, language });
+			const result = await call('/authorize', { consent, new_registration: newRegistration, language });
 			if (!current(owner, stamp)) return;
 			if (result.action === 'local_helper') {
 				if (result.helper_target !== undefined && result.helper_target !== 'container') throw new Error('chatgpt_operation_failed');
 				const identifier = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-				if (!identifier.test(owner) || (profileId && !identifier.test(profileId))) throw new Error('chatgpt_owner_not_allowed');
+				if (!identifier.test(owner)) throw new Error('chatgpt_owner_not_allowed');
 				const url = new URL('inku-chatgpt://connect');
 				url.searchParams.set('owner_id', owner);
 				url.searchParams.set('consent', consent ? '1' : '0');
-				if (profileId) url.searchParams.set('profile_id', profileId);
+				if (newRegistration) url.searchParams.set('new_registration', '1');
 				url.searchParams.set('browser', await helperBrowser());
 				url.searchParams.set('language', language);
 				if (result.helper_target === 'container') url.searchParams.set('target', 'container');
 				if (!current(owner, stamp)) return;
 				helperUrl = url.href;
 				helperBefore = state;
-				helperProfile = profileId;
 				code = 'chatgpt_helper_requested'; busy = false;
 				window.location.assign(url.href);
 				const deadline = Date.now() + 300_000;
@@ -205,8 +209,10 @@ export function createChatGPTSettings(deps: {
 				timer = setTimeout(() => void watch(), 1000);
 				return;
 			}
+			// A sign-in again carries the kept id token as `id_token_hint` (OpenAI's advice, the
+			// author 2026-11-14); the URL is opened, never logged or stored.
 			const url = new URL(result.authorization_url);
-			if (url.origin !== 'https://auth.openai.com' || url.pathname !== '/api/accounts/authorize' || url.searchParams.has('id_token_hint')) throw new Error('chatgpt_operation_failed');
+			if (url.origin !== 'https://auth.openai.com' || url.pathname !== '/api/accounts/authorize') throw new Error('chatgpt_operation_failed');
 			authorizationUrl = url.href; attemptId = result.attempt_id;
 			window.open(url.href, '_blank', 'noopener,noreferrer');
 			timer = setTimeout(() => void poll(owner, stamp, Date.now() + 300_000), 1000);
@@ -225,15 +231,14 @@ export function createChatGPTSettings(deps: {
 			if (!current(owner, stamp)) return;
 			const active = state?.profiles.find((profile) => profile.id === state?.active_profile_id);
 			const previous = helperBefore?.profiles.find((profile) => profile.id === active?.id);
-			if (active?.state === 'connected' && (!helperProfile || active.id === helperProfile)
-				&& (!previous || active.generation !== previous.generation)) {
-				helperBefore = null; helperProfile = undefined; code = null;
+			if (active?.state === 'connected' && (!previous || active.generation !== previous.generation)) {
+				helperBefore = null; code = null;
 				if (timer) clearTimeout(timer);
 				timer = null;
 				await refreshAfterLogin(owner, stamp);
 				if (current(owner, stamp)) helperUrl = null;
 			} else if (JSON.stringify(state) !== before) await deps.changed();
-		} catch { /* The explicit check button reports errors. */ }
+		} catch { /* Opening the screen again reads the state and reports errors. */ }
 		finally { helperChecking = false; }
 	}
 
@@ -270,10 +275,9 @@ export function createChatGPTSettings(deps: {
 			return value as ChatGPTView;
 		},
 		load, reset, stop, cancel, authorize, recheck,
-		select: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/select'),
-		signOut: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/sign-out', 'sign_out'),
-		remove: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/delete', 'delete'),
-		retry: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/retry')
+		// The one registration the server keeps (the active one, or the only one).
+		signOut: () => mutate('/profiles/' + encodeURIComponent(kept() ?? '') + '/sign-out', 'sign_out'),
+		retry: () => mutate('/profiles/' + encodeURIComponent(kept() ?? '') + '/retry')
 	};
 }
 

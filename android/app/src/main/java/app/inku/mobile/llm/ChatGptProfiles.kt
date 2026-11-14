@@ -73,15 +73,29 @@ class ChatGptException(
      * `ChatGPTError.failure`: by default the one the server gives [code], set
      * where the same code is a refusal in one place and temporary in another.
      */
-    val failure: String = chatGptFailureFor(code),
-) : IllegalArgumentException(code)
+    failure: String? = null,
+    /** What to do next (`retry`, `diagnose`, `usage`, …): the core's answer, by default its table's for [code]. */
+    action: String? = null,
+) : IllegalArgumentException(code) {
+    val failure: String
+    val action: String
+
+    init {
+        val row = if (failure == null || action == null) chatGptFailureRow(code) else null
+        this.failure = failure ?: row!!.getString("failure")
+        this.action = action ?: row!!.getString("action")
+    }
+}
 
 /** The shared core's failure table (`chatgpt_failure`); a code it does not know is `provider_rejected`. */
-internal fun chatGptFailureFor(code: String): String =
-    SharedProviderWire.call(JSONObject().put("action", "chatgpt_failure").put("code", code)).getString("failure")
+internal fun chatGptFailureFor(code: String): String = chatGptFailureRow(code).getString("failure")
+
+private fun chatGptFailureRow(code: String): JSONObject =
+    SharedProviderWire.call(JSONObject().put("action", "chatgpt_failure").put("code", code))
 
 internal const val CHATGPT_PROVIDER = "chatgpt"
 internal const val CHATGPT_ISSUER = "https://auth.openai.com"
+/** The token's resource for sign-in (step 5). Requests go where the core's `url` says. */
 internal const val CHATGPT_RESOURCE = "https://api.openai.com/v1"
 internal const val CHATGPT_TOKEN = "$CHATGPT_ISSUER/api/accounts/oauth/token"
 internal const val CHATGPT_USAGE = "https://chatgpt.com/settings/usage"

@@ -1,5 +1,16 @@
 # inku Android 実装メモ
 
+## 2026-11-14 「ChatGPT でサインイン」の送信の道と入出力の失敗を共通 core から
+
+step 4。作者の答え（時間切れの文を足す、`Accept` は両方に付ける、読めない流れは再試行する）による。
+
+- 送信先・method・header・鍵の付け方・答えと失敗の本文の上限は、共通 core の答えで送る。`/responses` は `chatgpt_request` の答え、`/models` は新しい `chatgpt_models_request` の答え。送る前の host の確かめ（`api.openai.com`・`auth.openai.com` の https だけ）は残す。ログイン（token の交換・更新・失効）は今のまま（step 5）。
+- 失敗の答えは `x-request-id` を読み、本文の文字列のまま `chatgpt_error` に渡す（JSON でない本文は、状態で決まる印になる）。`/models` の答えも本文のまま `chatgpt_catalog` に渡し、読めない一覧は core の `chatgpt_response_invalid` になる。
+- 入出力の失敗は新しい `chatgpt_transport` で名付ける。読み・接続の時間切れと、締め切りの全体の時間切れは `chatgpt_transport_timeout`（`transport_timeout`・再試行）、ほかの入出力の失敗は `chatgpt_transport_unavailable`、上限を超えた答えは `chatgpt_response_too_large`。流れの `malformed` は core の印・種類・次の行動を使う（UTF-8 でない時は `provider_rejected`、ほかは `malformed_payload`）。
+- `ChatGptException` は印と種類に加えて次の行動（`retry`・`diagnose`・`usage` など）を持つ。
+- 時間切れの文「ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。」を足した（今までは「通信が途切れました」）。
+- 送るバイト（本文・`Authorization`・`Accept`・`Content-Type`）と送信先の字は今と同じ。ChatGPT の Vision の送信は Android に無いまま。
+
 ## 2026-11-14 「ChatGPT でサインイン」の接続の見せ方と公開の編集を共通 core から
 
 作者の決定（接続の状態の見せ方は Web に揃える、文言の表はホストに残す）で、step 2 として直した。

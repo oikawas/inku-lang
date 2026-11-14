@@ -169,7 +169,7 @@ class SharedProviderWireJniTest {
     @Test
     fun allChatGptRowsMatchServer() {
         val rows = requireNotNull(cases["chatgpt"])
-        assertEquals(221, rows.size)
+        assertEquals(234, rows.size)
         val actions = mutableMapOf<String, Int>()
         for ((index, item) in rows.withIndex()) {
             val row = item.row
@@ -186,8 +186,9 @@ class SharedProviderWireJniTest {
                 sameJson("$why $key", expected.get(key), answer.get(key))
             }
         }
-        assertEquals(mapOf("chatgpt_request" to 8, "chatgpt_vision_request" to 8, "chatgpt_stream" to 57,
-            "chatgpt_error" to 9, "chatgpt_catalog" to 5, "chatgpt_failure" to 75), actions)
+        assertEquals(mapOf("chatgpt_request" to 9, "chatgpt_vision_request" to 9, "chatgpt_stream" to 59,
+            "chatgpt_error" to 11, "chatgpt_catalog" to 8, "chatgpt_failure" to 75,
+            "chatgpt_models_request" to 1, "chatgpt_transport" to 3), actions)
     }
 
     /** The core's failure table gives every code Android raises the class the old Kotlin table gave it. */

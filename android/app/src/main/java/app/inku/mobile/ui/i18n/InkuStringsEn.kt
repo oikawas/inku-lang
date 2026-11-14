@@ -115,6 +115,7 @@ object InkuStringsEn : InkuStrings {
         "chatgpt_reserved_provider" -> "Manage Sign in with ChatGPT in its dedicated settings."
         "chatgpt_unexpected_tool", "chatgpt_response_invalid", "chatgpt_response_too_large", "chatgpt_response_failed" -> "The ChatGPT response could not be used as drawing data. A protocol diagnosis is needed."
         "chatgpt_refused" -> "ChatGPT refused this request. Review the description."
+        "chatgpt_transport_timeout" -> "ChatGPT did not answer within the time limit. Try again later."
         else -> "The ChatGPT request did not complete. Check the connection and usage, then try again."
     } }
     override val code = "en"

@@ -108,6 +108,7 @@ object InkuStringsJa : InkuStrings {
         "chatgpt_reserved_provider" -> "ChatGPT でサインインは専用の設定で管理します。"
         "chatgpt_unexpected_tool", "chatgpt_response_invalid", "chatgpt_response_too_large", "chatgpt_response_failed" -> "ChatGPTの応答を描画のデータとして受け取れませんでした。形式の診断が必要です。"
         "chatgpt_refused" -> "ChatGPTがこの要求を断りました。記述を見直してください。"
+        "chatgpt_transport_timeout" -> "ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。"
         else -> "ChatGPTへの通信が完了しませんでした。接続状態と利用枠を確認し、もう一度試してください。"
     } }
     override val code = "ja"

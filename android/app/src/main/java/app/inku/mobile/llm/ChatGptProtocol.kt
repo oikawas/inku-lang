@@ -17,7 +17,6 @@ import java.security.spec.ECPublicKeySpec
 import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
 import org.json.JSONArray
-import org.json.JSONException
 import org.json.JSONObject
 
 internal fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
@@ -108,8 +107,8 @@ internal fun chatGptPurpose(action: String?): String {
 }
 
 
-/** What the shared core wrote for one request, and the bounds its stream is read to. */
-internal class ChatGptRequest(val body: String, val mode: String, val answerLimit: Int, val wireLimit: Long)
+/** What the shared core wrote for one request, where it goes, and the bounds its stream is read to. */
+internal class ChatGptRequest(val body: String, val mode: String, val answerLimit: Int, val wireLimit: Long, val send: ChatGptSend)
 
 /**
  * The shared core reads an HTTP error body, a `response.failed` event and a
@@ -119,8 +118,25 @@ internal fun chatGptResponseError(value: Any?, status: Int? = null): ChatGptExce
     chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "chatgpt_error")
         .put("value", value ?: JSONObject.NULL).put("status", status ?: JSONObject.NULL).put("request_id", JSONObject.NULL)))
 
-private fun chatGptFailure(answer: JSONObject): ChatGptException =
-    ChatGptException(answer.getString("code"), answer.getString("failure"))
+/** An HTTP error answer as it came: the core reads the [body] (one that is not JSON is as none) and keeps the [requestId]. */
+internal fun chatGptHttpError(response: ChatGptHttpResponse): ChatGptException =
+    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "chatgpt_error")
+        .put("body", response.body).put("status", response.status).put("request_id", response.requestId ?: JSONObject.NULL)))
+
+/**
+ * A failure of the connection itself, as the core names it (`chatgpt_transport`):
+ * `timeout` (a read, a connection or the whole deadline ran out),
+ * `unavailable` (it failed or was cut) or `too_large` (an answer passed its bound).
+ */
+internal fun chatGptTransport(kind: String): ChatGptException =
+    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "chatgpt_transport").put("kind", kind)))
+
+/** The core's code, failure class and next action. */
+internal fun chatGptFailure(answer: JSONObject): ChatGptException =
+    ChatGptException(answer.getString("code"), answer.getString("failure"), answer.optString("action").takeIf(String::isNotEmpty))
+
+/** Where the core sends the person's model list (`chatgpt_models_request`). */
+internal fun chatGptModelsSend(): ChatGptSend = ChatGptSend.of(SharedProviderWire.call(JSONObject().put("action", "chatgpt_models_request")))
 
 /** The operation is checked here; the body is the shared core's (`provider_wire`). */
 internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
@@ -152,7 +168,7 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
 private fun built(answer: JSONObject, mode: String, answerLimit: Int): ChatGptRequest {
     if (answer.optString("outcome") == "refused") throw IllegalArgumentException(answer.getString("detail"))
     check(answer.optString("outcome") == "ok") { "chatgpt request outcome missing" }
-    return ChatGptRequest(answer.getString("body"), mode, answerLimit, answer.getLong("wire_limit"))
+    return ChatGptRequest(answer.getString("body"), mode, answerLimit, answer.getLong("wire_limit"), ChatGptSend.of(answer))
 }
 
 /**
@@ -167,7 +183,7 @@ internal class ChatGptStream(private val request: ChatGptRequest, private val on
         private set
 
     fun feed(chunk: ByteArray) {
-        if (wire.size().toLong() + chunk.size > request.wireLimit) throw ChatGptException("chatgpt_response_too_large")
+        if (wire.size().toLong() + chunk.size > request.wireLimit) throw chatGptTransport("too_large")
         wire.write(chunk)
         runCatching { onReceivedBytes?.invoke(wire.size().toLong()) }
     }
@@ -179,13 +195,9 @@ internal class ChatGptStream(private val request: ChatGptRequest, private val on
         usage = answer.optJSONObject("terminal")?.optJSONObject("usage")
         when (answer.getString("outcome")) {
             "answer" -> return answer.getString("text")
-            "malformed" -> {
-                // As Server reads it: bytes that are not UTF-8 are refused;
-                // events and arguments of the wrong shape are malformed_payload.
-                val kind = answer.getString("kind")
-                if (kind == "utf8") throw ChatGptException("chatgpt_response_invalid", "provider_rejected")
-                throw JSONException("chatgpt stream is malformed: $kind")
-            }
+            // The core names it: bytes that are not UTF-8 are refused; events and
+            // arguments of the wrong shape are malformed_payload, asked again for.
+            "malformed" -> throw chatGptFailure(answer)
         }
         answer.optJSONArray("tool_shapes")?.let { shapes ->
             // Tool metadata explains protocol failures without logging text or arguments.

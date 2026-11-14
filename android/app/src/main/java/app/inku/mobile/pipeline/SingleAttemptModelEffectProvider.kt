@@ -117,7 +117,12 @@ class SingleAttemptModelEffectProvider(
             effectResult(resultTag, identity, response.text, elapsedMs(started)).toString()
         } catch (timeout: TimeoutCancellationException) {
             runCatching { onUsage(null, null) }
-            failed(identity, "transport_timeout", timeout, elapsedMs(started))
+            // The whole deadline of a Sign in with ChatGPT request is the core's
+            // transport timeout, as a read that timed out is (step 4).
+            val cause: Throwable = if (modelId.startsWith("chatgpt:")) {
+                app.inku.mobile.llm.chatGptTransport("timeout").apply { initCause(timeout) }
+            } else timeout
+            failed(identity, "transport_timeout", cause, elapsedMs(started))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {

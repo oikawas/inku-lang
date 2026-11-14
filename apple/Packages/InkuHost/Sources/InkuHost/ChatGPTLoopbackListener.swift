@@ -85,8 +85,14 @@ private final class LoopbackLease: @unchecked Sendable {
 
 // All mutable engine and connection state is confined to this private serial queue.
 private final class LoopbackEngine: @unchecked Sendable {
-    /// One more than the core's head limit (16 KiB), so a longer head reaches the core and is refused there.
-    private static let headerLimit = 16 * 1024 + 1
+    /// One more than the core's head limit (`sign_in_auth_constants`), so a longer head reaches the core and is
+    /// refused there.
+    private static let headerLimit: Int = {
+        guard let value = (try? ChatGPTPolicy.call("sign_in_auth_constants"))?["callback_header_bytes"].number.flatMap(Int.init) else {
+            preconditionFailure("the core answers the callback head limit")
+        }
+        return value + 1
+    }()
     private let queue = DispatchQueue(label: "inku.chatgpt.loopback")
     private let listener: NWListener
     private let lease: UUID

@@ -2,62 +2,9 @@ import CryptoKit
 import Foundation
 import Security
 
-public struct ChatGPTVerifiedIdentity: Sendable, Equatable {
-    public let issuer: String
-    public let subject: String
-    public let email: String?
-    public let label: String
-}
-
-/// Verifies only supplied discovery/JWKS data; fetching and profile activation belong to the runtime.
+/// The signature over an id token (core `verify`). The core chooses the key and checks the claims; the host only
+/// says whether the signature is the key's.
 public enum ChatGPTIdentityVerifier {
-    private static let issuer = ChatGPTEndpoints.issuer
-
-    public static func verify(idToken: String, clientID: String, nonce: String?, expectedSubject: String? = nil,
-                              discovery: ExactJSON, jwks: ExactJSON, now: Date = Date()) throws -> ChatGPTVerifiedIdentity {
-        do {
-            return try verified(idToken: idToken, clientID: clientID, nonce: nonce, expectedSubject: expectedSubject,
-                                discovery: discovery, jwks: jwks, now: now)
-        } catch is CancellationError { throw CancellationError() }
-        catch let error as HostError where error.code == "chatgpt_identity_mismatch" { throw error }
-        catch { throw HostError("chatgpt_identity_invalid") }
-    }
-
-    private static func verified(idToken: String, clientID: String, nonce: String?, expectedSubject: String?,
-                                 discovery: ExactJSON, jwks: ExactJSON, now: Date) throws -> ChatGPTVerifiedIdentity {
-        try Task.checkCancellation()
-        guard !clientID.isEmpty, clientID != "dynamic_agent_client", clientID.utf8.count <= 1024,
-              idToken.utf8.count <= 65_536 else { throw invalid() }
-        let parts = idToken.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count == 3 else { throw invalid() }
-        let header = try ExactJSON(data: base64URL(String(parts[0])))
-        let payloadBytes = try base64URL(String(parts[1]))
-        let payload = try ExactJSON(data: payloadBytes)
-        let signature = try base64URL(String(parts[2]))
-        guard header.object != nil, payload.object != nil else { throw invalid() }
-        _ = try ChatGPTPolicy.call("chatgpt_auth_discovery", ["discovery": discovery])
-        let selected = try ChatGPTPolicy.call("chatgpt_auth_key", ["header": header, "discovery": discovery, "keys": jwks])
-        let key = selected["key"]
-        let algorithm = try selected.requiredString("alg")
-        let message = Data((String(parts[0]) + "." + String(parts[1])).utf8)
-        try verifySignature(signature, message: message, key: key, algorithm: algorithm)
-        // Verify the signature first. The shared policy alone checks all claims, including iat, nbf and jti.
-        _ = try ChatGPTPolicy.call("chatgpt_auth_claims", ["claims": payload, "client_id": .string(clientID),
-            "nonce": ChatGPTPolicy.string(nonce), "now": ChatGPTPolicy.number(now.timeIntervalSince1970)])
-        let subject = try payload.requiredString("sub")
-        guard subject.utf8.count <= 1024 else { throw invalid() }
-        if let expectedSubject {
-            _ = try ChatGPTPolicy.call("chatgpt_auth_identity", ["previous": .object(["sub": .string(expectedSubject)]), "sub": .string(subject)])
-        }
-        try Task.checkCancellation()
-        var displayInput: [String: ExactJSON] = ["claims": payload, "client_id": .string(clientID)]
-        if let raw = try? ExactJSON.rawMember("email", in: payloadBytes) {
-            displayInput["email_json"] = .string(ChatGPTPolicy.pythonJSONNumbers(String(decoding: raw, as: UTF8.self)))
-        }
-        let display = try ChatGPTPolicy.call("chatgpt_auth_display", displayInput)
-        return ChatGPTVerifiedIdentity(issuer: issuer, subject: subject, email: try display.requiredString("email"), label: try display.requiredString("label"))
-    }
-
     /// Core `verify` (Sign in with ChatGPT step 5): whether the signature over `signingInput` is the key's. The key's
     /// shape is still checked here; the core chose the key and checks the claims.
     static func signatureValid(algorithm: String, key: ExactJSON, signingInput: String, signature: String) -> Bool {
@@ -90,22 +37,11 @@ public enum ChatGPTIdentityVerifier {
         }
     }
 
-    private static func numericDate(_ value: ExactJSON) -> Double? {
-        guard let number = value.number, let date = Double(number), date.isFinite else { return nil }
-        return date
-    }
     private static func base64URL(_ value: String) throws -> Data {
         guard !value.isEmpty, value.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 95 }), value.utf8.count % 4 != 1 else { throw invalid() }
         let padded = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/") + String(repeating: "=", count: (4 - value.utf8.count % 4) % 4)
         guard let data = Data(base64Encoded: padded), data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") == value else { throw invalid() }
         return data
-    }
-    private static func constantTimeEqual(_ lhs: String, _ rhs: String) -> Bool {
-        let first = Array(lhs.utf8), second = Array(rhs.utf8)
-        guard first.count == second.count else { return false }
-        var difference: UInt8 = 0
-        for (a, b) in zip(first, second) { difference |= a ^ b }
-        return difference == 0
     }
     private static func derInteger(_ value: Data) -> Data {
         der(tag: 0x02, bytes: (value.first! >= 0x80 ? Data([0]) : Data()) + value)

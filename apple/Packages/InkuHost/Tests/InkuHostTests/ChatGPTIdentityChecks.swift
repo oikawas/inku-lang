@@ -4,28 +4,18 @@ import Security
 import XCTest
 @testable import InkuHost
 
+/// The host's part of the core `verify` todo: the signature alone (the core chose the key and checks the claims).
 final class ChatGPTIdentityChecks: XCTestCase, @unchecked Sendable {
-    private let now = Date(timeIntervalSince1970: 100)
-    private var claims: ExactJSON {
-        .object(["iss": .string("https://auth.openai.com"), "aud": .string("oaiapp_fixture"), "sub": .string("fixture-subject"),
-                 "exp": .integer(150), "iat": .integer(90), "nonce": .string("fixture-nonce"), "email": .string("fixture@example.invalid")])
-    }
-    private func discovery(_ algorithm: String) -> ExactJSON {
-        .object(["issuer": .string("https://auth.openai.com"), "jwks_uri": .string("https://auth.openai.com/.well-known/jwks.json"),
-                 "id_token_signing_alg_values_supported": .array([.string(algorithm)])])
-    }
     private func b64(_ bytes: Data) -> String {
         bytes.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
     }
-    private func message(_ algorithm: String) -> String {
-        b64(ExactJSON.object(["alg": .string(algorithm), "kid": .string("fixture-key")]).data) + "." + b64(claims.data)
-    }
-    private func reject(_ expected: String = "chatgpt_identity_invalid", _ body: () throws -> Void) {
-        XCTAssertThrowsError(try body()) { XCTAssertEqual(($0 as? HostError)?.code, expected) }
+    private func input(_ algorithm: String, subject: String = "fixture-subject") -> String {
+        b64(ExactJSON.object(["alg": .string(algorithm), "kid": .string("fixture-key")]).data) + "."
+            + b64(ExactJSON.object(["sub": .string(subject)]).data)
     }
 
-    // Failure: a genuine RS256 signature authorizes a wrong nonce/audience, stale token, ambiguous kid, or altered payload.
-    func testRS256IdentityRequiresSignedCurrentUnambiguousClaims() throws {
+    // Failure: a genuine RS256 signature is accepted over an altered payload, or not accepted over its own.
+    func testRS256SignatureCoversTheSigningInput() throws {
         let attributes: [String: Any] = [kSecAttrKeyType as String: kSecAttrKeyTypeRSA, kSecAttrKeySizeInBits as String: 2048,
             kSecPrivateKeyAttrs as String: [kSecAttrIsPermanent as String: false]]
         var error: Unmanaged<CFError>?
@@ -34,56 +24,22 @@ final class ChatGPTIdentityChecks: XCTestCase, @unchecked Sendable {
         let representation = try XCTUnwrap(SecKeyCopyExternalRepresentation(publicKey, &error)) as Data
         // Read the platform-generated PKCS#1 public fixture, independent of the verifier's encoder.
         let numbers = try rsaNumbers(representation)
-        let key: ExactJSON = .object(["kty": .string("RSA"), "kid": .string("fixture-key"), "use": .string("sig"),
-            "n": .string(b64(numbers.0)), "e": .string(b64(numbers.1))])
-        let jwks: ExactJSON = .object(["keys": .array([key])])
-        let input = message("RS256")
-        let signature = try XCTUnwrap(SecKeyCreateSignature(fixtureKey, .rsaSignatureMessagePKCS1v15SHA256, Data(input.utf8) as CFData, &error)) as Data
-        let token = input + "." + b64(signature)
-        let identity = try ChatGPTIdentityVerifier.verify(idToken: token, clientID: "oaiapp_fixture", nonce: "fixture-nonce", discovery: discovery("RS256"), jwks: jwks, now: now)
-        XCTAssertEqual(identity.subject, "fixture-subject"); XCTAssertEqual(identity.email, "fixture@example.invalid")
-        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: token, clientID: "oaiapp_fixture", nonce: "different", discovery: discovery("RS256"), jwks: jwks, now: now) }
-        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: token, clientID: "oaiapp_other", nonce: "fixture-nonce", discovery: discovery("RS256"), jwks: jwks, now: now) }
-        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: token, clientID: "oaiapp_fixture", nonce: "fixture-nonce", discovery: discovery("RS256"), jwks: jwks, now: Date(timeIntervalSince1970: 150)) }
-        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: token, clientID: "oaiapp_fixture", nonce: "fixture-nonce", discovery: discovery("RS256"), jwks: .object(["keys": .array([key, key])]), now: now) }
-        var forged = claims; forged["sub"] = .string("forged")
-        let header = token.split(separator: ".")[0]
-        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: String(header) + "." + b64(forged.data) + "." + b64(signature), clientID: "oaiapp_fixture", nonce: "fixture-nonce", discovery: discovery("RS256"), jwks: jwks, now: now) }
+        let key: ExactJSON = .object(["kty": .string("RSA"), "n": .string(b64(numbers.0)), "e": .string(b64(numbers.1))])
+        let signed = input("RS256")
+        let signature = b64(try XCTUnwrap(SecKeyCreateSignature(fixtureKey, .rsaSignatureMessagePKCS1v15SHA256, Data(signed.utf8) as CFData, &error)) as Data)
+        XCTAssertTrue(ChatGPTIdentityVerifier.signatureValid(algorithm: "RS256", key: key, signingInput: signed, signature: signature))
+        XCTAssertFalse(ChatGPTIdentityVerifier.signatureValid(algorithm: "RS256", key: key, signingInput: input("RS256", subject: "forged"), signature: signature))
     }
 
-    // Failure: JOSE's raw ES256 signature is treated as DER or a returning account is replaced by a different signed subject.
-    func testES256UsesP256RawSignatureAndKeepsReturningSubject() throws {
+    // Failure: JOSE's raw ES256 signature is treated as DER.
+    func testES256UsesP256RawSignature() throws {
         let fixtureKey = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0, count: 31) + Data([1]))
         let publicBytes = fixtureKey.publicKey.x963Representation
-        let key: ExactJSON = .object(["kty": .string("EC"), "crv": .string("P-256"), "kid": .string("fixture-key"),
+        let key: ExactJSON = .object(["kty": .string("EC"), "crv": .string("P-256"),
             "x": .string(b64(publicBytes.subdata(in: 1..<33))), "y": .string(b64(publicBytes.subdata(in: 33..<65)))])
-        let jwks: ExactJSON = .object(["keys": .array([key])])
-        let input = message("ES256"), signature = try fixtureKey.signature(for: Data(input.utf8))
-        let token = input + "." + b64(signature.rawRepresentation)
-        XCTAssertEqual(try ChatGPTIdentityVerifier.verify(idToken: token, clientID: "oaiapp_fixture", nonce: nil, expectedSubject: "fixture-subject", discovery: discovery("ES256"), jwks: jwks, now: now).subject, "fixture-subject")
-        reject("chatgpt_identity_mismatch") { _ = try ChatGPTIdentityVerifier.verify(idToken: token, clientID: "oaiapp_fixture", nonce: nil, expectedSubject: "different-subject", discovery: discovery("ES256"), jwks: jwks, now: now) }
-        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: input + "." + b64(signature.derRepresentation), clientID: "oaiapp_fixture", nonce: nil, discovery: discovery("ES256"), jwks: jwks, now: now) }
-    }
-
-    func testCoreClaimsKeySelectionAndDisplayAfterSignature() throws {
-        let privateKey = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0, count: 31) + Data([1]))
-        let bytes = privateKey.publicKey.x963Representation
-        let key: ExactJSON = .object(["kty": .string("EC"), "crv": .string("P-256"), "kid": .string("fixture-key"),
-            "alg": .string("ignored-by-core"), "key_ops": .array([]),
-            "x": .string(b64(bytes.subdata(in: 1..<33))), "y": .string(b64(bytes.subdata(in: 33..<65)))])
-        let header = b64(ExactJSON.object(["alg": .string("ES256"), "kid": .string("fixture-key"), "crit": .array([.string("ignored")])]).data)
-        func token(_ payload: String) throws -> String {
-            let input = header + "." + b64(Data(payload.utf8))
-            return input + "." + b64(try privateKey.signature(for: Data(input.utf8)).rawRepresentation)
-        }
-        let payload = #"{"iss":"https://auth.openai.com","aud":"oaiapp_fixture","sub":"fixture-subject","exp":150,"iat":"9_0","email":{"first":1e20,"wide":123456789012345678901}}"#
-        let identity = try ChatGPTIdentityVerifier.verify(idToken: token(payload), clientID: "oaiapp_fixture", nonce: nil,
-            discovery: discovery("ES256"), jwks: .object(["keys": .array([key])]), now: now)
-        XCTAssertEqual(identity.email, "{'first': 1e+20, 'wide': 123456789012345678901}")
-        XCTAssertEqual(identity.label, "{'first': 1e+20, 'wide': 123456789012345678901} / _fixture")
-        let invalid = payload.replacingOccurrences(of: "\"iat\":\"9_0\"", with: "\"iat\":\"9_0\",\"jti\":3")
-        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: token(invalid), clientID: "oaiapp_fixture", nonce: nil,
-            discovery: discovery("ES256"), jwks: .object(["keys": .array([key])]), now: now) }
+        let signed = input("ES256"), signature = try fixtureKey.signature(for: Data(signed.utf8))
+        XCTAssertTrue(ChatGPTIdentityVerifier.signatureValid(algorithm: "ES256", key: key, signingInput: signed, signature: b64(signature.rawRepresentation)))
+        XCTAssertFalse(ChatGPTIdentityVerifier.signatureValid(algorithm: "ES256", key: key, signingInput: signed, signature: b64(signature.derRepresentation)))
     }
 
     private func rsaNumbers(_ data: Data) throws -> (Data, Data) {

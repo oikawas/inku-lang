@@ -10,7 +10,8 @@ final class ChatGPTAuth1115Checks: XCTestCase {
             let file = directory.appendingPathComponent("server/tests/data/chatgpt-auth-11-15-cases.json")
             if FileManager.default.fileExists(atPath: file.path) {
                 let rows = try ExactJSON(data: Data(contentsOf: file)).array ?? []
-                XCTAssertEqual(rows.count, 31)
+                // The closed parts' 17 rows moved to the core's own sign-in-part-cases.json (step 6).
+                XCTAssertEqual(rows.count, 14)
                 for row in rows {
                     var fields = row["request"].object ?? [:]
                     let action = fields.removeValue(forKey: "action")?.string ?? ""

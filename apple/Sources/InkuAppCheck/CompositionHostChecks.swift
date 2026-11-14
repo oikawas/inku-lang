@@ -257,7 +257,7 @@ private actor CompositionEmptyCredentials: CredentialStore {
 
 private actor CompositionNoHTTP: ChatGPTHTTPClient {
     private(set) var calls = 0
-    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+    func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         calls += 1; throw HostError("composition_check_must_not_contact_http")
     }
 }

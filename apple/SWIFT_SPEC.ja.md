@@ -22,6 +22,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-11-15 ChatGPT でサインイン（step 6、片付け）
+
+作者の指示「step6を実行」。共通coreが古い名（`chatgpt_*`）の action と、ホストから呼ばれない部品を断るようになったので、Swift は外から呼べる名だけを呼ぶ。作者に見える変化は無い。
+
+- 名：coreへの呼び出しは全て`sign_in_<名>`に`"service":"chatgpt"`を付ける（`model_catalog`：`flow_start`・`flow_next`・`publication`・`publication_update`・`offered`・`usable`・`auth_constants`・`auth_session`・`auth_publication_input`・`auth_publication_active`・`auth_operation`・`auth_quota_failure`・`auth_endpoint`、`provider_wire`：`request`・`vision_request`・`stream`・`error`・`transport`・`failure`）。
+- 消した物：試験からしか通らなかった ID token の確かめ（`ChatGPTIdentityVerifier.verify`。署名の確かめ`signatureValid`は手順の`verify`の todo のために残る）、email の数の書き直し、モデル一覧の送り先と読み（`ChatGPTWire.modelsEndpoint`・`catalog`）、使われなくなった関数。
+- coreの値にした物：登録の上限（8 件）と戻りの頭の上限（16 KiB）は`sign_in_auth_constants`の`registrations`・`callback_header_bytes`から読む。手順の`http`の todo は`answer_limit`と`error_limit`を必ず持ち、無い時は送らない。2xx でない答えの上限は、前は全ての送信で 64 KiB だったが、coreの`error_limit`になった（描画・Vision と失効は 64 KiB のまま、サインインの token の交換と更新は 1 MiB）。session が今の登録のものかは`sign_in_auth_session`だけが決める（Swift の UUID と世代の確かめを外した）。
+- 残した物（作者の答え）：送り先の二重の確かめ（`ChatGPTEndpoints`の`auth.openai.com`・`api.openai.com`の`/v1/models`・`/v1/responses`と、手順の`http`の確かめ直し）。その値がcoreの`issuer`・`resource`と食い違わないことを試験で確かめる。`"chatgpt"`の id の直書きもそのまま。
+- 試験データ：閉じた部品の行はcoreの`sign-in-part-cases.json`に移った。Swift の確かめは、共通の`chatgpt`の節の送信・流れ・失敗・入出力の 166 行（一覧 8 行と送り先 1 行が無くなった）、認証と公開の 21 行と addendum の 4 行、11-15 の 14 行、手順の 122 行を読む。
+
 ## 2026-11-14 ChatGPT でサインイン（接続は 1 つ、client_id を捨てない）
 
 作者の指示（2026-11-14「選択　再認証　接続解除　削除　の部分の挙動がゴミ」「アクションとして等価でも無いし、プロセスが繋がっているわけでもない。考え直して。」「複数登録ある前提がいらない。」）と、作者が選んだ「client_id を捨てない」。OpenAI の資料では登録を消す API が無く、inku が client_id を捨てて登録し直すたびに、OpenAI 側に消せない項目が増えていた。共通coreの`sign_in_connection_view`と手順の答えを使う。
@@ -35,7 +45,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 ## 2026-11-14 ChatGPT でサインイン（step 5、手順を「次にすること」の形で）
 
-ログイン・tokenの利用と更新・モデル一覧の取り直し・接続の解除・削除・選択・上限の停止と再開を、共通coreの`chatgpt_flow_start`・`chatgpt_flow_next`が答える「次にすること」（todo）を順に行う1つのdriverで回す（`ChatGPTFlowDriver.swift`。作者の答え：一度に作る、食い違いは推奨の表）。手順の順番と判定、HTTPの欄とフォームの符号化、保管に書く登録はcoreが決める。
+ログイン・tokenの利用と更新・モデル一覧の取り直し・接続の解除・削除・選択・上限の停止と再開を、共通coreの`sign_in_flow_start`・`sign_in_flow_next`（step 6 までの名は`chatgpt_flow_start`・`chatgpt_flow_next`）が答える「次にすること」（todo）を順に行う1つのdriverで回す（`ChatGPTFlowDriver.swift`。作者の答え：一度に作る、食い違いは推奨の表）。手順の順番と判定、HTTPの欄とフォームの符号化、保管に書く登録はcoreが決める。
 
 - ホストに残す物：錠（`edit`・`refresh`・`wire-<登録>`のflock）、保管（`profiles.sealed`。core の形`profiles`・`registrations_pending`・`active`との写しは読み書きの時に行い、Swiftが読まない欄は`coreExtras`にそのまま持つ）、乱数、戻りのソケット（`ChatGPTLoopbackListener`は受けた要求の頭のバイトを渡し、coreの答えをそのまま書くだけになった）、HTTP（ephemeral、redirectを拒む、todoの締め切りと上限、入出力の失敗はcoreの3種）、署名の確かめ（CryptoKitと`SecKey`。鍵の形の確かめは残す）、ログインの窓（Macの既定のブラウザ、iOSのログインの画面）、時差（その日時の`TimeZone.current`）。
 - 送信の途中の一覧の確かめは、送信が持つ`wire`の錠をcoreの一覧の手順にも使う（同じ錠を2度取らない）。
@@ -46,8 +56,8 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 送信先・header・鍵の付け方と、入出力の失敗の分けを、共通coreの`provider_wire`の答えで作る（作者の答え：時間切れの文を足す、`Accept`は両方に付ける、読めない流れは再試行する）。2026-10-17の節の`provider_wire`のactionに、`chatgpt_models_request`と`chatgpt_transport`が加わった。
 
-- 送信：`/responses`（描画・Vision）は`chatgpt_request`・`chatgpt_vision_request`の答えの`url`・`method`・`headers`・`auth`で、モデル一覧は`chatgpt_models_request`の答えで送る（`ChatGPTWire.Endpoint`）。`/models`に`Accept: application/json`が加わった。送る前のURLの確かめ（`ChatGPTEndpoints.validate`）は残る。一覧の答えの上限はcoreの`answer_limit`。
-- 入出力の失敗：時間切れ（処理の締め切り・認証の錠・`URLError.timedOut`）、接続の失敗（ほかの`URLError`・ほかの例外・HTTPの答えでない）、上限を超えた答えは、coreの`chatgpt_transport`の印・種類・次の行動で返す。
+- 送信：`/responses`（描画・Vision）は`sign_in_request`・`sign_in_vision_request`（step 6 までは`chatgpt_request`・`chatgpt_vision_request`）の答えの`url`・`method`・`headers`・`auth`・`error_limit`で送る（`ChatGPTWire.Endpoint`）。モデル一覧は、この節では`chatgpt_models_request`の答えで送り、step 5 からはcoreの手順の`http`の todo で送る。`/models`に`Accept: application/json`が加わった。送る前のURLの確かめ（`ChatGPTEndpoints.validate`）は残る。一覧の答えの上限はcoreの`answer_limit`。
+- 入出力の失敗：時間切れ（処理の締め切り・認証の錠・`URLError.timedOut`）、接続の失敗（ほかの`URLError`・ほかの例外・HTTPの答えでない）、上限を超えた答えは、coreの`sign_in_transport`（step 6 までは`chatgpt_transport`）の印・種類・次の行動で返す。
 - 読めない答え：流れと一覧が読めない時は、coreの`code`・`failure`・`action`をそのまま持つ。流れがJSONとして読めない・形が違う時は`malformed_payload`（pipelineが再試行する。前は`provider_rejected`で再試行しなかった）、UTF-8でない時は`provider_rejected`のまま。失敗の答えの本文と一覧は、本文の文字列のままcoreに渡す（`body`）。
 - 文言：失敗の表（`ChatGPTStatusCopy`）に、時間切れ（「ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。」）と、応答の形の失敗（`chatgpt_response_invalid`・`chatgpt_response_too_large`、「ChatGPTの応答を描画のデータとして受け取れませんでした。形式の診断が必要です。」）を足した。前は「ChatGPT でサインインの接続を確認してください。」に落ちていた。
 - 確かめ：共通の試験データの`chatgpt`の節の送信・流れ・失敗・一覧・`chatgpt_failure`・`chatgpt_models_request`・`chatgpt_transport`の175行を、core自身とSwiftの受け手の両方で読み、送信先とheaderは`URLRequest`で照らす。
@@ -61,7 +71,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 未完了の登録は、登録の一覧の前に、client idを添えて出す。使用量の頁は、状態を読めていない時も上の操作に出す。
 - 接続の解除は、削除と同じく、押すと確かめの文と「接続を解除する」「やめる」を出し、確かめで実行する（作者の答え）。
 - 「ChatGPT でサインインを有効にする」のトグルと、登録8件で新しい接続のボタンを止める所を外した（作者の答え、Webに揃える）。サインインの操作が接続を有効にし、予約の`chatgpt`のサービスを足す。登録の上限の確かめ（`chatgpt_profile_limit`）は残る。
-- 公開の選び（`ChatGPTModelsSheet`）：選び・用途・未保存・取り直しを押せるか・保存を押せるか・保存の本文を、coreの答え（`SignInPublicationDraft`）から出す。用途を外して空になれば公開から外し、全選択は選べて用途のある物だけ、保存は変更が無くても押せ、保存の本文は一覧の順の公開と全てのモデルの用途（Webと同じ）。評価は、同梱のカタログから作り直さず、公開の行（coreの`chatgpt_publication`）だけから読む。
+- 公開の選び（`ChatGPTModelsSheet`）：選び・用途・未保存・取り直しを押せるか・保存を押せるか・保存の本文を、coreの答え（`SignInPublicationDraft`）から出す。用途を外して空になれば公開から外し、全選択は選べて用途のある物だけ、保存は変更が無くても押せ、保存の本文は一覧の順の公開と全てのモデルの用途（Webと同じ）。評価は、同梱のカタログから作り直さず、公開の行（coreの`sign_in_publication`。step 6 までは`chatgpt_publication`）だけから読む。
 - 確かめ：`InkuAppCheck --sign-in-only`が共通の試験データの48行と、Swiftが作る要求（見せ方・編集）をcoreで照らす。
 
 ## 2026-11-14 ChatGPT でサインイン（step 1）
@@ -462,9 +472,9 @@ macOS の時系列サムネイルでは、カードにフォーカスして矢�
 
 ## 2026-10-17 ChatGPTプランの次の行動の表を共有coreへ移す
 
-ChatGPTプランの失敗で画面に出す次の行動（再試行・接続し直す・同意・設定・モデル・書き直す・使用量・調べる）と、パイプラインが自動で再試行するか（`provider_rejected`・`transport_unavailable`・`transport_timeout`）は、UniFFIの`provider_wire`の`chatgpt_failure`が答える。表の正本は共有coreの[`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs)で、ServerとAndroidも同じ表を引く。Serverセッションの依頼（共通Rustの段5）による。
+ChatGPTプランの失敗で画面に出す次の行動（再試行・接続し直す・同意・設定・モデル・書き直す・使用量・調べる）と、パイプラインが自動で再試行するか（`provider_rejected`・`transport_unavailable`・`transport_timeout`）は、UniFFIの`provider_wire`の`sign_in_failure`（step 6 までは`chatgpt_failure`）が答える。表の正本は共有coreの[`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs)で、ServerとAndroidも同じ表を引く。Serverセッションの依頼（共通Rustの段5）による。
 
-- `ChatGPTPlanDiagnostic`の一時的な印の一覧と次の行動の表を消し、印と（coreが分類した失敗のときだけ）一時的かどうかを`chatgpt_failure`へ渡す。表に無い印は`provider_rejected`と「調べる」。coreが流れやHTTPの失敗を自分で分類したときは、その答えの`failure`と`action`をそのまま使う。
+- `ChatGPTPlanDiagnostic`の一時的な印の一覧と次の行動の表を消し、印と（coreが分類した失敗のときだけ）一時的かどうかを`sign_in_failure`へ渡す。表に無い印は`provider_rejected`と「調べる」。coreが流れやHTTPの失敗を自分で分類したときは、その答えの`failure`と`action`をそのまま使う。
 - 自動で再試行するかは、次の行動から作らず、表の`failure`を使う。「再試行」を出す印でも、`chatgpt_cancelled`などは`provider_rejected`のままで、パイプラインは自動で再試行しない。
 - Swiftが出す印で次の行動が変わるのは7個：`chatgpt_attempt_busy`（調べる→再試行）、`chatgpt_auth_rejected`（調べる→接続し直す）、`chatgpt_cancelled`（調べる→再試行）、`chatgpt_consent_declined`（調べる→同意）、`chatgpt_registration_incomplete`（調べる→接続し直す）、`chatgpt_session_changed`（接続し直す→再試行）、`chatgpt_session_stale`（調べる→接続し直す）。自動で再試行するかが変わる印は無い。
 - coreは流れの応答IDと関数呼び出しのIDを確かめ、モデル一覧で公開できない行と同じslugの2行目以降を落とすようになった（段4で旧いSwiftとの違いとして伝えたもの）。Swiftの側の変更は無い。
@@ -472,7 +482,7 @@ ChatGPTプランの失敗で画面に出す次の行動（再試行・接続し�
 
 ## 2026-10-17 ChatGPTプランの本文と流れの読みを共有coreへ移す
 
-ChatGPTプランの描画とVisionの要求本文、SSEの流れの読み、HTTPの失敗の分類、モデル一覧の読みは、UniFFIの`provider_wire`（`inku.provider-wire.v1`）の`chatgpt_request`・`chatgpt_vision_request`・`chatgpt_limits`・`chatgpt_stream`・`chatgpt_error`・`chatgpt_catalog`を呼ぶ。正本は共有coreの[`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs)で、ServerとAndroidも同じ規則で読む。Serverセッションの依頼（共通Rustの段4）による。
+ChatGPTプランの描画とVisionの要求本文、SSEの流れの読み、HTTPの失敗の分類、モデル一覧の読みは、UniFFIの`provider_wire`（`inku.provider-wire.v1`）の`sign_in_request`・`sign_in_vision_request`・`sign_in_stream`・`sign_in_error`を呼ぶ（この節では`chatgpt_request`・`chatgpt_vision_request`・`chatgpt_limits`・`chatgpt_stream`・`chatgpt_error`・`chatgpt_catalog`。モデル一覧の読みは step 5 からcoreの手順の中にあり、step 6 で`chatgpt_catalog`は外から呼べなくなった）。正本は共有coreの[`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs)で、ServerとAndroidも同じ規則で読む。Serverセッションの依頼（共通Rustの段4）による。
 
 - Swiftの`ChatGPTResponseDecoder`を消し、受け手を[`ChatGPTWire.swift`](Packages/InkuHost/Sources/InkuHost/ChatGPTWire.swift)にした。描画の本文はeffectのpromptを元のJSONのまま渡し、coreの本文の文字列をそのまま送って観測記録にも書く。
 - 流れはこれまでどおり最後まで受けてから1回で読む。受けている間に守るのは、coreが返す流れ全体の上限（`wire_limit`）だけで、1つのeventと答えの上限はcoreが読むときに確かめる。最後の`response`は観測記録に渡す。道具の形の診断はcoreが返す形だけをログに書き、本文と引数は書かない。

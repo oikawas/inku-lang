@@ -126,7 +126,7 @@ public actor ChatGPTPlanRuntime {
         guard var attempt = attempts[id] else { throw HostError("chatgpt_attempt_not_found") }
         return try await withTaskCancellationHandler {
             do {
-                let next = try ChatGPTPolicy.call("chatgpt_flow_next", ["state": attempt.answer["state"], "result": .object([:]),
+                let next = try ChatGPTPolicy.call("sign_in_flow_next", ["state": attempt.answer["state"], "result": .object([:]),
                     "now": ChatGPTPolicy.number(Date().timeIntervalSince1970)])
                 let done = try await drive(next, &attempt.context)
                 attempts.removeValue(forKey: id); await attempt.context.listener?.cancel()
@@ -167,14 +167,14 @@ public actor ChatGPTPlanRuntime {
     public func savePublication(profileID: String, generation: Int64, models selected: [String],
                                 purposes: [String: [String]] = [:]) async throws -> ChatGPTPlanPublication {
         try checkOpen()
-        _ = try ChatGPTPolicy.call("chatgpt_auth_publication_input", ["profile_id": .string(profileID),
+        _ = try ChatGPTPolicy.call("sign_in_auth_publication_input", ["profile_id": .string(profileID),
             "generation": .number(String(generation)), "selected": .array(selected.map(ExactJSON.string)),
             "model_purposes": .object(purposes.mapValues { .array($0.map(ExactJSON.string)) })])
         let session = ChatGPTPlanSession(profileID: profileID, generation: generation)
         return try await mutate { value in
             var profile = try self.checkedProfile(session, value: value)
-            _ = try ChatGPTPolicy.call("chatgpt_auth_publication_active", ["active": ChatGPTPolicy.string(value.activeProfileID), "profile_id": .string(profileID)])
-            let result = try ChatGPTPolicy.call("chatgpt_publication_update", ["profile": ChatGPTPolicy.profile(profile),
+            _ = try ChatGPTPolicy.call("sign_in_auth_publication_active", ["active": ChatGPTPolicy.string(value.activeProfileID), "profile_id": .string(profileID)])
+            let result = try ChatGPTPolicy.call("sign_in_publication_update", ["profile": ChatGPTPolicy.profile(profile),
                 "selected": .array(selected.map(ExactJSON.string)),
                 "model_purposes": .object(purposes.mapValues { .array($0.map(ExactJSON.string)) }),
                 "assessments": try ChatGPTPolicy.assessments()])["profile"]
@@ -185,7 +185,7 @@ public actor ChatGPTPlanRuntime {
         }
     }
     private static func publication(_ profile: ChatGPTStoredProfile) throws -> ChatGPTPlanPublication {
-        let answer = try ChatGPTPolicy.call("chatgpt_publication", ["profile": ChatGPTPolicy.profile(profile),
+        let answer = try ChatGPTPolicy.call("sign_in_publication", ["profile": ChatGPTPolicy.profile(profile),
             "assessments": try ChatGPTPolicy.assessments()])["publication"]
         let rows = answer["models"].array ?? []
         var models: [ChatGPTPlanModel] = [], published = Set<String>(), purposes: [String: [String]] = [:]
@@ -209,7 +209,7 @@ public actor ChatGPTPlanRuntime {
     private static func requireOffered(_ model: String, purpose: String, publication: ChatGPTPlanPublication) throws {
         let rows = publication.models.map { ExactJSON.object(["id": .string($0.id), "enabled": .bool(publication.published.contains($0.id)),
             "purposes": .array(publication.purposes(of: $0.id).map(ExactJSON.string))]) }
-        let result = try ChatGPTPolicy.call("chatgpt_offered", ["models": .array(rows), "model": .string(model), "purpose": .string(purpose)])
+        let result = try ChatGPTPolicy.call("sign_in_offered", ["models": .array(rows), "model": .string(model), "purpose": .string(purpose)])
         guard result["offered"].bool == true else { throw HostError("chatgpt_model_not_offered") }
     }
     public func checkVisionAccess(session: ChatGPTPlanSession, model: String) throws {
@@ -234,9 +234,9 @@ public actor ChatGPTPlanRuntime {
                                 argumentLimit: Int, recorder: ProviderAttemptRecorder?, willSend: @escaping ProviderObservationHandler,
                                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         let effect = parsed.effect, tag = try effect.requiredString("tag")
-        let imageEffects = try ChatGPTPolicy.call("chatgpt_auth_constants")["image_effects"].array?.compactMap(\.string) ?? []
+        let imageEffects = try ChatGPTPolicy.call("sign_in_auth_constants")["image_effects"].array?.compactMap(\.string) ?? []
         let purpose = imageEffects.contains(tag) ? "vision" : "llm"
-        _ = try ChatGPTPolicy.call("chatgpt_auth_operation", ["purpose": .string(purpose), "tag": .string(tag)])
+        _ = try ChatGPTPolicy.call("sign_in_auth_operation", ["purpose": .string(purpose), "tag": .string(tag)])
         guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite,
               argumentLimit > 0, argumentLimit <= (Int.max - 524_288) / 6 else { throw HostError("pipeline_schema_violation") }
         // Server raises TimeoutError for a non-positive attempt timeout before the ChatGPT request.
@@ -273,13 +273,14 @@ public actor ChatGPTPlanRuntime {
                     recorder.receive(ProviderHTTPRead(status: nil, data: nil, sent: true, complete: false, truncated: false))
                     if let observed = self.http as? any ObservedChatGPTHTTPClient {
                         return try await observed.sendObserved(boundedRequest, maximumBytes: sent.wireLimit,
-                            onBytes: onBytes, onResponse: { recorder.receive($0) })
+                            errorBytes: sent.endpoint.errorLimit, onBytes: onBytes, onResponse: { recorder.receive($0) })
                     }
-                    let response = try await self.http.send(boundedRequest, maximumBytes: sent.wireLimit, onBytes: onBytes)
+                    let response = try await self.http.send(boundedRequest, maximumBytes: sent.wireLimit,
+                        errorBytes: sent.endpoint.errorLimit, onBytes: onBytes)
                     recorder.receive(ProviderHTTPRead(status: response.status, data: response.data, sent: true, complete: true, truncated: false))
                     return response
                 }
-                return try await self.http.send(boundedRequest, maximumBytes: sent.wireLimit, onBytes: onBytes)
+                return try await self.http.send(boundedRequest, maximumBytes: sent.wireLimit, errorBytes: sent.endpoint.errorLimit, onBytes: onBytes)
             }
             if !(200...299).contains(result.status) { throw try ChatGPTWire.httpFailure(result) }
             // The core reads the whole stream: a failure following a completed frame invalidates that frame.
@@ -299,7 +300,7 @@ public actor ChatGPTPlanRuntime {
     /// published and chosen for Vision; otherwise nothing is sent.
     public func visionText(session: ChatGPTPlanSession, model: String, system: String, message: String, images: [String],
                            timeoutSeconds: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        _ = try ChatGPTPolicy.call("chatgpt_auth_operation", ["purpose": .string("vision"), "tag": .string("vision")])
+        _ = try ChatGPTPolicy.call("sign_in_auth_operation", ["purpose": .string("vision"), "tag": .string("vision")])
         guard timeoutSeconds.isFinite, timeoutSeconds > 0 else { throw ChatGPTWire.transport(.timeout) }
         let prepared = try ChatGPTWire.visionRequest(model: model, system: system, text: message, images: images, answerLimit: Self.visionTextLimit)
         let deadline = Date().addingTimeInterval(timeoutSeconds)
@@ -312,7 +313,7 @@ public actor ChatGPTPlanRuntime {
             let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
             let boundedRequest = prepared.endpoint.request(token: token, body: prepared.body, deadline: deadline)
             let result = try await guarded(deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) }) {
-                try await self.http.send(boundedRequest, maximumBytes: prepared.wireLimit, onBytes: onBytes)
+                try await self.http.send(boundedRequest, maximumBytes: prepared.wireLimit, errorBytes: prepared.endpoint.errorLimit, onBytes: onBytes)
             }
             if !(200...299).contains(result.status) { throw try ChatGPTWire.httpFailure(result) }
             let stream = try ChatGPTWire.read(text: true, answerLimit: Self.visionTextLimit, wire: result.data)
@@ -328,9 +329,6 @@ public actor ChatGPTPlanRuntime {
     static let visionTextLimit = 512 * 1024
 
     /// The bytes recorded and sent: the effect's prompt as written, so the schema keeps its member order.
-    static func request(action: Data, model: String, argumentLimit: Int) throws -> ChatGPTWire.Request {
-        try request(parsed: ParsedProviderAction(action), model: model, argumentLimit: argumentLimit)
-    }
     static func request(parsed: ParsedProviderAction, model: String, argumentLimit: Int) throws -> ChatGPTWire.Request {
         let images = parsed.effect["_transient_images"].array?.compactMap(\.string) ?? []
         return try ChatGPTWire.request(model: model, prompt: ExactJSON.rawMemberValidated("prompt", in: ExactJSON.rawMemberValidated("payload", in: parsed.bytes)), answerLimit: argumentLimit, images: images)
@@ -367,11 +365,11 @@ public actor ChatGPTPlanRuntime {
         guard value.enabled else { throw HostError("chatgpt_disabled") }; return value
     }
     private func checkedProfile(_ session: ChatGPTPlanSession, value: ChatGPTVaultState? = nil) throws -> ChatGPTStoredProfile {
-        guard UUID(uuidString: session.profileID) != nil, session.generation > 0 else { throw HostError("chatgpt_session_changed") }
+        // The core's `sign_in_auth_session` decides whether the session is still this registration's.
         let value = try value ?? checkedState()
         try checkOpen(); guard value.enabled else { throw HostError("chatgpt_disabled") }
         guard let profile = value.profiles[session.profileID] else { throw HostError("chatgpt_not_connected") }
-        _ = try ChatGPTPolicy.call("chatgpt_auth_session", ["profile": ChatGPTPolicy.profile(profile), "generation": .number(String(session.generation))])
+        _ = try ChatGPTPolicy.call("sign_in_auth_session", ["profile": ChatGPTPolicy.profile(profile), "generation": .number(String(session.generation))])
         return profile
     }
     private func checkOpen() throws { try Task.checkCancellation(); guard !closed else { throw HostError("chatgpt_cancelled") } }
@@ -415,7 +413,7 @@ public actor ChatGPTPlanRuntime {
     }
     private static func base64URL(_ data: Data) -> String { data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }
     private static func shouldPause(_ code: String) throws -> Bool {
-        try ChatGPTPolicy.call("chatgpt_auth_quota_failure", ["code": .string(code)])["pause"].bool == true
+        try ChatGPTPolicy.call("sign_in_auth_quota_failure", ["code": .string(code)])["pause"].bool == true
     }
     public static func diagnostic(_ error: Error) -> ChatGPTPlanDiagnostic {
         if let failure = error as? ChatGPTPlanFailure { return failure.diagnostic }

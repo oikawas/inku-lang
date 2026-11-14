@@ -195,7 +195,7 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         let wireBody = String(decoding: try XCTUnwrap(wire.httpBody), as: UTF8.self)
         XCTAssertTrue(wireBody.contains(image.jpeg.base64EncodedString()))
         XCTAssertTrue(wireBody.contains("image/png"))
-        let chatGPT = try ChatGPTPlanRuntime.request(action: actions[1].data, model: "fixture", argumentLimit: 1048576)
+        let chatGPT = try ChatGPTPlanRuntime.request(parsed: ParsedProviderAction(actions[1].data), model: "fixture", argumentLimit: 1048576)
         let chatBody = String(decoding: chatGPT.body, as: UTF8.self)
         XCTAssertTrue(chatBody.contains("data:image/jpeg;base64,"))
         XCTAssertTrue(chatBody.contains("data:image/png;base64,"))

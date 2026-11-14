@@ -50,7 +50,7 @@ public struct ChatGPTPlanModel: Identifiable, Codable, Sendable, Equatable {
 public struct ChatGPTPlanPublication: Sendable, Equatable {
     /// A ChatGPT plan model takes images, so a model without a saved choice serves both purposes.
     public static let defaultPurposes: [String] = {
-        (try? ChatGPTPolicy.call("chatgpt_usable", ["profile": .object([:]), "model": .string("")])["purposes"].array?.compactMap(\.string)) ?? []
+        (try? ChatGPTPolicy.call("sign_in_usable", ["profile": .object([:]), "model": .string("")])["purposes"].array?.compactMap(\.string)) ?? []
     }()
     public let profileID: String
     public let generation: Int64
@@ -101,7 +101,6 @@ struct ChatGPTStoredProfile: Codable, Sendable {
         .init(id: id, label: label, email: email, clientID: clientID, state: state,
               generation: generation, scopes: scopes, expiresAt: expiresAt)
     }
-    mutating func removeTokens() { accessToken = nil; refreshToken = nil; idToken = nil; models = nil; modelsExpireAt = nil }
 }
 
 struct ChatGPTVaultState: Codable, Sendable {
@@ -174,6 +173,13 @@ private final class ChatGPTVaultCache: @unchecked Sendable {
 /// Profiles, identity and rotated tokens have a single atomic encrypted-file commit.
 struct ChatGPTPlanStore: Sendable {
     private static let maximumBytes = 1_048_576
+    /// The core's registration limit (`sign_in_auth_constants`); the vault never holds more of either kind.
+    static let registrations: Int = {
+        guard let value = (try? ChatGPTPolicy.call("sign_in_auth_constants"))?["registrations"].number.flatMap(Int.init) else {
+            preconditionFailure("the core answers the registration limit")
+        }
+        return value
+    }()
     let directory: URL
     let keys: any ChatGPTVaultKeyStore
     private let cache = ChatGPTVaultCache()
@@ -218,7 +224,8 @@ struct ChatGPTPlanStore: Sendable {
         do {
             let value = try JSONDecoder().decode(ChatGPTVaultState.self,
                 from: AES.GCM.open(AES.GCM.SealedBox(combined: data), using: SymmetricKey(data: key)))
-            guard value.schema == "inku.chatgpt-plan.v1", value.profiles.count <= 8, value.pendingRegistrations.count <= 8 else {
+            guard value.schema == "inku.chatgpt-plan.v1", value.profiles.count <= Self.registrations,
+                  value.pendingRegistrations.count <= Self.registrations else {
                 throw HostError("chatgpt_credentials_unavailable")
             }
             cache.set(value, identity: identity)
@@ -227,7 +234,9 @@ struct ChatGPTPlanStore: Sendable {
     }
     func write(_ value: ChatGPTVaultState) throws {
         try ensureDirectory()
-        guard value.profiles.count <= 8, value.pendingRegistrations.count <= 8 else { throw HostError("chatgpt_profile_limit") }
+        guard value.profiles.count <= Self.registrations, value.pendingRegistrations.count <= Self.registrations else {
+            throw HostError("chatgpt_profile_limit")
+        }
         let key: Data
         if let existing = try keys.readKey() { key = existing }
         else {

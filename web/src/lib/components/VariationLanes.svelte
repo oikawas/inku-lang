@@ -43,21 +43,34 @@
 	//
 	// Drawn rather than stepped -- an even step is itself a rhythm, and four
 	// bodies moving one after another read as a queue rather than as four
-	// workers. The row is mounted and unmounted with the run, so the offsets are
-	// drawn once and held.
+	// workers.
+	//
+	// Each lane draws its offset when it turns to running, not when the row is
+	// mounted: a run can show the row and then wait on a send before any lane
+	// starts (the AI's theses are asked first), and offsets drawn at mount have
+	// all run out by then, so the four mascots would mount together and beat in
+	// unison. Once drawn, a lane's offset is held.
 	const STAGGER_MS = 900;
-	let started = $state<boolean[]>([]);
-	// Read untracked, so this runs once for the row rather than on every lane
-	// that lands: `states` is a fresh array each time one does, and re-running
-	// would cancel the timers of the lanes that had not started yet.
+	let started = $state<Record<number, boolean>>({});
+	// Plain, not state: scheduling a lane must not re-run the effect, and a
+	// re-run must not cancel the timers of lanes that have not started yet.
+	const scheduled = new Map<number, number>();
 	$effect(() => {
-		const count = untrack(() => states.length);
-		started = Array.from({ length: count }, () => false);
-		const timers = Array.from({ length: count }, (_, index) => window.setTimeout(() => {
-			started = started.map((value, i) => i === index ? true : value);
-		}, Math.random() * STAGGER_MS));
-		return () => timers.forEach((timer) => window.clearTimeout(timer));
+		states.forEach((state, index) => {
+			// A lane back to waiting is a new run in a row that stayed mounted.
+			if (state === 'waiting' && scheduled.has(index)) {
+				window.clearTimeout(scheduled.get(index));
+				scheduled.delete(index);
+				if (untrack(() => started[index])) started = { ...untrack(() => started), [index]: false };
+				return;
+			}
+			if (state !== 'running' || scheduled.has(index)) return;
+			scheduled.set(index, window.setTimeout(() => {
+				started = { ...untrack(() => started), [index]: true };
+			}, Math.random() * STAGGER_MS));
+		});
 	});
+	$effect(() => () => scheduled.forEach((timer) => window.clearTimeout(timer)));
 </script>
 
 {#if states.length > 1}
@@ -75,7 +88,7 @@
 						<!-- Present but not working: the row shows how many jobs the
 						     fan-out is allowed to have in flight at once. -->
 						<span class="lane-mark lane-idle" aria-hidden="true">·</span>
-					{:else if started[index] ?? true}
+					{:else if started[index]}
 						{#if getMascot() === 'yuragi'}<IncuMascot />{:else}<YuragiMascot />{/if}
 					{/if}
 				</div>

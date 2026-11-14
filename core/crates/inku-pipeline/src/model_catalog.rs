@@ -8,6 +8,7 @@ mod chatgpt_policy;
 mod model_refresh;
 mod provider_settings;
 mod sign_in;
+mod sign_in_view;
 
 const SOURCE: &str = include_str!("../data/model_catalog.json");
 const PROVIDERS: &str = include_str!("../data/provider-definitions.json");
@@ -1059,6 +1060,9 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         }
         Some("retired_providers") => json!({"providers":retired_providers()}),
         Some("sign_in_services" | "provider_groups") => sign_in::run(&request),
+        Some("sign_in_connection_view" | "sign_in_publication_draft") => {
+            sign_in_view::run(&request)
+        }
         Some(
             "chatgpt_publication"
             | "chatgpt_publication_update"
@@ -1750,7 +1754,7 @@ mod tests {
     fn shared_sign_in_cases_answer_through_the_json_entry() {
         let cases: Value =
             serde_json::from_str(include_str!("../data/sign-in-cases.json")).unwrap();
-        assert_eq!(array(cases.get("cases")).len(), 21);
+        assert_eq!(array(cases.get("cases")).len(), 48);
         for row in array(cases.get("cases")) {
             let actual: Value = serde_json::from_slice(&model_catalog_json(
                 &serde_json::to_vec(&row["request"]).unwrap(),

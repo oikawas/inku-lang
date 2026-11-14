@@ -24,4 +24,4 @@ def test_the_core_answers_each_shared_sign_in_case(case):
 
 
 def test_the_shared_cases_are_all_read():
-    assert len(CASES) == 21
+    assert len(CASES) == 48

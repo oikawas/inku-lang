@@ -6,7 +6,7 @@ import InkuHost
 /// appending the ChatGPT connection after the other services, or named it with its own words.
 func runSignInChecks(casesURL: URL) throws {
     let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: casesURL)) as? [String: Any]
-    guard let cases = fixture?["cases"] as? [[String: Any]], cases.count == 21 else {
+    guard let cases = fixture?["cases"] as? [[String: Any]], cases.count == 48 else {
         throw CheckFailure.message("Shared sign-in cases unavailable")
     }
     // Each row goes through the binding the app uses, and the whole answer is compared.

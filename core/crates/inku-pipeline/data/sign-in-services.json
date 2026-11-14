@@ -5,6 +5,7 @@
     "abbreviation": "SIWC",
     "usage_url": "https://chatgpt.com/settings/usage",
     "kind": "chatgpt_responses",
-    "requires_api_key": false
+    "requires_api_key": false,
+    "use_scope": "chatgpt.tokens.use.direct"
   }
 ]

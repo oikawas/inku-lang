@@ -8,6 +8,7 @@ mod chatgpt_policy;
 mod model_refresh;
 mod provider_settings;
 pub(crate) mod sign_in;
+mod sign_in_flow;
 mod sign_in_view;
 
 const SOURCE: &str = include_str!("../data/model_catalog.json");
@@ -1114,6 +1115,7 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             | "chatgpt_auth_publication_input"
             | "chatgpt_auth_delete",
         ) => chatgpt_auth_policy::run(&request),
+        Some("chatgpt_flow_start" | "chatgpt_flow_next") => sign_in_flow::run(&request),
         Some("reference_batch") => {
             let results: Vec<Value> = array(request.get("queries"))
                 .iter()

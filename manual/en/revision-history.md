@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-14 — Drawing with a fixed thesis
+
+- "Creating images": `What to change` in `Change the composition and laws` gains `Thesis` (`Write the thesis yourself`, `Have the AI propose other theses`); the lineage's `Derived by` shows the heads of both theses, and the generation info adds `(written by the author)` or `(proposed by the AI)`.
+
 ## 2026-11-13 — Places for a thing (Another composition)
 
 - "Image Creation": in a child whose layout changed, `Parent's composition` shows a moved thing at its place now, with "(moved by changing the layout)".

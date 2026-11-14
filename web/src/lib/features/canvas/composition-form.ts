@@ -11,7 +11,17 @@ export type MainLaw = typeof MAIN_LAWS[number];
  *  change keeps the parent's form when the parent has one. */
 export type CompositionChange =
 	| { kind: 'form'; form: CompositionForm }
-	| { kind: 'main_law'; mainLaw: MainLaw; form: CompositionForm | null };
+	| { kind: 'main_law'; mainLaw: MainLaw; form: CompositionForm | null }
+	// One thesis fixed for the drawing (step 4): written by the author, or one
+	// of the four the AI proposed (with the digest of the request that proposed them).
+	| { kind: 'thesis'; thesis: string; source: 'author' | 'proposed'; digest?: string };
+
+/** What the dialog asks for (step 4c): one change, or the AI's four theses,
+ *  which become four thesis changes once they are proposed. */
+export type CompositionRequest = CompositionChange | { kind: 'proposed_theses' };
+
+/** The longest thesis a run takes (the core's MAX_THESIS_CHARS). */
+export const MAX_THESIS_CHARS = 400;
 
 /** The forms with their short names and one-line descriptions, from the composition names table (2026-11-13). */
 export function compositionFormOptions(isJapanese: boolean): { id: CompositionForm; name: string; description: string }[] {
@@ -40,10 +50,19 @@ export function mainLawFamilies(isJapanese: boolean): { family: string; laws: { 
 
 /** The run options and the derivation metadata a change sends. The Server
  *  builds the saved metadata itself; this is the option's own. */
-export function compositionChangeOptions(change: CompositionChange, parent: { form: string | null; mainLaw: string | null }): {
-	options: { composition_form?: CompositionForm; composition_main_law?: MainLaw };
+export function compositionChangeOptions(change: CompositionChange, parent: { form: string | null; mainLaw: string | null; thesis?: string | null }): {
+	options: { composition_form?: CompositionForm; composition_main_law?: MainLaw; composition_thesis?: string;
+		composition_thesis_source?: 'author' | 'proposed'; composition_thesis_prompt_digest?: string };
 	metadata: Record<string, string | null>;
 } {
+	if (change.kind === 'thesis') {
+		const thesis = change.thesis.trim();
+		return {
+			options: { composition_thesis: thesis, composition_thesis_source: change.source,
+				...(change.source === 'proposed' && change.digest ? { composition_thesis_prompt_digest: change.digest } : {}) },
+			metadata: { thesis_from: parent.thesis ?? null, thesis_to: thesis, thesis_source: change.source },
+		};
+	}
 	if (change.kind === 'form') {
 		return { options: { composition_form: change.form }, metadata: { form_from: parent.form, form_to: change.form } };
 	}
@@ -51,4 +70,16 @@ export function compositionChangeOptions(change: CompositionChange, parent: { fo
 		options: { ...(change.form ? { composition_form: change.form } : {}), composition_main_law: change.mainLaw },
 		metadata: { main_law_from: parent.mainLaw, main_law_to: change.mainLaw, form: change.form },
 	};
+}
+
+/** A thesis the author may fix: 1 to 400 characters once the spaces around it are dropped. */
+export function thesisWritable(text: string): boolean {
+	const thesis = text.trim();
+	return thesis.length > 0 && [...thesis].length <= MAX_THESIS_CHARS;
+}
+
+/** The head of a thesis for a seat or an edge: its first characters, with "…" when it goes on. */
+export function thesisHead(thesis: string, length = 14): string {
+	const characters = [...thesis.trim()];
+	return characters.length > length ? `${characters.slice(0, length).join('')}…` : characters.join('');
 }

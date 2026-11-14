@@ -32,3 +32,9 @@ test('a form change names both forms; other kinds and a half-recorded change add
 	assert.equal(derivationDetail('composition_form_change', undefined, true), null);
 	assert.equal(derivationDetail('layout_change', metadata, true), null);
 });
+
+test('step 4c: a thesis change names the heads of both theses', () => {
+	const metadata = { thesis_from: '広い海面から斜めに迫る波を画面の右下に置く。', thesis_to: '磯の岩を画面の左上に大きく据え、波の筋を走らせる。', thesis_source: 'proposed' };
+	assert.equal(derivationDetail('composition_form_change', metadata, true), '命題: 広い海面から斜めに迫る波を画… → 磯の岩を画面の左上に大きく据…');
+	assert.equal(derivationDetail('composition_form_change', { ...metadata, thesis_from: null }, false), 'Thesis: — → 磯の岩を画面の左上に大きく据…');
+});

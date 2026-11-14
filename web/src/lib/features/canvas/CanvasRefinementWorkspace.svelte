@@ -45,7 +45,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
-		onGenerateCompositionCandidates: (change: import('./composition-form').CompositionChange, count: 1 | 4) => void | Promise<void>;
+		onGenerateCompositionCandidates: (change: import('./composition-form').CompositionRequest, count: 1 | 4) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		/** The displayed work's chunks for "Change the layout" (step 3). */

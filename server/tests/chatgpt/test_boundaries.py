@@ -66,8 +66,9 @@ def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(
         assert not provider.offered("owner", "not-published")
         with pytest.raises(ChatGPTError, match="chatgpt_session_changed"):
             provider.offered("owner", "gpt-6-luna", profile_id=value["id"], generation=2)
-        # Refresh and inference still need the occupied wire slot.
-        with pytest.raises(TimeoutError):
+        # Refresh and inference still need the occupied wire slot; the core names
+        # a slot not had by the deadline as a time limit.
+        with pytest.raises(ChatGPTError, match="chatgpt_transport_timeout"):
             asyncio.run(provider.catalog("owner", value["id"], 1, time.monotonic() + 0.05, force=True))
         with pytest.raises(TimeoutError):
             asyncio.run(provider.request("owner", value["id"], 1, "gpt-6-luna",
@@ -174,13 +175,34 @@ def test_cli_opens_only_the_selected_brave_and_passes_japanese_to_callback(monke
     assert opened.call_count == 1
 
 
+def signing_server(monkeypatch):
+    """The sign-in server, answering with an id token signed for `nonce["value"]`."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk = {**json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key())), "kid": "fixture", "use": "sig"}
+    issued_calls = []
+    nonce = {"value": ""}
+    def handle(request):
+        assert request.url.host == "auth.openai.com"
+        if request.url.path.endswith("openid-configuration"):
+            return httpx.Response(200, json={"issuer": auth.ISSUER, "jwks_uri": auth.ISSUER + "/jwks", "id_token_signing_alg_values_supported": ["RS256"]})
+        if request.url.path == "/jwks":
+            return httpx.Response(200, json={"keys": [jwk]})
+        issued_calls.append(parse_qs(request.content.decode()))
+        token = jwt.encode({"iss": auth.ISSUER, "aud": "oaiapp_fixture", "sub": "subject", "exp": time.time() + 300,
+                            "nonce": nonce["value"], "email": "owner@example.test"}, key, algorithm="RS256", headers={"kid": "fixture"})
+        return httpx.Response(200, json={"token_type": "Bearer", "expires_in": 3600, "scope": "openid chatgpt.tokens.use.direct",
+                                        "access_token": "fixture-access", "refresh_token": "fixture-refresh", "id_token": token})
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    return nonce, issued_calls
+
+
 def test_japanese_callback_explains_success_and_failure_without_echoing_code(isolated, monkeypatch):
+    nonce, _calls = signing_server(monkeypatch)
     coordinator = auth.AuthorizationAttempts()
-    async def exchange(attempt, *_args):
-        attempt.update(status="completed", code=None)
-    monkeypatch.setattr(coordinator, "_exchange", exchange)
     started = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"), language="ja")
     params = parse_qs(urlsplit(started["authorization_url"]).query)
+    nonce["value"] = params["nonce"][0]
     with httpx.Client() as client:
         rejected = client.get(params["redirect_uri"][0], params={"state": "wrong", "code": "private-code"})
         assert rejected.status_code == 400
@@ -193,6 +215,8 @@ def test_japanese_callback_explains_success_and_failure_without_echoing_code(iso
         assert "接続状態を確認" in completed.text
         assert "private-code" not in completed.text
         assert completed.headers["cache-control"] == "no-store"
+        assert completed.headers["connection"] == "close"
+    assert coordinator.public("owner", started["attempt_id"])["status"] == "completed"
 
 
 def test_sealed_handoff_rejects_changed_owner_and_is_one_time(isolated, tmp_path, monkeypatch):
@@ -239,23 +263,7 @@ def test_sealed_handoff_rejects_changed_owner_and_is_one_time(isolated, tmp_path
 
 
 def test_callback_wrong_state_does_not_consume_and_oidc_nonce_is_checked(isolated, monkeypatch):
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    jwk = {**json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key())), "kid": "fixture", "use": "sig"}
-    issued_calls = []
-    nonce = {"value": ""}
-    def handle(request):
-        assert request.url.host == "auth.openai.com"
-        if request.url.path.endswith("openid-configuration"):
-            return httpx.Response(200, json={"issuer": auth.ISSUER, "jwks_uri": auth.ISSUER + "/jwks", "id_token_signing_alg_values_supported": ["RS256"]})
-        if request.url.path == "/jwks":
-            return httpx.Response(200, json={"keys": [jwk]})
-        issued_calls.append(parse_qs(request.content.decode()))
-        token = jwt.encode({"iss": auth.ISSUER, "aud": "oaiapp_fixture", "sub": "subject", "exp": time.time() + 300,
-                            "nonce": nonce["value"], "email": "owner@example.test"}, key, algorithm="RS256", headers={"kid": "fixture"})
-        return httpx.Response(200, json={"token_type": "Bearer", "expires_in": 3600, "scope": "openid chatgpt.tokens.use.direct",
-                                        "access_token": "fixture-access", "refresh_token": "fixture-refresh", "id_token": token})
-    real_client = httpx.AsyncClient
-    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    nonce, issued_calls = signing_server(monkeypatch)
     coordinator = auth.AuthorizationAttempts()
     started = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"))
     params = parse_qs(urlsplit(started["authorization_url"]).query)
@@ -270,15 +278,12 @@ def test_callback_wrong_state_does_not_consume_and_oidc_nonce_is_checked(isolate
     assert issued_calls[0]["redirect_uri"] == [callback]
     assert "id_token_hint" not in params
     assert isolated.profile("owner")["sub"] == "subject"
-    async def bad_nonce():
-        async with real_client(transport=httpx.MockTransport(handle)) as client:
-            token = isolated.profile("owner")["id_token"]
-            await auth.validate_identity(client, token, "oaiapp_fixture", "different", lambda: None, time.monotonic() + 5)
+    token = isolated.profile("owner")["id_token"]
     with pytest.raises(ChatGPTError, match="identity_invalid"):
-        asyncio.run(bad_nonce())
+        asyncio.run(auth.validate_identity(token, "oaiapp_fixture", "different", lambda: None, time.monotonic() + 5))
 
 
-def test_signed_identity_claims_are_checked_after_signature(isolated):
+def test_signed_identity_claims_are_checked_after_signature(isolated, monkeypatch):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     jwk = {**json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key())), "kid": "fixture", "use": "sig"}
@@ -286,10 +291,11 @@ def test_signed_identity_claims_are_checked_after_signature(isolated):
         if request.url.path.endswith("openid-configuration"):
             return httpx.Response(200, json={"issuer": auth.ISSUER, "jwks_uri": auth.ISSUER + "/jwks"})
         return httpx.Response(200, json={"keys": [jwk]})
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
     async def verify(claims, signer=key):
         token = jwt.encode(claims, signer, algorithm="RS256", headers={"kid": "fixture"})
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
-            return await auth.validate_identity(client, token, "client", "nonce", lambda: None, time.monotonic() + 5)
+        return await auth.validate_identity(token, "client", "nonce", lambda: None, time.monotonic() + 5)
     good = {"iss": auth.ISSUER, "aud": ["client", "other"], "azp": "client",
             "sub": "subject", "exp": time.time() + 300, "nonce": "nonce"}
     assert asyncio.run(verify(good))["sub"] == "subject"
@@ -305,7 +311,9 @@ def test_naive_refresh_date_uses_host_local_timezone():
     from datetime import datetime
     value = {"token_type": "Bearer", "access_token": "fixture", "refresh_token": "fixture",
              "expires_in": 60, "earliest_refresh_at": "2026-10-28T00:00:00"}
-    assert auth.token_fields(value)["earliest_refresh_at"] == datetime.fromisoformat(value["earliest_refresh_at"]).timestamp()
+    # The core asks the host for the local offset of a time without one (`offset`).
+    tokens = asyncio.run(auth.run_flow("tokens", {"value": value}, None))["tokens"]
+    assert tokens["earliest_refresh_at"] == datetime.fromisoformat(value["earliest_refresh_at"]).timestamp()
 
 
 def test_refresh_serializes_across_threads_and_signout_invalidates_late_result(isolated, monkeypatch):
@@ -684,7 +692,7 @@ def test_failed_initial_exchange_retains_issued_client_for_explicit_retry(isolat
     coordinator.stop("owner")
 
 
-def test_identity_json_limit_closes_stream_before_reading_the_whole_body(isolated):
+def test_identity_json_limit_closes_stream_before_reading_the_whole_body(isolated, monkeypatch):
     class Large(httpx.AsyncByteStream):
         read = 0
         closed = False
@@ -695,11 +703,12 @@ def test_identity_json_limit_closes_stream_before_reading_the_whole_body(isolate
         async def aclose(self):
             self.closed = True
     body = Large()
-    async def run():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(200, stream=body))) as client:
-            await auth.auth_json(client, "GET", auth.ISSUER + "/jwks", lambda: None, time.monotonic() + 5)
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, stream=body)), **kwargs))
+    # The core's answer limit for the sign-in server is 1 MiB; the host stops reading there.
     with pytest.raises(ChatGPTError, match="too_large"):
-        asyncio.run(run())
+        asyncio.run(auth.validate_identity("a.b.c", "client", None, lambda: None, time.monotonic() + 5))
     assert body.closed and body.read == 65
 
 
@@ -767,3 +776,57 @@ def test_pipeline_reprojection_keeps_safe_quota_only_for_the_same_action(isolate
         else:
             assert diagnostic["chatgpt"]["action"] == "usage" and diagnostic["chatgpt"]["request_id"] == "req_fixture"
             assert diagnostic["chatgpt"]["param"] is None and "never public" not in str(diagnostic)
+
+
+# Where the core's procedures (SIWC step 5, PLAN-STEP5 §2-1) changed what the Server did.
+
+def test_the_model_list_is_kept_in_the_registration_read_again_under_the_lock(isolated, monkeypatch):
+    # §2-1 10: a refresh token rotated while the list was asked for is not written back.
+    from inku_server.chatgpt_provider import catalog
+    value = profile()
+    seed(isolated, value)
+    real_client = httpx.AsyncClient
+    def handle(request):
+        with isolated.lock("edit:owner"):
+            saved = isolated.read("owner")
+            saved["profiles"][value["id"]]["refresh_token"] = "rotated-meanwhile"
+            isolated.write("owner", saved)
+        return httpx.Response(200, json={"models": [{"slug": "gpt-6-luna", "display_name": "Luna", "visibility": "list"}]})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    asyncio.run(catalog("owner", value["id"], 1, time.monotonic() + 5))
+    kept = isolated.profile("owner", value["id"])
+    assert kept["refresh_token"] == "rotated-meanwhile"
+    assert kept["catalog"]["models"]
+
+
+def test_signing_out_a_signed_out_registration_keeps_its_generation(isolated, monkeypatch):
+    # §2-1 11.
+    value = profile(state="signed_out", generation=4, refresh_owner="remote")
+    seed(isolated, value)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **_kwargs: pytest.fail("nothing to revoke"))
+    assert asyncio.run(auth.sign_out("owner", value["id"])) == {"status": "signed_out", "revocation_confirmed": False}
+    assert isolated.profile("owner", value["id"])["generation"] == 4
+
+
+def test_an_unhashable_oauth_error_code_is_an_unavailable_sign_in_server(isolated, monkeypatch):
+    # §2-1 13: no TypeError.
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(400, json={"error": ["unhashable"]})), **kwargs))
+    with pytest.raises(ChatGPTError, match="chatgpt_auth_unavailable"):
+        asyncio.run(auth.validate_identity("a.b.c", "client", None, lambda: None, time.monotonic() + 5))
+
+
+def test_a_cancelled_sign_in_stops_listening_and_stays_cancelled(isolated, monkeypatch):
+    signing_server(monkeypatch)
+    coordinator = auth.AuthorizationAttempts()
+    started = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"))
+    callback = parse_qs(urlsplit(started["authorization_url"]).query)["redirect_uri"][0]
+    assert coordinator.cancel("owner", started["attempt_id"])["status"] == "cancelled"
+    listener = next(thread for thread in threading.enumerate() if thread.name == "inku-chatgpt-callback")
+    listener.join(timeout=2)
+    assert not listener.is_alive()
+    assert coordinator.public("owner", started["attempt_id"]) == {
+        "id": started["attempt_id"], "status": "cancelled", "code": "chatgpt_cancelled", "profile_id": started["profile_id"]}
+    with httpx.Client() as client, pytest.raises(httpx.ConnectError):
+        client.get(callback)

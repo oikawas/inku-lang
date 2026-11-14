@@ -8,7 +8,6 @@ import os
 import time
 import uuid
 
-import httpx
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
@@ -137,8 +136,8 @@ async def import_profile(envelope: dict) -> dict:
             def check():
                 check_owner(owner, cli=True)
                 validate_request(request)
-            async with httpx.AsyncClient(follow_redirects=False) as client:
-                claims = await validate_identity(client, profile["id_token"], profile["client_id"], profile["oidc_nonce"], check, deadline)
+            # The identity check is the core's `identity` procedure (discovery, keys, signature, claims).
+            claims = await validate_identity(profile["id_token"], profile["client_id"], profile["oidc_nonce"], check, deadline)
             if claims["sub"] != profile["sub"]:
                 raise ValueError
             profile = {key: profile[key] for key in ("id", "issuer", "sub", "client_id", "oidc_nonce", "access_token", "refresh_token", "id_token", "scopes", "expires_at", "earliest_refresh_at")}

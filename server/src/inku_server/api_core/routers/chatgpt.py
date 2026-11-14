@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from ... import chatgpt_runtime as runtime
-from ...chatgpt_auth import USAGE_URL, attempts, auth_policy, delete_profile, sign_out
+from ...chatgpt_auth import USAGE_URL, attempts, delete_profile, run_flow, sign_out
 from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin, transport_error
 from ...chatgpt_store import ChatGPTError, CredentialStore
@@ -132,16 +132,8 @@ def select(
 
     Returns 403 with `chatgpt_not_connected` when the profile is not registered for the user.
     """
-    store = CredentialStore()
     try:
-        with store.lock("edit:" + actor, time.monotonic() + 5):
-            value = store.read(actor)
-            from ...verified_model_catalog import core_catalog
-            choice = core_catalog("chatgpt_auth_select", profile_ids=list(value["profiles"]), profile_id=profile_id)
-            if "error" in choice:
-                raise ChatGPTError(choice["error"])
-            value["active"] = choice["active"]
-            store.write(actor, value)
+        asyncio.run(run_flow("select", {"profile_id": profile_id}, actor))
         return state({"id": actor})
     except ChatGPTError as error:
         raise _error(error) from None
@@ -191,13 +183,8 @@ def retry(
     Only a profile in the `quota` state can be retried. Any other profile, or an unknown one, is
     rejected with 403 and `chatgpt_not_connected`. Returns the updated connection state.
     """
-    store = CredentialStore()
     try:
-        with store.lock("edit:" + actor, time.monotonic() + 5):
-            value = store.read(actor)
-            profile = value["profiles"].get(profile_id)
-            value["profiles"][profile_id] = auth_policy("resume_quota", profile=profile)["profile"]
-            store.write(actor, value)
+        asyncio.run(run_flow("resume", {"profile_id": profile_id}, actor))
         return state({"id": actor})
     except ChatGPTError as error:
         raise _error(error) from None
@@ -209,6 +196,9 @@ def models(actor: str, *, force: bool = False) -> dict:
         asyncio.run(catalog(actor, profile_id, generation, time.monotonic() + 15, force=force))
         return saved_publication(actor, profile_id, generation)
     except ChatGPTError as error:
+        # A time limit or a broken connection, named by the core, is not a refusal.
+        if error.code in {transport_error(kind).code for kind in ("timeout", "unavailable")}:
+            raise HTTPException(status_code=503, detail={"code": error.code, "action": error.action}) from None
         raise _error(error) from None
     # The shared core names a time limit and a broken connection (step 4, 2026-11-14).
     except (TimeoutError, httpx.TimeoutException):

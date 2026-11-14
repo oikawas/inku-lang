@@ -429,10 +429,10 @@
 			? (modelSettings.providers[activeProvider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} })
 			: null
 	);
-	// For Sign in with ChatGPT the core says whether the draft changed and what can be fetched again;
-	// a changed shared assessment counts as a change too.
+	// For Sign in with ChatGPT the core says whether the draft changed (an administrator's
+	// changed assessment included).
 	const modelPickerDirty = $derived(!modelPickerProvider ? false
-		: modelPickerProvider.id === 'chatgpt' ? (chatgptAnswer ? !chatgptAnswer.can_refresh || chatgptAnswer.assessments.length > 0 : false)
+		: modelPickerProvider.id === 'chatgpt' ? chatgptAnswer?.dirty === true
 		: pickerDraftSignature(modelPickerProvider.models) !== modelPickerInitialDraft);
 	const modelPickerPublishedCount = $derived(
 		modelPickerProvider ? modelPickerProvider.models.filter((model) => modelPickerDraftEnabled(model.id)).length : 0

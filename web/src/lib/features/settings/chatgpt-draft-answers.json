@@ -192,9 +192,9 @@
      "recommendation_vision": 3
     }
    ],
-   "can_refresh": true,
+   "can_refresh": false,
    "can_save": true,
-   "dirty": false,
+   "dirty": true,
    "draft": {
     "purposes": {
      "first-slug": [],

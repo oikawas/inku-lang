@@ -5069,101 +5069,78 @@ private fun VersionInfoRow(label: String, value: String) {
 internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val plan = state.chatGptPlan
-    var signOutTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var confirmingDelete by remember { mutableStateOf<String?>(null) }
+    var confirmingSignOut by remember { mutableStateOf(false) }
+    // One connection per device, and one action for its state: the core's
+    // `sign_in_connection_view` (2026-11-14, the author: "複数登録ある前提がいらない").
+    // The status line is read from it every time; nothing from an earlier action is kept.
+    val view = plan.connection
+    val label = view?.optStringOrNull("label")
     Column(
         modifier = modifier.testTag("ChatGPTPlanSettings").verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(SettingsPane.ChatGpt, viewModel)
-        // What is shown and pressable is the core's `sign_in_connection_view`
-        // (the Web's settings, 2026-11-14). The notice heads the card always;
-        // the status line is there only for the last failure code.
-        val view = plan.connection
         SettingsCard(S.chatGptPlan, S.chatGptPlanDescription, view?.optStringOrNull("status")?.let { chatGptStatusText(it, S) }.orEmpty()) {
+            label?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             if (plan.pending) Text(S.chatGptPending, style = MaterialTheme.typography.bodyMedium)
-            WrapRow {
-                view.rows("actions").forEach { action ->
-                    val enabled = action.optBoolean("enabled")
-                    when (action.getString("action")) {
-                        "sign_in" -> SecondarySmallButton(if (plan.profiles.isEmpty()) S.chatGptContinue else S.chatGptAddAccount,
-                            onClick = { viewModel.authorizeChatGpt() }, enabled = enabled)
-                        "check_connection" -> SecondarySmallButton(S.chatGptCheckConnection, onClick = viewModel::checkChatGptConnection, enabled = enabled)
-                        "manage_usage" -> SecondarySmallButton(S.chatGptManageUsage, onClick = {
-                            if (!openChatGptBrowser(context, action.getString("url"))) viewModel.chatGptBrowserUnavailable()
-                        }, enabled = enabled)
-                        "cancel" -> SecondarySmallButton(S.cancel, onClick = viewModel::cancelChatGptAuthorization, enabled = enabled)
-                    }
+            view?.optJSONObject("primary")?.let { action ->
+                val enabled = action.optBoolean("enabled")
+                when (action.getString("action")) {
+                    "sign_in" -> PrimarySmallButton(S.chatGptContinue, onClick = { viewModel.authorizeChatGpt() }, enabled = enabled)
+                    "grant_plan" -> PrimarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(consent = true) }, enabled = enabled)
+                    "new_sign_in" -> PrimarySmallButton(S.chatGptNewSignIn, onClick = { viewModel.authorizeChatGpt(newRegistration = true) }, enabled = enabled)
+                    "retry" -> PrimarySmallButton(S.chatGptRetry, onClick = viewModel::retryChatGptQuota, enabled = enabled)
                 }
             }
-            // A registration that never finished signing in, apart from the list (Web `pending_registrations`).
-            view.rows("pending").forEach { row ->
-                val id = row.getString("id")
-                val clientId = row.optStringOrNull("client_id")
-                row.rows("actions").filter { it.getString("action") == "reconnect" }.forEach { action ->
-                    SecondarySmallButton(S.chatGptReauthenticate + (clientId?.let { " ($it)" } ?: ""),
-                        onClick = { viewModel.authorizeChatGpt(id) }, enabled = action.optBoolean("enabled"))
-                }
-            }
-            view.rows("profiles").forEach { profile ->
-                val id = profile.getString("id")
-                val label = profile.getString("label")
-                val actions = profile.rows("actions")
-                fun enabled(name: String) = actions.firstOrNull { it.getString("action") == name }?.optBoolean("enabled") == true
-                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                    TextButton(onClick = { viewModel.selectChatGptProfile(id) }, enabled = enabled("select")) {
-                        Text((if (profile.optBoolean("active")) "● " else "○ ") + label)
-                    }
-                    Text(chatGptStatusText(profile.getString("status"), S), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    WrapRow {
-                        actions.forEach { action ->
-                            val on = action.optBoolean("enabled")
-                            when (action.getString("action")) {
-                                "reauthenticate" -> SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(id) }, enabled = on)
-                                "grant_plan" -> SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(id, consent = true) }, enabled = on)
-                                "retry" -> SecondarySmallButton(S.chatGptRetry, onClick = { viewModel.retryChatGptQuota(id) }, enabled = on)
-                                // Asked first (`confirm`), as deleting an API key is:
-                                // signing out takes a new authorization to undo.
-                                "sign_out" -> SecondarySmallButton(S.chatGptSignOut, onClick = {
-                                    if (action.optBoolean("confirm")) signOutTarget = id to label else viewModel.signOutChatGpt(id)
-                                }, enabled = on)
-                                "delete" -> if (confirmingDelete != id) SecondarySmallButton(S.chatGptDelete, onClick = { confirmingDelete = id }, enabled = on)
-                            }
-                        }
-                    }
-                    if (confirmingDelete == id) {
-                        WrapRow {
-                            Text(S.chatGptDeleteConfirmText)
-                            TextButton(onClick = { confirmingDelete = null; viewModel.deleteChatGptProfile(id) }, enabled = enabled("delete")) {
-                                Text(S.chatGptDeleteConfirm, color = MaterialTheme.colorScheme.error)
-                            }
-                            TextButton(onClick = { confirmingDelete = null }) { Text(S.chatGptDeleteCancel) }
-                        }
-                    }
-                }
+            // While Chrome is signing in. Android cannot open the same page again, so only cancel comes.
+            view.rows("attempt_actions").filter { it.getString("action") == "cancel" }.forEach { action ->
+                SecondarySmallButton(S.cancel, onClick = viewModel::cancelChatGptAuthorization, enabled = action.optBoolean("enabled"))
             }
             if (view?.optBoolean("guide") == true) {
                 Text(S.chatGptModelSettingsGuide, style = MaterialTheme.typography.bodyMedium)
                 SecondarySmallButton(S.chatGptOpenModels, onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
             }
-            state.message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            view?.optJSONObject("manage_usage")?.let { usage ->
+                TextButton(onClick = { if (!openChatGptBrowser(context, usage.getString("url"))) viewModel.chatGptBrowserUnavailable() },
+                    contentPadding = PaddingValues(0.dp)) { Text(S.chatGptManageUsage, style = MaterialTheme.typography.labelMedium) }
+            }
+        }
+        // Ending the connection, apart from the action above and asked first: it revokes and
+        // drops the tokens, and keeps the registration, so the next sign-in uses the same one.
+        val signOut = view?.optJSONObject("sign_out")
+        val notice = view?.optStringOrNull("notice")
+        if (signOut != null || notice != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.padding(top = Dimens.spaceL)) {
+                notice?.let { Text(chatGptNoticeText(it, S), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                signOut?.let { action ->
+                    TextButton(onClick = { if (action.optBoolean("confirm")) confirmingSignOut = true else viewModel.signOutChatGpt() },
+                        enabled = action.optBoolean("enabled"), contentPadding = PaddingValues(0.dp)) {
+                        Text(S.chatGptSignOut, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
         }
     }
-    signOutTarget?.let { (profileId, label) ->
+    if (confirmingSignOut) {
         AlertDialog(
-            onDismissRequest = { signOutTarget = null },
+            onDismissRequest = { confirmingSignOut = false },
             title = { Text(S.chatGptSignOut) },
-            text = { Text(S.chatGptSignOutBody(label)) },
+            text = { Text(S.chatGptSignOutBody(label ?: S.chatGptPlan)) },
             confirmButton = {
                 TextButton(onClick = {
-                    signOutTarget = null
-                    viewModel.signOutChatGpt(profileId)
+                    confirmingSignOut = false
+                    viewModel.signOutChatGpt()
                 }) { Text(S.chatGptSignOut) }
             },
-            dismissButton = { TextButton(onClick = { signOutTarget = null }) { Text(S.cancel) } },
+            dismissButton = { TextButton(onClick = { confirmingSignOut = false }) { Text(S.cancel) } },
         )
     }
+}
+
+/** The core's `notice` beside sign-out. */
+private fun chatGptNoticeText(key: String, strings: InkuStrings): String = when (key) {
+    "chatgpt_disconnect_in_settings" -> strings.chatGptDisconnectInSettings
+    else -> chatGptStatusText(key, strings)
 }
 
 /** A code the core answers as a status (Web `chatgptStatus`): a registration's state or the last failure. */
@@ -5173,16 +5150,13 @@ private fun chatGptStatusText(code: String, strings: InkuStrings): String = when
     "chatgpt_exported" -> strings.chatGptExported
     "chatgpt_scope_required" -> strings.chatGptScopeRequiredStatus
     "chatgpt_revocation_unconfirmed" -> strings.chatGptRevocationUnconfirmed
+    "chatgpt_account_changed" -> strings.chatGptAccountChanged
     else -> strings.chatGptError(code)
 }
 
-/** A card's status in model settings: the last failure, else the chosen registration's state (core `sign_in_connection_view`). */
-private fun chatGptCardStatus(plan: app.inku.mobile.llm.ChatGptPlanView, strings: InkuStrings): String {
-    val view = plan.connection ?: return ""
-    val code = view.optStringOrNull("status")
-        ?: view.rows("profiles").firstOrNull { it.optBoolean("active") }?.optStringOrNull("status")
-    return code?.let { chatGptStatusText(it, strings) }.orEmpty()
-}
+/** A card's status in model settings: the connection's status (core `sign_in_connection_view`). */
+private fun chatGptCardStatus(plan: app.inku.mobile.llm.ChatGptPlanView, strings: InkuStrings): String =
+    plan.connection?.optStringOrNull("status")?.let { chatGptStatusText(it, strings) }.orEmpty()
 
 private fun JSONObject?.rows(key: String): List<JSONObject> =
     this?.optJSONArray(key)?.let { array -> (0 until array.length()).map(array::getJSONObject) }.orEmpty()

@@ -95,14 +95,8 @@ interface InkuStrings {
     val chatGptConnectionSubtitle: String
     val chatGptPlanDescription: String
     val chatGptContinue: String
-    val chatGptAddAccount: String
-    val chatGptReauthenticate: String
     val chatGptEnablePlan: String
     val chatGptSignOut: String
-    val chatGptDelete: String
-    val chatGptDeleteConfirmText: String
-    val chatGptDeleteConfirm: String
-    val chatGptDeleteCancel: String
     val chatGptManageUsage: String
     val chatGptPending: String
     val chatGptConnected: String
@@ -110,8 +104,12 @@ interface InkuStrings {
     val chatGptPlanDisabled: String
     val chatGptOpenModels: String
     val chatGptUsingPlan: String
-    /** Web `chatgptCheckConnection`. */
-    val chatGptCheckConnection: String
+    /** The status `chatgpt_account_changed`: another account signed in with the saved registration. */
+    val chatGptAccountChanged: String
+    /** The notice `chatgpt_disconnect_in_settings` beside sign-out. */
+    val chatGptDisconnectInSettings: String
+    /** The action `new_sign_in`. */
+    val chatGptNewSignIn: String
     /** Web `chatgptRetry`. */
     val chatGptRetry: String
     /** Web `chatgptModelSettingsGuide`: shown with 「モデル設定を開く」. */

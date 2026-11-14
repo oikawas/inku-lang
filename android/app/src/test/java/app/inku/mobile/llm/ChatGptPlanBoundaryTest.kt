@@ -229,7 +229,7 @@ class ChatGptPlanBoundaryTest {
         val manager = ChatGptPlanManager(store, scope, http) { now }
         try {
             assertTrue(http.calls.isEmpty())
-            val start = query(manager.authorize("a"))
+            val start = query(manager.authorize())
             http.handler = { url, _, _ -> when {
                 url == CHATGPT_TOKEN -> ChatGptHttpResponse(200, tokens(start.getValue("nonce"))
                     .put("id_token", signedIdentity(start.getValue("nonce"), "issued-a", "person-a")).toString())
@@ -264,7 +264,7 @@ class ChatGptPlanBoundaryTest {
         val logs = java.util.Collections.synchronizedList(mutableListOf<String>())
         val manager = ChatGptPlanManager(store, scope, http, diagnostic = { logs.add(it) }) { now }
         try {
-            val start = query(manager.authorize("a"))
+            val start = query(manager.authorize())
             http.handler = { url, _, _ -> when {
                 url == CHATGPT_TOKEN -> ChatGptHttpResponse(200, tokens(start.getValue("nonce"))
                     .put("id_token", signedIdentity(start.getValue("nonce"), "issued-a", "person-a")).toString())
@@ -343,10 +343,11 @@ class ChatGptPlanBoundaryTest {
             withTimeout(2000) { while (manager.state.value.models == null) delay(5) }
             assertTrue(manager.state.value.canUsePlan)
             assertEquals(emptyList<String>(), manager.state.value.publishedModels)
-            val ref = manager.pinSession()
-            val returning = query(manager.authorize(ref.profileId, consent = true))
+            // One registration: the next sign-in uses it (its client ID and id token as the hint), never a new one.
+            val returning = query(manager.authorize(consent = true))
             assertEquals("issued-client", returning["client_id"])
             assertFalse(returning.containsKey("agent_name_hint"))
+            assertTrue(returning.containsKey("id_token_hint"))
             assertEquals(start["ext_agent_host_id"], returning["ext_agent_host_id"])
             assertEquals("consent", returning["prompt"])
             assertNotEquals(start["state"], returning["state"])
@@ -355,7 +356,8 @@ class ChatGptPlanBoundaryTest {
         } finally { manager.cancelAuthorization(); scope.cancel() }
     }
 
-    @Test fun publicationInputAndProfileDeletion() = runBlocking {
+    /** One registration per device: `tidy` keeps the chosen one, and signing out keeps its client ID. */
+    @Test fun publicationInputTidyAndSignOutKeepTheRegistration() = runBlocking {
         val store = Store().apply {
             value.put("active", "a")
             value.getJSONObject("profiles").put("a", profile("a").put("published_models", JSONArray().put("model")))
@@ -368,15 +370,18 @@ class ChatGptPlanBoundaryTest {
             rejected("chatgpt_model_not_offered") { manager.publishModels(ref, List(1025) { "m$it" }) }
             rejected("chatgpt_model_not_offered") { manager.publishModels(ref, listOf("x".repeat(257))) }
             rejected("chatgpt_model_not_offered") { manager.publishModels(ref, listOf("m"), JSONObject().put("m", JSONArray().put("other"))) }
-            rejected("chatgpt_session_changed") { ChatGptCore.call("chatgpt_auth_delete", JSONObject().put("value", store.read()).put("profile_id", "a")) }
-            manager.deleteProfile("b")
+            manager.tidy()
             assertFalse(store.read().getJSONObject("profiles").has("b"))
             assertEquals("a", store.read().getString("active"))
-            manager.deleteProfile("a")
-            assertFalse(store.read().getJSONObject("profiles").has("a"))
-            assertFalse(store.read().has("active"))
-            assertNull(manager.state.value.activeProfileId)
+            manager.signOut("a")
+            val kept = store.read().getJSONObject("profiles").getJSONObject("a")
+            assertEquals("issued-a", kept.getString("client_id"))
+            assertFalse(kept.has("refresh_token"))
+            assertEquals(listOf("model"), kept.stringList("published_models"))
+            assertEquals("a", manager.state.value.activeProfileId)
             assertTrue(manager.state.value.revocationUnconfirmed)
+            // The one action after signing out is to sign in again (with the same registration).
+            assertEquals("sign_in", manager.state.value.connection?.getJSONObject("primary")?.getString("action"))
         } finally { scope.cancel() }
     }
 
@@ -453,7 +458,6 @@ class ChatGptPlanBoundaryTest {
             val calls = http.calls.size
             try { manager.generate(request(ref).copy(imageJpeg = byteArrayOf(1))); fail("Vision must not use this route") }
             catch (error: ChatGptException) { assertEquals("chatgpt_operation_not_supported", error.code) }
-            manager.selectProfile("b"); manager.selectProfile("a")
             assertEquals("赤い円。", JSONObject(manager.generate(request(ref)).text).getString("ddl"))
             assertEquals(calls + 1, http.calls.size)
             http.handler = { _, _, _ -> ChatGptHttpResponse(503, "{}") }

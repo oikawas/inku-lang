@@ -1,5 +1,20 @@
 # inku Android Implementation Notes
 
+## 2026-11-14 "Sign in with ChatGPT": one connection per device
+
+The author's instructions ("the behaviour of select, reauthenticate, sign out and delete is rubbish", "no need to assume several registrations", align Web and Android too, keep the client_id) and three answers (offer one action when another account signs in, send `id_token_hint`, keep the registration chosen now when tidying).
+
+- The connection screen shows the shared core's `sign_in_connection_view` answer for one connection:
+  - the status (`status`) and label (`label`), and the one action for that state (`primary`);
+  - `primary` is one of four: `sign_in` ("Continue with ChatGPT"), `grant_plan` (allow plan usage: a sign-in with consent), `retry` ("Check usage and retry": the core's `resume`), and `new_sign_in` ("Sign in with a new registration", when the status is "This is a different account");
+  - while signing in, only "Cancel" (Android cannot open the same page again); when connected, the guide and "Open model settings"; always "Manage usage".
+- "Sign out" sits apart and acts after a confirmation. It revokes and drops the tokens, and keeps the registration (`client_id`), the host ID and the published-model settings. The next sign-in uses the same registration, and the authorization URL carries `id_token_hint` (the URL is never logged). Beside it is the note (`notice`): "You can remove inku's connection in ChatGPT's settings. Signing in after that makes a new registration."
+- Removed: selecting a registration, deleting, "Check connection", the list of unfinished registrations and "Add account". The core's `select` and `delete` procedures are gone too.
+- `login` takes no registration ID (the core uses the store's one registration). A new registration is made only by "Sign in with a new registration" (`new_registration`).
+- At start-up the core's `tidy` runs once. It keeps the registration chosen now (else the newest connected one) and drops the others and any unfinished one. Entries on OpenAI's side are removed in ChatGPT's settings.
+- The status is read from the connection's `status` every time. An action's failure shows there too, not as a message kept below the screen.
+- The store: a signed-out registration, or one that must sign in again, gains `retained_id_token` (written and read as is).
+
 ## 2026-11-14 "Sign in with ChatGPT": the procedures follow the shared core's next steps
 
 Step 5, following the author's answers (build it at once; settle each difference by the recommended table).

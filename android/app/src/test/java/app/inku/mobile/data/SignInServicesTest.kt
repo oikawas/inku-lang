@@ -20,7 +20,7 @@ class SignInServicesTest {
 
     @Test fun sharedSignInCasesUseTheActualJniCore() {
         val cases = JSONObject(File(System.getProperty("inku.signInCases")).readText()).getJSONArray("cases")
-        assertEquals(49, cases.length())
+        assertEquals(50, cases.length())
         for (index in 0 until cases.length()) {
             val row = cases.getJSONObject(index)
             val answer = JSONObject(NativePipelineBridge.modelCatalog(row.getJSONObject("request").toString().toByteArray())
@@ -64,7 +64,8 @@ class SignInServicesTest {
             assertEquals(name, row.getJSONObject("answer").getBoolean("guide"), ChatGptPlanView(connection = answer).canUsePlan)
             checked++
         }
-        assertEquals(13, checked)
+        // One connection per device: the rows Android states, including another account signing in.
+        assertEquals(14, checked)
     }
 
     private fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else (0 until length()).map(::getJSONObject)
@@ -72,7 +73,7 @@ class SignInServicesTest {
     /** Step 5: every shared row of the procedures (a request and its answer) through the JNI core. */
     @Test fun sharedSignInFlowRowsUseTheActualJniCore() {
         val rows = JSONArray(File(System.getProperty("inku.signInFlowCases")).readText())
-        assertEquals(106, rows.length())
+        assertEquals(122, rows.length())
         for (index in 0 until rows.length()) {
             val row = rows.getJSONObject(index)
             val request = JSONObject(row.getJSONObject("request").toString()).put("schema", "inku.model-catalog-request.v1")

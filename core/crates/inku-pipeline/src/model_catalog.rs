@@ -1765,13 +1765,23 @@ mod tests {
     fn shared_sign_in_cases_answer_through_the_json_entry() {
         let cases: Value =
             serde_json::from_str(include_str!("../data/sign-in-cases.json")).unwrap();
-        assert_eq!(array(cases.get("cases")).len(), 49);
+        assert_eq!(array(cases.get("cases")).len(), 50);
+        let mut answers = Map::new();
         for row in array(cases.get("cases")) {
             let actual: Value = serde_json::from_slice(&model_catalog_json(
                 &serde_json::to_vec(&row["request"]).unwrap(),
             ))
             .unwrap();
-            assert_eq!(actual, row["answer"], "{}", row["name"]);
+            answers.insert(
+                row["name"].as_str().unwrap_or("").to_owned(),
+                actual.clone(),
+            );
+            if std::env::var_os("INKU_DUMP_SIGN_IN_ANSWERS").is_none() {
+                assert_eq!(actual, row["answer"], "{}", row["name"]);
+            }
+        }
+        if let Some(path) = std::env::var_os("INKU_DUMP_SIGN_IN_ANSWERS") {
+            std::fs::write(path, Value::Object(answers).to_string()).unwrap();
         }
     }
 

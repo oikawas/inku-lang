@@ -8,6 +8,63 @@ enum ChatGPTWire {
     struct Request: Sendable {
         let body: Data
         let wireLimit: Int
+        let endpoint: Endpoint
+    }
+
+    /// Where a request goes and how it is sent, as the core answers it (step 4): the URL, method, headers, the
+    /// token's header and prefix, and the limits. The URL is still checked before anything is sent.
+    struct Endpoint: Sendable {
+        let url: URL
+        let method: String
+        let headers: [String: String]
+        let authHeader: String
+        let authPrefix: String
+        let errorLimit: Int
+        let answerLimit: Int?
+
+        init(_ result: ExactJSON) throws {
+            guard let text = result["url"].string, let url = URL(string: text), let method = result["method"].string,
+                  let headers = result["headers"].object, let header = result["auth"]["header"].string,
+                  let prefix = result["auth"]["prefix"].string, let errorLimit = ChatGPTWire.int(result["error_limit"])
+            else { throw HostError("chatgpt_endpoint_invalid") }
+            try ChatGPTEndpoints.validate(url)
+            self.url = url; self.method = method; authHeader = header; authPrefix = prefix; self.errorLimit = errorLimit
+            self.headers = try headers.mapValues { value in
+                guard let text = value.string else { throw HostError("chatgpt_endpoint_invalid") }
+                return text
+            }
+            answerLimit = ChatGPTWire.int(result["answer_limit"])
+        }
+
+        func request(token: String, body: Data?, deadline: Date) -> URLRequest {
+            var request = URLRequest(url: url); request.httpMethod = method; request.httpBody = body
+            request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
+            for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+            request.setValue(authPrefix + token, forHTTPHeaderField: authHeader)
+            return request
+        }
+    }
+
+    /// The model list's endpoint (core `chatgpt_models_request`).
+    static func modelsEndpoint() throws -> Endpoint {
+        let result = try ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_models_request")]).data)
+        guard result["outcome"].string == "ok" else { throw HostError("chatgpt_endpoint_invalid") }
+        return try Endpoint(result)
+    }
+
+    enum Transport: String { case timeout, unavailable, tooLarge = "too_large" }
+
+    /// A time limit, a failed or cut connection, or an answer past its limit, classified by the core
+    /// (`chatgpt_transport`) with its code, pipeline failure and next action.
+    static func transport(_ kind: Transport) -> ChatGPTPlanFailure {
+        let fallback: String = switch kind {
+        case .timeout: "chatgpt_transport_timeout"
+        case .unavailable: "chatgpt_transport_unavailable"
+        case .tooLarge: "chatgpt_response_too_large"
+        }
+        guard let result = try? ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_transport"), "kind": .string(kind.rawValue)]).data),
+              result["outcome"].string == "ok" else { return ChatGPTPlanFailure(diagnostic: ChatGPTPlanDiagnostic(code: fallback)) }
+        return failure(result)
     }
 
     struct Stream: Sendable {
@@ -46,36 +103,59 @@ enum ChatGPTWire {
             }
             return Stream(result: .failure(failure(result)), terminal: terminal)
         case "malformed":
-            return Stream(result: .failure(ChatGPTPlanFailure(diagnostic: ChatGPTPlanDiagnostic(code: "chatgpt_response_invalid"))), terminal: terminal)
+            // The core says which: bytes that are not UTF-8 are rejected, a stream it cannot read is asked again for.
+            return Stream(result: .failure(failure(result)), terminal: terminal)
         default:
             throw HostError("chatgpt_response_invalid")
         }
     }
 
-    /// An HTTP failure from the backend; a body that is not JSON says only what the status says.
+    /// An HTTP failure from the backend. The core reads the body's text; one that is not JSON says only what the
+    /// status says.
     static func httpFailure(_ response: ChatGPTHTTPResponse) throws -> ChatGPTPlanFailure {
-        try httpFailure(value: (try? ExactJSON(data: response.data)) ?? .null, status: response.status, requestID: response.requestID)
+        try httpFailure(body: response.data, status: response.status, requestID: response.requestID)
+    }
+
+    static func httpFailure(body: Data, status: Int?, requestID: String?) throws -> ChatGPTPlanFailure {
+        try httpFailure(["body": .string(String(decoding: body, as: UTF8.self))], status: status, requestID: requestID)
     }
 
     static func httpFailure(value: ExactJSON, status: Int?, requestID: String?) throws -> ChatGPTPlanFailure {
-        let result = try ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_error"), "value": value,
-            "status": status.map { .integer($0) } ?? .null, "request_id": requestID.map(ExactJSON.string) ?? .null]).data)
+        try httpFailure(["value": value], status: status, requestID: requestID)
+    }
+
+    private static func httpFailure(_ answer: [String: ExactJSON], status: Int?, requestID: String?) throws -> ChatGPTPlanFailure {
+        var input = answer
+        input["action"] = .string("chatgpt_error")
+        input["status"] = status.map { .integer($0) } ?? .null
+        input["request_id"] = requestID.map(ExactJSON.string) ?? .null
+        let result = try ProviderWire.evaluate(ExactJSON.object(input).data)
         guard result["outcome"].string == "failed" else { throw HostError("chatgpt_response_invalid") }
         return failure(result)
     }
 
+    /// The model list as the backend answered it: the core reads the text (one that is not JSON is malformed).
+    static func catalog(body: Data) throws -> [ChatGPTPlanModel] {
+        try catalog(["action": .string("chatgpt_catalog"), "body": .string(String(decoding: body, as: UTF8.self))])
+    }
+
     static func catalog(_ value: ExactJSON) throws -> [ChatGPTPlanModel] {
-        let result = try ProviderWire.evaluate(ExactJSON.object(["action": .string("chatgpt_catalog"), "value": value]).data)
+        try catalog(["action": .string("chatgpt_catalog"), "value": value])
+    }
+
+    private static func catalog(_ input: [String: ExactJSON]) throws -> [ChatGPTPlanModel] {
+        let result = try ProviderWire.evaluate(ExactJSON.object(input).data)
+        if result["outcome"].string == "malformed" { throw failure(result) }
         guard result["outcome"].string == "ok", let models = result["models"].array else { throw HostError("chatgpt_response_invalid") }
         return try models.map { ChatGPTPlanModel(id: try $0.requiredString("id"), label: try $0.requiredString("label")) }
     }
 
-    private static func int(_ value: ExactJSON) -> Int? { value.number.flatMap { Int($0) } }
+    fileprivate static func int(_ value: ExactJSON) -> Int? { value.number.flatMap { Int($0) } }
 
     private static func prepared(_ result: ExactJSON) throws -> Request {
         // A refused request (an image that is not a data URL, a prompt without a schema) is never sent.
         guard result["outcome"].string == "ok", let limit = int(result["wire_limit"]) else { throw HostError("pipeline_schema_violation") }
-        return Request(body: Data(try result.requiredString("body").utf8), wireLimit: limit)
+        return Request(body: Data(try result.requiredString("body").utf8), wireLimit: limit, endpoint: try Endpoint(result))
     }
 
     /// The next action and whether the pipeline may retry, from the core's one failure table. A table the core

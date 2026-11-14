@@ -22,6 +22,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-11-14 ChatGPT でサインイン（step 4、送信の道）
+
+送信先・header・鍵の付け方と、入出力の失敗の分けを、共通coreの`provider_wire`の答えで作る（作者の答え：時間切れの文を足す、`Accept`は両方に付ける、読めない流れは再試行する）。2026-10-17の節の`provider_wire`のactionに、`chatgpt_models_request`と`chatgpt_transport`が加わった。
+
+- 送信：`/responses`（描画・Vision）は`chatgpt_request`・`chatgpt_vision_request`の答えの`url`・`method`・`headers`・`auth`で、モデル一覧は`chatgpt_models_request`の答えで送る（`ChatGPTWire.Endpoint`）。`/models`に`Accept: application/json`が加わった。送る前のURLの確かめ（`ChatGPTEndpoints.validate`）は残る。一覧の答えの上限はcoreの`answer_limit`。
+- 入出力の失敗：時間切れ（処理の締め切り・認証の錠・`URLError.timedOut`）、接続の失敗（ほかの`URLError`・ほかの例外・HTTPの答えでない）、上限を超えた答えは、coreの`chatgpt_transport`の印・種類・次の行動で返す。
+- 読めない答え：流れと一覧が読めない時は、coreの`code`・`failure`・`action`をそのまま持つ。流れがJSONとして読めない・形が違う時は`malformed_payload`（pipelineが再試行する。前は`provider_rejected`で再試行しなかった）、UTF-8でない時は`provider_rejected`のまま。失敗の答えの本文と一覧は、本文の文字列のままcoreに渡す（`body`）。
+- 文言：失敗の表（`ChatGPTStatusCopy`）に、時間切れ（「ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。」）と、応答の形の失敗（`chatgpt_response_invalid`・`chatgpt_response_too_large`、「ChatGPTの応答を描画のデータとして受け取れませんでした。形式の診断が必要です。」）を足した。前は「ChatGPT でサインインの接続を確認してください。」に落ちていた。
+- 確かめ：共通の試験データの`chatgpt`の節の送信・流れ・失敗・一覧・`chatgpt_failure`・`chatgpt_models_request`・`chatgpt_transport`の175行を、core自身とSwiftの受け手の両方で読み、送信先とheaderは`URLRequest`で照らす。
+
 ## 2026-11-14 ChatGPT でサインイン（step 2）
 
 接続の状態の見せ方と公開の編集を、共通coreの`sign_in_connection_view`・`sign_in_publication_draft`の答えで出す（作者の決定：見せ方はWebに揃え、文言の表はホストに残す）。

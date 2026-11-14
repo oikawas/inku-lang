@@ -279,7 +279,7 @@ struct ChatGPTPlanStore: Sendable {
               info.st_mode & 0o077 == 0, info.st_uid == getuid() else { throw HostError("chatgpt_credentials_unavailable") }
         while true {
             try Task.checkCancellation(); try await check()
-            guard Date() < deadline else { throw HostError("chatgpt_transport_timeout") }
+            guard Date() < deadline else { throw ChatGPTWire.transport(.timeout) }
             if flock(descriptor, LOCK_EX | LOCK_NB) == 0 { adopted = true; return ChatGPTFileLease(descriptor) }
             guard errno == EWOULDBLOCK || errno == EAGAIN else { throw HostError("chatgpt_credentials_unavailable") }
             try await Task.sleep(for: .milliseconds(100))

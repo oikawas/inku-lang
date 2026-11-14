@@ -273,7 +273,7 @@ private actor ObservationSSEHTTP: ObservedChatGPTHTTPClient {
     func sendObserved(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
                       onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse {
         calls += 1
-        guard request.url == ChatGPTEndpoints.responses else { throw HostError("fixture_unexpected_auth_or_discovery_http") }
+        guard request.url == URL(string: ChatGPTEndpoints.resource + "/responses") else { throw HostError("fixture_unexpected_auth_or_discovery_http") }
         let durable = try JSONDecoder().decode(ProviderAttemptObservation.self, from: Data(contentsOf: recordURL))
         guard durable.metric.outcome == .requestSaved, durable.raw?.requestBody != nil else { throw HostError("fixture_missing_durable_request") }
         let body = try ExactJSON(data: request.httpBody!)

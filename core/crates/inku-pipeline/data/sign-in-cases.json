@@ -1042,6 +1042,3104 @@
      }
     ]
    }
+  },
+  {
+   "name": "view: connected with the plan scope",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "connected",
+       "scopes": [
+        "openid",
+        "chatgpt.tokens.use.direct"
+       ]
+      }
+     ],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_connected",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": true
+   }
+  },
+  {
+   "name": "view: connected without the plan scope",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "connected",
+       "scopes": [
+        "openid"
+       ]
+      }
+     ],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_scope_required",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "grant_plan",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: usage limit reached",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "quota",
+       "scopes": [
+        "openid",
+        "chatgpt.tokens.use.direct"
+       ]
+      }
+     ],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_quota",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "retry",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: needs to sign in again",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "reauthentication_required",
+       "scopes": [
+        "openid",
+        "chatgpt.tokens.use.direct"
+       ]
+      }
+     ],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_reauthentication_required",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: signed out",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "signed_out",
+       "scopes": []
+      }
+     ],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_signed_out",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "grant_plan",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: exported to another server",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "exported",
+       "scopes": [
+        "openid",
+        "chatgpt.tokens.use.direct"
+       ]
+      }
+     ],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_exported",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: two registrations, the second not chosen",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "connected",
+       "scopes": [
+        "openid",
+        "chatgpt.tokens.use.direct"
+       ]
+      },
+      {
+       "id": "profile-bbbb2222",
+       "label": "me@example.com / bbbb2222",
+       "state": "signed_out",
+       "scopes": []
+      }
+     ],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_connected",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     },
+     {
+      "id": "profile-bbbb2222",
+      "label": "me@example.com / bbbb2222",
+      "active": false,
+      "status": "chatgpt_signed_out",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "grant_plan",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": true
+   }
+  },
+  {
+   "name": "view: busy",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "connected",
+       "scopes": [
+        "openid",
+        "chatgpt.tokens.use.direct"
+       ]
+      }
+     ],
+     "pending_registrations": []
+    },
+    "busy": true
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": false
+     },
+     {
+      "action": "check_connection",
+      "enabled": false
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_connected",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": false
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": false
+       },
+       {
+        "action": "sign_out",
+        "enabled": false,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": false,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": true
+   }
+  },
+  {
+   "name": "view: signing in, the page can be opened again",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "signed_out",
+       "scopes": []
+      }
+     ],
+     "pending_registrations": []
+    },
+    "busy": true,
+    "attempt": {
+     "active": true,
+     "can_reopen": true,
+     "helper": false
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": false
+     },
+     {
+      "action": "check_connection",
+      "enabled": false
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     },
+     {
+      "action": "reopen_sign_in",
+      "enabled": true
+     },
+     {
+      "action": "cancel",
+      "enabled": true
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_signed_out",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": false
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": false
+       },
+       {
+        "action": "grant_plan",
+        "enabled": false
+       },
+       {
+        "action": "sign_out",
+        "enabled": false,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": false,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: signing in, nothing to open again",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "signed_out",
+       "scopes": []
+      }
+     ],
+     "pending_registrations": []
+    },
+    "busy": true,
+    "attempt": {
+     "active": true,
+     "can_reopen": false,
+     "helper": false
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": false
+     },
+     {
+      "action": "check_connection",
+      "enabled": false
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     },
+     {
+      "action": "cancel",
+      "enabled": true
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_signed_out",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": false
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": false
+       },
+       {
+        "action": "grant_plan",
+        "enabled": false
+       },
+       {
+        "action": "sign_out",
+        "enabled": false,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": false,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: a registration not finished",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": null,
+     "profiles": [],
+     "pending_registrations": [
+      {
+       "id": "pending-1",
+       "client_id": "app_1234"
+      }
+     ]
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [
+     {
+      "id": "pending-1",
+      "client_id": "app_1234",
+      "actions": [
+       {
+        "action": "reconnect",
+        "enabled": true
+       }
+      ]
+     }
+    ],
+    "profiles": [],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: signed out, revocation not confirmed",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "signed_out",
+       "scopes": []
+      }
+     ],
+     "pending_registrations": []
+    },
+    "last_operation": "sign_out",
+    "revocation_confirmed": false
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": "chatgpt_revocation_unconfirmed",
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_signed_out",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "grant_plan",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: signed out, revocation confirmed",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "signed_out",
+       "scopes": []
+      }
+     ],
+     "pending_registrations": []
+    },
+    "last_operation": "sign_out",
+    "revocation_confirmed": true
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_signed_out",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "grant_plan",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": false
+   }
+  },
+  {
+   "name": "view: a failure code from the host",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": "profile-aaaa1111",
+     "profiles": [
+      {
+       "id": "profile-aaaa1111",
+       "label": "me@example.com / aaaa1111",
+       "state": "connected",
+       "scopes": [
+        "openid",
+        "chatgpt.tokens.use.direct"
+       ]
+      }
+     ],
+     "pending_registrations": []
+    },
+    "code": "chatgpt_transport_unavailable"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": "chatgpt_transport_unavailable",
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [
+     {
+      "id": "profile-aaaa1111",
+      "label": "me@example.com / aaaa1111",
+      "active": true,
+      "status": "chatgpt_connected",
+      "actions": [
+       {
+        "action": "select",
+        "enabled": true
+       },
+       {
+        "action": "reauthenticate",
+        "enabled": true
+       },
+       {
+        "action": "sign_out",
+        "enabled": true,
+        "confirm": true
+       },
+       {
+        "action": "delete",
+        "enabled": true,
+        "confirm": true
+       }
+      ]
+     }
+    ],
+    "guide": true
+   }
+  },
+  {
+   "name": "view: no registration",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "chatgpt",
+    "connection": {
+     "active_profile_id": null,
+     "profiles": [],
+     "pending_registrations": []
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "status": null,
+    "actions": [
+     {
+      "action": "sign_in",
+      "enabled": true
+     },
+     {
+      "action": "check_connection",
+      "enabled": true
+     },
+     {
+      "action": "manage_usage",
+      "enabled": true,
+      "url": "https://chatgpt.com/settings/usage"
+     }
+    ],
+    "pending": [],
+    "profiles": [],
+    "guide": false
+   }
+  },
+  {
+   "name": "draft: opened as published",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": false,
+    "can_refresh": true,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: choose a model",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "edit": {
+     "kind": "toggle_model",
+     "id": "gpt-6.1-terra",
+     "selected": true
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": true
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": true,
+    "can_refresh": false,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna",
+      "gpt-6.1-terra"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: an unselectable model stays out",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "edit": {
+     "kind": "toggle_model",
+     "id": "gpt-5-old",
+     "selected": true
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": false,
+    "can_refresh": true,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: removing the last purpose unpublishes",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "edit": {
+     "kind": "toggle_purpose",
+     "id": "gpt-6-luna",
+     "purpose": "llm"
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": false,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": true,
+    "can_refresh": false,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: a purpose not answered cannot be pressed",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "edit": {
+     "kind": "toggle_purpose",
+     "id": "gpt-6-luna",
+     "purpose": "vision"
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": false,
+    "can_refresh": true,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: adding a purpose back keeps the order it was pressed in the draft",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "edit": {
+     "kind": "toggle_purpose",
+     "id": "gpt-6.1-sol",
+     "purpose": "llm"
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "vision",
+       "llm"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "vision",
+       "llm"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": true,
+    "can_refresh": false,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: select all skips the unselectable",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "edit": {
+     "kind": "select_all",
+     "ids": [
+      "gpt-6.1-sol",
+      "gpt-6-luna",
+      "gpt-5-old",
+      "gpt-6.1-terra"
+     ],
+     "selected": true
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": true
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": true,
+    "can_refresh": false,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna",
+      "gpt-6.1-terra"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: clear all",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "edit": {
+     "kind": "select_all",
+     "ids": [
+      "gpt-6.1-sol",
+      "gpt-6-luna",
+      "gpt-5-old",
+      "gpt-6.1-terra"
+     ],
+     "selected": false
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": false,
+      "gpt-6-luna": false,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": true,
+    "can_refresh": false,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: an administrator's changed assessment",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "administrator": true,
+    "assessment_drafts": {
+     "gpt-6.1-sol": {
+      "recommendation_llm": 4,
+      "comment_ja": "速い",
+      "comment_en": ""
+     }
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": false,
+    "can_refresh": true,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": [
+     {
+      "id": "gpt-6.1-sol",
+      "label": "GPT-6.1-SOL",
+      "recommendation_llm": 4,
+      "comment_ja": "速い"
+     }
+    ]
+   }
+  },
+  {
+   "name": "draft: not an administrator: no assessment",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "administrator": false,
+    "assessment_drafts": {
+     "gpt-6.1-sol": {
+      "recommendation_llm": 4
+     }
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "ok",
+    "draft": {
+     "selected": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     },
+     "purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "rows": [
+     {
+      "id": "gpt-6.1-sol",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6-luna",
+      "selected": true,
+      "can_toggle": true,
+      "purposes": [
+       "llm"
+      ],
+      "locked_purposes": [
+       "vision"
+      ]
+     },
+     {
+      "id": "gpt-5-old",
+      "selected": false,
+      "can_toggle": false,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     },
+     {
+      "id": "gpt-6.1-terra",
+      "selected": false,
+      "can_toggle": true,
+      "purposes": [
+       "llm",
+       "vision"
+      ],
+      "locked_purposes": []
+     }
+    ],
+    "dirty": false,
+    "can_refresh": true,
+    "can_save": true,
+    "save": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "published_models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna"
+     ],
+     "model_purposes": {
+      "gpt-6.1-sol": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6-luna": [
+       "llm"
+      ],
+      "gpt-5-old": [
+       "llm",
+       "vision"
+      ],
+      "gpt-6.1-terra": [
+       "llm",
+       "vision"
+      ]
+     }
+    },
+    "assessments": []
+   }
+  },
+  {
+   "name": "draft: refuses an unknown edit",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_publication_draft",
+    "service": "chatgpt",
+    "publication": {
+     "profile_id": "profile-aaaa1111",
+     "generation": 3,
+     "models": [
+      {
+       "id": "gpt-6.1-sol",
+       "label": "GPT-6.1-SOL",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6-luna",
+       "label": "GPT-6-LUNA",
+       "purposes": [
+        "llm"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": true
+        }
+       }
+      },
+      {
+       "id": "gpt-5-old",
+       "label": "GPT-5-OLD",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": true,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      },
+      {
+       "id": "gpt-6.1-terra",
+       "label": "GPT-6.1-TERRA",
+       "purposes": [
+        "llm",
+        "vision"
+       ],
+       "selection": {
+        "unselectable": false,
+        "unsupported": {
+         "llm": false,
+         "vision": false
+        }
+       }
+      }
+     ],
+     "enabled_models": {
+      "gpt-6.1-sol": true,
+      "gpt-6-luna": true,
+      "gpt-5-old": false,
+      "gpt-6.1-terra": false
+     }
+    },
+    "edit": {
+     "kind": "rename"
+    }
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "invalid_edit"
+   }
+  },
+  {
+   "name": "view: refuses an unknown service",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_connection_view",
+    "service": "claude",
+    "connection": {}
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "unknown_sign_in_service"
+   }
   }
  ]
 }

@@ -142,8 +142,15 @@ fn callback_target(head: &[u8], port: u64) -> Option<String> {
 }
 
 fn callback_page(language: &str, completed: bool) -> (u64, Value, String) {
-    let page = &login()["callback_page"][if language == "ja" { "ja" } else { "en" }]
-        [if completed { "completed" } else { "failed" }];
+    page(language, if completed { "completed" } else { "failed" })
+}
+
+/// The page a callback is answered with: `completed`, `failed`, or `received`
+/// (the callback taken before the exchange, for a host that sends it only
+/// once inku is in front again).
+fn page(language: &str, kind: &str) -> (u64, Value, String) {
+    let completed = kind != "failed";
+    let page = &login()["callback_page"][if language == "ja" { "ja" } else { "en" }][kind];
     let (title, message) = (text(&page[0]), text(&page[1]));
     let language = if language == "ja" { "ja" } else { "en" };
     (
@@ -1001,6 +1008,21 @@ impl Flow {
                     .clone();
                 self.set("client_id", json!(issued));
                 self.set("code", code);
+                if self.input("respond_before_exchange") == true {
+                    // Android sends the exchange only once inku is in front:
+                    // the browser is told now, and a later failure is only named.
+                    self.set("respond_failed", json!(false));
+                    self.set("responded", json!(true));
+                    let (status, headers, body) =
+                        page(self.input("language").as_str().unwrap_or("en"), "received");
+                    return Ok(self.todo(
+                        "li_pending_begin",
+                        json!({"todo":"respond","status":status,"headers":headers,"body":body}),
+                    ));
+                }
+                return Ok(self.resume("li_pending_begin", &Value::Null));
+            }
+            "li_pending_begin" => {
                 let deadline = self.deadline();
                 self.acquire("li_pending_own", "refresh", deadline)
             }
@@ -1119,6 +1141,9 @@ impl Flow {
             "li_save_released" => self.release("li_respond", "refresh"),
             "li_respond" => {
                 self.set("respond_failed", json!(false));
+                if self.get("responded") == true {
+                    return Ok(self.resume("li_done", &Value::Null));
+                }
                 let (status, headers, body) =
                     callback_page(self.input("language").as_str().unwrap_or("en"), true);
                 self.todo(
@@ -1487,6 +1512,46 @@ mod tests {
     }
 
     #[test]
+    fn a_host_that_exchanges_later_answers_the_browser_first() {
+        let mut host = Host::new(json!({"profiles":{},"registrations_pending":{}}));
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-9"));
+        host.http = vec![
+            tokens(&id_token(Some(&state_value()), "client-9")),
+            discovery(),
+            keys(),
+        ];
+        let done = host.run(
+            "login",
+            json!({"language":"ja","pending_count":0,"owner_count":0,"respond_before_exchange":true}),
+        );
+        assert_eq!(done["todo"], "done", "{done}");
+        assert_eq!(host.responses.len(), 1);
+        assert_eq!(host.responses[0]["status"], 200);
+        assert!(
+            host.responses[0]["body"]
+                .as_str()
+                .unwrap()
+                .contains("ChatGPTでの許可を受け取りました")
+        );
+
+        let mut host = Host::new(json!({"profiles":{},"registrations_pending":{}}));
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-9"));
+        host.http = vec![json!({"transport":"unavailable"})];
+        let failed = host.run(
+            "login",
+            json!({"language":"en","pending_count":0,"owner_count":0,"respond_before_exchange":true}),
+        );
+        assert_eq!(failed["code"], "chatgpt_transport_unavailable");
+        assert_eq!(
+            host.responses.len(),
+            1,
+            "a failure after the answer is only named"
+        );
+    }
+
+    #[test]
     fn the_callback_head_is_read_strictly() {
         let target = |head: &str| callback_target(head.as_bytes(), 4321);
         assert!(target("GET /auth/callback?a=1 HTTP/1.1\r\nHost: 127.0.0.1:4321").is_some());
@@ -1695,6 +1760,19 @@ mod tests {
             json!({"consent":false,"language":"ja","pending_count":0,"owner_count":0}),
         );
         keep("login", host);
+        let mut host = Host::new(json!({"profiles":{},"registrations_pending":{}}));
+        host.callbacks
+            .push(callback(&state_value(), "&client_id=client-9"));
+        host.http = vec![
+            tokens(&id_token(Some(&state_value()), "client-9")),
+            discovery(),
+            keys(),
+        ];
+        host.run(
+            "login",
+            json!({"language":"en","pending_count":0,"owner_count":0,"respond_before_exchange":true}),
+        );
+        keep("login answered before the exchange", host);
         let mut old = connected();
         old["expires_at"] = json!(NOW + 10.0);
         let mut host = Host::new(store(old));

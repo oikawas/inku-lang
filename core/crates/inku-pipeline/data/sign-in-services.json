@@ -65,11 +65,13 @@
       "callback_page": {
         "ja": {
           "completed": ["ChatGPTの認証が完了しました", "このタブを閉じ、inkuへ戻って「接続状態を確認」を押してください。別のホストへ接続する場合は、Macの登録移送完了を待ってから確認してください。"],
-          "failed": ["ChatGPTの認証は完了していません", "inkuへ戻り、接続の案内を確認してください。この画面から認証を自動でやり直すことはありません。"]
+          "failed": ["ChatGPTの認証は完了していません", "inkuへ戻り、接続の案内を確認してください。この画面から認証を自動でやり直すことはありません。"],
+          "received": ["ChatGPTでの許可を受け取りました", "inkuへ戻ると接続を完了します。"]
         },
         "en": {
           "completed": ["ChatGPT authorization completed", "Close this tab, return to inku and press Check connection. For a remote host, wait until the Mac registration transfer finishes first."],
-          "failed": ["ChatGPT authorization did not complete", "Return to inku and check the connection message. This page does not retry authorization automatically."]
+          "failed": ["ChatGPT authorization did not complete", "Return to inku and check the connection message. This page does not retry authorization automatically."],
+          "received": ["ChatGPT authorization received", "Return to inku to finish connecting."]
         }
       }
     },

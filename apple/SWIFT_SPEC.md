@@ -22,6 +22,18 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-14 Sign in with ChatGPT (step 2)
+
+The connection's state and the publication editing come from the shared core's `sign_in_connection_view` and `sign_in_publication_draft` (the author's decision: shown as the Web shows them, with the wording tables kept in the host).
+
+- Connection page (`ChatGPTPlanSettingsView`, `ChatGPTPlanSettingsModel`): the status line, the top actions, the actions while signing in, unfinished registrations, each registration's status code and actions, and the guide to model settings come from core's answer (`SignInConnectionView`). The status line shows only the last failure code through `ChatGPTStatusCopy`; free-text notices (selected, retry allowed, and so on) are gone. After a sign-out or deletion, the Web's "revocation not confirmed" text appears only when the revocation could not be confirmed.
+- On the Mac, "Open the sign-in page again" appears while signing in (it opens the browser again). iOS does not show it: its login sheet stays over the app and closing it stops the sign-in.
+- Unfinished registrations come before the registrations, with their client id. The usage page is among the top actions even when the state could not be read.
+- Disconnecting asks first, as deletion does: it shows a confirmation with "Disconnect" and "Keep", and runs on confirmation (the author's answer).
+- The "Enable Sign in with ChatGPT" switch and the stop on new connections at eight registrations are gone (the author's answer, as the Web). Signing in turns the connection on and adds the reserved `chatgpt` service. The registration limit check (`chatgpt_profile_limit`) remains.
+- Model publication (`ChatGPTModelsSheet`): selection, purposes, unsaved state, whether refresh and save can be pressed, and the save body come from core's answer (`SignInPublicationDraft`). Removing a model's last purpose unpublishes it, select all takes only models that can be published and have a purpose, save can be pressed without changes, and the body sends the catalog-ordered selection with every model's purposes (as the Web). Assessments are read from the publication's rows (core `chatgpt_publication`) only, no longer rebuilt from the bundled catalog.
+- Check: `InkuAppCheck --sign-in-only` compares the 48 shared rows and the requests Swift builds (view and draft) through core.
+
 ## 2026-11-14 Sign in with ChatGPT (step 1)
 
 The author's instruction (2026-11-14: put ChatGPT first in the model settings and model selection of the Web, Swift and Android) and the official names (Japanese 「ChatGPT でサインイン」, English "Sign in with ChatGPT", abbreviation "SIWC"). The shared core's `model_catalog_json` actions `provider_groups`, `sign_in_services` and `resolve_display` are used.

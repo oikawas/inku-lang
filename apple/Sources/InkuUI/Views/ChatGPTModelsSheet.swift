@@ -37,8 +37,8 @@ struct ChatGPTModelsSheet: View {
     let onChange: @MainActor (ChatGPTPlanPublication) async -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var publication: ChatGPTPlanPublication
-    @State private var selected: Set<String>
-    @State private var purposes: [String: [String]]
+    /// Core `sign_in_publication_draft`: the selection, purposes, dirty state and save body (Web model-administration).
+    @State private var draft: SignInPublicationDraft?
     @State private var search = ""
     @State private var filter: ProviderModelFilter = .all
     @State private var working = false
@@ -50,20 +50,20 @@ struct ChatGPTModelsSheet: View {
         self.model = model
         self.onChange = onChange
         _publication = State(initialValue: publication)
-        _selected = State(initialValue: publication.published)
-        _purposes = State(initialValue: publication.purposes)
+        _draft = State(initialValue: SignInPublicationDraft(publication: publication))
     }
 
     private var display: DisplaySettings { model.display }
-    private var dirty: Bool { selected != publication.published || purposes != publication.purposes }
-    private func purposes(of id: String) -> [String] { purposes[id] ?? ChatGPTPlanPublication.defaultPurposes }
-    /// A published model needs a purpose, as on the other services.
-    private var missingPurpose: Bool { selected.contains { purposes(of: $0).isEmpty } }
-    /// The same filter as the other services' picker; the catalog keeps ChatGPT's order.
+    private var dirty: Bool { draft?.dirty ?? false }
+    private func isSelected(_ id: String) -> Bool { draft?.row(id)?.selected ?? false }
+    private func purposes(of id: String) -> [String] { draft?.row(id)?.purposes ?? [] }
+    /// The same filter as the other services' picker; the catalog keeps ChatGPT's order. Assessments come from the
+    /// publication's own rows (core `chatgpt_publication`) only, not from the bundled catalog.
     private var catalogModels: [ProviderModelSettings] {
         publication.models.map { item in
-            let saved = ProviderModelSettings(id: item.id, label: item.label, purposes: purposes(of: item.id))
-            return ModelGuidanceCatalog.bundled?.applyingCatalog(to: saved, providerID: "chatgpt", kind: .chatGPTPlan) ?? saved
+            var model = publication.assessedModels[item.id] ?? ProviderModelSettings(id: item.id, label: item.label)
+            model.purposes = purposes(of: item.id)
+            return model
         }
     }
     private var visibleModels: [ProviderModelSettings] {
@@ -72,8 +72,8 @@ struct ChatGPTModelsSheet: View {
             guard query.isEmpty || item.label.localizedCaseInsensitiveContains(query) || item.id.localizedCaseInsensitiveContains(query) else { return false }
             switch filter {
             case .all: return true
-            case .enabled: return selected.contains(item.id)
-            case .disabled: return !selected.contains(item.id)
+            case .enabled: return isSelected(item.id)
+            case .disabled: return !isSelected(item.id)
             case .llm: return purposes(of: item.id).contains("llm")
             case .vision: return purposes(of: item.id).contains("vision")
             }
@@ -137,11 +137,11 @@ struct ChatGPTModelsSheet: View {
             }
             HStack(spacing: 10) {
                 Button(display.webCopy("chatgptRefreshModels", "モデル一覧を更新")) { Task { await refresh() } }
-                    .disabled(working || dirty || model.isSettingsInteractionLocked)
+                    .disabled(working || !(draft?.canRefresh ?? true) || model.isSettingsInteractionLocked)
                     .inkuTooltip(dirty ? display.tooltip("未保存の変更を保存または取り消してからモデルリストを取得してください。", serverKey: "settingsModelFetchDisabledWhileDirty") : "")
-                Button(display.webCopy("settingsModelSelectVisible", "表示中を全て選択")) { selected.formUnion(visibleModels.filter(\.isSelectable).map(\.id)) }
+                Button(display.webCopy("settingsModelSelectVisible", "表示中を全て選択")) { draft?.select(visibleModels.map(\.id), selected: true) }
                     .disabled(working || visibleModels.isEmpty)
-                Button(display.webCopy("settingsModelClearVisible", "表示中を全て解除")) { selected.subtract(visibleModels.map(\.id)) }
+                Button(display.webCopy("settingsModelClearVisible", "表示中を全て解除")) { draft?.select(visibleModels.map(\.id), selected: false) }
                     .disabled(working || visibleModels.isEmpty)
                 Spacer()
                 Text(display.localizedFormat("%ld / %ld モデルを表示", visibleModels.count, publication.models.count))
@@ -153,19 +153,16 @@ struct ChatGPTModelsSheet: View {
     private func row(_ item: ProviderModelSettings) -> some View {
       VStack(alignment: .leading, spacing: 10) {
         HStack(alignment: .top, spacing: 12) {
-            Toggle(isOn: Binding(get: { selected.contains(item.id) },
-                                 set: { if $0 && item.isSelectable { selected.insert(item.id) } else { selected.remove(item.id) } })) {
+            Toggle(isOn: Binding(get: { isSelected(item.id) }, set: { draft?.toggleModel(item.id, selected: $0) })) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.label).inkuFont(14, weight: .semibold)
                     Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
                     ModelLabelsView(labels: item.resolvedLabels, display: display, endOfLifeDate: item.eolDate)
-                    if selected.contains(item.id), purposes(of: item.id).isEmpty {
-                        Text(display.localized("LLM か Vision の用途を選んでください。")).inkuFont(12).foregroundStyle(.orange)
-                    }
                 }
             }
             .inkuCheckboxStyle()
-            .disabled(!item.isSelectable && !selected.contains(item.id))
+            // core: a model it cannot publish, or one with no purpose, is not toggled (a purpose publishes it again).
+            .disabled(!(draft?.row(item.id)?.canToggle ?? false) && !isSelected(item.id))
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) {
                 purposeButton("LLM", purpose: "llm", item: item)
@@ -191,17 +188,13 @@ struct ChatGPTModelsSheet: View {
 
     private func purposeButton(_ label: String, purpose: String, item: ProviderModelSettings) -> some View {
         let on = purposes(of: item.id).contains(purpose)
-        let locked = (item.unsupportedPurposes ?? []).contains(purpose)
+        let locked = draft?.row(item.id)?.lockedPurposes.contains(purpose) ?? true
         // A ChatGPT purpose measured without a response is disabled; its tooltip is gone with the model choice's floats
         // (author 2026-11-12, Web `noResponseTitle` removed). VoiceOver still reads the reason.
         let note = display.preferences.language == "en" ? "Not selectable: no response when measured" : "計測で応答が無かったため選べません"
-        return Button(label) {
-            var next = purposes(of: item.id)
-            if on { next.removeAll { $0 == purpose } } else { next.append(purpose) }
-            purposes[item.id] = ["llm", "vision"].filter(next.contains)
-        }
+        return Button(label) { draft?.togglePurpose(item.id, purpose: purpose) }
             .buttonStyle(.plain)
-            .disabled(!ProviderModelsDraft.canEditPurposes(item) || locked)
+            .disabled(locked)
             .inkuFont(12, weight: .medium)
             .padding(.horizontal, 10).padding(.vertical, 5)
             .foregroundStyle(on ? Color.accentColor : Color.secondary)
@@ -220,7 +213,7 @@ struct ChatGPTModelsSheet: View {
                 Text(statusMessage).inkuFont(12).foregroundStyle(.secondary).lineLimit(3)
             }
             HStack(spacing: 12) {
-                Text(display.webCopyFormat("settingsModelPublishedCount", "%@ モデルを公開中", publication.models.filter { selected.contains($0.id) }.count))
+                Text(display.webCopyFormat("settingsModelPublishedCount", "%@ モデルを公開中", publication.models.filter { isSelected($0.id) }.count))
                     .inkuFont(13).foregroundStyle(.secondary)
                 if dirty { Text(display.localized("未保存の変更")).inkuFont(12, weight: .semibold) }
                 Spacer()
@@ -229,7 +222,7 @@ struct ChatGPTModelsSheet: View {
                     .keyboardShortcut(.cancelAction).disabled(working)
                 Button(display.localized("保存")) { Task { await save() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(working || !dirty || missingPurpose || catalogModels.contains { selected.contains($0.id) && !$0.isSelectable } || model.isSettingsInteractionLocked)
+                    .disabled(working || draft == nil || !(draft?.canSave ?? false) || model.isSettingsInteractionLocked)
             }
         }.padding(16)
     }
@@ -239,7 +232,7 @@ struct ChatGPTModelsSheet: View {
         statusMessage = ChatGPTStatusCopy.text("chatgpt_models_loading", language: display.preferences.language)
         do {
             let next = try await model.personalPlanRuntime().refreshPublication()
-            publication = next; selected = next.published; purposes = next.purposes
+            publication = next; draft = SignInPublicationDraft(publication: next)
             statusMessage = next.models.isEmpty
                 ? display.webCopy("chatgptModelsEmpty", "この登録で選択できるモデルはありません。接続とプラン利用の許可を確認してください。")
                 : display.webCopyFormat("chatgptModelsLoaded", "%@件のモデルを取得しました。公開するモデルを選んで保存してください。", next.models.count)
@@ -251,12 +244,11 @@ struct ChatGPTModelsSheet: View {
     private func save() async {
         working = true; errorMessage = nil; statusMessage = nil
         do {
-            // Web sends the catalog order, not the order the boxes were checked.
-            let ids = publication.models.map(\.id).filter(selected.contains)
-            let changed = purposes.filter { publication.purposes[$0.key] != $0.value }
+            // core's save body: the catalog order, and every model's purposes (Web model-administration).
+            guard let draft else { throw HostError("chatgpt_publication_invalid") }
             let next = try await model.personalPlanRuntime().savePublication(
-                profileID: publication.profileID, generation: publication.generation, models: ids, purposes: changed)
-            publication = next; selected = next.published; purposes = next.purposes
+                profileID: publication.profileID, generation: publication.generation, models: draft.savedModels, purposes: draft.savedPurposes)
+            publication = next; self.draft = SignInPublicationDraft(publication: next)
             await onChange(next)
             working = false
             dismiss()

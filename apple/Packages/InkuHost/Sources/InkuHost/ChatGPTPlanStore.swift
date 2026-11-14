@@ -19,6 +19,11 @@ public struct ChatGPTPlanProfile: Identifiable, Sendable, Equatable {
     public let generation: Int64
     public let scopes: [String]
     public let expiresAt: Date
+    public init(id: String, label: String, email: String?, clientID: String, state: String, generation: Int64,
+                scopes: [String], expiresAt: Date) {
+        self.id = id; self.label = label; self.email = email; self.clientID = clientID; self.state = state
+        self.generation = generation; self.scopes = scopes; self.expiresAt = expiresAt
+    }
 }
 
 public struct ChatGPTPlanState: Sendable {
@@ -26,6 +31,13 @@ public struct ChatGPTPlanState: Sendable {
     public let activeProfileID: String?
     public let profiles: [ChatGPTPlanProfile]
     public let pendingRegistrations: [String]
+    /// Each unfinished registration's client id (core `sign_in_connection_view` shows it, as the Web does).
+    public let pendingClientIDs: [String: String]
+    public init(enabled: Bool, activeProfileID: String?, profiles: [ChatGPTPlanProfile], pendingRegistrations: [String],
+                pendingClientIDs: [String: String] = [:]) {
+        self.enabled = enabled; self.activeProfileID = activeProfileID; self.profiles = profiles
+        self.pendingRegistrations = pendingRegistrations; self.pendingClientIDs = pendingClientIDs
+    }
 }
 
 public struct ChatGPTPlanModel: Identifiable, Codable, Sendable, Equatable {
@@ -47,10 +59,12 @@ public struct ChatGPTPlanPublication: Sendable, Equatable {
     /// Every catalog model's purposes, in `llm`, `vision` order.
     public let purposes: [String: [String]]
     public let assessedModels: [String: ProviderModelSettings]
+    /// Core `chatgpt_publication`'s answer as it came, for core `sign_in_publication_draft` (empty when not from core).
+    public let coreAnswer: Data
     public init(profileID: String, generation: Int64, models: [ChatGPTPlanModel], published: Set<String>,
-                purposes: [String: [String]] = [:], assessedModels: [String: ProviderModelSettings] = [:]) {
+                purposes: [String: [String]] = [:], assessedModels: [String: ProviderModelSettings] = [:], coreAnswer: Data = Data()) {
         self.profileID = profileID; self.generation = generation; self.models = models; self.published = published
-        self.assessedModels = assessedModels
+        self.assessedModels = assessedModels; self.coreAnswer = coreAnswer
         self.purposes = Dictionary(uniqueKeysWithValues: models.map { ($0.id, Self.ordered(purposes[$0.id] ?? Self.defaultPurposes)) })
     }
     /// In catalog order, as Server's drawing and Vision catalogs list them.
@@ -97,7 +111,8 @@ struct ChatGPTVaultState: Codable, Sendable {
     var publicValue: ChatGPTPlanState {
         .init(enabled: enabled, activeProfileID: activeProfileID,
               profiles: profiles.values.map(\.publicValue).sorted { $0.id < $1.id },
-              pendingRegistrations: pendingRegistrations.keys.filter { profiles[$0] == nil }.sorted())
+              pendingRegistrations: pendingRegistrations.keys.filter { profiles[$0] == nil }.sorted(),
+              pendingClientIDs: pendingRegistrations.filter { profiles[$0.key] == nil })
     }
 }
 

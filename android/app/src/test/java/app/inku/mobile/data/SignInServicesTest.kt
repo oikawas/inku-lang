@@ -29,6 +29,46 @@ class SignInServicesTest {
         }
     }
 
+    /**
+     * The shared view rows Android can state, rebuilt from the host's own
+     * values through `chatGptConnectionRequest`: the answer is the row's.
+     * Android ties busy to a sign-in in Chrome and cannot open that page
+     * again, so a busy row with no attempt and a reopenable attempt are not
+     * among them.
+     */
+    @Test fun theConnectionViewRowsAreAnsweredFromTheHostRequest() {
+        val cases = JSONObject(File(System.getProperty("inku.signInCases")).readText()).getJSONArray("cases")
+        val skipped = setOf("view: busy", "view: signing in, the page can be opened again", "view: refuses an unknown service")
+        var checked = 0
+        for (index in 0 until cases.length()) {
+            val row = cases.getJSONObject(index)
+            val name = row.getString("name")
+            if (!name.startsWith("view: ") || name in skipped) continue
+            val request = row.getJSONObject("request")
+            val connection = request.getJSONObject("connection")
+            val profiles = connection.optJSONArray("profiles").objects().map { profile ->
+                val scopes = profile.optJSONArray("scopes").strings()
+                app.inku.mobile.llm.ChatGptProfileView(profile.getString("id"), profile.getString("label"), profile.getString("state"),
+                    planAllowed = "chatgpt.tokens.use.direct" in scopes, scopes = scopes)
+            }
+            val pending = connection.optJSONArray("pending_registrations").objects().map {
+                app.inku.mobile.llm.ChatGptPendingRegistration(it.getString("id"), if (it.isNull("client_id")) null else it.getString("client_id"))
+            }
+            val unconfirmed = request.optString("last_operation") in setOf("sign_out", "delete") && request.has("revocation_confirmed") &&
+                !request.getBoolean("revocation_confirmed")
+            val answer = catalogRequest("sign_in_connection_view", app.inku.mobile.llm.chatGptConnectionRequest(profiles, pending,
+                if (connection.isNull("active_profile_id")) null else connection.getString("active_profile_id"),
+                request.optJSONObject("attempt")?.optBoolean("active") == true,
+                if (request.isNull("code")) null else request.optString("code"), unconfirmed))
+            assertEquals(name, canonical(row.getJSONObject("answer")), canonical(answer))
+            assertEquals(name, row.getJSONObject("answer").getBoolean("guide"), ChatGptPlanView(connection = answer).canUsePlan)
+            checked++
+        }
+        assertEquals(13, checked)
+    }
+
+    private fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else (0 until length()).map(::getJSONObject)
+
     @Test fun theScreenNamesAreTheCoreLabels() {
         assertEquals("ChatGPT でサインイン", InkuStringsJa.chatGptPlan)
         assertEquals("Sign in with ChatGPT", InkuStringsEn.chatGptPlan)

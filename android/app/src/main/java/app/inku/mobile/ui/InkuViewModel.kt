@@ -1964,9 +1964,16 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun cancelChatGptAuthorization() = repository.chatGptPlan.cancelAuthorization()
     fun chatGptBrowserUnavailable() = repository.chatGptPlan.browserUnavailable()
-    fun acknowledgeChatGptPlan() {
+    /** 「接続状態を確認」 (Web `load`). */
+    fun checkChatGptConnection() {
+        repository.chatGptPlan.reload()
+        localState.value = localState.value.copy(message = null)
+    }
+
+    /** 「利用枠を確認して再試行」 for a registration a usage limit paused (Web `retry`). */
+    fun retryChatGptQuota(id: String) {
         guardedScope.launch {
-            try { withContext(Dispatchers.IO) { repository.chatGptPlan.acknowledgePlanNotice() } }
+            try { withContext(Dispatchers.IO) { repository.chatGptPlan.retryQuota(id) } }
             catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
         }
     }
@@ -2002,14 +2009,17 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Saves the core's `sign_in_publication_draft` body: [models] in the list's
+     * order and [purposes] for every model (Web's `/api/me/chatgpt/models/settings`).
+     * The purposes are also kept in `model_purposes`, which the drawing choices read.
+     */
     fun publishChatGptModels(session: app.inku.mobile.llm.ChatGptSessionRef, models: List<String>, purposes: Map<String, List<String>>) {
         guardedScope.launch {
             try {
-                val offered = state.value.chatGptPlan.models.orEmpty().map { it.id }.toSet()
-                val chosen = purposes.filterKeys { it in offered }
-                val json = JSONObject().apply { chosen.forEach { (id, items) -> put(id, JSONArray(items)) } }
+                val json = JSONObject().apply { purposes.forEach { (id, items) -> put(id, JSONArray(items)) } }
                 withContext(Dispatchers.IO) { repository.chatGptPlan.publishModels(session, models, json) }
-                saveModelPurposes("chatgpt", chosen)
+                saveModelPurposes("chatgpt", purposes)
                 localState.value = localState.value.copy(message = strings().modelSettingsSaved)
             } catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
         }

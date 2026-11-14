@@ -212,6 +212,7 @@ import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.DdlSource
+import app.inku.mobile.data.strings
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
@@ -569,14 +570,6 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
     ) {
     val typography = remember(state.uiTextScale) { inkuTypography(state.uiTextScale) }
     MaterialTheme(colorScheme = InkuColors, typography = typography) {
-        if (state.chatGptPlan.showPlanNotice) {
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text(S.chatGptNoticeTitle) },
-                text = { Text(S.chatGptPlanDescription) },
-                confirmButton = { TextButton(onClick = viewModel::acknowledgeChatGptPlan) { Text(S.chatGptNoticeAccept) } },
-            )
-        }
         Scaffold(
             bottomBar = {
                 // While the description is being written the destinations
@@ -5083,26 +5076,66 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(SettingsPane.ChatGpt, viewModel)
-        SettingsCard(S.chatGptPlan, S.chatGptPlanDescription, chatGptConnectionStatus(plan, S)) {
-            plan.profiles.forEach { profile ->
+        // What is shown and pressable is the core's `sign_in_connection_view`
+        // (the Web's settings, 2026-11-14). The notice heads the card always;
+        // the status line is there only for the last failure code.
+        val view = plan.connection
+        SettingsCard(S.chatGptPlan, S.chatGptPlanDescription, view?.optStringOrNull("status")?.let { chatGptStatusText(it, S) }.orEmpty()) {
+            if (plan.pending) Text(S.chatGptPending, style = MaterialTheme.typography.bodyMedium)
+            WrapRow {
+                view.rows("actions").forEach { action ->
+                    val enabled = action.optBoolean("enabled")
+                    when (action.getString("action")) {
+                        "sign_in" -> SecondarySmallButton(if (plan.profiles.isEmpty()) S.chatGptContinue else S.chatGptAddAccount,
+                            onClick = { viewModel.authorizeChatGpt() }, enabled = enabled)
+                        "check_connection" -> SecondarySmallButton(S.chatGptCheckConnection, onClick = viewModel::checkChatGptConnection, enabled = enabled)
+                        "manage_usage" -> SecondarySmallButton(S.chatGptManageUsage, onClick = {
+                            if (!openChatGptBrowser(context, action.getString("url"))) viewModel.chatGptBrowserUnavailable()
+                        }, enabled = enabled)
+                        "cancel" -> SecondarySmallButton(S.cancel, onClick = viewModel::cancelChatGptAuthorization, enabled = enabled)
+                    }
+                }
+            }
+            // A registration that never finished signing in, apart from the list (Web `pending_registrations`).
+            view.rows("pending").forEach { row ->
+                val id = row.getString("id")
+                val clientId = row.optStringOrNull("client_id")
+                row.rows("actions").filter { it.getString("action") == "reconnect" }.forEach { action ->
+                    SecondarySmallButton(S.chatGptReauthenticate + (clientId?.let { " ($it)" } ?: ""),
+                        onClick = { viewModel.authorizeChatGpt(id) }, enabled = action.optBoolean("enabled"))
+                }
+            }
+            view.rows("profiles").forEach { profile ->
+                val id = profile.getString("id")
+                val label = profile.getString("label")
+                val actions = profile.rows("actions")
+                fun enabled(name: String) = actions.firstOrNull { it.getString("action") == name }?.optBoolean("enabled") == true
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                    TextButton(onClick = { viewModel.selectChatGptProfile(profile.id) }, enabled = !plan.pending) {
-                        Text((if (plan.activeProfileId == profile.id) "● " else "○ ") + profile.label)
+                    TextButton(onClick = { viewModel.selectChatGptProfile(id) }, enabled = enabled("select")) {
+                        Text((if (profile.optBoolean("active")) "● " else "○ ") + label)
                     }
+                    Text(chatGptStatusText(profile.getString("status"), S), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     WrapRow {
-                        if (plan.activeProfileId == profile.id) {
-                            SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(profile.id) }, enabled = !plan.pending)
-                            if (!profile.planAllowed) SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(profile.id, consent = true) }, enabled = !plan.pending)
-                            // Asked first, as deleting an API key is: signing out
-                            // takes a new authorization to undo.
-                            SecondarySmallButton(S.chatGptSignOut, onClick = { signOutTarget = profile.id to profile.label }, enabled = !plan.pending)
+                        actions.forEach { action ->
+                            val on = action.optBoolean("enabled")
+                            when (action.getString("action")) {
+                                "reauthenticate" -> SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(id) }, enabled = on)
+                                "grant_plan" -> SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(id, consent = true) }, enabled = on)
+                                "retry" -> SecondarySmallButton(S.chatGptRetry, onClick = { viewModel.retryChatGptQuota(id) }, enabled = on)
+                                // Asked first (`confirm`), as deleting an API key is:
+                                // signing out takes a new authorization to undo.
+                                "sign_out" -> SecondarySmallButton(S.chatGptSignOut, onClick = {
+                                    if (action.optBoolean("confirm")) signOutTarget = id to label else viewModel.signOutChatGpt(id)
+                                }, enabled = on)
+                                "delete" -> if (confirmingDelete != id) SecondarySmallButton(S.chatGptDelete, onClick = { confirmingDelete = id }, enabled = on)
+                            }
                         }
-                        if (confirmingDelete != profile.id) SecondarySmallButton(S.chatGptDelete, onClick = { confirmingDelete = profile.id }, enabled = !plan.pending)
                     }
-                    if (confirmingDelete == profile.id) {
+                    if (confirmingDelete == id) {
                         WrapRow {
                             Text(S.chatGptDeleteConfirmText)
-                            TextButton(onClick = { confirmingDelete = null; viewModel.deleteChatGptProfile(profile.id) }, enabled = !plan.pending) {
+                            TextButton(onClick = { confirmingDelete = null; viewModel.deleteChatGptProfile(id) }, enabled = enabled("delete")) {
                                 Text(S.chatGptDeleteConfirm, color = MaterialTheme.colorScheme.error)
                             }
                             TextButton(onClick = { confirmingDelete = null }) { Text(S.chatGptDeleteCancel) }
@@ -5110,17 +5143,11 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
                     }
                 }
             }
-            if (plan.pending) {
-                Text(S.chatGptPending, style = MaterialTheme.typography.bodyMedium)
-                SecondarySmallButton(S.cancel, onClick = viewModel::cancelChatGptAuthorization)
-            } else {
-                SecondarySmallButton(if (plan.profiles.isEmpty()) S.chatGptContinue else S.chatGptAddAccount, onClick = { viewModel.authorizeChatGpt() })
+            if (view?.optBoolean("guide") == true) {
+                Text(S.chatGptModelSettingsGuide, style = MaterialTheme.typography.bodyMedium)
+                SecondarySmallButton(S.chatGptOpenModels, onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
             }
-            if (plan.canUsePlan || plan.active?.let { it.status == "quota" && it.planAllowed } == true) SecondarySmallButton(S.chatGptOpenModels, onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
-            SecondarySmallButton(S.chatGptManageUsage, onClick = { if (!openChatGptBrowser(context, app.inku.mobile.llm.CHATGPT_USAGE)) viewModel.chatGptBrowserUnavailable() })
-            plan.errorCode?.let { Text(S.chatGptError(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
             state.message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            if (plan.revocationUnconfirmed) Text(S.chatGptRevocationUnconfirmed, style = MaterialTheme.typography.bodyMedium)
         }
     }
     signOutTarget?.let { (profileId, label) ->
@@ -5139,6 +5166,30 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
     }
 }
 
+/** A code the core answers as a status (Web `chatgptStatus`): a registration's state or the last failure. */
+private fun chatGptStatusText(code: String, strings: InkuStrings): String = when (code) {
+    "chatgpt_connected" -> strings.chatGptConnected
+    "chatgpt_signed_out" -> strings.chatGptNotConnected
+    "chatgpt_exported" -> strings.chatGptExported
+    "chatgpt_scope_required" -> strings.chatGptScopeRequiredStatus
+    "chatgpt_revocation_unconfirmed" -> strings.chatGptRevocationUnconfirmed
+    else -> strings.chatGptError(code)
+}
+
+/** A card's status in model settings: the last failure, else the chosen registration's state (core `sign_in_connection_view`). */
+private fun chatGptCardStatus(plan: app.inku.mobile.llm.ChatGptPlanView, strings: InkuStrings): String {
+    val view = plan.connection ?: return ""
+    val code = view.optStringOrNull("status")
+        ?: view.rows("profiles").firstOrNull { it.optBoolean("active") }?.optStringOrNull("status")
+    return code?.let { chatGptStatusText(it, strings) }.orEmpty()
+}
+
+private fun JSONObject?.rows(key: String): List<JSONObject> =
+    this?.optJSONArray(key)?.let { array -> (0 until array.length()).map(array::getJSONObject) }.orEmpty()
+
+private fun JSONObject.optStringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf(String::isNotEmpty)
+
+/** The status beside a ChatGPT model while drawing (unchanged in step 2). */
 private fun chatGptConnectionStatus(plan: app.inku.mobile.llm.ChatGptPlanView, strings: InkuStrings): String = when {
     plan.pending -> strings.chatGptPending
     plan.active == null || plan.active?.status == "signed_out" -> strings.chatGptNotConnected
@@ -5172,7 +5223,7 @@ private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
     val session = plan.activeSession
     val provider = state.providerSettings.firstOrNull { it.providerId == "chatgpt" } ?: return
     var picker by remember(session) { mutableStateOf(false) }
-    SettingsCard(S.chatGptPlan, plan.active?.label.orEmpty(), chatGptConnectionStatus(plan, S)) {
+    SettingsCard(S.chatGptPlan, plan.active?.label.orEmpty(), chatGptCardStatus(plan, S)) {
         // As the other services: the model selection first, the account below.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -5198,6 +5249,7 @@ private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
             candidateLabels = plan.models?.associate { it.id to it.label }.orEmpty(),
             onDismiss = { picker = false }, onFetchModels = { viewModel.fetchProviderModels("chatgpt") },
             fetchState = state.providerModelFetchStates["chatgpt"],
+            publication = remember(plan, state.modelPurposes, state.modelCatalogObservations) { chatGptPublication(state) },
             onSave = { models, purposes ->
                 picker = false
                 viewModel.publishChatGptModels(session, models, purposes)
@@ -5250,7 +5302,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
             // (2026-11-14): the core's `provider_groups` order, and the
             // card that starts the sign-in at the same place.
             if (state.chatGptPlan.active == null) {
-                SettingsCard(S.chatGptPlan, S.chatGptConnectionSubtitle, chatGptConnectionStatus(state.chatGptPlan, S)) {
+                SettingsCard(S.chatGptPlan, S.chatGptConnectionSubtitle, chatGptCardStatus(state.chatGptPlan, S)) {
                     SecondarySmallButton(S.chatGptContinue, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
                 }
             }
@@ -5587,6 +5639,12 @@ private fun ProviderModelPickerDialog(
     fetchState: ProviderModelFetchState?,
     candidateLabels: Map<String, String> = emptyMap(),
     onCheckAccess: ((String) -> Unit)? = null,
+    /**
+     * A sign-in service's `chatgpt_publication`. With it, the rows are its
+     * models and the draft, what may be pressed and the saved body are the
+     * core's `sign_in_publication_draft` (Web's picker, 2026-11-14 step 2).
+     */
+    publication: JSONObject? = null,
     /** Saves the published models and, as Server's `model_purposes`, what each is used for. */
     onSave: (List<String>, Map<String, List<String>>) -> Unit,
 ) {
@@ -5595,9 +5653,19 @@ private fun ProviderModelPickerDialog(
     var selected by remember(provider.providerId, provider.publishedModelsJson) { mutableStateOf(normalizedSelection) }
     val catalog = state.modelCatalog
     val observation = state.modelCatalogObservations[provider.providerId]
+    val publicationKey = publication?.toString()
+    var draft by remember(provider.providerId, publicationKey) { mutableStateOf<JSONObject?>(null) }
+    fun draftAnswer(edit: JSONObject?): JSONObject? = publication?.let {
+        app.inku.mobile.data.catalogRequest("sign_in_publication_draft", JSONObject().put("service", provider.providerId)
+            .put("publication", it).put("draft", draft ?: JSONObject.NULL).put("edit", edit ?: JSONObject.NULL))
+    }
+    val shownDraft = remember(publicationKey, draft?.toString()) { draftAnswer(null) }
+    val draftRows = shownDraft.rows("rows")
+    fun editDraft(edit: JSONObject) { draft = draftAnswer(edit)?.getJSONObject("draft") }
     // Resolved once per list, not on every keystroke in the search field.
-    val candidateModels = remember(catalog, provider.providerId, candidateModelIds, observation, normalizedSelection) {
-        (catalog.defaults(provider.providerId) + catalog.ids(provider.providerId) + candidateModelIds.orEmpty() + observation?.seen.orEmpty() + normalizedSelection)
+    val candidateModels = remember(catalog, provider.providerId, candidateModelIds, observation, normalizedSelection, publicationKey) {
+        if (publication != null) publication.rows("models").map { catalog.classify(it) }
+        else (catalog.defaults(provider.providerId) + catalog.ids(provider.providerId) + candidateModelIds.orEmpty() + observation?.seen.orEmpty() + normalizedSelection)
             .map { app.inku.mobile.data.ModelCatalog.rawId(provider.providerId, it) }.distinct()
             .map { catalog.resolve(provider.providerId, it, candidateModelIds?.toSet(), observation?.access?.get(it)) }
     }
@@ -5614,11 +5682,15 @@ private fun ProviderModelPickerDialog(
     var purposeEdits by remember(provider.providerId, provider.publishedModelsJson, savedPurposes) {
         mutableStateOf(emptyMap<String, List<String>>())
     }
-    val purposes = initialPurposes + purposeEdits
+    val purposes = if (shownDraft != null) draftRows.associate { it.getString("id") to it.optJSONArray("purposes").strings() }
+        else initialPurposes + purposeEdits
+    val chosen: Set<String> = if (shownDraft != null) draftRows.filter { it.optBoolean("selected") }.mapTo(linkedSetOf()) { it.getString("id") }
+        else selected
     // Web: publishing everything never chooses a purpose the model did not answer,
     // so a model with none from the catalog is left out unless one was ticked.
     fun hasPurpose(model: app.inku.mobile.data.CatalogModel) = purposes[model.id].orEmpty().isNotEmpty() || modelPurposes(model).isNotEmpty()
-    val selectionChanged = selected != normalizedSelection || purposeEdits.any { (id, value) -> initialPurposes[id].orEmpty() != value }
+    val selectionChanged = if (shownDraft != null) shownDraft.optBoolean("dirty")
+        else selected != normalizedSelection || purposeEdits.any { (id, value) -> initialPurposes[id].orEmpty() != value }
     val fetching = fetchState?.loading == true
     val english = S.code == "en"
     val searchTexts = remember(candidateModels, candidateLabels, english) {
@@ -5665,13 +5737,23 @@ private fun ProviderModelPickerDialog(
                         enabled = !fetching && !selectionChanged,
                         modifier = Modifier.weight(1.5f),
                     )
-                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.filter { it.id in candidateIds && hasPurpose(it) }.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
-                    ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f), enabled = !fetching)
+                    ModelPickerActionButton(text = S.selectAll, onClick = {
+                        if (shownDraft != null) editDraft(JSONObject().put("kind", "select_all").put("selected", true).put("ids", JSONArray(filtered.map { it.id })))
+                        else selected = filtered.filter { it.id in candidateIds && hasPurpose(it) }.map { it.id }.toSet()
+                    }, modifier = Modifier.weight(1f), enabled = !fetching)
+                    ModelPickerActionButton(text = S.selectNone, onClick = {
+                        if (shownDraft != null) editDraft(JSONObject().put("kind", "select_all").put("selected", false).put("ids", JSONArray(candidateModels.map { it.id })))
+                        else selected = emptySet()
+                    }, modifier = Modifier.weight(1f), enabled = !fetching)
                 }
                 Text(S.modelPickerCount(filtered.size, candidateModels.size), style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                ModelCatalogRows(catalog, filtered, selected, S,
+                ModelCatalogRows(catalog, filtered, chosen, S,
                     onSelect = { id, checked ->
+                        if (shownDraft != null) {
+                            editDraft(JSONObject().put("kind", "toggle_model").put("id", id).put("selected", checked))
+                            return@ModelCatalogRows
+                        }
                         selected = if (checked) selected + id else selected - id
                         // Published with neither purpose, it would appear nowhere: take the catalog's back.
                         val model = candidateModels.firstOrNull { it.id == id }
@@ -5682,6 +5764,10 @@ private fun ProviderModelPickerDialog(
                     onCheckAccess = if (provider.providerId == "ollama-cloud" && !provider.encryptedApiKey.isNullOrBlank()) onCheckAccess else null,
                     purposes = purposes,
                     onTogglePurpose = { id, purpose ->
+                        if (shownDraft != null) {
+                            editDraft(JSONObject().put("kind", "toggle_purpose").put("id", id).put("purpose", purpose))
+                            return@ModelCatalogRows
+                        }
                         // Web `toggleModelPurpose`: a model with no purpose left is not published.
                         val current = purposes[id].orEmpty()
                         val next = if (purpose in current) current - purpose else listOf("llm", "vision").filter { it in current || it == purpose }
@@ -5703,15 +5789,25 @@ private fun ProviderModelPickerDialog(
                 // Web's `model-picker-footer`: how many would be published, whether it changed, then cancel and save.
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     Column(Modifier.weight(1f)) {
-                        Text(S.modelPublishedCount(selected.count { it in candidateIds }), style = MaterialTheme.typography.labelMedium)
+                        val saveBody = shownDraft?.getJSONObject("save")
+                        Text(S.modelPublishedCount(saveBody?.getJSONArray("published_models")?.length() ?: selected.count { it in candidateIds }),
+                            style = MaterialTheme.typography.labelMedium)
                         if (selectionChanged) Text(S.modelDraftChanges, style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                     TextButton(onClick = onDismiss) { Text(S.cancel) }
                     PrimarySmallButton(text = S.save, onClick = {
-                        val published = selected.filter { it in candidateIds }
-                        onSave(published, published.associateWith { purposes[it].orEmpty() })
-                    }, enabled = !fetching)
+                        val body = shownDraft?.getJSONObject("save")
+                        if (body != null) {
+                            // The core's body: the published models in the list's order and every model's purposes.
+                            val usesByModel = body.getJSONObject("model_purposes")
+                            onSave(body.getJSONArray("published_models").strings(),
+                                usesByModel.keys().asSequence().associateWith { usesByModel.getJSONArray(it).strings() })
+                        } else {
+                            val published = selected.filter { it in candidateIds }
+                            onSave(published, published.associateWith { purposes[it].orEmpty() })
+                        }
+                    }, enabled = !fetching && shownDraft?.optBoolean("can_save") != false)
                 }
             }
         }
@@ -6211,16 +6307,24 @@ private fun availablePublishedModels(provider: app.inku.mobile.data.db.ProviderS
     val published = parsePublishedModelIds(provider.publishedModelsJson)
     val usable = published.filter { catalogModelFor(state, provider.providerId, it).publishable }
     if (provider.providerId != "chatgpt") return usable
+    val rows = chatGptPublication(state, published).getJSONArray("models")
+    return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.optBoolean("enabled") }.map { it.getString("id") }
+}
+
+/**
+ * The core's `chatgpt_publication` for the chosen registration: its rows are
+ * the only source of each model's assessment, selectability and purposes,
+ * for the drawing choices and for the publishing picker alike.
+ */
+private fun chatGptPublication(state: InkuUiState, published: List<String> = state.chatGptPlan.publishedModels): JSONObject {
+    val plan = state.chatGptPlan
     val profile = JSONObject().put("published_models", JSONArray(published))
         .put("model_purposes", JSONObject().apply { state.modelPurposes["chatgpt"].orEmpty().forEach { (id, purposes) -> put(id, JSONArray(purposes)) } })
-    val models = JSONArray().apply { state.chatGptPlan.models.orEmpty().forEach { put(JSONObject().put("id", it.id).put("label", it.label)) } }
-    val observations = state.modelCatalogObservations["chatgpt"]
-    val assessments = JSONObject().apply { state.chatGptPlan.models.orEmpty().forEach { model ->
-        put(model.id, state.modelCatalog.resolve("chatgpt", model.id, observedRecord = observations?.records?.get(model.id)).record)
-    } }
-    val rows = app.inku.mobile.data.catalogRequest("chatgpt_publication", JSONObject().put("profile", profile)
-        .put("models", models).put("assessments", assessments)).getJSONObject("publication").getJSONArray("models")
-    return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.optBoolean("enabled") }.map { it.getString("id") }
+    plan.activeSession?.let { profile.put("id", it.profileId).put("generation", it.generation) }
+    val models = JSONArray().apply { plan.models.orEmpty().forEach { put(JSONObject().put("id", it.id).put("label", it.label)) } }
+    val assessments = app.inku.mobile.data.SignInServices.chatGptAssessments(state.modelCatalogObservations["chatgpt"]?.records.orEmpty())
+    return app.inku.mobile.data.catalogRequest("chatgpt_publication", JSONObject().put("profile", profile)
+        .put("models", models).put("assessments", assessments)).getJSONObject("publication")
 }
 
 private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings): String {

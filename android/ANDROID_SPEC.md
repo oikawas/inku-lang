@@ -1,5 +1,20 @@
 # inku Android Implementation Notes
 
+## 2026-11-14 "Sign in with ChatGPT": the connection view and the publishing draft from the shared core
+
+The author's decision (show the connection state as Web does; the wording tables stay in the hosts) makes this step 2.
+
+- Connection screen: what is shown and what can be pressed is the shared core's `sign_in_connection_view` answer.
+  - Each registration shows its status, and reauthenticate, allow plan usage, sign out and delete appear on registrations that are not chosen as well. A usage limit offers "Check usage and retry" (the core's `chatgpt_auth_resume_quota`, as Server's `/retry`).
+  - The actions at the top gain "Check connection" (reads the saved registrations again and clears the last failure).
+  - The notice (`chatGptPlanDescription`) always heads the card, and the status line appears only for the last failure code. The first-time "You're using your ChatGPT plan" dialog is removed (the author's answer: "remove it, as on Web").
+  - "Open model settings" appears, with its guide text, only when the chosen registration is connected and allowed the plan. `canUsePlan` reads the same answer (`guide`).
+  - A registration whose sign-in never finished (a provisional one with no `sub`) is listed apart, as "Reauthenticate (client id)".
+  - Signing out still asks first (the core's `confirm`); deleting keeps its two-step confirmation.
+  - The status next to a ChatGPT model while drawing is unchanged.
+- Choosing the published models: the rows, the draft, what can be pressed and the saved body are the shared core's `sign_in_publication_draft` over the `chatgpt_publication` rows. Saving sends every model's purposes and publishes in the list's order (as Web). The assessments come only from the `chatgpt_publication` rows (the bundled catalog's rows replaced by measured records, built by one function, `SignInServices.chatGptAssessments`, for both the saving policy and the screen). Only the models in the person's own list are shown.
+- Unchanged: the sign-in procedure (authorization in Chrome, the token exchange), sending and saving, and failure codes.
+
 ## 2026-11-14 "Sign in with ChatGPT" first in the lists, its name from the shared core
 
 The author's instruction ("put ChatGPT first in model settings and model selection on web, Swift and Android"; first of all, before the on-device models) and the official name (Japanese 「ChatGPT でサインイン」, English "Sign in with ChatGPT", abbreviation "SIWC") change Android as Web, Server and Swift.

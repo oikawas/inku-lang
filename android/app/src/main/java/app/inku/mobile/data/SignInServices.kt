@@ -54,6 +54,20 @@ internal object SignInServices {
         return ordered.map { byId.getValue(it) }
     }
 
+    private val chatGptCatalogRows: JSONObject by lazy {
+        val rows = catalogRequest("catalog").getJSONObject("catalog").getJSONObject("providers").getJSONObject("chatgpt").getJSONArray("models")
+        JSONObject().apply { for (index in 0 until rows.length()) rows.getJSONObject(index).let { put(it.getString("id"), it) } }
+    }
+
+    /**
+     * The assessments `chatgpt_publication` reads: the bundled catalog's rows,
+     * each replaced by the model's measured record when there is one. The one
+     * source for both the saving policy and what the model picker shows
+     * (there were two, 2026-11-14 step 2).
+     */
+    fun chatGptAssessments(records: Map<String, JSONObject>): JSONObject =
+        JSONObject(chatGptCatalogRows.toString()).also { assessments -> records.forEach { (id, record) -> assessments.put(id, record) } }
+
     /**
      * The one provider row Sign in with ChatGPT is listed and routed by. The
      * connection is owned by `ChatGptPlanManager`, outside `provider_settings`.

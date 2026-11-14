@@ -84,8 +84,11 @@ object InkuStringsJa : InkuStrings {
     override val chatGptPlanDisabled = "プランの利用はまだ許可されていません。"
     override val chatGptOpenModels = "モデル設定を開く"
     override val chatGptUsingPlan = "ChatGPTプランを使用中"
-    override val chatGptNoticeTitle = "ChatGPTプランを使います"
-    override val chatGptNoticeAccept = "確認しました"
+    override val chatGptCheckConnection = "接続状態を確認"
+    override val chatGptRetry = "利用枠を確認して再試行"
+    override val chatGptModelSettingsGuide = "接続が完了しました。モデル一覧を取得します。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。"
+    override val chatGptExported = "この登録の更新は移送先が担当します。"
+    override val chatGptScopeRequiredStatus = "接続済みですが、プラン利用の許可が必要です。"
     override val chatGptRevocationUnconfirmed = "この端末の認証情報は削除しました。OpenAI側の切断は確認できなかったため、ChatGPTの設定でも接続を確認してください。"
     override val chatGptError: (String) -> String = { code -> when (code) {
         "chatgpt_not_connected", "chatgpt_session_required" -> "ChatGPT でサインインしてください。"

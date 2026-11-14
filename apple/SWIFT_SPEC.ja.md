@@ -22,6 +22,15 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-11-14 ChatGPT でサインイン（step 5、手順を「次にすること」の形で）
+
+ログイン・tokenの利用と更新・モデル一覧の取り直し・接続の解除・削除・選択・上限の停止と再開を、共通coreの`chatgpt_flow_start`・`chatgpt_flow_next`が答える「次にすること」（todo）を順に行う1つのdriverで回す（`ChatGPTFlowDriver.swift`。作者の答え：一度に作る、食い違いは推奨の表）。手順の順番と判定、HTTPの欄とフォームの符号化、保管に書く登録はcoreが決める。
+
+- ホストに残す物：錠（`edit`・`refresh`・`wire-<登録>`のflock）、保管（`profiles.sealed`。core の形`profiles`・`registrations_pending`・`active`との写しは読み書きの時に行い、Swiftが読まない欄は`coreExtras`にそのまま持つ）、乱数、戻りのソケット（`ChatGPTLoopbackListener`は受けた要求の頭のバイトを渡し、coreの答えをそのまま書くだけになった）、HTTP（ephemeral、redirectを拒む、todoの締め切りと上限、入出力の失敗はcoreの3種）、署名の確かめ（CryptoKitと`SecKey`。鍵の形の確かめは残す）、ログインの窓（Macの既定のブラウザ、iOSのログインの画面）、時差（その日時の`TimeZone.current`）。
+- 送信の途中の一覧の確かめは、送信が持つ`wire`の錠をcoreの一覧の手順にも使う（同じ錠を2度取らない）。
+- 変わる物（推奨の表）：試みの数は本当の数を渡す。戻りの頁は、英語の1文の平文から、日英のHTML（表示の言語、`no-store`・`Referrer-Policy`・`Connection: close`）になる（作者に見える変化）。tokenの交換・更新・失効のフォームは、coreが欄の順のまま作る本文を送る（鍵の並べ替えと空白の`%20`をやめた）。再認証はcoreの`preserve`の答えを保存し、上限の停止と再開もcoreの答えを保存する。`chatgpt_auth_http`の`type_error`は`chatgpt_auth_unavailable`。登録の数はcoreが完了と未完了を分けて数え、Swiftの8件の確かめと締め切り300秒の補いは消した。失効の前にdiscoveryの答えを確かめる（Serverと同じ）。
+- 確かめ：共通の試験データ`server/tests/data/sign-in-flow-cases.json`の106行（要求と答えの組）を、SwiftのUniFFIの口で通して答えの全体を照らす（`SignInFlowCasesChecks`）。ログインの全体は、本物のソケットと作り物のHTTPで`ChatGPTReauthCatalogTests`が通す。
+
 ## 2026-11-14 ChatGPT でサインイン（step 4、送信の道）
 
 送信先・header・鍵の付け方と、入出力の失敗の分けを、共通coreの`provider_wire`の答えで作る（作者の答え：時間切れの文を足す、`Accept`は両方に付ける、読めない流れは再試行する）。2026-10-17の節の`provider_wire`のactionに、`chatgpt_models_request`と`chatgpt_transport`が加わった。

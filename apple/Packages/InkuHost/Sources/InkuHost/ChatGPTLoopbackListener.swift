@@ -1,36 +1,17 @@
 import Foundation
 @preconcurrency import Network
 
-public struct ChatGPTLoopbackCallback: Sendable, Equatable {
-    public let code: String
-    public let clientID: String?
-    public let state: String
-
-    public init(code: String, clientID: String?, state: String) {
-        self.code = code
-        self.clientID = clientID
-        self.state = state
-    }
-}
-
-/// Receives one authorization callback without launching a browser or exchanging credentials.
+/// The sign-in callback's socket (Sign in with ChatGPT step 5): it listens on 127.0.0.1, hands each request head to
+/// the core flow (`await_callback`) and writes the core's answer (`respond`). Reading the head and deciding the
+/// answer are the core's.
 public final class ChatGPTLoopbackListener: Sendable {
-    public let redirectURI: URL
+    public let port: UInt16
     private let engine: LoopbackEngine
 
-    private init(engine: LoopbackEngine, port: UInt16) {
-        self.engine = engine
-        // This URI uses the actual bound port, and must be reused verbatim for code exchange.
-        redirectURI = URL(string: "http://127.0.0.1:\(port)/auth/callback")!
-    }
+    private init(engine: LoopbackEngine, port: UInt16) { self.engine = engine; self.port = port }
 
-    public static func start(expectedState: String, deadline: Date = Date().addingTimeInterval(300),
-                             previousClientID: String? = nil) async throws -> ChatGPTLoopbackListener {
-        guard !expectedState.isEmpty, expectedState.utf8.count <= 256,
-              !expectedState.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else {
-            throw HostError("chatgpt_callback_invalid")
-        }
-        let duration = min(deadline.timeIntervalSinceNow, 300)
+    public static func start(deadline: Date) async throws -> ChatGPTLoopbackListener {
+        let duration = deadline.timeIntervalSinceNow
         guard duration.isFinite, duration > 0, !Task.isCancelled else { throw HostError("chatgpt_cancelled") }
         let lease = try LoopbackLease.shared.acquire()
         let engine: LoopbackEngine
@@ -47,8 +28,7 @@ public final class ChatGPTLoopbackListener: Sendable {
             #endif
             parameters.includePeerToPeer = false
             parameters.allowLocalEndpointReuse = false
-            engine = LoopbackEngine(listener: try NWListener(using: parameters, on: .any),
-                                    lease: lease, expectedState: expectedState, previousClientID: previousClientID, duration: duration)
+            engine = LoopbackEngine(listener: try NWListener(using: parameters, on: .any), lease: lease, duration: duration)
         } catch {
             LoopbackLease.shared.release(lease)
             throw HostError("chatgpt_auth_unavailable")
@@ -57,10 +37,7 @@ public final class ChatGPTLoopbackListener: Sendable {
             let port = try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { engine.start($0) }
             } onCancel: { engine.cancel() }
-            guard !Task.isCancelled else {
-                await engine.cancelAndWait()
-                throw HostError("chatgpt_cancelled")
-            }
+            guard !Task.isCancelled else { await engine.cancelAndWait(); throw HostError("chatgpt_cancelled") }
             return ChatGPTLoopbackListener(engine: engine, port: port)
         } catch {
             await engine.cancelAndWait()
@@ -68,11 +45,17 @@ public final class ChatGPTLoopbackListener: Sendable {
         }
     }
 
-    /// The callback is handed off once. Cancelling this wait cancels the complete listener.
-    public func waitForCallback() async throws -> ChatGPTLoopbackCallback {
+    /// The next request's head, without its closing blank line (core `await_callback`). Cancelling the wait cancels
+    /// the listener.
+    public func nextHead() async throws -> Data {
         try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { engine.wait($0) }
+            try await withCheckedThrowingContinuation { engine.next($0) }
         } onCancel: { engine.cancel() }
+    }
+
+    /// Answers the request whose head was handed out last and closes it (core `respond`).
+    public func respond(status: Int, headers: [(String, String)], body: String) async {
+        await withCheckedContinuation { engine.respond(status: status, headers: headers, body: body, done: $0) }
     }
 
     public func cancel() async { await engine.cancelAndWait() }
@@ -87,8 +70,7 @@ private final class LoopbackLease: @unchecked Sendable {
     private var active: UUID?
 
     func acquire() throws -> UUID {
-        lock.lock()
-        defer { lock.unlock() }
+        lock.lock(); defer { lock.unlock() }
         guard active == nil else { throw HostError("chatgpt_attempt_busy") }
         let lease = UUID()
         active = lease
@@ -96,27 +78,23 @@ private final class LoopbackLease: @unchecked Sendable {
     }
 
     func release(_ lease: UUID) {
-        lock.lock()
-        defer { lock.unlock() }
+        lock.lock(); defer { lock.unlock() }
         if active == lease { active = nil }
     }
 }
 
 // All mutable engine and connection state is confined to this private serial queue.
 private final class LoopbackEngine: @unchecked Sendable {
-    private static let headerLimit = 16 * 1024
+    /// One more than the core's head limit (16 KiB), so a longer head reaches the core and is refused there.
+    private static let headerLimit = 16 * 1024 + 1
     private let queue = DispatchQueue(label: "inku.chatgpt.loopback")
     private let listener: NWListener
     private let lease: UUID
     private let deadline: DispatchTime
-    private var expectedState: String?
-    private let previousClientID: String?
-    private var port: UInt16?
     private var ready: CheckedContinuation<UInt16, any Error>?
-    private var waiter: CheckedContinuation<ChatGPTLoopbackCallback, any Error>?
-    private var terminal: Result<ChatGPTLoopbackCallback, HostError>?
-    private var waitClaimed = false
-    private var used = false
+    private var waiter: CheckedContinuation<Data, any Error>?
+    private var heads: [(ObjectIdentifier, Data)] = []
+    private var current: ObjectIdentifier?
     private var closed = false
     private var deadlineTask: DispatchWorkItem?
     private var requests: [ObjectIdentifier: Request] = [:]
@@ -124,103 +102,88 @@ private final class LoopbackEngine: @unchecked Sendable {
     private final class Request {
         let connection: NWConnection
         var bytes = Data()
-        var responding = false
         var timeout: DispatchWorkItem?
         init(_ connection: NWConnection) { self.connection = connection }
     }
 
-    init(listener: NWListener, lease: UUID, expectedState: String, previousClientID: String?, duration: TimeInterval) {
+    init(listener: NWListener, lease: UUID, duration: TimeInterval) {
         self.listener = listener
         self.lease = lease
-        self.expectedState = expectedState
-        self.previousClientID = previousClientID
         deadline = .now() + duration
     }
 
     func start(_ continuation: CheckedContinuation<UInt16, any Error>) {
         queue.async { [self] in
-            guard !closed else {
-                continuation.resume(throwing: HostError("chatgpt_cancelled"))
-                return
-            }
+            guard !closed else { continuation.resume(throwing: HostError("chatgpt_cancelled")); return }
             ready = continuation
             listener.stateUpdateHandler = { [weak self] state in self?.listenerChanged(state) }
             listener.newConnectionHandler = { [weak self] connection in
                 guard let self else { connection.cancel(); return }
                 self.accept(connection)
             }
-            let timeout = DispatchWorkItem { [weak self] in self?.finish(.failure(HostError("chatgpt_cancelled"))) }
+            let timeout = DispatchWorkItem { [weak self] in self?.close() }
             deadlineTask = timeout
             queue.asyncAfter(deadline: deadline, execute: timeout)
             listener.start(queue: queue)
         }
     }
 
-    func wait(_ continuation: CheckedContinuation<ChatGPTLoopbackCallback, any Error>) {
+    func next(_ continuation: CheckedContinuation<Data, any Error>) {
         queue.async { [self] in
-            guard !waitClaimed else {
-                continuation.resume(throwing: HostError("chatgpt_callback_invalid"))
-                return
-            }
-            waitClaimed = true
-            if let result = terminal {
-                terminal = nil
-                continuation.resume(with: result.mapError { $0 as any Error })
-            } else if closed {
-                continuation.resume(throwing: HostError("chatgpt_cancelled"))
-            } else {
-                waiter = continuation
-            }
+            guard waiter == nil else { continuation.resume(throwing: HostError("chatgpt_callback_invalid")); return }
+            if !heads.isEmpty { hand(continuation) }
+            else if closed { continuation.resume(throwing: HostError("chatgpt_cancelled")) }
+            else { waiter = continuation }
         }
     }
 
-    func cancel() { queue.async { [self] in cancelOnQueue() } }
+    func respond(status: Int, headers: [(String, String)], body: String, done: CheckedContinuation<Void, Never>) {
+        queue.async { [self] in
+            guard let id = current, let request = requests[id] else { done.resume(); return }
+            current = nil
+            let reason = status == 200 ? "OK" : "Bad Request"
+            var text = "HTTP/1.1 \(status) \(reason)\r\n"
+            for (name, value) in headers { text += "\(name): \(value)\r\n" }
+            text += "Content-Length: \(body.utf8.count)\r\n\r\n" + body
+            request.connection.send(content: Data(text.utf8), contentContext: .finalMessage, isComplete: true,
+                                    completion: .contentProcessed { [weak self] _ in self?.removeRequest(id); done.resume() })
+        }
+    }
+
+    func cancel() { queue.async { [self] in close() } }
 
     func cancelAndWait() async {
         await withCheckedContinuation { continuation in
-            queue.async { [self] in
-                cancelOnQueue()
-                continuation.resume()
-            }
+            queue.async { [self] in close(); continuation.resume() }
         }
     }
 
-    private func cancelOnQueue() {
-        if closed {
-            // Explicit cancellation also discards a callback that has not yet been handed off.
-            if !waitClaimed { terminal = .failure(HostError("chatgpt_cancelled")) }
-            for id in Array(requests.keys) { removeRequest(id) }
-        } else {
-            finish(.failure(HostError("chatgpt_cancelled")))
-        }
+    private func hand(_ continuation: CheckedContinuation<Data, any Error>) {
+        let (id, head) = heads.removeFirst()
+        current = id
+        continuation.resume(returning: head)
     }
 
     private func listenerChanged(_ state: NWListener.State) {
         guard !closed else { return }
         switch state {
         case .ready:
-            guard let boundPort = listener.port?.rawValue, boundPort != 0 else {
-                finish(.failure(HostError("chatgpt_auth_unavailable")))
-                return
-            }
-            port = boundPort
-            let continuation = ready
-            ready = nil
-            continuation?.resume(returning: boundPort)
-        case .waiting, .failed:
-            finish(.failure(HostError("chatgpt_auth_unavailable")))
-        case .cancelled:
-            finish(.failure(HostError("chatgpt_cancelled")))
+            guard let port = listener.port?.rawValue, port != 0 else { fail(HostError("chatgpt_auth_unavailable")); return }
+            let continuation = ready; ready = nil
+            continuation?.resume(returning: port)
+        case .waiting, .failed: fail(HostError("chatgpt_auth_unavailable"))
+        case .cancelled: close()
         case .setup: break
-        @unknown default: finish(.failure(HostError("chatgpt_auth_unavailable")))
+        @unknown default: fail(HostError("chatgpt_auth_unavailable"))
         }
     }
 
     private func accept(_ connection: NWConnection) {
-        guard !closed, port != nil, requests.count < 4 else { connection.cancel(); return }
+        guard !closed, ready == nil, requests.count < 4 else { connection.cancel(); return }
         let id = ObjectIdentifier(connection)
         let request = Request(connection)
         requests[id] = request
+        // A connection that does not send its head within a second is dropped.
         let timeout = DispatchWorkItem { [weak self] in self?.removeRequest(id) }
         request.timeout = timeout
         queue.asyncAfter(deadline: .now() + 1, execute: timeout)
@@ -235,136 +198,63 @@ private final class LoopbackEngine: @unchecked Sendable {
     }
 
     private func receive(_ id: ObjectIdentifier) {
-        guard let request = requests[id], !request.responding else { return }
+        guard let request = requests[id] else { return }
         let remaining = Self.headerLimit - request.bytes.count
-        guard remaining > 0 else { respond(id, status: 400); return }
         request.connection.receive(minimumIncompleteLength: 1, maximumLength: min(4096, remaining)) {
             [weak self] data, _, complete, error in
-            guard let self, let request = self.requests[id], !request.responding else { return }
+            guard let self, let request = self.requests[id] else { return }
             if let data { request.bytes.append(data) }
-            if let end = request.bytes.range(of: Data([13, 10, 13, 10])) {
-                guard end.upperBound == request.bytes.endIndex else { self.respond(id, status: 400); return }
-                self.handle(id, header: request.bytes.subdata(in: 0..<end.lowerBound))
-            } else if error != nil || complete || request.bytes.count >= Self.headerLimit {
-                self.respond(id, status: 400)
+            let end = request.bytes.range(of: Data([13, 10, 13, 10]))
+            if let end, end.upperBound == request.bytes.endIndex {
+                self.queueHead(id, request.bytes.subdata(in: 0..<end.lowerBound))
+            } else if end != nil || request.bytes.count >= Self.headerLimit {
+                // Bytes after the blank line, or a head past its limit: the core refuses them as they came.
+                self.queueHead(id, request.bytes)
+            } else if error != nil || complete {
+                self.removeRequest(id)
             } else {
                 self.receive(id)
             }
         }
     }
 
-    private func handle(_ id: ObjectIdentifier, header: Data) {
-        guard !closed, let port, let expectedState else { respond(id, status: 400); return }
-        guard let target = Self.target(header: header, port: port) else { respond(id, status: 400); return }
-        let query: [String: ExactJSON]
-        do {
-            let parsed = try ChatGPTPolicy.call("chatgpt_auth_callback_query", ["target": .string(target)])
-            query = parsed["query"].object ?? [:]
-            _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": ChatGPTPolicy.string(query["state"]?.array?.first?.string),
-                "expected_state": .string(expectedState), "code": .string("state-check"), "error": .null])
-        } catch { respond(id, status: 400); return }
-        let decision: ExactJSON
-        do {
-            decision = try ChatGPTPolicy.result("chatgpt_auth_callback_use", ["used": .bool(used),
-                "cancelled": .bool(closed), "expired": .bool(DispatchTime.now() >= deadline)])
-        } catch { respond(id, status: 400); return }
-        used = decision["used"].bool ?? used
-        if let code = decision["error"].string {
-            respond(id, status: 400)
-            if decision["fail_attempt"].bool == true { finish(.failure(HostError(code)), keeping: id) }
-            return
-        }
-        let result: Result<ChatGPTLoopbackCallback, HostError>
-        do {
-            if let error = query["error"]?.array?.first?.string {
-                _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
-                    "expected_state": .string(expectedState), "code": .string("error-check"), "error": .string(error)])
-            }
-            let issued = query["client_id"]?.array?.first?.string ?? previousClientID ?? ""
-            _ = try ChatGPTPolicy.call("chatgpt_auth_callback_client", ["issued": .string(issued),
-                "previous": previousClientID.map { .object(["client_id": .string($0)]) } ?? .null])
-            let answer = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
-                "expected_state": .string(expectedState), "code": ChatGPTPolicy.string(query["code"]?.array?.first?.string), "error": .null])
-            result = .success(ChatGPTLoopbackCallback(code: try answer.requiredString("code"),
-                clientID: query["client_id"]?.array?.first?.string, state: expectedState))
-        } catch let error as HostError { result = .failure(error) }
-        catch { result = .failure(HostError("chatgpt_callback_invalid")) }
-        respond(id, status: (try? result.get()) == nil ? 400 : 200)
-        finish(result, keeping: id)
-    }
-
-    private func respond(_ id: ObjectIdentifier, status: Int) {
-        guard let request = requests[id], !request.responding else { return }
-        request.responding = true
+    private func queueHead(_ id: ObjectIdentifier, _ head: Data) {
+        guard !closed, let request = requests[id] else { return }
+        request.timeout?.cancel(); request.timeout = nil
         request.bytes.removeAll(keepingCapacity: false)
-        let body = "Return to inku. The connection status is shown there."
-        let reason = status == 200 ? "OK" : "Bad Request"
-        let response = "HTTP/1.1 \(status) \(reason)\r\nContent-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: \(body.utf8.count)\r\n\r\n\(body)"
-        request.connection.send(content: Data(response.utf8), contentContext: .finalMessage, isComplete: true,
-                                completion: .contentProcessed { [weak self] _ in self?.removeRequest(id) })
+        heads.append((id, head))
+        if let continuation = waiter { waiter = nil; hand(continuation) }
     }
 
     private func removeRequest(_ id: ObjectIdentifier) {
         guard let request = requests.removeValue(forKey: id) else { return }
         request.timeout?.cancel()
-        request.bytes.removeAll(keepingCapacity: false)
         request.connection.stateUpdateHandler = nil
         request.connection.cancel()
+        heads.removeAll { $0.0 == id }
+        if current == id { current = nil }
     }
 
-    private func finish(_ result: Result<ChatGPTLoopbackCallback, HostError>, keeping id: ObjectIdentifier? = nil) {
+    private func fail(_ error: HostError) {
+        if let continuation = ready { ready = nil; continuation.resume(throwing: error) }
+        close()
+    }
+
+    private func close() {
         guard !closed else { return }
         closed = true
-        expectedState = nil
-        deadlineTask?.cancel()
-        deadlineTask = nil
+        deadlineTask?.cancel(); deadlineTask = nil
         listener.cancel()
         listener.newConnectionHandler = nil
         listener.stateUpdateHandler = nil
-        for key in Array(requests.keys) where key != id { removeRequest(key) }
+        for id in Array(requests.keys) { removeRequest(id) }
         LoopbackLease.shared.release(lease)
-        if let continuation = ready {
-            ready = nil
-            continuation.resume(throwing: result.failure ?? HostError("chatgpt_callback_invalid"))
-        }
-        if let continuation = waiter {
-            waiter = nil
-            continuation.resume(with: result.mapError { $0 as any Error })
-        } else {
-            terminal = result
-        }
-    }
-
-    private static func target(header: Data, port: UInt16) -> String? {
-        guard header.allSatisfy({ $0 == 9 || $0 == 10 || $0 == 13 || (32...126).contains($0) }),
-              let text = String(data: header, encoding: .utf8) else { return nil }
-        let lines = text.components(separatedBy: "\r\n")
-        guard lines.count <= 65, let first = lines.first else { return nil }
-        let parts = first.split(separator: " ", omittingEmptySubsequences: false)
-        guard parts.count == 3, parts[0] == "GET", parts[1].utf8.count <= 8192,
-              parts[2] == "HTTP/1.1" || parts[2] == "HTTP/1.0" else { return nil }
-        var headers: [String: String] = [:]
-        for line in lines.dropFirst() {
-            guard let colon = line.firstIndex(of: ":"), colon != line.startIndex else { return nil }
-            let name = String(line[..<colon]).lowercased()
-            guard name.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }),
-                  headers[name] == nil else { return nil }
-            headers[name] = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
-        }
-        guard headers["host"] == "127.0.0.1:\(port)", headers["transfer-encoding"] == nil,
-              headers["content-length"] == nil || headers["content-length"] == "0" else { return nil }
-        return String(parts[1])
+        if let continuation = ready { ready = nil; continuation.resume(throwing: HostError("chatgpt_cancelled")) }
+        if let continuation = waiter { waiter = nil; continuation.resume(throwing: HostError("chatgpt_cancelled")) }
     }
 
     deinit {
         listener.cancel()
         LoopbackLease.shared.release(lease)
-    }
-}
-
-private extension Result where Failure == HostError {
-    var failure: HostError? {
-        if case .failure(let error) = self { return error }
-        return nil
     }
 }

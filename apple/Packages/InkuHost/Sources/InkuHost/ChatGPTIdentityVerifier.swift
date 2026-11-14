@@ -58,6 +58,13 @@ public enum ChatGPTIdentityVerifier {
         return ChatGPTVerifiedIdentity(issuer: issuer, subject: subject, email: try display.requiredString("email"), label: try display.requiredString("label"))
     }
 
+    /// Core `verify` (Sign in with ChatGPT step 5): whether the signature over `signingInput` is the key's. The key's
+    /// shape is still checked here; the core chose the key and checks the claims.
+    static func signatureValid(algorithm: String, key: ExactJSON, signingInput: String, signature: String) -> Bool {
+        guard let bytes = try? base64URL(signature) else { return false }
+        return (try? verifySignature(bytes, message: Data(signingInput.utf8), key: key, algorithm: algorithm)) != nil
+    }
+
     private static func verifySignature(_ signature: Data, message: Data, key: ExactJSON, algorithm: String) throws {
         if algorithm == "ES256" {
             guard key["kty"].string == "EC", key["crv"].string == "P-256",

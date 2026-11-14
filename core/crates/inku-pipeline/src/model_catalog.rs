@@ -9,6 +9,7 @@ mod model_refresh;
 mod provider_settings;
 pub(crate) mod sign_in;
 mod sign_in_flow;
+mod sign_in_transfer;
 mod sign_in_view;
 
 const SOURCE: &str = include_str!("../data/model_catalog.json");
@@ -445,7 +446,7 @@ pub(crate) fn split_ref<'a>(reference: &'a str, providers: &Value) -> (Option<&'
     if let Some((head, rest)) = reference.split_once(':')
         && !head.is_empty()
         && !rest.is_empty()
-        && (head == "chatgpt"
+        && (sign_in::is_service(head)
             || retired_providers().iter().any(|p| p["id"] == head)
             || providers.get(head).is_some())
     {
@@ -1028,7 +1029,7 @@ fn resolve_ref(
         .as_object()
         .into_iter()
         .flat_map(|entries| entries.iter())
-        .filter(|(id, _)| id.as_str() != "chatgpt")
+        .filter(|(id, _)| !sign_in::is_service(id))
         .filter(|(_, provider)| {
             provider
                 .get("active")
@@ -1049,19 +1050,31 @@ fn resolve_ref(
 #[must_use]
 pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
     let request: Value = match serde_json::from_slice(input) { Ok(v) => v, Err(_) => return br#"{"schema":"inku.model-catalog.v1","outcome":"refused","reason":"invalid_json"}"#.to_vec() };
-    let source = catalog();
     if request.get("schema").and_then(Value::as_str) != Some("inku.model-catalog-request.v1") {
         return br#"{"schema":"inku.model-catalog.v1","outcome":"refused","reason":"invalid_schema"}"#.to_vec();
     }
-    // A sign-in service's action under its general name (step 3).
+    // A sign-in service's action under its general name (step 3); the old
+    // names and the parts no host sends are closed (step 6).
     let mut request = request;
     if let Some(action) = request.get("action").and_then(Value::as_str) {
-        match sign_in::alias(action, request.get("service").and_then(Value::as_str)) {
+        match sign_in::gate(action, request.get("service").and_then(Value::as_str)) {
             Ok(Some(named)) => request["action"] = json!(named),
             Ok(None) => {}
-            Err(reason) => return finish(json!({"outcome":"refused","reason":reason})),
+            Err(sign_in::Refused::UnknownAction) => {
+                return finish(json!({"outcome":"refused","reason":"unknown_action"}));
+            }
+            Err(sign_in::Refused::UnknownService) => {
+                return finish(json!({"outcome":"refused","reason":"unknown_sign_in_service"}));
+            }
         }
     }
+    model_catalog_inside(&request, input)
+}
+
+/// The catalog's answer to a request that passed the entry's gate: the
+/// core's own procedures ask their parts here, under the inside names.
+pub(crate) fn model_catalog_inside(request: &Value, input: &[u8]) -> Vec<u8> {
+    let source = catalog();
     let result = match request.get("action").and_then(Value::as_str) {
         Some("catalog") => info(),
         Some("provider_metadata") => {
@@ -1069,17 +1082,15 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             "metadata":&provider_settings::METADATA[..17], "catalog":provider_settings::METADATA})
         }
         Some("retired_providers") => json!({"providers":retired_providers()}),
-        Some("sign_in_services" | "provider_groups") => sign_in::run(&request),
-        Some("sign_in_connection_view" | "sign_in_publication_draft") => {
-            sign_in_view::run(&request)
-        }
+        Some("sign_in_services" | "provider_groups") => sign_in::run(request),
+        Some("sign_in_connection_view" | "sign_in_publication_draft") => sign_in_view::run(request),
         Some(
             "chatgpt_publication"
             | "chatgpt_publication_update"
             | "chatgpt_usable"
             | "chatgpt_offered"
             | "chatgpt_cache",
-        ) => chatgpt_policy::run(&request),
+        ) => chatgpt_policy::run(request),
         Some(
             "chatgpt_auth_url"
             | "chatgpt_auth_endpoint"
@@ -1114,8 +1125,11 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             | "chatgpt_auth_operation"
             | "chatgpt_auth_publication_input"
             | "chatgpt_auth_delete",
-        ) => chatgpt_auth_policy::run(&request),
-        Some("chatgpt_flow_start" | "chatgpt_flow_next") => sign_in_flow::run(&request),
+        ) => chatgpt_auth_policy::run(request),
+        Some("chatgpt_flow_start" | "chatgpt_flow_next") => sign_in_flow::run(request),
+        Some("chatgpt_transfer_check" | "chatgpt_transfer_import") => {
+            sign_in_transfer::run(request)
+        }
         Some("reference_batch") => {
             let results: Vec<Value> = array(request.get("queries"))
                 .iter()
@@ -1194,11 +1208,11 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         }
         Some(
             "default_settings" | "normalize_settings" | "update_settings" | "validate_settings",
-        ) => provider_settings::run(&request),
+        ) => provider_settings::run(request),
         Some(
             "refresh_prepare" | "refresh_finish" | "access_probe" | "access_enabled"
             | "access_targets" | "access_apply",
-        ) => model_refresh::run(&request),
+        ) => model_refresh::run(request),
         Some("normalize_models") => json!({"models":normalize_models(&request["models"])}),
         Some("provider_catalog") => {
             json!({"providers":provider_catalog(&request["settings"], &request["order"],
@@ -1393,7 +1407,7 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         Some("resolve_display") => {
             let reference = request["ref"].as_str().unwrap_or("");
             let providers = &request["providers"];
-            let language = match sign_in::language(&request) {
+            let language = match sign_in::language(request) {
                 Ok(language) => language,
                 Err(refused) => return finish(refused),
             };
@@ -1409,7 +1423,7 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
                 .as_object()
                 .into_iter()
                 .flat_map(|p| p.iter())
-                .filter(|(id, _)| id.as_str() != "chatgpt")
+                .filter(|(id, _)| !sign_in::is_service(id))
                 .filter(|(_, p)| p.get("active").map(truthy).unwrap_or(true))
                 .filter(|(_, p)| array(p.get("models")).iter().any(|m| m["id"] == reference))
                 .map(|(id, _)| id.as_str())
@@ -1531,6 +1545,29 @@ mod tests {
                 assert_eq!(&actual[key], expected, "{}: {key}", row["name"]);
             }
         }
+    }
+
+    /// Step 6: the rows of the parts no host sends answer as before, asked
+    /// inside under their inside names.
+    #[test]
+    fn every_part_row_answers_inside_as_before() {
+        let parts: Value =
+            serde_json::from_str(include_str!("../data/sign-in-part-cases.json")).unwrap();
+        let mut compared = 0;
+        for key in ["auth_11_15", "auth_addendum"] {
+            for row in parts[key].as_array().unwrap() {
+                let mut request = row["request"].clone();
+                request["schema"] = json!("inku.model-catalog-request.v1");
+                let bytes = serde_json::to_vec(&request).unwrap();
+                let actual: Value =
+                    serde_json::from_slice(&model_catalog_inside(&request, &bytes)).unwrap();
+                for (name, expected) in row["expect"].as_object().unwrap() {
+                    assert_eq!(&actual[name], expected, "{}: {name}", row["name"]);
+                }
+                compared += 1;
+            }
+        }
+        assert_eq!(compared, 50);
     }
 
     #[test]
@@ -1790,7 +1827,7 @@ mod tests {
     #[test]
     fn the_sign_in_constants_are_the_ones_the_code_held() {
         let answer: Value = serde_json::from_slice(&model_catalog_json(
-            br#"{"schema":"inku.model-catalog-request.v1","action":"chatgpt_auth_constants"}"#,
+            br#"{"schema":"inku.model-catalog-request.v1","action":"sign_in_auth_constants","service":"chatgpt"}"#,
         ))
         .unwrap();
         assert_eq!(

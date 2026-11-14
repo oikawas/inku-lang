@@ -41,7 +41,7 @@ fn code_failure(code: &str) -> Value {
 }
 
 fn wire(request: Value) -> Value {
-    let bytes = crate::provider_wire::provider_wire_json(request.to_string().as_bytes());
+    let bytes = crate::provider_wire::provider_wire_inside(request.to_string().as_bytes());
     serde_json::from_slice(&bytes).expect("the wire answers JSON")
 }
 
@@ -1423,7 +1423,7 @@ mod tests {
 
         fn run(&mut self, flow: &str, input: Value) -> Value {
             let mut answer = self.ask(
-                json!({"action":"chatgpt_flow_start","flow":flow,"input":input,"now":self.now}),
+                json!({"action":"sign_in_flow_start","service":"chatgpt","flow":flow,"input":input,"now":self.now}),
             );
             loop {
                 self.steps += 1;
@@ -1486,7 +1486,7 @@ mod tests {
                     }
                     other => panic!("unknown todo {other}"),
                 };
-                answer = self.ask(json!({"action":"chatgpt_flow_next","state":answer["state"],"result":result,"now":self.now}));
+                answer = self.ask(json!({"action":"sign_in_flow_next","service":"chatgpt","state":answer["state"],"result":result,"now":self.now}));
             }
         }
     }
@@ -1938,22 +1938,29 @@ mod tests {
         assert_eq!(failed["code"], "chatgpt_account_changed", "{failed}");
     }
 
+    /// Step 6: a host starts a flow under the general name only.
     #[test]
-    fn the_flows_answer_under_the_general_name() {
+    fn the_flows_answer_under_the_general_name_only() {
         let start = |action: &str, service: Option<&str>| {
             let mut request = json!({"schema":"inku.model-catalog-request.v1","action":action,"flow":"tidy",
                 "input":{},"now":NOW});
             if let Some(service) = service {
                 request["service"] = json!(service);
             }
-            String::from_utf8(crate::model_catalog::model_catalog_json(
-                request.to_string().as_bytes(),
-            ))
-            .unwrap()
+            let bytes = crate::model_catalog::model_catalog_json(request.to_string().as_bytes());
+            serde_json::from_slice::<Value>(&bytes).unwrap()
         };
         assert_eq!(
-            start("sign_in_flow_start", Some("chatgpt")),
-            start("chatgpt_flow_start", None)
+            start("sign_in_flow_start", Some("chatgpt"))["todo"]["todo"],
+            "acquire"
+        );
+        assert_eq!(
+            start("chatgpt_flow_start", None)["reason"],
+            "unknown_action"
+        );
+        assert_eq!(
+            start("chatgpt_flow_start", Some("chatgpt"))["reason"],
+            "unknown_action"
         );
     }
 

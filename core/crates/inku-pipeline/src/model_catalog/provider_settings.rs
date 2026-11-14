@@ -181,7 +181,7 @@ fn normalize(input: &Value, env: &Value, input_order: &Value, host: &str) -> (Va
         if id.is_empty()
             || !incoming.is_object()
             || retired_providers().iter().any(|p| p["id"] == id)
-            || id == "chatgpt"
+            || super::sign_in::is_service(&id)
         {
             continue;
         }
@@ -351,7 +351,7 @@ fn update(
     for raw in array(Some(patch_order)).iter().filter_map(Value::as_str) {
         let id = sanitize_id(raw);
         let incoming = &providers[raw];
-        if id == "chatgpt" || !incoming.is_object() {
+        if super::sign_in::is_service(&id) || !incoming.is_object() {
             continue;
         }
         if incoming["delete"] == true {

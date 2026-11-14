@@ -31,7 +31,20 @@ fn function_name() -> &'static str {
 }
 /// The failure codes a ChatGPT error may name in public; any other is replaced
 /// by one that says only what the status says.
-fn public_codes() -> Vec<&'static str> {
+/// The next actions a failure answers (`classify` below), for a host that
+/// keeps a stored failure's action only when it is one of them.
+pub(crate) const FAILURE_ACTIONS: [&str; 8] = [
+    "usage",
+    "retry",
+    "consent",
+    "settings",
+    "models",
+    "edit",
+    "reconnect",
+    "diagnose",
+];
+
+pub(crate) fn public_codes() -> Vec<&'static str> {
     texts(&chatgpt()["failures"]["public_codes"])
 }
 fn admission_rejected(status: Option<i64>) -> bool {

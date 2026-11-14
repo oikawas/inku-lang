@@ -107,9 +107,9 @@ pub(super) fn run(request: &Value) -> Value {
     }
 }
 
-/// The actions a sign-in service answers that were named after ChatGPT
-/// before (step 3): `sign_in_<rest>` with a `service` runs `chatgpt_<rest>`
-/// with that service's descriptor. The step 1 and 2 actions keep their names.
+/// The sign-in actions that carry their own name (step 1 and 2). The others
+/// a host sends as `sign_in_<rest>` with a `service`, and the core runs them
+/// inside as `<code_prefix>_<rest>` (step 3; the old names closed in step 6).
 pub(crate) const NATIVE: [&str; 4] = [
     "sign_in_services",
     "provider_groups",
@@ -117,12 +117,54 @@ pub(crate) const NATIVE: [&str; 4] = [
     "sign_in_publication_draft",
 ];
 
-/// The `chatgpt_*` action a `sign_in_*` action names, or `None` when the
-/// action is not such a name. Refuses a missing or unknown service.
-pub(crate) fn alias(
-    action: &str,
-    service_id: Option<&str>,
-) -> Result<Option<String>, &'static str> {
+/// The actions a host may send under `sign_in_<rest>` with a `service`
+/// (step 6). The others (`auth_tokens`, `auth_select`, `catalog`, ...) are
+/// parts the core's own procedures use; no host sends them.
+pub(crate) const PUBLIC: [&str; 23] = [
+    "flow_start",
+    "flow_next",
+    "publication",
+    "publication_update",
+    "offered",
+    "usable",
+    "transfer_check",
+    "transfer_import",
+    "auth_constants",
+    "auth_session",
+    "auth_publication_input",
+    "auth_publication_active",
+    "auth_operation",
+    "auth_quota_failure",
+    "auth_attempt",
+    "auth_endpoint",
+    "request",
+    "vision_request",
+    "stream",
+    "error",
+    "transport",
+    "failure",
+    "limits",
+];
+
+/// Why an entry refuses an action name.
+pub(crate) enum Refused {
+    /// A name no host may send (an old `chatgpt_*` name, or a part).
+    UnknownAction,
+    /// `sign_in_*` without a known `service`.
+    UnknownService,
+}
+
+/// The inside name (`chatgpt_<rest>`) of an action a host sends to an entry,
+/// or `None` when the action is not a sign-in service's. An old `chatgpt_*`
+/// name and a part no host sends are refused (step 6).
+pub(crate) fn gate(action: &str, service_id: Option<&str>) -> Result<Option<String>, Refused> {
+    if services().iter().any(|s| {
+        s["code_prefix"]
+            .as_str()
+            .is_some_and(|prefix| action.starts_with(&format!("{prefix}_")))
+    }) {
+        return Err(Refused::UnknownAction);
+    }
     let Some(rest) = action.strip_prefix("sign_in_") else {
         return Ok(None);
     };
@@ -130,10 +172,19 @@ pub(crate) fn alias(
         return Ok(None);
     }
     let Some(found) = service_id.and_then(service) else {
-        return Err("unknown_sign_in_service");
+        return Err(Refused::UnknownService);
     };
+    if !PUBLIC.contains(&rest) {
+        return Err(Refused::UnknownAction);
+    }
     let prefix = found["code_prefix"].as_str().unwrap_or("chatgpt");
     Ok(Some(format!("{prefix}_{rest}")))
+}
+
+/// Whether an id names a sign-in service (its group and models are the
+/// service's, not a provider's).
+pub(crate) fn is_service(id: &str) -> bool {
+    service(id).is_some()
 }
 
 /// The descriptor the `chatgpt_*` handlers read (step 3): the alias names

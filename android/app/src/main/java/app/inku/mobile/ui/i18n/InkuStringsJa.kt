@@ -82,7 +82,7 @@ object InkuStringsJa : InkuStrings {
     override val chatGptDisconnectInSettings = "ChatGPT の設定で inku の接続を外せます。外した後のサインインは、新しい登録になります。"
     override val chatGptNewSignIn = "新しい登録でサインイン"
     override val chatGptRetry = "利用枠を確認して再試行"
-    override val chatGptModelSettingsGuide = "接続が完了しました。モデル一覧を取得します。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。"
+    override val chatGptModelSettingsGuide = "接続済みです。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。"
     override val chatGptExported = "この登録の更新は移送先が担当します。"
     override val chatGptScopeRequiredStatus = "接続済みですが、プラン利用の許可が必要です。"
     override val chatGptRevocationUnconfirmed = "この端末の認証情報は削除しました。OpenAI側の切断は確認できなかったため、ChatGPTの設定でも接続を確認してください。"

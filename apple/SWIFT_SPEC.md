@@ -22,6 +22,17 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-14 Sign in with ChatGPT (one connection, keeping the client ID)
+
+The author's instructions (2026-11-14: the select, reauthenticate, sign-out and delete controls behaved badly; they are neither equivalent actions nor one connected process; a premise of several registrations is not needed) and the author's choice to keep the client ID. OpenAI's documents give no API to delete a registration, and each time inku dropped a client ID and registered again, an entry that cannot be removed was left on OpenAI's side. The shared core's `sign_in_connection_view` and procedure answers are used.
+
+- Connection page: the registration list, "Select", "Delete", "Check connection", rows for unfinished registrations and "Connect a new personal profile" are gone. The page shows the state and the account label, the one action the state needs (the core's `primary`: "Sign in to ChatGPT", "Allow plan usage", "Check usage and retry", "Sign in with a new registration"), the actions while signing in, and "Manage usage". The state text always comes from the core's `status`; nothing is carried over from an earlier action.
+- Sign-out: in its own section; pressing it shows a confirmation with "Sign out" and "Keep" (one control per row). It revokes and clears the tokens, keeping the client ID and the published model settings. Below it: "You can remove inku's connection in ChatGPT's settings. Signing in after that makes a new registration."
+- Sign-in uses the host's one registration and its client ID, chosen by the core (no profile ID is passed). For a different account, the state reads "This is a different account. Sign in with a new registration." with "Sign in with a new registration" (`new_registration`). Signing in again sends the ID token the core kept as `id_token_hint`. The authorization URL is not logged.
+- At start, the core's `tidy` procedure runs once, keeping the chosen registration and removing other and unfinished ones.
+- On iOS the introduction reads "Saved works remain in this device's Library" (it said "this Mac" on iOS too).
+- The defect where the per-registration buttons shared one iOS form row and one press fired them all is gone with this layout.
+
 ## 2026-11-14 Sign in with ChatGPT (step 5, procedures as "the next thing to do")
 
 Sign-in, using and refreshing the token, refreshing the model list, signing out, deletion, selection, and pausing and resuming at the usage limit run through one driver that does, in turn, what the shared core's `chatgpt_flow_start` and `chatgpt_flow_next` answer to do next (a todo; `ChatGPTFlowDriver.swift`; the author's answers: build it at once, with the recommended table for the differences). The core decides the order and the checks, the HTTP fields and form encoding, and the registration saved.

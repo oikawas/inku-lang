@@ -22,13 +22,13 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         let fixture = try RuntimeFixture(expired: false)
         defer { fixture.remove() }
         let runtime = ChatGPTPlanRuntime(store: fixture.store, http: RuntimeHTTP(blockRefresh: false))
-        let first = try await runtime.beginAuthorization(profileID: fixture.activeID)
+        let first = try await runtime.beginAuthorization()
         XCTAssertEqual(first.profileID, fixture.activeID)
-        do { _ = try await runtime.beginAuthorization(profileID: fixture.activeID)
+        do { _ = try await runtime.beginAuthorization()
             XCTFail("A second local authorization started")
         } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_attempt_busy") }
         await runtime.cancelAuthorization(first.id)
-        let restarted = try await runtime.beginAuthorization(profileID: fixture.activeID)
+        let restarted = try await runtime.beginAuthorization()
         await runtime.cancelAuthorization(restarted.id)
     }
     // Failure: a one-provider bare model skipped pinning, or a reserved personal reference fell into an API-key route.
@@ -75,80 +75,9 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertFalse(sealed.range(of: Data("fixture-refresh-token".utf8)) != nil)
     }
 
-    // A deleted registration must not leave a selected session, model publication or a pending registration.
-    func testDeleteRegistrationInvalidatesSessionAndKeepsOtherProfiles() async throws {
-        let other = UUID().uuidString
-        let fixture = try RuntimeFixture(expired: false, otherProfileID: other)
-        defer { fixture.remove() }
-        var value = try fixture.store.load()
-        value.pendingRegistrations[fixture.activeID] = "fixture-client"
-        try fixture.store.write(value)
-        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: RuntimeHTTP(blockRefresh: false))
-        let session = try await runtime.pin()
-        let confirmed = try await runtime.deleteProfile(session.profileID)
-        XCTAssertFalse(confirmed)
-        let after = try fixture.store.load()
-        XCTAssertNil(after.profiles[session.profileID]); XCTAssertNil(after.pendingRegistrations[session.profileID])
-        XCTAssertNil(after.activeProfileID); XCTAssertNotNil(after.profiles[other])
-        do { try await runtime.validate(session); XCTFail("Deleted session remained valid") }
-        catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_not_connected") }
-        do { _ = try await runtime.publication(); XCTFail("Deleted publication remained available") }
-        catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_not_connected") }
-    }
 
-    // A newer connection arriving while remote revocation is pending must survive the delete request.
-    func testDeleteDoesNotEraseNewerConnection() async throws {
-        let fixture = try RuntimeFixture(expired: false)
-        defer { fixture.remove() }
-        let client = BlockingRevocationHTTP()
-        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
-        let task = Task { try await runtime.deleteProfile(fixture.activeID) }
-        await client.waitForDiscovery()
-        var value = try fixture.store.load()
-        var profile = try XCTUnwrap(value.profiles[fixture.activeID])
-        XCTAssertEqual(profile.state, "signed_out")
-        profile.state = "connected"; profile.generation += 1
-        profile.accessToken = "new-access"; profile.refreshToken = "new-refresh"
-        value.profiles[fixture.activeID] = profile
-        try fixture.store.write(value)
-        await client.resume()
-        do { _ = try await task.value; XCTFail("Deleted a newer connection") }
-        catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_session_changed") }
-        XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.generation, profile.generation)
-        XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.state, "connected")
-    }
 
-    // Server's delete decision checks signed_out state, not the generation captured before revocation.
-    func testDeleteAcceptsNewerSignedOutGeneration() async throws {
-        let fixture = try RuntimeFixture(expired: false)
-        defer { fixture.remove() }
-        let client = BlockingRevocationHTTP()
-        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
-        let task = Task { try await runtime.deleteProfile(fixture.activeID) }
-        await client.waitForDiscovery()
-        var value = try fixture.store.load()
-        value.profiles[fixture.activeID]?.generation += 1
-        try fixture.store.write(value)
-        await client.resume()
-        let confirmed = try await task.value
-        XCTAssertFalse(confirmed)
-        XCTAssertNil(try fixture.store.load().profiles[fixture.activeID])
-    }
 
-    // Deleting a different registration must not change the active profile or its published models.
-    func testDeleteInactiveRegistrationKeepsActivePublication() async throws {
-        let other = UUID().uuidString
-        let fixture = try RuntimeFixture(expired: false, otherProfileID: other)
-        defer { fixture.remove() }
-        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: SuccessfulRevocationHTTP())
-        let confirmed = try await runtime.deleteProfile(other)
-        XCTAssertTrue(confirmed)
-        let state = try await runtime.state()
-        XCTAssertEqual(state.activeProfileID, fixture.activeID)
-        XCTAssertEqual(state.profiles.map(\.id), [fixture.activeID])
-        let publication = try await runtime.publication()
-        XCTAssertEqual(publication.publishedModels.map(\.id), ["offered"])
-    }
 
     // Failure: a completed SSE frame hid a late quota error, and subsequent requests bypassed the quota pause.
     func testLateQuotaPausesUntilExplicitRetryAndUsesOnlyCanonicalResponsesBody() async throws {

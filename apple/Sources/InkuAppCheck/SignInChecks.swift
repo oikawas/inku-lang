@@ -7,7 +7,7 @@ import InkuUI
 /// appending the ChatGPT connection after the other services, or named it with its own words.
 func runSignInChecks(casesURL: URL) throws {
     let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: casesURL)) as? [String: Any]
-    guard let cases = fixture?["cases"] as? [[String: Any]], cases.count == 49 else {
+    guard let cases = fixture?["cases"] as? [[String: Any]], cases.count == 50 else {
         throw CheckFailure.message("Shared sign-in cases unavailable")
     }
     // Each row goes through the binding the app uses, and the whole answer is compared.
@@ -42,32 +42,30 @@ func runSignInChecks(casesURL: URL) throws {
     print("Sign in with ChatGPT passed: \(cases.count) shared rows through the Swift binding; connection first in 3 orders; ja/en names and SIWC; the connection view and publication draft from the host's own requests. No provider calls.")
 }
 
-/// Step 2. Failure: the Swift host built its connection or draft request in another shape than core reads, so the page
-/// lost the reopen and pending rows, the sign-out confirmation, or the Web's draft rules and save body.
+/// Step 2, and one connection per host (2026-11-14). Failure: the Swift host built its connection or draft request in
+/// another shape than core reads, so the page lost its state, its one action, the sign-out apart from it, or the
+/// Web's draft rules and save body.
 func runSignInStep2HostChecks(cases: [[String: Any]]) throws {
     let profile = ChatGPTPlanProfile(id: "profile-a", label: "me@example.com / aaaa1111", email: nil, clientID: "client-a",
                                      state: "connected", generation: 1, scopes: [], expiresAt: Date())
-    let state = ChatGPTPlanState(enabled: true, activeProfileID: "profile-a", profiles: [profile],
-                                 pendingRegistrations: ["pending-b"], pendingClientIDs: ["pending-b": "client-b"])
+    let state = ChatGPTPlanState(enabled: true, activeProfileID: "profile-a", profiles: [profile], pendingRegistrations: [])
     guard let waiting = SignInConnectionView.make(state: state, busy: true, attempt: .init(active: true, canReopen: true),
                                                   code: nil, lastOperation: nil, revocationConfirmed: nil),
-          waiting.actions.map(\.name) == ["sign_in", "check_connection", "manage_usage", "reopen_sign_in", "cancel"],
-          waiting.action("sign_in")?.enabled == false, waiting.action("cancel")?.enabled == true,
-          waiting.action("manage_usage")?.url?.absoluteString == "https://chatgpt.com/settings/usage",
-          waiting.pending.map(\.clientID) == ["client-b"],
-          waiting.profiles.first?.status == "chatgpt_scope_required", waiting.profiles.first?.active == true,
-          waiting.profiles.first?.actions.first(where: { $0.name == "sign_out" })?.confirm == true,
-          waiting.status == nil, !waiting.guide else {
-        throw CheckFailure.message("Connection view from the host's request differs from core's Web rules")
+          waiting.attemptActions.map(\.name) == ["cancel", "reopen_sign_in"], waiting.primary == nil,
+          waiting.label == "me@example.com / aaaa1111", waiting.manageUsage?.absoluteString == "https://chatgpt.com/settings/usage",
+          let idle = SignInConnectionView.make(state: state, busy: false, attempt: .init(), code: nil, lastOperation: nil, revocationConfirmed: nil),
+          idle.status == "chatgpt_scope_required", idle.primary?.name == "grant_plan", idle.signOut?.confirm == true,
+          idle.notice == "chatgpt_disconnect_in_settings", !idle.guide else {
+        throw CheckFailure.message("Connection view from the host's request differs from core's one-connection answer")
     }
     guard let signedOut = SignInConnectionView.make(state: state, busy: false, attempt: .init(), code: nil,
                                                     lastOperation: "sign_out", revocationConfirmed: false),
-          signedOut.status == "chatgpt_revocation_unconfirmed", signedOut.action("reopen_sign_in") == nil,
-          SignInConnectionView.make(state: state, busy: false, attempt: .init(active: true, canReopen: false), code: "chatgpt_quota",
-                                    lastOperation: nil, revocationConfirmed: nil)?.action("reopen_sign_in") == nil,
-          SignInConnectionView.make(state: nil, busy: false, attempt: .init(), code: nil, lastOperation: nil,
-                                    revocationConfirmed: nil)?.profiles.isEmpty == true else {
-        throw CheckFailure.message("Connection view lost the revocation code or reopened without a page")
+          signedOut.status == "chatgpt_revocation_unconfirmed",
+          SignInConnectionView.make(state: state, busy: false, attempt: .init(), code: "chatgpt_identity_mismatch",
+                                    lastOperation: nil, revocationConfirmed: nil)?.primary?.name == "new_sign_in",
+          let none = SignInConnectionView.make(state: nil, busy: false, attempt: .init(), code: nil, lastOperation: nil, revocationConfirmed: nil),
+          none.primary?.name == "sign_in", none.signOut == nil, none.label == nil else {
+        throw CheckFailure.message("Connection view lost the revocation code, the new-registration action or the first sign-in")
     }
 
     guard let opened = cases.first(where: { $0["name"] as? String == "draft: opened as published" }),

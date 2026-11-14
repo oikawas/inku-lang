@@ -1,38 +1,32 @@
 import Foundation
 import InkuHost
 
-/// Core `sign_in_connection_view` (Sign in with ChatGPT step 2): what the connection settings show, as the Web
-/// shows it. The host keeps the wording (`ChatGPTStatusCopy`, Localizable) and the windows; core answers the codes
-/// and the actions.
+/// Core `sign_in_connection_view`: what the connection settings show, as the Web shows them. One connection per
+/// host (the author, 2026-11-14): its state, the one action that state needs, and signing out apart from it. The
+/// host keeps the wording (`ChatGPTStatusCopy`, Localizable) and the windows; core answers the codes and actions.
 public struct SignInConnectionView: Equatable, Sendable {
     public struct Action: Equatable, Sendable {
         public let name: String
         public let enabled: Bool
-        /// The host asks before running it (sign out, delete).
+        /// The host asks before running it (sign out).
         public let confirm: Bool
-        public let url: URL?
     }
-    public struct Pending: Equatable, Sendable {
-        public let id: String
-        public let clientID: String?
-        public let actions: [Action]
-    }
-    public struct Profile: Equatable, Sendable {
-        public let id: String
-        public let label: String
-        public let active: Bool
-        public let status: String
-        public let actions: [Action]
-    }
-    /// The code of the line above the page (a host failure, or `chatgpt_revocation_unconfirmed`), or nil.
+    /// The state's code (`chatgpt_connected`, `chatgpt_signed_out`, `chatgpt_account_changed`, a failure, ...),
+    /// shown every time from this answer, never carried over from an earlier action.
     public let status: String?
-    public let actions: [Action]
-    public let pending: [Pending]
-    public let profiles: [Profile]
-    /// The active registration is connected with plan use allowed: the guide to model settings is shown.
+    /// The account's label (`<email> / <client id end>`), or nil before a registration.
+    public let label: String?
+    /// The one action the state needs: `sign_in`, `grant_plan`, `retry` or `new_sign_in`.
+    public let primary: Action?
+    /// While signing in: `cancel`, and `reopen_sign_in` where the page can be opened again.
+    public let attemptActions: [Action]
+    /// Signing out, shown apart from the state's action.
+    public let signOut: Action?
+    /// The guidance shown with signing out (`chatgpt_disconnect_in_settings`).
+    public let notice: String?
+    public let manageUsage: URL?
+    /// Connected with plan use allowed: the guide to model settings is shown.
     public let guide: Bool
-
-    public func action(_ name: String) -> Action? { actions.first { $0.name == name } }
 
     public struct Attempt: Sendable {
         public var active = false
@@ -40,7 +34,7 @@ public struct SignInConnectionView: Equatable, Sendable {
         public init(active: Bool = false, canReopen: Bool = false) { self.active = active; self.canReopen = canReopen }
     }
 
-    /// `lastOperation` is `sign_out` or `delete` after one finished, with whether the provider confirmed revocation.
+    /// `lastOperation` is `sign_out` after one finished, with whether the provider confirmed the revocation.
     public static func make(state: ChatGPTPlanState?, busy: Bool, attempt: Attempt, code: String?,
                             lastOperation: String?, revocationConfirmed: Bool?) -> SignInConnectionView? {
         var connection: [String: Any] = ["profiles": [Any](), "pending_registrations": [Any]()]
@@ -63,25 +57,18 @@ public struct SignInConnectionView: Equatable, Sendable {
         return SignInConnectionView(answer)
     }
 
-    init?(_ answer: [String: Any]) {
-        func actions(_ value: Any?) -> [Action] {
-            (value as? [[String: Any]] ?? []).compactMap { row in
-                guard let name = row["action"] as? String else { return nil }
-                return Action(name: name, enabled: row["enabled"] as? Bool ?? false, confirm: row["confirm"] as? Bool ?? false,
-                              url: (row["url"] as? String).flatMap(URL.init(string:)))
-            }
+    init(_ answer: [String: Any]) {
+        func action(_ value: Any?) -> Action? {
+            guard let row = value as? [String: Any], let name = row["action"] as? String else { return nil }
+            return Action(name: name, enabled: row["enabled"] as? Bool ?? false, confirm: row["confirm"] as? Bool ?? false)
         }
         status = answer["status"] as? String
-        self.actions = actions(answer["actions"])
-        pending = (answer["pending"] as? [[String: Any]] ?? []).compactMap { row in
-            guard let id = row["id"] as? String else { return nil }
-            return Pending(id: id, clientID: row["client_id"] as? String, actions: actions(row["actions"]))
-        }
-        profiles = (answer["profiles"] as? [[String: Any]] ?? []).compactMap { row in
-            guard let id = row["id"] as? String else { return nil }
-            return Profile(id: id, label: row["label"] as? String ?? id, active: row["active"] as? Bool ?? false,
-                           status: row["status"] as? String ?? "", actions: actions(row["actions"]))
-        }
+        label = answer["label"] as? String
+        primary = action(answer["primary"])
+        attemptActions = (answer["attempt_actions"] as? [Any] ?? []).compactMap(action)
+        signOut = action(answer["sign_out"])
+        notice = answer["notice"] as? String
+        manageUsage = ((answer["manage_usage"] as? [String: Any])?["url"] as? String).flatMap(URL.init(string:))
         guide = answer["guide"] as? Bool ?? false
     }
 }

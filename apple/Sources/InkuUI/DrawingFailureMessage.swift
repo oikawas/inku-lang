@@ -202,6 +202,11 @@ public enum ChatGPTStatusCopy {
             "The account changed. Check the connection."),
         "chatgpt_not_connected": ("ChatGPT でサインインしてください。",
             "Sign in with ChatGPT."),
+        // One connection per host (the author, 2026-11-14): another account, and the guidance with signing out.
+        "chatgpt_account_changed": ("前と違うアカウントです。新しい登録でサインインしてください。",
+            "This is a different account. Sign in with a new registration."),
+        "chatgpt_disconnect_in_settings": ("ChatGPT の設定で inku の接続を外せます。外した後のサインインは、新しい登録になります。",
+            "You can remove inku's connection in ChatGPT's settings. Signing in after that makes a new registration."),
         // Sign in with ChatGPT step 4 (the author's answer): a time limit, and an answer that cannot be drawing data.
         "chatgpt_transport_timeout": ("ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。",
             "ChatGPT did not answer within the time limit. Try again later."),

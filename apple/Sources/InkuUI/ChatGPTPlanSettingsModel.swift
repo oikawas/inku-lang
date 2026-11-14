@@ -33,9 +33,6 @@ public final class ChatGPTPlanSettingsModel {
         catch { report(error) }
         await app.synchronizePersonalPlanModels()
     }
-    public func checkConnection(app: AppModel) async {
-        await perform(app: app) {}
-    }
     /// The page has no switch, as the Web has none (the author, step 2): a sign-in turns the connection on and
     /// lists the reserved `chatgpt` service for the pickers.
     private func enable(app: AppModel) async throws {
@@ -47,7 +44,7 @@ public final class ChatGPTPlanSettingsModel {
             try await app.updateHostSettings(settings)
         }
     }
-    public func authorize(profileID: String? = nil, consent: Bool = false, app: AppModel,
+    public func authorize(consent: Bool = false, newRegistration: Bool = false, app: AppModel,
                           openURL: @escaping @MainActor (URL) -> Void,
                           closeLogin: @escaping @MainActor () -> Void = {}) async {
         guard !busy else { return }
@@ -57,7 +54,7 @@ public final class ChatGPTPlanSettingsModel {
             do {
                 try await self.enable(app: app)
                 let runtime = try app.personalPlanRuntime()
-                let attempt = try await runtime.beginAuthorization(profileID: profileID, consent: consent,
+                let attempt = try await runtime.beginAuthorization(consent: consent, newRegistration: newRegistration,
                                                                     language: app.display.preferences.language)
                 self.attemptID = attempt.id
                 try Task.checkCancellation()
@@ -88,22 +85,17 @@ public final class ChatGPTPlanSettingsModel {
         if let id = attemptID { try? await app.personalPlanRuntime().cancelAuthorization(id) }
         if let operation { await operation.value }
     }
-    public func selectProfile(_ id: String, app: AppModel) async {
-        await perform(app: app) { try await app.personalPlanRuntime().selectProfile(id) }
-    }
-    public func signOut(_ id: String, app: AppModel) async {
+    /// The host's one connection (core keeps one registration per host).
+    private var profileID: String? { state?.activeProfileID ?? state?.profiles.first?.id }
+    public func signOut(app: AppModel) async {
+        guard let id = profileID else { return }
         await perform(app: app) {
             let confirmed = try await app.personalPlanRuntime().signOut(id)
             self.lastOperation = "sign_out"; self.revocationConfirmed = confirmed
         }
     }
-    public func deleteProfile(_ id: String, app: AppModel) async {
-        await perform(app: app) {
-            let confirmed = try await app.personalPlanRuntime().deleteProfile(id)
-            self.lastOperation = "delete"; self.revocationConfirmed = confirmed
-        }
-    }
-    public func retryQuota(_ id: String, app: AppModel) async {
+    public func retryQuota(app: AppModel) async {
+        guard let id = profileID else { return }
         await perform(app: app) { try await app.personalPlanRuntime().retryQuota(id) }
     }
     private func perform(app: AppModel, operation: @escaping @MainActor () async throws -> Void) async {

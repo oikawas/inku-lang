@@ -8,7 +8,7 @@ import org.json.JSONObject
 
 internal fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
 internal fun chatGptPurpose(action: String?): String {
-    val effects = ChatGptCore.call("chatgpt_auth_constants").getJSONArray("image_effects")
+    val effects = ChatGptCore.call("sign_in_auth_constants").getJSONArray("image_effects")
     return if ((0 until effects.length()).any { effects.getString(it) == action }) "vision" else "llm"
 }
 
@@ -16,33 +16,22 @@ internal fun chatGptPurpose(action: String?): String {
 /** What the shared core wrote for one request, where it goes, and the bounds its stream is read to. */
 internal class ChatGptRequest(val body: String, val mode: String, val answerLimit: Int, val wireLimit: Long, val send: ChatGptSend)
 
-/**
- * The shared core reads an HTTP error body, a `response.failed` event and a
- * stream's `error` event alike, so a usage limit sent any of those ways is the same code.
- */
-internal fun chatGptResponseError(value: Any?, status: Int? = null): ChatGptException =
-    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "chatgpt_error")
-        .put("value", value ?: JSONObject.NULL).put("status", status ?: JSONObject.NULL).put("request_id", JSONObject.NULL)))
-
 /** An HTTP error answer as it came: the core reads the [body] (one that is not JSON is as none) and keeps the [requestId]. */
 internal fun chatGptHttpError(response: ChatGptHttpResponse): ChatGptException =
-    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "chatgpt_error")
+    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "sign_in_error").put("service", CHATGPT_PROVIDER)
         .put("body", response.body).put("status", response.status).put("request_id", response.requestId ?: JSONObject.NULL)))
 
 /**
- * A failure of the connection itself, as the core names it (`chatgpt_transport`):
+ * A failure of the connection itself, as the core names it (`sign_in_transport`):
  * `timeout` (a read, a connection or the whole deadline ran out),
  * `unavailable` (it failed or was cut) or `too_large` (an answer passed its bound).
  */
 internal fun chatGptTransport(kind: String): ChatGptException =
-    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "chatgpt_transport").put("kind", kind)))
+    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "sign_in_transport").put("service", CHATGPT_PROVIDER).put("kind", kind)))
 
 /** The core's code, failure class and next action. */
 internal fun chatGptFailure(answer: JSONObject): ChatGptException =
     ChatGptException(answer.getString("code"), answer.getString("failure"), answer.optString("action").takeIf(String::isNotEmpty))
-
-/** Where the core sends the person's model list (`chatgpt_models_request`). */
-internal fun chatGptModelsSend(): ChatGptSend = ChatGptSend.of(SharedProviderWire.call(JSONObject().put("action", "chatgpt_models_request")))
 
 /** The operation is checked here; the body is the shared core's (`provider_wire`). */
 internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
@@ -51,7 +40,7 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
     }
     val model = request.modelId.removePrefix("chatgpt:")
     val purpose = chatGptPurpose(request.pipelineAction)
-    ChatGptCore.call("chatgpt_auth_operation", JSONObject().put("purpose", purpose)
+    ChatGptCore.call("sign_in_auth_operation", JSONObject().put("purpose", purpose)
         .put("tag", request.pipelineAction ?: JSONObject.NULL))
     val tool = request.tool
     if (request.imageJpeg != null || tool == null) {
@@ -60,7 +49,7 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
     // The schema's original member order matters when it has no propertyOrdering.
     // Keep that object raw on the trip to the core.
     val images = request.pipelineImages
-    val raw = "{\"action\":\"chatgpt_request\",\"model\":${JSONObject.quote(model)}," +
+    val raw = "{\"action\":\"sign_in_request\",\"service\":\"$CHATGPT_PROVIDER\",\"model\":${JSONObject.quote(model)}," +
         "\"answer_limit\":$MAX_PROVIDER_RESPONSE_BYTES," +
         "\"prompt\":{\"system\":${JSONObject.quote(request.systemInstruction.orEmpty())}," +
         "\"message\":${JSONObject.quote(request.prompt)}," +
@@ -95,7 +84,7 @@ internal class ChatGptStream(private val request: ChatGptRequest, private val on
     }
 
     fun finish(): String {
-        val answer = SharedProviderWire.call(JSONObject().put("action", "chatgpt_stream").put("mode", request.mode)
+        val answer = SharedProviderWire.call(JSONObject().put("action", "sign_in_stream").put("service", CHATGPT_PROVIDER).put("mode", request.mode)
             .put("answer_limit", request.answerLimit)
             .put("wire_base64", Base64.getEncoder().encodeToString(wire.toByteArray())))
         usage = answer.optJSONObject("terminal")?.optJSONObject("usage")

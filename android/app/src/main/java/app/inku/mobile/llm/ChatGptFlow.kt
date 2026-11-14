@@ -21,8 +21,8 @@ import java.util.Base64
 import org.json.JSONObject
 
 /*
- * The host's part of the shared core's sign-in procedures (`chatgpt_flow_start`,
- * `chatgpt_flow_next`, step 5): the core answers what to do next, and these do
+ * The host's part of the shared core's sign-in procedures (`sign_in_flow_start`,
+ * `sign_in_flow_next`, step 5): the core answers what to do next, and these do
  * what only Android can do — the store's shape, the loopback socket, the
  * signature check with JCA, randomness and the local offset. The plan manager
  * runs the procedure and holds the locks.
@@ -119,7 +119,7 @@ internal class ChatGptCallbackServer : Closeable {
     private var connection: Socket? = null
     val port: Int get() = listener.localPort
 
-    /** The next connection's request head, before its blank line (at most 16 KiB); null once [deadline] passed. */
+    /** The next connection's request head, before its blank line (at most the core's bound); null once [deadline] passed. */
     fun await(deadline: Long, now: () -> Long, cancelled: () -> Boolean): ByteArray? {
         listener.soTimeout = 1000
         while (true) {
@@ -138,7 +138,7 @@ internal class ChatGptCallbackServer : Closeable {
         val input = socket.getInputStream()
         val head = ByteArrayOutputStream()
         try {
-            while (head.size() < HEAD_LIMIT + 4) {
+            while (head.size() < headLimit + 4) {
                 val value = input.read()
                 if (value == -1) break
                 head.write(value)
@@ -177,6 +177,7 @@ internal class ChatGptCallbackServer : Closeable {
     }
 
     private companion object {
-        const val HEAD_LIMIT = 16 * 1024
+        /** The core's bound of a callback head (`sign_in_auth_constants`). */
+        val headLimit: Int by lazy { ChatGptCore.call("sign_in_auth_constants").getInt("callback_header_bytes") }
     }
 }

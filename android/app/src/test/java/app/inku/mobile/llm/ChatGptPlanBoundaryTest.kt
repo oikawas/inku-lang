@@ -41,14 +41,14 @@ class ChatGptPlanBoundaryTest {
         /** Streamed instead of a 200 body's UTF-8, for bytes no String holds. */
         var streamBytes: ByteArray? = null
         var handler: (String, String?, String?) -> ChatGptHttpResponse = { _, _, _ -> error("Unexpected request") }
-        /** What the core said for each request sent through [ChatGptSend] (none for sign-in). */
+        /** What the core said for each request. */
         val sends = java.util.Collections.synchronizedList(mutableListOf<ChatGptSend>())
-        override suspend fun request(url: String, method: String, token: String?, body: String?, formBody: Boolean,
-                                     timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?,
-                                     send: ChatGptSend?): ChatGptHttpResponse {
-            check(); calls.add(url); send?.let(sends::add)
+        override suspend fun request(send: ChatGptSend, token: String?, body: String?,
+                                     timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?): ChatGptHttpResponse {
+            val url = send.url
+            check(); calls.add(url); sends.add(send)
             // A procedure's request carries its token in the core's headers.
-            val result = handler(url, token ?: send?.headers?.get("Authorization")?.removePrefix("Bearer "), body)
+            val result = handler(url, token ?: send.headers["Authorization"]?.removePrefix("Bearer "), body)
             check()
             if (onChunk != null && result.status == 200) {
                 (streamBytes ?: result.body.toByteArray()).asList().chunked(chunkSize).forEach { check(); onChunk(it.toByteArray()) }
@@ -102,9 +102,11 @@ class ChatGptPlanBoundaryTest {
     /** A stream read as the plan manager reads it: received in pieces, then read once by the core. */
     private fun stream(mode: String = "pipeline"): ChatGptStream {
         val limit = if (mode == "text") 512 * 1024 else MAX_PROVIDER_RESPONSE_BYTES
-        val wire = SharedProviderWire.call(JSONObject().put("action", "chatgpt_limits").put("answer_limit", limit)).getLong("wire_limit")
+        val wire = SharedProviderWire.call(JSONObject().put("action", "sign_in_limits").put("service", CHATGPT_PROVIDER)
+            .put("answer_limit", limit)).getLong("wire_limit")
         // Only the stream is read here; where it would be sent does not matter.
-        return ChatGptStream(ChatGptRequest("", mode, limit, wire, chatGptModelsSend()))
+        return ChatGptStream(ChatGptRequest("", mode, limit, wire,
+            ChatGptSend("https://api.openai.com/v1/responses", "POST", emptyMap(), "Authorization", "Bearer ", limit, 65536, null)))
     }
 
     private fun rejected(code: String, block: () -> Unit) {
@@ -451,10 +453,14 @@ class ChatGptPlanBoundaryTest {
             val models = http.sends.first { it.url.endsWith("/models") }
             assertEquals(ChatGptSend("$CHATGPT_RESOURCE/models", "GET", mapOf("Accept" to "application/json", "Authorization" to "Bearer access-a"),
                 "Authorization", "", 1024 * 1024, 64 * 1024, "x-request-id"), models)
+            // Step 6: a stream's answer gives no `answer_limit`; the host's 1 MiB default is gone and the
+            // stream's own bound (the core's `wire_limit`) stands in. A 2xx stream never read that bound.
             val responses = http.sends.first { it.url.endsWith("/responses") }
+            val wire = SharedProviderWire.call(JSONObject().put("action", "sign_in_limits").put("service", CHATGPT_PROVIDER)
+                .put("answer_limit", MAX_PROVIDER_RESPONSE_BYTES)).getLong("wire_limit").toInt()
             assertEquals(ChatGptSend("$CHATGPT_RESOURCE/responses", "POST",
                 mapOf("Accept" to "text/event-stream", "Content-Type" to "application/json"), "Authorization", "Bearer ",
-                1024 * 1024, 64 * 1024, "x-request-id"), responses)
+                wire, 64 * 1024, "x-request-id"), responses)
             val calls = http.calls.size
             try { manager.generate(request(ref).copy(imageJpeg = byteArrayOf(1))); fail("Vision must not use this route") }
             catch (error: ChatGptException) { assertEquals("chatgpt_operation_not_supported", error.code) }
@@ -562,10 +568,6 @@ class ChatGptPlanBoundaryTest {
             event("response.completed", "response", JSONObject().put("status", "failed")))))
         assertEquals("transport_unavailable", failureOf(decoded(added, event("response.incomplete", "response", JSONObject()))))
         assertEquals("transport_unavailable", failureOf(decoded(added)))
-        // A public code that arrives with a 5xx is temporary.
-        val ineligible = JSONObject().put("error", JSONObject().put("code", "subscription_sharing_user_not_eligible"))
-        assertEquals("transport_unavailable", failureOf(chatGptResponseError(ineligible, 503)))
-        assertEquals("provider_rejected", failureOf(chatGptResponseError(ineligible, 403)))
     }
 
     @Test
@@ -636,30 +638,17 @@ class ChatGptPlanBoundaryTest {
         }
     }
 
+    /**
+     * Step 6 (the author's answer): the host keeps its own list of the hosts a
+     * token may go to, beside the core's answer; it names the hosts of the
+     * core's issuer and resource, no more and no fewer.
+     */
     @Test
-    fun responseErrorsKeepNestedPrecedenceAndRequireAnErrorEventForTopLevelCodes() {
-        val limit = "subscription_sharing_usage_limit_exceeded"
-        val temporary = "subscription_sharing_usage_unavailable"
-        val nested = JSONObject().put("code", "subscription_sharing_user_not_eligible")
-        val top = JSONObject().put("type", "error").put("code", limit)
-            .put("error", nested).put("response", JSONObject().put("error", JSONObject().put("code", temporary)))
-        assertEquals("subscription_sharing_user_not_eligible", chatGptResponseError(top).code)
-        top.remove("error")
-        assertEquals(temporary, chatGptResponseError(top).code)
-        top.put("response", "not an object")
-        assertEquals(limit, chatGptResponseError(top).code)
-        top.remove("type")
-        assertEquals("chatgpt_response_failed", chatGptResponseError(top).code)
-        val http = chatGptResponseError(JSONObject().put("error", JSONObject().put("code", limit)), 429)
-        assertEquals(limit, http.code)
-        assertEquals("provider_rejected", http.failure)
-        val failed = chatGptResponseError(JSONObject().put("type", "response.failed")
-            .put("response", JSONObject().put("error", JSONObject().put("code", temporary))))
-        assertEquals(temporary, failed.code)
-        assertEquals("transport_unavailable", failed.failure)
-        for (value in listOf(null, "not an object", JSONArray())) {
-            assertEquals("chatgpt_response_failed", chatGptResponseError(value).code)
-        }
+    fun theAllowedHostsAreTheCoresIssuerAndResource() {
+        val constants = ChatGptCore.call("sign_in_auth_constants")
+        val described = listOf("issuer", "resource").map { URI(constants.getString(it)) }
+        described.forEach { assertEquals("https", it.scheme) }
+        assertEquals(described.map { it.host }.toSet(), UrlConnectionChatGptHttp.ALLOWED_HOSTS)
     }
 
     @Test

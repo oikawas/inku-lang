@@ -34,7 +34,7 @@ private const val STREAM_CHECK_INTERVAL_NANOS = 1_000_000_000L
  *
  * Every procedure — sign-in, using and refreshing the token, the model list,
  * sign-out, deletion, selection, pausing and resuming — is the shared core's
- * (`chatgpt_flow_start`/`chatgpt_flow_next`, step 5): it answers what to do
+ * (`sign_in_flow_start`/`sign_in_flow_next`, step 5): it answers what to do
  * next and [runFlow] does it. The locks are the core's three: `edit` guards the
  * store's reads and writes, `refresh` a token's refresh, `wire` the ChatGPT wire.
  */
@@ -93,19 +93,20 @@ class ChatGptPlanManager internal constructor(
             val activeId = saved.optString("active").takeIf(String::isNotEmpty)
             val active = activeId?.let(profiles::optJSONObject)
             val cache = active?.optJSONObject("catalog")?.optJSONArray("models")
-            val items = profiles.keys().asSequence().map { id -> id to profiles.getJSONObject(id) }.toList()
-            val finished = items.filter { (_, item) -> item.has("sub") }.map { (id, item) ->
-                ChatGptProfileView(id, item.optString("label", "ChatGPT / " + item.optString("client_id").takeLast(8)),
-                    item.optString("state", "reauthentication_required"), item.planAllowed(), item.stringList("scopes"))
-            }
-            // An unfinished registration: the core keeps it under `registrations_pending`;
-            // one saved before step 5 is still among the profiles, without `sub`.
-            val pendingStore = saved.optJSONObject("registrations_pending") ?: JSONObject()
-            val unfinished = items.filterNot { (_, item) -> item.has("sub") }.map { (id, item) ->
-                ChatGptPendingRegistration(id, item.optString("client_id").takeIf(String::isNotEmpty))
-            } + pendingStore.keys().asSequence().map { id ->
+            // The store as the core reads it (`coreStore`): the finished registrations,
+            // and the unfinished ones under `registrations_pending`. The label and the
+            // state are the core's as it wrote them; a missing state is the core's
+            // to name (`sign_in_connection_view`).
+            val read = coreStore(saved)
+            val coreProfiles = read.getJSONObject("profiles")
+            val finished = coreProfiles.keys().asSequence().map { id ->
+                val item = profiles.getJSONObject(id)
+                ChatGptProfileView(id, item.optString("label"), item.optString("state"), item.planAllowed(), item.stringList("scopes"))
+            }.toList()
+            val pendingStore = read.getJSONObject("registrations_pending")
+            val unfinished = pendingStore.keys().asSequence().map { id ->
                 ChatGptPendingRegistration(id, pendingStore.optJSONObject(id)?.optString("client_id")?.takeIf(String::isNotEmpty))
-            }
+            }.toList()
             val pending = authorization != null
             mutableState.value = ChatGptPlanView(
                 profiles = finished, pendingRegistrations = unfinished,
@@ -132,7 +133,7 @@ class ChatGptPlanManager internal constructor(
      */
     private suspend fun runFlow(name: String, input: JSONObject, attempt: Authorization? = null,
                                 trace: DiagnosticTrace? = null, opened: ((String) -> Unit)? = null): JSONObject {
-        var answer = ChatGptCore.call("chatgpt_flow_start", JSONObject().put("flow", name).put("input", input).put("now", seconds()))
+        var answer = ChatGptCore.call("sign_in_flow_start", JSONObject().put("flow", name).put("input", input).put("now", seconds()))
         val held = ArrayList<String>()
         try {
             while (true) {
@@ -174,7 +175,7 @@ class ChatGptPlanManager internal constructor(
                     "offset" -> JSONObject().put("seconds", localOffsetSeconds(todo.getString("local")))
                     else -> throw ChatGptException("chatgpt_auth_unavailable")
                 }
-                answer = ChatGptCore.call("chatgpt_flow_next", JSONObject().put("state", answer.get("state"))
+                answer = ChatGptCore.call("sign_in_flow_next", JSONObject().put("state", answer.get("state"))
                     .put("result", result).put("now", seconds()))
             }
         } finally {
@@ -221,8 +222,8 @@ class ChatGptPlanManager internal constructor(
             todo.getDouble("answer_limit").toInt(), todo.getDouble("error_limit").toInt(),
             todo.optString("request_id_header").takeIf(String::isNotEmpty))
         return try {
-            val response = http.request(send.url, send.method, body = if (todo.has("body")) todo.getString("body") else null,
-                timeoutMs = (deadline - now()).coerceAtLeast(1), check = { attempt?.check() }, send = send)
+            val response = http.request(send, body = if (todo.has("body")) todo.getString("body") else null,
+                timeoutMs = (deadline - now()).coerceAtLeast(1), check = { attempt?.check() })
             trace?.response(response.status)
             JSONObject().put("status", response.status).put("body", response.body).put("request_id", response.requestId ?: JSONObject.NULL)
         } catch (cancelled: CancellationException) { throw cancelled }
@@ -320,7 +321,7 @@ class ChatGptPlanManager internal constructor(
     internal fun checkSession(ref: ChatGptSessionRef): JSONObject = edit.withLock {
         val value = store.read()
         val profile = value.getJSONObject("profiles").optJSONObject(ref.profileId) ?: throw ChatGptException("chatgpt_not_connected")
-        ChatGptCore.call("chatgpt_auth_session", JSONObject().put("profile", ChatGptCore.toCore(profile)).put("generation", ref.generation))
+        ChatGptCore.call("sign_in_auth_session", JSONObject().put("profile", ChatGptCore.toCore(profile)).put("generation", ref.generation))
         profile
     }
 
@@ -360,14 +361,14 @@ class ChatGptPlanManager internal constructor(
     }
 
     fun publishModels(ref: ChatGptSessionRef, models: List<String>, purposes: JSONObject? = null): Unit = edit.withLock {
-        ChatGptCore.call("chatgpt_auth_publication_input", JSONObject().put("profile_id", ref.profileId)
+        ChatGptCore.call("sign_in_auth_publication_input", JSONObject().put("profile_id", ref.profileId)
             .put("generation", ref.generation).put("selected", JSONArray(models)).put("model_purposes", purposes ?: JSONObject.NULL))
         val profile = checkSession(ref)
         val value = store.read()
-        ChatGptCore.call("chatgpt_auth_publication_active", JSONObject().put("active", value.optString("active")).put("profile_id", ref.profileId))
+        ChatGptCore.call("sign_in_auth_publication_active", JSONObject().put("active", value.optString("active")).put("profile_id", ref.profileId))
         val policy = modelPolicy()
         val input = ChatGptCore.toCore(profile, policy.purposes)
-        val updated = ChatGptCore.call("chatgpt_publication_update", JSONObject().put("profile", input)
+        val updated = ChatGptCore.call("sign_in_publication_update", JSONObject().put("profile", input)
             .put("selected", JSONArray(models)).put("model_purposes", purposes ?: JSONObject.NULL).put("assessments", policy.assessments)).getJSONObject("profile")
         updated.remove("model_purposes")
         value.getJSONObject("profiles").put(ref.profileId, ChatGptCore.fromCore(updated))
@@ -414,10 +415,9 @@ class ChatGptPlanManager internal constructor(
                 val policy = modelPolicy()
                 fun check() {
                     val profile = checkSession(ref)
-                    val publication = ChatGptCore.call("chatgpt_publication", JSONObject().put("profile", ChatGptCore.toCore(profile, policy.purposes))
-                        .put("assessments", policy.assessments)).getJSONObject("publication")
+                    val publication = ChatGptCore.publication(ChatGptCore.toCore(profile), policy)
                     val purpose = chatGptPurpose(request.pipelineAction)
-                    if (!ChatGptCore.call("chatgpt_offered", JSONObject().put("models", publication.getJSONArray("models"))
+                    if (!ChatGptCore.call("sign_in_offered", JSONObject().put("models", publication.getJSONArray("models"))
                             .put("model", slug).put("purpose", purpose)).getBoolean("offered")) throw ChatGptException("chatgpt_model_not_offered")
                 }
                 check()
@@ -439,8 +439,8 @@ class ChatGptPlanManager internal constructor(
                     // effects still require their completed namespace function.
                     val stream = ChatGptStream(built, request.onReceivedBytes)
                     // Where, with which headers and bounds: the core's answer for this body.
-                    val response = http.request(built.send.url, built.send.method, token, built.body, timeoutMs = timeoutMs,
-                        check = ::streamCheck, onChunk = stream::feed, send = built.send)
+                    val response = http.request(built.send, token, built.body, timeoutMs = timeoutMs,
+                        check = ::streamCheck, onChunk = stream::feed)
                     if (response.status !in 200..299) throw chatGptHttpError(response)
                     val text = stream.finish(); check()
                     ModelResponse(text, request.modelId, stream.usage?.optInt("input_tokens")?.takeIf { it > 0 },
@@ -477,7 +477,7 @@ class ChatGptPlanManager internal constructor(
 
     /** A usage limit the answer named pauses the registration (the core's `pause`). */
     private suspend fun pauseForFailure(ref: ChatGptSessionRef, code: String) {
-        if (!ChatGptCore.call("chatgpt_auth_quota_failure", JSONObject().put("code", code)).getBoolean("pause")) return
+        if (!ChatGptCore.call("sign_in_auth_quota_failure", JSONObject().put("code", code)).getBoolean("pause")) return
         runCatching { runFlow("pause", JSONObject().put("profile_id", ref.profileId).put("generation", ref.generation).put("code", code)) }
         updateView()
     }

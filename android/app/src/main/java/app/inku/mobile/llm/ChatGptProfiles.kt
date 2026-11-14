@@ -87,11 +87,9 @@ class ChatGptException(
     }
 }
 
-/** The shared core's failure table (`chatgpt_failure`); a code it does not know is `provider_rejected`. */
-internal fun chatGptFailureFor(code: String): String = chatGptFailureRow(code).getString("failure")
-
+/** The shared core's failure table (`sign_in_failure`); a code it does not know is `provider_rejected`. */
 private fun chatGptFailureRow(code: String): JSONObject =
-    SharedProviderWire.call(JSONObject().put("action", "chatgpt_failure").put("code", code))
+    SharedProviderWire.call(JSONObject().put("action", "sign_in_failure").put("service", CHATGPT_PROVIDER).put("code", code))
 
 internal const val CHATGPT_PROVIDER = "chatgpt"
 
@@ -147,11 +145,7 @@ internal fun JSONObject.stringList(key: String): List<String> = optJSONArray(key
 } ?: emptyList()
 
 internal fun JSONObject.planAllowed(): Boolean =
-    runCatching { ChatGptCore.call("chatgpt_auth_session", JSONObject().put("profile", ChatGptCore.toCore(this).put("state", "connected"))
+    runCatching { ChatGptCore.call("sign_in_auth_session", JSONObject().put("profile", ChatGptCore.toCore(this).put("state", "connected"))
         .put("generation", optLong("generation"))); true }.getOrDefault(false)
 
 internal fun JSONObject.sessionRef(): ChatGptSessionRef = ChatGptSessionRef(getString("id"), getLong("generation"))
-
-internal fun modelArray(models: List<ChatGptModel>): JSONArray = JSONArray().apply {
-    models.forEach { put(JSONObject().put("id", it.id).put("label", it.label)) }
-}

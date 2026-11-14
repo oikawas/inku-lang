@@ -704,9 +704,13 @@ Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal 
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
 
+## v2.15.345 (2026-11-14 / Build 1421)
+
+- Web: a work opened from a lineage card no longer reads "No record" for its composition, a defect of the v2.15.344 change (Build 1420). The listed record is now adopted by the work's id, not by object identity.
+
 ## v2.15.344 (2026-11-14 / Build 1420)
 
-- Web: a work opened from a lineage card no longer shows "(written by the author)" after a thesis the AI proposed (found in the step 4c check). The lineage route's work items carry no derivation of their own (the edge does), so opening from the lineage now gives the work its edge's kind and metadata; when the source is unknown, nothing is added. This also fixes the first version of this change (Build 1420), where a work opened from the lineage read "No record" for its composition (the listed record is now adopted by the work's id, not by object identity).
+- Web: a work opened from a lineage card no longer shows "(written by the author)" after a thesis the AI proposed (found in the step 4c check). The lineage route's work items carry no derivation of their own (the edge does), so opening from the lineage now gives the work its edge's kind and metadata; when the source is unknown, nothing is added.
 
 ## v2.15.343 (2026-11-14 / Build 1419)
 

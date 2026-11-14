@@ -209,38 +209,41 @@ fn publication_draft(request: &Value) -> Value {
             (id.to_owned(), json!(ordered(&chosen)))
         })
         .collect();
-    let assessments: Vec<Value> = if truthy(&request["administrator"]) {
-        rows.iter()
-            .filter_map(|row| {
-                let id = row["id"].as_str().unwrap_or("");
-                let draft = request["assessment_drafts"].get(id)?;
-                if ASSESSMENT.iter().all(|key| {
-                    draft.get(*key).unwrap_or(&Value::Null) == row.get(*key).unwrap_or(&Value::Null)
-                }) {
-                    return None;
+    // The assessments an administrator changed (the Web's model settings: a
+    // key left out or empty is not sent; null is).
+    let administrator = truthy(&request["administrator"]);
+    let changed: Vec<Value> = rows
+        .iter()
+        .filter(|_| administrator)
+        .filter_map(|row| {
+            let id = row["id"].as_str().unwrap_or("");
+            let draft = request["assessment_drafts"].get(id)?;
+            if ASSESSMENT.iter().all(|key| {
+                draft.get(*key).unwrap_or(&Value::Null) == row.get(*key).unwrap_or(&Value::Null)
+            }) {
+                return None;
+            }
+            let mut out = Map::new();
+            out.insert("id".into(), row["id"].clone());
+            out.insert("label".into(), row["label"].clone());
+            for key in ASSESSMENT {
+                if let Some(value) = draft.get(key)
+                    && value != ""
+                {
+                    out.insert(key.into(), value.clone());
                 }
-                let mut out = Map::new();
-                out.insert("id".into(), row["id"].clone());
-                out.insert("label".into(), row["label"].clone());
-                for key in ASSESSMENT {
-                    if let Some(value) = draft.get(key)
-                        && !value.is_null()
-                        && value != ""
-                    {
-                        out.insert(key.into(), value.clone());
-                    }
-                }
-                Some(Value::Object(out))
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+            }
+            Some(Value::Object(out))
+        })
+        .collect();
+    // A changed assessment is unsaved too, as on the Web (its draft signature);
+    // only an administrator edits them.
+    let dirty = dirty || !changed.is_empty();
     json!({"draft": {"selected": selected, "purposes": purposes}, "rows": shown,
         "dirty": dirty, "can_refresh": !dirty, "can_save": true,
         "save": {"profile_id": publication["profile_id"], "generation": publication["generation"],
             "published_models": published, "model_purposes": model_purposes},
-        "assessments": assessments})
+        "assessments": changed})
 }
 
 pub(super) fn run(request: &Value) -> Value {

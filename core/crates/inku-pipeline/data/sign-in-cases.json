@@ -3660,7 +3660,7 @@
    }
   },
   {
-   "name": "draft: an administrator's changed assessment",
+   "name": "draft: an administrator's changed assessment is unsaved and keeps null",
    "request": {
     "schema": "inku.model-catalog-request.v1",
     "action": "sign_in_publication_draft",
@@ -3741,7 +3741,8 @@
      "gpt-6.1-sol": {
       "recommendation_llm": 4,
       "comment_ja": "速い",
-      "comment_en": ""
+      "comment_en": "",
+      "speed_label": null
      }
     }
    },
@@ -3816,8 +3817,8 @@
       "locked_purposes": []
      }
     ],
-    "dirty": false,
-    "can_refresh": true,
+    "dirty": true,
+    "can_refresh": false,
     "can_save": true,
     "save": {
      "profile_id": "profile-aaaa1111",
@@ -3849,7 +3850,8 @@
       "id": "gpt-6.1-sol",
       "label": "GPT-6.1-SOL",
       "recommendation_llm": 4,
-      "comment_ja": "速い"
+      "comment_ja": "速い",
+      "speed_label": null
      }
     ]
    }

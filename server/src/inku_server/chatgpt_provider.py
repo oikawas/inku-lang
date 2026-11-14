@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from .chatgpt_auth import RESOURCE, access_token, auth_policy, read_limited
+from .chatgpt_auth import access_token, auth_policy, read_limited
 from .chatgpt_runtime import check_session, guarded, session_checker
 from .chatgpt_store import ChatGPTError, CredentialStore
 from .chatgpt_models import publication
@@ -50,11 +50,23 @@ def safe_identifier(value) -> str | None:
     return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.:\[\]-]{1,160}", value) else None
 
 
-def response_error(value, status: int | None = None, request_id: str | None = None) -> ResponseFailure:
+def response_error(value=None, status: int | None = None, request_id: str | None = None, *, body: str | None = None) -> ResponseFailure:
     # The shared core reads an HTTP error body, a response.failed event and a
     # stream's `error` event alike (provider_wire), so a usage limit sent any
-    # of those ways still pauses the plan.
-    return ResponseFailure(provider_wire.chatgpt_error(value, status, request_id))
+    # of those ways still pauses the plan. An HTTP error passes its text as
+    # received (`body`); text that is not JSON is read by its status alone.
+    return ResponseFailure(provider_wire.chatgpt_error(value, status, request_id, body=body))
+
+
+def transport_error(kind: str) -> ChatGPTError:
+    """A failure of the transport itself (`timeout`, `unavailable`, `too_large`), as the shared core names it."""
+    named = provider_wire.chatgpt_transport(kind)
+    return ChatGPTError(named["code"], failure=named["failure"], action=named["action"])
+
+
+def _text(content: bytes) -> str:
+    # As received: the core reads text that is not JSON (or not UTF-8) as such.
+    return content.decode("utf-8-sig", errors="replace")
 
 
 def pause_quota(owner: str, profile_id: str, generation: int, deadline: float) -> None:
@@ -90,7 +102,7 @@ class SSEDecoder:
     def feed(self, chunk: bytes) -> None:
         self.wire.extend(chunk)
         if len(self.wire) > self.wire_limit:
-            raise ChatGPTError("chatgpt_response_too_large")
+            raise transport_error("too_large")
 
     def finish(self) -> str:
         answer = provider_wire.chatgpt_stream(self.mode, self.argument_limit, bytes(self.wire))
@@ -98,9 +110,9 @@ class SSEDecoder:
         if answer["outcome"] == "answer":
             return answer["text"]
         if answer["outcome"] == "malformed":
-            # As the stream's own decoding failed: bytes that were not UTF-8
-            # raised a ValueError, other shapes a TypeError or KeyError.
-            raise (ValueError if answer["kind"] == "utf8" else TypeError)(f"chatgpt stream is malformed: {answer['kind']}")
+            # The core names what a stream it could not read means (step 4, 2026-11-14):
+            # bytes that are not UTF-8 are rejected, other shapes are a malformed payload.
+            raise ChatGPTError(answer["code"], failure=answer["failure"], action=answer["action"])
         if answer.get("reported"):
             raise ResponseFailure(answer)
         if answer.get("tool_shapes") is not None:
@@ -130,23 +142,26 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
         with CredentialStore().lock("wire:" + owner + ":" + profile_id, deadline, check):
             return await catalog(owner, profile_id, generation, deadline, cancel, force=force, _wire_held=True)
     token = await access_token(owner, profile_id, generation, deadline, cancel)
+    # Where the list is asked for, its headers and limits are the shared core's (step 4, 2026-11-14).
+    sent = provider_wire.chatgpt_models_request()
     async with httpx.AsyncClient(follow_redirects=False) as client:
-        stream = client.stream("GET", RESOURCE + "/models", headers={"Authorization": "Bearer " + token},
+        stream = client.stream(sent["method"], sent["url"], headers=provider_wire.headers(sent, token),
                                timeout=max(0.001, deadline - time.monotonic()))
         response = await guarded(stream.__aenter__(), check, deadline)
         try:
-            content = await read_limited(response, check, deadline, 1024 * 1024)
+            limit = sent["answer_limit"] if response.is_success else sent["error_limit"]
+            content = await read_limited(response, check, deadline, limit)
         finally:
             await stream.__aexit__(None, None, None)
-    value = json.loads(content)
     if not response.is_success:
-        error = response_error(value, response.status_code, response.headers.get("x-request-id"))
+        error = response_error(status=response.status_code, request_id=response.headers.get(sent["request_id_header"]),
+                               body=_text(content))
         if auth_policy("quota_failure", code=error.code)["pause"]:
             pause_quota(owner, profile_id, generation, deadline)
         raise error
-    listed = provider_wire.chatgpt_catalog(value)
+    listed = provider_wire.chatgpt_catalog(body=_text(content))
     if listed["outcome"] != "ok":
-        raise KeyError("models")
+        raise ChatGPTError(listed["code"], failure=listed["failure"], action=listed["action"])
     models = listed["models"]
     store = CredentialStore()
     with store.lock("edit:" + owner, deadline, check):
@@ -200,17 +215,19 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                     client_options["transport"] = transport
                 async with httpx.AsyncClient(**client_options) as client:
                     check()
-                    stream = client.stream("POST", RESOURCE + "/responses", content=built["body"].encode("utf-8"),
-                                           headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+                    # Where it goes, its headers and the error limit are the shared core's (step 4, 2026-11-14).
+                    stream = client.stream(built["method"], built["url"], content=built["body"].encode("utf-8"),
+                                           headers=provider_wire.headers(built, token),
                                            timeout=max(0.001, deadline - time.monotonic()))
                     response = await guarded(stream.__aenter__(), check, deadline)
                     status = response.status_code
                     try:
                         if not response.is_success:
-                            content = await read_limited(response, check, deadline, 64 * 1024)
+                            content = await read_limited(response, check, deadline, built["error_limit"])
                             if observation and image_effect:
                                 raw.extend(content)
-                            raise response_error(json.loads(content), status, response.headers.get("x-request-id"))
+                            raise response_error(status=status, request_id=response.headers.get(built["request_id_header"]),
+                                                 body=_text(content))
                         async def consume():
                             received = 0
                             reported = 0
@@ -266,7 +283,9 @@ def offered(owner: str, model: str, *, profile_id: str | None = None, generation
         models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
         from .verified_model_catalog import core_catalog
         return core_catalog("chatgpt_offered", models=models, model=model, purpose=purpose)["offered"]
-    except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError):
+    except (TimeoutError, httpx.TimeoutException):
         # Unable to check is not evidence that a model is absent. Preserve
         # explicit registration/provider refusals; let the host report them.
-        raise ChatGPTError("chatgpt_transport_unavailable") from None
+        raise transport_error("timeout") from None
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        raise transport_error("unavailable") from None

@@ -139,16 +139,23 @@ class SingleAttemptProvider:
                 provider_id, model = provider_for_model(model_ref, stage=stage, settings=self.options.settings)
             self._target = (provider_id, model)
             if provider_id == "chatgpt":
-                from .chatgpt_provider import request
+                from .chatgpt_provider import request, transport_error
                 if not self.options.chatgpt_owner or not self.options.chatgpt_profile or self.options.chatgpt_generation is None:
                     raise ChatGPTError("chatgpt_profile_required")
-                response = asyncio.run(request(
-                    self.options.chatgpt_owner, self.options.chatgpt_profile, self.options.chatgpt_generation,
-                    model, action, started + timeout, self.options.max_response_bytes, self.options.chatgpt_cancel,
-                    (self.observation[0], self.observation[2]) if self.observation else None,
-                    purpose="vision" if action["tag"] in provider_wire.IMAGE_EFFECTS else "llm",
-                    images=self.images, transport=self.transport, usage=chatgpt_usage, on_bytes=self.on_bytes,
-                ))
+                try:
+                    response = asyncio.run(request(
+                        self.options.chatgpt_owner, self.options.chatgpt_profile, self.options.chatgpt_generation,
+                        model, action, started + timeout, self.options.max_response_bytes, self.options.chatgpt_cancel,
+                        (self.observation[0], self.observation[2]) if self.observation else None,
+                        purpose="vision" if action["tag"] in provider_wire.IMAGE_EFFECTS else "llm",
+                        images=self.images, transport=self.transport, usage=chatgpt_usage, on_bytes=self.on_bytes,
+                    ))
+                # A time limit or a broken connection is named by the shared core, so the
+                # failure detail keeps its code (step 4, 2026-11-14).
+                except (TimeoutError, httpx.TimeoutException):
+                    raise transport_error("timeout") from None
+                except httpx.TransportError:
+                    raise transport_error("unavailable") from None
             else:
                 connection = (connection_for(provider_id, self.options.settings, normalized_settings=self.options.settings)
                               if self.options.settings_normalized else connection_for(provider_id, self.options.settings))

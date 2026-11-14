@@ -130,7 +130,7 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
     """
     import base64
 
-    from inku_server.chatgpt_provider import ResponseFailure, SSEDecoder, TextSSEDecoder, response_error
+    from inku_server.chatgpt_provider import ResponseFailure, SSEDecoder, TextSSEDecoder, response_error, transport_error
     from inku_server.chatgpt_store import ChatGPTError
 
     compared = Counter()
@@ -143,7 +143,7 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
             assert {key: answer.get(key) for key in expect} == expect, row["why"]
             continue
         if action in {"chatgpt_request", "chatgpt_vision_request"}:
-            if expect["outcome"] == "refused":
+            if expect.get("outcome") == "refused":
                 with pytest.raises(provider_wire.ProviderWireRefused, match=expect["detail"]):
                     provider_wire.chatgpt_vision_request(request["model"], system=request["system"], text=request["text"],
                                                          images=request["images"], answer_limit=request["answer_limit"])
@@ -152,24 +152,45 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
                          if action == "chatgpt_request" else
                          provider_wire.chatgpt_vision_request(request["model"], system=request["system"], text=request["text"],
                                                               images=request["images"], answer_limit=request["answer_limit"]))
-                assert (built["body"], built["canonical"]) == (expect["body"], expect["canonical"]), row["why"]
+                if "body" in expect:
+                    assert (built["body"], built["canonical"]) == (expect["body"], expect["canonical"]), row["why"]
+                # Where it goes is the core's (step 4): the Server sends these, the token under `auth`.
+                shown = [key for key in expect if key not in ("body", "canonical", "outcome")]
+                assert {key: built[key] for key in shown} == {key: expect[key] for key in shown}, row["why"]
+                if "headers" in expect:
+                    # Prediction 3 (PLAN-STEP4 §6): the headers that went out before, and Accept.
+                    assert provider_wire.headers(built, "TOKEN") == {
+                        "Accept": "text/event-stream", "Content-Type": "application/json", "Authorization": "Bearer TOKEN"}, row["why"]
+        elif action == "chatgpt_models_request":
+            assert {key: value for key, value in provider_wire.chatgpt_models_request().items() if key != "schema"} == expect, row["why"]
+        elif action == "chatgpt_transport":
+            error = transport_error(request["kind"])
+            assert (error.code, error.failure, error.action) == (expect["code"], expect["failure"], expect["action"]), row["why"]
         elif action == "chatgpt_stream":
             decoder = (TextSSEDecoder if request["mode"] == "text" else SSEDecoder)(request["answer_limit"])
             decoder.feed(base64.b64decode(request["wire_base64"]))
             if expect["outcome"] == "answer":
                 assert decoder.finish() == expect["text"], row["why"]
             elif expect["outcome"] == "malformed":
-                with pytest.raises(ValueError if expect["kind"] == "utf8" else TypeError):
+                # The Server raises what the core names a stream it cannot read (step 4).
+                core = provider_wire.chatgpt_stream(request["mode"], request["answer_limit"], base64.b64decode(request["wire_base64"]))
+                with pytest.raises(ChatGPTError) as raised:
                     decoder.finish()
+                assert (raised.value.code, raised.value.failure, raised.value.action) == (
+                    core["code"], core["failure"], core["action"]), row["why"]
+                assert {key: core[key] for key in ("code", "failure", "action") if key in expect} == {
+                    key: expect[key] for key in ("code", "failure", "action") if key in expect}, row["why"]
             else:
                 with pytest.raises(ChatGPTError) as raised:
                     decoder.finish()
                 assert (raised.value.code, raised.value.failure, raised.value.action) == (
                     expect["code"], expect["failure"], expect["action"]), row["why"]
                 assert isinstance(raised.value, ResponseFailure) is bool(expect.get("reported")), row["why"]
-            assert (decoder.completed, decoder.terminal) == (expect["completed"], expect["terminal"]), row["why"]
+            if "completed" in expect:
+                assert (decoder.completed, decoder.terminal) == (expect["completed"], expect["terminal"]), row["why"]
         elif action == "chatgpt_error":
-            failure = response_error(request["value"], request["status"], request["request_id"])
+            failure = (response_error(status=request["status"], request_id=request["request_id"], body=request["body"])
+                       if "body" in request else response_error(request["value"], request["status"], request["request_id"]))
             assert (failure.code, failure.failure, failure.action, failure.status, failure.request_id, failure.param) == (
                 expect["code"], expect["failure"], expect["action"], expect["status"], expect["request_id"], expect["param"]), row["why"]
         elif action == "chatgpt_failure":
@@ -180,8 +201,11 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
             if error is not None:
                 assert (error.failure, error.action) == (expect["failure"], expect["action"]), row["why"]
         else:
-            assert {key: value for key, value in provider_wire.chatgpt_catalog(request["value"]).items()
-                    if key != "schema"} == expect, row["why"]
+            listed = (provider_wire.chatgpt_catalog(body=request["body"]) if "body" in request
+                      else provider_wire.chatgpt_catalog(request["value"]))
+            # A list that cannot be read also names its failure (step 4); older rows name only the outcome.
+            assert {key: listed[key] for key in expect} == expect, row["why"]
         compared[action] += 1
-    assert dict(compared) == {"chatgpt_request": 8, "chatgpt_vision_request": 8, "chatgpt_stream": 57,
-                              "chatgpt_error": 9, "chatgpt_catalog": 5, "chatgpt_failure": 75}
+    assert dict(compared) == {"chatgpt_request": 9, "chatgpt_vision_request": 9, "chatgpt_stream": 59,
+                              "chatgpt_error": 11, "chatgpt_catalog": 8, "chatgpt_failure": 75,
+                              "chatgpt_models_request": 1, "chatgpt_transport": 3}

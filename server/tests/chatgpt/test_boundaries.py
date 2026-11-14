@@ -499,6 +499,43 @@ def test_four_effect_tags_and_quota_blocks_fallback_http(isolated, monkeypatch):
     assert len(calls) == before
 
 
+@pytest.mark.parametrize("case, failure, code, status", [
+    # Before step 4 an error body that was not JSON was a malformed payload; its status decides now.
+    ("html-502", "transport_unavailable", "chatgpt_transport_unavailable", 502),
+    # Before step 4 these two kept no code in the failure detail.
+    ("read-timeout", "transport_timeout", "chatgpt_transport_timeout", None),
+    ("connect-failure", "transport_unavailable", "chatgpt_transport_unavailable", None),
+])
+def test_a_send_that_fails_on_the_way_is_named_by_the_core(isolated, monkeypatch, case, failure, code, status):
+    from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
+    from inku_server.model_settings import default_model_settings
+    value = profile(published_models=["model"], catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
+    seed(isolated, value)
+    sent = []
+    real_client = httpx.AsyncClient
+
+    def handle(request):
+        sent.append(request)
+        if case == "html-502":
+            return httpx.Response(502, content=b"<html>Bad gateway</html>", headers={"content-type": "text/html"})
+        if case == "read-timeout":
+            raise httpx.ReadTimeout("fixture time limit", request=request)
+        raise httpx.ConnectError("fixture transport failure", request=request)
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    transport = SingleAttemptProvider(ProviderOptions(settings=default_model_settings(), stage1_model="chatgpt:model", stage2_model="chatgpt:model",
+                                      max_tokens=1, max_response_bytes=4096, chatgpt_owner="owner", chatgpt_profile=value["id"], chatgpt_generation=1))
+    action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "fixture", "attempt": "1"}, "timeout_ms": "5000",
+              "payload": {"prompt": {"system": "Rust system", "message": "Rust message", "response_schema": {"type": "object"}}}}
+    assert transport(action)["failure"] == failure
+    assert transport.chatgpt_failure_detail["code"] == code
+    assert transport.chatgpt_failure_detail["status"] == status
+    # Where it went and its headers are the core's: the ones sent before, and Accept (step 4).
+    assert str(sent[0].url) == auth.RESOURCE + "/responses" and sent[0].method == "POST"
+    assert (sent[0].headers["accept"], sent[0].headers["content-type"], sent[0].headers["authorization"]) == (
+        "text/event-stream", "application/json", "Bearer fixture-access")
+
+
 def test_composition_effect_preserves_wire_and_separate_observation(isolated, tmp_path, monkeypatch):
     from sqlalchemy import create_engine
     from inku_server.model_settings import default_model_settings

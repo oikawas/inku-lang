@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ... import chatgpt_runtime as runtime
 from ...chatgpt_auth import USAGE_URL, attempts, auth_policy, delete_profile, sign_out
 from ...chatgpt_models import save_publication, saved_publication
-from ...chatgpt_provider import catalog, pin
+from ...chatgpt_provider import catalog, pin, transport_error
 from ...chatgpt_store import ChatGPTError, CredentialStore
 from ...verified_model_catalog import core_catalog, sign_in_service
 from ..deps import _current_user
@@ -210,8 +210,13 @@ def models(actor: str, *, force: bool = False) -> dict:
         return saved_publication(actor, profile_id, generation)
     except ChatGPTError as error:
         raise _error(error) from None
-    except (httpx.HTTPError, TimeoutError, ValueError, KeyError):
-        raise HTTPException(status_code=503, detail={"code": "chatgpt_transport_unavailable", "action": "retry"}) from None
+    # The shared core names a time limit and a broken connection (step 4, 2026-11-14).
+    except (TimeoutError, httpx.TimeoutException):
+        named = transport_error("timeout")
+        raise HTTPException(status_code=503, detail={"code": named.code, "action": named.action}) from None
+    except (httpx.HTTPError, ValueError, KeyError):
+        named = transport_error("unavailable")
+        raise HTTPException(status_code=503, detail={"code": named.code, "action": named.action}) from None
 
 
 @router.get("/models", summary="Get the model list of the active Sign in with ChatGPT profile")

@@ -9,7 +9,7 @@ assert.ok(source.startsWith('\tasync function loadAvailableModels()'));
 const moduleSource = `export function create(fetcher) {
   let modelCatalogRequest = 0, modelCatalogStatus = 'ready', availableModelsLoaded = true;
   let availableModelCatalog = [{id:'stale',models:[]}], availableVisionModelCatalog = [], demoPromptModelCatalog = [];
-  let chatgptPlanAvailable = false, modelCatalogOwner, stage1Provider = 'openai', stage1Model = 'x', stage2Provider = 'openai', stage2Model = 'x', visionProvider = 'openai', visionModel = 'x', okugakiModel = 'openai:x';
+  let chatgptPlanAvailable = false, chatgptUsageUrl = null, modelCatalogOwner, stage1Provider = 'openai', stage1Model = 'x', stage2Provider = 'openai', stage2Model = 'x', visionProvider = 'openai', visionModel = 'x', okugakiModel = 'openai:x';
   const session = {currentUser:{id:'actor'}}, apiFetch = fetcher;
   const console = {warn() {}};
   const clearModelReferences = () => {}, configureModelReferences = () => {}, loadModelReferences = async () => {}, setModelLabelTable = () => {};

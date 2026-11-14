@@ -28,19 +28,15 @@ import jwt
 
 from .chatgpt_runtime import check_owner, check_session, guarded
 from .chatgpt_store import ChatGPTError, CredentialStore
-from .verified_model_catalog import core_catalog
+from .verified_model_catalog import sign_in, sign_in_service
 
-_AUTH_CONSTANTS = core_catalog("chatgpt_auth_constants")
-ISSUER = _AUTH_CONSTANTS["issuer"]
-AUTHORIZE = _AUTH_CONSTANTS["authorize"]
-TOKEN = _AUTH_CONSTANTS["token"]
-RESOURCE = _AUTH_CONSTANTS["resource"]
-SCOPES = _AUTH_CONSTANTS["scopes"]
-USAGE_URL = "https://chatgpt.com/settings/usage"
+ISSUER = sign_in("auth_constants")["issuer"]
+# The subscriber's usage page, from the service's descriptor.
+USAGE_URL = sign_in_service("chatgpt")["usage_url"]
 
 
 def auth_policy(action, **fields):
-    result = core_catalog("chatgpt_auth_" + action, **fields)
+    result = sign_in("auth_" + action, **fields)
     if "error" in result:
         raise ChatGPTError(result["error"])
     return result
@@ -168,7 +164,7 @@ class Procedure:
         self.given, self.soft_http = set(held), soft_http
         self.callback, self.on_write, self.on_end = callback, on_write, on_end
         self.locks: dict[str, object] = {}
-        self.answer = core_catalog("chatgpt_flow_start", flow=flow, input=input, now=time.time())
+        self.answer = sign_in("flow_start", flow=flow, input=input, now=time.time())
         self.result, self.stopping = None, False
 
     def _lock_name(self, lock: str) -> str:
@@ -181,8 +177,8 @@ class Procedure:
         try:
             while True:
                 if self.result is not None:
-                    self.answer = core_catalog("chatgpt_flow_next", state=self.answer["state"],
-                                               result=self.result, now=time.time())
+                    self.answer = sign_in("flow_next", state=self.answer["state"],
+                                          result=self.result, now=time.time())
                     self.result = None
                 todo = self.answer["todo"]
                 if todo["todo"] in {"done", "failed"}:
@@ -206,8 +202,8 @@ class Procedure:
             # The caller settles the attempt by the cause, not by the deadline.
             self.stopping, self.result = True, None
             self.check, self.on_end = (lambda: None), None
-            self.answer = core_catalog("chatgpt_flow_next", state=self.answer["state"], result={},
-                                       now=max(time.time(), self.answer["deadline"]))
+            self.answer = sign_in("flow_next", state=self.answer["state"], result={},
+                                  now=max(time.time(), self.answer["deadline"]))
             await self.until()
             raise
 
@@ -441,13 +437,16 @@ class AuthorizationAttempts:
             if opened["todo"] != "open":
                 callback.close()
                 raise flow_failure(opened)
-            attempt.update(profile_id=opened["profile_id"],
-                           retain_until=time.monotonic() + auth_policy("attempt", **counts)["retain_seconds"])
+            limits = auth_policy("attempt", **counts)
+            attempt.update(profile_id=opened["profile_id"], retain_until=time.monotonic() + limits["retain_seconds"])
             self.attempts[attempt["id"]] = attempt
             procedure.give({})
             threading.Thread(target=self._finish, args=(attempt, procedure, callback), daemon=True,
                              name="inku-chatgpt-callback").start()
-            return {"attempt_id": attempt["id"], "profile_id": attempt["profile_id"], "authorization_url": opened["url"]}
+            # The page opens the URL only at the core's authorization endpoint, and waits the core's deadline.
+            return {"attempt_id": attempt["id"], "profile_id": attempt["profile_id"], "authorization_url": opened["url"],
+                    "authorization_endpoint": sign_in("auth_constants")["authorize"],
+                    "deadline_seconds": limits["deadline_seconds"]}
 
     def _finish(self, attempt: dict, procedure: Procedure, callback: Callback) -> None:
         # The procedure settles the attempt as it ends (`on_end`); a stop names its own cause.

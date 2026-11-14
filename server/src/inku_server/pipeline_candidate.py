@@ -636,11 +636,11 @@ class CandidateExecution:
             self.context["provider_failure"] = diagnostic
             if (isinstance(existing, dict) and isinstance(existing.get("chatgpt"), dict)
                     and all(existing.get(key) == diagnostic.get(key) for key in ("failure", "stage", "attempt", "action_id"))):
-                from .chatgpt_provider import PUBLIC_CODES, safe_identifier
+                from .chatgpt_provider import FAILURE_ACTIONS, PUBLIC_CODES, safe_identifier
                 detail = existing["chatgpt"]
                 code = detail.get("code")
                 if isinstance(code, str) and (code in PUBLIC_CODES or (code.startswith("chatgpt_") and _safe_compiler_failure_detail(code))):
-                    diagnostic["chatgpt"] = {"code": code, "action": detail.get("action") if detail.get("action") in {"usage", "retry", "reconnect", "consent", "settings", "models", "diagnose", "edit"} else "diagnose",
+                    diagnostic["chatgpt"] = {"code": code, "action": detail.get("action") if detail.get("action") in FAILURE_ACTIONS else "diagnose",
                                             "request_id": safe_identifier(detail.get("request_id")), "param": safe_identifier(detail.get("param")),
                                             "status": detail.get("status") if isinstance(detail.get("status"), int) and 100 <= detail["status"] <= 599 else None}
             _logger.warning(

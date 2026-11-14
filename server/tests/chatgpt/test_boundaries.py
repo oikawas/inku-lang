@@ -14,6 +14,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from inku_server import chatgpt_auth as auth
+from inku_server.verified_model_catalog import sign_in
 from inku_server import chatgpt_runtime as runtime
 from inku_server import chatgpt_transfer as transfer
 from inku_server.chatgpt_store import ChatGPTError, CredentialStore, canonical
@@ -40,8 +41,12 @@ def profile(**changes):
 
 
 def seed(store, value):
-    with store.lock("owner"):
-        store.save_profile("owner", value)
+    """Put a registration in the store and choose it (the test's setup; the core keeps the store's rules)."""
+    with store.lock("owner"), store.lock("edit:owner", time.monotonic() + 5):
+        saved = store.read("owner")
+        saved["profiles"][value["id"]] = value
+        saved["active"] = value["id"]
+        store.write("owner", saved)
 
 
 def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(isolated, monkeypatch):
@@ -154,7 +159,7 @@ def test_cli_opens_only_the_selected_brave_and_passes_japanese_to_callback(monke
     from inku_server import chatgpt_cli as cli
     from unittest.mock import Mock
     request = {"owner_id": "owner", "owner_label": "Fixture", "host_id": "fixture-host"}
-    start = {"profile_id": "profile", "attempt_id": "attempt", "authorization_url": auth.AUTHORIZE + "?state=fixture"}
+    start = {"profile_id": "profile", "attempt_id": "attempt", "authorization_url": sign_in("auth_constants")["authorize"] + "?state=fixture"}
     # Never the author's own store.
     monkeypatch.setenv("INKU_CHATGPT_AUTH_DIR", str(tmp_path / "auth"))
     tidied = []
@@ -493,7 +498,7 @@ def test_reserved_provider_and_admin_cannot_bypass_operation(isolated, monkeypat
 
 
 def test_four_effect_tags_and_quota_blocks_fallback_http(isolated, monkeypatch):
-    from inku_server.chatgpt_provider import EFFECTS
+    EFFECTS = frozenset(sign_in("auth_constants")["effects"])
     from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
     from inku_server.model_settings import default_model_settings
     value = profile(published_models=["model"], catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
@@ -503,7 +508,7 @@ def test_four_effect_tags_and_quota_blocks_fallback_http(isolated, monkeypatch):
     real_client = httpx.AsyncClient
     def handle(request):
         calls.append(request)
-        assert str(request.url) == auth.RESOURCE + "/responses"
+        assert str(request.url) == sign_in("auth_constants")["resource"] + "/responses"
         body = json.loads(request.content)
         assert set(body) == {"model", "store", "stream", "instructions", "input", "tools", "tool_choice", "parallel_tool_calls",
                              "prompt_cache_key"}
@@ -561,7 +566,7 @@ def test_a_send_that_fails_on_the_way_is_named_by_the_core(isolated, monkeypatch
     assert transport.chatgpt_failure_detail["code"] == code
     assert transport.chatgpt_failure_detail["status"] == status
     # Where it went and its headers are the core's: the ones sent before, and Accept (step 4).
-    assert str(sent[0].url) == auth.RESOURCE + "/responses" and sent[0].method == "POST"
+    assert str(sent[0].url) == sign_in("auth_constants")["resource"] + "/responses" and sent[0].method == "POST"
     assert (sent[0].headers["accept"], sent[0].headers["content-type"], sent[0].headers["authorization"]) == (
         "text/event-stream", "application/json", "Bearer fixture-access")
 
@@ -598,7 +603,7 @@ def test_composition_effect_preserves_wire_and_separate_observation(isolated, tm
     real_client = httpx.AsyncClient
 
     def handle(request):
-        assert str(request.url) == auth.RESOURCE + "/responses"
+        assert str(request.url) == sign_in("auth_constants")["resource"] + "/responses"
         sent.append(json.loads(request.content))
         return httpx.Response(200, content=wire, headers={"content-type": "text/event-stream"})
 
@@ -769,7 +774,8 @@ def test_self_hosted_http_state_has_no_secrets_and_authorize_returns_only_helper
         state = client.get("/api/me/chatgpt")
         assert state.status_code == 200 and state.json()["profiles"][0]["id"] == value["id"]
         assert all(secret not in state.text for secret in ("fixture-access", "fixture-refresh", "fixture-id", "authorization_url"))
-        assert client.post("/api/me/chatgpt/authorize", json={}).json() == {"status": "local_authorization_required", "action": "local_helper"}
+        assert client.post("/api/me/chatgpt/authorize", json={}).json() == {"status": "local_authorization_required", "action": "local_helper",
+                                                                        "deadline_seconds": 300}
         assert client.post("/api/me/chatgpt/authorize", json={"token": "untrusted"}).status_code == 422
         monkeypatch.setenv("INKU_DEVELOPER_MODE", "0")
         assert client.get("/api/me/chatgpt").json()["profiles"] == []

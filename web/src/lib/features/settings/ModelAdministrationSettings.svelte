@@ -495,7 +495,7 @@
 							onclick={() => (activeProviderId = provider.id)}
 						>
 							<span class="model-provider-choice-label">{providerGroupLabel(provider, t().code)}</span>
-							<span class="model-provider-choice-meta">{provider.id} · {provider.id === 'chatgpt' ? t().chatgptStatus('chatgpt_connected') : setting.api_key_set ? t().settingsModelApiKeySet : t().settingsModelApiKeyUnset}</span>
+							<span class="model-provider-choice-meta">{provider.id} · {provider.id === 'chatgpt' ? t().chatgptStatus('chatgpt_' + (administration.chatgptState ?? 'connected')) : setting.api_key_set ? t().settingsModelApiKeySet : t().settingsModelApiKeyUnset}</span>
 							<span class="model-provider-choice-count">{t().settingsModelPublishedCount(publishedModelCount(provider, setting))}</span>
 						</button>
 					{/each}

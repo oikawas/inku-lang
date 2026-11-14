@@ -23,11 +23,12 @@ def prepare_vision_settings(actor: dict, model: str, settings: dict) -> dict:
         if not _model_offered_to(actor, model, stage="stage1", purpose="vision", settings=settings, operation="vision"):
             raise HTTPException(status_code=403, detail=MODEL_NOT_OFFERED_DETAIL)
         return settings
+    from ..chatgpt_models import offered
     from ..chatgpt_provider import catalog, pin, transport_error
     try:
         profile_id, generation = pin(actor["id"])
         models = asyncio.run(catalog(actor["id"], profile_id, generation, time.monotonic() + 15))
-        if not any(entry["id"] == model_id and entry["enabled"] and "vision" in entry["purposes"] for entry in models):
+        if not offered(models, model_id, "vision"):
             raise ChatGPTError("chatgpt_model_not_offered")
         return {**settings, "chatgpt_owner_id": actor["id"], "chatgpt_profile_id": profile_id,
                 "chatgpt_generation": generation}

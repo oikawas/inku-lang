@@ -23,12 +23,12 @@ from functools import lru_cache
 from types import ModuleType
 from typing import Any
 
-from .verified_model_catalog import core_catalog
+from .verified_model_catalog import sign_in
 
 # A refusal body is read only this far.
 _REFUSAL_READ_BYTES = 16384
 # The effects that send an image. Read and draw's review sends its drawing.
-IMAGE_EFFECTS = frozenset(core_catalog("chatgpt_auth_constants")["image_effects"])
+IMAGE_EFFECTS = frozenset(sign_in("auth_constants")["image_effects"])
 # Read and draw's requests (SPEC §12.6.7), recorded apart from Stage 1 and the
 # image tab: the reading, the composition and laws when they are on, the
 # writing and the review.
@@ -67,6 +67,11 @@ def _ask(action: str, **fields: Any) -> dict:
     return answer
 
 
+def _sign_in(action: str, **fields: Any) -> dict:
+    # The core takes Sign in with ChatGPT's wire only as `sign_in_<action>` with its service (step 6).
+    return _ask("sign_in_" + action, service="chatgpt", **fields)
+
+
 def _connection(connection: dict) -> dict:
     return {"id": str(connection.get("id") or ""), "kind": str(connection.get("kind") or ""),
             "api_profile": str(connection.get("api_profile") or ""), "base_url": str(connection.get("base_url") or "")}
@@ -94,25 +99,25 @@ def text_request_with_count(connection: dict, model: str, *, system: str, text: 
 
 def chatgpt_request(model: str, prompt: dict, answer_limit: int, *, images: list[str] | None = None) -> dict:
     """The Sign in with ChatGPT body for one pipeline effect: body, canonical, wire_limit, event_limit."""
-    return _ask("chatgpt_request", model=model, answer_limit=answer_limit,
+    return _sign_in("request", model=model, answer_limit=answer_limit,
                 prompt={key: prompt[key] for key in ("system", "message", "response_schema", "action_name", "images") if key in prompt},
                 **({"images": list(images)} if images is not None else {}))
 
 
 def chatgpt_vision_request(model: str, *, system: str, text: str, images: list[str], answer_limit: int) -> dict:
     """The Sign in with ChatGPT Vision body; an image that is not a base64 data URL is refused."""
-    return _ask("chatgpt_vision_request", model=model, system=system, text=text, images=list(images),
+    return _sign_in("vision_request", model=model, system=system, text=text, images=list(images),
                 answer_limit=answer_limit)
 
 
 def chatgpt_limits(answer_limit: int) -> dict:
     """The stream and event limits for an answer limit."""
-    return _ask("chatgpt_limits", answer_limit=answer_limit)
+    return _sign_in("limits", answer_limit=answer_limit)
 
 
 def chatgpt_stream(mode: str, answer_limit: int, wire: bytes) -> dict:
     """The whole stream read once: ``answer`` with ``text``, ``failed`` or ``malformed``, with ``terminal``."""
-    return _ask("chatgpt_stream", mode=mode, answer_limit=answer_limit,
+    return _sign_in("stream", mode=mode, answer_limit=answer_limit,
                 wire_base64=base64.b64encode(wire).decode("ascii"))
 
 
@@ -122,44 +127,30 @@ def chatgpt_error(value: Any = None, status: int | None = None, request_id: str 
     ``body`` is the error's text as received; text that is not JSON reads as no body (the status decides).
     """
     if body is not None:
-        return _ask("chatgpt_error", body=body, status=status, request_id=request_id)
-    return _ask("chatgpt_error", value=value, status=status, request_id=request_id)
-
-
-def chatgpt_models_request() -> dict:
-    """Where the model list is asked for: url, method, headers, auth, error_limit, request_id_header, answer_limit."""
-    return _ask("chatgpt_models_request")
+        return _sign_in("error", body=body, status=status, request_id=request_id)
+    return _sign_in("error", value=value, status=status, request_id=request_id)
 
 
 @lru_cache(maxsize=8)
 def chatgpt_transport(kind: str) -> dict:
     """What a failure of the transport itself means (``timeout``, ``unavailable``, ``too_large``): code, failure, action."""
-    return _ask("chatgpt_transport", kind=kind)
+    return _sign_in("transport", kind=kind)
 
 
 @lru_cache(maxsize=256)
 def chatgpt_failure(code: str, temporary: bool | None = None) -> dict:
     """The pipeline failure and next action the core's table gives a code."""
-    return _ask("chatgpt_failure", code=code, temporary=temporary)
-
-
-def chatgpt_catalog(value: Any = None, *, body: str | None = None) -> dict:
-    """The models the backend lists for the subscriber: ``ok`` with ``models``, or ``malformed`` with code, failure, action.
-
-    ``body`` is the list's text as received; text that is not JSON is ``malformed``.
-    """
-    if body is not None:
-        return _ask("chatgpt_catalog", body=body)
-    return _ask("chatgpt_catalog", value=value)
+    return _sign_in("failure", code=code, temporary=temporary)
 
 
 def headers(request: dict, key: str) -> dict[str, str]:
     """The headers to send: the core's plain ones and the key under the header it names.
 
-    An API key's request names what stands in for a missing key; ChatGPT's names none.
+    An API key's request names what stands in for a missing key (``missing``);
+    ChatGPT's names none, as it is always sent with a token.
     """
     auth = request["auth"]
-    return {**request["headers"], auth["header"]: auth["prefix"] + (key or auth.get("missing", ""))}
+    return {**request["headers"], auth["header"]: auth["prefix"] + (key if key else auth["missing"])}
 
 
 def _body_text(raw: bytes) -> str:

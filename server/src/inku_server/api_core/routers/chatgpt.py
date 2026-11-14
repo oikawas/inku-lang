@@ -16,7 +16,7 @@ from ...chatgpt_auth import USAGE_URL, attempts, run_flow, sign_out, tidy
 from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin, transport_error
 from ...chatgpt_store import ChatGPTError, CredentialStore
-from ...verified_model_catalog import core_catalog, sign_in_service
+from ...verified_model_catalog import core_catalog, sign_in, sign_in_provider_groups, sign_in_service
 from ..deps import _current_user
 
 router = APIRouter(prefix="/api/me/chatgpt")
@@ -78,15 +78,20 @@ class AuthorizeBody(BaseModel):
 def authorize(body: AuthorizeBody, actor: str = Depends(owner)) -> dict:
     """Begin Sign in with ChatGPT and return the connection attempt to poll.
 
-    On a self-hosted server this returns status `local_authorization_required` with action
-    `local_helper`. The `helper_target` field is added when INKU_CHATGPT_HELPER_TARGET is `container`.
+    Otherwise the answer holds `attempt_id`, `profile_id`, `authorization_url`,
+    `authorization_endpoint` (the only place the URL may open) and `deadline_seconds` (how long the
+    attempt is waited for). On a self-hosted server this returns status
+    `local_authorization_required` with action `local_helper` and `deadline_seconds`. The
+    `helper_target` field is added when INKU_CHATGPT_HELPER_TARGET is `container`.
     Returns 403 with an error code when another connection attempt is pending
     (`chatgpt_attempt_busy`). A declined consent is reported later, as status `failed` with code
     `chatgpt_consent_declined`, and another ChatGPT account, as `chatgpt_account_changed`, by
     GET /attempts/{attempt_id}.
     """
     if runtime._startup and runtime._startup.self_hosted:
-        return {"status": "local_authorization_required", "action": "local_helper",
+        # How long the page waits for the Mac helper is the core's sign-in deadline.
+        deadline = sign_in("auth_attempt", pending_count=0, owner_count=0)["deadline_seconds"]
+        return {"status": "local_authorization_required", "action": "local_helper", "deadline_seconds": deadline,
                 **({"helper_target": "container"} if os.getenv("INKU_CHATGPT_HELPER_TARGET") == "container" else {})}
     try:
         return attempts.begin(actor, body.consent, lambda: runtime.check_owner(actor),
@@ -223,15 +228,24 @@ class PublishedModelsBody(BaseModel):
     )
 
 
+def _publication_answer(actor: str, publication: dict) -> dict:
+    # The service's descriptor, the group the core builds from it with these models
+    # (sign_in_provider_groups) and the registration's state (step 6, 2026-11-15).
+    group = sign_in_provider_groups([], [{"service": "chatgpt", "models": publication["models"]}])[0]
+    return {**publication, "service": sign_in_service("chatgpt"), "group": group,
+            "state": CredentialStore().profile(actor)["state"]}
+
+
 @router.get("/models/settings", summary="Get saved model publication settings")
 def model_settings(actor: str = Depends(owner)) -> dict:
     """Return the saved model publication settings of the active Sign in with ChatGPT profile.
 
-    This does not contact ChatGPT. Returns 403 for ownership or session errors.
+    The answer also holds `service` (the core's descriptor), `group` (the model group the core builds
+    from it with these models) and `state` (the registration's state). This does not contact ChatGPT. Returns 403 for ownership or session errors.
     """
     try:
         profile_id, generation = pin(actor)
-        return {**saved_publication(actor, profile_id, generation), "service": sign_in_service("chatgpt")}
+        return _publication_answer(actor, saved_publication(actor, profile_id, generation))
     except ChatGPTError as error:
         raise _error(error) from None
 
@@ -246,7 +260,7 @@ def publish_models(body: PublishedModelsBody, actor: str = Depends(owner)) -> di
     try:
         # Assessments are shared model settings now, saved through /api/settings/models.
         saved = save_publication(actor, body.profile_id, body.generation, body.published_models, body.model_purposes)
-        return {**saved, "service": sign_in_service("chatgpt")}
+        return _publication_answer(actor, saved)
     except ChatGPTError as error:
         raise _error(error) from None
 

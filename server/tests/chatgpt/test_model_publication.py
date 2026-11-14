@@ -12,7 +12,16 @@ from fastapi.testclient import TestClient
 
 from inku_server.chatgpt_provider import SSEDecoder
 from inku_server.chatgpt_store import ChatGPTError, canonical
-from inku_server.verified_model_catalog import sign_in_service
+from inku_server.verified_model_catalog import sign_in, sign_in_service
+
+
+def seed_profile(store, owner, profile):
+    """Put a registration in the store and choose it (the test's setup; the core keeps the store's rules)."""
+    with store.lock("edit:" + owner, time.monotonic() + 5):
+        value = store.read(owner)
+        value["profiles"][profile["id"]] = profile
+        value["active"] = profile["id"]
+        store.write(owner, value)
 
 
 def _read(*events, limit=4096):
@@ -43,13 +52,13 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
                "state": "connected", "generation": 1, "refresh_owner": "runtime", "scopes": ["chatgpt.tokens.use.direct"],
                "expires_at": time.time() + 3600, "earliest_refresh_at": 0, "access_token": "fixture-access"}
     store = CredentialStore()
-    store.save_profile("owner", profile)
+    seed_profile(store, "owner", profile)
     calls = []
     switch_during_fetch = False
     real_client = httpx.AsyncClient
     def handle(req):
         calls.append(str(req.url))
-        assert req.method == "GET" and str(req.url) == auth.RESOURCE + "/models"
+        assert req.method == "GET" and str(req.url) == sign_in("auth_constants")["resource"] + "/models"
         if switch_during_fetch:
             with store.lock("edit:owner", time.monotonic() + 5):
                 saved = store.read("owner")
@@ -136,13 +145,11 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         assert client.get("/api/me/chatgpt/models/settings").status_code == 403
         assert client.put("/api/me/chatgpt/models/settings", json=body).status_code == 403
         actor = {"id": "owner"}
-        # The refresh/reauthorization snapshot predates the later publication save.
-        store.save_profile("owner", {**profile, "generation": 2, "catalog": store.profile("owner")["catalog"]}, expected_generation=1)
-        assert store.profile("owner")["published_models"] == ["luna"]
-        assert store.profile("owner")["model_purposes"] == {"luna": ["vision"], "other": []}
+        # A later sign-in (generation 2) makes the earlier generation's save stale.
+        seed_profile(store, "owner", {**store.profile("owner"), "generation": 2})
         assert client.put("/api/me/chatgpt/models/settings", json=body).status_code == 403
         other_profile = {**profile, "id": str(uuid.uuid4())}
-        store.save_profile("owner", other_profile)
+        seed_profile(store, "owner", other_profile)
         assert client.put("/api/me/chatgpt/models/settings", json={**body, "generation": 2}).status_code == 403
         assert len(calls) == 2
         switch_during_fetch = True

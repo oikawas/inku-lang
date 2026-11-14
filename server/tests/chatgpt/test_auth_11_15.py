@@ -2,13 +2,12 @@
 
 import json
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from pydantic import ValidationError
 
 from inku_server.api_core.routers.chatgpt import PublishedModelsBody
-from inku_server.verified_model_catalog import core_catalog
+from inku_server.verified_model_catalog import core_catalog, sign_in
 
 
 CASES = json.loads((Path(__file__).parents[1] / "data/chatgpt-auth-11-15-cases.json").read_text())
@@ -19,20 +18,6 @@ def test_shared_cases(case):
     request = dict(case["request"])
     answer = core_catalog(request.pop("action"), **request)
     assert {key: answer.get(key) for key in case["expect"]} == case["expect"]
-
-
-@pytest.mark.parametrize("target", [
-    row["request"]["target"] for row in CASES
-    if row["request"]["action"] == "chatgpt_auth_callback_query"
-])
-def test_callback_against_python_urlsplit(target):
-    parsed = urlsplit(target)
-    query = parse_qs(parsed.query)
-    valid = parsed.path == "/auth/callback" and all(len(v) == 1 for v in query.values())
-    result = core_catalog("chatgpt_auth_callback_query", target=target)
-    assert result.get("query") == (query if valid else None)
-    if not valid:
-        assert result["error"] == "chatgpt_callback_invalid"
 
 
 @pytest.mark.parametrize("field,length,valid", [
@@ -54,9 +39,9 @@ def test_publication_boundaries_and_http(field, length, valid):
         body["model_purposes"] = {"x" * length: ["llm"]}
     else:
         body["published_models"] = ["x"] * length
-    result = core_catalog("chatgpt_auth_publication_input", profile_id=body["profile_id"],
-                          generation=body["generation"], selected=body["published_models"],
-                          model_purposes=body["model_purposes"])
+    result = sign_in("auth_publication_input", profile_id=body["profile_id"],
+                     generation=body["generation"], selected=body["published_models"],
+                     model_purposes=body["model_purposes"])
     assert ("error" not in result) is valid
     if valid:
         PublishedModelsBody.model_validate(body)

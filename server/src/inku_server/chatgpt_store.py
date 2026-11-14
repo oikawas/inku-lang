@@ -186,25 +186,6 @@ class CredentialStore:
             raise ChatGPTError("chatgpt_not_connected")
         return profile
 
-    def save_profile(self, owner: str, profile: dict, *, expected_generation: int | None = None, activate: bool = True, deadline: float | None = None) -> None:
-        with self.lock("edit:" + owner, deadline or time.monotonic() + 5):
-            value = self.read(owner)
-            previous = value["profiles"].get(profile["id"])
-            from .verified_model_catalog import core_catalog
-            answer = core_catalog("chatgpt_auth_save_check", previous=previous, expected_generation=expected_generation, count=len(value["profiles"]))
-            if "error" in answer:
-                raise ChatGPTError(answer["error"])
-            if previous:
-                # Token refresh and reauthorization must not replace newer model choices.
-                answer = core_catalog("chatgpt_auth_preserve", profile=profile, previous=previous)
-                if "error" in answer:
-                    raise ChatGPTError(answer["error"])
-                profile = answer["profile"]
-            value["profiles"][profile["id"]] = profile
-            if activate:
-                value["active"] = profile["id"]
-            self.write(owner, value)
-
     def public_state(self, owner: str) -> dict:
         if not self.root.exists():
             return {"active_profile_id": None, "profiles": [], "pending_registrations": []}

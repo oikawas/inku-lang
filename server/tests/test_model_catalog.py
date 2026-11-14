@@ -17,7 +17,6 @@ from inku_server.model_settings import (
     chatgpt_assessments,
     default_model_settings,
     model_provider_catalog,
-    normalize_chatgpt_models,
     normalize_model_settings,
     update_model_settings,
 )
@@ -124,7 +123,8 @@ def test_the_chatgpt_plan_is_kept_in_the_same_format():
     older_client = update_model_settings(default_model_settings(), {"chatgpt_models": [
         {"id": model_id, "label": "GPT-6-Luna", "comment_ja": "古い形"}]})
     assert chatgpt_assessments(older_client)[model_id]["comment_ja"] == "古い形"
-    expected = normalize_chatgpt_models([catalog[model_id]])[0]
+    # Once the catalog changes, the administrator's change gives way to the catalog's assessment.
+    expected = chatgpt_assessments(default_model_settings())[model_id]
     assert chatgpt_assessments({**saved, "model_catalog_version": "2.5.0"})[model_id] == expected
 
 

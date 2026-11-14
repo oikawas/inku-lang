@@ -18,6 +18,16 @@ from inku_server.api_core.vision import prepare_vision_settings
 IMAGE = "data:image/png;base64,iVBORw0KGgo="
 
 
+
+def seed_profile(store, owner, profile):
+    """Put a registration in the store and choose it (the test's setup; the core keeps the store's rules)."""
+    with store.lock("edit:" + owner, time.monotonic() + 5):
+        value = store.read(owner)
+        value["profiles"][profile["id"]] = profile
+        value["active"] = profile["id"]
+        store.write(owner, value)
+
+
 @pytest.fixture
 def personal(tmp_path, monkeypatch):
     from inku_server import db
@@ -36,7 +46,7 @@ def personal(tmp_path, monkeypatch):
                "access_token": "fixture-a-token", "published_models": ["sight"],
                "catalog": {"expires_at": time.time() + 300,
                            "models": [{"id": "sight", "label": "Sight", "purposes": ["llm"]}]}}
-    store.save_profile("owner", profile)
+    seed_profile(store, "owner", profile)
     return store, default_model_settings()
 
 
@@ -62,7 +72,7 @@ def test_pinned_vision_sends_images_without_tools_and_reads_only_completed_text(
     store, settings = personal
     pinned = prepare_vision_settings({"id": "owner"}, "chatgpt:sight", settings)
     second = {**store.profile("owner"), "id": "fixture-b", "sub": "other-sub", "access_token": "fixture-b-token"}
-    store.save_profile("owner", second)
+    seed_profile(store, "owner", second)
     sent = []
     def reply(request):
         sent.append(request)
@@ -202,7 +212,7 @@ def test_colophon_cache_is_profile_bound_and_cannot_bypass_withdrawal(personal, 
     assert okugaki._vision_chat(**kwargs, settings=pinned) == "visible facts"
     assert calls == ["fixture-a"]
     second = {**store.profile("owner"), "id": "fixture-b", "sub": "other-sub"}
-    store.save_profile("owner", second)
+    seed_profile(store, "owner", second)
     another = prepare_vision_settings({"id": "owner"}, "chatgpt:sight", settings)
     assert okugaki._vision_chat(**kwargs, settings=another) == "visible facts"
     assert calls == ["fixture-a", "fixture-b"]

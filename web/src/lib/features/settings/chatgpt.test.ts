@@ -40,6 +40,16 @@ const signInCase = (name: string): any => {
 	const { schema: _schema, outcome: _outcome, ...answer } = SIGN_IN_CASES.find((row) => row.name === name)!.answer;
 	return answer;
 };
+// What the Server's /authorize adds from the core: where the URL may open and how long to wait.
+const SIGN_IN_ATTEMPT = { authorization_endpoint: 'https://auth.openai.com/api/accounts/authorize', deadline_seconds: 300 };
+// The publication as the Server answers it: every model with its purposes (the core's default is
+// both), the group the core builds from the descriptor with those models, and the state.
+const publicationAnswer = (saved: { models: any[] }) => {
+	const models = saved.models.map((model) => ({ ...model, purposes: model.purposes ?? ['llm', 'vision'] }));
+	return { ...saved, models, state: 'connected',
+		group: { id: 'chatgpt', label: 'Sign in with ChatGPT', labels: { ja: 'ChatGPT でサインイン', en: 'Sign in with ChatGPT' },
+			abbreviation: 'SIWC', usage_url: 'https://chatgpt.com/settings/usage', kind: 'chatgpt_responses', requires_api_key: false, models } };
+};
 const state = (label: string) => ({ available: true, reason: null, self_hosted: true, active_profile_id: 'profile', profiles: [{ id: 'profile', label, state: 'connected' }] });
 
 test('completed authorization refreshes the catalog once and keeps login successful on refresh failure', async () => {
@@ -59,7 +69,7 @@ test('completed authorization refreshes the catalog once and keeps login success
 				apiFetch: async (url: string) => {
 					requests.push(url);
 					// A sign-in again carries the kept id token as id_token_hint (the author, 2026-11-14).
-					if (url.endsWith('/authorize')) return response({ attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize?id_token_hint=kept' });
+					if (url.endsWith('/authorize')) return response({ ...SIGN_IN_ATTEMPT, attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize?id_token_hint=kept' });
 					if (url.endsWith('/attempts/attempt')) return response({ status: 'completed', profile_id: 'profile', code: null });
 					if (url.endsWith('/models/refresh')) { cached = !failed; return failed ? new Response(JSON.stringify({ detail: { code: 'chatgpt_auth_unavailable' } }), { status: 403 }) : response({ models: [{ id: 'previously-published' }], enabled_models: { 'previously-published': true } }); }
 					return response(state('Account'));
@@ -93,7 +103,7 @@ test('failed authorization does not refresh the catalog', async () => {
 	const connection = createChatGPTSettings({
 		owner: () => 'owner', available: () => true, invalidate() {}, changed() { finish(); },
 		apiFetch: async (url: string) => {
-			if (url.endsWith('/authorize')) return response({ attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize' });
+			if (url.endsWith('/authorize')) return response({ ...SIGN_IN_ATTEMPT, attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize' });
 			if (url.endsWith('/attempts/attempt')) return response({ status: 'failed', profile_id: 'profile', code: 'chatgpt_auth_rejected' });
 			if (url.endsWith('/models/refresh')) fetches++;
 			return response(state('Account'));
@@ -123,7 +133,7 @@ test('helper completion is detected by generation and refreshes only once', asyn
 	const connection = createChatGPTSettings({
 		owner: () => owner, available: () => true, invalidate() {}, changed() { changes++; finish(); },
 		apiFetch: async (url: string) => {
-			if (url.endsWith('/authorize')) return response({ action: 'local_helper' });
+			if (url.endsWith('/authorize')) return response({ action: 'local_helper', deadline_seconds: 300 });
 			if (url.endsWith('/models/refresh')) { fetches++; return response({ models: [] }); }
 			return response({ ...state('Account'), active_profile_id: profile, profiles: [{ id: profile, state: 'connected', generation }] });
 		}
@@ -153,7 +163,7 @@ test('self-hosted authorization keeps Brave and Japanese in the public Mac helpe
 	try {
 		const connection = createChatGPTSettings({
 			owner: () => owner, available: () => true, invalidate() {}, changed() {},
-			apiFetch: async (url: string) => response(url.endsWith('/authorize') ? { action: 'local_helper' } : state('Account'))
+			apiFetch: async (url: string) => response(url.endsWith('/authorize') ? { action: 'local_helper', deadline_seconds: 300 } : state('Account'))
 		});
 		await connection.authorize(true);
 		assert.equal(launched.length, 1);
@@ -190,7 +200,7 @@ test('only the fixed server-selected container target enters the helper URI', as
 		let helperTarget: string | undefined = 'container';
 		const connection = createChatGPTSettings({
 			owner: () => owner, available: () => true, invalidate() {}, changed() {},
-			apiFetch: async (url: string) => response(url.endsWith('/authorize') ? { action: 'local_helper', helper_target: helperTarget } : state('Account'))
+			apiFetch: async (url: string) => response(url.endsWith('/authorize') ? { action: 'local_helper', deadline_seconds: 300, helper_target: helperTarget } : state('Account'))
 		});
 		await connection.authorize();
 		assert.equal(new URL(launched[0]).searchParams.get('target'), 'container');
@@ -327,7 +337,7 @@ test('connected guide leads to personal model settings with explicit publication
 					recommendation_stage1: 4, comment_ja: '実測の評価' },
 					{ id: 'first-slug', label: 'Second offered', purposes: [], enabled: false }], enabled_models: { 'second-slug': true, 'first-slug': false } };
 			}
-			return response(saved);
+			return response(publicationAnswer(saved));
 		}
 	});
 	await administration.loadModelSettings();
@@ -336,7 +346,7 @@ test('connected guide leads to personal model settings with explicit publication
 	assert.equal(administration.modelSettingsLoading, true);
 	assert.equal(administration.modelFetchResults.chatgpt.message, ja.chatgptStatus('chatgpt_models_loading'));
 	saved = { ...saved, models: [{ id: 'second-slug', label: 'First offered', speed_label: 'Old speed' }, { id: 'first-slug', label: 'Second offered' }], enabled_models: { 'second-slug': false, 'first-slug': false } };
-	deferred!(response(saved));
+	deferred!(response(publicationAnswer(saved)));
 	await pending;
 	assert.deepEqual(administration.modelCatalog[0].models.map((model: any) => model.id), ['second-slug', 'first-slug']);
 	assert.deepEqual(administration.modelCatalog[0].models[0].purposes, ['llm', 'vision']);
@@ -360,7 +370,7 @@ test('connected guide leads to personal model settings with explicit publication
 	const late = administration.fetchProviderModels('chatgpt');
 	owner = 'other';
 	assert.equal(administration.modelSettings, null);
-	deferred!(response(saved));
+	deferred!(response(publicationAnswer(saved)));
 	await late;
 	assert.deepEqual(administration.modelCatalog, []);
 	assert.equal(changes, 2);
@@ -439,7 +449,7 @@ test('sign-out posts to the one registration, and a return from the Mac helper r
 			owner: () => owner, available: () => true, invalidate() {}, changed() { changes++; },
 			apiFetch: async (url: string) => {
 				calls.push(url);
-				if (url.endsWith('/authorize')) return response({ action: 'local_helper' });
+				if (url.endsWith('/authorize')) return response({ action: 'local_helper', deadline_seconds: 300 });
 				if (url.endsWith('/sign-out')) { current = { ...state('Account'), active_profile_id: id, profiles: [{ id, label: 'Account', state: 'signed_out', generation: 3, scopes: [] }] }; return response({ status: 'signed_out', revocation_confirmed: true }); }
 				return response(current);
 			}

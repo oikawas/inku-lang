@@ -8,6 +8,7 @@
 
 ## 未リリース
 
+- Server・Web：ChatGPT でサインインは共有 core を `sign_in_<名>` の action だけで呼ぶ（step 6）。ほかのホストから移した登録の取り込みは `sign_in_transfer_check`・`sign_in_transfer_import` を使い、封筒の暗号・受け取りの記録・lock は Server に残る。公開の失敗の印、保存した失敗が名指せる次の操作、503 で答える印、モデルをその用途で使えるか、使用量の頁は core から引く。`/api/models` に `sign_in_services`、`POST /api/me/chatgpt/authorize` に `deadline_seconds`（自前のサーバーでないときは `authorization_endpoint` も）、モデルの公開の設定に `group` と `state` を足した。Web は自分のコピーの代わりにこれを読む。画面は変わらない。
 - 共通core：サインインの接続の action は、ホストから `sign_in_<名>` に `service` を付けた名だけで受けるようにしました（ChatGPT でサインインの片付け、step 6）。前の `chatgpt_*` の名は断ります。どのホストも呼ばなくなった部品の action（`chatgpt_auth_tokens`・`_select`・`_delete`・`chatgpt_catalog` など 28 個）は、core の手順の中からだけ使います。その試験データの行は `core/crates/inku-pipeline/data/sign-in-part-cases.json` に移しました。登録の移しの取り込みの確かめと保管への入れ方を、Server から `sign_in_transfer_check`・`sign_in_transfer_import` に移しました。モデルの持ち主探しと provider の設定で `chatgpt` を特別に扱う所は、サインインのサービスの記述の id で見分けます。失敗の印（`chatgpt_*`）と、答えの中身は変わりません。
 - Swift（macOS・iOS）：ChatGPT でサインインの接続を端末ごとに 1 つにし、状態ごとに操作を 1 つだけ出すようにしました。登録の選択と削除、「接続状態を確認」は無くなり、終わらせる操作は確かめ付きのサインアウトだけです。サインインはいつも同じ client_id でやり直すので、OpenAI 側に消せない接続の項目が増えません。iOS の説明の文の「このMac」も直しました。
 - Android：「ChatGPT でサインイン」の接続の画面を、1 つの接続の形にしました。状態の文・名札と、その状態の操作を 1 つだけ出します（ChatGPTで続ける・プランの利用を許可する・利用枠を確認して再試行・前と違うアカウントの時の「新しい登録でサインイン」）。選択・削除・「接続状態を確認」・未完了の登録の一覧はなくなりました。「接続を解除」は離れた所に置き、確かめてから行い、登録（client_id）は残します。ChatGPT の設定で inku の接続を外せることを案内します。起動の時に 1 度、登録を 1 つに片付けます。状態の文は毎回接続の状態から出し、前の操作の結果を残しません。

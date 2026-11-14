@@ -19,21 +19,16 @@ import httpx
 from .chatgpt_auth import access_token, auth_policy, read_limited, run_flow
 from .chatgpt_runtime import check_session, guarded, session_checker
 from .chatgpt_store import ChatGPTError, CredentialStore
-from .chatgpt_models import publication
+from .chatgpt_models import offered as model_offered, publication
 from . import provider_wire
 
 logger = logging.getLogger(__name__)
 
-EFFECTS = frozenset(auth_policy("constants")["effects"])
-# The codes a stored diagnostic may keep (pipeline_candidate). The shared core
-# classifies failures with the same list.
-PUBLIC_CODES = {
-    "subscription_sharing_usage_limit_exceeded", "subscription_sharing_user_not_eligible",
-    "subscription_sharing_unsupported_capability", "subscription_sharing_route_not_supported",
-    "subscription_sharing_invalid_user", "chatpass_v2_scope_not_authorized",
-    "chatpass_v2_invalid_authorization_context", "subscription_sharing_usage_unavailable",
-    "subscription_sharing_user_unavailable",
-}
+# The codes a stored diagnostic may keep (pipeline_candidate) and the next
+# actions it may name: the shared core's lists, which classify the failures.
+_CONSTANTS = auth_policy("constants")
+PUBLIC_CODES = frozenset(_CONSTANTS["public_codes"])
+FAILURE_ACTIONS = frozenset(_CONSTANTS["failure_actions"])
 
 
 class ResponseFailure(ChatGPTError):
@@ -157,7 +152,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
     with store.lock("wire:" + owner + ":" + profile_id, deadline, check):
         try:
             models = await catalog(owner, profile_id, generation, deadline, cancel, _wire_held=True)
-            if not any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models):
+            if not model_offered(models, model, purpose):
                 raise ChatGPTError("chatgpt_model_not_offered")
             token = await access_token(owner, profile_id, generation, deadline, cancel)
             # The shared core writes the body (provider_wire); the observation
@@ -247,8 +242,7 @@ def offered(owner: str, model: str, *, profile_id: str | None = None, generation
         if profile_id is None or generation is None:
             profile_id, generation = pin(owner)
         models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
-        from .verified_model_catalog import core_catalog
-        return core_catalog("chatgpt_offered", models=models, model=model, purpose=purpose)["offered"]
+        return model_offered(models, model, purpose)
     except (TimeoutError, httpx.TimeoutException):
         # Unable to check is not evidence that a model is absent. Preserve
         # explicit registration/provider refusals; let the host report them.

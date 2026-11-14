@@ -650,6 +650,7 @@
 "本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこのMacの同じライブラリに残ります。" = "Draw using your ChatGPT plan. Connect the account separately from API key connections; choose drawing models in model settings. Saved works remain in this Mac's Library.";
 "本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこの端末の同じライブラリに残ります。" = "Draw using your ChatGPT plan. Connect the account separately from API key connections; choose drawing models in model settings. Saved works remain in this device's Library.";
 "新しい登録でサインイン" = "Sign in with a new registration";
+"接続済みです。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。" = "Connected. In model settings, choose uses and models to publish and save them to use them for drawing or Vision.";
 "この接続を解除します。もう一度使うにはサインインが必要です。" = "This connection will be signed out. Sign in again to use it.";
 "記述の解釈・写生・自動配色選択・指示書の補完で利用できます。Vision推敲、奥書、デモ記述生成、モデル調査には対応していません。" = "Supports description interpretation, sketches, automatic color selection and DDL hole filling. Vision refinement, colophons, demo description generation and model inspection are unavailable.";
 "認証を停止" = "Stop authorization";

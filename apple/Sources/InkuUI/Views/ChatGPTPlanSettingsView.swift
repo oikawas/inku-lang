@@ -48,7 +48,8 @@ public struct ChatGPTPlanSettingsView: View {
             .onDisappear { Task { await controller.cancel(app: app) } }
             if view?.guide == true {
                 Section {
-                    Text(app.display.webCopy("chatgptModelSettingsGuide", "接続が完了しました。モデル一覧を取得します。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。"))
+                    // The present state, not a past event (Web chatgptModelSettingsGuide, changed with it on 2026-11-14).
+                    Text(app.display.localized("接続済みです。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。"))
                         .foregroundStyle(.secondary)
                     Button(app.display.webCopy("chatgptOpenModelSettings", "モデル設定を開く"), action: onOpenModelSettings)
                 }

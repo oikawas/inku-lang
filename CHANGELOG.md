@@ -706,7 +706,7 @@ Saved works also offer random or Vision autonomous refinement. The author sets t
 
 ## v2.15.344 (2026-11-14 / Build 1420)
 
-- Web: a work opened from a lineage card no longer shows "(written by the author)" after a thesis the AI proposed (found in the step 4c check). The lineage route's work items carry no derivation of their own (the edge does), so opening from the lineage now gives the work its edge's kind and metadata; when the source is unknown, nothing is added.
+- Web: a work opened from a lineage card no longer shows "(written by the author)" after a thesis the AI proposed (found in the step 4c check). The lineage route's work items carry no derivation of their own (the edge does), so opening from the lineage now gives the work its edge's kind and metadata; when the source is unknown, nothing is added. This also fixes the first version of this change (Build 1420), where a work opened from the lineage read "No record" for its composition (the listed record is now adopted by the work's id, not by object identity).
 
 ## v2.15.343 (2026-11-14 / Build 1419)
 

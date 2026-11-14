@@ -2031,7 +2031,10 @@ $effect(() => {
 	// Once the history listing holds the work, its composition joins the work shown
 	// (step 3, 2026-11-13: "Composition and laws" said there was no record).
 	function adoptListedComposition(it: Iteration, signal: AbortSignal): void {
-		if (signal.aborted || !it.id || work.displayedHistoryItem !== it) return;
+		// By id: the state wraps a plain object in a proxy, so a work built here
+		// (a lineage node's work with its edge, step 4c) is never the same object.
+		// The signal already drops an older opening.
+		if (signal.aborted || !it.id || work.displayedHistoryItem?.id !== it.id) return;
 		const listed = history.items.find((item) => item.id === it.id);
 		if (!listed || listed === it || (listed.description_ddl == null && listed.composition_inherited == null)) return;
 		if (it.description_ddl != null || it.composition_inherited != null) return;

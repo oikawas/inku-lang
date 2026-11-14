@@ -96,6 +96,8 @@ export const ja: LangPack = {
 	chatgptDelete: '削除',
 	chatgptDeleteConfirmText: 'この登録と、公開モデルの設定を削除します。接続中なら先に接続を解除します。',
 	chatgptDeleteConfirm: '削除する',
+	chatgptSignOutConfirmText: 'この登録の接続を解除します。もう一度使うには再認証が必要です。',
+	chatgptSignOutConfirm: '解除する',
 	chatgptDeleteCancel: 'やめる',
 	chatgptRefreshModels: 'モデル一覧を更新',
 	chatgptModelsLoaded: (count) => `${count}件のモデルを取得しました。公開するモデルを選んで保存してください。`,

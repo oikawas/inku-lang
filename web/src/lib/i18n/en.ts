@@ -96,6 +96,8 @@ export const en: LangPack = {
 	chatgptDelete: 'Delete',
 	chatgptDeleteConfirmText: 'This deletes the registration and its published model settings. A connected registration is signed out first.',
 	chatgptDeleteConfirm: 'Delete',
+	chatgptSignOutConfirmText: 'This signs the registration out. Using it again needs another sign-in.',
+	chatgptSignOutConfirm: 'Sign out',
 	chatgptDeleteCancel: 'Keep',
 	chatgptRefreshModels: 'Refresh models',
 	chatgptModelsLoaded: (count) => `Loaded ${count} models. Select models to publish and save.`,

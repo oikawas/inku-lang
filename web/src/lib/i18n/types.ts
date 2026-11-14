@@ -97,6 +97,8 @@ export interface LangPack {
 	chatgptDelete: string;
 	chatgptDeleteConfirmText: string;
 	chatgptDeleteConfirm: string;
+	chatgptSignOutConfirmText: string;
+	chatgptSignOutConfirm: string;
 	chatgptDeleteCancel: string;
 	chatgptRefreshModels: string;
 	chatgptModelsLoaded: (count: number) => string;

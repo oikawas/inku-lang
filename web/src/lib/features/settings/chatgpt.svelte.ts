@@ -3,6 +3,25 @@ import type { ApiFetch } from '../../transport/api-fetch';
 export type ChatGPTProfile = { id: string; label: string; email: string; state: string; generation: number; scopes: string[] };
 export type ChatGPTState = { available: boolean; reason: string | null; self_hosted: boolean; active_profile_id: string | null; profiles: ChatGPTProfile[]; pending_registrations?: { id: string; client_id: string }[] };
 
+// What the settings show is the shared core's answer (Sign in with ChatGPT step 2,
+// 2026-11-14): this screen keeps only the words and the windows.
+export type ChatGPTViewAction = { action: string; enabled: boolean; url?: string; confirm?: boolean };
+export type ChatGPTView = {
+	status: string | null;
+	actions: ChatGPTViewAction[];
+	pending: { id: string; client_id: string | null; actions: ChatGPTViewAction[] }[];
+	profiles: { id: string; label: string; active: boolean; status: string; actions: ChatGPTViewAction[] }[];
+	guide: boolean;
+};
+export type ChatGPTViewInput = {
+	connection: ChatGPTState | null;
+	attempt: { active: boolean; can_reopen: boolean; helper: boolean };
+	busy: boolean;
+	code: string | null;
+	last_operation: 'sign_out' | 'delete' | null;
+	revocation_confirmed: boolean | null;
+};
+
 async function helperBrowser(): Promise<'brave' | 'chrome'> {
 	const brave = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { brave?: { isBrave: () => Promise<boolean> } }).brave;
 	if (brave && typeof brave.isBrave === 'function') {
@@ -26,6 +45,8 @@ export function createChatGPTSettings(deps: {
 	let authorizationUrl = $state<string | null>(null);
 	let helperUrl = $state<string | null>(null);
 	let boundOwner = $state<string | undefined>();
+	let lastOperation = $state<'sign_out' | 'delete' | null>(null);
+	let revocationConfirmed = $state<boolean | null>(null);
 	let attemptId: string | null = null;
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let epoch = 0;
@@ -49,7 +70,7 @@ export function createChatGPTSettings(deps: {
 		busy = false;
 	}
 
-	function reset() { stop(); state = null; code = null; catalogFailure = false; boundOwner = undefined; }
+	function reset() { stop(); state = null; code = null; lastOperation = null; revocationConfirmed = null; catalogFailure = false; boundOwner = undefined; }
 	const current = (owner: string | undefined, stamp: number) => Boolean(owner && owner === deps.owner() && stamp === epoch && deps.available());
 	const visible = () => boundOwner === deps.owner() && deps.available();
 
@@ -63,10 +84,12 @@ export function createChatGPTSettings(deps: {
 		return value;
 	}
 
-	async function refresh(owner: string, stamp: number, preserveCode: string | null = null) {
+	async function refresh(owner: string, stamp: number, preserveCode: string | null = null,
+		operation: { name: 'sign_out' | 'delete'; revocationConfirmed: boolean } | null = null) {
 		const value = await call('');
 		if (!current(owner, stamp)) return;
 		state = value; code = preserveCode ?? value.reason;
+		lastOperation = operation?.name ?? null; revocationConfirmed = operation?.revocationConfirmed ?? null;
 	}
 
 	async function load() {
@@ -104,18 +127,20 @@ export function createChatGPTSettings(deps: {
 		}
 	}
 
-	async function mutate(path: string) {
+	async function mutate(path: string, operation: 'sign_out' | 'delete' | null = null) {
 		stop(); deps.invalidate();
 		catalogFailure = false;
 		const stamp = epoch, owner = deps.owner();
 		if (!owner || !deps.available()) return;
 		if (owner !== boundOwner) state = null;
 		boundOwner = owner;
-		abort = new AbortController(); busy = true; code = null;
+		abort = new AbortController(); busy = true; code = null; lastOperation = null; revocationConfirmed = null;
 		try {
 			const result = await call(path, {});
 			if (!current(owner, stamp)) return;
-			await refresh(owner, stamp, (result.status === 'signed_out' || result.status === 'deleted') && result.revocation_confirmed === false ? 'chatgpt_revocation_unconfirmed' : null);
+			// The core says whether an unconfirmed revocation is reported (sign_in_connection_view).
+			await refresh(owner, stamp, null, operation && (result.status === 'signed_out' || result.status === 'deleted')
+				? { name: operation, revocationConfirmed: result.revocation_confirmed !== false } : null);
 			if (current(owner, stamp)) await deps.changed();
 		} catch (error) {
 			if (current(owner, stamp)) code = error instanceof Error ? error.message : 'chatgpt_operation_failed';
@@ -145,7 +170,7 @@ export function createChatGPTSettings(deps: {
 		if (!owner || !deps.available()) return;
 		if (owner !== boundOwner) state = null;
 		boundOwner = owner;
-		abort = new AbortController(); busy = true; code = null;
+		abort = new AbortController(); busy = true; code = null; lastOperation = null; revocationConfirmed = null;
 		try {
 			if (!state) {
 				await refresh(owner, stamp);
@@ -226,10 +251,28 @@ export function createChatGPTSettings(deps: {
 		get authorizationUrl() { return visible() ? authorizationUrl : null; },
 		get helperUrl() { return visible() ? helperUrl : null; },
 		get finishingAuthorization() { return visible() && finishingAuthorization; },
+		// The state the shared core's view is asked for; the screen asks again whenever it changes.
+		get viewInput(): ChatGPTViewInput {
+			const shown = visible();
+			return {
+				connection: shown ? state : null,
+				attempt: { active: shown && Boolean(authorizationUrl || helperUrl), can_reopen: shown && Boolean(authorizationUrl), helper: shown && Boolean(helperUrl) },
+				busy: shown && busy, code: shown ? code : null,
+				last_operation: shown ? lastOperation : null, revocation_confirmed: shown ? revocationConfirmed : null
+			};
+		},
+		async view(input: ChatGPTViewInput): Promise<ChatGPTView> {
+			const response = await deps.apiFetch('/api/me/chatgpt/view', {
+				method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input)
+			});
+			const value = await response.json();
+			if (!response.ok) throw new Error(typeof value?.detail?.code === 'string' ? value.detail.code : 'chatgpt_operation_failed');
+			return value as ChatGPTView;
+		},
 		load, reset, stop, cancel, authorize, recheck,
 		select: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/select'),
-		signOut: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/sign-out'),
-		remove: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/delete'),
+		signOut: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/sign-out', 'sign_out'),
+		remove: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/delete', 'delete'),
 		retry: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/retry')
 	};
 }

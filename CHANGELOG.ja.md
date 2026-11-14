@@ -8,6 +8,7 @@
 
 ## 未リリース
 
+- Server・Web：設定「ChatGPT でサインイン」の見せ方と、公開するモデルの選び・保存の本文・管理者が変えた共有の評価を、coreの答えから出すようにしました（step 2）。Serverに`POST /api/me/chatgpt/view`と`POST /api/me/chatgpt/models/draft`を足し、Webが渡す画面の状態にserviceを付けてcoreの`sign_in_connection_view`・`sign_in_publication_draft`の答えを返します（読み書きはしません）。画面は変わらず、接続の解除だけは、削除と同じ2段の確かめの後に行うようにしました（作者の決定）。解除・削除の後の「失効は未確認」の文も、coreが決めます。
 - 共通core：「ChatGPT でサインイン」の接続の状態の見せ方と、公開するモデルの選びの決まりを、coreの答えにしました（step 2のcore。見せ方はWebの今の見せ方に揃える作者の決定）。`model_catalog_json`に`sign_in_connection_view`（上の状態の行の印、上の操作、未完了の登録、登録ごとの状態の印と操作、接続済みの案内。接続の解除と削除には確かめの印`confirm`）と`sign_in_publication_draft`（選び・用途・全選択の編集を当てた下書き、行ごとの選べるか・押せない用途、未保存か、保存の本文、管理者の評価の変更）を足しました。共通の試験データ`sign-in-cases.json`は48行。各ホストの切り替えは、続く変更で入ります。
 - Swift（macOS・iOS）：モデル設定・モデル選択・比べで、「ChatGPT でサインイン」の接続を一番上に置くようにしました（coreの`provider_groups`の並び。ほかのサービスの並びは今のまま）。接続の名はcoreの記述の名札（日本語「ChatGPT でサインイン」、英語「Sign in with ChatGPT」）、履歴の帯の略称は「SIWC」になります。接続の名を言う文言と、未接続の時の文「ChatGPT でサインインしてください。」も替えました。id `chatgpt`・モデル名・失敗の印は変わりません。
 - Android：設定のモデル選択・モデル設定・描くモデルの選びの一覧で、「ChatGPT でサインイン」を端末内のモデルより前の先頭に置くようにしました（共通coreの`provider_groups`の並び。サインインしていない時の接続の案内のカードもモデル設定の先頭）。接続の名は共通coreの名札（日本語「ChatGPT でサインイン」、英語「Sign in with ChatGPT」）を使い、未接続の時の文は「ChatGPT でサインインしてください。」になります。ほかの群の並び、利用枠のプランを言う文、送信・保存は変わりません。

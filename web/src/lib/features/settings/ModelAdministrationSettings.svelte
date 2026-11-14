@@ -3,7 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { isModelUnselectable, modelFold, modelFolds, modelFoldTitle, modelStatusLabel, modelStatusParts, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
 	import { isSignInGroup, providerGroupLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
+	import type { ChatGPTDraft, ChatGPTDraftEdit, ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
 
 	type Props = {
@@ -206,7 +206,36 @@
 		baseUrlDrafts = nextDrafts;
 	}
 
+	// Sign in with ChatGPT's publication draft is the shared core's answer (step 2,
+	// 2026-11-14): each edit goes to the core, which returns the draft, each row's state,
+	// whether it changed and the save body. The other providers keep the drafts below.
+	let chatgptAnswer = $state<ChatGPTDraft | null>(null);
+	let chatgptQueue: Promise<void> = Promise.resolve();
+	const signInPicker = () => modelPickerProviderId === 'chatgpt';
+	function chatgptRow(modelId: string) {
+		return chatgptAnswer?.rows.find((row) => row.id === modelId);
+	}
+	function chatgptEdit(edit: ChatGPTDraftEdit | null, fromPublication = false): Promise<void> {
+		chatgptQueue = chatgptQueue.then(async () => {
+			if (!signInPicker()) return;
+			try {
+				const answer = await administration.chatgptDraft({
+					draft: fromPublication ? null : chatgptAnswer?.draft ?? null, edit,
+					assessment_drafts: personalOnly ? {} : modelPickerMetadataDraft
+				});
+				if (!signInPicker()) return;
+				chatgptAnswer = answer;
+				modelPickerEnabledDraft = { ...answer.draft.selected };
+				modelPickerPurposeDraft = { ...answer.draft.purposes };
+			} catch (error) {
+				modelPickerError = error instanceof Error ? error.message : String(error);
+			}
+		});
+		return chatgptQueue;
+	}
+
 	function setAllPublishedModels(models: ModelOption[], enabled: boolean) {
+		if (signInPicker()) { void chatgptEdit({ kind: 'select_all', ids: models.map((model) => model.id), selected: enabled }); return; }
 		modelPickerEnabledDraft = {
 			...modelPickerEnabledDraft,
 			// A retired or plan-only model is never published; the Server refuses it too.
@@ -229,10 +258,13 @@
 		modelPickerOpenFolds = {};
 		modelPickerInitialDraft = pickerDraftSignature(catalogProvider?.models ?? []);
 		modelPickerProviderId = provider;
+		chatgptAnswer = null;
+		if (provider === 'chatgpt') void chatgptEdit(null, true);
 	}
 
 	function closeModelPicker() {
 		modelPickerProviderId = null;
+		chatgptAnswer = null;
 		modelPickerSearch = '';
 		modelPickerFilter = 'all';
 		modelPickerEnabledDraft = {};
@@ -247,7 +279,19 @@
 	}
 
 	function modelPickerDraftEnabled(modelId: string): boolean {
+		if (signInPicker()) return chatgptRow(modelId)?.selected === true;
 		return modelPickerEnabledDraft[modelId] !== false;
+	}
+
+	// Whether a row's publish box can be pressed.
+	function modelPickerCanToggle(model: ModelOption): boolean {
+		if (signInPicker()) return chatgptRow(model.id)?.can_toggle === true;
+		return !isModelUnselectable(model) && (modelDraft(model).purposes?.length ?? 0) > 0;
+	}
+
+	function setModelPublished(model: ModelOption, published: boolean): void {
+		if (signInPicker()) { void chatgptEdit({ kind: 'toggle_model', id: model.id, selected: published }); return; }
+		modelPickerEnabledDraft = { ...modelPickerEnabledDraft, [model.id]: published };
 	}
 
 	function modelPurposeSelected(modelId: string, purpose: 'llm' | 'vision'): boolean {
@@ -255,6 +299,7 @@
 	}
 
 	function toggleModelPurpose(modelId: string, purpose: 'llm' | 'vision'): void {
+		if (signInPicker()) { void chatgptEdit({ kind: 'toggle_purpose', id: modelId, purpose }); return; }
 		const current = modelPickerPurposeDraft[modelId] ?? ['llm'];
 		const next = current.includes(purpose) ? current.filter((item) => item !== purpose) : [...current, purpose];
 		modelPickerPurposeDraft = { ...modelPickerPurposeDraft, [modelId]: next };
@@ -285,6 +330,8 @@
 			...modelPickerMetadataDraft,
 			[model.id]: { ...modelDraft(model), ...patch },
 		};
+		// The core says which shared assessments changed.
+		if (signInPicker()) void chatgptEdit(null);
 	}
 
 	// The editor offers the three tiers the cards print (the author, 2026-10-13). A
@@ -316,7 +363,7 @@
 	// as not recommended (the author, 2026-10-26). A ChatGPT plan model's purposes
 	// are each person's own, and that path still leaves such a purpose out.
 	function purposeLocked(model: ModelOption, purpose: 'llm' | 'vision'): boolean {
-		return modelPickerProvider?.id === 'chatgpt' && purposeUnsupported(model, purpose);
+		return signInPicker() && (chatgptRow(model.id)?.locked_purposes.includes(purpose) ?? true);
 	}
 
 
@@ -326,6 +373,7 @@
 
 	async function saveModelPicker() {
 		if (!modelPickerProvider) return;
+		if (signInPicker()) await chatgptQueue;
 		const models = modelPickerProvider.models.map((model) => modelDraft(model));
 		modelPickerError = null;
 		const saved = await onSaveModelProvider(modelPickerProvider.id, { models, enabled_models: modelPickerEnabledDraft });
@@ -343,6 +391,7 @@
 		modelPickerPurposeDraft = Object.fromEntries((provider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
 		modelPickerMetadataDraft = Object.fromEntries((provider?.models ?? []).map((model) => [model.id, { ...model }]));
 		modelPickerInitialDraft = pickerDraftSignature(provider?.models ?? []);
+		if (providerId === 'chatgpt') { chatgptAnswer = null; await chatgptEdit(null, true); }
 	}
 
 	function hasPendingApiKey(setting: ModelProviderSetting): boolean {
@@ -380,7 +429,11 @@
 			? (modelSettings.providers[activeProvider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} })
 			: null
 	);
-	const modelPickerDirty = $derived(modelPickerProvider ? pickerDraftSignature(modelPickerProvider.models) !== modelPickerInitialDraft : false);
+	// For Sign in with ChatGPT the core says whether the draft changed (an administrator's
+	// changed assessment included).
+	const modelPickerDirty = $derived(!modelPickerProvider ? false
+		: modelPickerProvider.id === 'chatgpt' ? chatgptAnswer?.dirty === true
+		: pickerDraftSignature(modelPickerProvider.models) !== modelPickerInitialDraft);
 	const modelPickerPublishedCount = $derived(
 		modelPickerProvider ? modelPickerProvider.models.filter((model) => modelPickerDraftEnabled(model.id)).length : 0
 	);
@@ -618,13 +671,8 @@
 								<input
 									type="checkbox"
 								checked={!isModelUnselectable(model) && modelPickerDraftEnabled(model.id)}
-									disabled={isModelUnselectable(model) || modelDraft(model).purposes?.length === 0}
-								onchange={(e) => {
-									modelPickerEnabledDraft = {
-										...modelPickerEnabledDraft,
-										[model.id]: (e.currentTarget as HTMLInputElement).checked,
-										};
-									}}
+									disabled={!modelPickerCanToggle(model)}
+								onchange={(e) => setModelPublished(model, (e.currentTarget as HTMLInputElement).checked)}
 								/>
 									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{#each modelStatusParts(model, t().code === 'ja') as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:unselectable={part.blocking}>{part.text}</span>{/each}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>

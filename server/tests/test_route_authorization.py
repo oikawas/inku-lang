@@ -118,7 +118,10 @@ PUBLIC = {  # every entry needs a reason
 #   place for the refinement "Change the layout" (step 3, 2026-11-13).
 #   +1 for POST /api/composition/theses, four theses the composer proposes for a
 #   work's description (step 4, 2026-11-14).
-EXPECTED_ROUTE_COUNT = 154
+#   +2 for POST /api/me/chatgpt/view and POST /api/me/chatgpt/models/draft, the shared
+#   core's view of the Sign in with ChatGPT settings and its publication draft
+#   (Sign in with ChatGPT step 2, 2026-11-14).
+EXPECTED_ROUTE_COUNT = 156
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

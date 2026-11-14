@@ -1,9 +1,20 @@
 //! Pure ChatGPT plan publication policy; the host owns storage and HTTP.
+use super::sign_in::{chatgpt, count};
 use super::*;
 
+/// The purposes a model has when none were chosen, and how long a fetched
+/// model list stays fresh (step 3: `sign-in-services.json`).
+fn default_purposes() -> &'static Value {
+    &chatgpt()["models"]["default_purposes"]
+}
+fn cache_seconds() -> f64 {
+    count(&chatgpt()["models"]["cache_seconds"]) as f64
+}
+
 fn usable(profile: &Value, id: &str, assessment: &Value) -> Vec<Value> {
-    let default = json!(["llm", "vision"]);
-    let chosen = profile["model_purposes"].get(id).unwrap_or(&default);
+    let chosen = profile["model_purposes"]
+        .get(id)
+        .unwrap_or(default_purposes());
     array(Some(chosen))
         .iter()
         .filter(|p| !array(assessment.get("unsupported_purposes")).contains(p))
@@ -82,7 +93,7 @@ pub(super) fn run(request: &Value) -> Value {
         }
         "chatgpt_cache" => {
             let now = request["now"].as_f64().unwrap_or(0.0);
-            json!({"fresh": !truthy(&request["force"]) && truthy(&request["cache"]) && request["cache"]["expires_at"].as_f64().is_some_and(|expiry| expiry > now), "expires_at":now + 300.0})
+            json!({"fresh": !truthy(&request["force"]) && truthy(&request["cache"]) && request["cache"]["expires_at"].as_f64().is_some_and(|expiry| expiry > now), "expires_at":now + cache_seconds()})
         }
         "chatgpt_publication_update" => {
             let mut profile = profile.clone();
@@ -136,7 +147,7 @@ pub(super) fn run(request: &Value) -> Value {
                     let purposes = profile["model_purposes"]
                         .get(id)
                         .cloned()
-                        .unwrap_or(json!(["llm", "vision"]));
+                        .unwrap_or_else(|| default_purposes().clone());
                     if array(Some(&purposes)).is_empty()
                         || (!selected.is_null()
                             && (usable(&profile, id, &request["assessments"][id]).is_empty()

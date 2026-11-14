@@ -1,14 +1,31 @@
 //! Pure OIDC policy. Signature verification, randomness and I/O remain with hosts.
+use super::sign_in::{chatgpt, count, text, texts};
 use super::*;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use icu_properties::{CodePointMapData, props::GeneralCategory};
 use serde::de::{Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use std::fmt;
 use subtle::ConstantTimeEq;
-const ISSUER: &str = "https://auth.openai.com";
-const RESOURCE: &str = "https://api.openai.com/v1";
-const SCOPES: &str =
-    "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
+
+/// The service's sign-in values (step 3: `sign-in-services.json`).
+fn login() -> &'static Value {
+    &chatgpt()["login"]
+}
+fn issuer() -> &'static str {
+    text(&login()["issuer"])
+}
+fn resource() -> &'static str {
+    text(&login()["resource"])
+}
+fn scopes() -> String {
+    texts(&login()["scopes"]).join(" ")
+}
+fn limit(name: &str) -> u64 {
+    count(&login()["limits"][name])
+}
+fn authorize_url() -> String {
+    format!("{}{}", issuer(), text(&login()["authorize_path"]))
+}
 
 fn fail(code: &str) -> Value {
     json!({"error":code})
@@ -61,7 +78,7 @@ fn callback_query(target: &str) -> Value {
     if let Some(authority) = path.strip_prefix("//") {
         path = authority.find('/').map_or("", |i| &authority[i..]);
     }
-    if path != "/auth/callback" {
+    if path != text(&login()["callback_path"]) {
         return fail("chatgpt_callback_invalid");
     }
     let mut values = serde_json::Map::new();
@@ -79,24 +96,13 @@ fn callback_query(target: &str) -> Value {
     json!({"query":values})
 }
 
-const CHATGPT_EFFECTS: &[&str] = &[
-    "generate_sketch",
-    "select_description_catalog",
-    "generate_normalized_ddl",
-    "read_composition",
-    "choose_laws",
-    "choose_colors",
-    "complete_visible_ddl_holes",
-    "read_description",
-    "compose_description",
-    "write_description_ddl",
-];
-const IMAGE_EFFECTS: &[&str] = &[
-    "select_image_catalog",
-    "write_image_ddl",
-    "review_image_ddl",
-    "review_description_ddl",
-];
+/// The operations the subscription may draw: the LLM ones and the image ones.
+fn chatgpt_effects() -> Vec<&'static str> {
+    texts(&chatgpt()["operations"]["llm"])
+}
+fn image_effects() -> Vec<&'static str> {
+    texts(&chatgpt()["operations"]["vision"])
+}
 
 fn publication_input(r: &Value) -> Value {
     if !r["profile_id"]
@@ -137,7 +143,7 @@ fn valid_endpoint(url: &str) -> bool {
         return false;
     };
     scheme.eq_ignore_ascii_case("https")
-        && rest.split(['/', '?', '#']).next() == Some("auth.openai.com")
+        && rest.split(['/', '?', '#']).next() == Some(text(&login()["endpoint_host"]))
         && !rest
             .split_once('#')
             .is_some_and(|(_, fragment)| !fragment.is_empty())
@@ -165,7 +171,8 @@ fn authorization(request: &Value) -> Value {
     let challenge = URL_SAFE_NO_PAD.encode(digest);
     let client = previous["client_id"]
         .as_str()
-        .unwrap_or("dynamic_agent_client");
+        .unwrap_or(text(&login()["provisional_client_id"]));
+    let scope = scopes();
     let mut pairs = vec![
         ("client_id", client),
         (
@@ -177,8 +184,8 @@ fn authorization(request: &Value) -> Value {
             "redirect_uri",
             request["redirect_uri"].as_str().unwrap_or(""),
         ),
-        ("scope", SCOPES),
-        ("resource", RESOURCE),
+        ("scope", scope.as_str()),
+        ("resource", resource()),
         ("state", request["state"].as_str().unwrap_or("")),
         ("nonce", request["nonce"].as_str().unwrap_or("")),
         ("code_challenge_method", "S256"),
@@ -188,12 +195,12 @@ fn authorization(request: &Value) -> Value {
         pairs.push(("login_hint", email));
     }
     if !truthy(previous) {
-        pairs.push(("agent_name_hint", "inku"));
+        pairs.push(("agent_name_hint", text(&login()["agent_name_hint"])));
     }
     if request["consent"] == true {
         pairs.push(("prompt", "consent"));
     }
-    json!({"url":format!("{ISSUER}/api/accounts/authorize?{}",pairs.iter().map(|(k,v)|format!("{}={}",encode(k),encode(v))).collect::<Vec<_>>().join("&"))})
+    json!({"url":format!("{}?{}",authorize_url(),pairs.iter().map(|(k,v)|format!("{}={}",encode(k),encode(v))).collect::<Vec<_>>().join("&"))})
 }
 fn token_fields(request: &Value) -> Value {
     let value = &request["value"];
@@ -218,7 +225,9 @@ fn token_fields(request: &Value) -> Value {
             .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
             .filter(|v: &f64| v.is_finite())
     };
-    let Some(expiry) = number(&value["expires_in"]).filter(|v| *v > 0.0 && *v <= 86400.0) else {
+    let Some(expiry) = number(&value["expires_in"])
+        .filter(|v| *v > 0.0 && *v <= limit("max_expires_in_seconds") as f64)
+    else {
         return fail("chatgpt_identity_invalid");
     };
     let earliest = match value.get("earliest_refresh_at") {
@@ -469,12 +478,12 @@ pub(super) fn run(r: &Value) -> Value {
             }
         }
         "chatgpt_auth_attempt" => {
-            if r["pending_count"].as_u64().unwrap_or(0) >= 4
-                || r["owner_count"].as_u64().unwrap_or(0) >= 1
+            if r["pending_count"].as_u64().unwrap_or(0) >= limit("attempts")
+                || r["owner_count"].as_u64().unwrap_or(0) >= limit("owner_attempts")
             {
                 fail("chatgpt_attempt_busy")
             } else {
-                json!({"valid":true,"deadline_seconds":300,"retain_seconds":600})
+                json!({"valid":true,"deadline_seconds":limit("deadline_seconds"),"retain_seconds":limit("retain_seconds")})
             }
         }
         "chatgpt_auth_previous" => {
@@ -492,9 +501,9 @@ pub(super) fn run(r: &Value) -> Value {
         }
         "chatgpt_auth_operation" => {
             let tag = r["tag"].as_str().unwrap_or("");
-            let image = IMAGE_EFFECTS.contains(&tag);
+            let image = image_effects().contains(&tag);
             let valid = match r["purpose"].as_str() {
-                Some("llm") => CHATGPT_EFFECTS.contains(&tag),
+                Some("llm") => chatgpt_effects().contains(&tag),
                 Some("vision") => tag == "vision" || image,
                 _ => false,
             };
@@ -543,16 +552,9 @@ pub(super) fn run(r: &Value) -> Value {
                 if code.is_array() || code.is_object() {
                     return json!({"type_error":true});
                 }
-                if [
-                    "invalid_grant",
-                    "invalid_refresh_token",
-                    "token_expired",
-                    "refresh_token_expired",
-                    "refresh_token_invalidated",
-                    "refresh_token_reused",
-                ]
-                .iter()
-                .any(|s| code == *s)
+                if texts(&login()["reauthentication_errors"])
+                    .iter()
+                    .any(|s| code == *s)
                 {
                     return fail("chatgpt_reauthentication_required");
                 }
@@ -571,12 +573,14 @@ pub(super) fn run(r: &Value) -> Value {
         "chatgpt_auth_key" => {
             let header = &r["header"];
             let metadata = &r["discovery"];
-            let defaults = json!(["RS256"]);
+            let defaults = login()["default_signing_algorithms"].clone();
             let allowed = metadata
                 .get("id_token_signing_alg_values_supported")
                 .unwrap_or(&defaults);
             let alg = &header["alg"];
-            if !(alg == "RS256" || alg == "ES256") || !array(Some(allowed)).contains(alg) {
+            if !texts(&login()["signing_algorithms"]).contains(&alg.as_str().unwrap_or(""))
+                || !array(Some(allowed)).contains(alg)
+            {
                 return fail("chatgpt_identity_invalid");
             }
             let Some(keys) = r["keys"]["keys"].as_array() else {
@@ -614,21 +618,23 @@ pub(super) fn run(r: &Value) -> Value {
             }
         }
         "chatgpt_auth_quota_failure" => {
-            json!({"pause":r["code"] == "subscription_sharing_usage_limit_exceeded"})
+            json!({"pause":r["code"] == chatgpt()["failures"]["usage_limit_code"]})
         }
         "chatgpt_auth_save_check" => {
             let previous = &r["previous"];
             let expected = &r["expected_generation"];
             if !expected.is_null() && (!truthy(previous) || previous["generation"] != *expected) {
                 fail("chatgpt_session_changed")
-            } else if !truthy(previous) && r["count"].as_u64().unwrap_or(0) >= 8 {
+            } else if !truthy(previous)
+                && r["count"].as_u64().unwrap_or(0) >= limit("registrations")
+            {
                 fail("chatgpt_profile_limit")
             } else {
                 json!({"valid":true})
             }
         }
         "chatgpt_auth_pending_check" => {
-            if r["exists"] != true && r["count"].as_u64().unwrap_or(0) >= 8 {
+            if r["exists"] != true && r["count"].as_u64().unwrap_or(0) >= limit("registrations") {
                 fail("chatgpt_profile_limit")
             } else {
                 json!({"valid":true})
@@ -687,12 +693,12 @@ pub(super) fn run(r: &Value) -> Value {
             }
         }
         "chatgpt_auth_constants" => {
-            json!({"issuer":ISSUER,"authorize":format!("{ISSUER}/api/accounts/authorize"),"token":format!("{ISSUER}/api/accounts/oauth/token"),"resource":RESOURCE,"scopes":SCOPES,"image_effects":IMAGE_EFFECTS,"effects":CHATGPT_EFFECTS})
+            json!({"issuer":issuer(),"authorize":authorize_url(),"token":format!("{}{}",issuer(),text(&login()["token_path"])),"resource":resource(),"scopes":scopes(),"image_effects":image_effects(),"effects":chatgpt_effects()})
         }
         "chatgpt_auth_callback_client" => {
             let issued = r["issued"].as_str().unwrap_or("");
             if issued.is_empty()
-                || issued == "dynamic_agent_client"
+                || issued == text(&login()["provisional_client_id"])
                 || (truthy(&r["previous"]) && r["previous"]["client_id"] != issued)
             {
                 fail("chatgpt_registration_incomplete")
@@ -709,7 +715,7 @@ pub(super) fn run(r: &Value) -> Value {
         }
         "chatgpt_auth_url" => authorization(r),
         "chatgpt_auth_discovery" => {
-            if r["discovery"]["issuer"] != ISSUER
+            if r["discovery"]["issuer"] != issuer()
                 || !valid_endpoint(r["discovery"]["jwks_uri"].as_str().unwrap_or(""))
             {
                 fail("chatgpt_identity_invalid")
@@ -783,7 +789,7 @@ pub(super) fn run(r: &Value) -> Value {
                     .get(*key)
                     .is_some_and(|v| !python_int(v).is_some_and(|i| i <= now))
             }) || claims.get("jti").is_some_and(|v| !v.is_string())
-                || claims["iss"] != ISSUER
+                || claims["iss"] != issuer()
                 || !ok_aud
                 || !exp.is_some_and(|v| (v as f64) > now)
                 || !claims["sub"].as_str().is_some_and(|s| !s.is_empty())
@@ -805,7 +811,9 @@ pub(super) fn run(r: &Value) -> Value {
             let earliest = profile["earliest_refresh_at"].as_f64().unwrap_or(0.0);
             if profile["refresh_owner"] != "runtime" {
                 fail("chatgpt_session_transferred")
-            } else if expiry > now + 60.0 || (now < earliest && expiry > now) {
+            } else if expiry > now + limit("refresh_margin_seconds") as f64
+                || (now < earliest && expiry > now)
+            {
                 json!({"decision":"use"})
             } else if now < earliest {
                 fail("chatgpt_refresh_not_ready")
@@ -821,7 +829,7 @@ pub(super) fn run(r: &Value) -> Value {
                     "chatgpt_{}",
                     profile["state"].as_str().unwrap_or("")
                 ))
-            } else if !contains(profile.get("scopes"), "chatgpt.tokens.use.direct") {
+            } else if !contains(profile.get("scopes"), text(&chatgpt()["use_scope"])) {
                 fail("chatgpt_scope_required")
             } else {
                 json!({"valid":true})

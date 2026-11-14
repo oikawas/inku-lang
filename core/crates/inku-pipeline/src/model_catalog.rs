@@ -7,7 +7,7 @@ mod chatgpt_auth_policy;
 mod chatgpt_policy;
 mod model_refresh;
 mod provider_settings;
-mod sign_in;
+pub(crate) mod sign_in;
 mod sign_in_view;
 
 const SOURCE: &str = include_str!("../data/model_catalog.json");
@@ -1052,6 +1052,15 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
     if request.get("schema").and_then(Value::as_str) != Some("inku.model-catalog-request.v1") {
         return br#"{"schema":"inku.model-catalog.v1","outcome":"refused","reason":"invalid_schema"}"#.to_vec();
     }
+    // A sign-in service's action under its general name (step 3).
+    let mut request = request;
+    if let Some(action) = request.get("action").and_then(Value::as_str) {
+        match sign_in::alias(action, request.get("service").and_then(Value::as_str)) {
+            Ok(Some(named)) => request["action"] = json!(named),
+            Ok(None) => {}
+            Err(reason) => return finish(json!({"outcome":"refused","reason":reason})),
+        }
+    }
     let result = match request.get("action").and_then(Value::as_str) {
         Some("catalog") => info(),
         Some("provider_metadata") => {
@@ -1754,7 +1763,7 @@ mod tests {
     fn shared_sign_in_cases_answer_through_the_json_entry() {
         let cases: Value =
             serde_json::from_str(include_str!("../data/sign-in-cases.json")).unwrap();
-        assert_eq!(array(cases.get("cases")).len(), 48);
+        assert_eq!(array(cases.get("cases")).len(), 49);
         for row in array(cases.get("cases")) {
             let actual: Value = serde_json::from_slice(&model_catalog_json(
                 &serde_json::to_vec(&row["request"]).unwrap(),
@@ -1762,5 +1771,28 @@ mod tests {
             .unwrap();
             assert_eq!(actual, row["answer"], "{}", row["name"]);
         }
+    }
+
+    /// Step 3: the sign-in values moved to `sign-in-services.json` answer as
+    /// the constants did.
+    #[test]
+    fn the_sign_in_constants_are_the_ones_the_code_held() {
+        let answer: Value = serde_json::from_slice(&model_catalog_json(
+            br#"{"schema":"inku.model-catalog-request.v1","action":"chatgpt_auth_constants"}"#,
+        ))
+        .unwrap();
+        assert_eq!(
+            answer,
+            json!({"schema":"inku.model-catalog.v1","outcome":"ok",
+                "issuer":"https://auth.openai.com",
+                "authorize":"https://auth.openai.com/api/accounts/authorize",
+                "token":"https://auth.openai.com/api/accounts/oauth/token",
+                "resource":"https://api.openai.com/v1",
+                "scopes":"openid profile email offline_access resource.invoke chatgpt.tokens.use.direct",
+                "image_effects":["select_image_catalog","write_image_ddl","review_image_ddl","review_description_ddl"],
+                "effects":["generate_sketch","select_description_catalog","generate_normalized_ddl","read_composition",
+                    "choose_laws","choose_colors","complete_visible_ddl_holes","read_description","compose_description",
+                    "write_description_ddl"]})
+        );
     }
 }

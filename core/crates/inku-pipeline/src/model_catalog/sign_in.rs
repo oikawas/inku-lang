@@ -106,3 +106,58 @@ pub(super) fn run(request: &Value) -> Value {
         _ => json!({"outcome":"refused","reason":"unknown_action"}),
     }
 }
+
+/// The actions a sign-in service answers that were named after ChatGPT
+/// before (step 3): `sign_in_<rest>` with a `service` runs `chatgpt_<rest>`
+/// with that service's descriptor. The step 1 and 2 actions keep their names.
+pub(crate) const NATIVE: [&str; 4] = [
+    "sign_in_services",
+    "provider_groups",
+    "sign_in_connection_view",
+    "sign_in_publication_draft",
+];
+
+/// The `chatgpt_*` action a `sign_in_*` action names, or `None` when the
+/// action is not such a name. Refuses a missing or unknown service.
+pub(crate) fn alias(
+    action: &str,
+    service_id: Option<&str>,
+) -> Result<Option<String>, &'static str> {
+    let Some(rest) = action.strip_prefix("sign_in_") else {
+        return Ok(None);
+    };
+    if NATIVE.contains(&action) {
+        return Ok(None);
+    }
+    let Some(found) = service_id.and_then(service) else {
+        return Err("unknown_sign_in_service");
+    };
+    let prefix = found["code_prefix"].as_str().unwrap_or("chatgpt");
+    Ok(Some(format!("{prefix}_{rest}")))
+}
+
+/// The descriptor the `chatgpt_*` handlers read (step 3): the alias names
+/// them by the service's code prefix, so they always serve `chatgpt`.
+pub(crate) fn chatgpt() -> &'static Value {
+    service("chatgpt").expect("the chatgpt sign-in descriptor")
+}
+
+/// A descriptor text.
+pub(crate) fn text(value: &'static Value) -> &'static str {
+    value.as_str().expect("a descriptor text")
+}
+
+/// A descriptor list of texts.
+pub(crate) fn texts(value: &'static Value) -> Vec<&'static str> {
+    value
+        .as_array()
+        .expect("a descriptor list")
+        .iter()
+        .map(text)
+        .collect()
+}
+
+/// A descriptor whole number.
+pub(crate) fn count(value: &'static Value) -> u64 {
+    value.as_u64().expect("a descriptor number")
+}

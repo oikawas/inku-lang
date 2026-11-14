@@ -18,22 +18,32 @@ use super::{
 };
 use crate::identity::canonical_json;
 
-const NAMESPACE: &str = "inku";
-const FUNCTION: &str = "submit_pipeline_response";
+use crate::model_catalog::sign_in::{chatgpt, count, text, texts};
 
+/// The service's sending and listing values (step 3: `sign-in-services.json`).
+fn namespace() -> &'static str {
+    text(&chatgpt()["send"]["tool_namespace"])
+}
+fn function_name() -> &'static str {
+    text(&chatgpt()["send"]["tool_function"])
+}
 /// The failure codes a ChatGPT error may name in public; any other is replaced
 /// by one that says only what the status says.
-const PUBLIC_CODES: [&str; 9] = [
-    "subscription_sharing_usage_limit_exceeded",
-    "subscription_sharing_user_not_eligible",
-    "subscription_sharing_unsupported_capability",
-    "subscription_sharing_route_not_supported",
-    "subscription_sharing_invalid_user",
-    "chatpass_v2_scope_not_authorized",
-    "chatpass_v2_invalid_authorization_context",
-    "subscription_sharing_usage_unavailable",
-    "subscription_sharing_user_unavailable",
-];
+fn public_codes() -> Vec<&'static str> {
+    texts(&chatgpt()["failures"]["public_codes"])
+}
+fn admission_rejected(status: Option<i64>) -> bool {
+    status.is_some_and(|status| {
+        chatgpt()["failures"]["admission_statuses"]
+            .as_array()
+            .expect("the admission statuses")
+            .iter()
+            .any(|item| item.as_i64() == Some(status))
+    })
+}
+fn listing(name: &str) -> &'static serde_json::Value {
+    &chatgpt()["models"][name]
+}
 
 /// The codes whose failure is temporary however they arrive.
 const TEMPORARY_CODES: [&str; 5] = [
@@ -188,7 +198,7 @@ fn cache_key(system: &str, schema: &Value) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
-    format!("inku-{hex}")
+    format!("{}{hex}", text(&chatgpt()["send"]["cache_key_prefix"]))
 }
 
 /// `chatgpt_provider.request_body`: the one function, in the `inku` namespace,
@@ -230,7 +240,7 @@ pub(super) fn pipeline_request<T: AsRef<str>>(
             "tools",
             Value::Array(vec![object(vec![
                 ("type", string("namespace")),
-                ("name", string(NAMESPACE)),
+                ("name", string(namespace())),
                 (
                     "description",
                     string("Return data for the inku drawing pipeline."),
@@ -239,7 +249,7 @@ pub(super) fn pipeline_request<T: AsRef<str>>(
                     "tools",
                     Value::Array(vec![object(vec![
                         ("type", string("function")),
-                        ("name", string(FUNCTION)),
+                        ("name", string(function_name())),
                         ("description", string("Return the requested drawing data.")),
                         ("parameters", ordered_schema(schema, false)),
                         ("strict", Value::Bool(false)),
@@ -379,10 +389,10 @@ fn response_error(value: &Value, status: Option<i64>, request_id: Option<&Value>
         .or_else(|| (as_str(get(value, "type")) == Some("error")).then_some(value))
         .filter(|item| matches!(item, Value::Object(_)))
         .unwrap_or(&empty);
-    let named = as_str(get(error, "code")).filter(|code| PUBLIC_CODES.contains(code));
+    let named = as_str(get(error, "code")).filter(|code| public_codes().contains(code));
     let code = match named {
         Some(code) => code,
-        None if matches!(status, Some(401 | 403)) => "chatgpt_admission_rejected",
+        None if admission_rejected(status) => "chatgpt_admission_rejected",
         None if status.is_some_and(|status| status >= 500) => "chatgpt_transport_unavailable",
         None => "chatgpt_response_failed",
     };
@@ -628,8 +638,8 @@ impl Decoder {
 
     fn function(&self, item: &Value) -> Step<()> {
         if !is(field(item, "type")?, "function_call")
-            || !is(field(item, "name")?, FUNCTION)
-            || !is(field(item, "namespace")?, NAMESPACE)
+            || !is(field(item, "name")?, function_name())
+            || !is(field(item, "namespace")?, namespace())
         {
             return self.unexpected(&[item]);
         }
@@ -1073,31 +1083,34 @@ pub(super) fn stream_answer(text: bool, answer_limit: usize, wire: &[u8]) -> Val
 // ---------------------------------------------------------------------------
 // The model list.
 
-/// The longest slug and display name a listed model may have, in UTF-8 bytes.
-const SLUG_BYTES: usize = 256;
-const LABEL_BYTES: usize = 512;
-
 /// The models the backend lists for the subscriber: `visibility == "list"`,
 /// with a slug and a display name. A row that cannot be published is dropped
 /// rather than losing the list, and a slug listed twice keeps its first row;
 /// `dropped` counts the listed rows left out.
 pub(super) fn catalog_answer(value: &Value) -> Value {
-    let Some(Value::Array(entries)) = get(value, "models") else {
+    let Some(Value::Array(entries)) = get(value, text(listing("field"))) else {
         return object(vec![("outcome", string("malformed"))]);
     };
     let mut models = Vec::new();
     let mut slugs: Vec<&str> = Vec::new();
     let mut dropped = 0;
     for entry in entries {
-        if matches!(entry, Value::Object(_)) && !is(get(entry, "visibility"), "list") {
+        if matches!(entry, Value::Object(_))
+            && !is(
+                get(entry, text(listing("visibility_field"))),
+                text(listing("visible")),
+            )
+        {
             continue;
         }
-        let named = |name: &str, limit: usize| {
-            as_str(get(entry, name)).filter(|text| !text.is_empty() && text.len() <= limit)
+        // The longest slug and display name a listed model may have, in UTF-8 bytes.
+        let named = |name: &str, limit: u64| {
+            as_str(get(entry, name))
+                .filter(|value| !value.is_empty() && value.len() as u64 <= limit)
         };
         let (Some(slug), Some(label)) = (
-            named("slug", SLUG_BYTES),
-            named("display_name", LABEL_BYTES),
+            named(text(listing("slug_field")), count(listing("slug_bytes"))),
+            named(text(listing("label_field")), count(listing("label_bytes"))),
         ) else {
             dropped += 1;
             continue;
@@ -1114,7 +1127,12 @@ pub(super) fn catalog_answer(value: &Value) -> Value {
             set(
                 &mut model,
                 "purposes",
-                Value::Array(vec![string("llm"), string("vision")]),
+                Value::Array(
+                    texts(listing("default_purposes"))
+                        .into_iter()
+                        .map(string)
+                        .collect(),
+                ),
             );
             models.push(Value::Object(model));
         }

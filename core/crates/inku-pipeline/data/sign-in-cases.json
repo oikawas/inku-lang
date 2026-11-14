@@ -4142,6 +4142,19 @@
     "outcome": "refused",
     "reason": "unknown_sign_in_service"
    }
+  },
+  {
+   "name": "an action under the general name refuses an unknown service",
+   "request": {
+    "schema": "inku.model-catalog-request.v1",
+    "action": "sign_in_auth_constants",
+    "service": "claude"
+   },
+   "answer": {
+    "schema": "inku.model-catalog.v1",
+    "outcome": "refused",
+    "reason": "unknown_sign_in_service"
+   }
   }
  ]
 }

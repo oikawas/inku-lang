@@ -2006,6 +2006,32 @@ fn limit_of(request: &Value) -> Result<usize, Refusal> {
 fn answer(request: &Value) -> Result<Value, Refusal> {
     let action = as_str(get(request, "action"))
         .ok_or_else(|| Refusal::invalid("action must be a string"))?;
+    // A sign-in service's action under its general name (step 3).
+    match crate::model_catalog::sign_in::alias(action, as_str(get(request, "service"))) {
+        Ok(Some(named)) => {
+            let Value::Object(members) = request else {
+                return Err(Refusal::invalid("the request is not a JSON object"));
+            };
+            let renamed = members
+                .iter()
+                .map(|(name, item)| {
+                    if name == "action" {
+                        (name.clone(), Value::String(named.clone()))
+                    } else {
+                        (name.clone(), item.clone())
+                    }
+                })
+                .collect();
+            return answer(&Value::Object(renamed));
+        }
+        Ok(None) => {}
+        Err(reason) => {
+            return Err(Refusal {
+                reason,
+                detail: "unknown sign-in service".to_owned(),
+            });
+        }
+    }
     let model =
         || as_str(get(request, "model")).ok_or_else(|| Refusal::invalid("model must be a string"));
     match action {
@@ -2238,6 +2264,63 @@ pub fn provider_wire_json(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Step 3: every shared ChatGPT row answers byte for byte the same under
+    /// its general name `sign_in_<rest>` with `service: "chatgpt"`.
+    #[test]
+    fn every_chatgpt_row_answers_the_same_under_the_sign_in_name() {
+        let mut rows: Vec<serde_json::Value> = Vec::new();
+        for text in [
+            include_str!("../../../../server/tests/data/chatgpt-auth-11-15-cases.json"),
+            include_str!("../../../../server/tests/data/chatgpt-auth-addendum-cases.json"),
+        ] {
+            let parsed: serde_json::Value = serde_json::from_str(text).unwrap();
+            for row in parsed.as_array().unwrap() {
+                let mut request = row["request"].clone();
+                request["schema"] = serde_json::json!("inku.model-catalog-request.v1");
+                rows.push(request);
+            }
+        }
+        for row in cases()["chatgpt"].as_array().unwrap() {
+            rows.push(row["request"].clone());
+        }
+        assert_eq!(rows.len(), 289);
+        let run = |request: &serde_json::Value| -> Vec<u8> {
+            let bytes = serde_json::to_vec(request).unwrap();
+            if request["schema"] == "inku.model-catalog-request.v1" {
+                crate::model_catalog::model_catalog_json(&bytes)
+            } else {
+                provider_wire_json(&bytes)
+            }
+        };
+        for request in &rows {
+            let action = request["action"].as_str().unwrap();
+            let rest = action.strip_prefix("chatgpt_").expect("a chatgpt action");
+            let mut renamed = request.clone();
+            renamed["action"] = serde_json::json!(format!("sign_in_{rest}"));
+            renamed["service"] = serde_json::json!("chatgpt");
+            let mut original = request.clone();
+            original["service"] = serde_json::json!("chatgpt");
+            assert_eq!(
+                String::from_utf8(run(&renamed)).unwrap(),
+                String::from_utf8(run(&original)).unwrap(),
+                "{action}"
+            );
+            // Through the wire entry as well, as a host that sends everything there.
+            assert_eq!(
+                String::from_utf8(provider_wire_json(&serde_json::to_vec(&renamed).unwrap()))
+                    .unwrap(),
+                String::from_utf8(provider_wire_json(&serde_json::to_vec(&original).unwrap()))
+                    .unwrap(),
+                "wire {action}"
+            );
+        }
+        let mut unknown = rows[0].clone();
+        unknown["action"] = serde_json::json!("sign_in_auth_callback_query");
+        unknown["service"] = serde_json::json!("claude");
+        let refused: serde_json::Value = serde_json::from_slice(&run(&unknown)).unwrap();
+        assert_eq!(refused["reason"], "unknown_sign_in_service");
+    }
 
     fn cases() -> serde_json::Value {
         serde_json::from_str(include_str!(

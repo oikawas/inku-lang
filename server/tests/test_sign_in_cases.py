@@ -24,7 +24,7 @@ def test_the_core_answers_each_shared_sign_in_case(case):
 
 
 def test_the_shared_cases_are_all_read():
-    assert len(CASES) == 48
+    assert len(CASES) == 49
 
 
 # The two routes of step 2 pass what the screen holds to the core and return its answer.

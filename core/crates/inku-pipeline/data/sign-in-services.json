@@ -1,11 +1,115 @@
 [
   {
     "id": "chatgpt",
-    "label": {"ja": "ChatGPT でサインイン", "en": "Sign in with ChatGPT"},
+    "label": {
+      "ja": "ChatGPT でサインイン",
+      "en": "Sign in with ChatGPT"
+    },
     "abbreviation": "SIWC",
     "usage_url": "https://chatgpt.com/settings/usage",
     "kind": "chatgpt_responses",
     "requires_api_key": false,
-    "use_scope": "chatgpt.tokens.use.direct"
+    "use_scope": "chatgpt.tokens.use.direct",
+    "code_prefix": "chatgpt",
+    "login": {
+      "issuer": "https://auth.openai.com",
+      "endpoint_host": "auth.openai.com",
+      "authorize_path": "/api/accounts/authorize",
+      "token_path": "/api/accounts/oauth/token",
+      "resource": "https://api.openai.com/v1",
+      "scopes": [
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+        "resource.invoke",
+        "chatgpt.tokens.use.direct"
+      ],
+      "provisional_client_id": "dynamic_agent_client",
+      "callback_path": "/auth/callback",
+      "agent_name_hint": "inku",
+      "signing_algorithms": [
+        "RS256",
+        "ES256"
+      ],
+      "default_signing_algorithms": [
+        "RS256"
+      ],
+      "reauthentication_errors": [
+        "invalid_grant",
+        "invalid_refresh_token",
+        "token_expired",
+        "refresh_token_expired",
+        "refresh_token_invalidated",
+        "refresh_token_reused"
+      ],
+      "limits": {
+        "attempts": 4,
+        "owner_attempts": 1,
+        "deadline_seconds": 300,
+        "retain_seconds": 600,
+        "registrations": 8,
+        "refresh_margin_seconds": 60,
+        "max_expires_in_seconds": 86400
+      }
+    },
+    "operations": {
+      "llm": [
+        "generate_sketch",
+        "select_description_catalog",
+        "generate_normalized_ddl",
+        "read_composition",
+        "choose_laws",
+        "choose_colors",
+        "complete_visible_ddl_holes",
+        "read_description",
+        "compose_description",
+        "write_description_ddl"
+      ],
+      "vision": [
+        "select_image_catalog",
+        "write_image_ddl",
+        "review_image_ddl",
+        "review_description_ddl"
+      ]
+    },
+    "models": {
+      "field": "models",
+      "visibility_field": "visibility",
+      "visible": "list",
+      "slug_field": "slug",
+      "label_field": "display_name",
+      "cache_seconds": 300,
+      "default_purposes": [
+        "llm",
+        "vision"
+      ],
+      "slug_bytes": 256,
+      "label_bytes": 512
+    },
+    "send": {
+      "dialect": "openai_responses",
+      "tool_namespace": "inku",
+      "tool_function": "submit_pipeline_response",
+      "cache_key_prefix": "inku-"
+    },
+    "failures": {
+      "public_codes": [
+        "subscription_sharing_usage_limit_exceeded",
+        "subscription_sharing_user_not_eligible",
+        "subscription_sharing_unsupported_capability",
+        "subscription_sharing_route_not_supported",
+        "subscription_sharing_invalid_user",
+        "chatpass_v2_scope_not_authorized",
+        "chatpass_v2_invalid_authorization_context",
+        "subscription_sharing_usage_unavailable",
+        "subscription_sharing_user_unavailable"
+      ],
+      "usage_limit_code": "subscription_sharing_usage_limit_exceeded",
+      "admission_statuses": [
+        401,
+        403
+      ]
+    }
   }
 ]

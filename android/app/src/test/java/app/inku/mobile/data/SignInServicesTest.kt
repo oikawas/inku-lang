@@ -20,7 +20,7 @@ class SignInServicesTest {
 
     @Test fun sharedSignInCasesUseTheActualJniCore() {
         val cases = JSONObject(File(System.getProperty("inku.signInCases")).readText()).getJSONArray("cases")
-        assertEquals(48, cases.length())
+        assertEquals(49, cases.length())
         for (index in 0 until cases.length()) {
             val row = cases.getJSONObject(index)
             val answer = JSONObject(NativePipelineBridge.modelCatalog(row.getJSONObject("request").toString().toByteArray())

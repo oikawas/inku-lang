@@ -567,7 +567,10 @@ impl Flow {
                 self.set("access_token", profile["access_token"].clone());
                 self.todo("ac_saved", json!({"todo":"write","value":store}))
             }
-            "ac_saved" => self.release("ac_released", "edit"),
+            "ac_saved" => {
+                self.set("refreshed", json!(true));
+                self.release("ac_released", "edit")
+            }
             "ac_released" => self.release("ac_done", "refresh"),
             "ac_reauth_got" => self.todo("ac_reauth_read", json!({"todo":"read"})),
             "ac_reauth_read" => {
@@ -586,6 +589,19 @@ impl Flow {
                 return Err((self, failure));
             }
             "ac_done" => {
+                // A refreshed registration is read again before it is used, as
+                // Server's session check does before it sends: a refresh that
+                // dropped the plan's scope stops here.
+                if self.get("refreshed") == true {
+                    self.set("refreshed", json!(false));
+                    return Ok(self.todo("ac_checked", json!({"todo":"read"})));
+                }
+                return Ok(self.resume("ac_checked", &Value::Null));
+            }
+            "ac_checked" => {
+                if result["value"].is_object() {
+                    check!(self.session(&result["value"]));
+                }
                 let after = self.get("ac_after").as_str().unwrap_or("").to_owned();
                 if after.is_empty() {
                     let token = self.get("access_token").clone();
@@ -1608,6 +1624,32 @@ mod tests {
         assert_eq!(profile["refresh_token"], "refresh-2");
         assert_eq!(profile["generation"], 3);
         assert_eq!(profile["model_purposes"], json!({"gpt-6.1-sol":["llm"]}));
+    }
+
+    #[test]
+    fn a_refresh_that_drops_the_plan_scope_sends_no_model_list() {
+        let mut old = connected();
+        old["expires_at"] = json!(NOW + 10.0);
+        let mut host = Host::new(store(old));
+        let mut refreshed = tokens(&id_token(None, "client-1"));
+        refreshed["body"] = json!(
+            refreshed["body"]
+                .as_str()
+                .unwrap()
+                .replace(" chatgpt.tokens.use.direct", "")
+        );
+        host.http = vec![refreshed, discovery(), keys()];
+        let failed = host.run(
+            "catalog",
+            json!({"profile_id":"p1","generation":3,"force":true}),
+        );
+        assert_eq!(failed["code"], "chatgpt_scope_required", "{failed}");
+        assert_eq!(
+            host.sent.len(),
+            3,
+            "the refresh and its identity, no model list"
+        );
+        assert_eq!(host.store["profiles"]["p1"]["refresh_token"], "refresh-2");
     }
 
     #[test]

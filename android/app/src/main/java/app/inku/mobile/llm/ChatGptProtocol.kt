@@ -2,105 +2,11 @@ package app.inku.mobile.llm
 
 import android.util.Log
 import java.io.ByteArrayOutputStream
-import java.math.BigInteger
-import java.net.URI
-import java.net.URLEncoder
-import java.security.AlgorithmParameters
-import java.security.KeyFactory
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.security.Signature
-import java.security.spec.ECGenParameterSpec
-import java.security.spec.ECParameterSpec
-import java.security.spec.ECPoint
-import java.security.spec.ECPublicKeySpec
-import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-internal fun randomOAuthValue(): String = base64Url(ByteArray(32).also(SecureRandom()::nextBytes))
-internal fun form(values: Map<String, String>): String = values.entries.joinToString("&") {
-    URLEncoder.encode(it.key, Charsets.UTF_8) + "=" + URLEncoder.encode(it.value, Charsets.UTF_8)
-}
-
-internal fun authorizationUrl(hostId: String, redirectUri: String, state: String, nonce: String,
-                              verifier: String, previous: JSONObject?, consent: Boolean): String {
-    return ChatGptCore.call("chatgpt_auth_url", JSONObject().put("host_id", hostId).put("redirect_uri", redirectUri)
-        .put("state", state).put("nonce", nonce).put("verifier", verifier)
-        .put("previous", previous ?: JSONObject.NULL).put("consent", consent)).getString("url")
-}
-
-internal fun callbackParameters(target: String): Map<String, String> {
-    if (target.length > 16_384) throw ChatGptException("chatgpt_callback_invalid")
-    val query = ChatGptCore.call("chatgpt_auth_callback_query", JSONObject().put("target", target)).getJSONObject("query")
-    return query.keys().asSequence().associateWith { query.getJSONArray(it).getString(0) }
-}
-
-internal fun callbackStateMatches(query: Map<String, String>, expected: String): Boolean =
-    runCatching { ChatGptCore.call("chatgpt_auth_callback", JSONObject().put("state", query["state"].orEmpty())
-        .put("expected_state", expected).put("code", "state-check")); true }.getOrDefault(false)
-
-internal fun issuedClientId(query: Map<String, String>, previous: JSONObject?): String {
-    ChatGptCore.call("chatgpt_auth_callback", JSONObject().put("state", "ok").put("expected_state", "ok")
-        .put("error", query["error"] ?: JSONObject.NULL).put("code", query["code"] ?: JSONObject.NULL))
-    val issued = query["client_id"] ?: previous?.optString("client_id").orEmpty()
-    return ChatGptCore.call("chatgpt_auth_callback_client", JSONObject().put("issued", issued)
-        .put("previous", previous ?: JSONObject.NULL)).getString("client_id")
-}
-
-/** JCA verifies only advertised RSA/P-256 signatures; no unsigned claims are adopted. */
-internal fun validateChatGptIdentity(token: String, clientId: String, nonce: String?, metadata: JSONObject,
-                                     jwks: JSONObject, nowSeconds: Long): JSONObject {
-    try {
-        require(token.length <= 65_536 && metadata.getString("issuer") == CHATGPT_ISSUER)
-        val parts = token.split('.')
-        require(parts.size == 3 && parts.all { it.matches(Regex("[A-Za-z0-9_-]+")) })
-        val decoder = Base64.getUrlDecoder()
-        val header = JSONObject(decoder.decode(parts[0]).toString(Charsets.UTF_8))
-        val selected = ChatGptCore.call("chatgpt_auth_key", JSONObject().put("header", header).put("discovery", metadata).put("keys", jwks))
-        val algorithm = selected.getString("alg")
-        val key = selected.getJSONObject("key")
-        val signature = Signature.getInstance(if (algorithm == "RS256") "SHA256withRSA" else "SHA256withECDSA")
-        val publicKey = if (algorithm == "RS256") {
-            require(key.getString("kty") == "RSA")
-            val n = BigInteger(1, decoder.decode(key.getString("n")))
-            val e = BigInteger(1, decoder.decode(key.getString("e")))
-            require(n.bitLength() in 2048..8192 && e >= BigInteger.valueOf(3) && e.bitLength() <= 32)
-            KeyFactory.getInstance("RSA").generatePublic(RSAPublicKeySpec(n, e))
-        } else {
-            require(key.getString("kty") == "EC" && key.getString("crv") == "P-256")
-            val parameters = AlgorithmParameters.getInstance("EC").apply { init(ECGenParameterSpec("secp256r1")) }
-                .getParameterSpec(ECParameterSpec::class.java)
-            val x = decoder.decode(key.getString("x")); val y = decoder.decode(key.getString("y"))
-            require(x.size == 32 && y.size == 32)
-            KeyFactory.getInstance("EC").generatePublic(ECPublicKeySpec(ECPoint(BigInteger(1, x), BigInteger(1, y)), parameters))
-        }
-        signature.initVerify(publicKey)
-        signature.update((parts[0] + "." + parts[1]).toByteArray(Charsets.US_ASCII))
-        val rawSignature = decoder.decode(parts[2])
-        require(signature.verify(if (algorithm == "ES256") ecdsaDer(rawSignature) else rawSignature))
-        val claims = JSONObject(decoder.decode(parts[1]).toString(Charsets.UTF_8))
-        ChatGptCore.call("chatgpt_auth_claims", JSONObject().put("claims", claims).put("client_id", clientId)
-            .put("nonce", nonce ?: JSONObject.NULL).put("now", nowSeconds))
-        return claims
-    } catch (_: Exception) {
-        throw ChatGptException("chatgpt_identity_invalid")
-    }
-}
-
-private fun ecdsaDer(raw: ByteArray): ByteArray {
-    require(raw.size == 64)
-    fun integer(bytes: ByteArray): ByteArray {
-        val first = bytes.indexOfFirst { it != 0.toByte() }.let { if (it < 0) bytes.lastIndex else it }
-        val value = bytes.copyOfRange(first, bytes.size)
-        return if (value[0].toInt() and 128 != 0) byteArrayOf(0) + value else value
-    }
-    val r = integer(raw.copyOfRange(0, 32)); val s = integer(raw.copyOfRange(32, 64))
-    return byteArrayOf(0x30, (r.size + s.size + 4).toByte(), 0x02, r.size.toByte()) + r + byteArrayOf(0x02, s.size.toByte()) + s
-}
-
 internal fun chatGptPurpose(action: String?): String {
     val effects = ChatGptCore.call("chatgpt_auth_constants").getJSONArray("image_effects")
     return if ((0 until effects.length()).any { effects.getString(it) == action }) "vision" else "llm"

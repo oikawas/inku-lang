@@ -27,6 +27,9 @@ internal object SignInServices {
 
     fun isSignIn(id: String): Boolean = services("en").any { it.getString("id") == id }
 
+    /** The service's usage page (the descriptor's `usage_url`). */
+    fun usageUrl(id: String): String = services("en").first { it.getString("id") == id }.getString("usage_url")
+
     /** The connection's name in [language] (`ja` or `en`), e.g. "ChatGPT でサインイン". */
     fun label(id: String, language: String): String =
         services(language).first { it.getString("id") == id }.getString("label")

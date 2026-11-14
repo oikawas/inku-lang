@@ -49,7 +49,11 @@ class ChatGptPolicyCoreTest {
         assertEquals("1800000000.001", core.get("expires_at").toString())
         assertEquals(canonical(purposes), canonical(core.getJSONObject("model_purposes")))
         val restored = ChatGptCore.fromCore(core).apply { remove("model_purposes") }
-        assertEquals(canonical(profile), canonical(restored))
+        // Step 5: what the core is given is kept as saved. A registration saved
+        // before step 5 had neither field; it is given Android's own (the runtime refreshes, at the core's issuer).
+        val legacy = JSONObject(profile.toString()).put("refresh_owner", "runtime").put("issuer", "https://auth.openai.com")
+        assertEquals(canonical(legacy), canonical(restored))
+        assertEquals("exported", ChatGptCore.toCore(JSONObject(profile.toString()).put("refresh_owner", "exported")).getString("refresh_owner"))
     }
 
     @Test fun directScopeAloneAllowsThePlan() {

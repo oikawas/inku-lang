@@ -5213,7 +5213,7 @@ private fun ChatGptDrawingStatus(state: InkuUiState, viewModel: InkuViewModel) {
         Text(if (state.chatGptPlan.canUsePlan) S.chatGptUsingPlan else chatGptConnectionStatus(state.chatGptPlan, S), style = MaterialTheme.typography.labelMedium)
         state.chatGptPlan.active?.label?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
         state.chatGptPlan.errorCode?.let { Text(S.chatGptError(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-        TextButton(onClick = { if (!openChatGptBrowser(context, app.inku.mobile.llm.CHATGPT_USAGE)) viewModel.chatGptBrowserUnavailable() }) { Text(S.chatGptManageUsage) }
+        TextButton(onClick = { if (!openChatGptBrowser(context, app.inku.mobile.data.SignInServices.usageUrl("chatgpt"))) viewModel.chatGptBrowserUnavailable() }) { Text(S.chatGptManageUsage) }
     }
 }
 

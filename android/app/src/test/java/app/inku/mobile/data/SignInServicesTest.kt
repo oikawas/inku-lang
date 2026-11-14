@@ -69,6 +69,18 @@ class SignInServicesTest {
 
     private fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else (0 until length()).map(::getJSONObject)
 
+    /** Step 5: every shared row of the procedures (a request and its answer) through the JNI core. */
+    @Test fun sharedSignInFlowRowsUseTheActualJniCore() {
+        val rows = JSONArray(File(System.getProperty("inku.signInFlowCases")).readText())
+        assertEquals(106, rows.length())
+        for (index in 0 until rows.length()) {
+            val row = rows.getJSONObject(index)
+            val request = JSONObject(row.getJSONObject("request").toString()).put("schema", "inku.model-catalog-request.v1")
+            val answer = JSONObject(NativePipelineBridge.modelCatalog(request.toString().toByteArray()).toString(Charsets.UTF_8))
+            assertEquals("[$index] ${row.optString("why")}", canonical(row.getJSONObject("expect")), canonical(answer))
+        }
+    }
+
     @Test fun theScreenNamesAreTheCoreLabels() {
         assertEquals("ChatGPT でサインイン", InkuStringsJa.chatGptPlan)
         assertEquals("Sign in with ChatGPT", InkuStringsEn.chatGptPlan)

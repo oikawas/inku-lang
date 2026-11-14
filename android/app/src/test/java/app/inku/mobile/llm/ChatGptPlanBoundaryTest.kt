@@ -18,6 +18,16 @@ import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 
+// The values the core sends to (step 5 moved them out of the app); the fake server answers by them.
+private const val CHATGPT_ISSUER = "https://auth.openai.com"
+private const val CHATGPT_RESOURCE = "https://api.openai.com/v1"
+private const val CHATGPT_TOKEN = "$CHATGPT_ISSUER/api/accounts/oauth/token"
+private const val CHATGPT_SCOPE = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
+
+private fun form(values: Map<String, String>): String = values.entries.joinToString("&") {
+    java.net.URLEncoder.encode(it.key, Charsets.UTF_8) + "=" + java.net.URLEncoder.encode(it.value, Charsets.UTF_8)
+}
+
 class ChatGptPlanBoundaryTest {
     private class Store : ChatGptCredentialStore {
         var value = JSONObject().put("profiles", JSONObject())
@@ -37,7 +47,8 @@ class ChatGptPlanBoundaryTest {
                                      timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?,
                                      send: ChatGptSend?): ChatGptHttpResponse {
             check(); calls.add(url); send?.let(sends::add)
-            val result = handler(url, token, body)
+            // A procedure's request carries its token in the core's headers.
+            val result = handler(url, token ?: send?.headers?.get("Authorization")?.removePrefix("Bearer "), body)
             check()
             if (onChunk != null && result.status == 200) {
                 (streamBytes ?: result.body.toByteArray()).asList().chunked(chunkSize).forEach { check(); onChunk(it.toByteArray()) }
@@ -67,7 +78,10 @@ class ChatGptPlanBoundaryTest {
         return "$input.${base64Url(signature)}"
     }
 
-    private fun query(url: String) = callbackParameters("/auth/callback?" + URI(url).rawQuery)
+    private fun query(url: String): Map<String, String> = URI(url).rawQuery.split('&').filter(String::isNotEmpty).associate { pair ->
+        val (name, value) = pair.split('=', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        java.net.URLDecoder.decode(name, Charsets.UTF_8) to java.net.URLDecoder.decode(value, Charsets.UTF_8)
+    }
     private fun tokens(nonce: String) = JSONObject().put("token_type", "Bearer").put("access_token", "test-access")
         .put("refresh_token", "test-refresh").put("expires_in", 3600).put("scope", CHATGPT_SCOPE)
         .put("id_token", signedIdentity(nonce))
@@ -129,7 +143,9 @@ class ChatGptPlanBoundaryTest {
             }
             val response = callbackResponse(start, "issued-client")
             assertEquals(200, response.first)
-            assertTrue(response.second.contains("ChatGPTでの許可を受け取りました。inkuへ戻ると接続を完了します。"))
+            // The core's received page (respond_before_exchange): answered before the code is exchanged.
+            assertTrue(response.second.contains("ChatGPTでの許可を受け取りました"))
+            assertTrue(response.second.contains("inkuへ戻ると接続を完了します。"))
             withTimeout(2000) { while (logs.isEmpty()) delay(5) }
             assertEquals(1, logs.size)
             val line = logs.single()
@@ -170,7 +186,8 @@ class ChatGptPlanBoundaryTest {
             } }
             val response = callbackResponse(start, "issued-client")
             assertEquals(200, response.first)
-            assertTrue(response.second.contains("ChatGPT authorization received. Return to inku to finish connecting."))
+            assertTrue(response.second.contains("ChatGPT authorization received"))
+            assertTrue(response.second.contains("Return to inku to finish connecting."))
             assertTrue(manager.state.value.pending)
             delay(100)
             assertTrue(http.calls.isEmpty())
@@ -284,9 +301,11 @@ class ChatGptPlanBoundaryTest {
             assertEquals("inku", start["agent_name_hint"])
             assertEquals(CHATGPT_SCOPE, start["scope"])
             assertTrue(start.getValue("ext_agent_host_id").startsWith("urn:uuid:"))
+            val verifierLength = java.util.concurrent.atomic.AtomicInteger()
             http.handler = { url, _, body -> when {
                 url == CHATGPT_TOKEN -> {
                     val fields = query("https://test.invalid/?$body")
+                    verifierLength.set(fields.getValue("code_verifier").length)
                     assertEquals("issued-client", fields["client_id"])
                     assertEquals(start["redirect_uri"], fields["redirect_uri"])
                     assertEquals(start["code_challenge"], base64Url(MessageDigest.getInstance("SHA-256").digest(fields.getValue("code_verifier").toByteArray())))
@@ -331,11 +350,8 @@ class ChatGptPlanBoundaryTest {
             assertEquals(start["ext_agent_host_id"], returning["ext_agent_host_id"])
             assertEquals("consent", returning["prompt"])
             assertNotEquals(start["state"], returning["state"])
-            rejected("chatgpt_registration_incomplete") { issuedClientId(mapOf("client_id" to "another-client", "code" to "x"), store.read().getJSONObject("profiles").getJSONObject(ref.profileId)) }
-            rejected("chatgpt_callback_invalid") { callbackParameters("/auth/callback?state=a&state=b") }
-            assertEquals("a", callbackParameters("//other.invalid/auth/callback?state=a")["state"])
-            rejected("chatgpt_callback_invalid") { callbackParameters("/other?state=a") }
-            assertEquals(mapOf("b" to "ok"), callbackParameters("/auth/callback?a=&b=ok"))
+            // Step 5: the verifier is 64 bytes, as Server's (the core's `random_bytes`).
+            assertEquals(86, verifierLength.get())
         } finally { manager.cancelAuthorization(); scope.cancel() }
     }
 
@@ -364,15 +380,20 @@ class ChatGptPlanBoundaryTest {
         } finally { scope.cancel() }
     }
 
+    /**
+     * Step 5: the host checks only the signature (`verify`); the nonce, the
+     * audience and the claims are the core's (`sign-in-flow-cases.json`).
+     */
     @Test
-    fun aSignedIdentityStillNeedsTheCurrentNonceAndAudience() {
+    fun aSignatureIsCheckedWithTheAdvertisedKey() {
         val token = signedIdentity("expected")
-        assertEquals("person-a", validateChatGptIdentity(token, "issued-client", "expected", metadata, keys, now / 1000).getString("sub"))
-        rejected("chatgpt_identity_invalid") { validateChatGptIdentity(token, "issued-client", "old-attempt", metadata, keys, now / 1000) }
-        rejected("chatgpt_identity_invalid") { validateChatGptIdentity(token, "other-client", "expected", metadata, keys, now / 1000) }
-        val parts = token.split('.').toMutableList()
-        parts[1] = base64Url(JSONObject(String(java.util.Base64.getUrlDecoder().decode(parts[1]))).put("sub", "forged-person").toString().toByteArray())
-        rejected("chatgpt_identity_invalid") { validateChatGptIdentity(parts.joinToString("."), "issued-client", "expected", metadata, keys, now / 1000) }
+        val key = keys.getJSONArray("keys").getJSONObject(0)
+        val parts = token.split('.')
+        assertTrue(verifyChatGptSignature("RS256", key, "${parts[0]}.${parts[1]}", parts[2]))
+        val forged = base64Url(JSONObject(String(java.util.Base64.getUrlDecoder().decode(parts[1]))).put("sub", "forged-person").toString().toByteArray())
+        assertFalse(verifyChatGptSignature("RS256", key, "${parts[0]}.$forged", parts[2]))
+        assertFalse(verifyChatGptSignature("RS256", JSONObject(key.toString()).put("kty", "EC"), "${parts[0]}.${parts[1]}", parts[2]))
+        assertFalse(verifyChatGptSignature("HS256", key, "${parts[0]}.${parts[1]}", parts[2]))
     }
 
     @Test
@@ -421,9 +442,10 @@ class ChatGptPlanBoundaryTest {
             val response = manager.generate(request(ref))
             assertEquals("赤い円。", JSONObject(response.text).getString("ddl")); assertEquals(12, response.completionTokens)
             // Step 4: the core says where and how; the same URLs, headers and bounds as this client's constants before.
+            // Step 5: the core's `catalog` puts the token in its headers; the bytes sent are the same.
             val models = http.sends.first { it.url.endsWith("/models") }
-            assertEquals(ChatGptSend("$CHATGPT_RESOURCE/models", "GET", mapOf("Accept" to "application/json"), "Authorization", "Bearer ",
-                1024 * 1024, 64 * 1024, "x-request-id"), models)
+            assertEquals(ChatGptSend("$CHATGPT_RESOURCE/models", "GET", mapOf("Accept" to "application/json", "Authorization" to "Bearer access-a"),
+                "Authorization", "", 1024 * 1024, 64 * 1024, "x-request-id"), models)
             val responses = http.sends.first { it.url.endsWith("/responses") }
             assertEquals(ChatGptSend("$CHATGPT_RESOURCE/responses", "POST",
                 mapOf("Accept" to "text/event-stream", "Content-Type" to "application/json"), "Authorization", "Bearer ",

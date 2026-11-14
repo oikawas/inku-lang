@@ -1,5 +1,20 @@
 # inku Android 実装メモ
 
+## 2026-11-14 「ChatGPT でサインイン」の手順を共通 core の「次にすること」で回す
+
+step 5。作者の答え（一度に作る、食い違いは項ごとの推奨の表）による。
+
+- ログイン・token を使う・更新・一覧の取り直し・接続の解除・削除・選択・利用枠の停止と再開は、共通 core の `chatgpt_flow_start`・`chatgpt_flow_next` が答える `todo` を 1 つずつ行う（`ChatGptPlanManager.runFlow`）。Android に残るのは次のもの：
+  - lock：`edit`（保管の読み書き）・`refresh`・`wire`。
+  - 暗号化した保管の読み書き（ミリ秒と秒の直し）。
+  - `UrlConnectionChatGptHttp` での送受信（締め切りと上限は `todo` のまま、入出力の失敗は `timeout`・`unavailable`・`too_large`）。
+  - JCA での署名の確かめ（鍵の形の確かめを含む）、乱数、その日時の時差。
+  - `127.0.0.1` の待ち受け（受けた要求の頭のバイトを core に渡し、core の答えをそのまま書く）と Chrome。
+- token の交換（`purpose: token_exchange`）は、今までどおり inku が前に出てから送る（Android 17 の裏の通信の停止）。戻りの頁は core の `respond_before_exchange` で、受け取った時に「ChatGPTでの許可を受け取りました」「inkuへ戻ると接続を完了します。」の頁を返す。
+- 保管の形：sign-in が終わっていない登録は `registrations_pending` に置く（前は `sub` の無い登録として `profiles` の中にあり、次に書く時に移る）。`refresh_owner`・`issuer` は保管の値のまま core に渡す（前の登録には無いので、`runtime` と core の issuer を足す）。
+- 食い違いの表で変わる所：verifier は 64 バイト（前は 32）、戻りの頁は core の日英の HTML、一覧の取り直しの待ちは 15 秒（前は 30 秒）、日付だけの更新の時刻にもその日の時差を渡す、登録の数は完了と未完了を分けて数える。
+- 戻りの要求の頭の読み、state・client id の確かめ、試みの数、登録の上限、discovery・JWKS・claim・名札・世代・保存の決まりは core が持つ。`CHATGPT_ISSUER`・`CHATGPT_TOKEN`・`CHATGPT_RESOURCE`・`CHATGPT_USAGE`・`CHATGPT_SCOPE` の写しは消した。
+
 ## 2026-11-14 「ChatGPT でサインイン」の送信の道と入出力の失敗を共通 core から
 
 step 4。作者の答え（時間切れの文を足す、`Accept` は両方に付ける、読めない流れは再試行する）による。

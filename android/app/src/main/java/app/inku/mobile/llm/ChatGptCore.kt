@@ -21,10 +21,14 @@ internal object ChatGptCore {
         value.optJSONObject("catalog")?.let { cache ->
             if (cache.opt("expires_at") is Number) cache.put("expires_at", BigDecimal(cache.get("expires_at").toString()).movePointLeft(3))
         }
-        value.put("refresh_owner", "runtime")
-        if (!value.has("issuer")) value.put("issuer", CHATGPT_ISSUER)
+        // As saved (step 5). A registration saved before step 5 has neither:
+        // Android has always refreshed its own tokens, at the core's issuer.
+        if (!value.has("refresh_owner")) value.put("refresh_owner", "runtime")
+        if (!value.has("issuer")) value.put("issuer", issuer)
         if (purposes != null) value.put("model_purposes", purposes)
     }
+
+    private val issuer: String by lazy { call("chatgpt_auth_constants").getString("issuer") }
 
     fun fromCore(profile: JSONObject): JSONObject = JSONObject(profile.toString()).also { value ->
         for (key in listOf("expires_at", "earliest_refresh_at")) {
@@ -33,7 +37,5 @@ internal object ChatGptCore {
         value.optJSONObject("catalog")?.let { cache ->
             if (cache.opt("expires_at") is Number) cache.put("expires_at", BigDecimal(cache.get("expires_at").toString()).movePointRight(3).toLong())
         }
-        value.remove("refresh_owner")
-        value.remove("issuer")
     }
 }

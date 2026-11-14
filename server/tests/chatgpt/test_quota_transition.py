@@ -23,8 +23,10 @@ def test_server_quota_transition_and_persistence(row, monkeypatch):
         def read(self, owner):
             return saved
         def write(self, owner, value):
+            # The core's `pause` procedure writes the whole store it read, changed.
             self.writes += 1
-            assert value is saved
+            saved.clear()
+            saved.update(value)
     store = Store()
     monkeypatch.setattr(chatgpt_provider, "CredentialStore", lambda: store)
     chatgpt_provider.pause_quota("owner", "fixture", row["request"]["generation"], 100)

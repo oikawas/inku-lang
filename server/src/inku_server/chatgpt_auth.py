@@ -1,15 +1,26 @@
-"""Public-client PKCE/OIDC, token rotation and owner-bound loopback attempts."""
+"""Sign in with ChatGPT's procedures, run as the shared core answers them.
+
+The core holds each procedure step for step (SIWC step 5, 2026-11-14): sign-in,
+using or refreshing the token, the model list, sign-out, delete, select, the
+pause on a usage limit and the identity check of an imported registration. It
+answers one thing to do (`todo`) at a time; this module does it and gives back
+what came of it. What stays here: the store and its locks, HTTP, the signature
+check, randomness, the callback's socket, the attempts' bookkeeping and the
+owner gate (chatgpt_runtime).
+"""
 
 from __future__ import annotations
 
 import asyncio
-import json
+import base64
+import binascii
+import http
 import secrets
+import socket
 import threading
 import time
 import uuid
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import httpx
 import jwt
@@ -25,23 +36,6 @@ TOKEN = _AUTH_CONSTANTS["token"]
 RESOURCE = _AUTH_CONSTANTS["resource"]
 SCOPES = _AUTH_CONSTANTS["scopes"]
 USAGE_URL = "https://chatgpt.com/settings/usage"
-
-
-def callback_page(language: str, *, completed: bool) -> bytes:
-    if language == "ja":
-        title = "ChatGPTの認証が完了しました" if completed else "ChatGPTの認証は完了していません"
-        message = ("このタブを閉じ、inkuへ戻って「接続状態を確認」を押してください。別のホストへ接続する場合は、Macの登録移送完了を待ってから確認してください。"
-                   if completed else "inkuへ戻り、接続の案内を確認してください。この画面から認証を自動でやり直すことはありません。")
-    else:
-        title = "ChatGPT authorization completed" if completed else "ChatGPT authorization did not complete"
-        message = ("Close this tab, return to inku and press Check connection. For a remote host, wait until the Mac registration transfer finishes first."
-                   if completed else "Return to inku and check the connection message. This page does not retry authorization automatically.")
-    return (f'<!doctype html><html lang="{language}"><head><meta charset="utf-8"><title>{title}</title></head>'
-            f'<body><main><h1>{title}</h1><p>{message}</p></main></body></html>').encode("utf-8")
-
-
-def auth_endpoint(url: str) -> str:
-    return auth_policy("endpoint", url=url)["url"]
 
 
 def auth_policy(action, **fields):
@@ -65,132 +59,305 @@ async def read_limited(response: httpx.Response, check, deadline: float, limit: 
     return bytes(result)
 
 
-async def auth_json(client: httpx.AsyncClient, method: str, url: str, check, deadline: float, **kwargs) -> dict:
-    check()
-    stream = client.stream(method, auth_endpoint(url), timeout=max(0.001, deadline - time.monotonic()), **kwargs)
-    response = await guarded(stream.__aenter__(), check, deadline)
-    try:
-        content = await read_limited(response, check, deadline, 1024 * 1024)
-    finally:
-        await stream.__aexit__(None, None, None)
-    try:
-        value = json.loads(content)
-    except ValueError as error:
-        auth_policy("http", status=response.status_code, json_valid=False)
-        raise ChatGPTError("chatgpt_auth_unavailable") from error
-    if auth_policy("http", status=response.status_code, json_valid=True, value=value).get("type_error"):
-        raise TypeError("unhashable OAuth error code")
-    return value
+def _monotonic(deadline: float) -> float:
+    """A deadline on the core's clock (`time.time()`) as one on the monotonic clock."""
+    return time.monotonic() + (deadline - time.time())
 
 
-async def discovery(client, check, deadline) -> dict:
-    value = await auth_json(client, "GET", ISSUER + "/.well-known/openid-configuration", check, deadline)
-    auth_policy("discovery", discovery=value)
-    return value
+def flow_failure(todo: dict) -> ChatGPTError:
+    if todo.get("status") is not None:
+        from .chatgpt_provider import ResponseFailure
+        return ResponseFailure(todo)
+    return ChatGPTError(todo["code"], failure=todo.get("failure"), action=todo.get("action"))
 
 
-async def validate_identity(client, token: str, client_id: str, nonce: str | None, check, deadline) -> dict:
-    metadata = await discovery(client, check, deadline)
-    keys = await auth_json(client, "GET", auth_endpoint(metadata["jwks_uri"]), check, deadline)
-    try:
-        header = jwt.get_unverified_header(token)
-        chosen = auth_policy("key", header=header, discovery=metadata, keys=keys)
-        key = jwt.PyJWK.from_dict(chosen["key"], algorithm=chosen["alg"]).key
-        claims = jwt.decode(token, key, algorithms=[header["alg"]],
-                            options={"verify_iss": False, "verify_aud": False, "verify_exp": False,
-                                     "verify_iat": False, "verify_nbf": False, "verify_jti": False})
-        auth_policy("claims", claims=claims, client_id=client_id, nonce=nonce, now=time.time())
-    except (jwt.PyJWTError, ValueError, KeyError, TypeError) as error:
-        raise ChatGPTError("chatgpt_identity_invalid") from error
-    check()
-    return claims
+class Callback:
+    """The sign-in's loopback listener: the next request head, and its answer."""
 
+    def __init__(self, host_id: str | None):
+        self.host_id = host_id
+        self.server: socket.socket | None = None
+        self.connection: socket.socket | None = None
+        self.reply: bytes | None = None
 
-def token_fields(value: dict, previous: dict | None = None) -> dict:
-    offset = None
-    earliest = value.get("earliest_refresh_at")
-    if isinstance(earliest, str):
+    def listen(self) -> dict:
+        self.server = socket.create_server(("127.0.0.1", 0))
+        self.server.settimeout(0.2)
+        return {"port": self.server.getsockname()[1]}
+
+    def wait(self, todo: dict, check) -> dict:
+        deadline = _monotonic(todo["deadline"])
+        while time.monotonic() < deadline:
+            check()
+            try:
+                connection, _address = self.server.accept()
+            except TimeoutError:
+                continue
+            head = self._head(connection)
+            if head is None:
+                connection.close()
+                continue
+            self.connection = connection
+            return {"head_base64": base64.b64encode(head).decode()}
+        # Past the deadline: the core ends the sign-in on the next step.
+        return {}
+
+    @staticmethod
+    def _head(connection: socket.socket) -> bytes | None:
+        # Up to the blank line; a longer head is given cut, for the core to refuse.
+        connection.settimeout(1)
+        received = bytearray()
         try:
-            local = datetime.fromisoformat(earliest.replace("Z", "+00:00"))
-            if local.tzinfo is None:
-                offset = int(local.astimezone().utcoffset().total_seconds())
-        except (TypeError, ValueError, OverflowError):
+            while b"\r\n\r\n" not in received and len(received) <= 16 * 1024 + 4:
+                chunk = connection.recv(4096)
+                if not chunk:
+                    return None
+                received.extend(chunk)
+        except OSError:
+            return None
+        end = received.find(b"\r\n\r\n")
+        return bytes(received[:end]) if end >= 0 else bytes(received[:16 * 1024 + 1])
+
+    def respond(self, todo: dict) -> dict:
+        # Sent with the next step, so an attempt that ends is settled before the browser hears.
+        body = todo["body"].encode("utf-8")
+        lines = [f"HTTP/1.1 {todo['status']} {http.HTTPStatus(todo['status']).phrase}",
+                 *(f"{name}: {value}" for name, value in todo["headers"].items()), f"Content-Length: {len(body)}"]
+        self.reply = "\r\n".join(lines).encode("latin-1") + b"\r\n\r\n" + body
+        return {}
+
+    def flush(self) -> None:
+        """Send the answer the last `respond` named, if any, and close its connection."""
+        if self.reply is None:
+            return
+        reply, self.reply = self.reply, None
+        connection, self.connection = self.connection, None
+        if connection is None:
+            return
+        try:
+            connection.sendall(reply)
+        except OSError:
             pass
-    return auth_policy("tokens", value=value, previous=previous, now=time.time(),
-                       local_offset_seconds=offset)["tokens"]
+        finally:
+            connection.close()
+
+    def close(self) -> None:
+        self.flush()
+        for held in (self.connection, self.server):
+            if held is not None:
+                held.close()
+        self.connection = self.server = None
+
+
+class Procedure:
+    """One procedure of the core, done step by step.
+
+    `check` runs before each wait and while HTTP is in flight; it raises when
+    the trusted runtime, the session or the attempt changed. Locks the caller
+    already holds (`held`) are taken as given. With `soft_http`, a check that
+    stops HTTP reads as an unavailable server, as sign-out's revocation did.
+    """
+
+    def __init__(self, flow: str, input: dict, owner: str | None, *, store: CredentialStore | None = None,
+                 check=None, held: tuple[str, ...] = (), soft_http: bool = False,
+                 callback: Callback | None = None, on_write=None, on_end=None):
+        self.flow, self.owner = flow, owner
+        self.store = store or CredentialStore()
+        self.check = check or (lambda: None)
+        self.given, self.soft_http = set(held), soft_http
+        self.callback, self.on_write, self.on_end = callback, on_write, on_end
+        self.locks: dict[str, object] = {}
+        self.answer = core_catalog("chatgpt_flow_start", flow=flow, input=input, now=time.time())
+        self.result, self.stopping = None, False
+
+    def _lock_name(self, lock: str) -> str:
+        return {"edit": "edit:" + self.owner, "refresh": self.owner,
+                "wire": f"wire:{self.owner}:{self.answer['state']['input']['profile_id']}"}[lock]
+
+    async def until(self, stop: str | None = None) -> dict:
+        """Do each todo until the procedure ends, or until one named `stop` (left undone)."""
+        try:
+            while True:
+                if self.result is not None:
+                    self.answer = core_catalog("chatgpt_flow_next", state=self.answer["state"],
+                                               result=self.result, now=time.time())
+                    self.result = None
+                todo = self.answer["todo"]
+                if todo["todo"] in {"done", "failed"}:
+                    if self.on_end:
+                        self.on_end(todo)
+                    self.release()
+                    if self.callback:
+                        self.callback.flush()
+                    return todo
+                if self.callback:
+                    self.callback.flush()
+                if todo["todo"] == stop:
+                    return todo
+                self.result = await self._do(todo)
+        except BaseException:
+            if self.flow != "login" or self.answer.get("state") is None or self.stopping:
+                self.release()
+                raise
+            # A sign-in stopped by its attempt or the runtime: past its deadline, the
+            # core releases what is held and answers a callback it had taken.
+            # The caller settles the attempt by the cause, not by the deadline.
+            self.stopping, self.result = True, None
+            self.check, self.on_end = (lambda: None), None
+            self.answer = core_catalog("chatgpt_flow_next", state=self.answer["state"], result={},
+                                       now=max(time.time(), self.answer["deadline"]))
+            await self.until()
+            raise
+
+    def give(self, result: dict) -> None:
+        self.result = result
+
+    def release(self) -> None:
+        while self.locks:
+            _name, lock = self.locks.popitem()
+            lock.__exit__(None, None, None)
+
+    async def _do(self, todo: dict) -> dict:
+        kind = todo["todo"]
+        if kind == "acquire":
+            if todo["lock"] in self.given:
+                return {"acquired": True}
+            lock = self.store.lock(self._lock_name(todo["lock"]), _monotonic(todo["deadline"]), self.check)
+            try:
+                lock.__enter__()
+            except TimeoutError:
+                return {"acquired": False}
+            self.locks[todo["lock"]] = lock
+            return {"acquired": True}
+        if kind == "release":
+            lock = self.locks.pop(todo["lock"], None)
+            if lock is not None:
+                lock.__exit__(None, None, None)
+            return {}
+        if kind == "read":
+            return {"value": self.store.read(self.owner)}
+        if kind == "write":
+            if self.on_write:
+                self.on_write(lambda: self.store.write(self.owner, todo["value"]), todo["value"])
+            else:
+                self.store.write(self.owner, todo["value"])
+            return {}
+        if kind == "http":
+            return await self._http(todo)
+        if kind == "verify":
+            return {"valid": _verify(todo)}
+        if kind == "offset":
+            return {"seconds": _offset(todo["local"])}
+        if kind == "random":
+            return {"values": {name: secrets.token_urlsafe(size) for name, size in todo["bytes"].items()}}
+        if kind == "host_id":
+            return {"host_id": self.callback.host_id or self.store.host_id()}
+        if kind == "listen":
+            return self.callback.listen()
+        if kind == "await_callback":
+            return self.callback.wait(todo, self.check)
+        if kind == "respond":
+            return self.callback.respond(todo)
+        if kind == "open":
+            return {}
+        raise ChatGPTError("chatgpt_auth_unavailable")
+
+    async def _http(self, todo: dict) -> dict:
+        deadline = _monotonic(todo["deadline"])
+        body = todo["body"].encode("utf-8") if "body" in todo else None
+        try:
+            async with httpx.AsyncClient(follow_redirects=False) as client:
+                self.check()
+                stream = client.stream(todo["method"], todo["url"], headers=todo["headers"], content=body,
+                                       timeout=max(0.001, deadline - time.monotonic()))
+                response = await guarded(stream.__aenter__(), self.check, deadline)
+                try:
+                    limit = todo["answer_limit"] if response.is_success else todo["error_limit"]
+                    content = await read_limited(response, self.check, deadline, limit)
+                finally:
+                    await stream.__aexit__(None, None, None)
+        except ChatGPTError as error:
+            if error.code == "chatgpt_response_too_large":
+                return {"transport": "too_large"}
+            if self.soft_http:
+                return {"transport": "unavailable"}
+            raise
+        except (TimeoutError, httpx.TimeoutException):
+            return {"transport": "timeout"}
+        except httpx.HTTPError:
+            return {"transport": "unavailable"}
+        result = {"status": response.status_code, "body": _text(content, strict=todo["purpose"] != "models")}
+        if todo.get("request_id_header"):
+            result["request_id"] = response.headers.get(todo["request_id_header"])
+        return result
+
+
+def _text(content: bytes, *, strict: bool) -> str:
+    # The sign-in server's answers are JSON, read as json.loads read the bytes;
+    # bytes that are not UTF-8 are not JSON. The model list is read as received.
+    try:
+        return content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return "" if strict else content.decode("utf-8-sig", errors="replace")
+
+
+def _verify(todo: dict) -> bool:
+    try:
+        algorithm = jwt.get_algorithm_by_name(todo["alg"])
+        key = jwt.PyJWK.from_dict(todo["key"], algorithm=todo["alg"]).key
+        signature = jwt.utils.base64url_decode(todo["signature"].encode("ascii"))
+        return bool(algorithm.verify(todo["signing_input"].encode("ascii"), key, signature))
+    except (jwt.PyJWTError, NotImplementedError, ValueError, KeyError, TypeError, binascii.Error):
+        return False
+
+
+def _offset(local: str) -> int | None:
+    """The host's local offset on that date and time, for a value without one."""
+    try:
+        value = datetime.fromisoformat(local)
+        if value.tzinfo is None:
+            return int(value.astimezone().utcoffset().total_seconds())
+    except (TypeError, ValueError, OverflowError):
+        pass
+    return None
+
+
+async def run_flow(flow: str, input: dict, owner: str | None, **options) -> dict:
+    """Run one procedure to its end: the core's `done` answer, or its failure raised."""
+    todo = await Procedure(flow, input, owner, **options).until()
+    if todo["todo"] == "failed":
+        raise flow_failure(todo)
+    return todo
+
+
+async def validate_identity(token: str, client_id: str, nonce: str | None, check, deadline: float) -> dict:
+    return (await run_flow("identity", {"id_token": token, "client_id": client_id, "nonce": nonce,
+                                        "deadline": time.time() + (deadline - time.monotonic())},
+                           None, check=check))["claims"]
 
 
 async def access_token(owner: str, profile_id: str, generation: int, deadline: float, cancel=None) -> str:
     def check():
         return check_session(owner, profile_id, generation, cancel)
-    store = CredentialStore()
-    with store.lock(owner, deadline, check):
-        profile = check()
-        if auth_policy("access", profile=profile, now=time.time())["decision"] == "use":
-            return profile["access_token"]
-        try:
-            async with httpx.AsyncClient(follow_redirects=False) as client:
-                result = await auth_json(client, "POST", TOKEN, check, deadline, data={
-                    "grant_type": "refresh_token", "client_id": profile["client_id"],
-                    "refresh_token": profile["refresh_token"], "resource": RESOURCE,
-                })
-                if result.get("id_token"):
-                    claims = await validate_identity(client, result["id_token"], profile["client_id"], None, check, deadline)
-                    auth_policy("identity", previous=profile, sub=claims["sub"])
-            check()
-            profile = auth_policy("refresh_profile", profile=profile, tokens=token_fields(result, profile))["profile"]
-            store.save_profile(owner, profile, expected_generation=generation, activate=False, deadline=deadline)
-        except ChatGPTError as error:
-            if error.code == "chatgpt_reauthentication_required":
-                profile = auth_policy("transition", profile=profile, state="reauthentication_required")["profile"]
-                store.save_profile(owner, profile, expected_generation=generation, activate=False, deadline=deadline)
-            raise
-        return profile["access_token"]
+    check()
+    return (await run_flow("access", {"profile_id": profile_id, "generation": generation,
+                                      "deadline": time.time() + (deadline - time.monotonic())},
+                           owner, check=check))["access_token"]
 
 
 async def sign_out(owner: str, profile_id: str) -> dict:
+    # Sign-out takes only the edit lock, never the refresh lock, so it is seen
+    # at once, even while a refresh is blocked.
     check_owner(owner)
-    store = CredentialStore()
-    # This lock is deliberately separate from the refresh/slot lock: sign-out
-    # invalidates the session immediately, including while refresh is blocked.
-    with store.lock("edit:" + owner, time.monotonic() + 5):
-        value = store.read(owner)
-        profile = value["profiles"].get(profile_id)
-        if not profile:
-            raise ChatGPTError("chatgpt_not_connected")
-        old = dict(profile)
-        profile = auth_policy("transition", profile=profile, state="signed_out")["profile"]
-        value["profiles"][profile_id] = profile
-        store.write(owner, value)
-    confirmed = False
-    try:
-        deadline = time.monotonic() + 10
-        if auth_policy("revocation", profile=old)["send"]:
-            async with httpx.AsyncClient(follow_redirects=False) as client:
-                metadata = await discovery(client, lambda: check_owner(owner), deadline)
-                stream = client.stream("POST", auth_endpoint(metadata["revocation_endpoint"]), data={
-                    "token": old["refresh_token"], "token_type_hint": "refresh_token", "client_id": old["client_id"],
-                }, timeout=10)
-                response = await guarded(stream.__aenter__(), lambda: check_owner(owner), deadline)
-                try:
-                    await read_limited(response, lambda: check_owner(owner), deadline, 64 * 1024)
-                    confirmed = auth_policy("revocation", profile=old, status=response.status_code)["confirmed"]
-                finally:
-                    await stream.__aexit__(None, None, None)
-    except (ChatGPTError, httpx.HTTPError, TimeoutError, KeyError):
-        pass
-    return {"status": "signed_out", "revocation_confirmed": confirmed}
+    result = await run_flow("sign_out", {"profile_id": profile_id}, owner, check=lambda: check_owner(owner), soft_http=True)
+    return {"status": result["status"], "revocation_confirmed": result["revocation_confirmed"]}
 
 
 async def delete_profile(owner: str, profile_id: str) -> dict:
-    # Sign out first so a connected registration's tokens are revoked, then drop the entry.
-    result = await sign_out(owner, profile_id)
-    store = CredentialStore()
-    with store.lock("edit:" + owner, time.monotonic() + 5):
-        value = store.read(owner)
-        value = auth_policy("delete", value=value, profile_id=profile_id)["value"]
-        store.write(owner, value)
-    return {"status": "deleted", "revocation_confirmed": result["revocation_confirmed"]}
+    # Signed out first, so a connected registration's tokens are revoked, then dropped.
+    check_owner(owner)
+    result = await run_flow("delete", {"profile_id": profile_id}, owner, check=lambda: check_owner(owner), soft_http=True)
+    return {"status": result["status"], "revocation_confirmed": result["revocation_confirmed"]}
 
 
 class AuthorizationAttempts:
@@ -229,117 +396,58 @@ class AuthorizationAttempts:
         with self.lock:
             self.attempts = {key: value for key, value in self.attempts.items() if time.monotonic() < value["retain_until"]}
             pending = [value for value in self.attempts.values() if value["status"] == "pending"]
-            limits = auth_policy("attempt", pending_count=len(pending), owner_count=sum(value["owner"] == owner for value in pending))
-            saved = CredentialStore().read(owner) if CredentialStore().root.exists() else {"profiles": {}}
-            previous = auth_policy("previous", profile_id=profile_id,
-                                   profile=saved["profiles"].get(profile_id),
-                                   pending=saved.get("registrations_pending", {}).get(profile_id))["previous"]
-            attempt = {"id": str(uuid.uuid4()), "owner": owner, "profile_id": profile_id or str(uuid.uuid4()),
-                       "status": "pending", "code": None, "state": secrets.token_urlsafe(32), "nonce": secrets.token_urlsafe(32),
-                       "verifier": secrets.token_urlsafe(64), "used": False, "cancel": threading.Event(),
-                       "deadline": time.monotonic() + limits["deadline_seconds"], "retain_until": time.monotonic() + limits["retain_seconds"]}
+            counts = {"pending_count": len(pending), "owner_count": sum(value["owner"] == owner for value in pending)}
+            attempt = {"id": str(uuid.uuid4()), "owner": owner, "profile_id": profile_id, "status": "pending",
+                       "code": None, "cancel": threading.Event()}
+
             def check():
                 guard()
-                if attempt["cancel"].is_set() or time.monotonic() >= attempt["deadline"]:
+                if attempt["cancel"].is_set():
                     raise ChatGPTError("chatgpt_cancelled")
-            coordinator = self
-            class Listener(HTTPServer):
-                def get_request(self):
-                    sock, address = super().get_request()
-                    sock.settimeout(1)
-                    return sock, address
 
-                def handle_error(self, *_args):
-                    # Malformed callback sockets must never produce a traceback.
-                    pass
+            def write(save, value):
+                # Cancellation and the kept registration have one linearization point.
+                with self.lock:
+                    check()
+                    save()
+                    if attempt["profile_id"] not in value.get("registrations_pending", {}):
+                        attempt.update(status="completed", code=None)
 
-            class Callback(BaseHTTPRequestHandler):
-                def log_message(self, *_args):
-                    pass
-
-                def do_GET(self):
-                    status = 400
-                    try:
-                        query = auth_policy("callback_query", target=self.path)["query"]
-                        auth_policy("callback", state=query.get("state", [""])[0],
-                                    expected_state=attempt["state"], code="state-check", error=None)
-                        with coordinator.lock:
-                            guard()
-                            decision = auth_policy("callback_use", used=attempt["used"], cancelled=attempt["cancel"].is_set(), expired=time.monotonic() >= attempt["deadline"])
-                            attempt["used"] = decision["used"]
-                        if "error" in query:
-                            auth_policy("callback", state=attempt["state"], expected_state=attempt["state"],
-                                        code="error-check", error=query["error"][0])
-                        issued = query.get("client_id", [previous["client_id"] if previous else ""])[0]
-                        auth_policy("callback_client", issued=issued, previous=previous)
-                        code = auth_policy("callback", state=attempt["state"], expected_state=attempt["state"],
-                                           code=query.get("code", [None])[0], error=None)["code"]
-                        asyncio.run(coordinator._exchange(attempt, issued, code, previous, check))
-                        status = 200
-                    except Exception as error:
-                        if attempt["used"]:
-                            attempt.update(status="failed", code=error.code if isinstance(error, ChatGPTError) else "chatgpt_auth_unavailable")
-                    self.send_response(status)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Referrer-Policy", "no-referrer")
-                    self.end_headers()
-                    self.wfile.write(callback_page(language, completed=status == 200))
-            server = Listener(("127.0.0.1", 0), Callback)
-            server.timeout = 0.2
-            attempt["redirect_uri"] = f"http://127.0.0.1:{server.server_port}/auth/callback"
+            callback = Callback(registration_host_id)
+            procedure = Procedure("login", {"profile_id": profile_id, "consent": consent, "language": language, **counts},
+                                  owner, check=check, callback=callback, on_write=write,
+                                  on_end=lambda todo: self._settle(attempt, None if todo["todo"] == "done" else todo["code"]))
+            try:
+                opened = asyncio.run(procedure.until("open"))
+            except BaseException:
+                callback.close()
+                raise
+            if opened["todo"] != "open":
+                callback.close()
+                raise flow_failure(opened)
+            attempt.update(profile_id=opened["profile_id"],
+                           retain_until=time.monotonic() + auth_policy("attempt", **counts)["retain_seconds"])
             self.attempts[attempt["id"]] = attempt
-            def listen():
-                try:
-                    while attempt["status"] == "pending":
-                        check()
-                        server.handle_request()
-                except ChatGPTError as error:
-                    attempt.update(status="failed", code=error.code)
-                finally:
-                    server.server_close()
-                    for field in ("state", "nonce", "verifier"):
-                        attempt.pop(field, None)
-            url = auth_policy("url", previous=previous, consent=consent,
-                              host_id=registration_host_id or CredentialStore().host_id(),
-                              redirect_uri=attempt["redirect_uri"], state=attempt["state"],
-                              nonce=attempt["nonce"], verifier=attempt["verifier"])["url"]
-            threading.Thread(target=listen, daemon=True, name="inku-chatgpt-callback").start()
-            return {"attempt_id": attempt["id"], "profile_id": attempt["profile_id"], "authorization_url": url}
+            procedure.give({})
+            threading.Thread(target=self._finish, args=(attempt, procedure, callback), daemon=True,
+                             name="inku-chatgpt-callback").start()
+            return {"attempt_id": attempt["id"], "profile_id": attempt["profile_id"], "authorization_url": opened["url"]}
 
-    async def _exchange(self, attempt, issued, code, previous, check):
-        store = CredentialStore()
-        with store.lock(attempt["owner"], attempt["deadline"], check):
-            with store.lock("edit:" + attempt["owner"], attempt["deadline"], check):
-                value = store.read(attempt["owner"])
-                registrations = value.setdefault("registrations_pending", {})
-                auth_policy("pending_check", exists=attempt["profile_id"] in registrations, count=len(registrations))
-                registrations[attempt["profile_id"]] = {"client_id": issued}
-                store.write(attempt["owner"], value)
-        async with httpx.AsyncClient(follow_redirects=False) as client:
-            tokens = await auth_json(client, "POST", TOKEN, check, attempt["deadline"], data={
-                "grant_type": "authorization_code", "client_id": issued, "code": code, "code_verifier": attempt["verifier"],
-                "redirect_uri": attempt["redirect_uri"], "resource": RESOURCE,
-            })
-            claims = await validate_identity(client, tokens["id_token"], issued, attempt["nonce"], check, attempt["deadline"])
-        auth_policy("identity", previous=previous, sub=claims["sub"])
-        display = auth_policy("display", claims=claims, client_id=issued,
-                              email_json=json.dumps(claims["email"], ensure_ascii=False) if "email" in claims else None)
-        profile = {"id": attempt["profile_id"], "issuer": ISSUER, "sub": claims["sub"], "client_id": issued,
-                   "email": display["email"], "label": display["label"],
-                   "generation": auth_policy("generation", previous=previous)["generation"], "state": "connected", "refresh_owner": "runtime",
-                   "oidc_nonce": attempt["nonce"], **token_fields(tokens)}
-        with store.lock(attempt["owner"], attempt["deadline"], check):
-            # Cancellation and verified adoption have one linearization point.
-            # Never hold this coordinator lock during HTTP.
-            with self.lock:
-                check()
-                store.save_profile(attempt["owner"], profile, expected_generation=previous.get("generation") if previous else None, deadline=attempt["deadline"])
-                with store.lock("edit:" + attempt["owner"], attempt["deadline"], check):
-                    value = store.read(attempt["owner"])
-                    value.get("registrations_pending", {}).pop(attempt["profile_id"], None)
-                    store.write(attempt["owner"], value)
-                attempt.update(status="completed", code=None)
+    def _finish(self, attempt: dict, procedure: Procedure, callback: Callback) -> None:
+        # The procedure settles the attempt as it ends (`on_end`); a stop names its own cause.
+        try:
+            asyncio.run(procedure.until())
+        except ChatGPTError as error:
+            self._settle(attempt, error.code)
+        except Exception:
+            self._settle(attempt, "chatgpt_auth_unavailable")
+        finally:
+            callback.close()
+
+    def _settle(self, attempt: dict, code: str | None) -> None:
+        with self.lock:
+            if attempt["status"] == "pending":
+                attempt.update(status="completed" if code is None else "failed", code=code)
 
 
 attempts = AuthorizationAttempts()

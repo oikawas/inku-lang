@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from .chatgpt_auth import access_token, auth_policy, read_limited
+from .chatgpt_auth import access_token, auth_policy, read_limited, run_flow
 from .chatgpt_runtime import check_session, guarded, session_checker
 from .chatgpt_store import ChatGPTError, CredentialStore
 from .chatgpt_models import publication
@@ -70,15 +70,13 @@ def _text(content: bytes) -> str:
 
 
 def pause_quota(owner: str, profile_id: str, generation: int, deadline: float) -> None:
-    store = CredentialStore()
-    with store.lock("edit:" + owner, deadline):
-        saved = store.read(owner)
-        profile = saved["profiles"].get(profile_id)
-        from .verified_model_catalog import core_catalog
-        result = core_catalog("chatgpt_auth_pause_quota", profile=profile, generation=generation)
-        if result["changed"]:
-            saved["profiles"][profile_id] = result["profile"]
-            store.write(owner, saved)
+    """The core's `pause` procedure: the registration read again under the edit lock.
+
+    Called outside an event loop (a send calls it through a thread).
+    """
+    asyncio.run(run_flow("pause", {"profile_id": profile_id, "generation": generation,
+                                   "deadline": time.time() + (deadline - time.monotonic())},
+                         owner, store=CredentialStore()))
 
 
 class SSEDecoder:
@@ -130,48 +128,16 @@ class TextSSEDecoder(SSEDecoder):
 
 
 async def catalog(owner: str, profile_id: str, generation: int, deadline: float, cancel=None, *, force: bool = False, _wire_held: bool = False) -> list[dict]:
+    # The core's `catalog` procedure: a current list is local data; a refresh
+    # takes the wire slot inference holds (a send passes it held), refreshes the
+    # token, asks for the list, pauses the plan on a usage limit, and keeps the
+    # list in the registration read again under the edit lock.
     check = session_checker(owner, profile_id, generation, cancel, validate=check_session)
-    profile = check()
-    cache = profile.get("catalog")
-    from .verified_model_catalog import core_catalog
-    if core_catalog("chatgpt_cache", cache=cache, force=force, now=time.time())["fresh"]:
-        return publication(profile, cache["models"])["models"]
-    # A current, validated catalog is local data. Only a refresh needs the
-    # wire slot held by inference; recheck both session and cache after waiting.
-    if not _wire_held:
-        with CredentialStore().lock("wire:" + owner + ":" + profile_id, deadline, check):
-            return await catalog(owner, profile_id, generation, deadline, cancel, force=force, _wire_held=True)
-    token = await access_token(owner, profile_id, generation, deadline, cancel)
-    # Where the list is asked for, its headers and limits are the shared core's (step 4, 2026-11-14).
-    sent = provider_wire.chatgpt_models_request()
-    async with httpx.AsyncClient(follow_redirects=False) as client:
-        stream = client.stream(sent["method"], sent["url"], headers=provider_wire.headers(sent, token),
-                               timeout=max(0.001, deadline - time.monotonic()))
-        response = await guarded(stream.__aenter__(), check, deadline)
-        try:
-            limit = sent["answer_limit"] if response.is_success else sent["error_limit"]
-            content = await read_limited(response, check, deadline, limit)
-        finally:
-            await stream.__aexit__(None, None, None)
-    if not response.is_success:
-        error = response_error(status=response.status_code, request_id=response.headers.get(sent["request_id_header"]),
-                               body=_text(content))
-        if auth_policy("quota_failure", code=error.code)["pause"]:
-            pause_quota(owner, profile_id, generation, deadline)
-        raise error
-    listed = provider_wire.chatgpt_catalog(body=_text(content))
-    if listed["outcome"] != "ok":
-        raise ChatGPTError(listed["code"], failure=listed["failure"], action=listed["action"])
-    models = listed["models"]
-    store = CredentialStore()
-    with store.lock("edit:" + owner, deadline, check):
-        profile = check()
-        profile["catalog"] = {"expires_at": core_catalog("chatgpt_cache", now=time.time())["expires_at"], "models": models}
-        # The caller holds the edit lock; atomic write preserves other accounts.
-        saved = store.read(owner)
-        saved["profiles"][profile_id] = profile
-        store.write(owner, saved)
-    return publication(profile, models)["models"]
+    check()
+    listed = await run_flow("catalog", {"profile_id": profile_id, "generation": generation, "force": force,
+                                        "deadline": time.time() + (deadline - time.monotonic())},
+                            owner, store=CredentialStore(), check=check, held=("wire",) if _wire_held else ())
+    return publication(check(), listed["models"])["models"]
 
 
 async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float,
@@ -256,7 +222,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
             if image_effect:
                 error.request_id, error.param = safe_identifier(error.request_id), safe_identifier(error.param)
             if auth_policy("quota_failure", code=error.code)["pause"]:
-                pause_quota(owner, profile_id, generation, deadline)
+                await asyncio.to_thread(pause_quota, owner, profile_id, generation, deadline)
             raise
 
 

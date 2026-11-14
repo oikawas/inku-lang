@@ -27,6 +27,21 @@ def test_the_shared_cases_are_all_read():
     assert len(CASES) == 49
 
 
+# The sign-in's procedures, step for step (SIWC step 5): each request a host sends and the
+# core's answer, as the core's own test host recorded them.
+FLOW_CASES = json.loads((pathlib.Path(__file__).resolve().parent / "data/sign-in-flow-cases.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("case", FLOW_CASES, ids=[case["why"] for case in FLOW_CASES])
+def test_the_core_answers_each_step_of_the_shared_procedures(case):
+    request = json.dumps(case["request"], ensure_ascii=False).encode("utf-8")
+    assert json.loads(inku_render.pipeline_model_catalog(request)) == case["expect"]
+
+
+def test_the_shared_procedure_steps_are_all_read():
+    assert len(FLOW_CASES) == 106
+
+
 # The two routes of step 2 pass what the screen holds to the core and return its answer.
 VIEW_FIELDS = ("connection", "attempt", "busy", "code", "last_operation", "revocation_confirmed")
 DRAFT_FIELDS = ("publication", "draft", "edit", "administrator", "assessment_drafts")

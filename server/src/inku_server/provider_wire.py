@@ -154,9 +154,12 @@ def chatgpt_catalog(value: Any = None, *, body: str | None = None) -> dict:
 
 
 def headers(request: dict, key: str) -> dict[str, str]:
-    """The headers to send: the core's plain ones and the key under the header it names."""
+    """The headers to send: the core's plain ones and the key under the header it names.
+
+    An API key's request names what stands in for a missing key; ChatGPT's names none.
+    """
     auth = request["auth"]
-    return {**request["headers"], auth["header"]: auth["prefix"] + (key or auth["missing"])}
+    return {**request["headers"], auth["header"]: auth["prefix"] + (key or auth.get("missing", ""))}
 
 
 def _body_text(raw: bytes) -> str:

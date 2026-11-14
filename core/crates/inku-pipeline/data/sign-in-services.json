@@ -91,7 +91,21 @@
       "dialect": "openai_responses",
       "tool_namespace": "inku",
       "tool_function": "submit_pipeline_response",
-      "cache_key_prefix": "inku-"
+      "cache_key_prefix": "inku-",
+      "responses": {
+        "path": "/responses",
+        "method": "POST",
+        "headers": { "Content-Type": "application/json", "Accept": "text/event-stream" }
+      },
+      "models_list": {
+        "path": "/models",
+        "method": "GET",
+        "headers": { "Accept": "application/json" },
+        "answer_limit": 1048576
+      },
+      "auth": { "header": "Authorization", "prefix": "Bearer " },
+      "error_limit": 65536,
+      "request_id_header": "x-request-id"
     },
     "failures": {
       "public_codes": [

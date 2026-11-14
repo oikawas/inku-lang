@@ -302,7 +302,7 @@ public actor ChatGPTPlanRuntime {
             if let object = try JSONSerialization.jsonObject(with: row.data) as? [String: Any] { assessed[id] = try ProviderCoreSettings.model(object) }
         }
         return .init(profileID: profile.id, generation: profile.generation, models: models, published: published,
-                     purposes: purposes, assessedModels: assessed)
+                     purposes: purposes, assessedModels: assessed, coreAnswer: answer.data)
     }
     private func checkOffered(_ model: String, purpose: String, session: ChatGPTPlanSession, deadline: Date, operationEpoch: UInt64) async throws {
         _ = try await offeredModels(session: session, force: false, deadline: deadline, operationEpoch: operationEpoch)

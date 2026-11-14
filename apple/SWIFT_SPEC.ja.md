@@ -22,6 +22,18 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-11-14 ChatGPT でサインイン（step 2）
+
+接続の状態の見せ方と公開の編集を、共通coreの`sign_in_connection_view`・`sign_in_publication_draft`の答えで出す（作者の決定：見せ方はWebに揃え、文言の表はホストに残す）。
+
+- 接続の頁（`ChatGPTPlanSettingsView`・`ChatGPTPlanSettingsModel`）：上の状態の行・上の操作・試みの最中の操作・未完了の登録・登録ごとの状態の印と操作・接続済みの案内を、coreの答え（`SignInConnectionView`）から出す。上の状態の行は直前の失敗の印だけを`ChatGPTStatusCopy`で出し、自由文の知らせ（選んだ・再試行を許可した、など）はやめた。解除・削除の後は、失効を確かめられなかった時だけWebの「失効は未確認」の文を出す。
+- Macでは、試みの最中に「認証画面をもう一度開く」を出す（ブラウザで開き直す）。iOSはログインの画面がアプリの上にあり、閉じると止まるので出さない。
+- 未完了の登録は、登録の一覧の前に、client idを添えて出す。使用量の頁は、状態を読めていない時も上の操作に出す。
+- 接続の解除は、削除と同じく、押すと確かめの文と「接続を解除する」「やめる」を出し、確かめで実行する（作者の答え）。
+- 「ChatGPT でサインインを有効にする」のトグルと、登録8件で新しい接続のボタンを止める所を外した（作者の答え、Webに揃える）。サインインの操作が接続を有効にし、予約の`chatgpt`のサービスを足す。登録の上限の確かめ（`chatgpt_profile_limit`）は残る。
+- 公開の選び（`ChatGPTModelsSheet`）：選び・用途・未保存・取り直しを押せるか・保存を押せるか・保存の本文を、coreの答え（`SignInPublicationDraft`）から出す。用途を外して空になれば公開から外し、全選択は選べて用途のある物だけ、保存は変更が無くても押せ、保存の本文は一覧の順の公開と全てのモデルの用途（Webと同じ）。評価は、同梱のカタログから作り直さず、公開の行（coreの`chatgpt_publication`）だけから読む。
+- 確かめ：`InkuAppCheck --sign-in-only`が共通の試験データの48行と、Swiftが作る要求（見せ方・編集）をcoreで照らす。
+
 ## 2026-11-14 ChatGPT でサインイン（step 1）
 
 作者の指示（2026-11-14「web/swift/androidのモデル設定、モデル選択で、chatGPTを先頭に変更。」）と、正式の名（日本語「ChatGPT でサインイン」、英語「Sign in with ChatGPT」、略称「SIWC」）。共通coreの`model_catalog_json`の`provider_groups`・`sign_in_services`・`resolve_display`を使う。

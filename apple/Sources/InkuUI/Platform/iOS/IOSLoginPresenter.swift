@@ -10,6 +10,9 @@ import UIKit
 @MainActor
 final class InkuLoginPresenter: NSObject, ASWebAuthenticationPresentationContextProviding {
     private var session: ASWebAuthenticationSession?
+    /// The login sheet stays over the app while the sign-in waits, and closing it stops the sign-in, so there is
+    /// nothing to open again (core `attempt.can_reopen`).
+    static let canReopen = false
 
     /// `onCancel`: the person closed the sheet before signing in.
     func open(_ url: URL, fallback: OpenURLAction, onCancel: @escaping @MainActor () -> Void) {

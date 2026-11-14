@@ -18,8 +18,7 @@ import XCTest
                 fixture.accept(url)
             }
             XCTAssertTrue(model.connected, mode)
-            XCTAssertEqual(model.status, "")
-            XCTAssertNil(model.errorText)
+            XCTAssertNil(model.code)
             let calls = await fixture.http.modelCalls
             XCTAssertEqual(calls, 1, mode)
             let publication = try await fixture.runtime.publication()
@@ -39,8 +38,7 @@ import XCTest
         let model = ChatGPTPlanSettingsModel()
         await model.authorize(profileID: fixture.profileID, app: fixture.app) { fixture.accept($0) }
         XCTAssertTrue(model.connected)
-        XCTAssertEqual(model.status, "")
-        XCTAssertEqual(model.errorText, ChatGPTStatusCopy.text("chatgpt_transport_unavailable", language: fixture.app.display.preferences.language))
+        XCTAssertEqual(model.code, "chatgpt_transport_unavailable")
         let calls = await fixture.http.modelCalls
         XCTAssertEqual(calls, 1)
         let saved = try XCTUnwrap(fixture.store.load().profiles[fixture.profileID])
@@ -63,7 +61,7 @@ import XCTest
             XCTAssertEqual(calls, 0)
             let saved = try XCTUnwrap(fixture.store.load().profiles[fixture.profileID])
             XCTAssertEqual(saved.generation, 1)
-            if !cancelled { XCTAssertNotNil(model.errorText) }
+            if !cancelled { XCTAssertNotNil(model.code) }
         }
     }
 }

@@ -319,7 +319,6 @@ class ChatGptPlanBoundaryTest {
             withTimeout(2000) { while (manager.state.value.pending) delay(5) }
             withTimeout(2000) { while (manager.state.value.models == null) delay(5) }
             assertTrue(manager.state.value.canUsePlan)
-            assertTrue(manager.state.value.showPlanNotice)
             assertEquals(emptyList<String>(), manager.state.value.publishedModels)
             val ref = manager.pinSession()
             val returning = query(manager.authorize(ref.profileId, consent = true))

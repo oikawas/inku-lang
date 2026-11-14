@@ -110,8 +110,16 @@ interface InkuStrings {
     val chatGptPlanDisabled: String
     val chatGptOpenModels: String
     val chatGptUsingPlan: String
-    val chatGptNoticeTitle: String
-    val chatGptNoticeAccept: String
+    /** Web `chatgptCheckConnection`. */
+    val chatGptCheckConnection: String
+    /** Web `chatgptRetry`. */
+    val chatGptRetry: String
+    /** Web `chatgptModelSettingsGuide`: shown with 「モデル設定を開く」. */
+    val chatGptModelSettingsGuide: String
+    /** Web `chatgptStatus(chatgpt_exported)`. */
+    val chatGptExported: String
+    /** Web `chatgptStatus(chatgpt_scope_required)`, as a registration's state. */
+    val chatGptScopeRequiredStatus: String
     val chatGptRevocationUnconfirmed: String
     val chatGptError: (String) -> String
 

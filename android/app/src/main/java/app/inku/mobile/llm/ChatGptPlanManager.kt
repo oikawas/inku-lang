@@ -6,6 +6,7 @@ import java.net.SocketTimeoutException
 import java.nio.charset.CharacterCodingException
 import java.util.UUID
 import android.util.Log
+import app.inku.mobile.data.catalogRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -80,18 +81,25 @@ class ChatGptPlanManager internal constructor(
             val activeId = saved.optString("active").takeIf(String::isNotEmpty)
             val active = activeId?.let(profiles::optJSONObject)
             val cache = active?.optJSONObject("catalog")?.optJSONArray("models")
+            val items = profiles.keys().asSequence().map { id -> id to profiles.getJSONObject(id) }.toList()
+            // A registration without `sub` never finished signing in: listed apart (Web `pending_registrations`).
+            val finished = items.filter { (_, item) -> item.has("sub") }.map { (id, item) ->
+                ChatGptProfileView(id, item.optString("label", "ChatGPT / " + item.optString("client_id").takeLast(8)),
+                    item.optString("state", "reauthentication_required"), item.planAllowed(), item.stringList("scopes"))
+            }
+            val unfinished = items.filterNot { (_, item) -> item.has("sub") }.map { (id, item) ->
+                ChatGptPendingRegistration(id, item.optString("client_id").takeIf(String::isNotEmpty))
+            }
+            val pending = authorization != null
             mutableState.value = ChatGptPlanView(
-                profiles = profiles.keys().asSequence().map { id ->
-                    val item = profiles.getJSONObject(id)
-                    ChatGptProfileView(id, item.optString("label", "ChatGPT / " + item.optString("client_id").takeLast(8)),
-                        item.optString("state", "reauthentication_required"), item.planAllowed())
-                }.toList(),
-                activeProfileId = activeId, pending = authorization != null,
+                profiles = finished, pendingRegistrations = unfinished,
+                activeProfileId = activeId, pending = pending,
                 errorCode = errorCode, revocationUnconfirmed = revocationUnconfirmed,
                 models = cache?.let { (0 until it.length()).map { i -> it.getJSONObject(i).let { model -> ChatGptModel(model.getString("id"), model.getString("label")) } } },
                 publishedModels = active?.stringList("published_models") ?: emptyList(),
                 activeSession = active?.sessionRef(),
-                showPlanNotice = active?.let { it.optString("state") == "connected" && it.planAllowed() && !it.optBoolean("plan_notice_seen") } == true,
+                connection = catalogRequest("sign_in_connection_view",
+                    chatGptConnectionRequest(finished, unfinished, activeId, pending, errorCode, revocationUnconfirmed)),
             )
         } catch (_: Exception) {
             mutableState.value = ChatGptPlanView(errorCode = "chatgpt_storage_unavailable")
@@ -349,9 +357,16 @@ class ChatGptPlanManager internal constructor(
         }
     }
 
-    fun acknowledgePlanNotice(): Unit = synchronized(store) {
+    /** 「接続状態を確認」: reads the saved registrations again and clears the last failure (Web `load`). */
+    fun reload() = updateView()
+
+    /** 「利用枠を確認して再試行」: a registration a usage limit paused goes back to `connected` (Server `/profiles/{id}/retry`). */
+    fun retryQuota(id: String): Unit = synchronized(store) {
         val value = store.read()
-        value.getJSONObject("profiles").optJSONObject(value.optString("active"))?.put("plan_notice_seen", true)
+        val profile = value.getJSONObject("profiles").optJSONObject(id)?.takeIf { it.optString("state") == "quota" }
+            ?: throw ChatGptException("chatgpt_not_connected")
+        val resumed = ChatGptCore.call("chatgpt_auth_resume_quota", JSONObject().put("profile", ChatGptCore.toCore(profile))).getJSONObject("profile")
+        value.getJSONObject("profiles").put(id, ChatGptCore.fromCore(resumed))
         store.write(value); updateView()
     }
 

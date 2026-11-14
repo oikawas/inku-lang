@@ -1649,9 +1649,19 @@
 		outputTab = source;
 	}
 
+// A lineage node's work carries no derivation of its own: its edge to the
+// parent does. Opened from the lineage, the work takes that edge's kind and
+// metadata, as the history list's item has them (step 4c: the thesis source).
+function lineageNodeWork(node: LineageNode): NonNullable<LineageNode['history']> {
+	const history = node.history!;
+	const edge = lineageState.graph?.edges.find((entry) => entry.child_node_id === node.id);
+	if (!edge) return history;
+	return { ...history, derivation_kind: edge.derivation_kind, derivation_metadata: edge.metadata ?? {} } as NonNullable<LineageNode['history']>;
+}
+
 async function openLineageNode(node: LineageNode): Promise<void> {
 	if (!node.history) return;
-	loadIterationItem(node.history);
+	loadIterationItem(lineageNodeWork(node));
 	outputTab = 'lineage';
 	work.lineageDetached = false;
 	await lineageState.load(node.id, true);
@@ -1660,7 +1670,7 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 // In the Lineage tab, double-click opens the work in Canvas; single-click only selects it.
 async function openLineageNodeInCanvas(node: LineageNode): Promise<void> {
 	if (!node.history) return;
-	loadIterationItem(node.history);
+	loadIterationItem(lineageNodeWork(node));
 	outputTab = 'canvas';
 }
 

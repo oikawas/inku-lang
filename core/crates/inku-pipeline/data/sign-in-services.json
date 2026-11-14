@@ -51,6 +51,28 @@
         "registrations": 8,
         "refresh_margin_seconds": 60,
         "max_expires_in_seconds": 86400
+      },
+      "discovery_path": "/.well-known/openid-configuration",
+      "random_bytes": { "state": 32, "nonce": 32, "verifier": 64 },
+      "callback_head": { "header_bytes": 16384, "lines": 65, "target_bytes": 8192 },
+      "flow_limits": {
+        "edit_lock_seconds": 5,
+        "revocation_seconds": 10,
+        "catalog_seconds": 15,
+        "auth_answer_limit": 1048576,
+        "revocation_answer_limit": 65536
+      },
+      "callback_page": {
+        "ja": {
+          "completed": ["ChatGPTの認証が完了しました", "このタブを閉じ、inkuへ戻って「接続状態を確認」を押してください。別のホストへ接続する場合は、Macの登録移送完了を待ってから確認してください。"],
+          "failed": ["ChatGPTの認証は完了していません", "inkuへ戻り、接続の案内を確認してください。この画面から認証を自動でやり直すことはありません。"],
+          "received": ["ChatGPTでの許可を受け取りました", "inkuへ戻ると接続を完了します。"]
+        },
+        "en": {
+          "completed": ["ChatGPT authorization completed", "Close this tab, return to inku and press Check connection. For a remote host, wait until the Mac registration transfer finishes first."],
+          "failed": ["ChatGPT authorization did not complete", "Return to inku and check the connection message. This page does not retry authorization automatically."],
+          "received": ["ChatGPT authorization received", "Return to inku to finish connecting."]
+        }
       }
     },
     "operations": {

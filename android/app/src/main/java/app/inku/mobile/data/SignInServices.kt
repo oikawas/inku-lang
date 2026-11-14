@@ -63,7 +63,7 @@ internal object SignInServices {
     }
 
     /**
-     * The assessments `chatgpt_publication` reads: the bundled catalog's rows,
+     * The assessments `sign_in_publication` reads: the bundled catalog's rows,
      * each replaced by the model's measured record when there is one. The one
      * source for both the saving policy and what the model picker shows
      * (there were two, 2026-11-14 step 2).

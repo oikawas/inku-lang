@@ -6286,19 +6286,19 @@ private fun availablePublishedModels(provider: app.inku.mobile.data.db.ProviderS
 }
 
 /**
- * The core's `chatgpt_publication` for the chosen registration: its rows are
- * the only source of each model's assessment, selectability and purposes,
- * for the drawing choices and for the publishing picker alike.
+ * The core's `sign_in_publication` for the chosen registration
+ * (`ChatGptCore.publication`): its rows are the only source of each model's
+ * assessment, selectability and purposes, for the drawing choices and for the
+ * publishing picker alike.
  */
 private fun chatGptPublication(state: InkuUiState, published: List<String> = state.chatGptPlan.publishedModels): JSONObject {
     val plan = state.chatGptPlan
     val profile = JSONObject().put("published_models", JSONArray(published))
-        .put("model_purposes", JSONObject().apply { state.modelPurposes["chatgpt"].orEmpty().forEach { (id, purposes) -> put(id, JSONArray(purposes)) } })
     plan.activeSession?.let { profile.put("id", it.profileId).put("generation", it.generation) }
     val models = JSONArray().apply { plan.models.orEmpty().forEach { put(JSONObject().put("id", it.id).put("label", it.label)) } }
-    val assessments = app.inku.mobile.data.SignInServices.chatGptAssessments(state.modelCatalogObservations["chatgpt"]?.records.orEmpty())
-    return app.inku.mobile.data.catalogRequest("chatgpt_publication", JSONObject().put("profile", profile)
-        .put("models", models).put("assessments", assessments)).getJSONObject("publication")
+    val purposes = JSONObject().apply { state.modelPurposes["chatgpt"].orEmpty().forEach { (id, purposes) -> put(id, JSONArray(purposes)) } }
+    val policy = app.inku.mobile.llm.ChatGptModelPolicy.of(purposes, state.modelCatalogObservations["chatgpt"]?.records.orEmpty())
+    return app.inku.mobile.llm.ChatGptCore.publication(profile, policy, models)
 }
 
 private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings): String {

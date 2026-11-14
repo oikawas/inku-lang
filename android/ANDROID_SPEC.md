@@ -1,5 +1,14 @@
 # inku Android Implementation Notes
 
+## 2026-11-15 "Sign in with ChatGPT": the general action names, and the host's copies gone
+
+Step 6 (the shared core's tidying). Nothing the author sees changes.
+
+- Android sends the core's sign-in actions under the general names with the service: `sign_in_<name>` and `"service": "chatgpt"` (`ChatGptCore.call`, and `sign_in_request`, `sign_in_stream`, `sign_in_error`, `sign_in_transport` and `sign_in_failure` to the provider wire). The core refuses the old `chatgpt_*` names, and the parts only its own procedures use.
+- Gone: `ChatGptEmailJson`, the `/models` request of the host (`chatGptModelsSend`), `chatGptResponseError`, `chatGptFailureFor`, `modelArray`, and `UrlConnectionChatGptHttp`'s own headers and form body (every request is the core's answer).
+- From the core instead of copies: the bounds of an answer and of an error body (no defaults; a stream is bounded by its `wire_limit`), the bound of the callback head (`sign_in_auth_constants`), the registrations' label and state and the unfinished registrations (the store as the core reads it, once), and the publication (`ChatGptCore.publication`, the one place it is asked). The host's 2 MiB bound on a body the core wrote is gone. A diagnostic line keeps a code and a failure class by their shape, not by a copy of the core's table.
+- Kept, as the host's own: the list of hosts a token may go to (`api.openai.com`, `auth.openai.com`; a test holds it to the core's issuer and resource), the `"chatgpt"` id, cancelling an attempt and exchanging the code once inku is in front, the once-a-second checks while an answer streams, the status beside a ChatGPT model while drawing, and when "Model selection" can be pressed.
+
 ## 2026-11-14 "Sign in with ChatGPT": one connection per device
 
 The author's instructions ("the behaviour of select, reauthenticate, sign out and delete is rubbish", "no need to assume several registrations", align Web and Android too, keep the client_id) and three answers (offer one action when another account signs in, send `id_token_hint`, keep the registration chosen now when tidying).
@@ -19,7 +28,7 @@ The author's instructions ("the behaviour of select, reauthenticate, sign out an
 
 Step 5, following the author's answers (build it at once; settle each difference by the recommended table).
 
-- Sign-in, using and refreshing the token, refreshing the model list, sign-out, deletion, selection, and pausing and resuming at a usage limit do the `todo` that the shared core's `chatgpt_flow_start` and `chatgpt_flow_next` answer, one at a time (`ChatGptPlanManager.runFlow`). Android keeps:
+- Sign-in, using and refreshing the token, refreshing the model list, sign-out, deletion, selection, and pausing and resuming at a usage limit do the `todo` that the shared core's `sign_in_flow_start` and `sign_in_flow_next` answer, one at a time (`ChatGptPlanManager.runFlow`). Android keeps:
   - the locks: `edit` (reading and writing the store), `refresh` and `wire`;
   - reading and writing the encrypted store (milliseconds against seconds);
   - sending and receiving with `UrlConnectionChatGptHttp` (the deadline and bounds as the `todo` gives them; I/O failures as `timeout`, `unavailable` or `too_large`);
@@ -34,9 +43,9 @@ Step 5, following the author's answers (build it at once; settle each difference
 
 Step 4, following the author's answers (add the timeout text, send `Accept` on both, retry an unreadable stream).
 
-- The URL, method, headers, where the token goes and the bounds of an answer and of an error body are the shared core's answers. `/responses` uses the `chatgpt_request` answer and `/models` the new `chatgpt_models_request`. The host check before sending (https to `api.openai.com` and `auth.openai.com` only) stays. Sign-in (token exchange, refresh, revocation) is unchanged (step 5).
-- An error answer's `x-request-id` is read, and its body goes to `chatgpt_error` as text (a body that is not JSON gives the code the status decides). The `/models` answer goes to `chatgpt_catalog` as text too, and a list that cannot be read is the core's `chatgpt_response_invalid`.
-- I/O failures are named by the new `chatgpt_transport`. A read or connection timeout and the whole deadline running out are `chatgpt_transport_timeout` (`transport_timeout`, retry); other I/O failures are `chatgpt_transport_unavailable`; an answer past its bound is `chatgpt_response_too_large`. A malformed stream uses the core's code, class and next action (`provider_rejected` for bytes that are not UTF-8, `malformed_payload` otherwise).
+- The URL, method, headers, where the token goes and the bounds of an answer and of an error body are the shared core's answers. `/responses` uses the `sign_in_request` answer and `/models` the core's model-list procedure (`catalog`). The host check before sending (https to `api.openai.com` and `auth.openai.com` only) stays. Sign-in (token exchange, refresh, revocation) is unchanged (step 5).
+- An error answer's `x-request-id` is read, and its body goes to `sign_in_error` as text (a body that is not JSON gives the code the status decides). The `/models` answer is read by the core's procedure, and a list that cannot be read is the core's `chatgpt_response_invalid`.
+- I/O failures are named by the new `sign_in_transport`. A read or connection timeout and the whole deadline running out are `chatgpt_transport_timeout` (`transport_timeout`, retry); other I/O failures are `chatgpt_transport_unavailable`; an answer past its bound is `chatgpt_response_too_large`. A malformed stream uses the core's code, class and next action (`provider_rejected` for bytes that are not UTF-8, `malformed_payload` otherwise).
 - `ChatGptException` carries the next action (`retry`, `diagnose`, `usage`, …) besides the code and class.
 - The timeout text "ChatGPT did not answer within the time limit. Try again later." is added (before, "the connection was interrupted").
 - The bytes sent (body, `Authorization`, `Accept`, `Content-Type`) and the URLs are the same as before. Android still sends no ChatGPT Vision request.
@@ -46,14 +55,14 @@ Step 4, following the author's answers (add the timeout text, send `Accept` on b
 The author's decision (show the connection state as Web does; the wording tables stay in the hosts) makes this step 2.
 
 - Connection screen: what is shown and what can be pressed is the shared core's `sign_in_connection_view` answer.
-  - Each registration shows its status, and reauthenticate, allow plan usage, sign out and delete appear on registrations that are not chosen as well. A usage limit offers "Check usage and retry" (the core's `chatgpt_auth_resume_quota`, as Server's `/retry`).
+  - Each registration shows its status, and reauthenticate, allow plan usage, sign out and delete appear on registrations that are not chosen as well. A usage limit offers "Check usage and retry" (the core's `resume`, as Server's `/retry`).
   - The actions at the top gain "Check connection" (reads the saved registrations again and clears the last failure).
   - The notice (`chatGptPlanDescription`) always heads the card, and the status line appears only for the last failure code. The first-time "You're using your ChatGPT plan" dialog is removed (the author's answer: "remove it, as on Web").
   - "Open model settings" appears, with its guide text, only when the chosen registration is connected and allowed the plan. `canUsePlan` reads the same answer (`guide`).
   - A registration whose sign-in never finished (a provisional one with no `sub`) is listed apart, as "Reauthenticate (client id)".
   - Signing out still asks first (the core's `confirm`); deleting keeps its two-step confirmation.
   - The status next to a ChatGPT model while drawing is unchanged.
-- Choosing the published models: the rows, the draft, what can be pressed and the saved body are the shared core's `sign_in_publication_draft` over the `chatgpt_publication` rows. Saving sends every model's purposes and publishes in the list's order (as Web). The assessments come only from the `chatgpt_publication` rows (the bundled catalog's rows replaced by measured records, built by one function, `SignInServices.chatGptAssessments`, for both the saving policy and the screen). Only the models in the person's own list are shown.
+- Choosing the published models: the rows, the draft, what can be pressed and the saved body are the shared core's `sign_in_publication_draft` over the `sign_in_publication` rows. Saving sends every model's purposes and publishes in the list's order (as Web). The assessments come only from the `sign_in_publication` rows (the bundled catalog's rows replaced by measured records, built by one function, `SignInServices.chatGptAssessments`, for both the saving policy and the screen). Only the models in the person's own list are shown.
 - Unchanged: the sign-in procedure (authorization in Chrome, the token exchange), sending and saving, and failure codes.
 
 ## 2026-11-14 "Sign in with ChatGPT" first in the lists, its name from the shared core

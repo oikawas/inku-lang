@@ -18,7 +18,7 @@ internal data class ChatGptHttpResponse(val status: Int, val body: String, val r
 
 /**
  * Where and how a request to the ChatGPT API is sent, as the shared core
- * answers it (`chatgpt_request`, `chatgpt_models_request`): the URL, the
+ * answers it (`sign_in_request`, and the sign-in procedure's `http`): the URL, the
  * method, the headers that are not secret, where the token goes, the bounds of
  * an answer and of an error body, and the header that names the request.
  */
@@ -33,27 +33,24 @@ internal data class ChatGptSend(
     val requestIdHeader: String?,
 ) {
     companion object {
-        /** The fields of a core answer; [answerLimit] where the answer gives none (a stream is bounded by the core). */
-        fun of(answer: JSONObject, answerLimit: Int = 1024 * 1024): ChatGptSend {
+        /** The fields of a core answer; a stream's answer gives no `answer_limit` and is bounded by its `wire_limit`. */
+        fun of(answer: JSONObject): ChatGptSend {
             val headers = answer.getJSONObject("headers")
             val auth = answer.getJSONObject("auth")
             return ChatGptSend(answer.getString("url"), answer.getString("method"),
                 headers.keys().asSequence().associateWith(headers::getString), auth.getString("header"), auth.getString("prefix"),
-                answer.optInt("answer_limit", answerLimit), answer.getInt("error_limit"),
+                if (answer.has("answer_limit")) answer.getInt("answer_limit") else answer.getLong("wire_limit").coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                answer.getInt("error_limit"),
                 answer.optString("request_id_header").takeIf(String::isNotEmpty))
         }
     }
 }
 
 internal interface ChatGptHttp {
-    /**
-     * With [send], the headers, the token's header, the bounds and the request
-     * ID are the core's; without it (sign-in, step 5) they are this client's own.
-     */
-    suspend fun request(url: String, method: String = "GET", token: String? = null,
-                        body: String? = null, formBody: Boolean = false,
+    /** The URL, the method, the headers, the token's header, the bounds and the request ID are the core's [send]. */
+    suspend fun request(send: ChatGptSend, token: String? = null, body: String? = null,
                         timeoutMs: Long = 30_000, check: () -> Unit = {},
-                        onChunk: ((ByteArray) -> Unit)? = null, send: ChatGptSend? = null): ChatGptHttpResponse
+                        onChunk: ((ByteArray) -> Unit)? = null): ChatGptHttpResponse
     fun cancelAll()
 }
 
@@ -63,13 +60,14 @@ internal class UrlConnectionChatGptHttp : ChatGptHttp {
 
     override fun cancelAll() { connections.forEach { it.disconnect() } }
 
-    override suspend fun request(url: String, method: String, token: String?, body: String?, formBody: Boolean,
-                                 timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?,
-                                 send: ChatGptSend?): ChatGptHttpResponse =
+    override suspend fun request(send: ChatGptSend, token: String?, body: String?,
+                                 timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?): ChatGptHttpResponse =
         withContext(Dispatchers.IO) {
             coroutineScope {
-                val uri = URI(url)
-                if (!uri.scheme.equals("https", ignoreCase = true) || uri.host !in setOf("auth.openai.com", "api.openai.com") ||
+                val uri = URI(send.url)
+                // A guard kept beside the core's answer (the author, step 6);
+                // a test holds it to the core's issuer and resource.
+                if (!uri.scheme.equals("https", ignoreCase = true) || uri.host !in ALLOWED_HOSTS ||
                     uri.userInfo != null || !uri.fragment.isNullOrEmpty() || (uri.port != -1 && uri.port != 443)) {
                     throw ChatGptException("chatgpt_identity_invalid")
                 }
@@ -83,23 +81,14 @@ internal class UrlConnectionChatGptHttp : ChatGptHttp {
                 }
                 try {
                     connection.instanceFollowRedirects = false
-                    connection.requestMethod = method
+                    connection.requestMethod = send.method
                     connection.connectTimeout = timeoutMs.coerceIn(1, Int.MAX_VALUE.toLong()).toInt()
                     connection.readTimeout = connection.connectTimeout
-                    if (send != null) {
-                        send.headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
-                        token?.let { connection.setRequestProperty(send.authHeader, send.authPrefix + it) }
-                    } else {
-                        connection.setRequestProperty("Accept", if (onChunk == null) "application/json" else "text/event-stream")
-                        token?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
-                    }
+                    send.headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
+                    token?.let { connection.setRequestProperty(send.authHeader, send.authPrefix + it) }
                     body?.let {
                         val bytes = it.toByteArray(Charsets.UTF_8)
-                        if (bytes.size > 2 * 1024 * 1024) throw chatGptTransport("too_large")
                         connection.doOutput = true
-                        if (send?.headers?.containsKey("Content-Type") != true) {
-                            connection.setRequestProperty("Content-Type", if (formBody) "application/x-www-form-urlencoded" else "application/json")
-                        }
                         connection.setFixedLengthStreamingMode(bytes.size)
                         check()
                         connection.outputStream.use { stream -> stream.write(bytes) }
@@ -109,8 +98,8 @@ internal class UrlConnectionChatGptHttp : ChatGptHttp {
                     check()
                     val output = ByteArrayOutputStream()
                     val streaming = status in 200..299 && onChunk != null
-                    val limit = if (status in 200..299) send?.answerLimit ?: (1024 * 1024) else send?.errorLimit ?: (64 * 1024)
-                    val requestId = send?.requestIdHeader?.let(connection::getHeaderField)
+                    val limit = if (status in 200..299) send.answerLimit else send.errorLimit
+                    val requestId = send.requestIdHeader?.let(connection::getHeaderField)
                     val source = if (status in 200..299) connection.inputStream else connection.errorStream
                     source?.use { stream ->
                         val buffer = ByteArray(8192)
@@ -135,4 +124,9 @@ internal class UrlConnectionChatGptHttp : ChatGptHttp {
                 }
             }
         }
+
+    internal companion object {
+        /** The official origins a token may go to: the core's issuer and resource hosts. */
+        val ALLOWED_HOSTS = setOf("auth.openai.com", "api.openai.com")
+    }
 }

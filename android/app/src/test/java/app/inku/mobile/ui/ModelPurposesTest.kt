@@ -93,8 +93,8 @@ class ModelPurposesTest {
         assertTrue(picker.contains("purposes = purposes,"))
         assertTrue(picker.contains("selected = if (next.isNotEmpty()) selected + id else selected - id"))
         assertTrue(picker.contains("onSave(published, published.associateWith { purposes[it].orEmpty() })"))
-        // A red-framed purpose can be pressed except on a ChatGPT plan, and select-all never takes a model with none (2026-10-26).
-        assertTrue(picker.contains("lockUnsupportedPurposes = provider.providerId == \"chatgpt\""))
+        // Select-all never takes a model with no purpose (2026-10-26). Whether a ChatGPT plan's
+        // red-framed purpose can be pressed is the core's `sign_in_publication_draft` (step 6).
         assertTrue(picker.contains("it.id in candidateIds && hasPurpose(it)"))
         // The drawing models that did not answer come after those that did.
         assertTrue(app.contains("}.sortedBy { it.notRecommended }"))

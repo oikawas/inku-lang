@@ -1,5 +1,14 @@
 # inku Android 実装メモ
 
+## 2026-11-15 「ChatGPT でサインイン」の action を一般の名にし、host のコピーを消す
+
+step 6（共通 core の片付け）。作者に見える変化は無い。
+
+- Android は core のサインインの action を、サービスを付けた一般の名で送る：`sign_in_<名>` と `"service": "chatgpt"`（`ChatGptCore.call`。provider wire へは `sign_in_request`・`sign_in_stream`・`sign_in_error`・`sign_in_transport`・`sign_in_failure`）。古い `chatgpt_*` の名と、core の手順だけが使う部品の名は core が断る。
+- 消したもの：`ChatGptEmailJson`、host の `/models` の送り（`chatGptModelsSend`）、`chatGptResponseError`、`chatGptFailureFor`、`modelArray`、`UrlConnectionChatGptHttp` の自前の header と form の本文（送りは全て core の答えで行う）。
+- コピーをやめて core から引くもの：答えと失敗の本文の上限（既定を持たない。流れは `wire_limit` で守る）、戻りの頭の上限（`sign_in_auth_constants`）、登録の名札と状態、未完了の登録（core が読む形の保管を 1 回で作る）、公開（`ChatGptCore.publication` の 1 か所で問う）。core が書いた本文に host が当てていた 2 MiB の上限は消した。診断の行は、core の表のコピーでなく、形で印と失敗の種類を確かめる。
+- host に残すもの：token を送ってよい host の表（`api.openai.com`・`auth.openai.com`。core の issuer・resource と食い違わないことを試験で確かめる）、`"chatgpt"` の id、試みの取り消しと前に出てからの交換、流れを受ける間の 1 秒ごとの確かめ、描画中の ChatGPT のモデルの横の状態の文、「モデルの選択」を押せる条件。
+
 ## 2026-11-14 「ChatGPT でサインイン」の接続は端末ごとに 1 つ
 
 作者の指示（「選択　再認証　接続解除　削除　の部分の挙動がゴミ」「複数登録ある前提がいらない」、範囲は Web・Android も揃える、登録は client_id を捨てない）と、作者の答え 3 問（アカウントが替わった時は操作を 1 つ出す、`id_token_hint` を送る、片付けで残すのは今選んでいる登録）による。
@@ -19,7 +28,7 @@
 
 step 5。作者の答え（一度に作る、食い違いは項ごとの推奨の表）による。
 
-- ログイン・token を使う・更新・一覧の取り直し・接続の解除・削除・選択・利用枠の停止と再開は、共通 core の `chatgpt_flow_start`・`chatgpt_flow_next` が答える `todo` を 1 つずつ行う（`ChatGptPlanManager.runFlow`）。Android に残るのは次のもの：
+- ログイン・token を使う・更新・一覧の取り直し・接続の解除・削除・選択・利用枠の停止と再開は、共通 core の `sign_in_flow_start`・`sign_in_flow_next` が答える `todo` を 1 つずつ行う（`ChatGptPlanManager.runFlow`）。Android に残るのは次のもの：
   - lock：`edit`（保管の読み書き）・`refresh`・`wire`。
   - 暗号化した保管の読み書き（ミリ秒と秒の直し）。
   - `UrlConnectionChatGptHttp` での送受信（締め切りと上限は `todo` のまま、入出力の失敗は `timeout`・`unavailable`・`too_large`）。
@@ -34,9 +43,9 @@ step 5。作者の答え（一度に作る、食い違いは項ごとの推奨�
 
 step 4。作者の答え（時間切れの文を足す、`Accept` は両方に付ける、読めない流れは再試行する）による。
 
-- 送信先・method・header・鍵の付け方・答えと失敗の本文の上限は、共通 core の答えで送る。`/responses` は `chatgpt_request` の答え、`/models` は新しい `chatgpt_models_request` の答え。送る前の host の確かめ（`api.openai.com`・`auth.openai.com` の https だけ）は残す。ログイン（token の交換・更新・失効）は今のまま（step 5）。
-- 失敗の答えは `x-request-id` を読み、本文の文字列のまま `chatgpt_error` に渡す（JSON でない本文は、状態で決まる印になる）。`/models` の答えも本文のまま `chatgpt_catalog` に渡し、読めない一覧は core の `chatgpt_response_invalid` になる。
-- 入出力の失敗は新しい `chatgpt_transport` で名付ける。読み・接続の時間切れと、締め切りの全体の時間切れは `chatgpt_transport_timeout`（`transport_timeout`・再試行）、ほかの入出力の失敗は `chatgpt_transport_unavailable`、上限を超えた答えは `chatgpt_response_too_large`。流れの `malformed` は core の印・種類・次の行動を使う（UTF-8 でない時は `provider_rejected`、ほかは `malformed_payload`）。
+- 送信先・method・header・鍵の付け方・答えと失敗の本文の上限は、共通 core の答えで送る。`/responses` は `sign_in_request` の答え、`/models` は core のモデル一覧の手順（`catalog`）。送る前の host の確かめ（`api.openai.com`・`auth.openai.com` の https だけ）は残す。ログイン（token の交換・更新・失効）は今のまま（step 5）。
+- 失敗の答えは `x-request-id` を読み、本文の文字列のまま `sign_in_error` に渡す（JSON でない本文は、状態で決まる印になる）。`/models` の答えは core の手順が読み、読めない一覧は core の `chatgpt_response_invalid` になる。
+- 入出力の失敗は新しい `sign_in_transport` で名付ける。読み・接続の時間切れと、締め切りの全体の時間切れは `chatgpt_transport_timeout`（`transport_timeout`・再試行）、ほかの入出力の失敗は `chatgpt_transport_unavailable`、上限を超えた答えは `chatgpt_response_too_large`。流れの `malformed` は core の印・種類・次の行動を使う（UTF-8 でない時は `provider_rejected`、ほかは `malformed_payload`）。
 - `ChatGptException` は印と種類に加えて次の行動（`retry`・`diagnose`・`usage` など）を持つ。
 - 時間切れの文「ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。」を足した（今までは「通信が途切れました」）。
 - 送るバイト（本文・`Authorization`・`Accept`・`Content-Type`）と送信先の字は今と同じ。ChatGPT の Vision の送信は Android に無いまま。
@@ -46,14 +55,14 @@ step 4。作者の答え（時間切れの文を足す、`Accept` は両方に�
 作者の決定（接続の状態の見せ方は Web に揃える、文言の表はホストに残す）で、step 2 として直した。
 
 - 接続の画面：見せる物と押せる物は共通 core の `sign_in_connection_view` の答え。
-  - 登録ごとに状態の文を出し、再認証・プラン利用の許可・接続の解除・削除を、選んでいない登録にも出す。利用枠の上限の時は「利用枠を確認して再試行」（core の `chatgpt_auth_resume_quota`、Server の `/retry` と同じ）。
+  - 登録ごとに状態の文を出し、再認証・プラン利用の許可・接続の解除・削除を、選んでいない登録にも出す。利用枠の上限の時は「利用枠を確認して再試行」（core の `resume`、Server の `/retry` と同じ）。
   - 上の操作に「接続状態を確認」（保存した登録を読み直し、直前の失敗を消す）を足した。
   - カードの頭にはいつも知らせの文（`chatGptPlanDescription`）を出し、状態の行は直前の失敗の印がある時だけ出す。初めての時の「ChatGPTプランを使います」の窓は外した（作者の答え「Web に揃えて外す」）。
   - 「モデル設定を開く」は、選んでいる登録が接続済みでプラン利用の許可がある時だけ、案内の文とともに出す。`canUsePlan` もこの答え（`guide`）から読む。
   - sign-in が終わっていない登録（`sub` の無い仮の登録）は、登録の一覧と分けて「再認証（client id）」で出す。
   - 接続の解除は今までどおり確かめの窓を出す（core の `confirm`）。削除は今までどおり 2 段の確かめ。
   - 描画中のモデルの横の状態の文は今のまま。
-- 公開するモデルの選び：行・下書き・押せるか・保存の本文は、`chatgpt_publication` の行を入力にした共通 core の `sign_in_publication_draft` の答え。保存は全てのモデルの用途を送り、一覧の順で公開する（Web と同じ）。評価の出どころは `chatgpt_publication` の行だけにした（評価は同梱のカタログの行を観測の記録で上書きした物で、保存の決まりと画面で同じ関数 `SignInServices.chatGptAssessments` から作る）。並ぶのは本人の一覧のモデルだけ。
+- 公開するモデルの選び：行・下書き・押せるか・保存の本文は、`sign_in_publication` の行を入力にした共通 core の `sign_in_publication_draft` の答え。保存は全てのモデルの用途を送り、一覧の順で公開する（Web と同じ）。評価の出どころは `sign_in_publication` の行だけにした（評価は同梱のカタログの行を観測の記録で上書きした物で、保存の決まりと画面で同じ関数 `SignInServices.chatGptAssessments` から作る）。並ぶのは本人の一覧のモデルだけ。
 - 変えないもの：接続の手順（Chrome での認証、token の交換）、送信・保存、失敗の印。
 
 ## 2026-11-14 「ChatGPT でサインイン」を一覧の先頭に、名札を共通 core から

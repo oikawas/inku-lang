@@ -1,18 +1,38 @@
 package app.inku.mobile.llm
 
+import app.inku.mobile.data.SignInServices
 import app.inku.mobile.data.catalogRequest
 import java.math.BigDecimal
+import org.json.JSONArray
 import org.json.JSONObject
 
-internal data class ChatGptModelPolicy(val purposes: JSONObject = JSONObject(), val assessments: JSONObject = JSONObject())
+/** The person's purposes for each ChatGPT model, and each model's assessment. */
+internal data class ChatGptModelPolicy(val purposes: JSONObject = JSONObject(), val assessments: JSONObject = JSONObject()) {
+    companion object {
+        /** The measured [records] over the bundled catalog's rows: the one layering, for drawing and for the settings alike. */
+        fun of(purposes: JSONObject, records: Map<String, JSONObject>): ChatGptModelPolicy =
+            ChatGptModelPolicy(purposes, SignInServices.chatGptAssessments(records))
+    }
+}
 
 /** Adapts the encrypted Android profile's millisecond timestamps to the shared policy. */
 internal object ChatGptCore {
+    /** A sign-in action (`sign_in_<name>`), sent for the ChatGPT service (step 6). */
     fun call(action: String, fields: JSONObject = JSONObject()): JSONObject {
-        val result = catalogRequest(action, fields)
+        val result = catalogRequest(action, fields.put("service", CHATGPT_PROVIDER))
         result.optString("error").takeIf(String::isNotEmpty)?.let { throw ChatGptException(it) }
         return result
     }
+
+    /**
+     * The core's `sign_in_publication` for a registration (in the core's
+     * units) under [policy]: each model's assessment, selectability and
+     * purposes. The one place it is asked (step 6), for the check before and
+     * during a drawing and for the drawing choices and the publishing picker.
+     */
+    fun publication(profile: JSONObject, policy: ChatGptModelPolicy, models: JSONArray? = null): JSONObject =
+        call("sign_in_publication", JSONObject().put("profile", JSONObject(profile.toString()).put("model_purposes", policy.purposes))
+            .put("models", models ?: JSONObject.NULL).put("assessments", policy.assessments)).getJSONObject("publication")
 
     fun toCore(profile: JSONObject, purposes: JSONObject? = null): JSONObject = JSONObject(profile.toString()).also { value ->
         for (key in listOf("expires_at", "earliest_refresh_at")) {
@@ -28,7 +48,7 @@ internal object ChatGptCore {
         if (purposes != null) value.put("model_purposes", purposes)
     }
 
-    private val issuer: String by lazy { call("chatgpt_auth_constants").getString("issuer") }
+    private val issuer: String by lazy { call("sign_in_auth_constants").getString("issuer") }
 
     fun fromCore(profile: JSONObject): JSONObject = JSONObject(profile.toString()).also { value ->
         for (key in listOf("expires_at", "earliest_refresh_at")) {

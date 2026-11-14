@@ -169,7 +169,7 @@ class SharedProviderWireJniTest {
     @Test
     fun allChatGptRowsMatchServer() {
         val rows = requireNotNull(cases["chatgpt"])
-        assertEquals(234, rows.size)
+        assertEquals(187, rows.size)
         val actions = mutableMapOf<String, Int>()
         for ((index, item) in rows.withIndex()) {
             val row = item.row
@@ -186,9 +186,9 @@ class SharedProviderWireJniTest {
                 sameJson("$why $key", expected.get(key), answer.get(key))
             }
         }
-        assertEquals(mapOf("chatgpt_request" to 9, "chatgpt_vision_request" to 9, "chatgpt_stream" to 59,
-            "chatgpt_error" to 11, "chatgpt_catalog" to 8, "chatgpt_failure" to 75,
-            "chatgpt_models_request" to 1, "chatgpt_transport" to 3), actions)
+        // Step 6: a host sends the general names; the parts' rows (`catalog`, `models_request`) are the core's own.
+        assertEquals(mapOf("sign_in_request" to 9, "sign_in_vision_request" to 9, "sign_in_stream" to 59,
+            "sign_in_error" to 11, "sign_in_failure" to 75, "sign_in_transport" to 3), actions)
     }
 
     /** The core's failure table gives every code Android raises the class the old Kotlin table gave it. */
@@ -208,7 +208,6 @@ class SharedProviderWireJniTest {
             "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "not_a_chatgpt_code")
         for (code in raised) {
             val expected = if (code in temporary) "transport_unavailable" else "provider_rejected"
-            assertEquals(code, expected, chatGptFailureFor(code))
             assertEquals(code, expected, ChatGptException(code).failure)
         }
         assertEquals(29, raised.size)

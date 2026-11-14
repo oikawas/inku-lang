@@ -31,7 +31,7 @@ class InkuApplication : Application() {
                     val purposes = runCatching { org.json.JSONObject(settings.get("model_purposes")?.valueJson ?: "{}")
                         .optJSONObject("chatgpt") ?: org.json.JSONObject() }.getOrDefault(org.json.JSONObject())
                     val records = app.inku.mobile.data.ModelCatalogObservation.read(settings.get("model_catalog_observations:chatgpt")?.valueJson).records
-                    app.inku.mobile.llm.ChatGptModelPolicy(purposes, app.inku.mobile.data.SignInServices.chatGptAssessments(records))
+                    app.inku.mobile.llm.ChatGptModelPolicy.of(purposes, records)
                 }
             }).also { manager ->
                 // One registration per device: once at start-up, the others and any unfinished one go.

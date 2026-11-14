@@ -2,6 +2,7 @@
 // source for the labels, shared by the lineage panel and the provenance drawer.
 // A work with no kind recorded is the origin of its lineage.
 import { formName, lawName, placeName } from './features/composition-record/composition-names.ts';
+import { thesisHead } from './features/canvas/composition-form.ts';
 
 export type DerivationKind =
 	| 'touch_change'
@@ -88,6 +89,12 @@ export function derivationDetail(kind: string | null | undefined, metadata: unkn
 		return `${title}: ${before} → ${placeName(at, isJapanese)}`;
 	}
 	if (kind !== 'composition_form_change' || !metadata || typeof metadata !== 'object') return null;
+	// A thesis change (step 4c): "命題: 広い海面から斜めに迫る波を… → 磯の岩を画面の左上に大きく据え…".
+	const { thesis_from: thesisFrom, thesis_to: thesisTo } = metadata as { thesis_from?: unknown; thesis_to?: unknown };
+	if (typeof thesisTo === 'string' && thesisTo.trim()) {
+		const before = typeof thesisFrom === 'string' && thesisFrom.trim() ? thesisHead(thesisFrom) : '—';
+		return `${isJapanese ? '命題: ' : 'Thesis: '}${before} → ${thesisHead(thesisTo)}`;
+	}
 	const { main_law_from: lawFrom, main_law_to: lawTo } = metadata as { main_law_from?: unknown; main_law_to?: unknown };
 	if (typeof lawTo === 'string' && lawTo) {
 		if (typeof lawFrom !== 'string' || !lawFrom) return null;

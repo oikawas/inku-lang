@@ -14,7 +14,7 @@ import { otherCatalogIds, planRefinementCandidates, runRefinementFanout } from '
 import { layoutCandidateResult, requestLayoutComposition, type RecomposeMode, type LayoutComposeResponse } from './recomposition.ts';
 import { PipelineApi } from '../pipeline/api';
 import { PipelineController } from '../pipeline/controller';
-import { compositionChangeOptions, type CompositionChange } from './composition-form';
+import { compositionChangeOptions, thesisHead, type CompositionChange, type CompositionRequest } from './composition-form';
 import { compositionModeOf, compositionOption, drawRouteOf } from '$lib/draw-route';
 import { readUnits } from '$lib/features/composition-record/things';
 import { shownRecordOf } from '$lib/features/composition-record/record';
@@ -617,7 +617,21 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return contextVersion === targetIdentityVersion ? failed : {};
 	}
 
-	async function generateCompositionCandidates(change: CompositionChange, count: 1 | 4): Promise<void> {
+	/** The AI's four theses for the work (step 4): one send under the work's
+	 *  connection, with the digest a drawing from one of them records. */
+	async function proposeTheses(workId: string, model: string, signal: AbortSignal): Promise<{ theses: string[]; digest: string }> {
+		const response = await apiFetch('/api/composition/theses', {
+			method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ history_id: workId, model }), signal,
+		});
+		if (!response.ok) throw await apiError(response);
+		const body = await response.json() as { theses?: unknown; prompt_digest?: unknown };
+		const theses = Array.isArray(body.theses) ? body.theses.filter((item): item is string => typeof item === 'string') : [];
+		if (theses.length !== 4 || typeof body.prompt_digest !== 'string') throw new Error(t().pipelineAttentionReason('host_commit_failed'));
+		return { theses, digest: body.prompt_digest };
+	}
+
+	async function generateCompositionCandidates(request: CompositionRequest, count: 1 | 4): Promise<void> {
 		const workId = refinementWorkId();
 		const target = refinementTarget();
 		if (!workId || !target.source || !work.result || refinementSession.gridBusy) return;
@@ -626,11 +640,26 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		if (!parentNode || version !== targetIdentityVersion) return;
 		const parent = work.result;
 		const answer = work.displayedHistoryItem?.description_ddl?.composition?.answer;
-		const { options: changed, metadata } = compositionChangeOptions(change, { form: answer?.form ?? null, mainLaw: answer?.main_law ?? null });
+		const parentComposition = { form: answer?.form ?? null, mainLaw: answer?.main_law ?? null, thesis: answer?.thesis ?? null };
+		const stage1 = parent.stage1_model ?? deps.models.stage1();
 		const controller = refinementSession.beginGrid({ includesReading: true, taskLabel: t().workActionComposition, count });
 		const timer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
 		try {
-			const plans = Array.from({ length: count }, (_, index) => async (): Promise<VariationCandidate> => {
+			// The AI's theses are asked first, so each seat reads its thesis while it draws (step 4c).
+			let changes: CompositionChange[];
+			let labels: string[];
+			if (request.kind === 'proposed_theses') {
+				const proposed = await proposeTheses(workId, stage1, controller.signal);
+				controller.signal.throwIfAborted();
+				if (version !== targetIdentityVersion) return;
+				changes = proposed.theses.map((thesis) => ({ kind: 'thesis', thesis, source: 'proposed', digest: proposed.digest }));
+				labels = proposed.theses.map((thesis, index) => `${index + 1}. ${thesisHead(thesis)}`);
+			} else {
+				changes = Array.from({ length: count }, () => request);
+				labels = changes.map((_, index) => String(index + 1));
+			}
+			const plans = changes.map((change, index) => async (): Promise<VariationCandidate> => {
+				const { options: changed, metadata } = compositionChangeOptions(change, parentComposition);
 				const api = new PipelineApi(apiFetch);
 				const pipeline = new PipelineController(api, () => ({}), () => {}, undefined, (view) => {
 					refinementSession.setSlotProgress(controller, index, view.progress ? { event: 'progress', ...view.progress } : null);
@@ -642,7 +671,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 					const view = await pipeline.fromDescription(target.source, {
 						route: 'read_and_draw', composition: 'on', ...changed,
 						sketch: 'on', ...(target.sketchText ? { sketch_text: target.sketchText } : {}),
-						stage1_model: parent.stage1_model ?? deps.models.stage1(), stage2_model: parent.stage2_model ?? deps.models.stage2(),
+						stage1_model: stage1, stage2_model: parent.stage2_model ?? deps.models.stage2(),
 						catalog_id: refinementCatalogId(), catalog_mode: 'fixed', canvas_aspect: refinementCanvasAspectId(),
 						...(parent.render_seed != null ? { render_seed: parent.render_seed } : {}),
 						save_history: false, save_artifacts: false, count_generation: true,
@@ -651,13 +680,13 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 					}, controller.signal);
 					controller.signal.throwIfAborted();
 					if (!view.result?.ddl || !view.result.svg) throw new Error(t().pipelineAttentionReason('host_commit_failed'));
-					return { id: view.execution_id, executionId: view.execution_id, label: String(index + 1), selected: false,
+					return { id: view.execution_id, executionId: view.execution_id, label: labels[index], selected: false,
 						result: { ...view.result, ddl: view.result.ddl, thinking: view.result.thinking ?? null,
 							lineage_parent_node_id: parentNode, derivation_kind: 'composition_form_change',
 							derivation_metadata: metadata } };
 				} finally { controller.signal.removeEventListener('abort', cancel); }
 			});
-			refinementSession.setPlans(controller, plans.map((_, index) => String(index + 1)));
+			refinementSession.setPlans(controller, labels);
 			const candidates = await runRefinementFanout(plans, deps.render.fanoutLimit(), {
 				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
 				onDone: (index) => refinementSession.finishSlot(controller, index),

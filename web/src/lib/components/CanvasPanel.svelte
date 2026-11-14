@@ -161,7 +161,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
-		onGenerateCompositionCandidates: (change: import('$lib/features/canvas/composition-form').CompositionChange, count: 1 | 4) => void | Promise<void>;
+		onGenerateCompositionCandidates: (change: import('$lib/features/canvas/composition-form').CompositionRequest, count: 1 | 4) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		/** Draws the work with each model picked in the "change the model" dialog. */
 		onGenerateModelCandidates: () => void | Promise<void>;

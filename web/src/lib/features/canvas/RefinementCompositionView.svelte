@@ -12,8 +12,8 @@
 	import CompositionFigure from '$lib/features/composition-record/CompositionFigure.svelte';
 	import { formName } from '$lib/features/composition-record/composition-names';
 	import type { CompositionSummary } from '$lib/features/composition-record/record';
-	import { compositionFormOptions, isCompositionForm, isMainLaw, mainLawFamilies,
-		type CompositionChange, type CompositionForm, type MainLaw } from './composition-form';
+	import { compositionFormOptions, isCompositionForm, isMainLaw, mainLawFamilies, MAX_THESIS_CHARS, thesisWritable,
+		type CompositionForm, type CompositionRequest, type MainLaw } from './composition-form';
 	import type { RefinementSession } from './refinement-session.svelte';
 
 	let { isJapanese, resultAvailable, artworkUrl, canvasAspectWidth, canvasAspectHeight, refinementSession,
@@ -22,10 +22,15 @@
 		canvasAspectWidth: number; canvasAspectHeight: number; refinementSession: RefinementSession;
 		compositionForm: string | null; compositionFormSwitch: boolean;
 		targetComposition: CompositionSummary | null;
-		onGenerateCandidates: (change: CompositionChange, count: 1 | 4) => void | Promise<void>;
+		onGenerateCandidates: (change: CompositionRequest, count: 1 | 4) => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>; onDiscardAndClose: () => void | Promise<void>;
 	} = $props();
-	type What = 'form' | 'main_law';
+	type What = 'form' | 'main_law' | 'thesis';
+	// The thesis (step 4c, the mock's section 6): the author writes one and draws
+	// one option, or the AI proposes four and each is drawn.
+	type ThesisHow = 'write' | 'propose';
+	let thesisHow = $state<ThesisHow>('write');
+	let thesisText = $state('');
 	let what = $state<What>('form');
 	let selectedForm = $state<CompositionForm>('one_corner');
 	let selectedLaw = $state<MainLaw>('B1');
@@ -37,12 +42,18 @@
 	const busy = $derived(refinementSession.busy || refinementSession.gridBusy);
 	const families = $derived(mainLawFamilies(isJapanese));
 	const selectedSummary = $derived(families.flatMap((family) => family.laws).find((law) => law.code === selectedLaw)?.summary ?? '');
-	const change = $derived<CompositionChange>(what === 'form'
+	const change = $derived<CompositionRequest>(what === 'form'
 		? { kind: 'form', form: selectedForm }
-		: { kind: 'main_law', mainLaw: selectedLaw, form: currentForm });
+		: what === 'main_law' ? { kind: 'main_law', mainLaw: selectedLaw, form: currentForm }
+		: thesisHow === 'write' ? { kind: 'thesis', thesis: thesisText, source: 'author' } : { kind: 'proposed_theses' });
 	const keeps = $derived(what === 'form' ? t().compositionFormKeeps
+		: what === 'thesis' ? t().compositionThesisKeeps
 		: t().compositionMainLawKeeps(currentForm ? formName(currentForm, isJapanese) : null));
-	const redecides = $derived(what === 'form' ? t().compositionFormRedecides : t().compositionMainLawRedecides(currentForm !== null));
+	const redecides = $derived(what === 'form' ? t().compositionFormRedecides
+		: what === 'thesis' ? t().compositionThesisRedecides : t().compositionMainLawRedecides(currentForm !== null));
+	// A thesis written by the author draws one option; the AI's draw four (the mock's rule).
+	const oneAllowed = $derived(what !== 'thesis' || (thesisHow === 'write' && thesisWritable(thesisText)));
+	const fourAllowed = $derived(what !== 'thesis' || thesisHow === 'propose');
 </script>
 
 <div class="refine-panel"><div class="refine-stage wide">
@@ -61,6 +72,7 @@
 			<div class="segmented what-tabs" role="group" aria-label={t().compositionWhatToChange}>
 				<button type="button" class:on={what === 'form'} aria-pressed={what === 'form'} disabled={busy} onclick={() => { what = 'form'; }}>{t().compositionFormTerm}</button>
 				<button type="button" class:on={what === 'main_law'} aria-pressed={what === 'main_law'} disabled={busy} onclick={() => { what = 'main_law'; }}>{t().compositionMainLawTerm}</button>
+				<button type="button" class:on={what === 'thesis'} aria-pressed={what === 'thesis'} disabled={busy} onclick={() => { what = 'thesis'; }}>{t().compositionThesisLabel}</button>
 			</div>
 			<div class="what-scroll">
 				{#if what === 'form'}
@@ -71,6 +83,17 @@
 								<span><strong>{form.name}</strong>{#if form.id === currentForm} ({t().compositionFormCurrent}){/if}<br /><span class="form-desc">{form.description}</span></span>
 							</label>
 						{/each}
+					</div>
+				{:else if what === 'thesis'}
+					<div class="thesis-options" role="radiogroup" aria-label={t().compositionThesisLabel}>
+						<label class="thesis-choice" class:on={thesisHow === 'write'}><input type="radio" name="composition-thesis-how" value="write" bind:group={thesisHow} disabled={busy} />
+							<span><strong>{t().compositionThesisWrite}</strong><br /><span class="form-desc">{t().compositionThesisWriteNote}</span></span>
+						</label>
+						<textarea class="thesis-input" rows="3" maxlength={MAX_THESIS_CHARS} aria-label={t().compositionThesisWrite}
+							bind:value={thesisText} disabled={busy} onfocus={() => { thesisHow = 'write'; }}></textarea>
+						<label class="thesis-choice" class:on={thesisHow === 'propose'}><input type="radio" name="composition-thesis-how" value="propose" bind:group={thesisHow} disabled={busy} />
+							<span><strong>{t().compositionThesisPropose}</strong><br /><span class="form-desc">{t().compositionThesisProposeNote}</span></span>
+						</label>
 					</div>
 				{:else}
 					<div class="law-families" role="radiogroup" aria-label={t().compositionMainLawTerm}>
@@ -94,8 +117,8 @@
 			{#if what === 'main_law' && selectedSummary}<p class="law-sentence">{selectedSummary}</p>{/if}
 			<dl class="keeps"><dt>{t().compositionKeepsTerm}</dt><dd>{keeps}</dd><dt>{t().compositionRedecidesTerm}</dt><dd>{redecides}</dd></dl>
 			<div class="refine-actions refine-paint-actions">
-				<PaintButton onclick={() => onGenerateCandidates(change, 1)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved}>{t().refineSingleButton}</PaintButton>
-				<PaintButton onclick={() => onGenerateCandidates(change, 4)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved}>{t().variationGridDefault}</PaintButton>
+				<PaintButton onclick={() => onGenerateCandidates(change, 1)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved || !oneAllowed}>{t().refineSingleButton}</PaintButton>
+				<PaintButton onclick={() => onGenerateCandidates(change, 4)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved || !fourAllowed}>{t().variationGridDefault}</PaintButton>
 				{#if busy}<RunStatus label={t().refineGeneratingTask(refinementSession.gridTaskLabel)}
 					progressDone={refinementSession.gridDone} progressTotal={refinementSession.gridTotal}
 					elapsedMs={refinementSession.elapsedMs} progress={refinementSession.gridProgress}
@@ -121,7 +144,12 @@
 	.segmented { display: inline-flex; padding: 2px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg); }
 	.segmented button { padding: 4px 14px; border: 0; border-radius: 4px; background: none; color: var(--fg2); font-size: var(--ui-font-size-12); cursor: pointer; white-space: nowrap; }
 	.segmented button.on { background: var(--bg3); color: var(--fg); font-weight: 600; }
-	.what-tabs { display: grid; grid-template-columns: repeat(2, 1fr); }
+	.what-tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
+	.thesis-options { display: grid; gap: 6px; font-size: var(--ui-font-size-12); }
+	.thesis-choice { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r, 6px); cursor: pointer; color: var(--fg2); }
+	.thesis-choice.on { border-color: var(--accent); background: var(--accent-light); color: var(--fg); }
+	.thesis-choice input { accent-color: var(--accent); margin: 3px 0 0; }
+	.thesis-input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border2); border-radius: var(--r, 6px); background: var(--bg); color: var(--fg); font: inherit; line-height: 1.6; resize: vertical; }
 	.what-scroll { max-height: 322px; overflow: auto; padding-right: 4px; }
 	.form-options { display: grid; gap: 4px; font-size: var(--ui-font-size-12); }
 	.form-option { display: grid; grid-template-columns: auto 30px minmax(0, 1fr); gap: 8px; align-items: center; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r, 6px); cursor: pointer; color: var(--fg2); }

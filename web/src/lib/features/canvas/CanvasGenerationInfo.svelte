@@ -443,7 +443,7 @@
 						<dl>
 							{@render term(isJapanese ? '状態' : 'State', t().provenanceHintComposition)}<dd>{compositionStateNote(detailComposition, isJapanese)}</dd>
 							{#if detailComposition.answer}
-								{@render term(isJapanese ? '命題' : 'Thesis', t().provenanceHintComposition)}<dd>{detailComposition.answer.thesis ?? '-'}</dd>
+								{@render term(isJapanese ? '命題' : 'Thesis', t().provenanceHintComposition)}<dd>{detailComposition.answer.thesis ?? '-'}{#if typeof detailComposition.requested_thesis === 'string'}{@const by = detailDerivationMetadata.thesis_source === 'proposed' ? t().compositionThesisProposed : t().compositionThesisAuthorWrote}{isJapanese ? `（${by}）` : ` (${by})`}{/if}</dd>
 								{@render term(isJapanese ? '画の型' : 'Form', t().provenanceHintComposition)}<dd>{compositionFormLabel(detailComposition.answer.form, isJapanese) || '-'}{#if typeof detailComposition.requested_form === 'string'}{isJapanese ? `（${t().compositionAuthorChose}）` : ` (${t().compositionAuthorChose})`}{/if}</dd>
 								{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintComposition)}<dd>{detailComposition.answer.main_law ? lawNameWithCode(detailComposition.answer.main_law, isJapanese) : '-'}{#if typeof detailComposition.requested_main_law === 'string'}{isJapanese ? `（${t().compositionAuthorChose}）` : ` (${t().compositionAuthorChose})`}{/if}</dd>
 								{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintComposition)}<dd>{Object.keys(detailComposition.answer.laws ?? {}).map((code) => lawNameWithCode(code, isJapanese)).join(isJapanese ? '、' : ', ') || '-'}</dd>

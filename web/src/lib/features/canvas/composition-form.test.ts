@@ -29,3 +29,27 @@ test('the language packs keep the names table\'s form names and descriptions', (
 		assert.deepEqual([...strings.compositionFormDescriptions], options.map((option) => option.description));
 	}
 });
+
+// Step 4c: a thesis the author writes or one the AI proposed.
+import { MAX_THESIS_CHARS, compositionChangeOptions, thesisHead, thesisWritable } from './composition-form.ts';
+
+test('a thesis change sends the thesis, who wrote it and, for a proposed one, its digest', () => {
+	const parent = { form: 'one_corner', mainLaw: 'B1', thesis: '今の命題。' };
+	assert.deepEqual(compositionChangeOptions({ kind: 'thesis', thesis: '  磯の岩を左上に据える。 ', source: 'author' }, parent), {
+		options: { composition_thesis: '磯の岩を左上に据える。', composition_thesis_source: 'author' },
+		metadata: { thesis_from: '今の命題。', thesis_to: '磯の岩を左上に据える。', thesis_source: 'author' },
+	});
+	assert.deepEqual(compositionChangeOptions({ kind: 'thesis', thesis: '波の筋を走らせる。', source: 'proposed', digest: 'sha256:abc' }, { form: null, mainLaw: null }), {
+		options: { composition_thesis: '波の筋を走らせる。', composition_thesis_source: 'proposed', composition_thesis_prompt_digest: 'sha256:abc' },
+		metadata: { thesis_from: null, thesis_to: '波の筋を走らせる。', thesis_source: 'proposed' },
+	});
+});
+
+test('a thesis may be fixed from one to 400 characters, and its head is cut with an ellipsis', () => {
+	assert.equal(thesisWritable('   '), false);
+	assert.equal(thesisWritable('あ'), true);
+	assert.equal(thesisWritable('あ'.repeat(MAX_THESIS_CHARS)), true);
+	assert.equal(thesisWritable('あ'.repeat(MAX_THESIS_CHARS + 1)), false);
+	assert.equal(thesisHead('短い命題。'), '短い命題。');
+	assert.equal(thesisHead('広い海面から斜めに迫る波を画面の右下に置く。'), '広い海面から斜めに迫る波を画…');
+});

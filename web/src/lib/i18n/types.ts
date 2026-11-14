@@ -463,6 +463,14 @@ export interface LangPack {
 	compositionMainLawRedecides: (keepsForm: boolean) => string;
 	/** Beside a form or main law the author named in the generation info. */
 	compositionAuthorChose: string;
+	compositionThesisWrite: string;
+	compositionThesisWriteNote: string;
+	compositionThesisPropose: string;
+	compositionThesisProposeNote: string;
+	compositionThesisKeeps: string;
+	compositionThesisRedecides: string;
+	compositionThesisAuthorWrote: string;
+	compositionThesisProposed: string;
 	/** "Change the layout" on a work written in words (step 3, 2026-11-13). */
 	placeLoading: string;
 	placeThingsHead: string;

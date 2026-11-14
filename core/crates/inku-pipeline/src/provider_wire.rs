@@ -18,7 +18,7 @@
 
 use crate::identity::{Value, python_dumps, python_float_repr, python_loads, python_strip};
 
-mod chatgpt;
+pub(crate) mod chatgpt;
 
 pub const PROVIDER_WIRE_SCHEMA_ID: &str = "inku.provider-wire.v1";
 

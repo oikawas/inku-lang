@@ -1842,7 +1842,13 @@ mod tests {
                 "effects":["generate_sketch","select_description_catalog","generate_normalized_ddl","read_composition",
                     "choose_laws","choose_colors","complete_visible_ddl_holes","read_description","compose_description",
                     "write_description_ddl"],
-                "registrations":8,"callback_header_bytes":16384})
+                "registrations":8,"callback_header_bytes":16384,
+                "public_codes":["subscription_sharing_usage_limit_exceeded","subscription_sharing_user_not_eligible",
+                    "subscription_sharing_unsupported_capability","subscription_sharing_route_not_supported",
+                    "subscription_sharing_invalid_user","chatpass_v2_scope_not_authorized",
+                    "chatpass_v2_invalid_authorization_context","subscription_sharing_usage_unavailable",
+                    "subscription_sharing_user_unavailable"],
+                "failure_actions":["usage","retry","consent","settings","models","edit","reconnect","diagnose"]})
         );
     }
 }

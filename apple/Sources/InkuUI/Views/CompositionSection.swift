@@ -23,13 +23,15 @@ struct CompositionSection: View {
         VStack(alignment: .leading, spacing: 6) {
             DisclosureGroup(isExpanded: open) {
                 if let answer {
-                    HStack {
+                    if model.workActionState(for: work) != .userDDL {
+                      HStack {
                         if model.workActionState(for: work)?.showsDescriptionActions == true {
                             Button(display.webCopy("workActionComposition", "構図と法則を変える")) { onAction(work, "composition-form") }
                                 .disabled(disabled || model.workActionState(for: work)?.canReadDescription != true)
                         }
                         Button(display.webCopy("canvasVaryComposition", "配置を変える")) { onAction(work, "layout") }.disabled(disabled)
-                    }.buttonStyle(InkuGhostButtonStyle())
+                      }.buttonStyle(InkuGhostButtonStyle())
+                    }
                     details(answer).padding(.top, 6)
                 } else {
                     Text(display.webCopy(fallback ? "compositionFallback" : "compositionNoRecordNote", fallback ? "構図なし" : "構図の記録がありません。"))

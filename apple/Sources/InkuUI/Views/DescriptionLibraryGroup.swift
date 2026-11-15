@@ -63,6 +63,6 @@ struct DescriptionLibraryGroup: View {
         case "layout_change": name = model.display.label("配置", "Layout")
         default: name = kind ?? ""
         }
-        return model.display.localizedFormat("%@の子", name)
+        return model.display.webCopyFormat("historyDescriptionChildOf", "%@の子", name)
     }
 }

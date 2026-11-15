@@ -30,15 +30,15 @@ func compositionDerivationDetail(_ edge: LineageEdge?, display: DisplaySettings)
     }
     guard edge.derivationKind == "composition_form_change" else { return nil }
     if let to = metadata["thesis_to"].string, !to.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        func head(_ s: String) -> String { let t = s.trimmingCharacters(in: .whitespacesAndNewlines); return t.count > 20 ? String(t.prefix(20)) + "…" : t }
+        func head(_ s: String) -> String { let t = s.trimmingCharacters(in: .whitespacesAndNewlines); return t.unicodeScalars.count > 14 ? String(String.UnicodeScalarView(t.unicodeScalars.prefix(14))) + "…" : t }
         let from = metadata["thesis_from"].string.flatMap { $0.isEmpty ? nil : head($0) } ?? "—"
-        return "\(display.label("命題", "Thesis")): \(from) → \(head(to))"
+        return "\(display.webCopy("compositionThesisLabel", "命題")): \(from) → \(head(to))"
     }
     if let from = metadata["main_law_from"].string, !from.isEmpty, let to = metadata["main_law_to"].string, !to.isEmpty {
-        return "\(display.label("主の法則", "Main law")): \(CompositionNames.lawName(from, language: language)) → \(CompositionNames.lawName(to, language: language))"
+        return "\(display.webCopy("compositionMainLawTerm", "主の法則")): \(CompositionNames.lawName(from, language: language)) → \(CompositionNames.lawName(to, language: language))"
     }
     if let from = metadata["form_from"].string, !from.isEmpty, let to = metadata["form_to"].string, !to.isEmpty {
-        return "\(display.label("画の型", "Form")): \(CompositionNames.formName(from, language: language)) → \(CompositionNames.formName(to, language: language))"
+        return "\(display.webCopy("compositionFormTerm", "画の型")): \(CompositionNames.formName(from, language: language)) → \(CompositionNames.formName(to, language: language))"
     }
     return nil
 }

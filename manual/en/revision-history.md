@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-15 — The model in refinement windows
+
+- "Creating images": the `Model` row in the windows of `Change the description`, `Redraw with or without sketch from life` and `Change the composition and laws` (it starts at the painting model of the next work's conditions, and a model chosen again applies to that window only).
+
 ## 2026-11-14 — Drawing with a fixed thesis
 
 - "Creating images": `What to change` in `Change the composition and laws` gains `Thesis` (`Write the thesis yourself`, `Have the AI propose other theses`); the lineage's `Derived by` shows the heads of both theses, and the generation info adds `(written by the author)` or `(proposed by the AI)`.

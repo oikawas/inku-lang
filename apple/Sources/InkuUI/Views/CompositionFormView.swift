@@ -127,9 +127,13 @@ public struct CompositionFormView: View {
             let keptText = form.change == .mainLaw ? form.currentForm.map {
                 model.display.webCopyFormat(keeps, "記述・読み・記述が名指す物・画の型（%@）", CompositionNames.formName($0, language: model.display.preferences.language))
             } ?? model.display.label("記述・読み・記述が名指す物", "The description, the reading and the things the description names") : model.display.webCopy(keeps, "記述・読み・記述が名指す物")
+            let redoneText = form.change == .mainLaw ? (form.currentForm == nil
+                ? model.display.label("命題・画の型・ほかの法則・物の描き方・配色", "The thesis, the form, the other laws, how the things are drawn and the colors")
+                : (ServerTips.template(redecides, language: model.display.preferences.language, argumentCount: 0) ?? model.display.label("命題・ほかの法則・物の描き方・配色", "The thesis, the other laws, how the things are drawn and the colors")))
+                : model.display.webCopy(redecides, "画の型・法則・配色")
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.display.webCopy("compositionKeepsTerm", "変わらないもの") + "：" + keptText)
-                Text(model.display.webCopy("compositionRedecidesTerm", "決め直すもの") + "：" + model.display.webCopy(redecides, "画の型・法則・配色"))
+                Text(model.display.webCopy("compositionRedecidesTerm", "決め直すもの") + "：" + redoneText)
             }.inkuFont(12).foregroundStyle(.secondary)
             DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"),
                 value: DrawPresentation.modelReference(form.modelReference, empty: model.display.localized("選択してください")),

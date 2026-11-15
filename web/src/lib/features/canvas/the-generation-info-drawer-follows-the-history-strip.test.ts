@@ -79,3 +79,16 @@ test('lineage has the shared drawer toggle at the work-tab position and tab chan
 	assert.match(panel, /outputTab === 'lineage'[\s\S]*?bind:this=\{lineageGenerationInfoToggleEl\}[\s\S]*?onclick=\{toggleGenerationInfo\}/);
 	assert.match(panel, /lineage-generation-info-control \{ position: absolute; right: 178px; bottom: 14px;/);
 });
+
+test('only lineage overview raises the drawer above the map, while selection still follows', () => {
+	const panel = read('../../components/CanvasPanel.svelte');
+	const drawer = read('./CanvasGenerationInfo.svelte');
+	const lineage = read('../../components/LineagePanel.svelte');
+	assert.match(panel, /aboveOverview=\{outputTab === 'lineage' && lineageBrowsingState\.overviewOpen\}/);
+	assert.match(drawer, /aboveOverview = false/);
+	assert.match(drawer, /class:above-overview=\{aboveOverview\}/);
+	assert.match(drawer, /\.generation-info\.above-overview \{ z-index: 1302; \}/);
+	assert.match(lineage, /\.lineage-panel\.overview \{[^}]*z-index: 1300/);
+	assert.match(lineage, /class="card-main" data-selects-work=\{node\.history \? '' : undefined\}/);
+	assert.match(panel, /generationInfoSettings\.followsSelection && target instanceof Element && pressChoosesWork\(target\)/);
+});

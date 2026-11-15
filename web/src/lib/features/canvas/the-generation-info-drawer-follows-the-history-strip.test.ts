@@ -47,6 +47,18 @@ test('the star inside a work does not choose it, nor does a press elsewhere', ()
 	assert.equal(pressChoosesWork(null), false);
 });
 
+test('a lineage selection button and its contents choose the work; its other controls do not', () => {
+	const cardButton = {};
+	const cardContent = { closest: (selector: string) => selector === WORK || selector === 'button' ? cardButton : null };
+	assert.equal(pressChoosesWork(cardContent), true);
+	for (const control of ['star', 'revision', 'menu', 'checkbox', 'branch', 'details']) {
+		const otherControl = { closest: (selector: string) => selector === 'button' && control !== 'checkbox' ? {} : null };
+		assert.equal(pressChoosesWork(otherControl), false, control);
+	}
+	const lineage = read('../../components/LineagePanel.svelte');
+	assert.match(lineage, /class="card-main" data-selects-work=\{node\.history \? '' : undefined\}/);
+});
+
 test('each history-strip work carries the attribute the drawer looks for', () => {
 	const strip = read('../../components/HistoryStrip.svelte');
 	const thumb = strip.slice(strip.indexOf('class="thumb"'), strip.indexOf('onclick={() => !interactionLocked && onLoadItem(it)}'));
@@ -56,4 +68,14 @@ test('each history-strip work carries the attribute the drawer looks for', () =>
 test('the drawer closes on a press outside unless the setting keeps it for a chosen work', () => {
 	const panel = read('../../components/CanvasPanel.svelte');
 	assert.match(panel, /generationInfoSettings\.followsSelection && target instanceof Element && pressChoosesWork\(target\)\) return;\s*closeGenerationInfo\(\);/);
+});
+
+test('lineage has the shared drawer toggle at the work-tab position and tab changes keep it open', () => {
+	const panel = read('../../components/CanvasPanel.svelte');
+	assert.match(panel, /onpointerdowncapture=/);
+	assert.match(panel, /lineageGenerationInfoToggleEl\?\.contains\(target\)/);
+	assert.match(panel, /target\.closest\('\[data-generation-info-tab\]'\)/);
+	assert.match(panel, /onToggleGenerationInfo=\{toggleGenerationInfo\}/);
+	assert.match(panel, /outputTab === 'lineage'[\s\S]*?bind:this=\{lineageGenerationInfoToggleEl\}[\s\S]*?onclick=\{toggleGenerationInfo\}/);
+	assert.match(panel, /lineage-generation-info-control \{ position: absolute; right: 178px; bottom: 14px;/);
 });

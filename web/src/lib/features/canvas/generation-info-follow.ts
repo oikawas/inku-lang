@@ -1,6 +1,6 @@
 /**
- * Whether the generation-information drawer follows the history strip: with
- * it on, choosing another work from the strip while the drawer is open keeps
+ * Whether the generation-information drawer follows work selection: with
+ * it on, choosing another work while the drawer is open keeps
  * the drawer open, and the drawer shows the work just chosen.
  *
  * Plain .ts (no runes), so the parsing and the press test are testable without
@@ -13,7 +13,7 @@ export const FOLLOW_FIELD = 'generation_info_follows_selection';
 /** On for an account that never chose: it is the reason the setting exists. */
 export const FOLLOW_DEFAULT = true;
 
-/** The attribute a history-strip work carries; pressing it chooses that work. */
+/** The attribute a work-selection area carries. */
 export const SELECTS_WORK_ATTRIBUTE = 'data-selects-work';
 
 export function followFromSettings(settings: Record<string, unknown> | null | undefined): boolean {
@@ -24,12 +24,13 @@ export function followFromSettings(settings: Record<string, unknown> | null | un
 type Pressed = { closest: (selector: string) => unknown } | null;
 
 /**
- * A press that chooses another work from the history strip. A control inside
- * the work (its star) does not choose it, so it closes the drawer as any other
- * press outside does.
+ * A work-selection area may itself be a button (a lineage card). Other
+ * buttons inside a marked area, such as a history star, are not selection.
  */
 export function pressChoosesWork(target: Pressed): boolean {
 	if (!target || typeof target.closest !== 'function') return false;
-	if (!target.closest(`[${SELECTS_WORK_ATTRIBUTE}]`)) return false;
-	return !target.closest('button');
+	const selection = target.closest(`[${SELECTS_WORK_ATTRIBUTE}]`);
+	if (!selection) return false;
+	const button = target.closest('button');
+	return !button || button === selection;
 }

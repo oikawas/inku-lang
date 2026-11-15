@@ -431,7 +431,12 @@
 			if (pane) pane.scrollTop = drawerScrollToRestore(drawerScrollMemory, generationInfoTab);
 		});
 	}
+	function toggleGenerationInfo(): void {
+		if (generationInfoOpen) closeGenerationInfo();
+		else openGenerationInfo();
+	}
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
+	let lineageGenerationInfoToggleEl = $state<HTMLButtonElement | null>(null);
 	let refineView = $state<RefinementView>('layout');
 	let refineModalOpen = $state(false);
 	let refineReturnTab = $state<OutputTab>('lineage');
@@ -711,14 +716,16 @@
 		else if (generationInfoOpen) closeGenerationInfo();
 		else if (presentationMode) closePresentationMode();
 	}}
-	onpointerdown={(event) => {
+	onpointerdowncapture={(event) => {
 		// Clicking outside closes the generation drawer; its button toggles itself.
 		if (!generationInfoOpen) return;
 		const target = event.target as Node | null;
 		if (!target) return;
 		if (generationInfoEl?.contains(target)) return;
 		if (generationInfoToggleEl?.contains(target)) return;
-		// Choosing another work from the history strip keeps the drawer open
+		if (lineageGenerationInfoToggleEl?.contains(target)) return;
+		if (target instanceof Element && target.closest('[data-generation-info-tab]')) return;
+		// Choosing another work from the history strip or lineage keeps the drawer open
 		// when the setting says so; the drawer reads the work on the canvas,
 		// so it shows the chosen one once it is loaded.
 		if (generationInfoSettings.followsSelection && target instanceof Element && pressChoosesWork(target)) return;
@@ -736,10 +743,10 @@
 	<div class="right-tabs">
 		<div class="rtab-group" role="tablist">
 			<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
-				<button class="rtab" role="tab" aria-selected={outputTab === 'canvas'} class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
+				<button class="rtab" role="tab" aria-selected={outputTab === 'canvas'} data-generation-info-tab class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
 			</Tooltip>
 			<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show how this work was derived'}>
-				<button class="rtab" role="tab" aria-selected={outputTab === 'lineage'} class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
+				<button class="rtab" role="tab" aria-selected={outputTab === 'lineage'} data-generation-info-tab class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 			</Tooltip>
 		</div>
 		{#if result}
@@ -897,7 +904,7 @@
 				{singleUserMode}
 				{onCopyWorkId}
 				{onReplayCurrent}
-				onToggleGenerationInfo={() => (generationInfoOpen ? closeGenerationInfo() : openGenerationInfo())}
+				onToggleGenerationInfo={toggleGenerationInfo}
 				{onToggleSaijiki}
 				onDownloadCard={downloadCardFromCanvas}
 				{clipboardBusy}
@@ -974,6 +981,18 @@
 				{/await}
 			{/if}
 		</div>
+		{/if}
+
+		{#if outputTab === 'lineage'}
+			<div class="lineage-generation-info-control">
+				<Tooltip placement="top-left" text={isJapanese ? '選択中作品の生成情報を表示' : 'Show the provenance, prompts, and JSON of the chosen work'}>
+					<button bind:this={lineageGenerationInfoToggleEl} type="button" class="canvas-icon-btn canvas-provenance-btn"
+						class:active={generationInfoOpen} disabled={!result && !allowEmptyOutputTabs} aria-expanded={generationInfoOpen}
+						aria-label={isJapanese ? '生成情報' : 'Provenance'} onclick={toggleGenerationInfo}>
+						<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.5M12 7.8v.4" /></svg>
+					</button>
+				</Tooltip>
+			</div>
 		{/if}
 
 
@@ -1261,6 +1280,12 @@
 	}
 	.nav-left { left: 14px; }
 	.nav-right { right: 14px; }
+	/* Four 34px controls and four 6px gaps follow this button on the work tab. */
+	.lineage-generation-info-control { position: absolute; right: 178px; bottom: 14px; z-index: 1301; display: flex; }
+	.lineage-generation-info-control .canvas-icon-btn { width: 34px; height: 34px; border: 1px solid var(--border2); border-radius: 999px; background: var(--floating-control-bg); color: var(--floating-control-fg); box-shadow: 0 1px 6px rgba(0,0,0,0.1); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+	.lineage-generation-info-control .canvas-icon-btn:hover:not(:disabled), .lineage-generation-info-control .canvas-icon-btn.active { background: var(--floating-control-hover); border-color: rgba(77,95,134,0.45); }
+	.lineage-generation-info-control .canvas-icon-btn:disabled { background: var(--floating-control-disabled-bg); color: var(--floating-control-muted); cursor: not-allowed; }
+	.lineage-generation-info-control svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 
 	.nav-circle {
 		width: 38px;

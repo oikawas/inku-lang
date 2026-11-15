@@ -1,6 +1,7 @@
 """History-row presentation projection owned by the persistence boundary."""
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 import uuid
@@ -9,6 +10,7 @@ from copy import deepcopy
 from contextlib import nullcontext
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from hashlib import sha256
 from typing import Any
 
@@ -29,9 +31,7 @@ from .schema import (
     UserGroupRow,
 )
 from .description_lock import (
-    COMPOSITION_KEEPING_KINDS,
     DESCRIPTION_READING_KINDS,
-    composition_sources,
     locked_history_ids,
     replay_ddls,
 )
@@ -463,6 +463,19 @@ _DESCRIPTION_GROUP_KEYS: dict[str, str] = {}
 _DESCRIPTION_TEXT_CHUNK = 500
 
 
+def _composition_rules(request: dict) -> dict:
+    native = importlib.import_module("inku_render")
+    answer = json.loads(native.pipeline_composition_rules(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+    if answer.get("outcome") != "ok":
+        raise RuntimeError(f"composition rules core: {answer!r}")
+    return answer["result"]
+
+
+@lru_cache(maxsize=1)
+def _composition_keeping_kinds() -> frozenset[str]:
+    return frozenset(_composition_rules({"action": "keeping_kinds"})["kinds"])
+
+
 @dataclass(frozen=True)
 class _DescriptionGroup:
     key: str
@@ -525,25 +538,21 @@ class HistoryDescriptionGroupReader(HistoryLineageGroupReader):
             .all()
         )
         keys = self._keys_for(session, rows)
-        members: dict[str, list] = {}
-        for row in rows:
-            key = keys.get(row.id) or ""
-            if key:
-                members.setdefault(key, []).append(row)
-        kept_key = keys.get(include_item_id or "") or None
-        groups = [
+        native = importlib.import_module("inku_render")
+        request = {"action": "group", "items": [
+            {"id": row.id, "at": row.at, "starred": row.starred == 1,
+             "for_revision": row.for_revision == 1, "key": keys.get(row.id) or ""}
+            for row in rows], "min_items": min_item_count, "include_item_id": include_item_id}
+        result = json.loads(native.pipeline_description_groups(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+        if result.get("outcome") != "ok":
+            raise RuntimeError(f"description groups core: {result!r}")
+        return [
             _DescriptionGroup(
-                key=key,
-                member_ids=[row.id for row in group_rows],
-                starred_count=sum(1 for row in group_rows if row.starred == 1),
-                for_revision_count=sum(1 for row in group_rows if row.for_revision == 1),
-                latest_at=int(group_rows[0].at or 0),
+                key=group["key"], member_ids=group["member_ids"], starred_count=group["starred_count"],
+                for_revision_count=group["for_revision_count"], latest_at=group["latest_at"],
             )
-            for key, group_rows in members.items()
-            if len(group_rows) >= min_item_count or key == kept_key
+            for group in result["groups"]
         ]
-        groups.sort(key=lambda group: (-group.latest_at, group.key))
-        return groups
 
     def _items(self, session, actor, ids: list[str], include_svg: bool) -> list[dict]:
         if not ids:
@@ -1294,6 +1303,7 @@ class HistoryListProjector:
         if not starts:
             return
         nodes, edges, readable = ancestry
+        keeping_kinds = _composition_keeping_kinds()
         links_by_work = {(link.owner_id, link.history_id): link for link in links}
         node_of_history = {node.history_id: node for node in nodes.values() if node.history_id}
         records: dict[str, dict | None] = {}
@@ -1334,7 +1344,7 @@ class HistoryListProjector:
                 while current not in seen:
                     seen.add(current)
                     edge = edges.get(current)
-                    if edge is None or edge.id not in readable or edge.derivation_kind not in COMPOSITION_KEEPING_KINDS:
+                    if edge is None or edge.id not in readable or edge.derivation_kind not in keeping_kinds:
                         break
                     if edge.parent_node_id not in nodes:
                         break
@@ -1348,45 +1358,44 @@ class HistoryListProjector:
             def readable_node(node_id: str, _known=readable_node) -> bool:
                 return _known(node_id) or node_id in readable_ids
 
-        sources = composition_sources(starts, ancestry, ddls, record_of, readable_node)
         for row, item in zip(rows, items, strict=True):
-            source = sources.get(row.id)
-            if source is None:
+            start = starts.get(row.id)
+            if start is None:
                 continue
-            ancestor, via = source
-            record = record_of(ancestor) or {}
-            if not isinstance(record.get("answer"), dict):
-                continue  # the ancestor's composition fell back: there is no answer to show
-            inherited = {"history_id": ancestor, "at": getattr(node_of_history.get(ancestor), "at", None),
-                         "via": via, "answer": record["answer"]}
-            for requested in ("requested_form", "requested_main_law", "requested_thesis"):
-                if record.get(requested) is not None:
-                    inherited[requested] = record[requested]
-            places = _moved_places(edges, starts[row.id], len(via))
-            if places:
-                inherited["places"] = places
-            item["composition_inherited"] = inherited
-
-
-def _moved_places(edges, start: str, steps: int) -> list[dict]:
-    """The things "change the layout" moved on the edges walked from a work up to
-    the ancestor whose composition it keeps, each at its latest place (step 3,
-    2026-11-13): the ancestor's record still names where the thing was."""
-    found: dict[int, dict] = {}
-    current = start
-    for _ in range(steps):
-        edge = edges.get(current)
-        if edge is None:
-            break
-        if edge.derivation_kind == "layout_change":
-            try:
-                place = (json.loads(edge.metadata_json or "{}") or {}).get("place")
-            except (TypeError, ValueError):
-                place = None
-            if isinstance(place, dict) and isinstance(place.get("thing"), int) and isinstance(place.get("at"), str):
-                found.setdefault(place["thing"], {"thing": place["thing"], "at": place["at"]})
-        current = edge.parent_node_id
-    return sorted(found.values(), key=lambda moved: moved["thing"])
+            chain, seen, current = [], set(), start
+            while current not in seen and current in nodes:
+                seen.add(current)
+                node, edge = nodes[current], edges.get(current)
+                metadata = {}
+                if edge is not None:
+                    try:
+                        value = json.loads(getattr(edge, "metadata_json", None) or "{}")
+                        metadata = value if isinstance(value, dict) else {}
+                    except (TypeError, ValueError):
+                        pass
+                composition = record_of(node.history_id) if current != start and node.history_id else None
+                chain.append({"node_id": node.id, "history_id": node.history_id, "at": getattr(node, "at", None),
+                              "state": node.state, "readable": readable_node(node.id),
+                              "edge_readable": edge is not None and edge.id in readable,
+                              "parent_node_id": edge.parent_node_id if edge else None,
+                              "derivation_kind": edge.derivation_kind if edge else None,
+                              "ddl": ddls.get(node.history_id or ""), "composition": composition,
+                              "metadata": metadata})
+                if composition is not None or edge is None or edge.id not in readable \
+                        or edge.derivation_kind not in keeping_kinds:
+                    break
+                parent = nodes.get(edge.parent_node_id)
+                if parent is None or not parent.history_id or parent.state == "tombstone" \
+                        or not readable_node(parent.id):
+                    break
+                if edge.derivation_kind == "replay":
+                    child_ddl, parent_ddl = ddls.get(node.history_id or ""), ddls.get(parent.history_id)
+                    if not child_ddl or child_ddl != parent_ddl:
+                        break
+                current = parent.id
+            inherited = _composition_rules({"action": "walk", "start": start, "nodes": chain})["composition_inherited"]
+            if inherited is not None:
+                item["composition_inherited"] = inherited
 
 
 @dataclass(frozen=True)

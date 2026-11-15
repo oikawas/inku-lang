@@ -25,12 +25,15 @@ class CompositionBoxesRefused(ValueError):
         self.detail = detail
 
 
-def composition_boxes(config: dict[str, Any], ddl: str, composition: dict[str, Any] | None) -> tuple[list[dict[str, Any]], bool]:
-    """The core's chunks of a work (``chunk_moves.rs``, action ``boxes``): each chunk's title,
+def composition_boxes(config: dict[str, Any], ddl: str, own_record: dict[str, Any] | None,
+                      inherited_record: dict[str, Any] | None, derivation_kind: str | None,
+                      score: dict[str, Any] | None) -> tuple[list[dict[str, Any]], bool]:
+    """The core's chunks of a work (``chunk_moves.rs``, action ``work_boxes``): each chunk's title,
     the record's thing, its lines in ``ddl``, its sentences, those with no readable place, its box and its
     places; and whether the work draws free lines (step 3)."""
     native = importlib.import_module("inku_render")
-    request = {"action": "boxes", "config": config, "ddl": ddl, "composition": composition}
+    request = {"action": "work_boxes", "config": config, "ddl": ddl, "own_record": own_record,
+               "inherited_record": inherited_record, "derivation_kind": derivation_kind, "score": score}
     answer = json.loads(native.pipeline_chunk_moves(json.dumps(request, ensure_ascii=False).encode("utf-8")))
     if not isinstance(answer, dict) or answer.get("error"):
         raise RuntimeError(f"chunk moves core (boxes): {answer!r}")

@@ -19,7 +19,7 @@ removed on 2026-11-13; the author kept what the thesis-handle work uses):
 
 from __future__ import annotations
 
-import hashlib
+import importlib
 import json
 import threading
 from typing import Any
@@ -44,9 +44,12 @@ def _prompt(request: dict[str, Any]) -> dict[str, Any]:
 
 def typed_request_digest(request: dict[str, Any]) -> str:
     """The digest ``send_typed`` sends ``request`` under (and records as its prompt's digest)."""
-    prompt = _prompt(request)
-    return "sha256:" + hashlib.sha256(json.dumps(prompt, ensure_ascii=False, sort_keys=True,
-                                                 separators=(",", ":")).encode("utf-8")).hexdigest()
+    native = importlib.import_module("inku_render")
+    answer = json.loads(native.pipeline_composition_theses(json.dumps(
+        {"action": "digest", "request": request}, ensure_ascii=False).encode("utf-8")))
+    if answer.get("outcome") != "ok":
+        raise RuntimeError(f"composition theses core (digest): {answer!r}")
+    return answer["prompt_digest"]
 
 
 def send_typed(owner: str, context: dict[str, Any], request: dict[str, Any], *, execution_id: str,

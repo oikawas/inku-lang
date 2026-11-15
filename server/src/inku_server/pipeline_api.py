@@ -1075,61 +1075,34 @@ class PipelineService:
         with run._lock:
             snapshot = run.snapshot()
             settings = run.context.get("host_options") or {}
-            if settings.get("save_history") is not False:
-                raise HTTPException(409, "execution_already_saved")
-            if run.view()["busy"] or run._rendered is None or self.project_result is None:
-                raise HTTPException(409, "candidate_not_ready")
-            if settings.get("derivation_kind") != body.derivation_kind:
-                raise HTTPException(422, "invalid_candidate")
-            if body.derivation_kind == "composition_form_change" and settings.get("composition_form") is None \
-                    and settings.get("composition_main_law") is None and settings.get("composition_thesis") is None:
-                raise HTTPException(422, "invalid_candidate")
-            place = (settings.get("derivation_metadata") or {}).get("place")
-            if body.derivation_kind == "layout_change" and (
-                    run.context.get("derivation_kind") not in ("variation_ddl_fork", "legacy_ddl_fork")
-                    or not isinstance(place, dict)):
-                # Only a DDL fork that recorded what it moved (step 3).
-                raise HTTPException(422, "invalid_candidate")
-            if settings.get("lineage_parent_node_id") != body.lineage_parent_node_id:
-                raise HTTPException(422, "candidate_parent_mismatch")
             with db.SessionLocal() as session:
                 node = session.get(LineageNodeRow, body.lineage_parent_node_id)
                 history_id = node.history_id if node is not None and node.user_id == owner else None
             parents = db.get_items(owner, [history_id]) if history_id else []
-            if not parents:
-                raise HTTPException(404, "history_not_found")
-            link = self.store.history_link(owner, history_id)
+            link = self.store.history_link(owner, history_id) if history_id else None
             parent = run.context.get("parent") or {}
-            if not ((link and parent == {"kind": "variation", "id": link["variation_id"]}) or
-                    (not link and parent == {"kind": "legacy_history", "id": history_id})):
-                raise HTTPException(422, "candidate_parent_mismatch")
-            if body.derivation_kind != "layout_change":
-                # Moving a thing keeps the DDL, so a parent its DDL holds may
-                # still take it; the others read the description again.
-                _refuse_if_locked(history_id)
-            if body.derivation_kind == "layout_change":
-                metadata = {"place": {key: place.get(key) for key in ("title", "thing", "at_from", "at")}}
-            elif body.derivation_kind == "model_comparison":
-                # Both stages are drawn by the compared model, as the history
-                # save of a model candidate has recorded it.
-                metadata = {"comparison_mode": "common", "compared_model": settings.get("stage1_model"),
-                            "stage1_model": settings.get("stage1_model"), "stage2_model": settings.get("stage2_model")}
-            else:
-                description = parents[0].get("description_ddl") or {}
-                answer = (description.get("composition") or {}).get("answer") or {}
-                if settings.get("composition_thesis") is not None:
-                    # A thesis child (step 4): the parent's thesis, the fixed one, and who wrote it.
-                    source = settings.get("composition_thesis_source") or "author"
-                    metadata = {"thesis_from": answer.get("thesis"), "thesis_to": settings["composition_thesis"],
-                                "thesis_source": source}
-                    if source == "proposed":
-                        metadata["thesis_prompt_digest"] = settings.get("composition_thesis_prompt_digest")
-                elif settings.get("composition_main_law") is not None:
-                    # A main-law child keeps its parent's form when it has one (step 2).
-                    metadata = {"main_law_from": answer.get("main_law"), "main_law_to": settings["composition_main_law"],
-                                "form": settings.get("composition_form")}
-                else:
-                    metadata = {"form_from": answer.get("form"), "form_to": settings["composition_form"]}
+            parent_matches = bool(history_id and ((link and parent == {"kind": "variation", "id": link["variation_id"]})
+                                  or (not link and parent == {"kind": "legacy_history", "id": history_id})))
+            description = (parents[0].get("description_ddl") or {}) if parents else {}
+            answer = (description.get("composition") or {}).get("answer") or {}
+            request = {"action": "metadata", "derivation_kind": body.derivation_kind, "settings": settings,
+                       "parent_answer": answer, "fork_kind": run.context.get("derivation_kind"),
+                       "candidate": {"ready": not run.view()["busy"] and run._rendered is not None
+                                      and self.project_result is not None,
+                                      "history_found": bool(parents), "parent_matches": parent_matches,
+                                      "description_locked": db.history_description_locked(history_id)
+                                      if history_id else False,
+                                      "requested_parent_node_id": body.lineage_parent_node_id}}
+            native = importlib.import_module("inku_render")
+            decision = json.loads(native.pipeline_composition_rules(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+            if decision.get("outcome") != "ok":
+                reason = decision.get("reason")
+                statuses = {"execution_already_saved": 409, "candidate_not_ready": 409, "invalid_candidate": 422,
+                            "candidate_parent_mismatch": 422, "history_not_found": 404, "description_locked": 409}
+                if reason not in statuses:
+                    raise RuntimeError(f"composition rules core (metadata): {decision!r}")
+                raise HTTPException(statuses[reason], DESCRIPTION_LOCKED if reason == "description_locked" else reason)
+            metadata = decision["result"]["metadata"]
             context = deepcopy(run.context)
             context["host_options"] = {**settings, "save_history": True, "save_artifacts": True, "count_generation": False,
                                        "derivation_kind": body.derivation_kind, "derivation_metadata": metadata}

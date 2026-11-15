@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 #[serde(deny_unknown_fields)]
 struct Item {
     id: String,
+    #[serde(default, deserialize_with = "present_key")]
+    key: Option<String>,
     #[serde(default)]
     source_text: Option<String>,
     #[serde(default)]
@@ -19,6 +21,12 @@ struct Item {
     starred: bool,
     #[serde(default)]
     for_revision: bool,
+}
+
+fn present_key<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    String::deserialize(deserializer).map(Some)
 }
 
 #[derive(Deserialize)]
@@ -54,9 +62,11 @@ pub fn description_groups_json(input: &[u8]) -> Vec<u8> {
         if item.image_provenance.is_some() {
             continue;
         }
-        let key = super::description_labels::description_group_key(
-            item.source_text.as_deref().unwrap_or(&item.input),
-        );
+        let key = item.key.clone().unwrap_or_else(|| {
+            super::description_labels::description_group_key(
+                item.source_text.as_deref().unwrap_or(&item.input),
+            )
+        });
         if !key.is_empty() {
             groups.entry(key).or_default().push(item);
         }
@@ -104,5 +114,23 @@ mod tests {
             assert_eq!(result["groups"], case["expected"]["groups"]);
             assert_eq!(result["total"], case["expected"]["total"]);
         }
+        // Reuse Server's sample: b's text is snow, but its supplied rain key
+        // joins c; a's explicitly empty key excludes it from grouping.
+        let mut input = cases["groups"][0]["input"].clone();
+        let rain_key = cases["groups"][0]["expected"]["groups"][1]["key"].clone();
+        input["items"][0]["key"] = rain_key.clone();
+        input["items"][1]["key"] = Value::String(String::new());
+        let result: Value = serde_json::from_slice(&super::description_groups_json(
+            &serde_json::to_vec(&input).unwrap(),
+        ))
+        .unwrap();
+        assert_eq!(result["outcome"], "ok");
+        assert_eq!(result["total"], 1);
+        assert_eq!(result["groups"][0]["key"], rain_key);
+        assert_eq!(
+            result["groups"][0]["member_ids"],
+            serde_json::json!(["b", "c"])
+        );
+        assert_eq!(result["groups"][0]["item_count"], 2);
     }
 }

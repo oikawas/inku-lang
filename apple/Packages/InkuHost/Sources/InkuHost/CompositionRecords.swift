@@ -24,12 +24,15 @@ public struct CompositionRecordSnapshot: Sendable {
 extension PipelineHost {
     /// Read a library page's shared ancestry once, then let the same core walk decide each record.
     public func compositionRecords(works: [SavedWork]) async throws -> [String: CompositionRecordSnapshot] {
-        let stored = try await database.compositionNodes(starts: works.compactMap(\.lineageNodeID))
+        let batch = try await database.compositionNodes(starts: works.compactMap(\.lineageNodeID),
+            unlinkedWorkIDs: works.filter { $0.lineageNodeID == nil }.map(\.id))
+        let stored = batch.nodes
         var result: [String: CompositionRecordSnapshot] = [:]
         for work in works {
           do {
             guard let start = work.lineageNodeID else {
-                result[work.id] = try? await compositionRecord(work: work)
+                let own = try CompositionRecords.ownRecord(descriptionDDL: batch.unlinked[work.id], derivationKind: nil)
+                result[work.id] = CompositionRecordSnapshot(own: own, inherited: nil, places: [], derivationKind: nil, metadata: .object([:]))
                 continue
             }
             var nodes: [ExactJSON] = [], id: String? = start, seen = Set<String>()

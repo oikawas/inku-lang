@@ -306,10 +306,29 @@ public actor InkuDatabase {
     }
 
     /// A page's ancestry and authoring records from one read snapshot, sharing common ancestors.
-    public func compositionNodes(starts: [String]) throws -> [String: CompositionStoredNode] {
+    public func compositionNodes(starts: [String], unlinkedWorkIDs: [String]) throws -> (nodes: [String: CompositionStoredNode], unlinked: [String: Data]) {
         try queue.read { db in
             var result: [String: CompositionStoredNode] = [:]
             var missing = Set<String>()
+            func descriptionDDL(_ workID: String) throws -> Data? {
+                guard let split = workID.lastIndex(of: "_") else { return nil }
+                let execution = String(workID[..<split]), sequence = String(workID[workID.index(after: split)...])
+                guard !execution.isEmpty, !sequence.isEmpty, sequence.utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
+                let json = try String.fetchOne(db, sql: """
+                    SELECT json_extract(CAST(acknowledgement AS TEXT), '$.performance.description_ddl')
+                    FROM effect_acknowledgements
+                    WHERE execution_id = ? AND effect_id = ? AND json_valid(CAST(acknowledgement AS TEXT))
+                      AND json_extract(CAST(acknowledgement AS TEXT), '$.work_id') = ?
+                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.description_ddl') = 'object'
+                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.configuration') = 'object'
+                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.options') = 'object'
+                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.clip') = 'object'
+                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority.authority') = 'text'
+                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority.origin') = 'text'
+                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority.revision') = 'text'
+                    """, arguments: [execution, "save-render:" + sequence, workID])
+                return json.map { Data($0.utf8) }
+            }
             for start in Set(starts) {
                 var current: String? = start
                 var seen = Set<String>()
@@ -321,29 +340,15 @@ public actor InkuDatabase {
                         if let row = try Row.fetchOne(db, sql: "SELECT ddl, trashed FROM history WHERE id = ?", arguments: [workID]) {
                             ddl = row["ddl"]; readable = (row["trashed"] as Bool? == false) && node.state == "active"
                         }
-                        if let split = workID.lastIndex(of: "_") {
-                            let execution = String(workID[..<split]), sequence = String(workID[workID.index(after: split)...])
-                            if !execution.isEmpty, !sequence.isEmpty, sequence.utf8.allSatisfy({ (48...57).contains($0) }) {
-                                let json = try String.fetchOne(db, sql: """
-                                    SELECT json_extract(CAST(acknowledgement AS TEXT), '$.performance.description_ddl')
-                                    FROM effect_acknowledgements
-                                    WHERE execution_id = ? AND effect_id = ? AND json_valid(CAST(acknowledgement AS TEXT))
-                                      AND json_extract(CAST(acknowledgement AS TEXT), '$.work_id') = ?
-                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.description_ddl') = 'object'
-                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.configuration') = 'object'
-                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.options') = 'object'
-                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.clip') = 'object'
-                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority') = 'object'
-                                    """, arguments: [execution, "save-render:" + sequence, workID])
-                                description = json.map { Data($0.utf8) }
-                            }
-                        }
+                        description = try descriptionDDL(workID)
                     }
                     result[id] = CompositionStoredNode(node: node, edge: edge, ddl: ddl, readable: readable, descriptionDDL: description)
                     current = edge?.parentNodeID
                 }
             }
-            return result
+            var unlinked: [String: Data] = [:]
+            for id in Set(unlinkedWorkIDs) { unlinked[id] = try descriptionDDL(id) }
+            return (result, unlinked)
         }
     }
 

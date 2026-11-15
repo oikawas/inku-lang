@@ -11,5 +11,7 @@ final class PlacePresentationTests: XCTestCase {
         XCTAssertTrue(PlacePresentation.title(unit: unit, place: "third_top", display: display).contains("はめ込んだ"))
         XCTAssertTrue(PlacePresentation.label(what: "海", unit: unit, place: "golden_ul", display: display).contains("画面の端"))
         XCTAssertFalse(PlacePresentation.label(what: "海", unit: unit, place: "golden_ul", display: display).contains("golden_ul"))
+        let fitted: ExactJSON = .object(["at": .null, "places": .object(["center": .string("fitted")])])
+        XCTAssertFalse(PlacePresentation.title(unit: fitted, place: "center", display: display).contains("（今）"))
     }
 }

@@ -315,17 +315,20 @@ public actor InkuDatabase {
                 let execution = String(workID[..<split]), sequence = String(workID[workID.index(after: split)...])
                 guard !execution.isEmpty, !sequence.isEmpty, sequence.utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
                 let json = try String.fetchOne(db, sql: """
-                    SELECT json_extract(CAST(acknowledgement AS TEXT), '$.performance.description_ddl')
-                    FROM effect_acknowledgements
-                    WHERE execution_id = ? AND effect_id = ? AND json_valid(CAST(acknowledgement AS TEXT))
-                      AND json_extract(CAST(acknowledgement AS TEXT), '$.work_id') = ?
-                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.description_ddl') = 'object'
-                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.configuration') = 'object'
-                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.options') = 'object'
-                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.clip') = 'object'
-                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority.authority') = 'text'
-                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority.origin') = 'text'
-                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority.revision') = 'text'
+                    WITH record AS (
+                        SELECT CASE WHEN json_valid(CAST(acknowledgement AS TEXT))
+                            THEN CAST(acknowledgement AS TEXT) ELSE '{}' END AS document
+                        FROM effect_acknowledgements WHERE execution_id = ? AND effect_id = ?
+                    )
+                    SELECT json_extract(document, '$.performance.description_ddl') FROM record
+                    WHERE json_extract(document, '$.work_id') = ?
+                      AND json_type(document, '$.performance.description_ddl') = 'object'
+                      AND json_type(document, '$.performance.configuration') = 'object'
+                      AND json_type(document, '$.performance.options') = 'object'
+                      AND json_type(document, '$.performance.clip') = 'object'
+                      AND json_type(document, '$.performance.authority.authority') = 'text'
+                      AND json_type(document, '$.performance.authority.origin') = 'text'
+                      AND json_type(document, '$.performance.authority.revision') = 'text'
                     """, arguments: [execution, "save-render:" + sequence, workID])
                 return json.map { Data($0.utf8) }
             }

@@ -226,6 +226,8 @@ pub struct UnitBox {
     /// fractions `[x0, y0, x1, y1]`; `None` when no sentence has one.
     #[serde(rename = "box")]
     pub area: Option<[f64; 4]>,
+    /// The named place nearest the center of the box, when there is one.
+    pub at: Option<String>,
     /// Each of the nine places' outcome for this chunk (`place_at`): `ok`,
     /// `clamped` or the reason it is refused (step 3).
     pub places: BTreeMap<String, String>,
@@ -269,12 +271,15 @@ pub fn boxes(
                 .filter(|(_, owner)| owner.as_deref() == Some(title.as_str()))
                 .map(|(index, _)| index)
                 .collect();
+            let unplaced = members.len() - placed.len();
+            let area = union(placed);
             UnitBox {
                 thing,
                 lines,
                 sentences: members.len(),
-                unplaced: members.len() - placed.len(),
-                area: union(placed),
+                unplaced,
+                area,
+                at: area.and_then(|bounds| place_of(center(bounds))),
                 places: places_of(&doc, paper, &title),
                 title,
             }
@@ -702,6 +707,7 @@ fn respond(request: Request) -> Result<Value, Refusal> {
             if fitted(request.derivation_kind.as_deref(), &request.score) {
                 for unit in &mut units {
                     unit.area = None;
+                    unit.at = None;
                     for value in unit.places.values_mut() {
                         *value = "fitted".to_owned();
                     }
@@ -989,8 +995,10 @@ mod tests {
         assert_eq!(units[0]["thing"], 1);
         assert_eq!(units[0]["lines"], json!([3, 4]));
         assert_eq!(units[0]["box"], json!([0.12, 0.24, 0.89, 0.32]));
+        assert_eq!(units[0]["at"], Value::Null);
         assert_eq!(units[1]["title"], "磯もとどろに");
         assert_eq!(units[1]["thing"], 2);
+        assert_eq!(units[1]["at"], "golden_lr");
         assert_eq!(units[1]["lines"], json!([6, 7, 8, 9]));
         assert_eq!(
             (
@@ -1056,7 +1064,7 @@ mod tests {
         }));
         assert_eq!(
             scene["units"],
-            json!([{"title": "葉", "thing": null, "lines": [2, 3], "sentences": 1, "unplaced": 1, "box": null,
+            json!([{"title": "葉", "thing": null, "lines": [2, 3], "sentences": 1, "unplaced": 1, "box": null, "at": null,
                 "places": {"golden_ul": "scene_word", "golden_ur": "scene_word", "golden_ll": "scene_word",
                     "golden_lr": "scene_word", "third_left": "scene_word", "third_right": "scene_word",
                     "third_top": "scene_word", "third_bottom": "scene_word", "center": "scene_word"}}])

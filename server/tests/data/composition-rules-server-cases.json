@@ -906,6 +906,7 @@
       "expected": {
         "units": [
           {
+            "at": null,
             "box": [
               0.12,
               0.24,
@@ -1080,6 +1081,7 @@
       "expected": {
         "units": [
           {
+            "at": null,
             "box": [
               0.12,
               0.24,
@@ -1263,6 +1265,7 @@
       "expected": {
         "units": [
           {
+            "at": null,
             "box": null,
             "lines": [
               3,
@@ -1416,6 +1419,7 @@
       "expected": {
         "units": [
           {
+            "at": null,
             "box": null,
             "lines": [
               3,
@@ -1578,6 +1582,7 @@
       "expected": {
         "units": [
           {
+            "at": null,
             "box": [
               0.12,
               0.24,
@@ -1741,6 +1746,7 @@
       "expected": {
         "units": [
           {
+            "at": null,
             "box": null,
             "lines": [
               3,

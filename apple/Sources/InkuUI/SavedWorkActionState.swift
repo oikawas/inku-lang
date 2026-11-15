@@ -25,6 +25,74 @@ public enum SavedWorkActionState: Sendable, Equatable {
     }
 }
 
+/// Header popover using the same actions and availability as the native menus.
+@MainActor
+struct SavedWorkRefinementPopover: View {
+    @Bindable var model: AppModel
+    let work: SavedWork
+    let title: String
+    let onAction: (SavedWork, String) -> Void
+    var writingLocked = false
+    private var state: SavedWorkActionState? { model.workActionState(for: work) }
+    private var disabled: Bool { model.isBusy || writingLocked || work.trashed }
+    private var reason: String {
+        if state == .lockedDescription { return model.display.webCopy("descriptionLockedReason", "編集した指示書で確定した作品です。記述を読み直す操作は使えません。") }
+        if state == .image { return model.display.label("画像から作った作品では、記述から描き直せません。", "A work made from an image cannot be redrawn from a description.") }
+        return model.display.localized(state == nil ? "保存条件を読み込み中です。" : "この作品には操作に必要な保存条件が記録されていません。")
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title).inkuFont(12, weight: .bold).frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 13).padding(.vertical, 8).background(Color.accentColor.opacity(0.14))
+                .overlay(alignment: .bottom) { Rectangle().fill(Color.accentColor).frame(height: 1) }
+            group("workActionGroupLook", "色と質感") {
+                item("canvasVaryColor", "色カタログを変える", "color")
+                item("workActionColorArrangement", "配色を変える", "color-arrangement")
+                item("workActionGround", "支持体を変える", "ground")
+                item("workActionTool", "てざわりを変える", "tool")
+            }
+            Divider()
+            group("workActionGroupForm", "形と指示書") {
+                item("canvasVaryComposition", "配置を変える", "layout")
+                item("workActionInstructions", "指示書エディタ", "ddl", held: work.ddl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false)
+            }
+            if state?.showsDescriptionActions != false {
+                Divider()
+                group("workActionGroupDescription", "記述から描き直す") {
+                    item("workActionDescription", "記述を変える", "description", llm: true, held: state?.canReadDescription != true)
+                    item("workActionComposition", "構図と法則を変える", "composition-form", llm: true, held: state?.canReadDescription != true)
+                    item("workActionSketchGrain", "写生なし／ありで描き直す", "sketch", llm: true, held: state?.canReadDescription != true)
+                    item("workActionModels", "モデルを変える", "model", llm: true, held: state?.canReadDescription != true)
+                    if state?.canReadDescription != true { Text(reason).inkuFont(10).foregroundStyle(.tertiary).padding(.horizontal, 13).padding(.vertical, 4) }
+                }
+            }
+        }.padding(.bottom, 4).frame(width: 260).background(InkuColor.panel)
+    }
+    private func group<Content: View>(_ key: String, _ fallback: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(model.display.webCopy(key, fallback)).inkuFont(10, weight: .semibold).foregroundStyle(.tertiary).padding(.horizontal, 13).padding(.top, 7).padding(.bottom, 2)
+            content()
+        }.padding(.bottom, 4)
+    }
+    private func item(_ key: String, _ fallback: String, _ action: String, llm: Bool = false, held: Bool = false) -> some View {
+        Button { onAction(work, action) } label: {
+            HStack(spacing: 12) {
+                Text(model.display.webCopy(key, fallback)).inkuFont(12).lineLimit(1)
+                Spacer(minLength: 0)
+                if llm { Text("LLM").inkuFont(9, weight: .semibold).foregroundStyle(.secondary).padding(.horizontal, 4).overlay(RoundedRectangle(cornerRadius: 3).stroke(InkuColor.border2)) }
+            }.padding(.horizontal, 13).padding(.vertical, 6).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+        }.buttonStyle(RefinementMenuRowStyle()).disabled(disabled || held).inkuTooltip(held ? reason : "")
+    }
+}
+
+private struct RefinementMenuRowStyle: ButtonStyle {
+    @State private var hovered = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.background(hovered || configuration.isPressed ? InkuColor.bg2 : .clear)
+            .onHover { hovered = $0 }
+    }
+}
+
 /// All entrances act on the saved work, without selecting it as the next input.
 @MainActor
 struct SavedWorkRefinementActions: View {

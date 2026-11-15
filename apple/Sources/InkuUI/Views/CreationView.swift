@@ -1098,15 +1098,12 @@ struct CreationView: View {
             }
             .buttonStyle(InkuGhostButtonStyle())
             .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-            .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } })) {
+            .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } }), arrowEdge: .trailing) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(workActionTitle(work)).inkuFont(12, weight: .semibold)
-                        SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
-                            ui.refinementMenuWorkID = nil
-                            onWorkAction(target, action)
-                        }, writingLocked: automation.isOccupied)
-                    }.padding(16).inkuFixedWidth(300)
+                    SavedWorkRefinementPopover(model: model, work: work, title: workActionTitle(work), onAction: { target, action in
+                        ui.refinementMenuWorkID = nil
+                        onWorkAction(target, action)
+                    }, writingLocked: automation.isOccupied)
                 }.frame(maxHeight: max(120, rightPanelHeight - 80)).inkuPopoverContent()
             }
             .fixedSize()

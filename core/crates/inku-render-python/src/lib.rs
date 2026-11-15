@@ -472,7 +472,7 @@ fn pipeline_saved_variants<'py>(
     })
 }
 
-/// The chunk moves (まとまりの手) from the shared core: start, answer, drawn.
+/// The shared core's chunk units, boxes, and author-directed placement.
 #[pyfunction]
 fn pipeline_chunk_moves<'py>(
     py: Python<'py>,

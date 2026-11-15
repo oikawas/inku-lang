@@ -124,7 +124,7 @@ final class CompositionUpdateTests: XCTestCase, @unchecked Sendable {
 
     func testWorkBoxesExposeCoreCurrentPlaceAndFittedHasNone() throws {
         var input = try XCTUnwrap(cases()["boxes"].array?.first)["input"]
-        input["ddl"] = .string("画面比1:1。\n\n「丸」\n画面の横0.5、縦0.5の位置に、直径0.1の赤の塗りの円を1個置く。")
+        input["ddl"] = .string("画面比1:1。\n\n「丸」\n画面の横0.5、縦0.5の位置に、直径0.1の白の塗りの円を1個置く。")
         let normal = try ExactJSON(data: InkuCore.chunkMoves(input.data))
         XCTAssertEqual(normal["units"].array?.first?["at"].string, "center")
         input["derivation_kind"] = .string("canvas_fit")

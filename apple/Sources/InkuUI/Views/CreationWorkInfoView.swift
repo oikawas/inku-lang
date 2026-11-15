@@ -240,9 +240,7 @@ struct CreationWorkInfoView: View {
     private func effectiveReading(_ record: ExactJSON) -> ExactJSON {
         var result = record
         if let snapshot = compositionSnapshot {
-            var composition = snapshot.own ?? snapshot.inherited ?? .null
-            if snapshot.own == nil && snapshot.inherited != nil { composition["state"] = .string("used") }
-            result["composition"] = composition
+            result["composition"] = snapshot.own ?? snapshot.inherited ?? .null
         } else { result["composition"] = .null }
         return result
     }

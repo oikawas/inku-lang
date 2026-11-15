@@ -115,9 +115,10 @@ struct ReadDrawInfoView: View {
                     Text(display.label("この作品は「\(via)」の子です。下は、親の作品（\(at)）の構図と法則です。", "This work is a child of \(via). Below is the parent’s composition (\(at)).")).inkuFont(12).foregroundStyle(.secondary)
                 }
                 let source = compositionSnapshot?.metadata["thesis_source"].string
-                let thesisOrigin = source == "proposed" ? l("（AI が出した）", " (AI-proposed)") : source == "author" ? l("（作者が書いた）", " (author-written)") : ""
+                let thesisOrigin = source == "proposed" ? display.webCopy("compositionThesisProposed", "AI が出した") : source == "author" ? display.webCopy("compositionThesisAuthorWrote", "作者が書いた") : ""
                 let requested = l("（作者が選んだ）", " (chosen by the author)")
-                row(l("命題", "Thesis"), (answer["thesis"].string ?? "") + thesisOrigin + (c["requested_thesis"].string == nil ? "" : requested), "provenanceHintComposition")
+                let thesisNote = c["requested_thesis"].string != nil && !thesisOrigin.isEmpty ? l("（\(thesisOrigin)）", " (\(thesisOrigin))") : ""
+                row(l("命題", "Thesis"), (answer["thesis"].string ?? "") + thesisNote, "provenanceHintComposition")
                 let form = answer["form"].string ?? ""
                 row(l("画の型", "Form"), CompositionNames.formName(form, language: display.preferences.language) + (c["requested_form"].string == nil ? "" : requested), "provenanceHintComposition")
                 let main = answer["main_law"].string ?? ""

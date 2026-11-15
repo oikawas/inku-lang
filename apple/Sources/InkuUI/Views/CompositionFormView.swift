@@ -117,10 +117,13 @@ public struct CompositionFormView: View {
     private var controlsFooter: some View {
         let isThesis = form.change == .authorThesis || form.change == .proposedTheses
         return VStack(alignment: .leading, spacing: 8) {
-            let keeps = isThesis ? "compositionThesisKeeps" : "compositionFormKeeps"
-            let redecides = isThesis ? "compositionThesisRedecides" : "compositionFormRedecides"
+            let keeps = isThesis ? "compositionThesisKeeps" : form.change == .mainLaw ? "compositionMainLawKeeps" : "compositionFormKeeps"
+            let redecides = isThesis ? "compositionThesisRedecides" : form.change == .mainLaw ? "compositionMainLawRedecides" : "compositionFormRedecides"
+            let keptText = form.change == .mainLaw ? form.currentForm.map {
+                model.display.webCopyFormat(keeps, "記述・読み・記述が名指す物・画の型（%@）", CompositionNames.formName($0, language: model.display.preferences.language))
+            } ?? model.display.label("記述・読み・記述が名指す物", "The description, the reading and the things the description names") : model.display.webCopy(keeps, "記述・読み・記述が名指す物")
             VStack(alignment: .leading, spacing: 4) {
-                Text(model.display.webCopy("compositionKeepsTerm", "変わらないもの") + "：" + model.display.webCopy(keeps, "記述・読み・記述が名指す物"))
+                Text(model.display.webCopy("compositionKeepsTerm", "変わらないもの") + "：" + keptText)
                 Text(model.display.webCopy("compositionRedecidesTerm", "決め直すもの") + "：" + model.display.webCopy(redecides, "画の型・法則・配色"))
             }.inkuFont(12).foregroundStyle(.secondary)
             DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"),

@@ -15,7 +15,10 @@ struct CompositionSection: View {
     private var language: String { display.preferences.language }
     private var inherited: Bool { snapshot?.own == nil && snapshot?.inherited != nil }
     private var record: ExactJSON? { snapshot?.own ?? snapshot?.inherited }
-    private var answer: ExactJSON? { record?["answer"].object == nil ? nil : record?["answer"] }
+    private var answer: ExactJSON? {
+        guard inherited || record?["state"].string == "used", record?["answer"].object != nil else { return nil }
+        return record?["answer"]
+    }
     private var fallback: Bool { record?["state"].string == "fallback" }
     private var open: Binding<Bool> { Binding(get: { display.preferences.compositionExpanded ?? false }, set: { display.preferences.compositionExpanded = $0 }) }
 

@@ -12,6 +12,35 @@ fn call(f: fn(&[u8]) -> Vec<u8>, request: &Value) -> Value {
 }
 
 #[test]
+fn keeping_kinds_returns_walk_order_and_matches_server_set() {
+    use std::collections::BTreeSet;
+    let server = include_str!("../../../../server/src/inku_server/persistence/description_lock.py");
+    let contents = server
+        .split_once("COMPOSITION_KEEPING_KINDS = frozenset({")
+        .unwrap()
+        .1
+        .split_once("})")
+        .unwrap()
+        .0;
+    let server_kinds: BTreeSet<&str> = contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with('"'))
+        .map(|line| line.trim_end_matches(',').trim_matches('"'))
+        .collect();
+    let response = call(
+        crate::composition_rules::composition_rules_json,
+        &json!({"action": "keeping_kinds"}),
+    );
+    assert_eq!(
+        response,
+        json!({"schema":"inku.composition-rules.v1", "outcome":"ok", "result":{"kinds": crate::composition_rules::KEEPING}})
+    );
+    let core_kinds: BTreeSet<&str> = crate::composition_rules::KEEPING.iter().copied().collect();
+    assert_eq!(core_kinds, server_kinds);
+}
+
+#[test]
 fn boxes_and_ancestry_match_server_examples() {
     let cases = fixture();
     for case in cases["boxes"].as_array().unwrap() {

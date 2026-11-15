@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-const KEEPING: &[&str] = &[
+pub(crate) const KEEPING: &[&str] = &[
     "replay",
     "tool_change",
     "ground_change",
@@ -41,6 +41,7 @@ struct Node {
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
+    KeepingKinds,
     Walk {
         start: String,
         nodes: Vec<Node>,
@@ -253,6 +254,7 @@ pub fn composition_rules_json(input: &[u8]) -> Vec<u8> {
         return br#"{"error":"invalid_request"}"#.to_vec();
     };
     let result = match request {
+        Request::KeepingKinds => Ok(json!({"kinds": KEEPING})),
         Request::Walk { start, nodes } => Ok(walk(&start, &nodes)),
         Request::Metadata {
             derivation_kind,

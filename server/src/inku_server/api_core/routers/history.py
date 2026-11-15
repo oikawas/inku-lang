@@ -535,26 +535,6 @@ class CompositionBoxesResponse(BaseModel):
     )
 
 
-def _fitted_onto_another_paper(item: dict) -> bool:
-    """A work fitted onto another paper (はめ込み), or a child keeping its Score: the instructions'
-    numbers are the declared ratio's and the picture sits in a centred frame of it, so the boxes
-    (fractions of the paper) would miss. A frame of the paper's own ratio fills it."""
-    from ...canvas_formats import canvas_format
-
-    if item.get("derivation_kind") == "canvas_fit":
-        return True
-    canvas = (item.get("score") or {}).get("canvas")
-    if not isinstance(canvas, dict) or canvas.get("fit") is None:
-        return False
-    declared = canvas.get("declared_ratio") or {}
-    try:
-        paper = canvas_format(str(canvas.get("aspect")))
-        width, height = int(declared["width_units"]), int(declared["height_units"])
-    except (KeyError, TypeError, ValueError):
-        return True
-    return width * paper.height_units != height * paper.width_units
-
-
 @router.get(
     "/api/history/{item_id}/composition-boxes",
     response_model=CompositionBoxesResponse,
@@ -571,18 +551,19 @@ def api_history_composition_boxes(
     """
     from ...composition_record import CompositionBoxesRefused, composition_boxes
 
-    item, config, composition = _chunk_input(actor, item_id)
+    item, config, composition, inherited_record = _chunk_input(actor, item_id)
+    description = item.get("description_ddl")
+    own_record = description.get("composition") if isinstance(description, dict) else None
+    own_record = own_record if isinstance(own_record, dict) else None
     try:
-        units, free_lines = composition_boxes(config, item.get("ddl") or "", composition)
+        units, free_lines = composition_boxes(config, item.get("ddl") or "", own_record, inherited_record,
+                                              item.get("derivation_kind"), item.get("score"))
     except CompositionBoxesRefused as error:
         raise HTTPException(status_code=422, detail=error.detail) from error
-    if _fitted_onto_another_paper(item):
-        # Its numbers are the declared ratio's: no box, and no place to move to.
-        units = [{**unit, "box": None, "places": {at: "fitted" for at in unit.get("places") or {}}} for unit in units]
     return CompositionBoxesResponse(units=units, free_lines=free_lines)
 
 
-def _chunk_input(actor: dict, item_id: str) -> tuple[dict, dict, dict | None]:
+def _chunk_input(actor: dict, item_id: str) -> tuple[dict, dict, dict | None, dict | None]:
     """A work, the config its instructions are read with, and the composition record that titles them."""
     from ...composition_record import composition_of
     from ...pipeline_runtime import get_service
@@ -596,6 +577,7 @@ def _chunk_input(actor: dict, item_id: str) -> tuple[dict, dict, dict | None]:
         raise HTTPException(status_code=422, detail="composition boxes cannot be read: binding_unavailable")
     composition = composition_of(item)
     inherited = item.get("composition_inherited")
+    inherited_record = None
     if composition is None and isinstance(inherited, dict):
         # A child that keeps no record of its own titles its chunks from the
         # ancestor's (step 1d): that ancestor's things, and its line owners,
@@ -603,7 +585,10 @@ def _chunk_input(actor: dict, item_id: str) -> tuple[dict, dict, dict | None]:
         # lines as the ancestor's; another DDL is left untitled, as before.
         ancestors = _db.get_items(actor["id"], [inherited["history_id"]])
         composition = composition_of(ancestors[0]) if ancestors else None
-    return item, config, composition
+        description = ancestors[0].get("description_ddl") if ancestors else None
+        record = description.get("composition") if isinstance(description, dict) else None
+        inherited_record = record if isinstance(record, dict) else None
+    return item, config, composition, inherited_record
 
 
 @router.post(
@@ -626,11 +611,10 @@ def api_history_chunk_place(
     """
     from ...composition_record import CompositionBoxesRefused, chunk_place
 
-    item, config, composition = _chunk_input(actor, item_id)
-    if _fitted_onto_another_paper(item):
-        raise HTTPException(status_code=422, detail="fitted")
+    item, config, composition, _ = _chunk_input(actor, item_id)
     try:
-        ddl, place = chunk_place(config, item.get("ddl") or "", composition, body.chunk, body.at)
+        ddl, place = chunk_place(config, item.get("ddl") or "", composition, body.chunk, body.at,
+                                 item.get("derivation_kind"), item.get("score"))
     except CompositionBoxesRefused as error:
         raise HTTPException(status_code=422, detail=error.reason) from error
     return ChunkPlaceResponse(ddl=ddl, place=ChunkPlaced.model_validate(place))

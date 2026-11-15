@@ -79,11 +79,13 @@ def propose_theses(owner: str, item: dict, model: str) -> dict:
         raise ThesesRefused(422, str(error)) from error
     execution_id = f"theses:{uuid.uuid4().hex}"
     try:
+        made = _core(ask)
+        if made.get("outcome") != "ok":
+            raise ThesesRefused(422, str(made.get("reason") or made.get("error") or "invalid_request"))
+        request = made["request"]
+        prompt_digest = typed_request_digest(request)
+        retry_ask = {key: value for key, value in ask.items() if key != "action"}
         for attempt in (1, 2):
-            made = _core(ask)
-            if made.get("outcome") != "ok":
-                raise ThesesRefused(422, str(made.get("reason") or made.get("error") or "invalid_request"))
-            request = made["request"]
             try:
                 text, failure = send_typed(owner, context, request, execution_id=execution_id,
                                            prompt_id=THESES_PROMPT_ID, action_id=f"{execution_id}-{attempt}",
@@ -92,14 +94,17 @@ def propose_theses(owner: str, item: dict, model: str) -> dict:
                 raise ThesesRefused(409, "stopped") from error
             if failure is not None:
                 raise ThesesRefused(502, "provider_failed", failure=failure)
-            checked = _core({"action": "answer", "answer": text or "", "language": language,
-                             **({"current_thesis": thesis} if thesis is not None else {})})
-            if checked.get("outcome") == "ok":
-                return {"theses": checked["theses"], "prompt_digest": typed_request_digest(request), "model": model,
+            checked = _core({"action": "retry", "ask": retry_ask, "answer": text or "", "attempt": attempt})
+            if checked.get("outcome") == "ok" and checked.get("next") == "accept":
+                return {"theses": checked["theses"], "prompt_digest": prompt_digest, "model": model,
                         "current_thesis": thesis}
-            problems = list(checked.get("problems") or [checked.get("detail") or "invalid_answer"])
-            ask["feedback"] = {"rejected_answer": text or "", "problems": problems}
-        raise ThesesRefused(502, "invalid_answer", problems=problems)
+            if checked.get("outcome") != "ok":
+                problems = list(checked.get("problems") or [checked.get("detail") or "invalid_answer"])
+                raise ThesesRefused(502, "invalid_answer", problems=problems)
+            if checked.get("next") != "send" or attempt != 1:
+                raise RuntimeError(f"composition theses core (retry): {checked!r}")
+            request, prompt_digest = checked["request"], checked["prompt_digest"]
+        raise RuntimeError("composition theses core did not decide after two attempts")
     finally:
         retire_execution(owner, execution_id)
 

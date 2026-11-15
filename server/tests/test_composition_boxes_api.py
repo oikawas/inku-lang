@@ -4,7 +4,7 @@ import uuid
 
 from fastapi.testclient import TestClient
 
-from inku_server import composition_record, db
+from inku_server import db
 from inku_server.api import app
 
 TITLED = ("画面比1:1。\n背景を青で埋める。\n\n「大海の」\n"
@@ -57,8 +57,12 @@ def test_composition_boxes_tie_chunks_to_things_lines_and_boxes(monkeypatch):
         assert client.get(path, headers={"Authorization": f"Bearer {other_token}"}).status_code == 404
 
         # Untitled instructions are titled from the work's own record; the lines are the saved DDL's.
-        monkeypatch.setattr(composition_record, "composition_of", lambda item: RECORD)
         untitled = _work(owner, UNTITLED)
+        read = db.get_items
+        monkeypatch.setattr(db, "get_items", lambda user_id, ids: [
+            {**item, "description_ddl": {"composition": {"things": RECORD["owners"],
+                                                          "answer": {"things": RECORD["things"]}}}}
+            if item["id"] == untitled["id"] else item for item in read(user_id, ids)])
         units = client.get(f"/api/history/{untitled['id']}/composition-boxes",
                            headers={"Authorization": f"Bearer {token}"}).json()["units"]
         assert [(unit["title"], unit["thing"], unit["lines"]) for unit in units] == [
@@ -86,11 +90,12 @@ def test_a_child_without_a_record_is_titled_from_the_ancestors_record(monkeypatc
     try:
         parent, child = _work(owner, UNTITLED), _work(owner, UNTITLED)
         # The ancestor keeps the record; the child names it as its inherited one (step 1d).
-        monkeypatch.setattr(composition_record, "composition_of",
-                            lambda item: RECORD if item["id"] == parent["id"] else None)
         read = db.get_items
         monkeypatch.setattr(db, "get_items", lambda user_id, ids: [
             {**item, "composition_inherited": {"history_id": parent["id"]}} if item["id"] == child["id"] else item
+            if item["id"] != parent["id"] else
+            {**item, "description_ddl": {"composition": {"things": RECORD["owners"],
+                                                          "answer": {"things": RECORD["things"]}}}}
             for item in read(user_id, ids)])
         units = client.get(f"/api/history/{child['id']}/composition-boxes",
                            headers={"Authorization": f"Bearer {token}"}).json()["units"]

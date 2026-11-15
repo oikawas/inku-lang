@@ -22,6 +22,41 @@ public struct CompositionRecordSnapshot: Sendable {
 }
 
 extension PipelineHost {
+    /// Read a library page's shared ancestry once, then let the same core walk decide each record.
+    public func compositionRecords(works: [SavedWork]) async throws -> [String: CompositionRecordSnapshot] {
+        let stored = try await database.compositionNodes(starts: works.compactMap(\.lineageNodeID))
+        var result: [String: CompositionRecordSnapshot] = [:]
+        for work in works {
+          do {
+            guard let start = work.lineageNodeID else {
+                result[work.id] = try? await compositionRecord(work: work)
+                continue
+            }
+            var nodes: [ExactJSON] = [], id: String? = start, seen = Set<String>()
+            var own: ExactJSON?, ownKind: String?, ownMetadata: ExactJSON = .object([:])
+            while let current = id, seen.insert(current).inserted, let row = stored[current] {
+                let edge = row.edge
+                let record = try CompositionRecords.ownRecord(descriptionDDL: row.descriptionDDL, derivationKind: edge?.derivationKind)
+                let metadata = edge.flatMap { try? ExactJSON(data: Data($0.metadataJSON.utf8)) } ?? .object([:])
+                if current == start { own = record; ownKind = edge?.derivationKind; ownMetadata = metadata }
+                nodes.append(.object(["node_id": .string(current), "history_id": row.node.historyID.map(ExactJSON.string) ?? .null,
+                    "at": .number(String(row.node.at)), "state": .string(row.node.state), "readable": .bool(row.readable),
+                    "edge_readable": .bool(true), "parent_node_id": edge.map { .string($0.parentNodeID) } ?? .null,
+                    "derivation_kind": edge.map { .string($0.derivationKind) } ?? .null, "ddl": row.ddl.map(ExactJSON.string) ?? .null,
+                    "composition": record ?? .null, "metadata": metadata]))
+                id = edge?.parentNodeID
+            }
+            let input: ExactJSON = .object(["action": .string("walk"), "start": .string(start), "nodes": .array(nodes)])
+            let output = try ExactJSON(data: InkuCore.compositionRules(input.data))
+            guard output["outcome"].string == "ok" else { throw HostError(output["reason"].string ?? "composition_walk_failed") }
+            let inherited = output["result"]["composition_inherited"]
+            result[work.id] = CompositionRecordSnapshot(own: own, inherited: inherited.object == nil ? nil : inherited,
+                places: output["result"]["places"].array ?? [], derivationKind: ownKind, metadata: ownMetadata)
+          } catch { continue }
+        }
+        return result
+    }
+
     /// Assemble storage facts only; the core owns the traversal and inheritance rules.
     public func compositionRecord(work: SavedWork) async throws -> CompositionRecordSnapshot {
         guard let start = work.lineageNodeID else {

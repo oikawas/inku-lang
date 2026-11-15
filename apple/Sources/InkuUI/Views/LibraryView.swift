@@ -398,6 +398,7 @@ struct LibraryView: View {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     ForEach(library.groups) { group in
                         DescriptionLibraryGroup(model: model, group: group, members: library.groupMembers[group.id] ?? [],
+                            records: library.descriptionCompositions,
                             onOpen: { openInWorkTab($0) }, onPreview: { openWork($0) })
                     }
                 }.padding(12)

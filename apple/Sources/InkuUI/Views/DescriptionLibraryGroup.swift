@@ -8,9 +8,9 @@ struct DescriptionLibraryGroup: View {
     @Bindable var model: AppModel
     let group: LibraryGroup
     let members: [InkuPersistence.LibraryItem]
+    let records: [String: CompositionRecordSnapshot]
     let onOpen: (SavedWork) -> Void
     let onPreview: (SavedWork) -> Void
-    @State private var records: [String: CompositionRecordSnapshot] = [:]
     private var language: String { model.display.preferences.language }
     private var forms: [String] { CompositionNames.formIDs + [""] }
 
@@ -43,14 +43,6 @@ struct DescriptionLibraryGroup: View {
                 }
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
-            .task(id: members.map(\.id)) {
-                var loaded: [String: CompositionRecordSnapshot] = [:]
-                for item in members {
-                    if let snapshot = try? await model.compositionRecord(work: item.work) { loaded[item.id] = snapshot }
-                    guard !Task.isCancelled else { return }
-                }
-                records = loaded
-            }
     }
 
     private func formID(_ work: SavedWork) -> String {

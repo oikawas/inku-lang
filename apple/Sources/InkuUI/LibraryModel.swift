@@ -147,6 +147,7 @@ public final class LibraryModel {
     public private(set) var selectedAnnotationLoading = false
     public private(set) var groups: [LibraryGroup] = []
     public private(set) var groupMembers: [String: [InkuPersistence.LibraryItem]] = [:]
+    public private(set) var descriptionCompositions: [String: CompositionRecordSnapshot] = [:]
     public private(set) var groupMemberTotals: [String: Int] = [:]
     public private(set) var expandedGroups: Set<String> = []
     public private(set) var page = 0
@@ -253,6 +254,7 @@ public final class LibraryModel {
         svgSizes.removeAll()
         groups.removeAll()
         groupMembers.removeAll()
+        descriptionCompositions.removeAll()
         groupMemberTotals.removeAll()
         expandedGroups.removeAll()
         total = 0
@@ -555,10 +557,12 @@ public final class LibraryModel {
                         revisionCount: row["for_revision_count"].number.flatMap(Int.init) ?? 0,
                         latestAt: row["latest_at"].number.flatMap(Int64.init) ?? 0))
                 }
+                let compositions = try await host.compositionRecords(works: members.values.flatMap { $0.map(\.work) })
                 guard refreshToken == token, !Task.isCancelled else { return }
                 await pageCompanions?(members.values.flatMap { $0.map(\.id) })
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = groupedItems; total = rows.count; groupMembers = members
+                descriptionCompositions = compositions
                 groupMemberTotals = Dictionary(uniqueKeysWithValues: groupedItems.map { ($0.id, $0.itemCount) })
                 works = groupedItems.map(\.representative.work)
                 annotations = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.annotation) })

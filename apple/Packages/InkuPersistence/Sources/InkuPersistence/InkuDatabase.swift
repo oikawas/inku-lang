@@ -305,6 +305,48 @@ public actor InkuDatabase {
         }
     }
 
+    /// A page's ancestry and authoring records from one read snapshot, sharing common ancestors.
+    public func compositionNodes(starts: [String]) throws -> [String: CompositionStoredNode] {
+        try queue.read { db in
+            var result: [String: CompositionStoredNode] = [:]
+            var missing = Set<String>()
+            for start in Set(starts) {
+                var current: String? = start
+                var seen = Set<String>()
+                while let id = current, seen.insert(id).inserted, result[id] == nil, !missing.contains(id) {
+                    guard let node = try LineageNode.fetchOne(db, key: id) else { missing.insert(id); break }
+                    let edge = try LineageEdge.fetchOne(db, sql: "SELECT * FROM lineage_edges WHERE child_node_id = ?", arguments: [id])
+                    var ddl: String?, readable = false, description: Data?
+                    if let workID = node.historyID {
+                        if let row = try Row.fetchOne(db, sql: "SELECT ddl, trashed FROM history WHERE id = ?", arguments: [workID]) {
+                            ddl = row["ddl"]; readable = (row["trashed"] as Bool? == false) && node.state == "active"
+                        }
+                        if let split = workID.lastIndex(of: "_") {
+                            let execution = String(workID[..<split]), sequence = String(workID[workID.index(after: split)...])
+                            if !execution.isEmpty, !sequence.isEmpty, sequence.utf8.allSatisfy({ (48...57).contains($0) }) {
+                                let json = try String.fetchOne(db, sql: """
+                                    SELECT json_extract(CAST(acknowledgement AS TEXT), '$.performance.description_ddl')
+                                    FROM effect_acknowledgements
+                                    WHERE execution_id = ? AND effect_id = ? AND json_valid(CAST(acknowledgement AS TEXT))
+                                      AND json_extract(CAST(acknowledgement AS TEXT), '$.work_id') = ?
+                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.description_ddl') = 'object'
+                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.configuration') = 'object'
+                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.options') = 'object'
+                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.clip') = 'object'
+                                      AND json_type(CAST(acknowledgement AS TEXT), '$.performance.authority') = 'object'
+                                    """, arguments: [execution, "save-render:" + sequence, workID])
+                                description = json.map { Data($0.utf8) }
+                            }
+                        }
+                    }
+                    result[id] = CompositionStoredNode(node: node, edge: edge, ddl: ddl, readable: readable, descriptionDDL: description)
+                    current = edge?.parentNodeID
+                }
+            }
+            return result
+        }
+    }
+
     /// Root is generation 1; every primary-parent edge adds one, including tombstones.
     /// Missing nodes are omitted, matching the Server history-list projection.
     public func lineageGenerations(nodeIDs: [String]) throws -> [String: Int] {

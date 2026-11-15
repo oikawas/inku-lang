@@ -48,6 +48,9 @@ final class CompositionUpdateTests: XCTestCase, @unchecked Sendable {
         let child = try await saved(db, id: "form", nodeID: "f", parent: "p", kind: "composition_form_change", composition: changed)
         let own = try await host.compositionRecord(work: child)
         XCTAssertEqual(own.own?["answer"]["form"].string, "bands")
+        let batched = try await host.compositionRecords(works: [copied, child])
+        XCTAssertEqual(batched[copied.id]?.inherited, inherited.inherited)
+        XCTAssertEqual(batched[child.id]?.own, own.own)
     }
 
     func testSavedEdgesUseCoreMetadata() async throws {

@@ -11,6 +11,7 @@ public struct CompositionFormView: View {
     @Bindable var model: AppModel
     @State private var form: CompositionFormModel
     @State private var showModelPicker = false
+    @State private var choiceContentHeight: CGFloat = 322
     @FocusState private var thesisFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.inkuWindowSize) private var windowSize
@@ -90,18 +91,7 @@ public struct CompositionFormView: View {
                 choiceButton(model.display.webCopy("compositionThesisLabel", "命題"), selected: isThesis) { if !isThesis { form.change = .authorThesis } }
             }.padding(2).background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(InkuColor.border2)).disabled(form.running || model.isBusy)
-            if isThesis {
-                VStack(alignment: .leading, spacing: 6) {
-                    thesisChoice(.authorThesis, title: "compositionThesisWrite", fallback: "自分で命題を書く", note: "compositionThesisWriteNote")
-                    TextEditor(text: Binding(get: { form.authorThesis }, set: { text in
-                        form.authorThesis = ThesisInput.limited(text)
-                    })).focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
-                        if focused { form.change = .authorThesis }
-                    }.frame(height: 72).overlay(Rectangle().stroke(InkuColor.border2))
-                        .disabled(form.running || model.isBusy)
-                    thesisChoice(.proposedTheses, title: "compositionThesisPropose", fallback: "AI に別の命題を出させる", note: "compositionThesisProposeNote")
-                }
-            } else { ScrollView {
+            ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
                     if form.change == .form {
                         ForEach(Array(CompositionForm.all.enumerated()), id: \.element) { index, id in formOption(id, index: index) }
@@ -114,9 +104,26 @@ public struct CompositionFormView: View {
                                 }
                             }
                         }
+                    } else {
+                        thesisChoice(.authorThesis, title: "compositionThesisWrite", fallback: "自分で命題を書く", note: "compositionThesisWriteNote")
+                        TextEditor(text: Binding(get: { form.authorThesis }, set: { text in
+                            form.authorThesis = ThesisInput.limited(text)
+                        })).focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
+                            if focused { form.change = .authorThesis }
+                        }.frame(height: 72).overlay(Rectangle().stroke(InkuColor.border2))
+                            .disabled(form.running || model.isBusy)
+                        thesisChoice(.proposedTheses, title: "compositionThesisPropose", fallback: "AI に別の命題を出させる", note: "compositionThesisProposeNote")
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(height: 322) }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear
+                                .onAppear { choiceContentHeight = geometry.size.height }
+                                .onChange(of: geometry.size.height) { _, height in choiceContentHeight = height }
+                        }
+                    }
+            }.frame(height: min(322, max(0, choiceContentHeight)))
             if form.change == .mainLaw {
                 HStack(spacing: 0) {
                     Rectangle().fill(Color.accentColor).frame(width: 2)

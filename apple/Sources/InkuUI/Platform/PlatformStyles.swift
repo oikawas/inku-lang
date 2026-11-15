@@ -69,11 +69,11 @@ extension View {
 
     /// Escape: the Mac's cancel command, or Escape on an iOS hardware keyboard while the view holds the focus.
     @ViewBuilder
-    func inkuOnEscape(_ action: @escaping () -> Void) -> some View {
+    func inkuOnEscape(isActive: Bool = true, _ action: @escaping () -> Void) -> some View {
         #if os(macOS)
-        onExitCommand(perform: action)
+        onExitCommand(perform: isActive ? action : nil)
         #else
-        onKeyPress(.escape) { action(); return .handled }
+        onKeyPress(.escape) { if isActive { action(); return .handled }; return .ignored }
         #endif
     }
 

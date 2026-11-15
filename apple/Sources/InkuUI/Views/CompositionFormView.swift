@@ -11,6 +11,7 @@ public struct CompositionFormView: View {
     @Bindable var model: AppModel
     @State private var form: CompositionFormModel
     @State private var showModelPicker = false
+    @FocusState private var thesisFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.inkuWindowSize) private var windowSize
     private let onCommitted: (SavedWork) -> Void
@@ -85,7 +86,7 @@ public struct CompositionFormView: View {
             HStack(spacing: 4) {
                 choiceButton(model.display.webCopy("compositionFormTerm", "画の型"), selected: form.change == .form) { form.change = .form }
                 choiceButton(model.display.webCopy("compositionMainLawTerm", "主の法則"), selected: form.change == .mainLaw) { form.change = .mainLaw }
-                choiceButton(model.display.webCopy("compositionThesisLabel", "命題"), selected: isThesis) { form.change = .authorThesis }
+                choiceButton(model.display.webCopy("compositionThesisLabel", "命題"), selected: isThesis) { if !isThesis { form.change = .authorThesis } }
             }.disabled(form.running || model.isBusy)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
@@ -102,7 +103,11 @@ public struct CompositionFormView: View {
                         }
                     } else {
                         thesisChoice(.authorThesis, title: "compositionThesisWrite", fallback: "自分で命題を書く", note: "compositionThesisWriteNote")
-                        TextEditor(text: $form.authorThesis).frame(minHeight: 72).overlay(Rectangle().stroke(InkuColor.border2))
+                        TextEditor(text: Binding(get: { form.authorThesis }, set: { text in
+                            form.authorThesis = String(String.UnicodeScalarView(text.unicodeScalars.prefix(400)))
+                        })).focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
+                            if focused { form.change = .authorThesis }
+                        }.frame(minHeight: 72).overlay(Rectangle().stroke(InkuColor.border2))
                             .disabled(form.running || model.isBusy)
                         thesisChoice(.proposedTheses, title: "compositionThesisPropose", fallback: "AI に別の命題を出させる", note: "compositionThesisProposeNote")
                     }

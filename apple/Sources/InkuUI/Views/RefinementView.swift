@@ -9,7 +9,6 @@ public struct RefinementView: View {
     @State private var closing = false
     @State private var placeBoxes: ExactJSON?
     @State private var boxesLoading = true
-    @State private var boxesError: String?
     @Environment(\.dismiss) private var dismiss
     private let onCommitted: @MainActor (SavedWork) -> Void
     private let onClose: (@MainActor () -> Void)?
@@ -30,11 +29,6 @@ public struct RefinementView: View {
         return Group {
             if boxesLoading {
                 ProgressView(model.display.webCopy("placeLoading", "指示書の物を読んでいます…"))
-            } else if let boxesError {
-                VStack {
-                    Text(model.display.message(boxesError)).foregroundStyle(.red)
-                    Button(model.display.localized("閉じる")) { finish() }
-                }
             } else if let placeBoxes, !(placeBoxes["units"].array ?? []).isEmpty {
                 RefinementPlaceView(model: model, work: refinement.work, boxes: placeBoxes,
                                     onClose: { finish() }, onCommitted: onCommitted)
@@ -75,11 +69,10 @@ public struct RefinementView: View {
             }
         }
         .task {
-            do { placeBoxes = try await model.compositionWorkBoxes(work: refinement.work) }
-            catch { boxesError = error.localizedDescription }
+            placeBoxes = try? await model.compositionWorkBoxes(work: refinement.work)
             guard !Task.isCancelled else { return }
             boxesLoading = false
-            if boxesError == nil && (placeBoxes?["units"].array ?? []).isEmpty { await refinement.initialize(app: model) }
+            if (placeBoxes?["units"].array ?? []).isEmpty { await refinement.initialize(app: model) }
         }
         .interactiveDismissDisabled(refinement.running || refinement.hasUnsaved || model.isBusy || closing)
         .onDisappear { Task { _ = await refinement.close(app: model) } }

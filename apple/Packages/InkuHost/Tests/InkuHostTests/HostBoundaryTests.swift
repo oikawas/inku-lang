@@ -588,7 +588,7 @@ private func response(_ action: Data) throws -> Data {
                              "response": .string(#"{"normalized_ddl":"place one red circle at center."}"#), "elapsed_ms": .string("1")]).data
 }
 
-private func fixture(_ authoring: GenerationAuthoring) throws -> GenerationRequest {
+func fixture(_ authoring: GenerationAuthoring) throws -> GenerationRequest {
     let seed = "18446744073709551615"
     let registry = try ExactJSON(data: InkuCore.canvasRegistry)
     let palette = try ExactJSON(data: InkuCore.resolvePalette(ExactJSON.object(["color_map": .object([:]), "catalog_id": .string("default"), "render_seed": .string(seed), "background": .string("white")]).data))

@@ -24,6 +24,46 @@ public actor PipelineHost {
         self.svgLimitBytes = svgLimitBytes
     }
 
+    /// Send the core's schema-bearing thesis prompt through the work's pinned provider.
+    public func proposeCompositionTheses(ask: ExactJSON, request: GenerationRequest) async throws -> (theses: [String], digest: String) {
+        let made = try CompositionTheses.request(ask: ask)
+        var promptRequest = made["request"]
+        var digest = try CompositionTheses.digest(request: promptRequest)
+        var models = request.models
+        models.stage1MaxTokens = 4096
+        let config = try ExactJSON(data: request.configuration)
+        let limit = config["prompt_limits"]["max_response_bytes"]
+        guard let argumentLimit = (limit.number ?? limit.string).flatMap(Int.init), argumentLimit > 0 else {
+            throw HostError("pipeline_schema_violation")
+        }
+        for attempt in 1...2 {
+            try Task.checkCancellation()
+            let effect = try CompositionTheses.effect(request: promptRequest, actionID: "theses-\(UUID().uuidString)-\(attempt)")
+            let bytes: Data
+            if let personal = transport as? any ChatGPTPlanEffectTransport {
+                bytes = try await personal.performPersonalPlan(action: effect.data, models: models, providers: request.providers,
+                    session: request.chatGPTSession, argumentLimit: argumentLimit, credentials: credentials,
+                    onBytes: { _ in }, onDiagnostic: { _ in })
+            } else {
+                guard !PersonalPlanRoutingTransport.isPersonal(models.stage1Model, providers: request.providers) else { throw HostError("chatgpt_transport_unavailable") }
+                bytes = try await transport.perform(action: effect.data, models: models, providers: request.providers,
+                                                    credentials: credentials, onBytes: { _ in })
+            }
+            let answer = try ExactJSON(data: bytes)
+            guard answer["tag"].string == "normalized_ddl_generated", let text = answer["response"].string else {
+                throw HostError(answer["failure"].string ?? "provider_failed")
+            }
+            let checked = try CompositionTheses.retry(ask: ask, answer: text, attempt: attempt)
+            if checked["next"].string == "accept" {
+                return (checked["theses"].array?.compactMap(\.string) ?? [], digest)
+            }
+            guard attempt == 1, checked["next"].string == "send" else { throw HostError("invalid_answer") }
+            promptRequest = checked["request"]
+            digest = try checked.requiredString("prompt_digest")
+        }
+        throw HostError("invalid_answer")
+    }
+
     public func generate(_ request: GenerationRequest, image: PreparedImageInput? = nil,
                          progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
         try await generate(request, image: image, onStarted: nil, progress: progress)
@@ -67,8 +107,9 @@ public actor PipelineHost {
         defer { Task { await driver.clearImages() } }
         try await onStarted?(started.executionID)
         try Task.checkCancellation()
+        let allowProvider = request.noProviderEffects != true
         return try await withTaskCancellationHandler {
-            try await driver.drive(progress: progress)
+            try await driver.drive(progress: progress, allowProvider: allowProvider)
         } onCancel: {
             Task { _ = try? await driver.cancel(progress: progress) }
         }
@@ -467,6 +508,7 @@ public actor PipelineHost {
             guard expectedWorkID == nil || expectedWorkID == stored.candidate.work.id else { throw HostError("candidate_identity_changed") }
             if stored.saved, let work = try await database.work(id: stored.candidate.work.id) { return work }
             try Task.checkCancellation()
+            stored.candidate = try await compositionMetadataForSaving(stored.candidate, database: database)
             stored.saved = true
             let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
             _ = try await database.commitEffect(id: executionID, expectedRevision: record.revision, effectID: "save-render:0",
@@ -480,6 +522,17 @@ public actor PipelineHost {
         return try await driver.saveCandidate(expectedWorkID: expectedWorkID)
     }
 
+    public func candidateComposition(executionID: String) async throws -> ExactJSON? {
+        guard let record = try await database.loadExecution(id: executionID) else { throw HostError("candidate_not_found") }
+        let decoder = JSONDecoder()
+        let candidate = (try? decoder.decode(StandaloneCandidate.self, from: record.snapshot))?.candidate
+            ?? (try? decoder.decode(StoredExecution.self, from: record.snapshot))?.candidate
+        guard let candidate else { return nil }
+        let context = try ExactJSON(data: candidate.context)
+        return try CompositionRecords.ownRecord(descriptionDDL: context["description_ddl"].object == nil ? nil : context["description_ddl"].data,
+                                                derivationKind: candidate.edge?.derivationKind)
+    }
+
     private func prepareCandidate(executionID: String, candidate: StoredCandidate) async throws -> PreparedCandidate {
         try Task.checkCancellation()
         let stored = StandaloneCandidate(candidate: candidate)
@@ -491,7 +544,9 @@ public actor PipelineHost {
             snapshot: bytes, acknowledgement: ack.data)
         let context = try ExactJSON(data: candidate.context)
         return PreparedCandidate(executionID: executionID, work: candidate.work, authority: context["authority"]["authority"].string ?? "legacy_unknown",
-            providerMetrics: try metrics(in: context))
+            providerMetrics: try metrics(in: context), composition: try CompositionRecords.ownRecord(
+                descriptionDDL: context["description_ddl"].object == nil ? nil : context["description_ddl"].data,
+                derivationKind: candidate.edge?.derivationKind))
     }
 
     private func generateRetained(_ request: GenerationRequest, progress: PipelineProgressHandler) async throws -> PipelineView {
@@ -564,7 +619,8 @@ public actor PipelineHost {
             prompts: nil, events: Data("[]".utf8), configuration: config, document: document,
             disabledPluginNames: request.disabledPluginNames ?? [], provenance: request.provenance)
         let candidate = try await prepareCandidate(executionID: executionID,
-            candidate: StoredCandidate(work: work, node: node, edge: edge, context: context.data))
+            candidate: StoredCandidate(work: work, node: node, edge: edge, context: context.data,
+                                       compositionRuleSettings: request.compositionRuleSettings))
         let savedID: String?
         if request.saveHistory { savedID = try await saveCandidate(executionID: executionID).id }
         else { savedID = nil }
@@ -640,6 +696,7 @@ private struct StoredExecution: Codable, Sendable {
     var parentWorkID: String?
     var derivationKind: String
     var derivationMetadata: Data? = nil
+    var compositionRuleSettings: Data? = nil
     var interpretationSeed: String? = nil
     var pendingProviderAction: Data?
     var savedWorkID: String?
@@ -668,17 +725,55 @@ private struct StoredMetricRead: Decodable {
     let providerObservations: [Record]?
 }
 
-private struct StoredCandidate: Codable, Sendable {
+struct StoredCandidate: Codable, Sendable {
     var work: SavedWork
     var node: LineageNode
     var edge: LineageEdge?
     var context: Data
+    var compositionRuleSettings: Data? = nil
 }
 
-private struct StandaloneCandidate: Codable, Sendable {
+struct StandaloneCandidate: Codable, Sendable {
     var schema = "inku.swift-candidate.v1"
     var candidate: StoredCandidate
     var saved = false
+}
+
+/// The candidate exists before this is called. The core decides what the edge may record.
+private func compositionMetadataForSaving(_ candidate: StoredCandidate, database: InkuDatabase) async throws -> StoredCandidate {
+    guard let bytes = candidate.compositionRuleSettings else { return candidate }
+    guard var edge = candidate.edge else { throw HostError("lineage_parent_unavailable") }
+    var settings = try ExactJSON(data: bytes)
+    let parentNode = try await database.node(id: edge.parentNodeID)
+    let parent: SavedWork?
+    if let historyID = parentNode?.historyID { parent = try await database.work(id: historyID) } else { parent = nil }
+    let reader = PipelineHost(database: database)
+    let context: SavedAuthoringContext?
+    let record: CompositionRecordSnapshot?
+    if let parent {
+        context = try? await reader.savedAuthoringContext(workID: parent.id)
+        record = try? await reader.compositionRecord(work: parent)
+    } else { context = nil; record = nil }
+    let composition = record?.own ?? record?.inherited
+    let requestedParent = settings["lineage_parent_node_id"].string
+    settings["save_history"] = .bool(false)
+    settings["derivation_kind"] = .string(edge.derivationKind)
+    let input: ExactJSON = .object([
+        "action": .string("metadata"), "derivation_kind": .string(edge.derivationKind), "settings": settings,
+        "parent_answer": composition?["answer"] ?? .null,
+        "fork_kind": edge.derivationKind == "layout_change" ? .string("variation_ddl_fork") : .null,
+        "candidate": .object(["ready": .bool(true), "parent_matches": .bool(candidate.node.id == edge.childNodeID && requestedParent == edge.parentNodeID),
+            "history_found": .bool(parent != nil && parent?.trashed == false && parentNode?.state == "active"),
+            "description_locked": .bool(context?.authority != "description_authoritative"),
+            "requested_parent_node_id": requestedParent.map(ExactJSON.string) ?? .null])
+    ])
+    let result = try ExactJSON(data: InkuCore.compositionRules(input.data))
+    guard result["outcome"].string == "ok", result["result"]["metadata"].object != nil else {
+        throw HostError(result["reason"].string ?? "invalid_candidate")
+    }
+    edge.metadataJSON = result["result"]["metadata"].text
+    var next = candidate; next.edge = edge
+    return next
 }
 
 actor AsyncGate {
@@ -775,6 +870,7 @@ private actor ExecutionDriver {
             guard try ExactJSON(data: metadata).object != nil else { throw HostError("invalid_derivation_metadata") }
         }
         self.state.derivationMetadata = request.derivationMetadata
+        self.state.compositionRuleSettings = request.compositionRuleSettings
         self.state.interpretationSeed = request.interpretationSeed
         if let image { self.images[image.sha256] = "data:image/jpeg;base64," + image.jpeg.base64EncodedString() }
     }
@@ -798,6 +894,8 @@ private actor ExecutionDriver {
             if request.descriptionComposition == true {
                 var composition: [String: ExactJSON] = ["mode": .string("on")]
                 if let form = request.descriptionCompositionForm { composition["form"] = .string(form) }
+                if let law = request.descriptionCompositionMainLaw { composition["main_law"] = .string(law) }
+                if let thesis = request.descriptionCompositionThesis { composition["thesis"] = .string(thesis) }
                 authoring["composition"] = .object(composition)
             }
             let result = try ExactJSON(data: Data(InkuCore.descriptionSourceLabels(text).utf8))
@@ -1360,7 +1458,8 @@ private actor ExecutionDriver {
             performance["personal_provider_context"] = .object(["provider": .string("chatgpt"),
                 "profile_id": .string(session.profileID), "generation": .string(String(session.generation))])
         }
-        savedState.candidate = StoredCandidate(work: work, node: node, edge: edge, context: performance.data)
+        savedState.candidate = StoredCandidate(work: work, node: node, edge: edge, context: performance.data,
+                                               compositionRuleSettings: state.compositionRuleSettings)
         try Task.checkCancellation()
         if state.saveHistory == false {
             savedState.savedWorkID = nil
@@ -1402,10 +1501,11 @@ private actor ExecutionDriver {
             guard expectedWorkID == nil || expectedWorkID == work.id else { throw HostError("candidate_identity_changed") }
             return work
         }
-        guard let candidate = state.candidate, let revision = databaseRevision else { throw HostError("candidate_not_ready") }
+        guard let original = state.candidate, let revision = databaseRevision else { throw HostError("candidate_not_ready") }
+        let candidate = try await compositionMetadataForSaving(original, database: database)
         guard expectedWorkID == nil || expectedWorkID == candidate.work.id else { throw HostError("candidate_identity_changed") }
         try Task.checkCancellation()
-        var savedState = state; savedState.savedWorkID = candidate.work.id
+        var savedState = state; savedState.savedWorkID = candidate.work.id; savedState.candidate = candidate
         // Explicit promotion makes later editor commands ordinary committed child mutations.
         savedState.saveHistory = true
         let context = try ExactJSON(data: candidate.context)

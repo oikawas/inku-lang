@@ -97,6 +97,14 @@ public struct GenerationRequest: Codable, Sendable {
     /// Server `composition_form`: one of `CompositionForm.all`, only with `read_and_draw` and composition on (the
     /// composition-form refinement). Sent as `authoring.composition.form`; a saved child does not inherit it.
     public var descriptionCompositionForm: String?
+    public var descriptionCompositionMainLaw: String?
+    public var descriptionCompositionThesis: String?
+    public var compositionThesisSource: String?
+    public var compositionThesisPromptDigest: String?
+    /// Core metadata inputs, checked again against the actual candidate at adoption.
+    public var compositionRuleSettings: Data?
+    /// A local-only preview must never begin a provider effect, even if its DDL needs completion.
+    public var noProviderEffects: Bool?
     public var descriptionReview: Bool?
     public var catalogMode: String?
     /// Only a new description or text-batch input records the four draw options.
@@ -259,10 +267,12 @@ public struct PreparedCandidate: Identifiable, Sendable {
     public let work: SavedWork
     public let authority: String
     public let providerMetrics: [ProviderAttemptMetric]
+    public let composition: ExactJSON?
     public var id: String { executionID }
-    public init(executionID: String, work: SavedWork, authority: String, providerMetrics: [ProviderAttemptMetric] = []) {
+    public init(executionID: String, work: SavedWork, authority: String, providerMetrics: [ProviderAttemptMetric] = [], composition: ExactJSON? = nil) {
         self.executionID = executionID; self.work = work; self.authority = authority
         self.providerMetrics = providerMetrics
+        self.composition = composition
     }
 }
 

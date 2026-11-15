@@ -22,12 +22,14 @@ struct CompositionSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             DisclosureGroup(isExpanded: open) {
-                HStack {
-                    Button(display.webCopy("workActionComposition", "構図と法則を変える")) { onAction(work, "composition-form") }
-                        .disabled(disabled || model.workActionState(for: work)?.canReadDescription != true)
-                    Button(display.webCopy("canvasVaryComposition", "配置を変える")) { onAction(work, "layout") }.disabled(disabled)
-                }.buttonStyle(InkuGhostButtonStyle())
                 if let answer {
+                    HStack {
+                        if model.workActionState(for: work)?.showsDescriptionActions == true {
+                            Button(display.webCopy("workActionComposition", "構図と法則を変える")) { onAction(work, "composition-form") }
+                                .disabled(disabled || model.workActionState(for: work)?.canReadDescription != true)
+                        }
+                        Button(display.webCopy("canvasVaryComposition", "配置を変える")) { onAction(work, "layout") }.disabled(disabled)
+                    }.buttonStyle(InkuGhostButtonStyle())
                     details(answer).padding(.top, 6)
                 } else {
                     Text(display.webCopy(fallback ? "compositionFallback" : "compositionNoRecordNote", fallback ? "構図なし" : "構図の記録がありません。"))
@@ -67,7 +69,12 @@ struct CompositionSection: View {
 
     @ViewBuilder private func details(_ answer: ExactJSON) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if inherited { Text(display.webCopy("compositionInheritedMark", "親の構図")).inkuFont(11).foregroundStyle(.secondary) }
+            if inherited, let source = snapshot?.inherited {
+                let kind = compositionDerivationName(source["via"].array?.first?.string ?? "", display: display)
+                let date = source["at"].number.flatMap(Double.init).map { Date(timeIntervalSince1970: $0 / 1000).formatted(date: .abbreviated, time: .shortened) } ?? "—"
+                Text(display.webCopyFormat("compositionInheritedNote", "この作品は『%@』の子です。下は、親の作品（%@）の構図と法則です。", kind, date))
+                    .inkuFont(11).foregroundStyle(.secondary)
+            }
             if let form = answer["form"].string { row(display.webCopy("compositionFormTerm", "画の型"), CompositionNames.formName(form, language: language), figure: form) }
             if let law = answer["main_law"].string { row(display.webCopy("compositionMainLawTerm", "主の法則"), CompositionNames.lawName(law, language: language), figure: law) }
             let laws = (answer["laws"].object ?? [:]).keys.sorted().filter { $0 != answer["main_law"].string }
@@ -93,7 +100,14 @@ struct CompositionSection: View {
                                 Text(CompositionNames.placeName(at, language: language) + display.webCopy("compositionMovedNote", "（配置を変えて移した）"))
                                     .inkuFont(11).foregroundStyle(.secondary)
                             }
-                            if let quote = thing["quote"].string { Text("「\(quote)」").inkuFont(11).foregroundStyle(.secondary) }
+                            if let quote = thing["quote"].string {
+                                HStack(spacing: 4) {
+                                    Text("「\(quote)」")
+                                    if !quote.isEmpty && !plain(work.effectiveSourceText).contains(plain(quote)) {
+                                        Text(display.webCopy("compositionFromReading", "読みから"))
+                                    }
+                                }.inkuFont(11).foregroundStyle(.secondary)
+                            }
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()) }
                     .buttonStyle(.plain).onHover { inside in model.activeCompositionThing = inside ? number : nil }
@@ -101,6 +115,8 @@ struct CompositionSection: View {
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    private func plain(_ value: String) -> String { value.filter { !$0.isWhitespace && $0 != "　" } }
 
     private func unitFor(_ thing: ExactJSON) -> ExactJSON? {
         guard model.compositionBoxWorkID == work.id else { return nil }

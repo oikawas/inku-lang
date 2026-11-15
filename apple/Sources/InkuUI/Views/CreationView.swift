@@ -1211,7 +1211,7 @@ struct CreationView: View {
                         workActionMenu(availableHeight: max(0, geometry.size.height - 24))
                             .padding([.top, .trailing], 12)
                     }
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topTrailing)
                     .inkuEndsEditingOnOutsidePress(isActive: ui.refinementMenuWorkID != nil) { ui.refinementMenuWorkID = nil }
                 }
             }

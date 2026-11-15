@@ -1,6 +1,9 @@
 import InkuHost
 import InkuPersistence
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// Web `RefinementCompositionFormView.svelte`: the target picture, the switch notice, the seven forms (name and
 /// description, the work's own marked "current"), "one option" and "four options", the run's progress and lanes, and
@@ -108,6 +111,13 @@ public struct CompositionFormView: View {
                         }
                     } else {
                         thesisChoice(.authorThesis, title: "compositionThesisWrite", fallback: "自分で命題を書く", note: "compositionThesisWriteNote")
+                        #if os(macOS)
+                        CompositionThesisEditor(text: Binding(get: { form.authorThesis }, set: { form.authorThesis = $0 }),
+                            isEditable: !form.running && !model.isBusy, textScale: model.display.preferences.textScale,
+                            accessibilityLabel: model.display.webCopy("compositionThesisWrite", "自分で命題を書く"),
+                            onFocus: { form.change = .authorThesis })
+                            .frame(height: 72).overlay(Rectangle().stroke(InkuColor.border2).allowsHitTesting(false))
+                        #else
                         TextEditor(text: Binding(get: { form.authorThesis }, set: { text in
                             form.authorThesis = ThesisInput.limited(text)
                         })).scrollIndicators(form.authorThesis.isEmpty ? .hidden : .automatic)
@@ -115,6 +125,7 @@ public struct CompositionFormView: View {
                             if focused { form.change = .authorThesis }
                         }.frame(height: 72).overlay(Rectangle().stroke(InkuColor.border2))
                             .disabled(form.running || model.isBusy)
+                        #endif
                         thesisChoice(.proposedTheses, title: "compositionThesisPropose", fallback: "AI に別の命題を出させる", note: "compositionThesisProposeNote")
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -247,6 +258,63 @@ public struct CompositionFormView: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
+
+#if os(macOS)
+/// A native text area with an overlay scroller: no reserved gutter when its text fits.
+private struct CompositionThesisEditor: NSViewRepresentable {
+    @Binding var text: String
+    let isEditable: Bool
+    let textScale: Double
+    let accessibilityLabel: String
+    let onFocus: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.borderType = .noBorder
+        scroll.scrollerStyle = .overlay
+        scroll.autohidesScrollers = true
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
+        if let editor = scroll.documentView as? NSTextView {
+            editor.isRichText = false
+            editor.importsGraphics = false
+            editor.allowsUndo = true
+            editor.isHorizontallyResizable = false
+            editor.textContainer?.widthTracksTextView = true
+            editor.delegate = context.coordinator
+        }
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let editor = scroll.documentView as? NSTextView else { return }
+        context.coordinator.parent = self
+        editor.isEditable = isEditable
+        editor.font = .systemFont(ofSize: 13 * textScale)
+        editor.setAccessibilityLabel(accessibilityLabel)
+        if editor.string != text && !editor.hasMarkedText() { editor.string = text }
+    }
+
+    @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: CompositionThesisEditor?
+
+        func textDidBeginEditing(_ notification: Notification) { parent?.onFocus() }
+
+        func textDidChange(_ notification: Notification) {
+            guard let editor = notification.object as? NSTextView, !editor.hasMarkedText(), let parent else { return }
+            let limited = ThesisInput.limited(editor.string)
+            if editor.string != limited {
+                let location = min(editor.selectedRange().location, (limited as NSString).length)
+                editor.string = limited
+                editor.setSelectedRange(NSRange(location: location, length: 0))
+            }
+            parent.text = limited
+        }
+    }
+}
+#endif
 
 private struct CompositionPaintButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled

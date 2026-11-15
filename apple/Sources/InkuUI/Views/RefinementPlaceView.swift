@@ -52,6 +52,7 @@ struct RefinementPlaceView: View {
     @Bindable var model: AppModel
     @State private var place: PlaceRefinementModel
     @State private var composition: CompositionRecordSnapshot?
+    @State private var compositionLoaded = false
     let onClose: () -> Void
     let onCommitted: (SavedWork) -> Void
 
@@ -106,7 +107,12 @@ struct RefinementPlaceView: View {
                     }
                 } })
         }
-        .task(id: place.work.id) { composition = try? await model.compositionRecord(work: place.work) }
+        .task(id: place.work.id) {
+            compositionLoaded = false
+            let loaded = try? await model.compositionRecord(work: place.work)
+            guard !Task.isCancelled else { return }
+            composition = loaded; compositionLoaded = true
+        }
         .interactiveDismissDisabled(place.running || place.hasUnsaved || model.isBusy)
     }
 
@@ -132,7 +138,7 @@ struct RefinementPlaceView: View {
                             Circle().fill(Color.accentColor).frame(width: 12, height: 12)
                                 .overlay { if now { Circle().stroke(Color.accentColor, lineWidth: 2).padding(-4) } }
                                 .padding(8).contentShape(Rectangle())
-                        }.buttonStyle(.plain).disabled(place.running || model.isBusy || !["ok", "clamped"].contains(state ?? ""))
+                        }.buttonStyle(.plain).disabled(!compositionLoaded || place.running || model.isBusy || !["ok", "clamped"].contains(state ?? ""))
                             .opacity(["ok", "clamped"].contains(state ?? "") ? 1 : 0.3)
                             .position(x: geometry.size.width * point.x, y: geometry.size.height * point.y)
                             .accessibilityLabel(PlacePresentation.title(unit: unit, place: id, display: model.display))

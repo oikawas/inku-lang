@@ -13,6 +13,7 @@ struct CreationWorkInfoView: View {
     private var phone: Bool { phoneLayout || narrowPanel }
     private let work: SavedWork?
     @State private var information: SavedGenerationInformation?
+    @State private var compositionSnapshot: CompositionRecordSnapshot?
     @State private var loading = true
     @State private var loadError: String?
     @State private var localTab = "details"
@@ -106,6 +107,8 @@ struct CreationWorkInfoView: View {
             scoreDark = JSONHighlight.attributed(scoreText, dark: true)
             pluginOffersJA = []; pluginOffersEN = []
             await load()
+            compositionSnapshot = nil
+            if let work { compositionSnapshot = try? await model.compositionRecord(work: work) }
         }
     }
 
@@ -140,7 +143,11 @@ struct CreationWorkInfoView: View {
                     }
                 }
                 if let data = information?.context?.descriptionDDL, let record = try? ExactJSON(data: data) {
-                    ReadDrawInfoView(record: record, display: model.display, pluginOffers: pluginOffers)
+                    ReadDrawInfoView(record: effectiveReading(record), display: model.display, pluginOffers: pluginOffers,
+                                     compositionSnapshot: compositionSnapshot)
+                } else if compositionSnapshot?.inherited != nil {
+                    ReadDrawInfoView(record: effectiveReading(.object([:])), display: model.display,
+                                     compositionSnapshot: compositionSnapshot, showsReading: false)
                 }
                 if information?.context?.descriptionDDL == nil && (work.sketchGrain != nil || work.sketchState != nil) {
                     group(information?.context?.descriptionDDL != nil ? model.display.label("写生（読み）", "Sketch from life (reading)") : copy("sketchLabel", "写生")) {
@@ -211,6 +218,9 @@ struct CreationWorkInfoView: View {
                 group(copy("provenanceSectionOrigin", "由来")) {
                     row(copy("provenanceLabelGeneration", "世代"), information?.generation.map(String.init), hint: "provenanceHintGeneration")
                     row(copy("provenanceLabelDerivation", "派生"), information.map { derivation($0.edge?.derivationKind) }, hint: "provenanceHintDerivation")
+                    if let detail = compositionDerivationDetail(information?.edge, display: model.display) {
+                        row(model.display.label("変更", "Change"), detail, hint: "provenanceHintDerivation")
+                    }
                     if let run = provenance?.batchRunID { row(copy("provenanceLabelBatchRun", "バッチ実行 ID"), run, hint: "provenanceHintBatchRun") }
                     if let line = provenance?.batchLineNumber { row(copy("provenanceLabelBatchLine", "バッチ行番号"), String(line), hint: "provenanceHintBatchLine") }
                 }
@@ -225,6 +235,14 @@ struct CreationWorkInfoView: View {
                 }
             }.padding(14).textSelection(.enabled)
         }
+    }
+
+    private func effectiveReading(_ record: ExactJSON) -> ExactJSON {
+        var result = record
+        if let snapshot = compositionSnapshot {
+            result["composition"] = snapshot.own ?? snapshot.inherited ?? .null
+        } else { result["composition"] = .null }
+        return result
     }
 
     private func prompts(_ work: SavedWork) -> some View {
@@ -416,6 +434,7 @@ struct CreationWorkInfoView: View {
         return raw == "none" ? model.display.localized("なし") : raw
     }
     private func derivation(_ kind: String?) -> String {
+        if kind == "composition_form_change" { return model.display.label("構図と法則", "Composition and laws") }
         if kind == "laws_change" { return model.display.preferences.language == "en" ? "Laws" : "法則" }
         if kind == "chunk_move" { return model.display.webCopy("aiRefineKindChunks", "まとまりの手") }
         // The child that moved one thing to another place (Web 3a90dea84, the author's choice 2026-11-13). The key

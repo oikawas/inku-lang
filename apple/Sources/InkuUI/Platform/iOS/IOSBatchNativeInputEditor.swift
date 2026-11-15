@@ -26,6 +26,7 @@ struct BatchNativeInputEditor: UIViewRepresentable {
     let marksKey: InkuEditorMarksKey
     let covered: Bool
     let insertion: Binding<InkuEditorInsertion?>?
+    var reveal: Binding<InkuEditorReveal?>? = nil
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
     var completions: DdlCompletions? = nil
@@ -78,6 +79,7 @@ struct BatchNativeInputEditor: UIViewRepresentable {
         private var fontSize: CGFloat?
         private var baseAttributes: [NSAttributedString.Key: Any] = [:]
         private var lastInsertionID: UUID?
+        private var lastRevealID: UUID?
         /// Set by the author's own typing; a chosen word, a followed name or a restored text offers nothing.
         private var typedInsertion = false
         private var programmaticEdit = false
@@ -144,6 +146,14 @@ struct BatchNativeInputEditor: UIViewRepresentable {
             if editor.text != source { replaceText(with: source) }
             applySettings()
             applyMarks()
+            if let request = settings.reveal?.wrappedValue, request.id != lastRevealID {
+                lastRevealID = request.id
+                let starts = BatchEditorLineIndex(source).starts
+                if starts.indices.contains(request.line) {
+                    let range = NSRange(location: starts[request.line], length: 0)
+                    DispatchQueue.main.async { [weak editor] in editor?.scrollRangeToVisible(range) }
+                }
+            }
             if let request = settings.insertion?.wrappedValue, request.id != lastInsertionID {
                 lastInsertionID = request.id
                 let binding = settings.insertion

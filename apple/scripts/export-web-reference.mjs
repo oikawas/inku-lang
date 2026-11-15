@@ -36,6 +36,7 @@ async function copyFor(language) {
   for (const [functionName, argument, prefix] of [
     ['pipelineDiagnosticReason', 'reason', 'diagnosticReason.'],
     ['pipelineDiagnosticPart', 'kind', 'diagnosticPart.'],
+    ['placeRefused', 'reason', 'placeRefused.'],
   ]) {
     const pattern = new RegExp(`${functionName}:\\s*\\(${argument}\\)\\s*=>\\s*\\((\\{[\\s\\S]*?\\})\\[${argument}\\]`);
     const matched = script(source).match(pattern);
@@ -128,6 +129,12 @@ for (const category of vocabulary.categories) {
     };
   }
 }
+
+const figuresSource = await sourceFile('web/src/lib/features/composition-record/figures.ts');
+const figuresContext = vm.createContext({});
+vm.runInContext(`${script(figuresSource)}\nglobalThis.figures = FIGURES;`, figuresContext, { timeout: 5000 });
+if (Object.keys(figuresContext.figures).length !== 26) throw new Error('composition_figures_count_changed');
+await writeFile(path.join(resources, 'composition-figures.json'), JSON.stringify(figuresContext.figures, null, 2) + '\n');
 
 const reference = {
   schema: 'inku.apple-ui-reference.v1',

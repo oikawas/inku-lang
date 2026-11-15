@@ -167,7 +167,7 @@ public struct ContentView: View {
         .onChange(of: model.library.layout) { _, layout in
             model.display.rememberLibraryLayout(layout.rawValue)
         }
-        .onChange(of: model.library.grouped) { _, grouped in model.display.rememberLibraryGrouped(grouped) }
+        .onChange(of: model.library.grouping) { _, grouping in model.display.rememberLibraryGrouping(grouping.rawValue) }
         .onChange(of: ui.settingsOpen) { _, open in if !open { Task { await refreshDrawingKeyState() } } }
         .onChange(of: model.providerSettingsRevision) { _, _ in Task { await refreshDrawingKeyState() } }
         .onChange(of: model.errorText) { _, error in if error != nil { Task { await refreshDrawingKeyState() } } }

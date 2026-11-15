@@ -1,5 +1,16 @@
 import Foundation
 
+public struct CompositionStoredNode: Sendable {
+    public let node: LineageNode
+    public let edge: LineageEdge?
+    public let ddl: String?
+    public let readable: Bool
+    public let descriptionDDL: Data?
+    public init(node: LineageNode, edge: LineageEdge?, ddl: String?, readable: Bool, descriptionDDL: Data?) {
+        self.node = node; self.edge = edge; self.ddl = ddl; self.readable = readable; self.descriptionDDL = descriptionDDL
+    }
+}
+
 /// Menu eligibility projected from the same saved authoring journal as the complete context.
 public struct SavedAuthoringSummary: Sendable, Equatable {
     public let authority: String
@@ -66,6 +77,11 @@ public struct LibraryGroup: Sendable, Equatable, Identifiable {
     public let revisionCount: Int
     public let latestAt: Int64
     public var id: String { rootNodeID }
+
+    public init(rootNodeID: String, representative: LibraryItem, itemCount: Int, starredCount: Int, revisionCount: Int, latestAt: Int64) {
+        self.rootNodeID = rootNodeID; self.representative = representative; self.itemCount = itemCount
+        self.starredCount = starredCount; self.revisionCount = revisionCount; self.latestAt = latestAt
+    }
 }
 
 public struct LibraryGroupPage: Sendable, Equatable {

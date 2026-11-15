@@ -12,7 +12,10 @@ struct RefinementDialog<Controls: View, Options: View>: View {
     let onClose: () -> Void
     var targetTitle = "推敲対象"
     var targetModelName: String? = nil
+    var columnWidth: CGFloat = 280
+    var targetUnit: ExactJSON? = nil
     var topControls: AnyView? = nil
+    var bottomControls: AnyView? = nil
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let options: () -> Options
     @State private var topControlsHeight: CGFloat = 0
@@ -45,19 +48,22 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                             // by themselves (7c fixes: a swipe over the target moved nothing while the options
                             // slid inside a box of the screen's height).
                             VStack(alignment: .leading, spacing: 12) {
-                                RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName, unit: targetUnit)
                                     .frame(maxWidth: 280, alignment: .leading)
                                 controls()
                                 options().frame(maxWidth: .infinity)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             HStack(alignment: .top, spacing: 14) {
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
-                                        controls()
-                                    }.frame(maxWidth: .infinity, alignment: .leading)
-                                }.frame(width: 280)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 12) {
+                                            RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName, unit: targetUnit)
+                                            controls()
+                                        }.frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    if let bottomControls { bottomControls }
+                                }.frame(width: columnWidth)
                                 options().frame(maxWidth: .infinity, maxHeight: .infinity)
                             }.frame(height: max(360, geometry.size.height - 32 - (topControls == nil ? 0 : topControlsHeight + 12)))
                         }
@@ -65,6 +71,11 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                 }
             }
         }.background(InkuColor.panel)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if phone, let bottomControls {
+                bottomControls.padding(.horizontal, 16).padding(.vertical, 8).background(InkuColor.panel)
+            }
+        }
         .inkuDialogFrame(minWidth: 700, idealWidth: 1200, minHeight: 520, idealHeight: 780)
     }
 }
@@ -75,12 +86,32 @@ private struct RefinementTargetCard: View {
     let work: SavedWork
     let title: String
     let modelName: String?
+    var unit: ExactJSON? = nil
+    @State private var composition: CompositionRecordSnapshot?
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(model.display.localized(title)).inkuFont(11).foregroundStyle(.secondary)
             ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                 .aspectRatio(work.renderCanvasAspectRatio ?? 1, contentMode: .fit)
                 .accessibilityLabel(model.display.localized(title))
+                .overlay {
+                    if let values = unit?["box"].array?.compactMap({ $0.number.flatMap(Double.init) }), values.count == 4 {
+                        GeometryReader { size in
+                            Rectangle().stroke(Color.accentColor, lineWidth: 2)
+                                .frame(width: max(0, (values[2] - values[0]) * size.size.width), height: max(0, (values[3] - values[1]) * size.size.height))
+                                .overlay(alignment: .topLeading) { Text(unit?["title"].string ?? "").inkuFont(10).background(InkuColor.panel) }
+                                .offset(x: values[0] * size.size.width, y: values[1] * size.size.height)
+                        }.allowsHitTesting(false)
+                    }
+                }
+            if let answer = (composition?.own ?? composition?.inherited)?["answer"], answer.object != nil {
+                HStack(spacing: 4) {
+                    Text(model.display.webCopy("compositionTargetNow", "今"))
+                    if let form = answer["form"].string { CompositionFigure(id: form).frame(width: 20, height: 20); Text(CompositionNames.formName(form, language: model.display.preferences.language)) }
+                    if let law = answer["main_law"].string { CompositionFigure(id: law).frame(width: 20, height: 20); Text(CompositionNames.lawName(law, language: model.display.preferences.language)) }
+                }.inkuFont(11).foregroundStyle(.secondary)
+                if let thesis = answer["thesis"].string { Text(thesis).inkuFont(11).lineLimit(2) }
+            }
             if let modelName, !modelName.isEmpty {
                 Text(modelName).inkuFont(11).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
@@ -88,6 +119,7 @@ private struct RefinementTargetCard: View {
             Text(refinementSeedSummary(work, display: model.display)).inkuFont(11).foregroundStyle(.secondary)
                 .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
         }.padding(8).overlay(Rectangle().stroke(InkuColor.border))
+            .task(id: work.id) { composition = try? await model.compositionRecord(work: work) }
     }
 }
 
@@ -118,6 +150,8 @@ struct RefinementOptionsGrid: View {
     let placeholder: String
     var errors: [String] = []
     var status: String = ""
+    var targetWork: SavedWork? = nil
+    var targetComposition: ExactJSON? = nil
     let onPreview: (String?) -> Void
     let onSelect: (String, Bool) -> Void
     let onDiscard: () -> Void
@@ -232,7 +266,19 @@ struct RefinementOptionsGrid: View {
                     let canvas = ArtworkCanvas(svg: option.work.svg, renderer: model.displayRenderer, style: .workspace, showsZoomControls: false,
                         aspectRatio: option.work.renderCanvasAspectRatio)
                         .allowsHitTesting(false).accessibilityHidden(true)
-                    if height == nil {
+                    if let targetWork {
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading) {
+                                ArtworkCanvas(svg: targetWork.svg, renderer: model.displayRenderer, style: .workspace, showsZoomControls: false,
+                                              aspectRatio: targetWork.renderCanvasAspectRatio).aspectRatio(1, contentMode: .fit).allowsHitTesting(false)
+                                compositionFacts(targetComposition, compare: nil, showReason: true)
+                            }
+                            VStack(alignment: .leading) {
+                                canvas.aspectRatio(1, contentMode: .fit)
+                                compositionFacts(option.observation?.composition, compare: targetComposition, showReason: true)
+                            }
+                        }
+                    } else if height == nil {
                         canvas.aspectRatio(CGFloat(option.work.renderCanvasAspectRatio ?? 1), contentMode: .fit)
                     } else {
                         canvas.frame(minHeight: 0, maxHeight: .infinity)
@@ -248,6 +294,9 @@ struct RefinementOptionsGrid: View {
                     ForEach(Array(option.details.enumerated()), id: \.offset) { _, line in
                         Text(line).inkuFont(10).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
+                    if previewID != option.id, let composition = option.observation?.composition {
+                        compositionFacts(composition, compare: targetComposition, showReason: false)
+                    }
                     Text(refinementSeedSummary(option.work, display: model.display)).inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
                 }.padding(.horizontal, 8).padding(.vertical, 6)
             }.frame(maxWidth: .infinity, alignment: .leading).frame(height: height).contentShape(Rectangle())
@@ -257,6 +306,28 @@ struct RefinementOptionsGrid: View {
             .overlay(Rectangle().stroke(option.selected ? Color.accentColor : InkuColor.border2, lineWidth: option.selected ? 2 : 1))
             .opacity(option.saved ? 0.62 : 1)
             .overlay(alignment: .topTrailing) { selectButton(option) }
+    }
+
+    @ViewBuilder private func compositionFacts(_ record: ExactJSON?, compare: ExactJSON?, showReason: Bool) -> some View {
+        if let record {
+            let answer = record["answer"]
+            if record["state"].string == "fallback" {
+                Text(model.display.webCopy("compositionFallback", "構図なし")).inkuFont(10).foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 4) {
+                    if let form = answer["form"].string {
+                        Text(CompositionNames.formName(form, language: model.display.preferences.language))
+                            .foregroundStyle(compare != nil && compare?["answer"]["form"].string != form ? Color.accentColor : Color.secondary)
+                    }
+                    if let law = answer["main_law"].string {
+                        Text(CompositionNames.lawName(law, language: model.display.preferences.language))
+                            .foregroundStyle(compare != nil && compare?["answer"]["main_law"].string != law ? Color.accentColor : Color.secondary)
+                    }
+                }.inkuFont(10)
+                if let thesis = answer["thesis"].string { Text(thesis).inkuFont(10).lineLimit(showReason ? nil : 2) }
+                if showReason, let reason = answer["reason"].string { Text(reason).inkuFont(10).foregroundStyle(.secondary) }
+            }
+        }
     }
 
     private func selectButton(_ option: RefinementOption) -> some View {

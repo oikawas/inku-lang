@@ -21,6 +21,7 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var historyFields: Set<String> = ["generation", "model"]
     public var keepGenerationInfo = true
     public var sketchExpanded: Bool?
+    public var compositionExpanded: Bool?
     public var showTooltips = true
     public var mascot = "incu"
     public var batchRetries = 0
@@ -68,6 +69,11 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var inputTab: String?
     public var libraryLayout: String?
     public var libraryGrouped: Bool?
+    public var libraryGrouping: String?
+    public var resolvedLibraryGrouping: String {
+        if let libraryGrouping, ["timeline", "lineage", "description"].contains(libraryGrouping) { return libraryGrouping }
+        return libraryGrouped == true ? "lineage" : "timeline"
+    }
     /// Dialog choices (Web `model_inspection_selected_models`, `inku-ai-refine-settings`).
     public var comparisonModels: [String]?
     /// Web `inku-result-log-open`: the result log under the input starts closed.
@@ -211,6 +217,15 @@ public final class DisplaySettings {
     public var workspaceTab: String? { rememberedWorkspaceTab ?? preferences.workspaceTab }
     public var libraryLayout: String? { rememberedLibraryLayout ?? preferences.libraryLayout }
     public var libraryGrouped: Bool? { rememberedLibraryGrouped ?? preferences.libraryGrouped }
+    public var libraryGrouping: String {
+        if preferences.libraryGrouping != nil { return preferences.resolvedLibraryGrouping }
+        return libraryGrouped == true ? "lineage" : "timeline"
+    }
+    public func rememberLibraryGrouping(_ grouping: String) {
+        guard libraryGrouping != grouping else { return }
+        preferences.libraryGrouping = grouping
+        persist()
+    }
     public func rememberWorkspaceTab(_ tab: String) {
         guard workspaceTab != tab else { return }
         rememberedWorkspaceTab = tab; persist()

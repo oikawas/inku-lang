@@ -88,7 +88,6 @@ struct VariationLanesView: View {
     var labels: [String] = []
     /// Model comparison names each lane, since a number does not say which model it is.
     var named = false
-    @State private var started: [Bool] = []
 
     var body: some View {
         if states.count > 1 {
@@ -96,7 +95,6 @@ struct VariationLanesView: View {
                 ForEach(states.indices, id: \.self) { index in lane(index) }
             }
             .padding(.top, 6)
-            .task(id: states.count) { await stagger(states.count) }
         }
     }
 
@@ -107,10 +105,8 @@ struct VariationLanesView: View {
         return VStack(spacing: 2) {
             Group {
                 switch state {
-                case .done: Text("✓").inkuFont(18).foregroundStyle(Color.accentColor)
-                case .waiting: Text("·").inkuFont(18).foregroundStyle(.tertiary)
-                case .running:
-                    if index < started.count ? started[index] : true { MascotView(kind: other) } else { Color.clear.frame(width: 32, height: 32) }
+                case .done, .waiting, .running:
+                    StaggeredLaneMascot(kind: other, state: state)
                 }
             }.frame(minHeight: 34)
             Text(named && !label.isEmpty ? label : String(index + 1))
@@ -130,18 +126,44 @@ struct VariationLanesView: View {
         .accessibilityValue(display.localized(state == .done ? "準備完了" : state == .running ? "描画中" : "待機中"))
     }
 
-    private func stagger(_ count: Int) async {
-        started = Array(repeating: false, count: count)
-        await withTaskGroup(of: Int?.self) { group in
-            for index in 0..<count {
-                group.addTask {
-                    try? await Task.sleep(for: .milliseconds(Int.random(in: 0..<900)))
-                    return Task.isCancelled ? nil : index
-                }
+}
+
+/// A lane draws its delay only when it starts running. Removing this view cancels the delay.
+struct LaneStaggerTiming {
+    private var running = false
+    mutating func delay(for state: VariationLanesView.LaneState, draw: () -> Int) -> Int? {
+        guard state == .running else { running = false; return nil }
+        guard !running else { return nil }
+        running = true
+        return draw()
+    }
+}
+
+private struct StaggeredLaneMascot: View {
+    let kind: String
+    let state: VariationLanesView.LaneState
+    @State private var started = false
+    @State private var timing = LaneStaggerTiming()
+
+    var body: some View {
+        Group {
+            switch state {
+            case .done: Text("✓").inkuFont(18).foregroundStyle(Color.accentColor)
+            case .waiting: Text("·").inkuFont(18).foregroundStyle(.tertiary)
+            case .running:
+                if started { MascotView(kind: kind) } else { Color.clear.frame(width: 32, height: 32) }
             }
-            for await index in group {
-                if let index, index < started.count { started[index] = true }
+        }
+        .task(id: state) {
+            guard let delay = timing.delay(for: state, draw: { Int.random(in: 0..<900) }) else {
+                if state != .running { started = false }
+                return
             }
+            started = false
+            do { try await Task.sleep(for: .milliseconds(delay)) }
+            catch { return }
+            guard !Task.isCancelled else { return }
+            started = true
         }
     }
 }

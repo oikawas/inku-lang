@@ -103,12 +103,12 @@ struct RunJournalView: View {
             return display.webCopy("runFinishedReading", "読みました")
         }
         if action == "compose_description", let things = facts["things"].number, let law = facts["main_law"].string {
-            return format("runFinishedComposition", "構図：物 %@ つ・主の法則 %@", things, law)
+            return format("runFinishedComposition", "構図：物 %@ つ・主の法則 %@", things, CompositionNames.lawName(law, language: display.preferences.language))
         }
         if ["write_description_ddl", "write_image_ddl"].contains(action) { return display.webCopy("runFinishedWriting", "書きました") }
         if ["review_description_ddl", "review_image_ddl"].contains(action) { return display.webCopy("runFinishedReview", "見て直しました") }
         if let catalog = facts["catalog_id"].string { return format("runFinishedCatalog", "%@：%@", title, catalog) }
-        if let law = facts["main_law"].string { return format("runFinishedLaw", "%@：主の法則 %@", title, law) }
+        if let law = facts["main_law"].string { return format("runFinishedLaw", "%@：主の法則 %@", title, CompositionNames.lawName(law, language: display.preferences.language)) }
         return format("runFinishedReady", "%@：完了", title)
     }
 }

@@ -325,6 +325,7 @@ struct CreationView: View {
                 } label: {
                     Text(display.webCopy("displayedWorkConditions", "表示中作品の条件")).inkuFont(11).foregroundStyle(.secondary)
                 }
+                CompositionThesisLine(model: model, work: work)
             }
         }
         .padding(.horizontal, 14).padding(.vertical, 6)
@@ -973,6 +974,7 @@ struct CreationView: View {
                 metaStrip(work).frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .top) { Rectangle().fill(InkuColor.border).frame(height: 1) }
             }
+            if let work = workspaceWork { CompositionThesisLine(model: model, work: work) }
         }
         .padding(.horizontal, wide ? 16 : 10)
         .background(InkuColor.bg)
@@ -1202,6 +1204,8 @@ struct CreationView: View {
                           zoomControlsAtTop: rightPanelWidth < 740 * display.preferences.textScale,
                           aspectRatio: workspaceWork?.renderCanvasAspectRatio, viewport: $ui.canvasViewport,
                           rangePreview: usesBatchWork ? nil : model.rangePreview,
+                          compositionUnits: model.compositionBoxWorkID == workspaceWork?.id && model.compositionBoxSource == (workspaceWork?.ddl ?? "") ? model.compositionUnits : [],
+                          activeCompositionThing: $model.activeCompositionThing, compositionQuotes: model.compositionQuotes,
                           replacement: threeDimensionalReplacement)
             // The two corner rows side by side; where they would meet (an iPad in portrait), the right row goes
             // above the left one.

@@ -508,6 +508,9 @@ struct LineageView: View {
     private func operationRow(_ item: LineageItem, graph: LineageSnapshot) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Text(operation(graph.edges.first { $0.childNodeID == item.id }?.derivationKind)).fixedSize()
+            if let detail = compositionDerivationDetail(graph.edges.first { $0.childNodeID == item.id }, display: model.display) {
+                Text(detail).lineLimit(1)
+            }
             if let work = item.work, !stageModelNames(work).isEmpty {
                 Text(stageModelNames(work)).lineLimit(1).truncationMode(.tail)
                     .inkuTooltip(model.display.tooltipValue(stageModelTitle(work)), focus: .none)
@@ -636,7 +639,7 @@ struct LineageView: View {
                           "reinterpretation": "Reading", "model_comparison": "Model", "language_comparison": "Language",
                           "ddl_edit": "DDL edit", "description_edit": "Description edit", "replay": "Replay",
                           "canvas_aspect_change": "Canvas change", "canvas_fit": "Fit", "variation": "Variation (retired)", "sketch_grain_change": "Sketch from life",
-                          "composition_form_change": "Composition form"]
+                          "composition_form_change": "Composition and laws"]
             if let kind, let label = labels[kind] { return label }
         }
         // layout_change: the child that moved one thing to another place (Web 3a90dea84, author 2026-11-13).
@@ -645,7 +648,7 @@ struct LineageView: View {
                       "reinterpretation": "解釈", "model_comparison": "モデル", "language_comparison": "言語",
                       "ddl_edit": "DDL編集", "description_edit": "記述編集", "replay": "再描画",
                       "canvas_aspect_change": "キャンバス変更", "canvas_fit": "はめ込み", "variation": "変奏（旧）", "sketch_grain_change": "写生の有無",
-                      "composition_form_change": "構図の形", "render_engine_change": "描画エンジン", "external_seed_change": "シード", "renga_reply": "連歌"]
+                      "composition_form_change": "構図と法則", "render_engine_change": "描画エンジン", "external_seed_change": "シード", "renga_reply": "連歌"]
         return model.display.localized(kind.flatMap { labels[$0] ?? $0 } ?? "起点")
     }
 }

@@ -291,6 +291,26 @@ public enum InkuCore {
         InkuCoreBindings.savedVariants(inputBytes: input)
     }
 
+    public static func compositionNames() -> Data {
+        Data(InkuCoreBindings.compositionNames().utf8)
+    }
+
+    public static func chunkMoves(_ input: Data) -> Data {
+        InkuCoreBindings.chunkMoves(inputBytes: input)
+    }
+
+    public static func compositionRules(_ input: Data) -> Data {
+        InkuCoreBindings.compositionRules(inputBytes: input)
+    }
+
+    public static func descriptionGroups(_ input: Data) -> Data {
+        InkuCoreBindings.descriptionGroups(inputBytes: input)
+    }
+
+    public static func compositionTheses(_ input: Data) -> Data {
+        InkuCoreBindings.compositionTheses(inputBytes: input)
+    }
+
     public static func providerWire(_ input: Data) -> Data {
         InkuCoreBindings.providerWire(inputBytes: input)
     }

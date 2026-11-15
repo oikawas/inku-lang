@@ -52,7 +52,7 @@ struct InkuEditorStyle: Equatable {
 /// A range an editor paints without changing its text: the grey band of a number or comment (Web LabelHighlight),
 /// or a DDL token colour (Web `highlight.ts`). Painted as layout-manager temporary attributes, never while the IME composes.
 struct InkuEditorMark: Equatable {
-    enum Style: Equatable { case muted, token(DdlTokenClass), unknownName, completion(CompletionRangeState.State), title }
+    enum Style: Equatable { case muted, token(DdlTokenClass), unknownName, completion(CompletionRangeState.State), title, compositionThing }
     let range: NSRange
     let style: Style
 
@@ -65,6 +65,7 @@ enum InkuEditorMarksKey: Equatable {
     case description, none
     case ddl(DdlHighlighter, [CompletionRangeState], String)
     case ddlRevision(Int, Int, Bool, [CompletionRangeState], String)
+    case ddlComposition(Int, Int, Bool, [CompletionRangeState], String, String?)
 }
 
 struct InkuEditorMarksCache {
@@ -97,6 +98,11 @@ struct InkuEditorInsertion: Equatable {
     var replacesAll = false
 }
 
+struct InkuEditorReveal: Equatable {
+    let id = UUID()
+    let line: Int
+}
+
 @MainActor
 struct BatchInputEditor: View {
     @Binding var text: String
@@ -119,6 +125,7 @@ struct InkuTextEditor: View {
     var marks: (String) -> [InkuEditorMark] = InkuEditorMark.descriptionLabels
     var marksKey: InkuEditorMarksKey = .description
     var insertion: Binding<InkuEditorInsertion?>? = nil
+    var reveal: Binding<InkuEditorReveal?>? = nil
     /// Web `numericRangeEditing`: the core's range table folds matching numeric places; nil leaves the text open.
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
@@ -134,7 +141,7 @@ struct InkuTextEditor: View {
         BatchNativeInputEditor(text: $text, isEditable: isEditable && isEnabled && !covered,
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme,
-                               style: style, marks: marks, marksKey: marksKey, covered: covered, insertion: insertion,
+                               style: style, marks: marks, marksKey: marksKey, covered: covered, insertion: insertion, reveal: reveal,
                                rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions, onCharacterHover: onCharacterHover)
             .clipped()
     }

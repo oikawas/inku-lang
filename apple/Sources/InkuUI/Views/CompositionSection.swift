@@ -105,7 +105,7 @@ struct CompositionSection: View {
                             if let quote = thing["quote"].string {
                                 HStack(spacing: 4) {
                                     Text("「\(quote)」")
-                                    if !quote.isEmpty && !plain(work.effectiveSourceText).contains(plain(quote)) {
+                                    if plain(quote).isEmpty || !plain(work.effectiveSourceText).contains(plain(quote)) {
                                         Text(display.webCopy("compositionFromReading", "読みから"))
                                     }
                                 }.inkuFont(11).foregroundStyle(.secondary)

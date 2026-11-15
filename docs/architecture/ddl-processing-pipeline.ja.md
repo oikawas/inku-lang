@@ -174,7 +174,7 @@ ServerのPython adapter、AndroidのKotlin/JNI adapter、macOSのSwift/UniFFI ad
 | 構図の読み・法則・配色 | `inku-pipeline/src/{composition_reading,composition,recompose,laws,laws_entry,laws_record,colors,appearance}.rs` |
 | 画像から書く作品 | `inku-pipeline/src/{image_ddl,machine/image}.rs` |
 | providerへの要求本文と答えの読み | `inku-pipeline/src/provider_wire.rs`、`provider_wire/chatgpt.rs` |
-| 保存作品の推敲の規則 | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine,chunk_moves}.rs` |
+| 保存作品の推敲の規則 | `inku-pipeline/src/{saved_variants,retouch,chunk_moves}.rs` |
 | 作品の同一性 | `inku-pipeline/src/identity.rs` |
 | Typed compiler / 下絵 / Stage 1.5 / lowerer / 画面比の宣言 | `core/crates/inku-ddl`（`canvas_ratio.rs`、`completion_record.rs`を含む） |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |

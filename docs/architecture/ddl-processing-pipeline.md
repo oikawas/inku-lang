@@ -174,7 +174,7 @@ The direct inputs to `rh3` are Score, render seed, wild, engine identity, and th
 | Composition reading, laws and colors | `inku-pipeline/src/{composition_reading,composition,recompose,laws,laws_entry,laws_record,colors,appearance}.rs` |
 | Works written from an image | `inku-pipeline/src/{image_ddl,machine/image}.rs` |
 | Provider request bodies and answer reading | `inku-pipeline/src/provider_wire.rs`, `provider_wire/chatgpt.rs` |
-| Rules of saved-work refinements | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine,chunk_moves}.rs` |
+| Rules of saved-work refinements | `inku-pipeline/src/{saved_variants,retouch,chunk_moves}.rs` |
 | Work identity | `inku-pipeline/src/identity.rs` |
 | Typed compiler / underdrawing / Stage 1.5 / lowerer / canvas ratio declaration | `core/crates/inku-ddl` (including `canvas_ratio.rs` and `completion_record.rs`) |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |

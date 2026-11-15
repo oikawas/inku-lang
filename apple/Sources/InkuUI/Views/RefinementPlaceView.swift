@@ -61,7 +61,8 @@ struct RefinementPlaceView: View {
 
     var body: some View {
         RefinementDialog(model: model, title: model.display.webCopy("canvasVaryComposition", "配置を変える"), work: place.work,
-            closeDisabled: place.running || model.isBusy || place.hasUnsaved, onClose: onClose, columnWidth: 388) {
+            closeDisabled: place.running || model.isBusy || place.hasUnsaved, onClose: onClose, columnWidth: 388,
+            targetUnit: place.selected < place.units.count ? place.units[place.selected] : nil) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(model.display.webCopy("placeThingsHead", "動かす物")).inkuFont(12, weight: .semibold)
                 ForEach(Array(place.units.enumerated()), id: \.offset) { index, unit in

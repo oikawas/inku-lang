@@ -13,6 +13,7 @@ struct RefinementDialog<Controls: View, Options: View>: View {
     var targetTitle = "推敲対象"
     var targetModelName: String? = nil
     var columnWidth: CGFloat = 280
+    var targetUnit: ExactJSON? = nil
     var topControls: AnyView? = nil
     var bottomControls: AnyView? = nil
     @ViewBuilder let controls: () -> Controls
@@ -47,7 +48,7 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                             // by themselves (7c fixes: a swipe over the target moved nothing while the options
                             // slid inside a box of the screen's height).
                             VStack(alignment: .leading, spacing: 12) {
-                                RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName, unit: targetUnit)
                                     .frame(maxWidth: 280, alignment: .leading)
                                 controls()
                                 options().frame(maxWidth: .infinity)
@@ -57,7 +58,7 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     ScrollView {
                                         VStack(alignment: .leading, spacing: 12) {
-                                            RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                            RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName, unit: targetUnit)
                                             controls()
                                         }.frame(maxWidth: .infinity, alignment: .leading)
                                     }
@@ -85,6 +86,7 @@ private struct RefinementTargetCard: View {
     let work: SavedWork
     let title: String
     let modelName: String?
+    var unit: ExactJSON? = nil
     @State private var composition: CompositionRecordSnapshot?
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -92,6 +94,16 @@ private struct RefinementTargetCard: View {
             ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                 .aspectRatio(work.renderCanvasAspectRatio ?? 1, contentMode: .fit)
                 .accessibilityLabel(model.display.localized(title))
+                .overlay {
+                    if let values = unit?["box"].array?.compactMap({ $0.number.flatMap(Double.init) }), values.count == 4 {
+                        GeometryReader { size in
+                            Rectangle().stroke(Color.accentColor, lineWidth: 2)
+                                .frame(width: max(0, (values[2] - values[0]) * size.size.width), height: max(0, (values[3] - values[1]) * size.size.height))
+                                .overlay(alignment: .topLeading) { Text(unit?["title"].string ?? "").inkuFont(10).background(InkuColor.panel) }
+                                .offset(x: values[0] * size.size.width, y: values[1] * size.size.height)
+                        }.allowsHitTesting(false)
+                    }
+                }
             if let answer = (composition?.own ?? composition?.inherited)?["answer"], answer.object != nil {
                 HStack(spacing: 4) {
                     Text(model.display.webCopy("compositionTargetNow", "今"))

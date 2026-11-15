@@ -81,7 +81,7 @@ struct SavedWorkRefinementActions: View {
                         llm(model.display.webCopy("workActionDescription", "記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("記述を変える") : reason)
                         // WorkActionMenu.svelte:145: next to the description edit, with no tooltip of its own.
-                        llm(model.display.webCopy("workActionCompositionForm", "構図の形を変える"), systemImage: "rectangle.3.group") { onAction(work, "composition-form") }
+                        llm(model.display.webCopy("workActionComposition", "構図と法則を変える"), systemImage: "rectangle.3.group") { onAction(work, "composition-form") }
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription != true ? reason : "")
                         llm(model.display.webCopy("workActionSketchGrain", "写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onAction(work, "sketch") }
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("写生なし／ありで描き直す") : reason)

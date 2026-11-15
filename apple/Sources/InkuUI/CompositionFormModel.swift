@@ -9,8 +9,15 @@ import Observation
 /// are, and the chosen ones are saved from their executions (`AppModel.saveComparisonCandidate`), not drawn again.
 @MainActor @Observable
 public final class CompositionFormModel {
+    public enum Change: String, CaseIterable { case form, mainLaw, authorThesis, proposedTheses }
+    public var change = Change.form
     public var selectedForm = "one_corner"
     public var modelReference = ""
+    public var selectedMainLaw = "B1"
+    public var authorThesis = ""
+    public private(set) var currentMainLaw: String?
+    public private(set) var currentThesis: String?
+    public private(set) var currentComposition: ExactJSON?
     public private(set) var original: SavedWork?
     /// The form the work was composed with (`description_ddl.composition.answer.form`); nil when none was recorded.
     public private(set) var currentForm: String?
@@ -32,6 +39,7 @@ public final class CompositionFormModel {
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var failureOrder: [Int: String] = [:]
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private var proposalTask: Task<(theses: [String], digest: String), Error>?
     private let requestedWork: SavedWork?
 
     public init(work: SavedWork? = nil) { requestedWork = work }
@@ -53,11 +61,16 @@ public final class CompositionFormModel {
         do {
             let context = try await app.savedConfiguration(workID: work.id)
             sourceIsLocked = context.authority == "ddl_authoritative"
-            let record = context.descriptionDDL.flatMap { try? ExactJSON(data: $0) }
-            let form = record?["composition"]["answer"]["form"].string
+            let shown = try? await app.compositionRecord(work: work)
+            currentComposition = shown?.own ?? shown?.inherited
+            let answer = (shown?.own ?? shown?.inherited)?["answer"]
+            let form = answer?["form"].string
             currentForm = form.flatMap { CompositionForm.all.contains($0) ? $0 : nil }
+            currentMainLaw = answer?["main_law"].string
+            currentThesis = answer?["thesis"].string
+            selectedMainLaw = currentMainLaw ?? "B1"
             // CanvasPanel.svelte:916: the switch notice shows when the work has no composition record.
-            switchesComposition = record?["composition"].object == nil
+            switchesComposition = currentComposition == nil
             selectedForm = currentForm ?? "one_corner"
             contextAvailable = true
         } catch {
@@ -86,6 +99,11 @@ public final class CompositionFormModel {
         catch { errorText = error.localizedDescription; return }
         let form = selectedForm
         let selectedModel = modelReference
+        let choice = change
+        guard (choice != .authorThesis || (count == 1 && !authorThesis.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && authorThesis.count <= 400)),
+              (choice != .proposedTheses || count == 4) else { return }
+        let authored = authorThesis.trimmingCharacters(in: .whitespacesAndNewlines)
+        let law = selectedMainLaw
         let labels = (1...count).map(String.init)
         let run = UUID()
         runID = run
@@ -95,8 +113,40 @@ public final class CompositionFormModel {
         laneStates = labels.map { _ in .waiting }
         let succeeded = await app.performComparison(status: "候補を生成中", restoreDisplayStatus: true) { token in
             var requests: [GenerationRequest] = []
-            for _ in labels {
-                requests.append(try await app.makeRefinementRequest(work: work, kind: CompositionForm.derivationKind, modelReference: selectedModel, compositionForm: form))
+            var runLabels = labels
+            var proposals: [String] = []
+            var digest: String?
+            if choice == .proposedTheses {
+                let context = try await app.savedConfiguration(workID: work.id)
+                guard let bytes = context.descriptionDDL else { throw HostError("not_a_read_and_draw_work") }
+                let reading = try ExactJSON(data: bytes)
+                let language = ["ja", "en"].contains(work.instructionLangResolved ?? "") ? work.instructionLangResolved! : "ja"
+                var ask: ExactJSON = .object(["description": .string(work.effectiveSourceText), "language": .string(language)])
+                if reading["reading"].object != nil { ask["reading"] = reading["reading"] }
+                if let thesis = self.currentThesis, !thesis.isEmpty { ask["current_thesis"] = .string(thesis) }
+                let prototype = try await app.makeRefinementRequest(work: work, kind: CompositionForm.derivationKind,
+                    modelReference: selectedModel, compositionForm: form)
+                self.status = "命題の案を作成中"
+                let pending = Task { @MainActor in try await app.proposeCompositionTheses(ask: ask, request: prototype, token: token) }
+                self.proposalTask = pending
+                defer { self.proposalTask = nil }
+                let proposed = try await pending.value
+                guard proposed.theses.count == 4 else { throw HostError("invalid_answer") }
+                proposals = proposed.theses; digest = proposed.digest
+                runLabels = proposals.enumerated().map { index, thesis in
+                    let text = thesis.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return "\(index + 1). " + String(text.prefix(14)) + (text.count > 14 ? "…" : "")
+                }
+                self.laneLabels = runLabels
+            }
+            for index in labels.indices {
+                let chosenForm = choice == .form ? form : choice == .mainLaw ? self.currentForm : nil
+                let chosenLaw = choice == .mainLaw ? law : nil
+                let thesis = choice == .authorThesis ? authored : choice == .proposedTheses ? proposals[index] : nil
+                requests.append(try await app.makeRefinementRequest(work: work, kind: CompositionForm.derivationKind,
+                    modelReference: selectedModel, compositionForm: chosenForm, compositionMainLaw: chosenLaw,
+                    compositionThesis: thesis, thesisSource: thesis == nil ? nil : choice == .authorThesis ? "author" : "proposed",
+                    thesisPromptDigest: digest))
             }
             let pinned = try await app.pinPersonalPlanRequests(requests)
             try await RefinementFanout.run(count: labels.count, limit: fanoutLimit, onStart: { index in
@@ -109,12 +159,12 @@ public final class CompositionFormModel {
                     let candidate = try await app.generateCandidate(request: pinned[index], token: token)
                     try Task.checkCancellation()
                     guard self.runID == run, !self.stopping else { throw CancellationError() }
-                    self.candidates.append(ComparisonCandidate(prepared: candidate, label: labels[index], order: index))
+                    self.candidates.append(ComparisonCandidate(prepared: candidate, label: runLabels[index], order: index))
                     self.candidates.sort { $0.order < $1.order }
                 } catch {
                     try Task.checkCancellation()
                     guard self.runID == run, !self.stopping else { throw CancellationError() }
-                    self.failureOrder[index] = "\(labels[index]): \(error.localizedDescription)"
+                    self.failureOrder[index] = "\(runLabels[index]): \(error.localizedDescription)"
                     self.failures = self.failureOrder.sorted { $0.key < $1.key }.map(\.value)
                 }
                 self.laneStates[index] = .done
@@ -166,6 +216,7 @@ public final class CompositionFormModel {
         guard running, !stopping else { return }
         stopping = true
         status = "停止中"
+        proposalTask?.cancel()
         if !saving { runID = nil; candidates = []; failures = [] }
         await app.cancel()
         if running { await withCheckedContinuation { completionWaiters.append($0) } }

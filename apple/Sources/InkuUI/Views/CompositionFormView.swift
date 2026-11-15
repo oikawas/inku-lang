@@ -12,6 +12,7 @@ public struct CompositionFormView: View {
     @State private var form: CompositionFormModel
     @State private var showModelPicker = false
     @State private var choiceContentHeight: CGFloat = 322
+    @State private var namingProviders: [ProviderSettings] = []
     @FocusState private var thesisFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.inkuWindowSize) private var windowSize
@@ -58,6 +59,7 @@ public struct CompositionFormView: View {
             }
         }
         .task { await form.initialize(app: model) }
+        .task(id: model.providerSettingsRevision) { namingProviders = (await model.hostSettings()).providers }
         .sheet(isPresented: $showModelPicker) {
             BatchModelPickerView(model: model, initialReference: form.modelReference,
                 onSelection: { form.modelReference = $0 })
@@ -108,7 +110,8 @@ public struct CompositionFormView: View {
                         thesisChoice(.authorThesis, title: "compositionThesisWrite", fallback: "自分で命題を書く", note: "compositionThesisWriteNote")
                         TextEditor(text: Binding(get: { form.authorThesis }, set: { text in
                             form.authorThesis = ThesisInput.limited(text)
-                        })).focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
+                        })).scrollIndicators(form.authorThesis.isEmpty ? .hidden : .automatic)
+                        .focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
                             if focused { form.change = .authorThesis }
                         }.frame(height: 72).overlay(Rectangle().stroke(InkuColor.border2))
                             .disabled(form.running || model.isBusy)
@@ -135,6 +138,11 @@ public struct CompositionFormView: View {
 
     private var controlsFooter: some View {
         let isThesis = form.change == .authorThesis || form.change == .proposedTheses
+        let writtenThesis = form.authorThesis.trimmingCharacters(in: .whitespacesAndNewlines)
+        let oneAllowed = !isThesis || (form.change == .authorThesis && !writtenThesis.isEmpty && writtenThesis.unicodeScalars.count <= 400)
+        let fourAllowed = !isThesis || form.change == .proposedTheses
+        let unavailable = !form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference)
+        let naming = ModelNaming(providers: namingProviders, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language)
         return VStack(alignment: .leading, spacing: 8) {
             let keeps = isThesis ? "compositionThesisKeeps" : form.change == .mainLaw ? "compositionMainLawKeeps" : "compositionFormKeeps"
             let redecides = isThesis ? "compositionThesisRedecides" : form.change == .mainLaw ? "compositionMainLawRedecides" : "compositionFormRedecides"
@@ -150,20 +158,22 @@ public struct CompositionFormView: View {
                 GridRow { Text(model.display.webCopy("compositionRedecidesTerm", "決め直すもの")).foregroundStyle(.tertiary); Text(redoneText) }
             }.inkuFont(12).foregroundStyle(.secondary).padding(10).frame(maxWidth: .infinity, alignment: .leading)
                 .background(InkuColor.bg2).overlay(RoundedRectangle(cornerRadius: 6).stroke(InkuColor.border))
-            DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"),
-                value: DrawPresentation.modelReference(form.modelReference, empty: model.display.localized("選択してください")),
-                help: model.display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
-                showsPlan: form.modelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
-                .disabled(form.running || model.isBusy)
+            HStack(spacing: 8) {
+                Text(model.display.webCopy("modelButton", "モデル")).inkuFont(11).foregroundStyle(.tertiary)
+                Text(form.modelReference.isEmpty ? model.display.localized("選択してください") : naming.displayName(form.modelReference))
+                    .inkuFont(14).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                Button(model.display.webCopy("editButton", "変更")) { showModelPicker = true }
+                    .buttonStyle(InkuGhostButtonStyle()).disabled(form.running || model.isBusy)
+            }
             VStack(alignment: .leading, spacing: 8) {
                 Button {
                     Task { await form.generate(app: model, count: 1) }
                 } label: { Label(model.display.webCopy("refineSingleButton", "1案を作る"), systemImage: "play.fill").frame(maxWidth: .infinity) }
-                    .buttonStyle(.borderedProminent).controlSize(.large).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference) || form.change == .proposedTheses || (form.change == .authorThesis && (form.authorThesis.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || form.authorThesis.count > 400)))
+                    .buttonStyle(CompositionPaintButtonStyle()).disabled(unavailable || !oneAllowed)
                 Button {
                     Task { await form.generate(app: model, count: 4) }
                 } label: { Label(model.display.webCopy("variationGridDefault", "4案を作る"), systemImage: "play.fill").frame(maxWidth: .infinity) }
-                    .buttonStyle(.borderedProminent).controlSize(.large).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference) || form.change == .authorThesis)
+                    .buttonStyle(CompositionPaintButtonStyle()).disabled(unavailable || !fourAllowed)
             }
             if form.running {
                 RunStatusView(display: model.display, label: form.status, stopping: form.stopping,
@@ -235,5 +245,20 @@ public struct CompositionFormView: View {
         .buttonStyle(.plain)
         .disabled(form.running || model.isBusy)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+}
+
+private struct CompositionPaintButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        let dark = colorScheme == .dark
+        let background = isEnabled ? (dark ? Color(red: 111/255, green: 146/255, blue: 189/255) : Color(red: 26/255, green: 25/255, blue: 23/255))
+            : (dark ? Color(red: 76/255, green: 82/255, blue: 88/255) : Color(red: 128/255, green: 122/255, blue: 112/255))
+        let foreground = isEnabled ? (dark ? Color(red: 17/255, green: 21/255, blue: 26/255) : .white)
+            : (dark ? Color(red: 210/255, green: 215/255, blue: 220/255) : Color(red: 247/255, green: 243/255, blue: 235/255))
+        configuration.label.inkuFont(14, weight: .medium).padding(9)
+            .foregroundStyle(foreground).background(background.opacity(configuration.isPressed ? 0.8 : 1), in: RoundedRectangle(cornerRadius: 5))
     }
 }

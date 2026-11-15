@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-15 — The provenance button on the lineage tab
+
+- "Creating images": the provenance button at the bottom right of the lineage tab, and following a lineage card's selection.
+
 ## 2026-11-15 — The model in refinement windows
 
 - "Creating images": the `Model` row in the windows of `Change the description`, `Redraw with or without sketch from life` and `Change the composition and laws` (it starts at the painting model of the next work's conditions, and a model chosen again applies to that window only).

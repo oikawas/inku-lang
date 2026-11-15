@@ -8,6 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: the lineage tab has the provenance button too, in the same place as on the work tab (bottom right; the author's instruction). It shows the record of the work chosen in the lineage, and with the follow setting on, pressing another card while it is open switches to that work. The drawer stays open when you switch tabs.
 - Web: the run button of the refinement window `Redraw with or without sketch from life` now reads `Paint` instead of `Perform` (the author's instruction; as in `Change the description`).
 - iOS: `apple/scripts/build-ios.sh --device` now copies the installed app's data at most once a day for each device. When the device already has a copy from today, it installs without copying; after a new copy, the oldest are removed so that the newest two remain (the author's rule).
 - Swift (macOS and iOS): every Sign in with ChatGPT call to the core now uses the `sign_in_<name>` names with a `service` (step 6). The ID token check and the model list reading that only tests reached are gone, and the registration limit, the callback head limit and the answer limits come from the core. Nothing changes for the author.

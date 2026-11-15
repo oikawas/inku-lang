@@ -419,9 +419,9 @@ Choosing, saving, and discarding options work as in 8.2: choose the ones to keep
 
 ## 10. Read the Provenance
 
-Open the provenance drawer at the bottom of the work tab to see the record of the selected work. Its tabs are `Details`, `Prompts`, and `JSON`.
+Open the provenance drawer at the bottom of the work tab to see the record of the selected work. Its tabs are `Details`, `Prompts`, and `JSON`. The lineage tab has the same provenance button in the same place (bottom right, from 2026-11-15); it shows the record of the work chosen there. The drawer stays open when you switch tabs.
 
-`Details` has the following sections; sections such as Sketch and Origin depend on the work's records. The follow-selection setting in `Display and operation` is enabled by default: with the drawer open, selecting another work in the history strip switches its information to that work. For a work painted from an image (§15), `Details` begins with an `Image · Source note` section showing the source note written when it was painted.
+`Details` has the following sections; sections such as Sketch and Origin depend on the work's records. The follow-selection setting in `Display and operation` is enabled by default: with the drawer open, selecting another work in the history strip or on a lineage card switches its information to that work. For a work painted from an image (§15), `Details` begins with an `Image · Source note` section showing the source note written when it was painted.
 
 | Section | Main contents |
 |---|---|

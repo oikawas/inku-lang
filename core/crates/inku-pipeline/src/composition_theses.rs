@@ -9,6 +9,7 @@
 
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
 
 use crate::description_ddl::{DescriptionReading, folded};
 use crate::machine::MAX_THESIS_CHARS;
@@ -29,9 +30,17 @@ const MAX_TOKENS: u64 = 4_096;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
-enum Request {
+enum Action {
     Request(Box<Ask>),
     Answer(Box<AnswerRequest>),
+    Retry {
+        ask: Box<Ask>,
+        answer: String,
+        attempt: u8,
+    },
+    Digest {
+        request: Value,
+    },
 }
 
 /// What the request is built from: the description, its reading and the
@@ -159,6 +168,58 @@ fn request(ask: &Ask) -> Result<Value, Refusal> {
     }))
 }
 
+fn digest(request: &Value) -> Result<String, Refusal> {
+    let system = request
+        .get("system")
+        .and_then(Value::as_str)
+        .ok_or_else(|| refuse("invalid_request", "request.system is required"))?;
+    let message = request
+        .get("text")
+        .and_then(Value::as_str)
+        .ok_or_else(|| refuse("invalid_request", "request.text is required"))?;
+    let schema = request
+        .get("response_schema")
+        .ok_or_else(|| refuse("invalid_request", "request.response_schema is required"))?;
+    let prompt = json!({"system": system, "message": message, "response_schema": schema, "action_name": "generate_normalized_ddl"});
+    let hash = Sha256::digest(prompt.to_string().as_bytes());
+    Ok(format!(
+        "sha256:{}",
+        hash.iter().map(|b| format!("{b:02x}")).collect::<String>()
+    ))
+}
+
+fn retry(ask: &Ask, text: &str, attempt: u8) -> Result<Value, Refusal> {
+    let checked = AnswerRequest {
+        answer: text.to_owned(),
+        current_thesis: ask.current_thesis.clone(),
+        language: ask.language,
+    };
+    match answer(&checked) {
+        Ok(value) => Ok(json!({"next": "accept", "theses": value["theses"]})),
+        Err(refusal) if attempt == 1 => {
+            let next = Ask {
+                description: ask.description.clone(),
+                reading: ask.reading.clone(),
+                current_thesis: ask.current_thesis.clone(),
+                language: ask.language,
+                feedback: Some(Feedback {
+                    rejected_answer: text.to_owned(),
+                    problems: if refusal.problems.is_empty() {
+                        vec![refusal.detail]
+                    } else {
+                        refusal.problems
+                    },
+                }),
+            };
+            let made = request(&next)?;
+            Ok(
+                json!({"next": "send", "attempt": 2, "request": made["request"], "prompt_id": made["prompt_id"], "prompt_digest": digest(&made["request"])?}),
+            )
+        }
+        Err(refusal) => Err(refusal),
+    }
+}
+
 fn answer(request: &AnswerRequest) -> Result<Value, Refusal> {
     let ja = request.language == ResolvedInstructionLanguage::Ja;
     let invalid = |problems: Vec<String>| Refusal {
@@ -238,12 +299,19 @@ fn answer(request: &AnswerRequest) -> Result<Value, Refusal> {
 /// that cannot be read answers `{"error": "invalid_request"}`.
 #[must_use]
 pub fn composition_theses_json(input: &[u8]) -> Vec<u8> {
-    let Ok(request_value) = serde_json::from_slice::<Request>(input) else {
+    let Ok(request_value) = serde_json::from_slice::<Action>(input) else {
         return br#"{"error":"invalid_request"}"#.to_vec();
     };
     let answered = match &request_value {
-        Request::Request(ask) => request(ask),
-        Request::Answer(checked) => answer(checked),
+        Action::Request(ask) => request(ask),
+        Action::Answer(checked) => answer(checked),
+        Action::Retry {
+            ask,
+            answer,
+            attempt,
+        } if (1..=2).contains(attempt) => retry(ask, answer, *attempt),
+        Action::Retry { .. } => Err(refuse("invalid_request", "attempt must be 1 or 2")),
+        Action::Digest { request } => digest(request).map(|value| json!({"prompt_digest": value})),
     };
     let mut body = Map::new();
     match answered {

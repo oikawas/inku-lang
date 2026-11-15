@@ -8,6 +8,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Swift (macOS and iOS): the composition and laws update arrives in the same shape as on the Web (the author's instruction).
+  - Names and screens:
+    - The left panel of the Description tab is titled "Sketch from life, composition and instructions of the displayed work" and gains a "Composition and laws" section.
+    - A thesis line appears above the work.
+    - Laws show by name (generation info, progress, lineage).
+    - Candidate cards with a composition record show form and main-law badges and the thesis.
+    - Lineage edges say what changed into what.
+  - Parent's composition: children such as tool or color changes show the parent's composition as "Parent's composition".
+  - Linking things: thing rows, the frame on the work, the instructions' chunks and the caption's words are linked.
+  - By description: the library can group by description.
+  - Change the composition and laws: "Change the composition form" becomes "Change the composition and laws", choosing the form, the main law or the thesis (write one yourself, or have the AI propose other theses).
+  - Change the layout: on works written in words, it becomes the screen where you choose a thing and press a place. A saved child is description-locked.
+  - Change the model: candidates are drawn the same way as the target work.
+  - The rules are the shared core's entries, and the saved edge records are the core's answers.
 - Shared core: the composition rules that only the Server had (the record choice and `fitted` places of the thing boxes, the inherited-composition walk, the grouping by description, the derivation metadata of place and composition options, and the thesis proposals' retry and digest) and the name table are now core entries callable from UniFFI and Python (`chunk_moves` `work_boxes`, `composition_rules`, `description_groups`, `composition_theses` `retry` and `digest`, `composition_names`), so macOS and iOS can use the same rules without the Server. The answers match today's Server; the Server does not call them yet.`description_groups` accepts a host-made `key`, and `composition_rules` also answers the edge kinds it follows (action `keeping_kinds`).Given the work's derivation kind and Score, `chunk_moves` `place` refuses a work fitted onto another paper with `fitted` before any other refusal.The `boxes` and `work_boxes` units also answer the named place at the center of their box (`at`, or null), for Swift's "Change the layout"; the Server's `composition-boxes` answer is unchanged.
 - Swift (macOS and iOS): the "Change the description", "Redraw with or without sketch from life" and "Change the composition form" windows gain a "Model" row. It starts as the drawing button's model, and a model chosen with "Edit" draws only that refinement (the next drawing model does not change). "Change the composition form" draws with this model instead of the parent work's. The redraw button reads "Paint" instead of "Perform".
 - iOS: `apple/scripts/build-ios.sh --device` now copies the installed app's data at most once a day for each device. When the device already has a copy from today, it installs without copying; after a new copy, the oldest are removed so that the newest two remain (the author's rule).

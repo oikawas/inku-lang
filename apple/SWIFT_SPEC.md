@@ -22,6 +22,16 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-15 Choosing the model in the LLM refinement windows
+
+The author's instruction to bring the Web's change (model choice and the perform button) to Swift (the Web is v2.15.351). The author's answer: the choice applies to that refinement only.
+
+- The "Change the description", "Redraw with or without sketch from life" and "Change the composition form" windows gain the same "Model" row as the next drawing conditions (the name and "Edit"). On the Mac it starts the footer of the description and sketch window; on iPhone it is one row above the footer; in the composition form window it sits above "Make one option" and "Make four options".
+- It starts as the drawing button's model (the next drawing conditions) when the window opens. "Edit" opens the same model choice as the next drawing conditions (LLM), and the chosen model draws only that window's work (the same model for stage 1 and stage 2). The next drawing model, the model settings and the thinking setting are not changed. Opening the window again starts from the drawing button's model.
+- "Change the composition form" no longer draws with the parent work's model; it draws with this model. The Web's main-law choice and thesis proposals in "Change the composition and laws" are not ported yet.
+- "Change the model" and "Another composition" are unchanged.
+- The run button of "Redraw with or without sketch from life" now reads "Paint" (`submitBtn`, as in "Change the description") instead of "Perform".
+
 ## 2026-11-15 Sign in with ChatGPT (step 6, clean-up)
 
 The author's instruction "run step 6". The shared core now refuses the old `chatgpt_*` action names and the parts no host calls, so Swift calls only the names open to hosts. Nothing changes for the author.

@@ -13,6 +13,7 @@ public final class WorkEditModel {
     public let mode: WorkEditMode
     public var draftText: String
     public var sketchMode: String
+    public var modelReference = ""
     public var inheritWild = true
     public var wildOverride: Bool
     public private(set) var initialized = false
@@ -39,6 +40,7 @@ public final class WorkEditModel {
 
     public func initialize(app: AppModel) async {
         guard !initialized else { return }
+        modelReference = app.nextDrawingModelReference
         inheritWild = false; wildOverride = work.renderWild ?? false
         do {
             let context = try await app.savedConfiguration(workID: work.id)
@@ -52,7 +54,7 @@ public final class WorkEditModel {
     }
 
     @discardableResult public func draw(app: AppModel) async -> Bool {
-        guard canDraw, !app.isBusy, !app.isPreview, operation == nil else { return false }
+        guard canDraw, !app.isBusy, !app.isPreview, app.refinementModelAvailable(modelReference), operation == nil else { return false }
         let text = draftText
         let sketch = sketchMode
         let wild: Bool? = inheritWild ? nil : wildOverride
@@ -65,7 +67,8 @@ public final class WorkEditModel {
             defer { self.operation = nil; self.running = false; self.stopping = false }
             do {
                 let request = try await app.makeSavedWorkEditRequest(work: self.work, mode: self.mode,
-                    description: text, sketchMode: sketch, wildOverride: wild)
+                    description: text, sketchMode: sketch, wildOverride: wild,
+                    drawingSettings: try app.refinementHostSettings(modelReference: self.modelReference))
                 try Task.checkCancellation()
                 guard !app.isBusy, !app.isPreview else { throw HostError("authoring_busy_or_unavailable") }
                 self.ownsAppOperation = true

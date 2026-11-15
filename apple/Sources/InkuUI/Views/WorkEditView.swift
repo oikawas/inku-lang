@@ -5,7 +5,10 @@ import SwiftUI
 public struct WorkEditView: View {
     @Bindable private var model: AppModel
     @State private var editor: WorkEditModel
+    @State private var showModelPicker = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.inkuPhoneLayout) private var phoneLayout
+    @Environment(\.inkuWindowSize) private var windowSize
     private let onCommitted: @MainActor () -> Void
 
     public init(model: AppModel, work: SavedWork, mode: WorkEditMode, onCommitted: @escaping @MainActor () -> Void = {}) {
@@ -36,12 +39,18 @@ public struct WorkEditView: View {
                 editControls.padding(.horizontal, 20).padding(.vertical, 18)
             }
             Divider()
+            if phoneLayout { modelRow.padding(.horizontal, 20) }
             footer.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
         }
         .inkuDialogFrame(minWidth: 560, idealWidth: 780,
                minHeight: editor.mode == .description ? 380 : 260,
                idealHeight: editor.mode == .description ? 450 : 360)
         .task { await editor.initialize(app: model) }
+        .sheet(isPresented: $showModelPicker) {
+            BatchModelPickerView(model: model, initialReference: editor.modelReference,
+                onSelection: { editor.modelReference = $0 })
+                .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
+        }
         .interactiveDismissDisabled(editor.running || model.isBusy)
         .onDisappear { Task { await editor.stop(app: model) } }
     }
@@ -76,7 +85,7 @@ public struct WorkEditView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            if !model.hasNextDrawingModel {
+            if !model.refinementModelAvailable(editor.modelReference) {
                 Text(model.display.localized("描画モデルが未設定です。設定でAIサービスとモデルを選択してください。"))
                     .inkuFont(13).foregroundStyle(.secondary)
             }
@@ -86,6 +95,7 @@ public struct WorkEditView: View {
 
     private var footer: some View {
         HStack {
+            if !phoneLayout { modelRow }
             if editor.running {
                 // WorkEditDialog.svelte:118: the drawing indicator at the end of the footer row.
                 Spacer()
@@ -101,13 +111,20 @@ public struct WorkEditView: View {
                 Spacer()
                 Button(model.display.webCopy("pipelineCancel", "キャンセル")) { dismiss() }
                     .disabled(model.isBusy).keyboardShortcut(.cancelAction)
-                Button(model.display.webCopy(editor.mode == .description ? "submitBtn" : "pipelinePerform",
-                                             editor.mode == .description ? "描画する" : "演奏する")) {
+                Button(model.display.webCopy("submitBtn", "描画する")) {
                     Task { if await editor.draw(app: model) { onCommitted(); dismiss() } }
                 }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(!editor.canDraw || model.isBusy || model.isPreview || !model.hasNextDrawingModel)
+                    .disabled(!editor.canDraw || model.isBusy || model.isPreview || !model.refinementModelAvailable(editor.modelReference))
             }
         }
+    }
+
+    private var modelRow: some View {
+        DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"),
+            value: DrawPresentation.modelReference(editor.modelReference, empty: model.display.localized("選択してください")),
+            help: model.display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
+            showsPlan: editor.modelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
+            .disabled(editor.running || model.isBusy)
     }
 
     private var wildControl: some View {

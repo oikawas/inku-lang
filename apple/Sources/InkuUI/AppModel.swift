@@ -836,6 +836,18 @@ public final class AppModel {
         return next
     }
 
+    public func refinementModelAvailable(_ reference: String) -> Bool {
+        SettingsModel.isModelAvailable(reference, settings: settings)
+    }
+
+    public func refinementHostSettings(modelReference: String) throws -> HostSettings {
+        guard refinementModelAvailable(modelReference) else { throw HostError("drawing_model_not_available") }
+        var next = settings
+        next.models.stage1Model = modelReference
+        next.models.stage2Model = modelReference
+        return next
+    }
+
     /// Web model-inspection `$effect`: a saved comparison model that is no longer offered leaves the saved choice at once,
     /// not at the next tick of a checkbox.
     func pruneComparisonModels() {
@@ -1590,8 +1602,6 @@ public final class AppModel {
         if formChange, let compositionForm {
             request.drawRoute = "read_and_draw"; request.descriptionComposition = true
             request.descriptionCompositionForm = compositionForm
-            if let stage1 = work.stage1Model ?? work.stage2Model { request.models.stage1Model = stage1 }
-            if let stage2 = work.stage2Model ?? work.stage1Model { request.models.stage2Model = stage2 }
             let from = saved.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"]["answer"]["form"].string
             request.derivationMetadata = ExactJSON.object(["form_from": from.map(ExactJSON.string) ?? .null,
                                                            "form_to": .string(compositionForm)]).data

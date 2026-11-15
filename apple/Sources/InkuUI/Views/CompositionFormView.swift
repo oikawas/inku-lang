@@ -10,7 +10,9 @@ import SwiftUI
 public struct CompositionFormView: View {
     @Bindable var model: AppModel
     @State private var form: CompositionFormModel
+    @State private var showModelPicker = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.inkuWindowSize) private var windowSize
     private let onCommitted: (SavedWork) -> Void
 
     public init(model: AppModel, work: SavedWork? = nil, onCommitted: @escaping (SavedWork) -> Void = { _ in }) {
@@ -51,6 +53,11 @@ public struct CompositionFormView: View {
             }
         }
         .task { await form.initialize(app: model) }
+        .sheet(isPresented: $showModelPicker) {
+            BatchModelPickerView(model: model, initialReference: form.modelReference,
+                onSelection: { form.modelReference = $0 })
+                .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
+        }
         .interactiveDismissDisabled(form.running || form.hasUnsaved || model.isBusy)
         .onDisappear { Task { await form.stop(app: model); form.discardCandidates() } }
     }
@@ -69,13 +76,18 @@ public struct CompositionFormView: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(model.display.webCopy("workActionCompositionForm", "構図の形を変える"))
+            DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"),
+                value: DrawPresentation.modelReference(form.modelReference, empty: model.display.localized("選択してください")),
+                help: model.display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
+                showsPlan: form.modelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
+                .disabled(form.running || model.isBusy)
             VStack(alignment: .leading, spacing: 8) {
                 Button(model.display.webCopy("refineSingleButton", "1案を作る"), systemImage: "play.fill") {
                     Task { await form.generate(app: model, count: 1) }
-                }.buttonStyle(.borderedProminent).disabled(!form.canGenerate || model.isBusy)
+                }.buttonStyle(.borderedProminent).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference))
                 Button(model.display.webCopy("variationGridDefault", "4案を作る"), systemImage: "square.grid.2x2") {
                     Task { await form.generate(app: model, count: 4) }
-                }.buttonStyle(.bordered).disabled(!form.canGenerate || model.isBusy)
+                }.buttonStyle(.bordered).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference))
             }
             Label(model.display.localized("低速（LLM・API使用）"), systemImage: "clock").inkuFont(11).foregroundStyle(.secondary)
             if form.running {

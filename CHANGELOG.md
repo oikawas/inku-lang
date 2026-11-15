@@ -8,6 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Swift (macOS and iOS): the "Change the description", "Redraw with or without sketch from life" and "Change the composition form" windows gain a "Model" row. It starts as the drawing button's model, and a model chosen with "Edit" draws only that refinement (the next drawing model does not change). "Change the composition form" draws with this model instead of the parent work's. The redraw button reads "Paint" instead of "Perform".
 - iOS: `apple/scripts/build-ios.sh --device` now copies the installed app's data at most once a day for each device. When the device already has a copy from today, it installs without copying; after a new copy, the oldest are removed so that the newest two remain (the author's rule).
 - Swift (macOS and iOS): every Sign in with ChatGPT call to the core now uses the `sign_in_<name>` names with a `service` (step 6). The ID token check and the model list reading that only tests reached are gone, and the registration limit, the callback head limit and the answer limits come from the core. Nothing changes for the author.
 - Swift (macOS, iOS): Sign in with ChatGPT keeps one connection per host and shows one action per state. Selecting and deleting registrations and "Check connection" are gone; the only ending action is a confirmed sign-out. Sign-in always reuses the same client ID, so no new entries that cannot be removed are left on OpenAI's side. The iOS introduction no longer says "this Mac".

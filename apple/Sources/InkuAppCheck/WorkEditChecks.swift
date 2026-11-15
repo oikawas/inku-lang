@@ -67,6 +67,34 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     reopened.catalogID = reopened.catalogs.first(where: { $0.id != parent.catalogID })!.id
     reopened.seedText = "999"
     reopened.wild = false
+    reopened.selectNextDrawingModel("check:original")
+    let windowEdit = WorkEditModel(work: parent, mode: .description)
+    let windowSketch = WorkEditModel(work: parent, mode: .sketch)
+    let windowForm = CompositionFormModel(work: parent)
+    await windowEdit.initialize(app: reopened)
+    await windowSketch.initialize(app: reopened)
+    await windowForm.initialize(app: reopened)
+    guard windowEdit.modelReference == reopened.nextDrawingModelReference,
+          windowSketch.modelReference == reopened.nextDrawingModelReference,
+          windowForm.modelReference == reopened.nextDrawingModelReference else {
+        throw CheckFailure.message("Refinement windows did not initialize from the next drawing model")
+    }
+    windowEdit.modelReference = "check:pinned-drawing"
+    windowSketch.modelReference = "check:pinned-drawing"
+    windowForm.modelReference = "check:pinned-drawing"
+    let descriptionRequest = try await reopened.makeSavedWorkEditRequest(work: parent, mode: .description,
+        description: parent.effectiveSourceText, drawingSettings: reopened.refinementHostSettings(modelReference: windowEdit.modelReference))
+    let sketchRequest = try await reopened.makeSavedWorkEditRequest(work: parent, mode: .sketch,
+        description: parent.effectiveSourceText, drawingSettings: reopened.refinementHostSettings(modelReference: windowSketch.modelReference))
+    let selectedFormRequest = try await reopened.makeRefinementRequest(work: parent, kind: CompositionForm.derivationKind,
+        modelReference: windowForm.modelReference, compositionForm: "grid")
+    guard parent.stage1Model != windowForm.modelReference,
+          [descriptionRequest, sketchRequest, selectedFormRequest].allSatisfy({
+              $0.models.stage1Model == "check:pinned-drawing" && $0.models.stage2Model == "check:pinned-drawing"
+          }), reopened.nextDrawingModelReference == "check:original" else {
+        throw CheckFailure.message("Refinement request did not retain its window model independently of the next model and parent")
+    }
+    reopened.selectNextDrawingModel("check:pinned-drawing")
     let unchanged = try await reopened.makeSavedWorkEditRequest(work: parent, mode: .description, description: parent.effectiveSourceText)
     guard case .description(_, false, .supplied(let prose)) = unchanged.authoring, prose == parent.sketchText else {
         throw CheckFailure.message("Unchanged description did not preserve its saved sketch prose")

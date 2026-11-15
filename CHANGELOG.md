@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: the lineage tab has the provenance button too, in the same place as on the work tab (bottom right; the author's instruction). It shows the record of the work chosen in the lineage, and with the follow setting on, pressing another card while it is open switches to that work. The drawer stays open when you switch tabs.
-- Web: the run button of the refinement window `Redraw with or without sketch from life` now reads `Paint` instead of `Perform` (the author's instruction; as in `Change the description`).
 - iOS: `apple/scripts/build-ios.sh --device` now copies the installed app's data at most once a day for each device. When the device already has a copy from today, it installs without copying; after a new copy, the oldest are removed so that the newest two remain (the author's rule).
 - Swift (macOS and iOS): every Sign in with ChatGPT call to the core now uses the `sign_in_<name>` names with a `service` (step 6). The ID token check and the model list reading that only tests reached are gone, and the registration limit, the callback head limit and the answer limits come from the core. Nothing changes for the author.
 - Swift (macOS, iOS): Sign in with ChatGPT keeps one connection per host and shows one action per state. Selecting and deleting registrations and "Check connection" are gone; the only ending action is a confirmed sign-out. Sign-in always reuses the same client ID, so no new entries that cannot be removed are left on OpenAI's side. The iOS introduction no longer says "this Mac".
@@ -713,6 +711,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.352 (2026-11-15 / Build 1428)
+
+- Web: the lineage tab has the provenance button too, in the same place as on the work tab (bottom right; the author's instruction). It shows the record of the work chosen in the lineage, and with the follow setting on, pressing another card while it is open switches to that work. The drawer stays open when you switch tabs.
+- Web: the run button of the refinement window `Redraw with or without sketch from life` now reads `Paint` instead of `Perform` (the author's instruction; as in `Change the description`).
 
 ## v2.15.351 (2026-11-15 / Build 1427)
 

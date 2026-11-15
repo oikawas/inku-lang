@@ -78,6 +78,8 @@ struct CreationView: View {
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
     @State private var rightPanelHeight: CGFloat = 0
+    @State private var refinementMenuButtonHeight: CGFloat = 0
+    @State private var refinementMenuContentHeight: CGFloat = 400
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
     /// iPhone: a refinement chosen in the 作品編集 sheet, opened once the sheet has gone (one sheet at a time).
@@ -1089,28 +1091,46 @@ struct CreationView: View {
     }
 
     /// Web WorkActionMenu (header variant): editing only; viewing tools stay in the canvas toolbar.
-    @ViewBuilder private var workActionMenu: some View {
+    @ViewBuilder private func workActionMenu(availableHeight: CGFloat) -> some View {
         if let work = workspaceWork, hasSavedWorkspaceWork {
-            Button {
-                ui.refinementMenuWorkID = work.id
-            } label: {
-                Text(display.webCopy("workActionRefine", "推敲する")).inkuFont(12)
+            VStack(alignment: .trailing, spacing: 6) {
+                Button {
+                    ui.refinementMenuWorkID = ui.refinementMenuWorkID == work.id ? nil : work.id
+                } label: {
+                    Text(display.webCopy("workActionRefine", "推敲する")).inkuFont(12)
+                }
+                .buttonStyle(InkuGhostButtonStyle())
+                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+                .fixedSize()
+                .background(GeometryReader { geometry in
+                    Color.clear
+                        .onAppear { refinementMenuButtonHeight = geometry.size.height }
+                        .onChange(of: geometry.size.height) { _, height in refinementMenuButtonHeight = height }
+                })
+                .disabled(browsingDisabled)
+                .inkuTooltip(browsingDisabled ? display.tooltip("生成中は推敲を開始できません。", serverKey: "workActionGenerationLocked")
+                             : display.tooltip("作品の操作"))
+                if ui.refinementMenuWorkID == work.id {
+                    ScrollView {
+                        SavedWorkRefinementPopover(model: model, work: work, title: workActionTitle(work), onAction: { target, action in
+                            ui.refinementMenuWorkID = nil
+                            onWorkAction(target, action)
+                        }, writingLocked: automation.isOccupied)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(GeometryReader { geometry in
+                            Color.clear
+                                .onAppear { refinementMenuContentHeight = geometry.size.height }
+                                .onChange(of: geometry.size.height) { _, height in refinementMenuContentHeight = height }
+                        })
+                    }
+                    .frame(width: 260, height: min(refinementMenuContentHeight, max(0, availableHeight - refinementMenuButtonHeight - 6)))
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(InkuColor.border2))
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
+                }
             }
-            .buttonStyle(InkuGhostButtonStyle())
-            .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-            .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } }), arrowEdge: .trailing) {
-                ScrollView {
-                    SavedWorkRefinementPopover(model: model, work: work, title: workActionTitle(work), onAction: { target, action in
-                        ui.refinementMenuWorkID = nil
-                        onWorkAction(target, action)
-                    }, writingLocked: automation.isOccupied)
-                }.frame(maxHeight: max(120, rightPanelHeight - 80)).inkuPopoverContent()
-            }
-            .fixedSize()
-            .disabled(browsingDisabled)
-            // WorkActionMenu.svelte:107: a locked trigger says why (CanvasPanel passes `workActionGenerationLocked`).
-            .inkuTooltip(browsingDisabled ? display.tooltip("生成中は推敲を開始できません。", serverKey: "workActionGenerationLocked")
-                         : display.tooltip("作品の操作"))
+            .inkuEndsEditingOnOutsidePress(isActive: ui.refinementMenuWorkID == work.id) { ui.refinementMenuWorkID = nil }
+            .inkuOnEscape(isActive: ui.refinementMenuWorkID == work.id) { ui.refinementMenuWorkID = nil }
         } else if workspaceWork != nil, !model.isBusy {
             Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
                 .inkuFont(11).foregroundStyle(.tertiary).lineLimit(1)
@@ -1223,12 +1243,14 @@ struct CreationView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
             if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
-            VStack(alignment: .trailing, spacing: 6) {
-                if !phoneLayout { workActionMenu }
-                CanvasFallbackBadges(display: display, work: workspaceWork)
+            GeometryReader { geometry in
+                VStack(alignment: .trailing, spacing: 6) {
+                    if !phoneLayout { workActionMenu(availableHeight: max(0, geometry.size.height - 24)) }
+                    CanvasFallbackBadges(display: display, work: workspaceWork)
+                }
+                    .padding([.top, .trailing], 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
-                .padding([.top, .trailing], 12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
     }
 

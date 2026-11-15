@@ -1124,12 +1124,12 @@ struct CreationView: View {
                         })
                     }
                     .frame(width: 260, height: min(refinementMenuContentHeight, max(0, availableHeight - refinementMenuButtonHeight - 6)))
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(InkuColor.border2))
+                    .contentShape(Rectangle())
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(InkuColor.border2).allowsHitTesting(false))
                     .clipShape(RoundedRectangle(cornerRadius: 5))
                     .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
                 }
             }
-            .inkuEndsEditingOnOutsidePress(isActive: ui.refinementMenuWorkID == work.id) { ui.refinementMenuWorkID = nil }
             .inkuOnEscape(isActive: ui.refinementMenuWorkID == work.id) { ui.refinementMenuWorkID = nil }
         } else if workspaceWork != nil, !model.isBusy {
             Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
@@ -1199,6 +1199,23 @@ struct CreationView: View {
         .overlay(alignment: .topTrailing) {
             if ui.generationInfoOpen, inlinePanel == nil, !phoneLayout, let work = workspaceWork { generationInfoDrawer(work) }
         }
+        .overlay {
+            if !phoneLayout, inlinePanel == nil, ui.workspaceTab != "lineage" {
+                GeometryReader { geometry in
+                    ZStack(alignment: .topTrailing) {
+                        if ui.refinementMenuWorkID != nil {
+                            Color.clear.contentShape(Rectangle())
+                                .onTapGesture { ui.refinementMenuWorkID = nil }
+                                .accessibilityHidden(true)
+                        }
+                        workActionMenu(availableHeight: max(0, geometry.size.height - 24))
+                            .padding([.top, .trailing], 12)
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .inkuEndsEditingOnOutsidePress(isActive: ui.refinementMenuWorkID != nil) { ui.refinementMenuWorkID = nil }
+                }
+            }
+        }
         .clipped()
     }
 
@@ -1243,14 +1260,10 @@ struct CreationView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
             if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
-            GeometryReader { geometry in
-                VStack(alignment: .trailing, spacing: 6) {
-                    if !phoneLayout { workActionMenu(availableHeight: max(0, geometry.size.height - 24)) }
-                    CanvasFallbackBadges(display: display, work: workspaceWork)
-                }
-                    .padding([.top, .trailing], 12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            }
+            CanvasFallbackBadges(display: display, work: workspaceWork)
+                .padding(.top, phoneLayout ? 12 : 18 + refinementMenuButtonHeight)
+                .padding(.trailing, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
     }
 

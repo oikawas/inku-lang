@@ -129,6 +129,12 @@ for (const category of vocabulary.categories) {
   }
 }
 
+const figuresSource = await sourceFile('web/src/lib/features/composition-record/figures.ts');
+const figuresContext = vm.createContext({});
+vm.runInContext(`${script(figuresSource)}\nglobalThis.figures = FIGURES;`, figuresContext, { timeout: 5000 });
+if (Object.keys(figuresContext.figures).length !== 26) throw new Error('composition_figures_count_changed');
+await writeFile(path.join(resources, 'composition-figures.json'), JSON.stringify(figuresContext.figures, null, 2) + '\n');
+
 const reference = {
   schema: 'inku.apple-ui-reference.v1',
   version: (await sourceFile('web/APP_VERSION')).trim(),

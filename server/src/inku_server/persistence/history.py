@@ -1384,15 +1384,7 @@ class HistoryListProjector:
                 if composition is not None or edge is None or edge.id not in readable \
                         or edge.derivation_kind not in keeping_kinds:
                     break
-                parent = nodes.get(edge.parent_node_id)
-                if parent is None or not parent.history_id or parent.state == "tombstone" \
-                        or not readable_node(parent.id):
-                    break
-                if edge.derivation_kind == "replay":
-                    child_ddl, parent_ddl = ddls.get(node.history_id or ""), ddls.get(parent.history_id)
-                    if not child_ddl or child_ddl != parent_ddl:
-                        break
-                current = parent.id
+                current = edge.parent_node_id
             inherited = _composition_rules({"action": "walk", "start": start, "nodes": chain})["composition_inherited"]
             if inherited is not None:
                 item["composition_inherited"] = inherited

@@ -24,7 +24,8 @@ use crate::stroke::{
 use crate::support::{Support, support_with_mark_word};
 use crate::svg::{Element, closed_polyline_path, format_number, points_list, write_number};
 use crate::types::{
-    Amplitude, CanvasSize, Instruction, LineStyle, Point, Primitive, Quality, SvgProfile, Weight,
+    Amplitude, CanvasSize, Instruction, LineStyle, Point, Primitive, Quality, SurfaceIntensity,
+    SvgProfile, Weight,
 };
 
 pub(crate) fn rotate(
@@ -674,6 +675,7 @@ pub(crate) fn hand_line(
             style.stroke_opacity,
             seed,
             context.canvas.unit(),
+            instruction.surface_intensity,
         ));
     } else if instruction.weight == Weight::OilPaint {
         let middle = outline.len() / 2;
@@ -695,6 +697,23 @@ pub(crate) fn hand_line(
                 .attr("fill-opacity", format_number(style.stroke_opacity))
                 .attr("stroke", "none"),
         );
+    }
+    if instruction.surface_intensity == SurfaceIntensity::Dense
+        && matches!(instruction.weight, Weight::Pen | Weight::OilPaint)
+    {
+        for run in outline.split(|p| !p.x.is_finite() || !p.y.is_finite()) {
+            if run.len() >= 4 {
+                let middle = run.len() / 2;
+                let right = run[middle..].iter().rev().copied().collect::<Vec<_>>();
+                group.push(crate::media::dense_stroke_accents(
+                    instruction.weight,
+                    &run[..middle],
+                    &right,
+                    false,
+                    &style.color,
+                ));
+            }
+        }
     }
     if instruction.style != LineStyle::Solid {
         let mut line_style = style.clone();
@@ -800,10 +819,11 @@ pub(crate) fn hand_contour(
             style.stroke_opacity,
             context.seed_for(instruction),
             context.canvas.unit(),
+            instruction.surface_intensity,
         );
     }
     if instruction.weight == Weight::OilPaint {
-        return oil_paint_stroke(
+        let mut result = oil_paint_stroke(
             contour_stroke_path(&stroke),
             &stroke.left,
             &stroke.right,
@@ -820,6 +840,18 @@ pub(crate) fn hand_contour(
             context.seed_for(instruction),
             closed,
         );
+        if instruction.surface_intensity == SurfaceIntensity::Dense
+            && !(closed && style.fill && crate::accepted_fills::solid_fill(instruction))
+        {
+            result.push(crate::media::dense_stroke_accents(
+                instruction.weight,
+                &stroke.left,
+                &stroke.right,
+                closed,
+                &style.color,
+            ));
+        }
+        return result;
     }
     with_texture_filter(
         Element::new("g")
@@ -852,6 +884,18 @@ pub(crate) fn hand_contour(
                             .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
                             .attr("stroke", "none"),
                     );
+                    if instruction.weight == Weight::Pen
+                        && instruction.surface_intensity == SurfaceIntensity::Dense
+                        && !(closed && style.fill && crate::accepted_fills::solid_fill(instruction))
+                    {
+                        group.push(crate::media::dense_stroke_accents(
+                            instruction.weight,
+                            &stroke.left,
+                            &stroke.right,
+                            closed,
+                            &style.color,
+                        ));
+                    }
                 }
             }),
         instruction.weight,

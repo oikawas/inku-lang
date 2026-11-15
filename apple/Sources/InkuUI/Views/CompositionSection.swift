@@ -54,7 +54,7 @@ struct CompositionSection: View {
             guard !Task.isCancelled, model.compositionBoxWorkID == work.id else { return }
             var quotes: [String: String] = [:]
             for thing in answer?["things"].array ?? [] {
-                if let title = unitFor(thing)?["title"].string, let quote = thing["quote"].string { quotes[title] = quote }
+                if let number = thing["thing"].number, let quote = thing["quote"].string { quotes[number] = quote }
             }
             model.compositionQuotes = quotes
         }
@@ -80,9 +80,9 @@ struct CompositionSection: View {
                 Text(display.webCopy("compositionThingsHead", "物")).inkuFont(11).foregroundStyle(.secondary)
                 ForEach(Array(things.enumerated()), id: \.offset) { _, thing in
                     let unit = unitFor(thing)
-                    let title = unit?["title"].string
+                    let number = thing["thing"].number
                     Button {
-                        model.activeCompositionThing = title
+                        model.activeCompositionThing = number
                         if let line = unit?["lines"].array?.first?.number.flatMap(Int.init) { model.revealCompositionLine = InkuEditorReveal(line: line) }
                     } label: { HStack(alignment: .top, spacing: 8) {
                         Text(thing["thing"].number ?? "").inkuFont(11)
@@ -96,7 +96,7 @@ struct CompositionSection: View {
                             if let quote = thing["quote"].string { Text("「\(quote)」").inkuFont(11).foregroundStyle(.secondary) }
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()) }
-                    .buttonStyle(.plain).onHover { inside in model.activeCompositionThing = inside ? title : nil }
+                    .buttonStyle(.plain).onHover { inside in model.activeCompositionThing = inside ? number : nil }
                 }
             }
         }.frame(maxWidth: .infinity, alignment: .leading)

@@ -44,6 +44,7 @@ struct ArtworkCanvas: View {
     @Environment(DisplaySettings.self) private var display
     @Environment(\.displayScale) private var displayScale
     @Environment(\.inkuTooltipsCovered) private var covered
+    @Environment(\.inkuPhoneLayout) private var phone
     @State private var picture = CanvasPicture()
     @State private var localViewport = CanvasViewport()
     @State private var gestureScale: CGFloat = 1
@@ -246,6 +247,9 @@ struct ArtworkCanvas: View {
                   case .ended: activeCompositionThing?.wrappedValue = nil
                   }
               }
+              .simultaneousGesture(SpatialTapGesture().onEnded { value in
+                  if phone { activeCompositionThing?.wrappedValue = thing(at: value.location, size: size, box: box) }
+              })
               .task(id: DetailRequest(svg: svg, plan: plan)) {
                   await picture.loadWindow(svg: svg, plan: plan, renderer: renderer)
               }
@@ -261,19 +265,21 @@ struct ArtworkCanvas: View {
 
     private func thing(at point: CGPoint, size: CGSize, box: CGSize?) -> String? {
         compositionUnits.compactMap { unit -> (String, CGRect)? in
-            guard let title = unit["title"].string, let rect = thingRect(unit, size: size, box: box), rect.contains(point) else { return nil }
-            return (title, rect)
+            guard let number = unit["thing"].number, let rect = thingRect(unit, size: size, box: box), rect.contains(point) else { return nil }
+            return (number, rect)
         }.min { $0.1.width * $0.1.height < $1.1.width * $1.1.height }?.0
     }
 
     @ViewBuilder private func compositionFrame(size: CGSize, box: CGSize?) -> some View {
-        if let active = activeCompositionThing?.wrappedValue,
-           let unit = compositionUnits.first(where: { $0["title"].string == active }),
-           let rect = thingRect(unit, size: size, box: box) {
+        if let active = activeCompositionThing?.wrappedValue {
+          ForEach(Array(compositionUnits.enumerated()), id: \.offset) { _, unit in
+           if unit["thing"].number == active, let rect = thingRect(unit, size: size, box: box) {
             Rectangle().strokeBorder(Color.accentColor, lineWidth: 2).background(Color.accentColor.opacity(0.08))
                 .frame(width: max(1, rect.width), height: max(1, rect.height)).position(x: rect.midX, y: rect.midY)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .allowsHitTesting(false).accessibilityHidden(true)
+           }
+          }
         }
     }
 

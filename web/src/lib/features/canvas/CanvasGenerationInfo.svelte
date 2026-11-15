@@ -80,6 +80,7 @@
 
 	type Props = {
 		open: boolean;
+		aboveOverview?: boolean;
 		tab: DrawerTab;
 		drawerEl?: HTMLElement | null;
 		detailsScrollEl?: HTMLElement | null;
@@ -120,6 +121,7 @@
 
 	let {
 		open,
+		aboveOverview = false,
 		tab = $bindable('details'),
 		drawerEl = $bindable(null),
 		detailsScrollEl = $bindable(null),
@@ -332,6 +334,7 @@
 	bind:this={drawerEl}
 	class="generation-info"
 	class:open
+	class:above-overview={aboveOverview}
 	aria-hidden={!open}
 	aria-label={isJapanese ? '生成情報' : 'Provenance'}
 >
@@ -677,6 +680,7 @@
 		transition: clip-path 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 	.generation-info.open { clip-path: inset(0 0 0 0); pointer-events: all; }
+	.generation-info.above-overview { z-index: 1302; }
 	.generation-info-head { height: 44px; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border); }
 	.generation-info-head strong { font-size: var(--ui-font-size-13); font-weight: 600; }
 	.generation-info-close { width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: var(--ui-font-size-20); cursor: pointer; }

@@ -1012,6 +1012,7 @@
 
 	<CanvasGenerationInfo
 		open={generationInfoOpen}
+		aboveOverview={outputTab === 'lineage' && lineageBrowsingState.overviewOpen}
 		bind:tab={generationInfoTab}
 		bind:drawerEl={generationInfoEl}
 		bind:detailsScrollEl

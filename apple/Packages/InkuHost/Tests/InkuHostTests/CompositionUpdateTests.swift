@@ -21,18 +21,39 @@ final class CompositionUpdateTests: XCTestCase, @unchecked Sendable {
     }
 
     private func saved(_ db: InkuDatabase, id: String, nodeID: String, parent: String? = nil,
-                       kind: String? = nil, composition: ExactJSON, config: ExactJSON = .object([:]), ddl: String = "x") async throws -> SavedWork {
+                       kind: String? = nil, composition: ExactJSON, config: ExactJSON = .object([:]), ddl: String = "x",
+                       authority: String = "description_authoritative") async throws -> SavedWork {
         let work = SavedWork(id: id + "_0", at: 1, input: "雪", score: "{}", svg: "<svg/>", ddl: ddl, lineageNodeID: nodeID)
         let node = LineageNode(id: nodeID, historyID: work.id, at: 1)
         let edge = parent.map { LineageEdge(id: "edge-" + id, parentNodeID: $0, childNodeID: nodeID, derivationKind: kind!, at: 1) }
         let context: ExactJSON = .object(["configuration": config, "options": .object([:]), "clip": .object([:]),
-            "authority": .object(["authority": .string("description_authoritative"), "origin": .string("stage1_generated"), "revision": .string("0")]),
+            "authority": .object(["authority": .string(authority), "origin": .string("stage1_generated"), "revision": .string("0")]),
             "description_ddl": .object(["composition": composition])])
         let snapshot = Data("{}".utf8)
         let initial = try await db.compareAndSwapExecution(id: id, expectedRevision: nil, snapshot: snapshot)
         _ = try await db.commitEffect(id: id, expectedRevision: initial.revision, effectID: "save-render:0", snapshot: snapshot,
             acknowledgement: SavedPerformance.acknowledgement(workID: work.id, context: context), work: work, node: node, edge: edge)
         return work
+    }
+
+    func testLegacyUnknownParentCanSaveMetadataButDDLAuthorityCannot() async throws {
+        let db = try database(), host = PipelineHost(database: db)
+        let composition: ExactJSON = .object(["answer": .object(["form": .string("grid")])])
+        for (index, authority) in ["legacy_unknown", "ddl_authoritative"].enumerated() {
+            let parent = "legacy\(index)", nodeID = "parent\(index)"
+            _ = try await saved(db, id: parent, nodeID: nodeID, composition: composition, authority: authority)
+            let id = "child\(index)", work = SavedWork(id: id + "_0", at: 2, input: "雪", score: "{}", svg: "<svg/>", ddl: "x", lineageNodeID: id)
+            let edge = LineageEdge(id: "edge-" + id, parentNodeID: nodeID, childNodeID: id, derivationKind: "composition_form_change", at: 2)
+            let settings: ExactJSON = .object(["lineage_parent_node_id": .string(nodeID), "composition_form": .string("bands")])
+            let context: ExactJSON = .object(["configuration": .object([:]), "options": .object([:]), "clip": .object([:]), "authority": .object(["authority": .string("description_authoritative"), "origin": .string("stage1_generated"), "revision": .string("0")])])
+            let stored = StandaloneCandidate(candidate: StoredCandidate(work: work, node: LineageNode(id: id, historyID: work.id, at: 2), edge: edge, context: context.data, compositionRuleSettings: settings.data))
+            _ = try await db.compareAndSwapExecution(id: id, expectedRevision: nil, snapshot: JSONEncoder().encode(stored))
+            if authority == "legacy_unknown" { _ = try await host.saveCandidate(executionID: id) }
+            else {
+                do { _ = try await host.saveCandidate(executionID: id); XCTFail("locked parent saved") }
+                catch let error as HostError { XCTAssertEqual(error.code, "description_locked") }
+            }
+        }
     }
 
     func testCopiedRecordUsesWalkAndOwnFormChangeWins() async throws {

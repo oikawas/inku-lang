@@ -31,7 +31,7 @@ struct DdlBoxEditor: View {
     private var activeLines: [Int] {
         guard model.compositionBoxWorkID == work.id, text == model.compositionBoxSource,
               let number = model.activeCompositionThing else { return [] }
-        return model.compositionUnits.filter { $0["thing"].number == number }.flatMap { ($0["lines"].array ?? []).compactMap { $0.number.flatMap(Int.init) } }
+        return CompositionThings.lines(model.compositionUnits, for: number)
     }
 
     var body: some View {
@@ -64,9 +64,7 @@ struct DdlBoxEditor: View {
                                    model.activeCompositionThing = nil; return
                                }
                                let line = BatchEditorLineIndex(text).line(containing: index)
-                               model.activeCompositionThing = model.compositionUnits.first { unit in
-                                   (unit["lines"].array ?? []).contains { $0.number.flatMap(Int.init) == line }
-                               }?["thing"].number
+                               model.activeCompositionThing = CompositionThings.thing(model.compositionUnits, atLine: line)
                            })
                 .frame(minHeight: 100, maxHeight: 220)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }

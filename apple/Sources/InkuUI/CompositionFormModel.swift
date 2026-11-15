@@ -10,6 +10,7 @@ import Observation
 @MainActor @Observable
 public final class CompositionFormModel {
     public var selectedForm = "one_corner"
+    public var modelReference = ""
     public private(set) var original: SavedWork?
     /// The form the work was composed with (`description_ddl.composition.answer.form`); nil when none was recorded.
     public private(set) var currentForm: String?
@@ -43,6 +44,7 @@ public final class CompositionFormModel {
     public func initialize(app: AppModel) async {
         guard !initialized else { return }
         initialized = true
+        modelReference = app.nextDrawingModelReference
         guard !app.isPreview, let work = requestedWork ?? app.selectedWork else {
             errorText = "構図の形を変える保存作品を選択してください。"
             return
@@ -78,11 +80,12 @@ public final class CompositionFormModel {
 
     /// `count` is 1 or 4 candidates of the selected form.
     public func generate(app: AppModel, count: Int) async {
-        guard canGenerate, [1, 4].contains(count), !app.isBusy, let work = original else { return }
+        guard canGenerate, [1, 4].contains(count), !app.isBusy, app.refinementModelAvailable(modelReference), let work = original else { return }
         let fanoutLimit: Int
         do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
         catch { errorText = error.localizedDescription; return }
         let form = selectedForm
+        let selectedModel = modelReference
         let labels = (1...count).map(String.init)
         let run = UUID()
         runID = run
@@ -93,7 +96,7 @@ public final class CompositionFormModel {
         let succeeded = await app.performComparison(status: "候補を生成中", restoreDisplayStatus: true) { token in
             var requests: [GenerationRequest] = []
             for _ in labels {
-                requests.append(try await app.makeRefinementRequest(work: work, kind: CompositionForm.derivationKind, compositionForm: form))
+                requests.append(try await app.makeRefinementRequest(work: work, kind: CompositionForm.derivationKind, modelReference: selectedModel, compositionForm: form))
             }
             let pinned = try await app.pinPersonalPlanRequests(requests)
             try await RefinementFanout.run(count: labels.count, limit: fanoutLimit, onStart: { index in

@@ -8,7 +8,7 @@
 
 ## 未リリース
 
-- 共通core：構図と法則の決まりのうち Server にだけあった物（物の枠の記録の選びと `fitted`、親の構図の辿り方、記述ごとの束ね、置き場・構図の候補の派生の記録、命題の案の聞き直しと digest）と名の表を、共通coreの入口（`chunk_moves` の `work_boxes`、`composition_rules`、`description_groups`、`composition_theses` の `retry`・`digest`、`composition_names`）から UniFFI と Python で呼べるようにしました。macOS・iOS が Server を通らずに同じ決まりを使うためです。答えは今の Server と同じで、Server の呼び替えはまだです。`description_groups` は host が作った鍵（`key`）を受け、`composition_rules` は辿る辺の種類の一覧（action `keeping_kinds`）も答えます。`chunk_moves` の `place` は、作品の派生の種類と Score を受けると、紙にはめ込んだ作品をほかの断りより先に `fitted` で断ります。
+- 共通core：構図と法則の決まりのうち Server にだけあった物（物の枠の記録の選びと `fitted`、親の構図の辿り方、記述ごとの束ね、置き場・構図の候補の派生の記録、命題の案の聞き直しと digest）と名の表を、共通coreの入口（`chunk_moves` の `work_boxes`、`composition_rules`、`description_groups`、`composition_theses` の `retry`・`digest`、`composition_names`）から UniFFI と Python で呼べるようにしました。macOS・iOS が Server を通らずに同じ決まりを使うためです。答えは今の Server と同じで、Server の呼び替えはまだです。`description_groups` は host が作った鍵（`key`）を受け、`composition_rules` は辿る辺の種類の一覧（action `keeping_kinds`）も答えます。`chunk_moves` の `place` は、作品の派生の種類と Score を受けると、紙にはめ込んだ作品をほかの断りより先に `fitted` で断ります。`boxes`・`work_boxes` のまとまりは、四角の中心の今の置き場の名（`at`、無ければ null）も答えます（Swift の「配置を変える」のため。Server の `composition-boxes` の答えは変わりません）。
 - Swift（macOS・iOS）：「記述を変える」「写生なし／ありで描き直す」「構図の形を変える」の窓に「モデル」の行を置きました。初期値は描画ボタンのモデルで、「変更」で選んだモデルはその推敲の描画にだけ使います（次に描く条件のモデルは変わりません）。「構図の形を変える」は親の作品のモデルでなく、このモデルで描きます。写生なし／ありで描き直すのボタンは「演奏する」から「描画する」になりました。
 - iOS：`apple/scripts/build-ios.sh --device`が入れる前に取るアプリのデータのコピーを、機器ごとに1日1回までにしました。その日のコピーがもうあれば写さずに入れ、新しいコピーを取った後は古い物から消して新しい2つを残します（作者の決まり）。
 - Swift（macOS・iOS）：ChatGPT でサインインの core への呼び出しを、全て `sign_in_<名>` に `service` を付けた名にしました（step 6）。試験からしか通らなかった ID token の確かめとモデル一覧の読みを消し、登録の上限・戻りの頭の上限・答えの上限は core の値を使います。作者に見える変化はありません。

@@ -4,7 +4,10 @@ import InkuHost
 enum PlacePresentation {
     static func title(unit: ExactJSON, place: String, display: DisplaySettings) -> String {
         let name = CompositionNames.placeName(place, language: display.preferences.language)
-        if unit["at"].string == place { return name + "（" + display.webCopy("compositionTargetNow", "今") + "）" }
+        if unit["at"].string == place {
+            let now = display.webCopy("compositionTargetNow", "今")
+            return name + display.label("（\(now)）", " (\(now))")
+        }
         let state = unit["places"][place].string ?? "no_chunk"
         if state == "ok" { return name }
         if state == "clamped" { return name + display.webCopy("placeClamped", "（画面の端で止まる）") }

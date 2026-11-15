@@ -146,8 +146,8 @@ The current `db.py` no longer owns direct SQL, transactions, migration sessions,
 flowchart LR
     PYBIND["inku-render-python\nCPython: render + pipeline_*"]
     JNI["inku-render-android\nJNI: render + raster + pipeline"]
-    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / colors / Macro catalog\nStage 1 projection / render_saved\nsaved_variants / autonomous_refine / chunk_moves / provider_wire / display"]
-    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay\ncomposition / laws / colors / image_ddl / provider_wire\nsaved_variants / juxtaposition / autonomous_refine / chunk_moves / identity"]
+    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / colors / Macro catalog\nStage 1 projection / render_saved\nsaved_variants / chunk_moves / provider_wire / display"]
+    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay\ncomposition / laws / colors / image_ddl / provider_wire\nsaved_variants / chunk_moves / identity"]
     DDL["inku-ddl\ntyped compiler / Stage 1.5 / Plan / materializer\nunderdrawing / visible patch / ratio declaration / saijiki asset"]
     DISPLAY["inku-display\nSkia screen display (optional skia feature)"]
     DISPLAY_GPU["inku-display-gpu\nmacOS zoomed windows (Graphite, separate process)"]

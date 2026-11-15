@@ -232,12 +232,9 @@ pub fn saved_variants(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
-/// The chunk moves (まとまりの手, 2026-10-27): one JSON request with an
-/// `action` (`start`, `answer`, `drawn`), one JSON answer
-/// (`inku.chunk-moves.v1`) carrying the turn's state and what to do next. The
-/// host sends the requests, draws the children and saves the kept one. The
-/// Server calls it now; the binding version is unchanged: this only adds a
-/// call. A panic answers `{"error": "internal_invariant"}`.
+/// One JSON request and answer (`inku.chunk-moves.v1`) for the `units`,
+/// `boxes`, and `place` actions.
+/// A panic answers `{"error": "internal_invariant"}`.
 #[uniffi::export]
 pub fn chunk_moves(input_bytes: Vec<u8>) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {

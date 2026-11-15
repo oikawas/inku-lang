@@ -8,6 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Shared core: the autonomous refinement's chunk move turns that chose a move and rewrote a chunk (`chunk_moves` actions `start`, `answer` and `drawn`) are removed, with the parts only they used. Chunks, their boxes and moving a chunk to a place (`units`, `boxes` and `place`) are unchanged. Nothing changes for the author.
 - Web: in refinements with four candidates, each lane's mascot now offsets the start of its motion when that lane starts drawing. With "Have the AI propose other theses" in "Change the composition and laws", the offsets ran out while the theses were awaited, and the four mascots moved in unison.
 - iOS: `apple/scripts/build-ios.sh --device` now copies the installed app's data at most once a day for each device. When the device already has a copy from today, it installs without copying; after a new copy, the oldest are removed so that the newest two remain (the author's rule).
 - Swift (macOS and iOS): every Sign in with ChatGPT call to the core now uses the `sign_in_<name>` names with a `service` (step 6). The ID token check and the model list reading that only tests reached are gone, and the registration limit, the callback head limit and the answer limits come from the core. Nothing changes for the author.

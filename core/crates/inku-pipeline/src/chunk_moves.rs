@@ -601,11 +601,11 @@ fn composition_record(record: Option<&Value>) -> Result<Option<Composition>, Ref
         .map_err(|_| refuse("invalid_request", "invalid composition record"))
 }
 
-fn fitted(request: &WorkBoxesRequest) -> bool {
-    if request.derivation_kind.as_deref() == Some("canvas_fit") {
+fn fitted(derivation_kind: Option<&str>, score: &Value) -> bool {
+    if derivation_kind == Some("canvas_fit") {
         return true;
     }
-    let Some(canvas) = request.score.get("canvas").and_then(Value::as_object) else {
+    let Some(canvas) = score.get("canvas").and_then(Value::as_object) else {
         return false;
     };
     if canvas.get("fit").is_none_or(Value::is_null) {
@@ -656,6 +656,10 @@ struct PlaceRequest {
     ddl: String,
     #[serde(default)]
     composition: Option<Composition>,
+    #[serde(default)]
+    derivation_kind: Option<String>,
+    #[serde(default)]
+    score: Value,
     chunk: String,
     at: String,
 }
@@ -695,7 +699,7 @@ fn respond(request: Request) -> Result<Value, Refusal> {
             let free_lines = request.ddl.lines().any(|line| {
                 crate::description_laws::draws_free_line(line, paper.language, paper.definitions)
             });
-            if fitted(&request) {
+            if fitted(request.derivation_kind.as_deref(), &request.score) {
                 for unit in &mut units {
                     unit.area = None;
                     for value in unit.places.values_mut() {
@@ -706,6 +710,9 @@ fn respond(request: Request) -> Result<Value, Refusal> {
             Ok(json!({"units": units, "free_lines": free_lines}))
         }
         Request::Place(request) => {
+            if fitted(request.derivation_kind.as_deref(), &request.score) {
+                return Err(refuse("fitted", "the work is fitted onto another paper"));
+            }
             let (ddl, place) = place_at(
                 &request.config,
                 &request.ddl,

@@ -62,6 +62,38 @@ fn boxes_and_ancestry_match_server_examples() {
 }
 
 #[test]
+fn place_refuses_server_fitted_examples_before_other_refusals() {
+    let cases = fixture();
+    let mut saw_canvas_fit = false;
+    let mut saw_different_ratio = false;
+    for case in cases["boxes"].as_array().unwrap() {
+        let input = &case["input"];
+        let canvas_fit = input["derivation_kind"] == "canvas_fit";
+        let different_ratio = input["score"]["canvas"]["declared_ratio"]["width_units"] == 16;
+        if !canvas_fit && !different_ratio {
+            continue;
+        }
+        saw_canvas_fit |= canvas_fit;
+        saw_different_ratio |= different_ratio;
+        let request = json!({
+            "action": "place", "config": input["config"], "ddl": input["ddl"],
+            "derivation_kind": input["derivation_kind"], "score": input["score"],
+            "chunk": "missing", "at": "unknown"
+        });
+        let actual = call(crate::chunk_moves::chunk_moves_json, &request);
+        assert_eq!(actual["schema"], crate::chunk_moves::CHUNK_MOVES_SCHEMA_ID);
+        assert_eq!(actual["outcome"], "refused");
+        assert_eq!(actual["reason"], "fitted", "{actual}");
+        assert!(
+            actual["detail"]
+                .as_str()
+                .is_some_and(|detail| !detail.is_empty())
+        );
+    }
+    assert!(saw_canvas_fit && saw_different_ratio);
+}
+
+#[test]
 fn derivation_metadata_matches_server_examples() {
     for case in fixture()["metadata"].as_array().unwrap() {
         let actual = call(

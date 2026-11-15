@@ -36,6 +36,7 @@ async function copyFor(language) {
   for (const [functionName, argument, prefix] of [
     ['pipelineDiagnosticReason', 'reason', 'diagnosticReason.'],
     ['pipelineDiagnosticPart', 'kind', 'diagnosticPart.'],
+    ['placeRefused', 'reason', 'placeRefused.'],
   ]) {
     const pattern = new RegExp(`${functionName}:\\s*\\(${argument}\\)\\s*=>\\s*\\((\\{[\\s\\S]*?\\})\\[${argument}\\]`);
     const matched = script(source).match(pattern);

@@ -15,6 +15,7 @@ struct CompositionFigure: View {
     var body: some View {
         Group {
             if let image { Image(decorative: image, scale: 2).resizable().aspectRatio(contentMode: .fit) }
+            else { Color.clear }
         }
         .task(id: "\(id)-\(colorScheme)") {
             guard let body = Self.figures[id] else { image = nil; return }

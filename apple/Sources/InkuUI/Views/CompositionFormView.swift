@@ -11,6 +11,7 @@ public struct CompositionFormView: View {
     @Bindable var model: AppModel
     @State private var form: CompositionFormModel
     @State private var showModelPicker = false
+    @State private var choiceContentHeight: CGFloat = 322
     @FocusState private var thesisFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.inkuWindowSize) private var windowSize
@@ -35,8 +36,9 @@ public struct CompositionFormView: View {
                         RefinementOption(id: $0.id, work: $0.work, label: $0.label, selected: $0.selected, saved: $0.savedWork != nil,
                             observation: $0.prepared)
                     }, previewID: form.previewID, maxColumns: 4, busy: form.running || model.isBusy,
-                        placeholder: "形を選んで描くと、候補をここに並べます。",
+                        placeholder: model.display.webCopy("refineCandidatePlaceholder", "候補はここに並びます。左の要素を選んで「1案を作る」または「4案を作る」を押してください。"),
                         errors: form.failures + [form.errorText].compactMap { $0 }, status: form.status,
+                        compactPlaceholder: true,
                         targetWork: work, targetComposition: form.currentComposition,
                         onPreview: { form.preview($0) }, onSelect: { form.selectCandidate($0, selected: $1) },
                         onDiscard: { form.discardCandidates(); dismiss() },
@@ -83,11 +85,12 @@ public struct CompositionFormView: View {
                     .inkuFont(12).foregroundStyle(.secondary)
             }
             Text(model.display.webCopy("compositionWhatToChange", "何を変えるか")).inkuFont(12, weight: .semibold)
-            HStack(spacing: 4) {
+            HStack(spacing: 0) {
                 choiceButton(model.display.webCopy("compositionFormTerm", "画の型"), selected: form.change == .form) { form.change = .form }
                 choiceButton(model.display.webCopy("compositionMainLawTerm", "主の法則"), selected: form.change == .mainLaw) { form.change = .mainLaw }
                 choiceButton(model.display.webCopy("compositionThesisLabel", "命題"), selected: isThesis) { if !isThesis { form.change = .authorThesis } }
-            }.disabled(form.running || model.isBusy)
+            }.padding(2).background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(InkuColor.border2)).disabled(form.running || model.isBusy)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
                     if form.change == .form {
@@ -107,14 +110,25 @@ public struct CompositionFormView: View {
                             form.authorThesis = ThesisInput.limited(text)
                         })).focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
                             if focused { form.change = .authorThesis }
-                        }.frame(minHeight: 72).overlay(Rectangle().stroke(InkuColor.border2))
+                        }.frame(height: 72).overlay(Rectangle().stroke(InkuColor.border2))
                             .disabled(form.running || model.isBusy)
                         thesisChoice(.proposedTheses, title: "compositionThesisPropose", fallback: "AI に別の命題を出させる", note: "compositionThesisProposeNote")
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(maxHeight: 322)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear
+                                .onAppear { choiceContentHeight = geometry.size.height }
+                                .onChange(of: geometry.size.height) { _, height in choiceContentHeight = height }
+                        }
+                    }
+            }.frame(height: min(322, max(0, choiceContentHeight)))
             if form.change == .mainLaw {
-                Text(CompositionNames.lawSummary(form.selectedMainLaw, language: language)).inkuFont(12).foregroundStyle(.secondary)
+                HStack(spacing: 0) {
+                    Rectangle().fill(Color.accentColor).frame(width: 2)
+                    Text(CompositionNames.lawSummary(form.selectedMainLaw, language: language)).inkuFont(12).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+                }.fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -127,24 +141,30 @@ public struct CompositionFormView: View {
             let keptText = form.change == .mainLaw ? form.currentForm.map {
                 model.display.webCopyFormat(keeps, "記述・読み・記述が名指す物・画の型（%@）", CompositionNames.formName($0, language: model.display.preferences.language))
             } ?? model.display.label("記述・読み・記述が名指す物", "The description, the reading and the things the description names") : model.display.webCopy(keeps, "記述・読み・記述が名指す物")
-            VStack(alignment: .leading, spacing: 4) {
-                Text(model.display.webCopy("compositionKeepsTerm", "変わらないもの") + "：" + keptText)
-                Text(model.display.webCopy("compositionRedecidesTerm", "決め直すもの") + "：" + model.display.webCopy(redecides, "画の型・法則・配色"))
-            }.inkuFont(12).foregroundStyle(.secondary)
+            let redoneText = form.change == .mainLaw ? (form.currentForm == nil
+                ? model.display.label("命題・画の型・ほかの法則・物の描き方・配色", "The thesis, the form, the other laws, how the things are drawn and the colors")
+                : (ServerTips.template(redecides, language: model.display.preferences.language, argumentCount: 0) ?? model.display.label("命題・ほかの法則・物の描き方・配色", "The thesis, the other laws, how the things are drawn and the colors")))
+                : model.display.webCopy(redecides, "画の型・法則・配色")
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 4) {
+                GridRow { Text(model.display.webCopy("compositionKeepsTerm", "変わらないもの")).foregroundStyle(.tertiary); Text(keptText) }
+                GridRow { Text(model.display.webCopy("compositionRedecidesTerm", "決め直すもの")).foregroundStyle(.tertiary); Text(redoneText) }
+            }.inkuFont(12).foregroundStyle(.secondary).padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                .background(InkuColor.bg2).overlay(RoundedRectangle(cornerRadius: 6).stroke(InkuColor.border))
             DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"),
                 value: DrawPresentation.modelReference(form.modelReference, empty: model.display.localized("選択してください")),
                 help: model.display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
                 showsPlan: form.modelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
                 .disabled(form.running || model.isBusy)
             VStack(alignment: .leading, spacing: 8) {
-                Button(model.display.webCopy("refineSingleButton", "1案を作る"), systemImage: "play.fill") {
+                Button {
                     Task { await form.generate(app: model, count: 1) }
-                }.buttonStyle(.borderedProminent).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference) || form.change == .proposedTheses || (form.change == .authorThesis && (form.authorThesis.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || form.authorThesis.count > 400)))
-                Button(model.display.webCopy("variationGridDefault", "4案を作る"), systemImage: "square.grid.2x2") {
+                } label: { Label(model.display.webCopy("refineSingleButton", "1案を作る"), systemImage: "play.fill").frame(maxWidth: .infinity) }
+                    .buttonStyle(.borderedProminent).controlSize(.large).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference) || form.change == .proposedTheses || (form.change == .authorThesis && (form.authorThesis.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || form.authorThesis.count > 400)))
+                Button {
                     Task { await form.generate(app: model, count: 4) }
-                }.buttonStyle(.bordered).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference) || form.change == .authorThesis)
+                } label: { Label(model.display.webCopy("variationGridDefault", "4案を作る"), systemImage: "play.fill").frame(maxWidth: .infinity) }
+                    .buttonStyle(.borderedProminent).controlSize(.large).disabled(!form.canGenerate || model.isBusy || !model.refinementModelAvailable(form.modelReference) || form.change == .authorThesis)
             }
-            Label(model.display.localized("低速（LLM・API使用）"), systemImage: "clock").inkuFont(11).foregroundStyle(.secondary)
             if form.running {
                 RunStatusView(display: model.display, label: form.status, stopping: form.stopping,
                     onStop: { Task { await form.stop(app: model) } }, journalModel: model, journalActive: !form.saving) {
@@ -160,7 +180,8 @@ public struct CompositionFormView: View {
     }
 
     private func choiceButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(title, action: action).buttonStyle(.bordered).tint(selected ? .accentColor : .secondary).frame(maxWidth: .infinity)
+        Button(action: action) { Text(title).inkuFont(12, weight: selected ? .semibold : .regular).frame(maxWidth: .infinity).padding(.vertical, 5).background(selected ? InkuColor.bg2 : .clear, in: RoundedRectangle(cornerRadius: 4)) }
+            .buttonStyle(.plain)
             .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
@@ -172,7 +193,9 @@ public struct CompositionFormView: View {
                     Text(model.display.webCopy(title, fallback)).inkuFont(12, weight: .semibold)
                     Text(model.display.webCopy(note, "")).inkuFont(11).foregroundStyle(.secondary)
                 }
-            }.frame(maxWidth: .infinity, alignment: .leading)
+            }.padding(.horizontal, 8).padding(.vertical, 5).frame(maxWidth: .infinity, alignment: .leading)
+                .background(form.change == choice ? Color.accentColor.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(form.change == choice ? Color.accentColor : .clear))
         }.buttonStyle(.plain).disabled(form.running || model.isBusy)
     }
 
@@ -180,11 +203,12 @@ public struct CompositionFormView: View {
         let selected = form.selectedMainLaw == law
         return Button { form.selectedMainLaw = law } label: {
             VStack(spacing: 3) {
-                if law == form.currentMainLaw { Text(model.display.webCopy("compositionTargetNow", "今")).inkuFont(10) }
                 CompositionFigure(id: law).frame(width: 28, height: 28)
                 Text(CompositionNames.lawName(law, language: model.display.preferences.language)).inkuFont(11).lineLimit(2)
             }.frame(maxWidth: .infinity, minHeight: 64)
+                .background(selected ? Color.accentColor.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(selected ? Color.accentColor : InkuColor.border))
+                .overlay(alignment: .topTrailing) { if law == form.currentMainLaw { Text(model.display.webCopy("compositionTargetNow", "今")).inkuFont(10).padding(3) } }
         }.buttonStyle(.plain).disabled(form.running || model.isBusy)
             .inkuTooltip(CompositionNames.lawSummary(law, language: model.display.preferences.language))
             .accessibilityAddTraits(selected ? [.isSelected] : [])
@@ -204,7 +228,9 @@ public struct CompositionFormView: View {
                     Text(model.display.webCopy("compositionFormDescriptions.\(index)", "")).inkuFont(12).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-            }.contentShape(Rectangle())
+            }.padding(.horizontal, 8).padding(.vertical, 5).frame(maxWidth: .infinity, alignment: .leading)
+                .background(selected ? Color.accentColor.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? Color.accentColor : .clear)).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(form.running || model.isBusy)

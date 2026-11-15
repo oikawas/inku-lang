@@ -764,7 +764,7 @@ private func compositionMetadataForSaving(_ candidate: StoredCandidate, database
         "fork_kind": edge.derivationKind == "layout_change" ? .string("variation_ddl_fork") : .null,
         "candidate": .object(["ready": .bool(true), "parent_matches": .bool(candidate.node.id == edge.childNodeID && requestedParent == edge.parentNodeID),
             "history_found": .bool(parent != nil && parent?.trashed == false && parentNode?.state == "active"),
-            "description_locked": .bool(context?.authority != "description_authoritative"),
+            "description_locked": .bool(context?.authority == "ddl_authoritative"),
             "requested_parent_node_id": requestedParent.map(ExactJSON.string) ?? .null])
     ])
     let result = try ExactJSON(data: InkuCore.compositionRules(input.data))

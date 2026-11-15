@@ -164,12 +164,14 @@ struct LibraryView: View {
             }
             controlGroup(display.webCopy("historyGrouping", fallback: "まとめ方")) {
                 LibrarySegmentTabs(options: [
-                    (false, display.webCopy("historyChronologicalMode", fallback: "時系列"),
+                    (LibraryModel.Grouping.timeline, display.webCopy("historyChronologicalMode", fallback: "時系列"),
                      display.tooltip("系譜をまたいで、新しい順に並べます", serverKey: "tooltipHistoryChronological")),
-                    (true, display.webCopy("historyLineageMode", fallback: "系譜ごと"),
+                    (LibraryModel.Grouping.lineage, display.webCopy("historyLineageMode", fallback: "系譜ごと"),
                      display.tooltip(library.layout == .grid ? "2作品以上の系譜を、起点から世代順に並べます。単独作品は時系列で表示できます。" : "同じ系譜の作品をまとめて表示します。",
                                      serverKey: "tooltipHistoryLineageGrouped")),
-                ], selection: Binding(get: { library.grouped }, set: { library.grouped = $0 }))
+                    (LibraryModel.Grouping.description, display.webCopy("historyDescriptionMode", fallback: "記述ごと"),
+                     display.label("同じ記述の作品をまとめます。", "Group works by description.")),
+                ], selection: Binding(get: { library.grouping }, set: { library.grouping = $0 }))
             }
             Text(countText).inkuFont(12).monospacedDigit().foregroundStyle(.secondary).lineLimit(1).fixedSize()
             LibraryLoadingIndicator(library: library)
@@ -184,6 +186,10 @@ struct LibraryView: View {
     }
 
     private var countText: String {
+        if library.grouping == .description {
+            return "\(library.total) " + display.webCopy("historyDescriptionGroups", fallback: "記述")
+                + (library.layout == .grid ? display.webCopy("historyDescriptionGroupsDerivedOnly", fallback: "（2 件以上描いた記述と選択作品の記述）") : "")
+        }
         if library.isGrouped {
             // The thumbnail tab lists the lineages with a derivation (minimum two works) and the opened work's.
             return "\(library.total) " + display.webCopy("historyLineageGroups", fallback: "系譜")
@@ -387,6 +393,15 @@ struct LibraryView: View {
             }
         } else if library.total == 0 {
             emptyLibrary
+        } else if library.grouping == .description {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ForEach(library.groups) { group in
+                        DescriptionLibraryGroup(model: model, group: group, members: library.groupMembers[group.id] ?? [],
+                            onOpen: { openInWorkTab($0) }, onPreview: { openWork($0) })
+                    }
+                }.padding(12)
+            }
         } else if library.isGrouped {
             lineageList
         } else if library.layout == .list {
@@ -933,7 +948,7 @@ struct LibraryView: View {
     /// work tab on the timeline and in the lineage tab in a lineage view. Nothing opens from the trash.
     private func openThumbnail(_ work: SavedWork) {
         guard !library.isTrash, !work.trashed, !model.isBrowsingLocked else { return }
-        if library.isGrouped { openLineage(work) } else { openInWorkTab(work) }
+        if library.grouping == .lineage { openLineage(work) } else { openInWorkTab(work) }
     }
 
     /// Web `openLibraryWork(item, 'canvas')`: the work shown in Create's work tab, the library closed.

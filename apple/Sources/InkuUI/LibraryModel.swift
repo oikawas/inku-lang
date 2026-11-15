@@ -1,4 +1,6 @@
 import Foundation
+import InkuCore
+import InkuHost
 import InkuPersistence
 import Observation
 
@@ -92,8 +94,13 @@ public final class LibraryModel {
     public var layout: LibraryLayout = .grid {
         didSet { if layout != oldValue { changedPresentation(wasGrouped: grouped) } }
     }
-    public var grouped = false {
-        didSet { if grouped != oldValue { changedPresentation(wasGrouped: oldValue) } }
+    public enum Grouping: String, Sendable { case timeline, lineage, description }
+    public var grouping: Grouping = .timeline {
+        didSet { if grouping != oldValue { changedPresentation(wasGrouped: oldValue != .timeline) } }
+    }
+    public var grouped: Bool {
+        get { grouping != .timeline }
+        set { grouping = newValue ? .lineage : .timeline }
     }
     /// Web `HistoryManagerState.pageSize`, initially 24. Set directly by the history strip, by tests and for the lineage
     /// view's eight groups; a new size here starts on the page boundary that holds the first work, which the strip's own
@@ -275,7 +282,7 @@ public final class LibraryModel {
     public var shownTo: Int { min(total, startOffset + (page + 1) * pageSize) }
     /// ← newer and Latest: an earlier page, or newer works before the kept first work.
     public var hasNewer: Bool { page > 0 || startOffset > 0 }
-    public var isGrouped: Bool { grouped }
+    public var isGrouped: Bool { grouping != .timeline }
     public var filter: LibraryQuery {
         LibraryQuery(text: query, trashed: isTrash, starred: starredOnly,
                      forRevision: revisionOnly, order: order, canvasSearch: canvasSearch)
@@ -504,7 +511,59 @@ public final class LibraryModel {
         if errorText != nil { errorText = nil }
         do {
             let count = try await database.trashCount()
-            if requestedGrouping {
+            if grouping == .description {
+                var all: [LibraryItem] = []
+                var offset = 0
+                while true {
+                    let next = try await database.libraryPage(query: requestedFilter, limit: 1000, offset: offset, includeSVG: includeListSVG)
+                    all.append(contentsOf: next.items)
+                    offset += next.items.count
+                    if offset >= next.total || next.items.isEmpty { break }
+                }
+                let host = PipelineHost(database: database)
+                let summaries = try await host.savedAuthoringSummaries(workIDs: all.map(\.id))
+                let items: [ExactJSON] = all.map { item in
+                    let work = item.work
+                    return .object([
+                        "id": .string(work.id), "input": .string(work.input), "source_text": work.sourceText.map(ExactJSON.string) ?? .null,
+                        "at": .number(String(work.at)), "starred": .bool(work.starred), "for_revision": .bool(item.annotation.forRevision),
+                        "image_provenance": summaries[work.id]?.isImage == true ? .string(summaries[work.id]?.imageProvenance ?? "image") : .null
+                    ])
+                }
+                let anchor = focusRequest.flatMap { $0.visit == groupAnchorVisit ? nil : $0 }
+                let include = anchor?.workID ?? lineageIncludeID
+                let input: ExactJSON = .object(["action": .string("group"), "items": .array(items),
+                    "min_items": .integer(requestedMinimum), "include_item_id": include.map(ExactJSON.string) ?? .null])
+                let result = try ExactJSON(data: InkuCore.descriptionGroups(input.data))
+                guard result["outcome"].string == "ok", let rows = result["groups"].array else { throw HostError("description_groups_failed") }
+                let byID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+                var actualOffset = requestedOffset
+                if let anchor, let position = rows.firstIndex(where: { $0["member_ids"].array?.contains(.string(anchor.workID)) == true }) {
+                    actualOffset = position; startOffset = position; page = 0
+                    groupAnchorVisit = anchor.visit; lineageIncludeID = anchor.workID
+                }
+                let pageRows = Array(rows.dropFirst(actualOffset).prefix(requestedSize))
+                var groupedItems: [LibraryGroup] = []
+                var members: [String: [LibraryItem]] = [:]
+                for row in pageRows {
+                    guard let key = row["key"].string, let id = row["anchor_id"].string, let representative = byID[id] else { throw HostError("description_groups_invalid") }
+                    let found = (row["member_ids"].array ?? []).compactMap { $0.string.flatMap { byID[$0] } }
+                    members[key] = found
+                    groupedItems.append(LibraryGroup(rootNodeID: key, representative: representative,
+                        itemCount: row["item_count"].number.flatMap(Int.init) ?? found.count,
+                        starredCount: row["starred_count"].number.flatMap(Int.init) ?? 0,
+                        revisionCount: row["for_revision_count"].number.flatMap(Int.init) ?? 0,
+                        latestAt: row["latest_at"].number.flatMap(Int64.init) ?? 0))
+                }
+                guard refreshToken == token, !Task.isCancelled else { return }
+                await pageCompanions?(members.values.flatMap { $0.map(\.id) })
+                guard refreshToken == token, !Task.isCancelled else { return }
+                groups = groupedItems; total = rows.count; groupMembers = members
+                groupMemberTotals = Dictionary(uniqueKeysWithValues: groupedItems.map { ($0.id, $0.itemCount) })
+                works = groupedItems.map(\.representative.work)
+                annotations = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.annotation) })
+                svgSizes = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.svgBytes) })
+            } else if requestedGrouping {
                 // Web `fetchLineageGroups`: the opened work's lineage begins the first read of this grouping, and the
                 // thumbnail view keeps that lineage while the filter stands (Server `anchor_id`, `include_id`).
                 let anchor = focusRequest.flatMap { $0.visit == groupAnchorVisit ? nil : $0 }

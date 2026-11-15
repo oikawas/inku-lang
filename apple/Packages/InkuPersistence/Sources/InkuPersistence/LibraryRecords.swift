@@ -66,6 +66,11 @@ public struct LibraryGroup: Sendable, Equatable, Identifiable {
     public let revisionCount: Int
     public let latestAt: Int64
     public var id: String { rootNodeID }
+
+    public init(rootNodeID: String, representative: LibraryItem, itemCount: Int, starredCount: Int, revisionCount: Int, latestAt: Int64) {
+        self.rootNodeID = rootNodeID; self.representative = representative; self.itemCount = itemCount
+        self.starredCount = starredCount; self.revisionCount = revisionCount; self.latestAt = latestAt
+    }
 }
 
 public struct LibraryGroupPage: Sendable, Equatable {

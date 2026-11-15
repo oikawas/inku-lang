@@ -487,6 +487,38 @@ fn pipeline_chunk_moves<'py>(
     })
 }
 
+/// Composition names and bilingual summaries.
+#[pyfunction]
+fn pipeline_composition_names() -> PyResult<String> {
+    catch_python_panic(|| Ok(inku_pipeline_uniffi::composition_names()))
+}
+
+/// Composition ancestry and derivation metadata.
+#[pyfunction]
+fn pipeline_composition_rules<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        let input = input_bytes.as_bytes().to_vec();
+        let output = py.detach(|| inku_pipeline_uniffi::composition_rules(input));
+        Ok(PyBytes::new(py, &output))
+    })
+}
+
+/// Group visible saved works by description.
+#[pyfunction]
+fn pipeline_description_groups<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        let input = input_bytes.as_bytes().to_vec();
+        let output = py.detach(|| inku_pipeline_uniffi::description_groups(input));
+        Ok(PyBytes::new(py, &output))
+    })
+}
+
 /// The composition's theses to choose from (step 4): request, answer.
 #[pyfunction]
 fn pipeline_composition_theses<'py>(
@@ -948,6 +980,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_saved_variants, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_chunk_moves, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_composition_names, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_composition_rules, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_description_groups, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_theses, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_plugin_package, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;

@@ -4,6 +4,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
+mod description_groups;
 mod description_labels;
 #[cfg(not(target_os = "android"))]
 mod description_meter;
@@ -219,6 +220,30 @@ pub fn completion_range_states(input_bytes: Vec<u8>) -> Vec<u8> {
 #[uniffi::export]
 pub fn composition_ranges() -> String {
     inku_pipeline::recompose::composition_ranges_json()
+}
+
+/// Composition names and bilingual summaries.
+#[uniffi::export]
+pub fn composition_names() -> String {
+    inku_pipeline::composition_names::composition_names_json()
+}
+
+/// Composition ancestry and derivation metadata.
+#[uniffi::export]
+pub fn composition_rules(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::composition_rules::composition_rules_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
+/// Group visible saved works by their descriptions.
+#[uniffi::export]
+pub fn description_groups(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        description_groups::description_groups_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
 /// The refinements that change one part of a saved Score (touches, support,

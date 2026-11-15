@@ -13,6 +13,7 @@ pub mod completion_ranges;
 pub mod composition;
 pub mod composition_names;
 pub mod composition_reading;
+pub mod composition_rules;
 pub mod composition_theses;
 pub mod core_boundary;
 pub mod ddl3d;
@@ -39,6 +40,8 @@ pub mod replay;
 pub mod retouch;
 pub mod saved_variants;
 
+#[cfg(test)]
+mod composition_server_cases;
 #[cfg(test)]
 mod focused_flow;
 #[cfg(test)]

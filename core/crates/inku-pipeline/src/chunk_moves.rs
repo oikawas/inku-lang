@@ -568,6 +568,86 @@ struct BoxesRequest {
     composition: Option<Composition>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorkBoxesRequest {
+    config: PipelineConfig,
+    ddl: String,
+    #[serde(default)]
+    own_record: Option<Value>,
+    #[serde(default)]
+    inherited_record: Option<Value>,
+    #[serde(default)]
+    derivation_kind: Option<String>,
+    #[serde(default)]
+    score: Value,
+}
+
+fn composition_record(record: Option<&Value>) -> Result<Option<Composition>, Refusal> {
+    let Some(record) = record else {
+        return Ok(None);
+    };
+    let (Some(owners), Some(things)) = (
+        record.get("things").and_then(Value::as_array),
+        record
+            .get("answer")
+            .and_then(|a| a.get("things"))
+            .and_then(Value::as_array),
+    ) else {
+        return Ok(None);
+    };
+    serde_json::from_value(json!({"owners": owners, "things": things}))
+        .map(Some)
+        .map_err(|_| refuse("invalid_request", "invalid composition record"))
+}
+
+fn fitted(request: &WorkBoxesRequest) -> bool {
+    if request.derivation_kind.as_deref() == Some("canvas_fit") {
+        return true;
+    }
+    let Some(canvas) = request.score.get("canvas").and_then(Value::as_object) else {
+        return false;
+    };
+    if canvas.get("fit").is_none_or(Value::is_null) {
+        return false;
+    }
+    let declared = canvas.get("declared_ratio").unwrap_or(&Value::Null);
+    let integer = |v: &Value| -> Option<i128> {
+        if let Some(i) = v.as_i64() {
+            return Some(i128::from(i));
+        }
+        if let Some(s) = v.as_str() {
+            return s.trim().parse().ok();
+        }
+        if let Some(b) = v.as_bool() {
+            return Some(i128::from(b));
+        }
+        v.as_f64()
+            .filter(|x| x.is_finite())
+            .map(|x| x.trunc() as i128)
+    };
+    let Some(w) = declared.get("width_units").and_then(integer) else {
+        return true;
+    };
+    let Some(h) = declared.get("height_units").and_then(integer) else {
+        return true;
+    };
+    let Some(format) = canvas
+        .get("aspect")
+        .and_then(Value::as_str)
+        .and_then(|a| inku_score::lookup_canvas_format(a).ok())
+    else {
+        return true;
+    };
+    match (
+        w.checked_mul(i128::from(format.height_units)),
+        h.checked_mul(i128::from(format.width_units)),
+    ) {
+        (Some(left), Some(right)) => left != right,
+        _ => true,
+    }
+}
+
 /// One chunk moved to one place by the author (step 3).
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -585,6 +665,7 @@ struct PlaceRequest {
 enum Request {
     Units(Box<UnitsRequest>),
     Boxes(Box<BoxesRequest>),
+    WorkBoxes(Box<WorkBoxesRequest>),
     Place(Box<PlaceRequest>),
 }
 
@@ -602,6 +683,26 @@ fn respond(request: Request) -> Result<Value, Refusal> {
             let free_lines = request.ddl.lines().any(|line| {
                 crate::description_laws::draws_free_line(line, paper.language, paper.definitions)
             });
+            Ok(json!({"units": units, "free_lines": free_lines}))
+        }
+        Request::WorkBoxes(request) => {
+            let composition = match composition_record(request.own_record.as_ref())? {
+                Some(composition) => Some(composition),
+                None => composition_record(request.inherited_record.as_ref())?,
+            };
+            let mut units = boxes(&request.config, &request.ddl, composition.as_ref())?;
+            let (paper, _) = paper_of(&request.config)?;
+            let free_lines = request.ddl.lines().any(|line| {
+                crate::description_laws::draws_free_line(line, paper.language, paper.definitions)
+            });
+            if fitted(&request) {
+                for unit in &mut units {
+                    unit.area = None;
+                    for value in unit.places.values_mut() {
+                        *value = "fitted".to_owned();
+                    }
+                }
+            }
             Ok(json!({"units": units, "free_lines": free_lines}))
         }
         Request::Place(request) => {
@@ -634,6 +735,9 @@ pub fn chunk_moves_json(input: &[u8]) -> Vec<u8> {
         }
         Ok(_) => return br#"{"error":"internal"}"#.to_vec(),
         Err(refusal) => {
+            if refusal.reason == "invalid_request" {
+                return br#"{"error":"invalid_request"}"#.to_vec();
+            }
             body.insert("outcome".to_owned(), json!("refused"));
             body.insert("reason".to_owned(), json!(refusal.reason));
             body.insert("detail".to_owned(), json!(refusal.detail));

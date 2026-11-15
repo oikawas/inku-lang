@@ -43,11 +43,12 @@ def composition_boxes(config: dict[str, Any], ddl: str, own_record: dict[str, An
 
 
 def chunk_place(config: dict[str, Any], ddl: str, composition: dict[str, Any] | None, chunk: str,
-                at: str) -> tuple[str, dict[str, Any]]:
+                at: str, derivation_kind: str | None, score: dict[str, Any] | None) -> tuple[str, dict[str, Any]]:
     """The core's child DDL with one chunk moved to a place (``chunk_moves.rs``, action ``place``, step 3),
     and what moved (title, thing, at, at_from, from, to, clamped)."""
     native = importlib.import_module("inku_render")
-    request = {"action": "place", "config": config, "ddl": ddl, "composition": composition, "chunk": chunk, "at": at}
+    request = {"action": "place", "config": config, "ddl": ddl, "composition": composition, "chunk": chunk,
+               "at": at, "derivation_kind": derivation_kind, "score": score}
     answer = json.loads(native.pipeline_chunk_moves(json.dumps(request, ensure_ascii=False).encode("utf-8")))
     if not isinstance(answer, dict) or answer.get("error"):
         raise RuntimeError(f"chunk moves core (place): {answer!r}")

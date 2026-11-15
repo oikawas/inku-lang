@@ -535,26 +535,6 @@ class CompositionBoxesResponse(BaseModel):
     )
 
 
-def _fitted_onto_another_paper(item: dict) -> bool:
-    """A work fitted onto another paper (はめ込み), or a child keeping its Score: the instructions'
-    numbers are the declared ratio's and the picture sits in a centred frame of it, so the boxes
-    (fractions of the paper) would miss. A frame of the paper's own ratio fills it."""
-    from ...canvas_formats import canvas_format
-
-    if item.get("derivation_kind") == "canvas_fit":
-        return True
-    canvas = (item.get("score") or {}).get("canvas")
-    if not isinstance(canvas, dict) or canvas.get("fit") is None:
-        return False
-    declared = canvas.get("declared_ratio") or {}
-    try:
-        paper = canvas_format(str(canvas.get("aspect")))
-        width, height = int(declared["width_units"]), int(declared["height_units"])
-    except (KeyError, TypeError, ValueError):
-        return True
-    return width * paper.height_units != height * paper.width_units
-
-
 @router.get(
     "/api/history/{item_id}/composition-boxes",
     response_model=CompositionBoxesResponse,
@@ -632,10 +612,9 @@ def api_history_chunk_place(
     from ...composition_record import CompositionBoxesRefused, chunk_place
 
     item, config, composition, _ = _chunk_input(actor, item_id)
-    if _fitted_onto_another_paper(item):
-        raise HTTPException(status_code=422, detail="fitted")
     try:
-        ddl, place = chunk_place(config, item.get("ddl") or "", composition, body.chunk, body.at)
+        ddl, place = chunk_place(config, item.get("ddl") or "", composition, body.chunk, body.at,
+                                 item.get("derivation_kind"), item.get("score"))
     except CompositionBoxesRefused as error:
         raise HTTPException(status_code=422, detail=error.reason) from error
     return ChunkPlaceResponse(ddl=ddl, place=ChunkPlaced.model_validate(place))

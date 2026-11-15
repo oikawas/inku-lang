@@ -50,7 +50,6 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                                 RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
                                     .frame(maxWidth: 280, alignment: .leading)
                                 controls()
-                                if let bottomControls { bottomControls }
                                 options().frame(maxWidth: .infinity)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         } else {
@@ -71,6 +70,11 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                 }
             }
         }.background(InkuColor.panel)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if phone, let bottomControls {
+                bottomControls.padding(.horizontal, 16).padding(.vertical, 8).background(InkuColor.panel)
+            }
+        }
         .inkuDialogFrame(minWidth: 700, idealWidth: 1200, minHeight: 520, idealHeight: 780)
     }
 }
@@ -250,7 +254,7 @@ struct RefinementOptionsGrid: View {
                     let canvas = ArtworkCanvas(svg: option.work.svg, renderer: model.displayRenderer, style: .workspace, showsZoomControls: false,
                         aspectRatio: option.work.renderCanvasAspectRatio)
                         .allowsHitTesting(false).accessibilityHidden(true)
-                    if let targetWork, option.observation?.composition != nil {
+                    if let targetWork {
                         HStack(alignment: .top, spacing: 8) {
                             VStack(alignment: .leading) {
                                 ArtworkCanvas(svg: targetWork.svg, renderer: model.displayRenderer, style: .workspace, showsZoomControls: false,

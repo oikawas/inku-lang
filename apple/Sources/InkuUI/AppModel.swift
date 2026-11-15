@@ -1666,6 +1666,7 @@ public final class AppModel {
         let chosenCatalog = catalogIDOverride ?? (kind == "catalog_change" || kind == "model_comparison" || formChange ? catalogID : self.catalogID)
         let description = work.effectiveSourceText
         let savedSketch = work.sketchRequested.map { $0 == "1" || $0 == "on" }
+            ?? work.sketchState.map { !["off", "not_applicable"].contains($0) }
         let sketch: SketchRequest = work.sketchText.flatMap { $0.isEmpty ? nil : SketchRequest.supplied($0) }
             ?? ((formChange || (kind == "model_comparison" && savedSketch == true)) ? .on : .off)
         var request = try bootstrap.request(inputMode: reading ? "description" : "ddl", source: work.ddl ?? "", description: description,
@@ -1674,12 +1675,14 @@ public final class AppModel {
             catalogMode: reading && !formChange && kind != "model_comparison" ? self.catalogMode : "fixed", sketch: sketch,
             savedConfiguration: saved.configuration)
         if kind == "model_comparison" {
+            request.recordsDrawOptions = true
             request.drawRoute = work.drawRoute ?? saved.drawRoute
             request.descriptionComposition = work.compositionRequested.map { $0 == "1" || $0 == "on" }
                 ?? (saved.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"].object != nil)
             request.descriptionReview = config["description_ddl"]["review"].bool ?? false
         }
         if formChange {
+            request.recordsDrawOptions = true
             request.drawRoute = "read_and_draw"; request.descriptionComposition = true
             request.descriptionCompositionForm = compositionForm
             request.descriptionCompositionMainLaw = compositionMainLaw

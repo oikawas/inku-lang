@@ -14,6 +14,7 @@ struct RefinementDialog<Controls: View, Options: View>: View {
     var targetModelName: String? = nil
     var columnWidth: CGFloat = 280
     var topControls: AnyView? = nil
+    var bottomControls: AnyView? = nil
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let options: () -> Options
     @State private var topControlsHeight: CGFloat = 0
@@ -49,15 +50,19 @@ struct RefinementDialog<Controls: View, Options: View>: View {
                                 RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
                                     .frame(maxWidth: 280, alignment: .leading)
                                 controls()
+                                if let bottomControls { bottomControls }
                                 options().frame(maxWidth: .infinity)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             HStack(alignment: .top, spacing: 14) {
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
-                                        controls()
-                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 12) {
+                                            RefinementTargetCard(model: model, work: work, title: targetTitle, modelName: targetModelName)
+                                            controls()
+                                        }.frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    if let bottomControls { bottomControls }
                                 }.frame(width: columnWidth)
                                 options().frame(maxWidth: .infinity, maxHeight: .infinity)
                             }.frame(height: max(360, geometry.size.height - 32 - (topControls == nil ? 0 : topControlsHeight + 12)))

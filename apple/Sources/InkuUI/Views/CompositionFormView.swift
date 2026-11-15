@@ -26,7 +26,8 @@ public struct CompositionFormView: View {
             if let work = form.original {
                 RefinementDialog(model: model, title: model.display.webCopy("workActionComposition", "構図と法則を変える"), work: work,
                     closeDisabled: form.running || form.hasUnsaved || model.isBusy, onClose: { dismiss() },
-                    targetTitle: model.display.webCopy("refineTargetTitle", "推敲対象"), columnWidth: 388) {
+                    targetTitle: model.display.webCopy("refineTargetTitle", "推敲対象"), columnWidth: 388,
+                    bottomControls: AnyView(controlsFooter)) {
                     controls
                 } options: {
                     RefinementOptionsGrid(model: model, options: form.candidates.map {
@@ -110,6 +111,12 @@ public struct CompositionFormView: View {
             if form.change == .mainLaw {
                 Text(CompositionNames.lawSummary(form.selectedMainLaw, language: language)).inkuFont(12).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var controlsFooter: some View {
+        let isThesis = form.change == .authorThesis || form.change == .proposedTheses
+        return VStack(alignment: .leading, spacing: 8) {
             let keeps = isThesis ? "compositionThesisKeeps" : "compositionFormKeeps"
             let redecides = isThesis ? "compositionThesisRedecides" : "compositionFormRedecides"
             VStack(alignment: .leading, spacing: 4) {

@@ -41,6 +41,148 @@ private struct CanvasHeaderTab: View {
     }
 }
 
+/// The menu is above the canvas; its outside surface cannot receive a press on the menu itself.
+@MainActor
+private struct CreationRefinementMenuOverlay: View {
+    @Bindable var model: AppModel
+    @Bindable var ui: WorkspaceUIState
+    let work: SavedWork?
+    let saved: Bool
+    let writingLocked: Bool
+    @Binding var buttonHeight: CGFloat
+    let onAction: (SavedWork, String) -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topTrailing) {
+                if ui.refinementMenuWorkID != nil {
+                    Color.clear.contentShape(Rectangle())
+                        .onTapGesture { ui.refinementMenuWorkID = nil }
+                        .accessibilityHidden(true)
+                }
+                CreationRefinementMenu(model: model, ui: ui, work: work, saved: saved, writingLocked: writingLocked,
+                    buttonHeight: $buttonHeight, availableHeight: max(0, geometry.size.height - 24), onAction: onAction)
+                    .padding([.top, .trailing], 12)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topTrailing)
+            .inkuEndsEditingOnOutsidePress(isActive: ui.refinementMenuWorkID != nil) { ui.refinementMenuWorkID = nil }
+        }
+    }
+}
+
+/// Web WorkActionMenu's header variant, kept separate from the canvas's view type.
+@MainActor
+private struct CreationRefinementMenu: View {
+    @Bindable var model: AppModel
+    @Bindable var ui: WorkspaceUIState
+    let work: SavedWork?
+    let saved: Bool
+    let writingLocked: Bool
+    @Binding var buttonHeight: CGFloat
+    let availableHeight: CGFloat
+    let onAction: (SavedWork, String) -> Void
+    @State private var contentHeight: CGFloat = 400
+    private var display: DisplaySettings { model.display }
+
+    private func title(_ work: SavedWork) -> String {
+        let title = display.webCopy("workActionMenuTitle", "作品編集")
+        switch model.workActionState(for: work) {
+        case .userDDL: return title + " " + display.webCopy("workActionDdlOrigin", "（DDL直接生成作品）")
+        case .lockedDescription: return title + " " + display.webCopy("descriptionLockedMark", "ロック")
+        default: return title
+        }
+    }
+
+    var body: some View {
+        if let work, saved {
+            VStack(alignment: .trailing, spacing: 6) {
+                Button {
+                    ui.refinementMenuWorkID = ui.refinementMenuWorkID == work.id ? nil : work.id
+                } label: {
+                    Text(display.webCopy("workActionRefine", "推敲する")).inkuFont(12)
+                }
+                .buttonStyle(InkuGhostButtonStyle())
+                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+                .fixedSize()
+                .background(GeometryReader { geometry in
+                    Color.clear
+                        .onAppear { buttonHeight = geometry.size.height }
+                        .onChange(of: geometry.size.height) { _, height in buttonHeight = height }
+                })
+                .disabled(model.isBrowsingLocked)
+                .inkuTooltip(model.isBrowsingLocked ? display.tooltip("生成中は推敲を開始できません。", serverKey: "workActionGenerationLocked")
+                             : display.tooltip("作品の操作"))
+                if ui.refinementMenuWorkID == work.id {
+                    ScrollView {
+                        SavedWorkRefinementPopover(model: model, work: work, title: title(work), onAction: { target, action in
+                            ui.refinementMenuWorkID = nil
+                            onAction(target, action)
+                        }, writingLocked: writingLocked)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(GeometryReader { geometry in
+                            Color.clear
+                                .onAppear { contentHeight = geometry.size.height }
+                                .onChange(of: geometry.size.height) { _, height in contentHeight = height }
+                        })
+                    }
+                    .frame(width: 260, height: min(contentHeight, max(0, availableHeight - buttonHeight - 6)))
+                    .contentShape(Rectangle())
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(InkuColor.border2).allowsHitTesting(false))
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
+                }
+            }
+            .inkuOnEscape(isActive: ui.refinementMenuWorkID == work.id) { ui.refinementMenuWorkID = nil }
+        } else if work != nil, !model.isBusy {
+            Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
+                .inkuFont(11).foregroundStyle(.tertiary).lineLimit(1)
+                .padding(.horizontal, 9).padding(.vertical, 5)
+                .background(InkuColor.panel.opacity(0.94), in: Capsule())
+                .overlay(Capsule().stroke(InkuColor.border2))
+                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+        }
+    }
+}
+
+/// The picture and its corner controls form a separate, bounded SwiftUI type.
+private struct CreationArtworkLayer: View {
+    let canvas: AnyView
+    let leftControls: AnyView
+    let rightControls: AnyView
+    let preview: AnyView
+    let showPreview: Bool
+    let phoneLayout: Bool
+    let buttonHeight: CGFloat
+    let display: DisplaySettings
+    let work: SavedWork?
+
+    var body: some View {
+        ZStack {
+            canvas
+            if !phoneLayout {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .bottom, spacing: 0) {
+                        leftControls
+                        Spacer(minLength: 12)
+                        rightControls
+                    }
+                    VStack(alignment: .trailing, spacing: 8) {
+                        rightControls
+                        leftControls.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.horizontal, 18).padding(.bottom, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
+            if showPreview { preview.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
+            CanvasFallbackBadges(display: display, work: work)
+                .padding(.top, phoneLayout ? 12 : 18 + buttonHeight)
+                .padding(.trailing, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        }
+    }
+}
+
 /// Web `.main-shell`: the input panel, its 18pt toggle, the canvas panel, and the history strip under both.
 @MainActor
 struct CreationView: View {
@@ -79,7 +221,6 @@ struct CreationView: View {
     @State private var rightPanelWidth: CGFloat = 0
     @State private var rightPanelHeight: CGFloat = 0
     @State private var refinementMenuButtonHeight: CGFloat = 0
-    @State private var refinementMenuContentHeight: CGFloat = 400
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
     /// iPhone: a refinement chosen in the 作品編集 sheet, opened once the sheet has gone (one sheet at a time).
@@ -935,8 +1076,8 @@ struct CreationView: View {
 
     private var rightPanel: some View {
         VStack(spacing: 0) {
-            if inlinePanel == nil && !ui.canvasFullScreen { tabsRow }
-            canvasArea
+            if inlinePanel == nil && !ui.canvasFullScreen { AnyView(tabsRow) }
+            AnyView(canvasArea)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
@@ -1090,57 +1231,6 @@ struct CreationView: View {
         }.frame(maxWidth: 280 * display.preferences.textScale, alignment: .leading)
     }
 
-    /// Web WorkActionMenu (header variant): editing only; viewing tools stay in the canvas toolbar.
-    @ViewBuilder private func workActionMenu(availableHeight: CGFloat) -> some View {
-        if let work = workspaceWork, hasSavedWorkspaceWork {
-            VStack(alignment: .trailing, spacing: 6) {
-                Button {
-                    ui.refinementMenuWorkID = ui.refinementMenuWorkID == work.id ? nil : work.id
-                } label: {
-                    Text(display.webCopy("workActionRefine", "推敲する")).inkuFont(12)
-                }
-                .buttonStyle(InkuGhostButtonStyle())
-                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-                .fixedSize()
-                .background(GeometryReader { geometry in
-                    Color.clear
-                        .onAppear { refinementMenuButtonHeight = geometry.size.height }
-                        .onChange(of: geometry.size.height) { _, height in refinementMenuButtonHeight = height }
-                })
-                .disabled(browsingDisabled)
-                .inkuTooltip(browsingDisabled ? display.tooltip("生成中は推敲を開始できません。", serverKey: "workActionGenerationLocked")
-                             : display.tooltip("作品の操作"))
-                if ui.refinementMenuWorkID == work.id {
-                    ScrollView {
-                        SavedWorkRefinementPopover(model: model, work: work, title: workActionTitle(work), onAction: { target, action in
-                            ui.refinementMenuWorkID = nil
-                            onWorkAction(target, action)
-                        }, writingLocked: automation.isOccupied)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .background(GeometryReader { geometry in
-                            Color.clear
-                                .onAppear { refinementMenuContentHeight = geometry.size.height }
-                                .onChange(of: geometry.size.height) { _, height in refinementMenuContentHeight = height }
-                        })
-                    }
-                    .frame(width: 260, height: min(refinementMenuContentHeight, max(0, availableHeight - refinementMenuButtonHeight - 6)))
-                    .contentShape(Rectangle())
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(InkuColor.border2).allowsHitTesting(false))
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                    .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
-                }
-            }
-            .inkuOnEscape(isActive: ui.refinementMenuWorkID == work.id) { ui.refinementMenuWorkID = nil }
-        } else if workspaceWork != nil, !model.isBusy {
-            Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
-                .inkuFont(11).foregroundStyle(.tertiary).lineLimit(1)
-                .padding(.horizontal, 9).padding(.vertical, 5)
-                .background(InkuColor.panel.opacity(0.94), in: Capsule())
-                .overlay(Capsule().stroke(InkuColor.border2))
-                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-        }
-    }
-
     private func workActionTitle(_ work: SavedWork) -> String {
         let title = display.webCopy("workActionMenuTitle", "作品編集")
         switch model.workActionState(for: work) {
@@ -1163,20 +1253,20 @@ struct CreationView: View {
                     .padding(.vertical, 14)
             } else {
                 let showsLineage = ui.workspaceTab == "lineage" && workspaceWork != nil
-                artwork
+                AnyView(artwork)
                     .environment(\.inkuTooltipsCovered, covered || showsLineage)
                     .opacity(showsLineage ? 0 : 1)
                     .allowsHitTesting(!showsLineage)
                     .accessibilityHidden(showsLineage)
                 if (lineageMounted || showsLineage) && workspaceWork != nil {
-                    LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
+                    AnyView(LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
                                 writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
                                 onOpenInCanvas: { work in
                                     batchWorkspace.showHistory()
                                     Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
                                 }, onDetach: {
                                     batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
-                                })
+                                }))
                         .background(InkuColor.bg)
                         .padding(.horizontal, display.visible("history") && !phoneLayout ? 68 : 0)
                         // Native scroll views can still receive pointer events while their SwiftUI
@@ -1201,19 +1291,8 @@ struct CreationView: View {
         }
         .overlay {
             if !phoneLayout, inlinePanel == nil, ui.workspaceTab != "lineage" {
-                GeometryReader { geometry in
-                    ZStack(alignment: .topTrailing) {
-                        if ui.refinementMenuWorkID != nil {
-                            Color.clear.contentShape(Rectangle())
-                                .onTapGesture { ui.refinementMenuWorkID = nil }
-                                .accessibilityHidden(true)
-                        }
-                        workActionMenu(availableHeight: max(0, geometry.size.height - 24))
-                            .padding([.top, .trailing], 12)
-                    }
-                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topTrailing)
-                    .inkuEndsEditingOnOutsidePress(isActive: ui.refinementMenuWorkID != nil) { ui.refinementMenuWorkID = nil }
-                }
+                CreationRefinementMenuOverlay(model: model, ui: ui, work: workspaceWork, saved: hasSavedWorkspaceWork,
+                    writingLocked: automation.isOccupied, buttonHeight: $refinementMenuButtonHeight, onAction: onWorkAction)
             }
         }
         .clipped()
@@ -1230,8 +1309,7 @@ struct CreationView: View {
     }
 
     private var artwork: some View {
-        ZStack {
-            ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.displayRenderer,
+        CreationArtworkLayer(canvas: AnyView(ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.displayRenderer,
                           caption: workspaceWork?.effectiveSourceText ?? "", style: .workspace,
                           showsZoomControls: display.visible("work_tools"),
                           // Below about 740pt the capsule would sit on the right corner row (seven 34pt buttons).
@@ -1240,31 +1318,10 @@ struct CreationView: View {
                           rangePreview: usesBatchWork ? nil : model.rangePreview,
                           compositionUnits: model.compositionBoxWorkID == workspaceWork?.id && model.compositionBoxSource == (workspaceWork?.ddl ?? "") ? model.compositionUnits : [],
                           activeCompositionThing: $model.activeCompositionThing, compositionQuotes: model.compositionQuotes,
-                          replacement: threeDimensionalReplacement)
-            // The two corner rows side by side; where they would meet (an iPad in portrait), the right row goes
-            // above the left one.
-            // On an iPhone the corner tools are in the row under the canvas and the navigation bar's menu.
-            if !phoneLayout {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .bottom, spacing: 0) {
-                    canvasControls(.left)
-                    Spacer(minLength: 12)
-                    canvasControls(.right)
-                }
-                VStack(alignment: .trailing, spacing: 8) {
-                    canvasControls(.right)
-                    canvasControls(.left).frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-                .padding(.horizontal, 18).padding(.bottom, 14)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            }
-            if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
-            CanvasFallbackBadges(display: display, work: workspaceWork)
-                .padding(.top, phoneLayout ? 12 : 18 + refinementMenuButtonHeight)
-                .padding(.trailing, 12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        }
+                          replacement: threeDimensionalReplacement)),
+            leftControls: AnyView(canvasControls(.left)), rightControls: AnyView(canvasControls(.right)),
+            preview: AnyView(previewBadge), showPreview: workspaceIsPreview, phoneLayout: phoneLayout,
+            buttonHeight: refinementMenuButtonHeight, display: display, work: workspaceWork)
     }
 
     /// CanvasPanel `threeDimensionalContent`: the viewer in the picture's place while 3D is chosen and a work is shown.

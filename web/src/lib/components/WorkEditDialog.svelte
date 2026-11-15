@@ -128,7 +128,7 @@
 				<span class="sketch-current">{t().workEditParentGrain}: {node.history?.sketch_text ? (isJapanese ? 'あり' : 'With sketch') : (sketchStateNote(normalizeSketchState(node.history?.sketch_state), isJapanese) || (isJapanese ? 'なし' : 'None'))}</span>
 			{/if}
 			<button type="button" onclick={close}>{t().pipelineCancel}</button>
-			<button type="button" class="work-edit-draw" disabled={mode === 'description' && !draft.trim()} onclick={draw}>{mode === 'description' ? t().submitBtn : t().pipelinePerform}</button>
+			<button type="button" class="work-edit-draw" disabled={mode === 'description' && !draft.trim()} onclick={draw}>{t().submitBtn}</button>
 		{/if}
 	</footer>
 </dialog>

@@ -18,7 +18,7 @@ private final class PlaceRefinementModel {
     }
     var hasUnsaved: Bool { candidates.contains { $0.savedWork == nil } }
 
-    func generate(app: AppModel, place: String) async {
+    func generate(app: AppModel, place: String, label: String) async {
         guard !running, !app.isBusy, selected < units.count else { return }
         let unit = units[selected]
         guard ["ok", "clamped"].contains(unit["places"][place].string ?? ""), let chunk = unit["title"].string else { return }
@@ -27,7 +27,7 @@ private final class PlaceRefinementModel {
         let success = await app.performComparison(status: "候補を生成中", restoreDisplayStatus: true) { token in
             let request = try await app.makeCompositionPlaceRequest(work: self.work, chunk: chunk, at: place)
             let candidate = try await app.generateCandidate(request: request, token: token)
-            self.candidates.append(ComparisonCandidate(prepared: candidate, label: chunk + " · " + place, order: self.candidates.count))
+            self.candidates.append(ComparisonCandidate(prepared: candidate, label: label, order: self.candidates.count))
         }
         if !success { error = app.errorText }
     }
@@ -51,6 +51,7 @@ private final class PlaceRefinementModel {
 struct RefinementPlaceView: View {
     @Bindable var model: AppModel
     @State private var place: PlaceRefinementModel
+    @State private var composition: CompositionRecordSnapshot?
     let onClose: () -> Void
     let onCommitted: (SavedWork) -> Void
 
@@ -67,8 +68,13 @@ struct RefinementPlaceView: View {
                 Text(model.display.webCopy("placeThingsHead", "動かす物")).inkuFont(12, weight: .semibold)
                 ForEach(Array(place.units.enumerated()), id: \.offset) { index, unit in
                     Button { place.selected = index } label: {
-                        Label(unit["title"].string ?? "", systemImage: place.selected == index ? "largecircle.fill.circle" : "circle")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack {
+                            Label(thingName(unit), systemImage: place.selected == index ? "largecircle.fill.circle" : "circle")
+                            Spacer()
+                            if let at = unit["at"].string {
+                                Text(model.display.webCopyFormat("placeNow", "今: %@", CompositionNames.placeName(at, language: model.display.preferences.language))).inkuFont(10).foregroundStyle(.secondary)
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
                     }.buttonStyle(.plain).disabled(place.running || model.isBusy)
                 }
                 Text(model.display.webCopy("placePlacesHead", "置き場")).inkuFont(12, weight: .semibold)
@@ -100,6 +106,7 @@ struct RefinementPlaceView: View {
                     }
                 } })
         }
+        .task(id: place.work.id) { composition = try? await model.compositionRecord(work: place.work) }
         .interactiveDismissDisabled(place.running || place.hasUnsaved || model.isBusy)
     }
 
@@ -118,18 +125,29 @@ struct RefinementPlaceView: View {
                     }.stroke(InkuColor.border2, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     ForEach(slots, id: \.self) { id in
                         let state = place.selected < place.units.count ? place.units[place.selected]["places"][id].string : nil
+                        let unit = place.units[place.selected]
+                        let now = unit["at"].string == id
                         let point = placePoint(id)
-                        Button { Task { await place.generate(app: model, place: id) } } label: {
-                            Circle().fill(Color.accentColor).frame(width: 12, height: 12).padding(8).contentShape(Rectangle())
+                        Button { Task { await place.generate(app: model, place: id, label: PlacePresentation.label(what: thingName(unit), unit: unit, place: id, display: model.display)) } } label: {
+                            Circle().fill(Color.accentColor).frame(width: 12, height: 12)
+                                .overlay { if now { Circle().stroke(Color.accentColor, lineWidth: 2).padding(-4) } }
+                                .padding(8).contentShape(Rectangle())
                         }.buttonStyle(.plain).disabled(place.running || model.isBusy || !["ok", "clamped"].contains(state ?? ""))
                             .opacity(["ok", "clamped"].contains(state ?? "") ? 1 : 0.3)
                             .position(x: geometry.size.width * point.x, y: geometry.size.height * point.y)
-                            .accessibilityLabel(CompositionNames.placeName(id, language: model.display.preferences.language))
-                            .inkuTooltip(CompositionNames.placeName(id, language: model.display.preferences.language) + (state == "clamped" ? model.display.webCopy("placeClamped", "（画面の端で止まる）") : ""))
+                            .accessibilityLabel(PlacePresentation.title(unit: unit, place: id, display: model.display))
+                            .inkuTooltip(PlacePresentation.title(unit: unit, place: id, display: model.display))
                     }
                 }
             }.aspectRatio(1, contentMode: .fit)
         }.frame(maxWidth: .infinity)
+    }
+
+    private func thingName(_ unit: ExactJSON) -> String {
+        let things = (composition?.own ?? composition?.inherited)?["answer"]["things"].array ?? []
+        if let number = unit["thing"].number, let thing = things.first(where: { $0["thing"].number == number }),
+           let name = thing["what"].string, !name.isEmpty { return name }
+        return unit["title"].string ?? ""
     }
 
     private func placePoint(_ id: String) -> CGPoint {

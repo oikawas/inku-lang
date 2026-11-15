@@ -375,6 +375,7 @@ struct CreationDisplayedProcess: View {
     private var boxEditable: Bool { saved && !disabled && !work.trashed && !model.isBusy }
     @State private var confirmingDiscard = false
     @State private var displayedContext: SavedAuthoringContext?
+    @State private var composition: CompositionRecordSnapshot?
     private var readRecord: Data? { displayedContext?.descriptionDDL ?? (model.selectedWorkID == work.id ? model.savedDescriptionDDL : nil) }
     private var ddlHeading: String {
         let requested = InkuCore.normalizeInstructionLanguage(value: work.instructionLangResolved, defaultLanguage: "auto") ?? "auto"
@@ -386,7 +387,7 @@ struct CreationDisplayedProcess: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // `+page.svelte` `.displayed-work-heading`: 12px semibold under a rule, 16pt above.
-            Text(model.display.webCopy("displayedWorkProcess", "表示中作品の写生と指示書")).inkuFont(12, weight: .semibold)
+            Text(model.display.webCopy("displayedWorkProcessWithComposition", "表示中作品の写生・構図・指示書")).inkuFont(12, weight: .semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 16)
                 .overlay(alignment: .top) { Rectangle().fill(InkuColor.border).frame(height: 1) }
@@ -409,6 +410,8 @@ struct CreationDisplayedProcess: View {
                 } label: { Text(readRecord != nil ? model.display.webCopy("readDrawReadingLabel", "写生（読み）") : model.display.webCopy("sketchLabel", "写生")).inkuFont(12, weight: .semibold) }
                 .inkuTooltip(model.display.tooltip("写生層が書いた文章を表示します。", serverKey: "tooltipSketchToggle"))
             }
+            CompositionSection(model: model, work: work, snapshot: composition, saved: saved, disabled: !saved || disabled,
+                               onAction: onWorkAction)
             if model.display.visible("ddl_tools"), work.ddl != nil {
                 HStack(alignment: .firstTextBaseline) {
                     Text(model.display.localized(ddlHeading)).inkuFont(12, weight: .semibold)
@@ -445,10 +448,13 @@ struct CreationDisplayedProcess: View {
         }
         .task(id: work.id) {
             displayedContext = nil
+            composition = nil
             guard saved else { return }
             let context = try? await model.savedConfiguration(workID: work.id)
+            let record = try? await model.compositionRecord(work: work)
             guard !Task.isCancelled else { return }
             displayedContext = context
+            composition = record
         }
     }
 

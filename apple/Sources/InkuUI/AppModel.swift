@@ -241,6 +241,14 @@ public final class AppModel {
     var ddlBoxInsertion: InkuEditorInsertion?
     /// The numeric range an instruction editor's caret or pointer is on, framed over the displayed work.
     public var rangePreview: CompositionRanges.Preview?
+    var compositionBoxWorkID: String?
+    var compositionBoxSource = ""
+    var compositionUnits: [ExactJSON] = []
+    var activeCompositionThing: String?
+    var compositionQuotes: [String: String] = [:]
+    var revealCompositionLine: InkuEditorReveal?
+    @ObservationIgnored private var compositionBoxCache: [String: (source: String, units: [ExactJSON])] = [:]
+    @ObservationIgnored private var compositionBoxToken = UUID()
     /// The box holds an invalid range or an IME composition, so drawing from it waits.
     public var ddlBoxRangeBlocked = false
     public func ddlBoxText(for work: SavedWork) -> String { ddlBoxDraftWorkID == work.id ? ddlBoxDraft : work.ddl ?? "" }
@@ -514,7 +522,7 @@ public final class AppModel {
             if let layout = display.libraryLayout.flatMap(LibraryLayout.init(rawValue:)) {
                 library.layout = layout
             }
-            if let grouped = display.libraryGrouped { library.grouped = grouped }
+            if let grouping = LibraryModel.Grouping(rawValue: display.libraryGrouping) { library.grouping = grouping }
             await library.connect(database: database)
             try await reloadWorks()
             // Web completeAuthentication opens the first normal history item once at startup.
@@ -1027,6 +1035,65 @@ public final class AppModel {
         workActionStates[workID] = SavedWorkActionState(context)
         if context.imageDDL != nil { imageWorkProvenance[workID] = context.imageProvenance ?? "" }
         return context
+    }
+
+    public func compositionRecord(work: SavedWork) async throws -> CompositionRecordSnapshot {
+        guard let host else { throw HostError("pipeline_unavailable") }
+        return try await host.compositionRecord(work: work)
+    }
+
+    public func compositionWorkBoxes(work: SavedWork) async throws -> ExactJSON {
+        guard let host else { throw HostError("pipeline_unavailable") }
+        return try await host.compositionWorkBoxes(work: work)
+    }
+
+    func loadCompositionBoxes(work: SavedWork) async {
+        let token = UUID(); compositionBoxToken = token
+        compositionBoxWorkID = work.id; compositionBoxSource = work.ddl ?? ""; activeCompositionThing = nil
+        if let cached = compositionBoxCache[work.id], cached.source == compositionBoxSource {
+            compositionUnits = cached.units; return
+        }
+        compositionUnits = []
+        guard let result = try? await compositionWorkBoxes(work: work), !Task.isCancelled,
+              token == compositionBoxToken, let units = result["units"].array else { return }
+        compositionUnits = units
+        compositionBoxCache[work.id] = (work.ddl ?? "", units)
+    }
+
+    func clearCompositionBoxes(workID: String) {
+        guard compositionBoxWorkID == workID else { return }
+        compositionBoxToken = UUID(); compositionBoxWorkID = nil; compositionUnits = []; activeCompositionThing = nil; compositionQuotes = [:]
+    }
+
+    public func makeCompositionPlaceRequest(work: SavedWork, chunk: String, at: String) async throws -> GenerationRequest {
+        guard let host, let parentNodeID = work.lineageNodeID else { throw HostError("lineage_parent_unavailable") }
+        let result = try await host.compositionPlace(work: work, chunk: chunk, at: at)
+        let context = try await savedConfiguration(workID: work.id)
+        var request = try await makeRefinementRequest(work: work, kind: "layout_change")
+        request.authoring = .directDDL(try result.requiredString("ddl"))
+        request.retainedDocument = nil; request.retainedAuthority = nil
+        request.noProviderEffects = true
+        request.derivationMetadata = nil
+        let parentConfig = try ExactJSON(data: context.configuration)
+        var config = try ExactJSON(data: request.configuration)
+        var options = try ExactJSON(data: request.renderOptions)
+        config["compiler"]["composition_seed"] = parentConfig["compiler"]["composition_seed"]
+        options["composition_seed"] = parentConfig["compiler"]["composition_seed"]
+        request.configuration = config.data; request.renderOptions = options.data
+        request.compositionRuleSettings = ExactJSON.object([
+            "lineage_parent_node_id": .string(parentNodeID),
+            "derivation_metadata": .object(["place": result["place"]])
+        ]).data
+        return request
+    }
+
+    public func proposeCompositionTheses(ask: ExactJSON, request: GenerationRequest, token: UUID) async throws -> (theses: [String], digest: String) {
+        guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        let pinned = try await pinPersonalPlanRequests([request])
+        let result = try await host.proposeCompositionTheses(ask: ask, request: pinned[0])
+        try Task.checkCancellation()
+        guard generationToken == token, !stopping else { throw CancellationError() }
+        return result
     }
 
     func savedGenerationInformation(work: SavedWork) async throws -> SavedGenerationInformation {
@@ -1570,13 +1637,18 @@ public final class AppModel {
 
     public func makeRefinementRequest(work: SavedWork, kind: String,
                                       modelReference: String? = nil, catalogIDOverride: String? = nil,
-                                      wildOverride: Bool? = nil, compositionForm: String? = nil) async throws -> GenerationRequest {
+                                      wildOverride: Bool? = nil, compositionForm: String? = nil,
+                                      compositionMainLaw: String? = nil, compositionThesis: String? = nil,
+                                      thesisSource: String? = nil, thesisPromptDigest: String? = nil) async throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         guard ["layout_change", "catalog_change", "model_comparison", CompositionForm.derivationKind].contains(kind) else {
             throw HostError("unknown_refinement_kind")
         }
         let formChange = kind == CompositionForm.derivationKind
-        if formChange { guard let compositionForm, CompositionForm.all.contains(compositionForm) else { throw HostError("invalid_authoring_options") } }
+        if formChange {
+            guard compositionForm != nil || compositionMainLaw != nil || compositionThesis != nil,
+                  compositionForm.map(CompositionForm.all.contains) ?? true else { throw HostError("invalid_authoring_options") }
+        }
         let saved = try await savedConfiguration(workID: work.id)
         let config = try ExactJSON(data: saved.configuration)
         let options = try ExactJSON(data: saved.renderOptions)
@@ -1591,20 +1663,29 @@ public final class AppModel {
         }
         let fresh = String(UInt64.random(in: 0...((UInt64(1) << 53) - 1)))
         // Web generateCompositionFormCandidates: the work's own catalog, fixed, and a sketch (its saved one, else a new one).
-        let chosenCatalog = catalogIDOverride ?? (kind == "catalog_change" || formChange ? catalogID : self.catalogID)
+        let chosenCatalog = catalogIDOverride ?? (kind == "catalog_change" || kind == "model_comparison" || formChange ? catalogID : self.catalogID)
         let description = work.effectiveSourceText
-        let sketch: SketchRequest = work.sketchText.map(SketchRequest.supplied) ?? (formChange ? .on : .off)
+        let savedSketch = work.sketchRequested.map { $0 == "1" || $0 == "on" }
+        let sketch: SketchRequest = work.sketchText.flatMap { $0.isEmpty ? nil : SketchRequest.supplied($0) }
+            ?? ((formChange || (kind == "model_comparison" && savedSketch == true)) ? .on : .off)
         var request = try bootstrap.request(inputMode: reading ? "description" : "ddl", source: work.ddl ?? "", description: description,
             language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: renderSeed, wild: wildOverride ?? work.renderWild ?? false,
             settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind,
-            catalogMode: reading && !formChange ? self.catalogMode : "fixed", sketch: sketch,
+            catalogMode: reading && !formChange && kind != "model_comparison" ? self.catalogMode : "fixed", sketch: sketch,
             savedConfiguration: saved.configuration)
-        if formChange, let compositionForm {
+        if kind == "model_comparison" {
+            request.drawRoute = work.drawRoute ?? saved.drawRoute
+            request.descriptionComposition = work.compositionRequested.map { $0 == "1" || $0 == "on" }
+                ?? (saved.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"].object != nil)
+            request.descriptionReview = config["description_ddl"]["review"].bool ?? false
+        }
+        if formChange {
             request.drawRoute = "read_and_draw"; request.descriptionComposition = true
             request.descriptionCompositionForm = compositionForm
-            let from = saved.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"]["answer"]["form"].string
-            request.derivationMetadata = ExactJSON.object(["form_from": from.map(ExactJSON.string) ?? .null,
-                                                           "form_to": .string(compositionForm)]).data
+            request.descriptionCompositionMainLaw = compositionMainLaw
+            request.descriptionCompositionThesis = compositionThesis
+            request.compositionThesisSource = thesisSource
+            request.compositionThesisPromptDigest = thesisPromptDigest
         }
         var nextConfig = try ExactJSON(data: request.configuration)
         var nextOptions = try ExactJSON(data: request.renderOptions)
@@ -1627,6 +1708,19 @@ public final class AppModel {
         if let modelReference {
             guard !modelReference.isEmpty else { throw HostError("model_reference_missing") }
             request.models.stage1Model = modelReference; request.models.stage2Model = modelReference
+        }
+        if formChange || kind == "model_comparison" {
+            guard let parentNodeID = work.lineageNodeID else { throw HostError("lineage_parent_unavailable") }
+            var metadataSettings: ExactJSON = .object([
+                "lineage_parent_node_id": .string(parentNodeID),
+                "stage1_model": .string(request.models.stage1Model), "stage2_model": .string(request.models.stage2Model)
+            ])
+            if let compositionForm { metadataSettings["composition_form"] = .string(compositionForm) }
+            if let compositionMainLaw { metadataSettings["composition_main_law"] = .string(compositionMainLaw) }
+            if let compositionThesis { metadataSettings["composition_thesis"] = .string(compositionThesis) }
+            if let thesisSource { metadataSettings["composition_thesis_source"] = .string(thesisSource) }
+            if let thesisPromptDigest { metadataSettings["composition_thesis_prompt_digest"] = .string(thesisPromptDigest) }
+            request.compositionRuleSettings = metadataSettings.data
         }
         if !reading {
             guard let document = saved.document else { throw HostError("saved_document_unavailable") }
@@ -1831,7 +1925,8 @@ public final class AppModel {
             throw HostError("svg_too_large", svgLimitMiB: failure["svg_limit_mib"].number.flatMap(Int.init))
         }
         guard generationToken == token, let work = view.candidateWork else { throw HostError("comparison_candidate_requires_edit") }
-        return PreparedCandidate(executionID: view.executionID, work: work, authority: view.authority, providerMetrics: view.providerMetrics)
+        return PreparedCandidate(executionID: view.executionID, work: work, authority: view.authority, providerMetrics: view.providerMetrics,
+                                 composition: try await host.candidateComposition(executionID: view.executionID))
     }
 
     public func prepareReplayComparison(work: SavedWork, token: UUID) async throws -> ReplayComparisonSnapshot {

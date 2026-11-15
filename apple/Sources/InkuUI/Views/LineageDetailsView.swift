@@ -44,6 +44,9 @@ struct LineageDetailsView: View {
                             row(model.display.webCopy("historyModelCompletion", "補完のモデル"), work.stage2Model.map(naming.displayName))
                             row("seed", [work.renderSeed, work.compositionSeed, work.interpretationSeed].map { $0 ?? "—" }.joined(separator: " / "))
                             row(model.display.localized("派生"), operation)
+                            if let detail = compositionDerivationDetail(information?.edge, display: model.display) {
+                                row(model.display.label("変更", "Change"), detail)
+                            }
                             if let edge = information?.edge, let metadata = try? ExactJSON(data: Data(edge.metadataJSON.utf8)),
                                let kind = metadata["ai_move"]["kind"].string, ["laws", "juxtaposition", "chunks"].contains(kind) {
                                 let move = metadata["ai_move"]

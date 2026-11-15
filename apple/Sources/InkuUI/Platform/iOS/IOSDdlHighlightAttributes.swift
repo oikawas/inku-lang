@@ -9,6 +9,8 @@ extension InkuEditorMark.Style {
         switch self {
         case .muted:
             return [.backgroundColor: UIColor.systemGray.withAlphaComponent(0.22)]
+        case .compositionThing:
+            return [.backgroundColor: UIColor.systemBlue.withAlphaComponent(0.22)]
         case .completion(let state):
             let color: UIColor = switch state { case .completed: .systemBlue; case .numbersChanged: .systemGreen; case .wordsChanged: .systemOrange }
             return [.underlineStyle: NSUnderlineStyle.thick.rawValue | NSUnderlineStyle.patternDot.rawValue, .underlineColor: color]

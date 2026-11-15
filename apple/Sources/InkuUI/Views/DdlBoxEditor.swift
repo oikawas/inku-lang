@@ -28,23 +28,47 @@ struct DdlBoxEditor: View {
     }
 
     private var text: String { model.ddlBoxText(for: work) }
+    private var activeLines: [Int] {
+        guard model.compositionBoxWorkID == work.id, text == model.compositionBoxSource,
+              let title = model.activeCompositionThing,
+              let unit = model.compositionUnits.first(where: { $0["title"].string == title }) else { return [] }
+        return (unit["lines"].array ?? []).compactMap { $0.number.flatMap(Int.init) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             InkuTextEditor(text: Binding(get: { model.ddlBoxText(for: work) }, set: { model.setDdlBoxText($0, for: work) }),
                            isEditable: editable, accessibilityLabel: model.display.webCopy("ddlEditorInstructions", "指示書"),
                            style: .ddlCompact,
-                           marks: { [highlighter, completionStates, completionSource] source in
-                               highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
+                           marks: { [highlighter, completionStates, completionSource, activeLines] source in
+                               let lineIndex = BatchEditorLineIndex(source)
+                               let length = (source as NSString).length
+                               let marks = activeLines.compactMap { line -> InkuEditorMark? in
+                                   guard lineIndex.starts.indices.contains(line) else { return nil }
+                                   let start = lineIndex.starts[line]
+                                   let end = line + 1 < lineIndex.starts.count ? lineIndex.starts[line + 1] : length
+                                   return InkuEditorMark(range: NSRange(location: start, length: max(0, end - start)), style: .compositionThing)
+                               }
+                               return highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : []) + marks
                            },
-                           marksKey: .ddlRevision(model.saijikiRevision, pluginCallsRevision, pluginSource == text, completionStates, completionSource),
+                           marksKey: .ddlComposition(model.saijikiRevision, pluginCallsRevision, pluginSource == text, completionStates, completionSource, model.activeCompositionThing),
                            insertion: Binding(get: { model.ddlBoxInsertion }, set: { model.ddlBoxInsertion = $0 }),
+                           reveal: Binding(get: { model.revealCompositionLine }, set: { model.revealCompositionLine = $0 }),
                            rangeTable: CompositionRanges.table,
                            onRangeStatus: { status in
                                rangeStatus = status
                                model.rangePreview = status.preview
                            },
-                           completions: model.ddlCompletions, onCharacterHover: { hoverIndex = $0 })
+                           completions: model.ddlCompletions, onCharacterHover: { index in
+                               hoverIndex = index
+                               guard model.compositionBoxWorkID == work.id, text == model.compositionBoxSource, let index else {
+                                   model.activeCompositionThing = nil; return
+                               }
+                               let line = BatchEditorLineIndex(text).line(containing: index)
+                               model.activeCompositionThing = model.compositionUnits.first { unit in
+                                   (unit["lines"].array ?? []).contains { $0.number.flatMap(Int.init) == line }
+                               }?["title"].string
+                           })
                 .frame(minHeight: 100, maxHeight: 220)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
                 .overlay(alignment: .topTrailing) {

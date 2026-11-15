@@ -1,6 +1,7 @@
 import CoreGraphics
 import CoreText
 import InkuCore
+import InkuHost
 import InkuPersistence
 import SwiftUI
 
@@ -35,6 +36,9 @@ struct ArtworkCanvas: View {
     var viewport: Binding<CanvasViewport>? = nil
     /// Web DdlRangePreview: the numeric range the instructions' caret or pointer is on, over the work.
     var rangePreview: CompositionRanges.Preview? = nil
+    var compositionUnits: [ExactJSON] = []
+    var activeCompositionThing: Binding<String?>? = nil
+    var compositionQuotes: [String: String] = [:]
     /// The work tab's 3D view in place of the picture (workspace style only). The picture stays drawn behind it.
     var replacement: ArtworkReplacement? = nil
     @Environment(DisplaySettings.self) private var display
@@ -220,6 +224,7 @@ struct ArtworkCanvas: View {
                         .accessibilityLabel(display.localized("作品"))
                     detailLayer(size: size, box: box)
                     rangeFrame(size: size, box: box)
+                    compositionFrame(size: size, box: box)
                 } else if picture.loading {
                     ProgressView(display.localized("作品を表示中"))
                 } else if let error = picture.error {
@@ -235,9 +240,41 @@ struct ArtworkCanvas: View {
                 if (picture.loading || picture.windowLoading) && picture.image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
               }
               .frame(width: size.width, height: size.height)
+              .onContinuousHover { phase in
+                  switch phase {
+                  case .active(let point): activeCompositionThing?.wrappedValue = thing(at: point, size: size, box: box)
+                  case .ended: activeCompositionThing?.wrappedValue = nil
+                  }
+              }
               .task(id: DetailRequest(svg: svg, plan: plan)) {
                   await picture.loadWindow(svg: svg, plan: plan, renderer: renderer)
               }
+    }
+
+    private func thingRect(_ unit: ExactJSON, size: CGSize, box: CGSize?) -> CGRect? {
+        guard let values = unit["box"].array?.compactMap({ $0.number.flatMap(Double.init) }), values.count == 4,
+              let fitted = fittedRect(in: size, box: box) else { return nil }
+        let picture = CanvasInteraction.zoomedPicture(fitted, area: size, scale: scale, offset: offset)
+        return CGRect(x: picture.minX + values[0] * picture.width, y: picture.minY + values[1] * picture.height,
+                      width: (values[2] - values[0]) * picture.width, height: (values[3] - values[1]) * picture.height)
+    }
+
+    private func thing(at point: CGPoint, size: CGSize, box: CGSize?) -> String? {
+        compositionUnits.compactMap { unit -> (String, CGRect)? in
+            guard let title = unit["title"].string, let rect = thingRect(unit, size: size, box: box), rect.contains(point) else { return nil }
+            return (title, rect)
+        }.min { $0.1.width * $0.1.height < $1.1.width * $1.1.height }?.0
+    }
+
+    @ViewBuilder private func compositionFrame(size: CGSize, box: CGSize?) -> some View {
+        if let active = activeCompositionThing?.wrappedValue,
+           let unit = compositionUnits.first(where: { $0["title"].string == active }),
+           let rect = thingRect(unit, size: size, box: box) {
+            Rectangle().strokeBorder(Color.accentColor, lineWidth: 2).background(Color.accentColor.opacity(0.08))
+                .frame(width: max(1, rect.width), height: max(1, rect.height)).position(x: rect.midX, y: rect.midY)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .allowsHitTesting(false).accessibilityHidden(true)
+        }
     }
 
     /// The fitted picture at 100% in the canvas area: centered in the Web box, or inside the embedded frame's margin.
@@ -306,15 +343,23 @@ struct ArtworkCanvas: View {
         await picture.load(svg: svg, width: request.width, height: request.height, renderer: renderer)
         if let image = picture.image, image.height > 0 { imageAspect = CGFloat(image.width) / CGFloat(image.height) }
     }
+    private var activeQuote: String? {
+        activeCompositionThing?.wrappedValue.flatMap { compositionQuotes[$0] }.flatMap { $0.isEmpty ? nil : $0 }
+    }
+    private var markedCaption: AttributedString {
+        var value = AttributedString(caption)
+        if let quote = activeQuote, let range = value.range(of: quote) { value[range].backgroundColor = .accentColor.opacity(0.4) }
+        return value
+    }
     private func captionOverlay(size: CGSize) -> some View {
         HStack(alignment: .bottom) {
             if display.preferences.captionPosition == "right" { Spacer(minLength: 0) }
             Group {
                 if display.preferences.captionVertical && verticalCaption {
-                    VerticalCaption(text: caption)
+                    VerticalCaption(text: caption, highlight: activeQuote)
                         .frame(width: min(170, size.width * 0.28), height: min(320, size.height * 0.8))
                 } else {
-                    Text(caption).font(.system(.callout, design: .serif)).lineLimit(7)
+                    Text(markedCaption).font(.system(.callout, design: .serif)).lineLimit(7)
                         .textSelection(.enabled).frame(maxWidth: min(360, size.width * 0.5), alignment: .leading)
                 }
             }
@@ -330,14 +375,14 @@ struct ArtworkCanvas: View {
         let right = display.preferences.captionPosition == "right"
         return Group {
             if display.preferences.captionVertical && verticalCaption {
-                VerticalCaption(text: caption, color: Color(white: 0.99))
+                VerticalCaption(text: caption, color: Color(white: 0.99), highlight: activeQuote)
                     .frame(width: min(size.width * 0.4, 13 * 14 * 1.55), height: max(80, size.height - 116))
                     .padding(.vertical, 9).padding(.horizontal, 14)
                     .background(Color(white: 0.07, opacity: 0.78), in: RoundedRectangle(cornerRadius: 8))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: right ? .trailing : .leading)
                     .padding(.horizontal, 12).padding(.vertical, 58)
             } else {
-                Text(caption).inkuFont(14).lineSpacing(14 * 0.55).lineLimit(3)
+                Text(markedCaption).inkuFont(14).lineSpacing(14 * 0.55).lineLimit(3)
                     .multilineTextAlignment(right ? .trailing : .leading)
                     .foregroundStyle(Color(white: 0.99))
                     .frame(maxWidth: .infinity, alignment: right ? .trailing : .leading)
@@ -451,6 +496,7 @@ public final class CanvasPicture {
 private struct VerticalCaption: View {
     let text: String
     var color: Color? = nil
+    var highlight: String? = nil
     var body: some View {
         Canvas { context, size in
             context.withCGContext { cg in
@@ -460,7 +506,14 @@ private struct VerticalCaption: View {
                     NSAttributedString.Key(kCTVerticalFormsAttributeName as String): true,
                     NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
                 ]
-                let string = NSAttributedString(string: text, attributes: attributes)
+                let string = NSMutableAttributedString(string: text, attributes: attributes)
+                if let highlight, !highlight.isEmpty {
+                    let range = (text as NSString).range(of: highlight)
+                    if range.location != NSNotFound {
+                        string.addAttribute(NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String), value: false, range: range)
+                        string.addAttribute(NSAttributedString.Key(kCTForegroundColorAttributeName as String), value: Color.yellow.resolve(in: context.environment).cgColor, range: range)
+                    }
+                }
                 let setter = CTFramesetterCreateWithAttributedString(string)
                 let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0),
                     CGPath(rect: CGRect(origin: .zero, size: size), transform: nil),

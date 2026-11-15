@@ -6,12 +6,22 @@ struct ReadDrawInfoView: View {
     let record: ExactJSON
     let display: DisplaySettings
     var pluginOffers: [String] = []
+    var compositionSnapshot: CompositionRecordSnapshot?
+    var showsReading = true
     @Environment(\.inkuPhoneLayout) private var phoneLayout
     @Environment(\.inkuStacksLabels) private var stacksLabels
     private var phone: Bool { phoneLayout || stacksLabels }
     private var ja: Bool { display.preferences.language != "en" }
     private func l(_ jaText: String, _ en: String) -> String { ja ? jaText : en }
     private var sep: String { ja ? "、" : ", " }
+    private func namedLaw(_ code: String) -> String {
+        let name = CompositionNames.lawName(code, language: display.preferences.language)
+        return name == code ? code : name + (ja ? "（\(code)）" : " (\(code))")
+    }
+    private func namedColorLaw(_ code: String) -> String {
+        let name = CompositionNames.colorLawName(code, language: display.preferences.language)
+        return name == code ? code : name + (ja ? "（\(code)）" : " (\(code))")
+    }
     private func label(_ value: String?, _ table: [String: (String, String)]) -> String {
         guard let value else { return "" }
         guard let pair = table[value] else { return value }
@@ -78,7 +88,7 @@ struct ReadDrawInfoView: View {
         let labels = record["source_labels"].array?.compactMap(\.string) ?? []
         VStack(alignment: .leading, spacing: 16) {
             if !pluginOffers.isEmpty { row(l("提示したプラグイン", "Plugins offered"), pluginOffers.joined(separator: "\n"), "provenanceHintPluginOffers") }
-            group(l("言葉で描く", "In words")) {
+            if showsReading { group(l("言葉で描く", "In words")) {
                 row(l("描き方", "Drawing"), l("言葉で描く", "In words"), "provenanceHintDrawRoute")
                 row(l("読み", "Reading"), reading, "provenanceHintReading")
                 row(l("見比べ", "Review"), reviewed ? l("描いた画を見て一度直した", "Corrected once beside its drawing") : l("見比べなし", "Not reviewed"), "provenanceHintReadReview")
@@ -87,7 +97,7 @@ struct ReadDrawInfoView: View {
                 list(l("記述と札に無いため落とした項目", "Dropped: not in the description or its labels"), dropped)
                 list(l("回の記録", "Rounds"), rounds.map(round), numbered: true)
                 if let text = record["before_review"].string, !text.isEmpty { DisclosureGroup(l("見比べる前の指示書", "Instructions before the review")) { pre(text) } }
-            }
+            } }
             if record["composition"].object != nil { composition(record["composition"]) }
         }
     }
@@ -99,10 +109,20 @@ struct ReadDrawInfoView: View {
         group(l("構図と法則", "Composition and laws")) {
             row(l("状態", "State"), compositionState(c), "provenanceHintComposition")
             if answer.object != nil {
-                row(l("命題", "Thesis"), answer["thesis"].string ?? "", "provenanceHintComposition")
-                row(l("画の型", "Form"), label(answer["form"].string, forms), "provenanceHintComposition")
-                row(l("主の法則", "Main law"), answer["main_law"].string ?? "", "provenanceHintComposition")
-                row(l("法則", "Laws"), (answer["laws"].object ?? [:]).keys.sorted().joined(separator: sep), "provenanceHintComposition")
+                if compositionSnapshot?.own == nil, let inherited = compositionSnapshot?.inherited {
+                    let via = compositionDerivationName(inherited["via"].array?.first?.string ?? "", display: display)
+                    let at = inherited["at"].number.flatMap(Double.init).map { Date(timeIntervalSince1970: $0 / 1000).formatted(date: .abbreviated, time: .shortened) } ?? "—"
+                    Text(display.label("この作品は「\(via)」の子です。下は、親の作品（\(at)）の構図と法則です。", "This work is a child of \(via). Below is the parent’s composition (\(at)).")).inkuFont(12).foregroundStyle(.secondary)
+                }
+                let source = compositionSnapshot?.metadata["thesis_source"].string
+                let thesisOrigin = source == "proposed" ? l("（AI が出した）", " (AI-proposed)") : source == "author" ? l("（作者が書いた）", " (author-written)") : ""
+                let requested = l("（作者が選んだ）", " (chosen by the author)")
+                row(l("命題", "Thesis"), (answer["thesis"].string ?? "") + thesisOrigin + (c["requested_thesis"].string == nil ? "" : requested), "provenanceHintComposition")
+                let form = answer["form"].string ?? ""
+                row(l("画の型", "Form"), CompositionNames.formName(form, language: display.preferences.language) + (c["requested_form"].string == nil ? "" : requested), "provenanceHintComposition")
+                let main = answer["main_law"].string ?? ""
+                row(l("主の法則", "Main law"), namedLaw(main) + (c["requested_main_law"].string == nil ? "" : requested), "provenanceHintComposition")
+                row(l("法則", "Laws"), (answer["laws"].object ?? [:]).keys.sorted().map(namedLaw).joined(separator: sep), "provenanceHintComposition")
             }
             if !last.isEmpty { row(l("最後の測り", "Last measure"), counts(last.map { $0["state"].string ?? "" }, table: measures), "provenanceHintCompositionMeasure") }
             if let reason = answer["reason"].string, !reason.isEmpty { Text(l("理由", "Reason") + ": " + reason).inkuFont(12).foregroundStyle(.secondary) }
@@ -122,8 +142,8 @@ struct ReadDrawInfoView: View {
                 Text(l("配色", "Colors")).inkuFont(12).foregroundStyle(.secondary)
                 let reason = colors["fallback"].string ?? ""
                 row(l("状態", "State"), colors["state"].string == "used" ? l("配色を選び、当てて確定した", "Colors were chosen and applied before the commit") : l("配色を当てられず、配色の前の指示書で確定した（\(reason)）", "No colors could be applied, so the DDL before them was committed (\(reason))"), "provenanceHintCompositionColors")
-                if let law = colors["main_law"].string, !law.isEmpty { row(l("主の法則", "Main law"), law, "provenanceHintCompositionColors") }
-                if let laws = colors["laws"].array, !laws.isEmpty { row(l("法則", "Laws"), laws.compactMap(\.string).joined(separator: sep), "provenanceHintCompositionColors") }
+                if let law = colors["main_law"].string, !law.isEmpty { row(l("主の法則", "Main law"), namedColorLaw(law), "provenanceHintCompositionColors") }
+                if let laws = colors["laws"].array, !laws.isEmpty { row(l("法則", "Laws"), laws.compactMap(\.string).map(namedColorLaw).joined(separator: sep), "provenanceHintCompositionColors") }
                 if let ground = colors["ground"].string, !ground.isEmpty { row(l("地", "Ground"), label(ground, ["white": ("白", "white"), "black": ("黒", "black"), "blue": ("青", "blue"), "red": ("赤", "red"), "green": ("緑", "green"), "gray": ("灰", "gray"), "yellow": ("黄", "yellow"), "orange": ("橙", "orange"), "purple": ("紫", "purple")]), "provenanceHintCompositionColors") }
                 if !colorChanges.isEmpty {
                     row(l("変えた文", "Lines changed"), counts(colorChanges.map { $0["how"].string ?? "" }, table: changes), "provenanceHintCompositionColors")

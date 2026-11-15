@@ -36,11 +36,12 @@
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: RefinementView) => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, model?: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
-		stage1ModelLabel: string;
-		stage2ModelLabel: string;
+		refinementInitialModel: () => string;
+		refinementModelLabel: (model: string) => string;
+		onChooseRefinementModel: (model: string, accept: (model: string) => void) => void;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
@@ -52,7 +53,7 @@
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		/** Redraw a work with the sketch off or on, as its child. */
-		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean) => Promise<void>;
+		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean, model?: string) => Promise<void>;
 		visionModel: string;
 		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
@@ -88,7 +89,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, runProgress = null, onSaveOkugakiModel, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, refinementInitialModel, refinementModelLabel, onChooseRefinementModel, runTokensIn, runTokensOut, runAttempt = null, runProgress = null, onSaveOkugakiModel, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let handledFocusRequest = 0;
 	$effect(() => {
@@ -968,11 +969,11 @@ $effect(() => {
 {/if}
 
 {#if activeEditNode}
-	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
+	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {refinementInitialModel} {refinementModelLabel} {onChooseRefinementModel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if activeSketchNode}
-	<WorkEditDialog node={activeSketchNode} mode="sketch-grain" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeSketchNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
+	<WorkEditDialog node={activeSketchNode} mode="sketch-grain" {isJapanese} {stageLabel} {refinementInitialModel} {refinementModelLabel} {onChooseRefinementModel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeSketchNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if okugakiOpen}

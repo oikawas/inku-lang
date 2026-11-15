@@ -631,7 +631,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return { theses, digest: body.prompt_digest };
 	}
 
-	async function generateCompositionCandidates(request: CompositionRequest, count: 1 | 4): Promise<void> {
+	async function generateCompositionCandidates(request: CompositionRequest, count: 1 | 4, model: string): Promise<void> {
 		const workId = refinementWorkId();
 		const target = refinementTarget();
 		if (!workId || !target.source || !work.result || refinementSession.gridBusy) return;
@@ -641,7 +641,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		const parent = work.result;
 		const answer = work.displayedHistoryItem?.description_ddl?.composition?.answer;
 		const parentComposition = { form: answer?.form ?? null, mainLaw: answer?.main_law ?? null, thesis: answer?.thesis ?? null };
-		const stage1 = parent.stage1_model ?? deps.models.stage1();
+		const stage1 = model;
 		const controller = refinementSession.beginGrid({ includesReading: true, taskLabel: t().workActionComposition, count });
 		const timer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
 		try {
@@ -671,7 +671,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 					const view = await pipeline.fromDescription(target.source, {
 						route: 'read_and_draw', composition: 'on', ...changed,
 						sketch: 'on', ...(target.sketchText ? { sketch_text: target.sketchText } : {}),
-						stage1_model: stage1, stage2_model: parent.stage2_model ?? deps.models.stage2(),
+						stage1_model: stage1, stage2_model: model,
 						catalog_id: refinementCatalogId(), catalog_mode: 'fixed', canvas_aspect: refinementCanvasAspectId(),
 						...(parent.render_seed != null ? { render_seed: parent.render_seed } : {}),
 						save_history: false, save_artifacts: false, count_generation: true,

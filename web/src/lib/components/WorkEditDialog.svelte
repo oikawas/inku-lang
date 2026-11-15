@@ -5,6 +5,7 @@
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import DescriptionMeter from './DescriptionMeter.svelte';
+	import RefinementModelSelection from '$lib/features/canvas/RefinementModelSelection.svelte';
 	import { normalizeSketchState, sketchStateNote, type SketchMode } from '$lib/sketch';
 	import type { LineageNode } from '$lib/features/history/types';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
@@ -15,18 +16,20 @@
 		mode: 'description' | 'sketch-grain';
 		isJapanese: boolean;
 		stageLabel: string;
-		stage1ModelLabel: string;
-		stage2ModelLabel: string;
+		refinementInitialModel: () => string;
+		refinementModelLabel: (model: string) => string;
+		onChooseRefinementModel: (model: string, accept: (model: string) => void) => void;
 		tokensIn: number | null;
 		tokensOut: number | null;
 		attempt?: ProviderAttemptCount | null;
 		progress?: import('$lib/paintStream').PaintProgressEvent | null;
 		onClose: () => void;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
-		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, model?: string) => void | Promise<void>;
+		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean, model?: string) => void | Promise<void>;
 	};
 
-	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, progress = null, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
+	let { node, mode, isJapanese, stageLabel, refinementInitialModel, refinementModelLabel, onChooseRefinementModel, tokensIn, tokensOut, attempt = null, progress = null, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
+	let selectedModel = $state('');
 	let draft = $state('');
 	let wildOverride = $state(false);
 	let sketchMode = $state<SketchMode>('on');
@@ -39,6 +42,7 @@
 	let fallbackFocus: HTMLElement | null = null;
 
 	onMount(() => {
+		selectedModel = refinementInitialModel();
 		fallbackFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		dialogEl?.showModal();
 	});
@@ -79,8 +83,8 @@
 		controller = new AbortController();
 		let saved = false;
 		try {
-			if (mode === 'description') await onDrawDescription(node, draft, controller.signal, wildOverride);
-			else await onDrawSketchGrain(node, sketchMode, controller.signal, wildOverride);
+			if (mode === 'description') await onDrawDescription(node, draft, controller.signal, wildOverride, selectedModel);
+			else await onDrawSketchGrain(node, sketchMode, controller.signal, wildOverride, selectedModel);
 			saved = true;
 		} catch (cause) {
 			if (!(cause instanceof Error && cause.name === 'AbortError')) error = cause instanceof Error ? cause.message : String(cause);
@@ -116,9 +120,10 @@
 	</div>
 	<footer>
 		{#if drawing}
-			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} {progress} onStop={() => controller?.abort()} />
+			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={refinementModelLabel(selectedModel)} stage2Model={refinementModelLabel(selectedModel)} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} {progress} onStop={() => controller?.abort()} />
 		{:else}
 				<WildToggle value={wildOverride} onSelect={(next) => (wildOverride = next)} />
+			<RefinementModelSelection bind:model={selectedModel} label={refinementModelLabel} onChoose={onChooseRefinementModel} />
 			{#if mode !== 'description'}
 				<span class="sketch-current">{t().workEditParentGrain}: {node.history?.sketch_text ? (isJapanese ? 'あり' : 'With sketch') : (sketchStateNote(normalizeSketchState(node.history?.sketch_state), isJapanese) || (isJapanese ? 'なし' : 'None'))}</span>
 			{/if}
@@ -139,7 +144,7 @@
 	.work-edit-body { min-height: 0; overflow-y: auto; display: grid; gap: 8px; padding: 18px 20px; }
 	.work-edit-body label { color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 700; }
 	.work-edit-body textarea { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--border2); border-radius: 8px; padding: 12px 14px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.65; }
-	.work-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
+	.work-edit-dialog > footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.work-edit-dialog > footer :global(.wild-inline), .sketch-current { margin-right: auto; }
 	.work-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	.work-edit-dialog > footer .work-edit-draw { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); font-weight: 700; }

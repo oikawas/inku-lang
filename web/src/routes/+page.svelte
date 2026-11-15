@@ -247,6 +247,8 @@
 	let modelSelectionAllowVision = $state(true);
 	let modelSelectionVisionOnly = $state(false);
 	let modelSelectionForDrawing = false;
+	let refinementModelSelection = $state(false);
+	let acceptRefinementModel: ((model: string) => void) | null = null;
 	// The Server config supplies the candidate-grid cap so it tracks render slots;
 	// apiFetch handles 503 retries when other work temporarily occupies a slot.
 	let renderFanoutLimit = $state(4);
@@ -901,6 +903,15 @@
 		settings.openModelSelection();
 	}
 
+	function openRefinementModelSelection(current: string, accept: (model: string) => void) {
+		const selected = splitModelReference(current, availableModelCatalog);
+		acceptRefinementModel = accept;
+		refinementModelSelection = true;
+		openModelSelection(false, false, true);
+		if (selected.provider) stage1Provider = stage2Provider = selected.provider;
+		stage1Model = stage2Model = selected.model;
+	}
+
 	async function persistModelSelection() {
 		if (!session.currentUser) return;
 		const previousUser = session.currentUser;
@@ -958,6 +969,12 @@
 	}
 
 	async function confirmModelSelection() {
+		if (acceptRefinementModel) {
+			acceptRefinementModel(qualifiedModelRef(stage1Provider, stage1Model));
+			restoreModelSelection();
+			settings.finishModelSelection();
+			return;
+		}
 		if (modelSelectionForDrawing) {
 			work.invalidateWorkOptions();
 			if (modelSelectionVisionOnly) work.drawOptions.models.vision = qualifiedModelRef(visionProvider, visionModel);
@@ -981,6 +998,8 @@
 			visionModel = modelSelectionSnapshot.visionModel;
 		}
 		modelSelectionSnapshot = null;
+		acceptRefinementModel = null;
+		refinementModelSelection = false;
 	}
 
 	function openCatalogModal() {
@@ -1140,23 +1159,23 @@
 				.filter((group) => group.models.length > 0);
 			availableModelsLoaded = true;
 			modelCatalogStatus = 'ready';
-			if (Object.keys(userModels).length > 0) {
+			if (!refinementModelSelection && Object.keys(userModels).length > 0) {
 				applyUserModelSettings(
 					{ ...session.currentUser, model_settings: userModels },
 					{ excludeUserSettingIds: ['text-size'] }
 				);
 			}
-			if (stage1Provider !== 'chatgpt' && !modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
+			if (!refinementModelSelection && stage1Provider !== 'chatgpt' && !modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
 				const fallbackGroup = availableModelCatalog.find((group) => group.id !== 'chatgpt' && group.models.length > 0);
 				stage1Provider = fallbackGroup?.id ?? stage1Provider;
 				stage1Model = fallbackGroup?.models[0]?.id ?? stage1Model;
 			}
-			if (stage2Provider !== 'chatgpt' && !modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
+			if (!refinementModelSelection && stage2Provider !== 'chatgpt' && !modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
 				const fallbackGroup = availableModelCatalog.find((group) => group.id !== 'chatgpt' && group.models.length > 0);
 				stage2Provider = fallbackGroup?.id ?? stage2Provider;
 				stage2Model = fallbackGroup?.models[0]?.id ?? stage2Model;
 			}
-			if (!visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
+			if (!refinementModelSelection && !visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
 				const fallbackGroup = availableVisionModelCatalog.find((group) => group.models.length > 0);
 				visionProvider = fallbackGroup?.id ?? visionProvider;
 				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
@@ -1164,7 +1183,7 @@
 			const okugakiModelAvailable = availableVisionModelCatalog.some((group) =>
 				group.models.some((model) => qualifiedModelRef(group.id, model.id) === okugakiModel)
 			);
-			if (!okugakiModelAvailable) {
+			if (!refinementModelSelection && !okugakiModelAvailable) {
 				okugakiModel = qualifiedModelRef(visionProvider, visionModel);
 			}
 			demo.reconcilePromptModel(demoPromptModelCatalog, availableModelsLoaded);
@@ -1718,7 +1737,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	});
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, model?: string): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history?.id) return;
 	// Ask before the words are carried into a child (contract § stage 4).
@@ -1732,6 +1751,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	try {
 		const view = await work.authorDescription(sourceText, {
 			sourceText,
+			stage1Model: model, stage2Model: model,
 			canvasAspectId: lineageCanvasAspectId(node),
 			lineageParentNodeId: node.id,
 			derivationKind: 'description_edit',
@@ -1760,7 +1780,7 @@ function recordedWild(item: { draw_options?: RecordedDrawOptions | null } | null
 	return item?.draw_options?.wild === 'on';
 }
 
-async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = recordedWild(node.history)): Promise<void> {
+async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = recordedWild(node.history), model?: string): Promise<void> {
 	if (!node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
@@ -1768,6 +1788,7 @@ async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signa
 	if (!sourceText.trim()) return;
 	const rendered = await work.paintOne(sourceText, {
 		sourceText,
+		stage1Model: model, stage2Model: model,
 		historyInput: sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
 		lineageParentNodeId: node.id,
@@ -3219,8 +3240,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusStage2Model}
 				{statusStage1ModelOnly}
 				{statusStage2ModelOnly}
-				runStage1ModelLabel={work.stage1ModelLabel}
-				runStage2ModelLabel={work.stage2ModelLabel}
+				refinementInitialModel={() => work.tabModelRef('stage1')}
+				refinementModelLabel={statusModelName}
+				onChooseRefinementModel={openRefinementModelSelection}
 				visionModel={qualifiedModelRef(visionProvider, visionModel)}
 				{okugakiModel}
 				visionProviderGroups={availableVisionModelCatalog}
@@ -3458,6 +3480,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if settings.opened}
 	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
 		<SettingsModal
+			topLayer={refinementModelSelection}
 			drawDefaults={work.drawDefaults}
 			drawCatalogs={colorCatalogs}
 			drawCanvases={canvasAspectOptions}

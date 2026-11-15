@@ -30,6 +30,7 @@
 	import type { SettingsController, SettingsTab, SettingsUserItem } from '$lib/features/settings/state.svelte';
 
 	type Props = {
+		topLayer?: boolean;
 		drawDefaults: DrawDefaults;
 		drawCatalogs: { id: string; name: string }[];
 		drawCanvases: { id: string; label: string }[];
@@ -87,6 +88,7 @@
 	let {
 		drawDefaults, drawCatalogs, drawCanvases, onSaveDrawDefaults,
 		settings,
+		topLayer = false,
 		demoContent,
 		singleUserMode,
 		chatgptAvailable,
@@ -200,6 +202,7 @@
 		}
 	});
 	let modalElement = $state<HTMLDivElement | null>(null);
+	let topLayerDialog = $state<HTMLDialogElement | null>(null);
 	let restoreFocusTo: HTMLElement | null = null;
 
 	function visibleEnabledControls(): HTMLElement[] {
@@ -234,8 +237,10 @@
 	onMount(() => {
 		const activeElement = document.activeElement;
 		restoreFocusTo = activeElement instanceof HTMLElement && activeElement !== document.body ? activeElement : null;
+		if (topLayer) topLayerDialog?.showModal();
 		void tick().then(() => (visibleEnabledControls()[0] ?? modalElement)?.focus());
 		return () => {
+			topLayerDialog?.close();
 			if (restoreFocusTo?.isConnected) restoreFocusTo.focus();
 		};
 	});
@@ -251,6 +256,7 @@
 	}
 </script>
 
+{#snippet settingsContents()}
 <div class="settings-feature-root">
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
 <div bind:this={modalElement} class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={trapTab}>
@@ -520,3 +526,18 @@
 	{/if}
 </div>
 </div>
+{/snippet}
+
+{#if topLayer}
+	<dialog bind:this={topLayerDialog} class="settings-top-layer" aria-label={t().modelSelectButton}
+		oncancel={(event) => { event.preventDefault(); onClose(); }}>
+		{@render settingsContents()}
+	</dialog>
+{:else}
+	{@render settingsContents()}
+{/if}
+
+<style>
+	.settings-top-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; }
+	.settings-top-layer::backdrop { background: transparent; }
+</style>

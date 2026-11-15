@@ -88,9 +88,9 @@
 		statusStage2Model: string;
 		statusStage1ModelOnly: string;
 		statusStage2ModelOnly: string;
-		/** The models a redraw started here calls: the page's choice, not the displayed work's. */
-		runStage1ModelLabel: string;
-		runStage2ModelLabel: string;
+		refinementInitialModel: () => string;
+		refinementModelLabel: (model: string) => string;
+		onChooseRefinementModel: (model: string, accept: (model: string) => void) => void;
 		visionModel: string;
 		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
@@ -161,7 +161,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
-		onGenerateCompositionCandidates: (change: import('$lib/features/canvas/composition-form').CompositionRequest, count: 1 | 4) => void | Promise<void>;
+		onGenerateCompositionCandidates: (change: import('$lib/features/canvas/composition-form').CompositionRequest, count: 1 | 4, model: string) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		/** Draws the work with each model picked in the "change the model" dialog. */
 		onGenerateModelCandidates: () => void | Promise<void>;
@@ -180,9 +180,9 @@
 		onFocusLatestRefinementChild: (parentNodeId: string, knownChildNodeIds: Set<string>) => boolean | Promise<boolean>;
 		onToggleLineageStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleLineageForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
-		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
+		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, model?: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
-		onDrawLineageSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
+		onDrawLineageSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean, model?: string) => Promise<void>;
 		onToggleSaijiki: () => void;
 		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;
@@ -237,8 +237,9 @@
 		statusStage2Model,
 		statusStage1ModelOnly,
 		statusStage2ModelOnly,
-		runStage1ModelLabel,
-		runStage2ModelLabel,
+		refinementInitialModel,
+		refinementModelLabel,
+		onChooseRefinementModel,
 		visionModel,
 		okugakiModel,
 		visionProviderGroups,
@@ -917,6 +918,7 @@
 			>
 				{#if outputTab === 'refine'}
 				<CanvasRefinementWorkspace
+					{refinementInitialModel} {refinementModelLabel} {onChooseRefinementModel}
 					view={refineView}
 					modalOpen={refineModalOpen}
 					{isJapanese}
@@ -956,8 +958,8 @@
 						onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar}
 						onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement}
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
-						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={runStage1ModelLabel}
-						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} {runProgress} onSaveOkugakiModel={onSaveOkugakiModel}
+						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} {refinementInitialModel} {refinementModelLabel} {onChooseRefinementModel}
+						{runTokensIn} {runTokensOut} {runAttempt} {runProgress} onSaveOkugakiModel={onSaveOkugakiModel}
 						onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
 						onLoadBranch={onLoadLineageBranch} {visionModel} {okugakiModel}
@@ -1038,8 +1040,9 @@
 		mode={directEditMode}
 		{isJapanese}
 		{stageLabel}
-		stage1ModelLabel={runStage1ModelLabel}
-		stage2ModelLabel={runStage2ModelLabel}
+		{refinementInitialModel}
+		{refinementModelLabel}
+		{onChooseRefinementModel}
 		tokensIn={runTokensIn}
 		tokensOut={runTokensOut}
 		attempt={runAttempt}

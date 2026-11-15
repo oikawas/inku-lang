@@ -36,6 +36,9 @@
 		targetComposition: CompositionSummary | null;
 		statusStage1Model: string;
 		statusStage2Model: string;
+		refinementInitialModel: () => string;
+		refinementModelLabel: (model: string) => string;
+		onChooseRefinementModel: (model: string, accept: (model: string) => void) => void;
 		/** The model comparison's stroke limit switch. */
 		refineWildValue: boolean;
 		/** The catalog the work uses, named in the color change dialog. */
@@ -45,7 +48,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
-		onGenerateCompositionCandidates: (change: import('./composition-form').CompositionRequest, count: 1 | 4) => void | Promise<void>;
+		onGenerateCompositionCandidates: (change: import('./composition-form').CompositionRequest, count: 1 | 4, model: string) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		/** The displayed work's chunks for "Change the layout" (step 3). */
@@ -73,6 +76,9 @@
 		targetComposition,
 		statusStage1Model,
 		statusStage2Model,
+		refinementInitialModel,
+		refinementModelLabel,
+		onChooseRefinementModel,
 		refineWildValue,
 		catalogName,
 		onClose,
@@ -197,6 +203,7 @@
 	{:else if view === 'composition-form'}
 		<RefinementCompositionView {isJapanese} {resultAvailable} {artworkUrl} {canvasAspectWidth} {canvasAspectHeight}
 			{refinementSession} {compositionForm} {compositionFormSwitch} {targetComposition}
+			{refinementInitialModel} {refinementModelLabel} {onChooseRefinementModel}
 			onGenerateCandidates={onGenerateCompositionCandidates} {onSaveAndClose} {onDiscardAndClose} />
 	{:else}
 		<RefinementModelCompareView

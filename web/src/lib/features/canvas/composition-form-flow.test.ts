@@ -31,6 +31,7 @@ test('four composition-form forks retain the parent settings and only selected e
 		calls.push({ path, body });
 		let data: unknown;
 		if (path === '/api/pipeline/history/parent') data = { variation_id: 'vp', revision: '1' };
+		else if (path === '/api/composition/theses') data = { theses: ['one', 'two', 'three', 'four'], prompt_digest: 'digest' };
 		else if (path === '/api/pipeline/history/parent/fork') data = view(++sequence);
 		else if (path.endsWith('/commands')) data = view(Number(path.match(/e(\d+)/)?.[1]), true);
 		else if (path.endsWith('/save')) data = { history_id: 'saved', history_at: 1 };
@@ -54,12 +55,14 @@ test('four composition-form forks retain the parent settings and only selected e
 		seeds: { composition: () => 1 }, lineageParentId: () => 'node', ensureVisibleLineageParentId: async () => 'node',
 		pushHistory: async () => { throw new Error('must save execution'); }, resetTargetScopedState: () => {},
 	} as unknown as Parameters<typeof createRefinementCoordinator>[0]);
-	await coordinator.generateCompositionCandidates({ kind: 'form', form: 'bands' }, 4);
+	await coordinator.generateCompositionCandidates({ kind: 'form', form: 'bands' }, 4, 'selected:model');
 	assert.equal(session.candidates.length, 4);
 	const forks = calls.filter((call) => call.path.endsWith('/fork'));
 	assert.equal(forks.length, 4);
 	for (const fork of forks) {
 		const options = fork.body.options as Record<string, unknown>;
+		assert.equal(options.stage1_model, 'selected:model');
+		assert.equal(options.stage2_model, 'selected:model');
 		assert.equal(options.composition_form, 'bands');
 		assert.equal('composition_main_law' in options, false);
 		assert.deepEqual(options.derivation_metadata, { form_from: 'one_corner', form_to: 'bands' });
@@ -71,6 +74,14 @@ test('four composition-form forks retain the parent settings and only selected e
 	session.toggleCandidate(session.candidates[1].id);
 	assert.equal(await coordinator.saveSelectedVariationCandidates(), true);
 	assert.deepEqual(calls.filter((call) => call.path.endsWith('/save')).map((call) => call.path), ['/api/pipeline/executions/e2/save']);
+	await coordinator.generateCompositionCandidates({ kind: 'proposed_theses' }, 4, 'selected:theses');
+	assert.equal(calls.find((call) => call.path === '/api/composition/theses')?.body.model, 'selected:theses');
+	for (const fork of calls.filter((call) => call.path.endsWith('/fork')).slice(4)) {
+		const options = fork.body.options as Record<string, unknown>;
+		assert.equal(options.stage1_model, 'selected:theses');
+		assert.equal(options.stage2_model, 'selected:theses');
+	}
+	assert.equal(calls.filter((call) => call.path.endsWith('/fork')).length, 8);
 });
 
 test('step 2: a main-law change names the law and keeps the parent\'s form', async () => {

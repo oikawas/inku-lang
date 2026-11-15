@@ -4,10 +4,12 @@
 	// what is decided again. The list scrolls; what stays and the draw buttons
 	// stay in view.
 	import { t } from '$lib/i18n/index.svelte';
+	import { onMount } from 'svelte';
 	import PaintButton from '$lib/components/PaintButton.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import VariationLanes from '$lib/components/VariationLanes.svelte';
 	import RefinementCandidateGrid from './RefinementCandidateGrid.svelte';
+	import RefinementModelSelection from './RefinementModelSelection.svelte';
 	import CompositionChips from '$lib/features/composition-record/CompositionChips.svelte';
 	import CompositionFigure from '$lib/features/composition-record/CompositionFigure.svelte';
 	import { formName } from '$lib/features/composition-record/composition-names';
@@ -17,14 +19,19 @@
 	import type { RefinementSession } from './refinement-session.svelte';
 
 	let { isJapanese, resultAvailable, artworkUrl, canvasAspectWidth, canvasAspectHeight, refinementSession,
-		compositionForm, compositionFormSwitch, targetComposition, onGenerateCandidates, onSaveAndClose, onDiscardAndClose }: {
+		compositionForm, compositionFormSwitch, targetComposition, refinementInitialModel, refinementModelLabel,
+		onChooseRefinementModel, onGenerateCandidates, onSaveAndClose, onDiscardAndClose }: {
 		isJapanese: boolean; resultAvailable: boolean; artworkUrl: string | null;
 		canvasAspectWidth: number; canvasAspectHeight: number; refinementSession: RefinementSession;
 		compositionForm: string | null; compositionFormSwitch: boolean;
 		targetComposition: CompositionSummary | null;
-		onGenerateCandidates: (change: CompositionRequest, count: 1 | 4) => void | Promise<void>;
+		refinementInitialModel: () => string; refinementModelLabel: (model: string) => string;
+		onChooseRefinementModel: (model: string, accept: (model: string) => void) => void;
+		onGenerateCandidates: (change: CompositionRequest, count: 1 | 4, model: string) => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>; onDiscardAndClose: () => void | Promise<void>;
 	} = $props();
+	let selectedModel = $state('');
+	onMount(() => { selectedModel = refinementInitialModel(); });
 	type What = 'form' | 'main_law' | 'thesis';
 	// The thesis (step 4c, the mock's section 6): the author writes one and draws
 	// one option, or the AI proposes four and each is drawn.
@@ -116,10 +123,12 @@
 			</div>
 			{#if what === 'main_law' && selectedSummary}<p class="law-sentence">{selectedSummary}</p>{/if}
 			<dl class="keeps"><dt>{t().compositionKeepsTerm}</dt><dd>{keeps}</dd><dt>{t().compositionRedecidesTerm}</dt><dd>{redecides}</dd></dl>
+			<RefinementModelSelection bind:model={selectedModel} label={refinementModelLabel} disabled={busy} onChoose={onChooseRefinementModel} />
 			<div class="refine-actions refine-paint-actions">
-				<PaintButton onclick={() => onGenerateCandidates(change, 1)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved || !oneAllowed}>{t().refineSingleButton}</PaintButton>
-				<PaintButton onclick={() => onGenerateCandidates(change, 4)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved || !fourAllowed}>{t().variationGridDefault}</PaintButton>
+				<PaintButton onclick={() => onGenerateCandidates(change, 1, selectedModel)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved || !oneAllowed}>{t().refineSingleButton}</PaintButton>
+				<PaintButton onclick={() => onGenerateCandidates(change, 4, selectedModel)} disabled={!resultAvailable || busy || refinementSession.hasUnsaved || !fourAllowed}>{t().variationGridDefault}</PaintButton>
 				{#if busy}<RunStatus label={t().refineGeneratingTask(refinementSession.gridTaskLabel)}
+					stage1Model={refinementModelLabel(selectedModel)} stage2Model={refinementModelLabel(selectedModel)}
 					progressDone={refinementSession.gridDone} progressTotal={refinementSession.gridTotal}
 					elapsedMs={refinementSession.elapsedMs} progress={refinementSession.gridProgress}
 					tokensIn={refinementSession.tokensIn} tokensOut={refinementSession.tokensOut}

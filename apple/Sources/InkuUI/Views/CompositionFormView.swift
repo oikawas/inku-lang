@@ -104,7 +104,7 @@ public struct CompositionFormView: View {
                     } else {
                         thesisChoice(.authorThesis, title: "compositionThesisWrite", fallback: "自分で命題を書く", note: "compositionThesisWriteNote")
                         TextEditor(text: Binding(get: { form.authorThesis }, set: { text in
-                            form.authorThesis = String(String.UnicodeScalarView(text.unicodeScalars.prefix(400)))
+                            form.authorThesis = ThesisInput.limited(text)
                         })).focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
                             if focused { form.change = .authorThesis }
                         }.frame(minHeight: 72).overlay(Rectangle().stroke(InkuColor.border2))

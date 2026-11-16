@@ -69,6 +69,8 @@ struct IntensityProfile {
     pastel_base_tooth: f64,
     pastel_stroke_tooth: f64,
     pastel_width: f64,
+    pastel_overlap: f64,
+    pastel_coverage: f64,
     knife_tooth: f64,
     knife_opacity: f64,
     knife_ridge: f64,
@@ -82,6 +84,8 @@ const FILL_INTENSITY: [IntensityProfile; 3] = [
         pastel_base_tooth: 0.36,
         pastel_stroke_tooth: 0.30,
         pastel_width: 0.75,
+        pastel_overlap: 0.0,
+        pastel_coverage: 0.0,
         knife_tooth: 0.43,
         knife_opacity: 0.68,
         knife_ridge: 0.0,
@@ -93,6 +97,8 @@ const FILL_INTENSITY: [IntensityProfile; 3] = [
         pastel_base_tooth: 0.18,
         pastel_stroke_tooth: 0.14,
         pastel_width: 1.0,
+        pastel_overlap: 0.0,
+        pastel_coverage: 0.0,
         knife_tooth: 0.28,
         knife_opacity: 1.0,
         knife_ridge: 0.0,
@@ -104,9 +110,11 @@ const FILL_INTENSITY: [IntensityProfile; 3] = [
         pastel_base_tooth: 0.04,
         pastel_stroke_tooth: 0.03,
         pastel_width: 1.3,
+        pastel_overlap: 0.26,
+        pastel_coverage: 0.48,
         knife_tooth: 0.10,
         knife_opacity: 1.0,
-        knife_ridge: 0.6,
+        knife_ridge: 0.34,
         etching: 1.3,
         etching_spacing: 0.7,
     },
@@ -124,12 +132,18 @@ fn fill_intensity(intensity: SurfaceIntensity) -> IntensityProfile {
 const STROKE_INTENSITY: [(f64, f64, f64, f64, f64); 3] = [
     (0.48, 0.20, 0.43, 0.65, 0.0),
     (0.34, 0.05, 0.28, 1.0, 0.0),
-    (0.12, 0.01, 0.10, 1.0, 0.6),
+    (0.12, 0.01, 0.10, 1.0, 0.40),
 ];
-const DENSE_ACCENTS: [(f64, f64, [f64; 2]); 2] = [
-    (0.15, 0.20, [-0.22, 0.10]), // pooled ink and its sheen
-    (0.10, 0.12, [0.20, 0.20]),  // oil: raised streaks
+const DENSE_ACCENTS: [(f64, f64, [f64; 2]); 3] = [
+    (0.08, 0.40, [-0.35, 0.35]), // pooled ink and its sheen
+    (0.08, 0.40, [-0.35, 0.35]), // raised oil ridges
+    (0.08, 0.40, [-0.35, 0.35]), // pastel rubbed over itself
 ];
+const PEN_POOL_TONE: f64 = -0.7;
+const PEN_POOL_TURN_COS: f64 = 0.94;
+const PEN_POOL_SPAN: f64 = 0.06;
+const KNIFE_RIDGE_WIDTH: f64 = 0.30;
+const PASTEL_OVERLAP_WIDTH: f64 = 0.38;
 
 fn stroke_intensity(intensity: SurfaceIntensity) -> (f64, f64, f64, f64, f64) {
     STROKE_INTENSITY[match intensity {
@@ -403,15 +417,53 @@ pub(crate) fn dense_stroke_accents(
     closed: bool,
     color: &str,
 ) -> Element {
-    let (offset, width, tones) = DENSE_ACCENTS[usize::from(weight == Weight::OilPaint)];
+    let index = match weight {
+        Weight::OilPaint => 1,
+        Weight::OilPastel => 2,
+        _ => 0,
+    };
+    let (offset, width, tones) = DENSE_ACCENTS[index];
     let mut group = Element::new("g").attr("class", "dense-stroke-accents");
     for (center, tone) in [offset, 1.0 - offset - width].into_iter().zip(tones) {
         if let Some(band) = streak_band(left, right, closed, center, width, 0.0, 1.0) {
             group.push(
                 path(&closed_d(&band))
                     .attr("fill", bristle_tone(color, tone))
-                    .attr("fill-opacity", "0.7"),
+                    .attr("fill-opacity", "1"),
             );
+        }
+    }
+    if weight == Weight::Pen {
+        for (start, end) in [(0.0, 0.22), (0.78, 1.0)] {
+            if let Some(band) = streak_band(left, right, closed, 0.10, 0.80, start, end) {
+                group.push(path(&closed_d(&band)).attr("fill", bristle_tone(color, PEN_POOL_TONE)));
+            }
+        }
+        let centers = left
+            .iter()
+            .zip(right)
+            .map(|(a, b)| Point::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5))
+            .collect::<Vec<_>>();
+        for (index, points) in centers.windows(3).enumerate() {
+            let (ax, ay) = (points[1].x - points[0].x, points[1].y - points[0].y);
+            let (bx, by) = (points[2].x - points[1].x, points[2].y - points[1].y);
+            let lengths = ax.dhypot(ay) * bx.dhypot(by);
+            if lengths > 1e-9 && (ax * bx + ay * by) / lengths < PEN_POOL_TURN_COS {
+                let t = (index + 1) as f64 / (centers.len() - usize::from(!closed)) as f64;
+                if let Some(band) = streak_band(
+                    left,
+                    right,
+                    closed,
+                    0.10,
+                    0.80,
+                    (t - PEN_POOL_SPAN).max(0.0),
+                    (t + PEN_POOL_SPAN).min(1.0),
+                ) {
+                    group.push(
+                        path(&closed_d(&band)).attr("fill", bristle_tone(color, PEN_POOL_TONE)),
+                    );
+                }
+            }
         }
     }
     group
@@ -1091,6 +1143,15 @@ fn oil_pastel_stroke(
             );
         }
     }
+    if intensity == SurfaceIntensity::Dense {
+        group.push(dense_stroke_accents(
+            Weight::OilPastel,
+            left,
+            right,
+            closed,
+            color,
+        ));
+    }
     group
 }
 
@@ -1122,6 +1183,7 @@ fn knife_pull(
     whole: bool,
     tooth: &str,
     ridge: f64,
+    ridge_clip: Option<&str>,
 ) -> Element {
     let mut mark = Element::new("g").attr("class", "proto-knife-mark");
     let count = spine.len();
@@ -1508,15 +1570,19 @@ fn knife_pull(
         );
     }
     if ridge > 0.0 {
-        let points = (1..=9)
-            .map(|k| at(f64::from(k) / 10.0, 0.25, 0.0))
-            .collect::<Vec<_>>();
-        mark.push(
-            polyline_path(&points)
-                .attr("stroke", bristle_tone(&base, 0.2))
-                .attr("stroke-width", n((half0 * 0.12).max(unit * 0.0007)))
-                .attr("stroke-opacity", n(ridge)),
-        );
+        for (side, tone) in [(-0.48, -ridge), (0.35, ridge)] {
+            let points = (1..=9)
+                .map(|k| at(f64::from(k) / 10.0, side, 0.0))
+                .collect::<Vec<_>>();
+            let mut accent = polyline_path(&points)
+                .attr("stroke", bristle_tone(&base, tone))
+                .attr("stroke-width", n(half0 * KNIFE_RIDGE_WIDTH))
+                .attr("stroke-opacity", "1");
+            if let Some(clip) = ridge_clip {
+                accent.set_attr("clip-path", format!("url(#{clip})"));
+            }
+            mark.push(accent);
+        }
     }
     mark
 }
@@ -1592,6 +1658,15 @@ fn knife_stroke(
         stroke_intensity(intensity).2,
         &noise_seed(seed, "pk-tooth"),
     ));
+    let ridge_clip = if intensity == SurfaceIntensity::Dense {
+        let id = fresh("pk-ridge-clip");
+        let mut clip = Element::new("clipPath").attr("id", &id);
+        clip.push(path(&banks_d(left, right, closed)).attr("fill-rule", "evenodd"));
+        defs.push(clip);
+        Some(id)
+    } else {
+        None
+    };
     group.push(defs);
     let mut start = 0.0;
     let mut order = 0_i64;
@@ -1628,6 +1703,7 @@ fn knife_stroke(
             false,
             &tooth,
             stroke_intensity(intensity).4,
+            ridge_clip.as_deref(),
         ));
         // Pulls overlap a little where the knife was set down again.
         start = end - (end - start) * 0.12;
@@ -1958,6 +2034,26 @@ fn oil_pastel_fill(
             )
             .attr("stroke-linecap", "round"),
         );
+        if profile.pastel_overlap > 0.0 && hash01(i, seed, "op-overlap") < profile.pastel_coverage {
+            strokes.push(
+                path(&format!(
+                    "M {} {} Q {} {} {} {}",
+                    n(a.x),
+                    n(a.y),
+                    n(control.x),
+                    n(control.y),
+                    n(b.x),
+                    n(b.y)
+                ))
+                .attr("fill", "none")
+                .attr("stroke", bristle_tone(&pigment, -profile.pastel_overlap))
+                .attr(
+                    "stroke-width",
+                    n(width * profile.pastel_width * PASTEL_OVERLAP_WIDTH),
+                )
+                .attr("stroke-linecap", "round"),
+            );
+        }
     }
     face.push(strokes);
     group.push(face);
@@ -2085,6 +2181,7 @@ fn knife_fill(
             true,
             &tooth,
             profile.knife_ridge,
+            None,
         ));
     }
     group.push(face);

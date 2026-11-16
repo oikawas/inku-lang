@@ -751,7 +751,8 @@ fn compat_grain_omits_the_nonportable_pattern_class() {
         },
     };
     let output = render(request).unwrap();
-    assert!(output.svg.contains("<pattern"));
+    // Compat lays 粒 as one flat tone of its cover (render engine 104).
+    assert!(output.svg.contains("class=\"surface-grain-noise-v1\""));
     assert!(!output.svg.contains("class=\"surface-grain-pattern-v1\""));
     assert!(!output.svg.contains("<filter"));
 }

@@ -8,11 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web and Swift: the About vocabulary table no longer lists “Interpret” and describes the instructions as directions for drawing a picture. Both Japanese and English are updated.
-
-- Drawing (render engine 103, I-743): following the author's selection, varied straight lines retain hand sway, frequency and amplitude are half-coupled, and arcs, closed shapes and free lines use length-based sway too. Connected targets retain the wild hand gesture. Reperformance of works with sway changes; saved SVGs do not.
-
-- Drawing (render engine 102, I-740): faint and dense handling now reaches watercolor, oil-pastel, painting-knife and etching fills and oil-pastel and knife lines. Temperate keeps the former fill. Dense fill layers retain the pigment's hue and chroma, and dense pen and oil-paint lines gain pools or streaks without widening the outline. Reperformance of works with these words can change; saved SVGs do not.
+- Swift: the About vocabulary table no longer lists “Interpret” and describes the instructions as directions for drawing a picture. Both Japanese and English are updated.
 
 - Swift (macOS and iOS): the composition and laws update arrives in the same shape as on the Web (the author's instruction).
   - Names and screens:
@@ -733,6 +729,13 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.354 (2026-11-17 / Build 1430)
+
+- Web: the About vocabulary table no longer lists “Interpret” and describes the instructions as directions for drawing a picture. Both Japanese and English are updated.
+- Drawing (render engine 103, I-743): following the author's selection, varied straight lines retain hand sway, frequency and amplitude are half-coupled, and arcs, closed shapes and free lines use length-based sway too. Connected targets retain the wild hand gesture. Reperformance of works with sway changes; saved SVGs do not.
+- Drawing (render engine 102, I-740): faint and dense handling now reaches watercolor, oil-pastel, painting-knife and etching fills and oil-pastel and knife lines. Temperate keeps the former fill. Dense fill layers retain the pigment's hue and chroma, and dense pen and oil-paint lines gain pools or streaks without widening the outline. Reperformance of works with these words can change; saved SVGs do not.
+- Server: composition and laws rules now use the shared core entries.
 
 ## v2.15.353 (2026-11-15 / Build 1429)
 

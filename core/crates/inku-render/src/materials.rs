@@ -263,6 +263,67 @@ fn adjust_pigment(color: &str, change: impl Fn(f64, f64, f64) -> (f64, f64, f64)
     format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])
 }
 
+/// Change a layer's lightness only as far as the same chroma and hue fit in sRGB.
+pub(crate) fn layered_pigment(color: &str, fraction: f64, limit: f64) -> String {
+    let Some(rgb) = parse_pigment(color) else {
+        return color.to_owned();
+    };
+    let [lightness, a, b] = oklab(rgb);
+    let fits = |l: f64| {
+        linear_from_oklab([l, a, b])
+            .iter()
+            .all(|channel| (-1e-9..=1.0 + 1e-9).contains(channel))
+    };
+    let target = (lightness + (lightness * fraction).clamp(-limit, limit)).clamp(0.0, 1.0);
+    let mut fraction = 1.0;
+    if !fits(target) {
+        let (mut low, mut high) = (0.0, 1.0);
+        for _ in 0..32 {
+            let middle = (low + high) * 0.5;
+            if fits(lightness + (target - lightness) * middle) {
+                low = middle;
+            } else {
+                high = middle;
+            }
+        }
+        fraction = low;
+    }
+    let chosen = lightness + (target - lightness) * fraction;
+    let rounded = linear_from_oklab([chosen, a, b]).map(|channel| {
+        (linear_to_srgb(channel.clamp(0.0, 1.0)) * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8
+    });
+    // Quantisation must not undo the lightness limit or reduce chroma. Search
+    // the neighbouring sRGB codes; the original pigment is a safe fallback.
+    let original = rgb.map(|channel| (linear_to_srgb(channel) * 255.0).round() as u8);
+    let original_chroma = a.dhypot(b);
+    let mut best = original;
+    let mut best_error = (lightness - chosen).abs();
+    for dr in -1_i16..=1 {
+        for dg in -1_i16..=1 {
+            for db in -1_i16..=1 {
+                let candidate: [u8; 3] = std::array::from_fn(|i| {
+                    (i16::from(rounded[i]) + [dr, dg, db][i]).clamp(0, 255) as u8
+                });
+                let [l, ca, cb] =
+                    oklab(candidate.map(|channel| srgb_to_linear(f64::from(channel) / 255.0)));
+                let chroma = ca.dhypot(cb);
+                let hue_matches = original_chroma < 1e-9
+                    || (ca * a + cb * b) >= chroma * original_chroma * 0.9998;
+                let within =
+                    (l >= lightness.min(target) - 1e-9) && (l <= lightness.max(target) + 1e-9);
+                let error = (l - chosen).abs() + (ca - a).dhypot(cb - b);
+                if within && hue_matches && chroma + 1e-9 >= original_chroma && error < best_error {
+                    best = candidate;
+                    best_error = error;
+                }
+            }
+        }
+    }
+    format!("#{:02x}{:02x}{:02x}", best[0], best[1], best[2])
+}
+
 fn turn_towards(hue: f64, target: f64, limit: f64) -> f64 {
     let difference = (target - hue + 540.0).rem_euclid(360.0) - 180.0;
     (hue + difference.clamp(-limit, limit)).rem_euclid(360.0)

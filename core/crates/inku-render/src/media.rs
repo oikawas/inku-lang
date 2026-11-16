@@ -58,7 +58,7 @@ use std::cell::RefCell;
 use inku_score::math::DetFloat;
 
 use crate::determinism::hash01;
-use crate::materials::bristle_tone;
+use crate::materials::{bristle_tone, layered_pigment};
 use crate::svg::{Element, format_number};
 use crate::types::{Point, Seed, SurfaceIntensity, Weight};
 
@@ -110,8 +110,8 @@ const FILL_INTENSITY: [IntensityProfile; 3] = [
         pastel_base_tooth: 0.04,
         pastel_stroke_tooth: 0.03,
         pastel_width: 1.3,
-        pastel_overlap: 0.26,
-        pastel_coverage: 0.48,
+        pastel_overlap: 0.20,
+        pastel_coverage: 1.0,
         knife_tooth: 0.10,
         knife_opacity: 1.0,
         knife_ridge: 0.34,
@@ -143,7 +143,12 @@ const PEN_POOL_TONE: f64 = -0.7;
 const PEN_POOL_TURN_COS: f64 = 0.94;
 const PEN_POOL_SPAN: f64 = 0.06;
 const KNIFE_RIDGE_WIDTH: f64 = 0.30;
-const PASTEL_OVERLAP_WIDTH: f64 = 0.38;
+const PASTEL_OVERLAP_WIDTH: f64 = 0.65;
+const PIGMENT_DARK_FRACTION: f64 = 0.20;
+const PIGMENT_DARK_LIMIT: f64 = 0.10;
+const PIGMENT_LIGHT_FRACTION: f64 = 1.0;
+const PIGMENT_LIGHT_LIMIT: f64 = 0.06;
+const FILL_KNIFE_RIDGE_WIDTH: f64 = 0.60;
 
 fn stroke_intensity(intensity: SurfaceIntensity) -> (f64, f64, f64, f64, f64) {
     STROKE_INTENSITY[match intensity {
@@ -1242,11 +1247,14 @@ fn knife_pull(
         None
     };
     let mut base = bristle_tone(color, (h(0, "pk-tone") - 0.5) * 0.10);
+    let mut ridge_pigment = color.to_owned();
     if let Some(other) = other.as_deref()
         && whole
         && h(0, "pk-mix") < share
     {
-        base = mix(&base, other, 0.55 + 0.35 * h(0, "pk-mix-amount"));
+        let amount = 0.55 + 0.35 * h(0, "pk-mix-amount");
+        base = mix(&base, other, amount);
+        ridge_pigment = mix(color, other, amount);
     }
     let dry = h(0, "pk-dry") < 0.4;
     let head = 0.10 + 0.08 * h(0, "pk-head");
@@ -1574,10 +1582,27 @@ fn knife_pull(
             let points = (1..=9)
                 .map(|k| at(f64::from(k) / 10.0, side, 0.0))
                 .collect::<Vec<_>>();
+            let pigment = if whole {
+                if tone < 0.0 {
+                    layered_pigment(&ridge_pigment, -PIGMENT_DARK_FRACTION, PIGMENT_DARK_LIMIT)
+                } else {
+                    layered_pigment(&ridge_pigment, PIGMENT_LIGHT_FRACTION, PIGMENT_LIGHT_LIMIT)
+                }
+            } else {
+                bristle_tone(&base, tone)
+            };
+            let width = if whole {
+                FILL_KNIFE_RIDGE_WIDTH
+            } else {
+                KNIFE_RIDGE_WIDTH
+            };
             let mut accent = polyline_path(&points)
-                .attr("stroke", bristle_tone(&base, tone))
-                .attr("stroke-width", n(half0 * KNIFE_RIDGE_WIDTH))
+                .attr("stroke", pigment)
+                .attr("stroke-width", n(half0 * width))
                 .attr("stroke-opacity", "1");
+            if whole {
+                accent.set_attr("class", "knife-dense-pigment-ridge");
+            }
             if let Some(clip) = ridge_clip {
                 accent.set_attr("clip-path", format!("url(#{clip})"));
             }
@@ -2045,8 +2070,12 @@ fn oil_pastel_fill(
                     n(b.x),
                     n(b.y)
                 ))
+                .attr("class", "pastel-dense-pigment-layer")
                 .attr("fill", "none")
-                .attr("stroke", bristle_tone(&pigment, -profile.pastel_overlap))
+                .attr(
+                    "stroke",
+                    layered_pigment(&pigment, -profile.pastel_overlap, PIGMENT_DARK_LIMIT),
+                )
                 .attr(
                     "stroke-width",
                     n(width * profile.pastel_width * PASTEL_OVERLAP_WIDTH),

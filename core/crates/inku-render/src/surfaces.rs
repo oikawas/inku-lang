@@ -69,11 +69,14 @@ const GRAIN_RADIUS_FACTOR: f64 = 0.55;
 const GRAIN_COUNT_FACTOR: f64 = 38.0;
 const GRAIN_OPACITY_FACTOR: f64 = 0.8;
 /// The grain lies on three repeating tiles whose sides do not divide one
-/// another, each carrying a third of the points, so the face's SVG stays the
-/// same size however large the face is and no single repeat shows as a
-/// lattice (render engine 104; one face-sized tile grew with the face).
-const GRAIN_TILE_SIDE: f64 = 0.19;
-const GRAIN_TILE_SCALES: [f64; 3] = [1.0, 1.31, 1.73];
+/// another, each carrying a third of the points. The largest tile is as wide
+/// as the face, between 0.08 and 0.19 of the canvas, so a small face carries
+/// fewer points than its area and a large face no more than the tiles, and no
+/// single repeat shows as a lattice (render engine 104; one face-sized tile
+/// grew with the face).
+const GRAIN_TILE_SIDE_MIN: f64 = 0.08;
+const GRAIN_TILE_SIDE_MAX: f64 = 0.19;
+const GRAIN_TILE_SCALES: [f64; 3] = [0.58, 0.76, 1.0];
 const AQUATINT_DARKEN_FRACTION: f64 = -0.30;
 const AQUATINT_DARKEN_LIMIT: f64 = 0.15;
 const AQUATINT_LIGHT_OPACITY: f64 = 0.18;
@@ -758,11 +761,22 @@ fn grain_pattern(
     context: MarkContext<'_>,
     color: &str,
     opacity: f64,
+    contour: &[Point],
 ) -> (Vec<Element>, Vec<String>) {
     let surface = instruction
         .surface
         .as_ref()
         .expect("surface checked by caller");
+    // The face's width, rounded to whole pixels so that copies of one size
+    // share their tiles.
+    let extent = {
+        let (xs, ys): (Vec<f64>, Vec<f64>) = contour.iter().map(|p| (p.x, p.y)).unzip();
+        let span = |values: &[f64]| {
+            values.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                - values.iter().copied().fold(f64::INFINITY, f64::min)
+        };
+        span(&xs).max(span(&ys)).round()
+    };
     // A hand's pressure turns each face's opacity a little; the tiles take it
     // in steps of 0.02, so the faces of one instruction share a few sets.
     let opacity = ((opacity * 50.0).round() / 50.0).max(0.02);
@@ -802,7 +816,10 @@ fn grain_pattern(
     let density = per_tile as f64 / tile_area;
     let width = mark_width(instruction, context.canvas);
     let reach = (radius * 1.65 * 2.0).max(width * 0.75);
-    let base = context.canvas.unit() * GRAIN_TILE_SIDE;
+    let base = (extent + 2.0 * reach).clamp(
+        context.canvas.unit() * GRAIN_TILE_SIDE_MIN,
+        context.canvas.unit() * GRAIN_TILE_SIDE_MAX,
+    );
     let payload = format!(
         "{color}|{opacity:.6}|{radius:.6}|{density:.9}|{width:.6}|{base:.6}|{:?}|{}|{:?}",
         instruction.weight,
@@ -1009,6 +1026,7 @@ fn aquatint_surface(
         context,
         &pigment,
         (AQUATINT_TEXTURE_OPACITY * strength * underpaint_boost(instruction)).min(1.0),
+        contour,
     );
     definitions.extend(rocker);
     for pattern in ids {
@@ -1399,6 +1417,7 @@ pub(crate) fn render_surface(
                 * GRAIN_OPACITY_FACTOR
                 * underpaint_boost(instruction))
             .min(1.0),
+            &contour,
         );
         definitions.extend(grain);
         for pattern in ids {
@@ -1901,9 +1920,19 @@ mod tests {
                 .definitions
         };
         let small = defs(0.1, [0.5, 0.5]);
-        let large = defs(0.45, [0.5, 0.5]);
-        // The same tiles, whatever the size of the face.
-        assert_eq!(format!("{small:?}"), format!("{large:?}"));
+        let large = defs(0.3, [0.5, 0.5]);
+        let larger = defs(0.45, [0.5, 0.5]);
+        // Above 0.19 of the canvas the tiles stop growing with the face.
+        assert_eq!(format!("{large:?}"), format!("{larger:?}"));
+        // A small face carries fewer points than a large one.
+        let placed = |definitions: &[Element]| {
+            definitions
+                .iter()
+                .filter(|element| element.name() == "pattern")
+                .map(|pattern| pattern.children().len())
+                .sum::<usize>()
+        };
+        assert!(placed(&small) < placed(&large));
         // A copy elsewhere names the same tiles, so the document keeps one set.
         let moved = defs(0.1, [0.2, 0.7]);
         let mut document = small.clone();

@@ -327,8 +327,7 @@ export const ja: LangPack = {
 	appInfoVocabColMeaning: '対応',
 	appInfoVocabRows: [
 		{ term: '記述', meaning: '作者が書く詩歌的な入力。作品の最上層（inku 固有）' },
-		{ term: '解釈', meaning: '記述を指示書へ読み解くこと（型を埋める・書く）' },
-		{ term: '指示書（正規化DDL）', meaning: '解釈が生む実行仕様。LeWitt の指示書に相当する' },
+		{ term: '指示書（正規化DDL）', meaning: '記述をもとに作る、絵を描くための指示' },
 		{ term: '楽譜（JSON Score）', meaning: '指示書を構造化した中間表現。決定的に保存される' },
 		{ term: '演奏（SVG）', meaning: '楽譜を描く一回性の結果' },
 	],

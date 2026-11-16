@@ -329,8 +329,7 @@ export const en: LangPack = {
 	appInfoVocabColMeaning: 'Corresponds to',
 	appInfoVocabRows: [
 		{ term: 'Description', meaning: 'Your poem-like input — the top, authored layer (inku\'s own).' },
-		{ term: 'Interpret', meaning: 'Reading a description into instructions (filling the plan or writing).' },
-		{ term: 'Instructions (normalized DDL)', meaning: 'The executable spec interpretation produces — LeWitt\'s instruction sheet.' },
+		{ term: 'Instructions (normalized DDL)', meaning: 'Directions for drawing a picture, made from the description.' },
 		{ term: 'Score (JSON Score)', meaning: 'The structured, deterministically saved intermediate.' },
 		{ term: 'Performance (SVG)', meaning: 'The one-time drawing of a score.' },
 	],

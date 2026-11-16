@@ -10,7 +10,9 @@ use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element,
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
 use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
-use crate::marks::{MarkContext, intensity_factor, mark_width, reaches_canvas, sweep_band_width};
+use crate::marks::{
+    MarkContext, intensity_factor, mark_style, mark_width, reaches_canvas, sweep_band_width,
+};
 use crate::materials::{texture_filter_id, with_texture_filter};
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
@@ -57,6 +59,15 @@ const SURFACE_BLEED_RINGS: usize = 3;
 /// own formulas read these (render engine 89).
 const SURFACE_DEFAULT_DENSITY: f64 = 0.35;
 const SURFACE_DEFAULT_SCALE: f64 = 0.35;
+
+/// Prototype parameters for distinct point surfaces (render engine 104).
+const STIPPLE_RADIUS_FACTOR: f64 = 2.4;
+const STIPPLE_COUNT_FACTOR: f64 = 1.5;
+const STIPPLE_MAX: usize = 2400;
+const STIPPLE_OPACITY_MIN: f64 = 0.8;
+const GRAIN_RADIUS_FACTOR: f64 = 0.55;
+const GRAIN_COUNT_FACTOR: f64 = 38.0;
+const GRAIN_OPACITY_FACTOR: f64 = 0.8;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SurfaceRender {
@@ -750,14 +761,17 @@ fn grain_pattern(
         .expect("surface checked by caller");
     let tile = context.canvas.unit() * 0.08;
     let size = texture_size_factor(surface.scale.max(0.04));
-    let radius = (context.canvas.unit() * (0.002 + SURFACE_DEFAULT_SCALE * 0.004)).max(0.45) * size;
+    let radius = (context.canvas.unit() * (0.002 + SURFACE_DEFAULT_SCALE * 0.004)).max(0.45)
+        * size
+        * GRAIN_RADIUS_FACTOR;
     let tile_area = tile * tile;
     let reference_area = context.canvas.unit().powi(2) * 0.18;
     let cover = 1.0 / (size * size);
     let per_tile = (((22.0 + SURFACE_DEFAULT_DENSITY * 120.0) * tile_area / reference_area
         * cover
-        * texture_count_ratio(surface.density.max(0.02)))
-    .ceil() as usize)
+        * texture_count_ratio(surface.density.max(0.02))
+        * GRAIN_COUNT_FACTOR)
+        .ceil() as usize)
         .max(1);
     let density = per_tile as f64 / tile_area;
     let reach = (radius * 1.65 * 2.0).max(mark_width(instruction, context.canvas) * 0.75);
@@ -894,9 +908,26 @@ fn render_vectors(
         .clamp(0.2, SURFACE_AREA_FACTOR_MAX);
     match surface.texture {
         SurfaceTexture::Stipple | SurfaceTexture::PaperGrain => {
-            let count = ((SURFACE_MARK_MAX as f64 * cover * count_ratio) as usize)
-                .min(((22.0 + density * 120.0) * area_factor * cover * count_ratio) as usize);
-            let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45) * size;
+            let stipple = surface.texture == SurfaceTexture::Stipple;
+            let count_factor = if stipple { STIPPLE_COUNT_FACTOR } else { 1.0 };
+            let maximum = if stipple {
+                STIPPLE_MAX
+            } else {
+                SURFACE_MARK_MAX
+            };
+            let count = ((maximum as f64 * cover * count_ratio) as usize).min(
+                ((22.0 + density * 120.0) * area_factor * cover * count_ratio * count_factor)
+                    as usize,
+            );
+            let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45)
+                * size
+                * if stipple { STIPPLE_RADIUS_FACTOR } else { 1.0 };
+            let opacity = if stipple {
+                (mark_style(instruction, context).stroke_opacity * underpaint_boost(instruction))
+                    .min(1.0)
+            } else {
+                opacity
+            };
             for (index, point) in scatter(contour, count, seed).into_iter().enumerate() {
                 // A dab is at most 1.65 `radius` round, and its stroke runs at
                 // most 1.75 of that from its point.
@@ -910,7 +941,14 @@ fn render_vectors(
                     DabSpec {
                         radius: radius * (0.55 + hash01(index as i64, seed, "surface-r") * 1.1),
                         color: &color,
-                        opacity: opacity * (0.45 + hash01(index as i64, seed, "surface-o") * 0.55),
+                        opacity: opacity
+                            * if stipple {
+                                STIPPLE_OPACITY_MIN
+                                    + hash01(index as i64, seed, "surface-o")
+                                        * (1.0 - STIPPLE_OPACITY_MIN)
+                            } else {
+                                0.45 + hash01(index as i64, seed, "surface-o") * 0.55
+                            },
                         seed,
                         index: index as i64,
                         class_name: "surface-stroke-v1",
@@ -1238,10 +1276,10 @@ pub(crate) fn render_surface(
             context,
             seed,
             &color,
-            (surface.opacity
-                * intensity_factor(instruction.surface_intensity)
+            (mark_style(instruction, context).stroke_opacity
+                * GRAIN_OPACITY_FACTOR
                 * underpaint_boost(instruction))
-            .min(0.75),
+            .min(1.0),
             &pattern_id,
             &contour,
         ));
@@ -1620,13 +1658,13 @@ mod tests {
             let length: f64 = pattern.attribute(side).unwrap().parse().unwrap();
             assert!(length >= 400.0);
         }
-        // About 3 points per 80 px square, as the repeating tile held.
+        // The finer grain densely covers the face in one unrepeated tile.
         let placed = pattern
             .children()
             .iter()
             .filter(|node| matches!(node, Node::Element(element) if element.name() == "use"))
             .count();
-        assert!((40..=120).contains(&placed));
+        assert!((500..=5000).contains(&placed));
         let group = format!("{:?}", rendered.group);
         assert!(group.contains("surface-grain-carrier-v1"));
         assert!(!group.contains("clipPath"));

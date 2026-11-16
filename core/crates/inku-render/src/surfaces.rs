@@ -1833,7 +1833,7 @@ mod tests {
     }
 
     #[test]
-    fn grain_lays_one_unrepeated_tile_through_a_portable_carrier() {
+    fn grain_lays_shared_tiles_through_portable_carriers() {
         let score: Score = serde_json::from_str(
             r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{"texture":"grain"}}]}"#,
         )
@@ -1842,25 +1842,72 @@ mod tests {
         let instruction = &score.instructions[0];
         let geometry = MarkGeometry::of(instruction).unwrap();
         let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
-        // Twelve dab shapes, and the tile that places them.
-        assert_eq!(rendered.definitions.len(), SURFACE_GRAIN_SHAPES + 1);
-        let pattern = rendered.definitions.last().unwrap();
-        assert_eq!(pattern.name(), "pattern");
-        // The tile covers the whole face (400 px across), so nothing repeats.
-        for side in ["width", "height"] {
-            let length: f64 = pattern.attribute(side).unwrap().parse().unwrap();
-            assert!(length >= 400.0);
-        }
-        // The finer grain densely covers the face in one unrepeated tile.
-        let placed = pattern
-            .children()
+        // Twelve dab shapes, and the three tiles that place them.
+        assert_eq!(
+            rendered.definitions.len(),
+            SURFACE_GRAIN_SHAPES + GRAIN_TILE_SCALES.len()
+        );
+        let patterns = rendered
+            .definitions
             .iter()
-            .filter(|node| matches!(node, Node::Element(element) if element.name() == "use"))
-            .count();
-        assert!((500..=5000).contains(&placed));
+            .filter(|element| element.name() == "pattern")
+            .collect::<Vec<_>>();
+        assert_eq!(patterns.len(), GRAIN_TILE_SCALES.len());
+        let mut sides = Vec::new();
+        for pattern in &patterns {
+            let width: f64 = pattern.attribute("width").unwrap().parse().unwrap();
+            let height: f64 = pattern.attribute("height").unwrap().parse().unwrap();
+            assert_eq!(width, height);
+            // The tiles are smaller than the face (400 px across): they repeat.
+            assert!(width < 400.0);
+            sides.push(width);
+            // Each tile places its third of the points, and more than a few.
+            let placed = pattern
+                .children()
+                .iter()
+                .filter(|node| matches!(node, Node::Element(element) if element.name() == "use"))
+                .count();
+            assert!((20..=5000).contains(&placed), "{placed}");
+        }
+        // No tile's side divides another's, so their repeats never line up.
+        for (i, a) in sides.iter().enumerate() {
+            for b in &sides[i + 1..] {
+                let ratio = a.max(*b) / a.min(*b);
+                assert!((ratio - ratio.round()).abs() > 0.05, "{a} {b}");
+            }
+        }
         let group = format!("{:?}", rendered.group);
-        assert!(group.contains("surface-grain-carrier-v1"));
+        assert_eq!(
+            group.matches("surface-grain-carrier-v1").count(),
+            GRAIN_TILE_SCALES.len()
+        );
         assert!(!group.contains("clipPath"));
         assert!(!group.contains("filter"));
+    }
+
+    #[test]
+    fn grain_tiles_do_not_grow_with_the_face_and_are_shared_by_its_copies() {
+        let colors = BTreeMap::new();
+        let defs = |radius: f64, center: [f64; 2]| {
+            let score: Score = serde_json::from_str(&format!(
+                r#"{{"instructions":[{{"primitive":"circle","center":[{},{}],"radius":{radius},"surface":{{"texture":"grain"}}}}]}}"#,
+                center[0], center[1]
+            ))
+            .unwrap();
+            let instruction = &score.instructions[0];
+            let geometry = MarkGeometry::of(instruction).unwrap();
+            render_surface(instruction, geometry, context(&colors))
+                .unwrap()
+                .definitions
+        };
+        let small = defs(0.1, [0.5, 0.5]);
+        let large = defs(0.45, [0.5, 0.5]);
+        // The same tiles, whatever the size of the face.
+        assert_eq!(format!("{small:?}"), format!("{large:?}"));
+        // A copy elsewhere names the same tiles, so the document keeps one set.
+        let moved = defs(0.1, [0.2, 0.7]);
+        let mut document = small.clone();
+        extend_definitions(&mut document, moved);
+        assert_eq!(document.len(), small.len());
     }
 }

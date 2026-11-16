@@ -68,6 +68,16 @@ const STIPPLE_OPACITY_MIN: f64 = 0.8;
 const GRAIN_RADIUS_FACTOR: f64 = 0.55;
 const GRAIN_COUNT_FACTOR: f64 = 38.0;
 const GRAIN_OPACITY_FACTOR: f64 = 0.8;
+const AQUATINT_DARKEN_FRACTION: f64 = -0.30;
+const AQUATINT_DARKEN_LIMIT: f64 = 0.15;
+const AQUATINT_LIGHT_OPACITY: f64 = 0.18;
+const AQUATINT_DARK_OPACITY: f64 = 0.97;
+const AQUATINT_TEXTURE_OPACITY: f64 = 0.85;
+const AQUATINT_RADIUS_BASE: f64 = 0.95;
+const AQUATINT_RADIUS_DENSITY: f64 = 0.55;
+const AQUATINT_STOPS_PER_STEP: usize = 4;
+const AQUATINT_MIN_LIGHTNESS: f64 = 0.15;
+const AQUATINT_LIFT_LIGHTNESS: f64 = 0.16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SurfaceRender {
@@ -860,6 +870,119 @@ fn grain_pattern(
     definitions
 }
 
+/// A colored mezzotint holds one pigment, letting the paper show in the light.
+fn aquatint_pigment(color: &str) -> String {
+    let Some(rgb) = hex_rgb(color) else {
+        return color.to_owned();
+    };
+    if rgb == [0, 0, 0] || rgb == [17, 17, 17] {
+        return color.to_owned();
+    }
+    let [lightness, a, b] = inku_score::oklab_from_srgb(rgb.map(|v| f64::from(v) / 255.0));
+    if lightness < AQUATINT_MIN_LIGHTNESS {
+        let lifted =
+            crate::materials::adjust_pigment(color, |_, c, h| (AQUATINT_LIFT_LIGHTNESS, c, h));
+        let center = hex_rgb(&lifted).expect("pigment is hexadecimal");
+        let chroma = a.dhypot(b);
+        let mut best = None;
+        for dr in -4_i16..=4 {
+            for dg in -4_i16..=4 {
+                for db in -4_i16..=4 {
+                    let candidate: [u8; 3] = std::array::from_fn(|i| {
+                        (i16::from(center[i]) + [dr, dg, db][i]).clamp(0, 255) as u8
+                    });
+                    let [l, ca, cb] =
+                        inku_score::oklab_from_srgb(candidate.map(|v| f64::from(v) / 255.0));
+                    let candidate_chroma = ca.dhypot(cb);
+                    if l < AQUATINT_MIN_LIGHTNESS
+                        || (chroma > 1e-5
+                            && ca * a + cb * b
+                                < candidate_chroma * chroma * 2_f64.to_radians().dcos())
+                    {
+                        continue;
+                    }
+                    let error = (l - AQUATINT_LIFT_LIGHTNESS).abs() + (ca - a).dhypot(cb - b);
+                    if best.as_ref().is_none_or(|(old, _)| error < *old) {
+                        best = Some((error, candidate));
+                    }
+                }
+            }
+        }
+        let selected = best.map_or(center, |(_, rgb)| rgb);
+        return format!("#{:02x}{:02x}{:02x}", selected[0], selected[1], selected[2]);
+    }
+    let fraction = AQUATINT_DARKEN_FRACTION.max(AQUATINT_MIN_LIGHTNESS / lightness - 1.0);
+    crate::materials::layered_pigment(color, fraction, AQUATINT_DARKEN_LIMIT)
+}
+
+/// Lay a smooth light from the upper left, then faint ink-texture over it.
+fn aquatint_surface(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    seed: Seed,
+    contour: &[Point],
+    group: &mut Element,
+    definitions: &mut Vec<Element>,
+) {
+    let surface = instruction
+        .surface
+        .as_ref()
+        .expect("surface checked by caller");
+    let pigment = aquatint_pigment(&texture_color(instruction, context));
+    let id = format!(
+        "surface_aquatint_{:03}_{:03}",
+        context.instruction_index, context.mark_index
+    );
+    let radius =
+        (AQUATINT_RADIUS_BASE - AQUATINT_RADIUS_DENSITY * surface.density).clamp(0.35, 0.94);
+    let count = usize::from(surface.tone_steps.clamp(1, 16)) * AQUATINT_STOPS_PER_STEP;
+    let strength = intensity_factor(instruction.surface_intensity);
+    let mut gradient = Element::new("radialGradient")
+        .attr("id", &id)
+        .attr("cx", "25%")
+        .attr("cy", "25%")
+        .attr("r", format!("{}%", format_number(radius * 100.0)));
+    for i in 0..=count {
+        let t = i as f64 / count as f64;
+        let smooth = t * t * (3.0 - 2.0 * t);
+        let opacity = ((AQUATINT_LIGHT_OPACITY
+            + (AQUATINT_DARK_OPACITY - AQUATINT_LIGHT_OPACITY) * smooth)
+            * strength)
+            .clamp(0.0, 1.0);
+        gradient.push(
+            Element::new("stop")
+                .attr("offset", format_number(t))
+                .attr("stop-color", &pigment)
+                .attr("stop-opacity", format_number(opacity)),
+        );
+    }
+    definitions.push(gradient);
+    group.push(
+        Element::new("path")
+            .attr("d", closed_path(contour))
+            .attr("fill", format!("url(#{id})"))
+            .attr("stroke", "none")
+            .attr("class", "surface-aquatint-tone-v1"),
+    );
+    let pattern_id = format!("{id}_rocker");
+    definitions.extend(grain_pattern(
+        instruction,
+        context,
+        seed,
+        &pigment,
+        (AQUATINT_TEXTURE_OPACITY * strength * underpaint_boost(instruction)).min(1.0),
+        &pattern_id,
+        contour,
+    ));
+    group.push(
+        Element::new("path")
+            .attr("d", closed_path(contour))
+            .attr("fill", format!("url(#{pattern_id})"))
+            .attr("stroke", "none")
+            .attr("class", "surface-aquatint-rocker-v1"),
+    );
+}
+
 fn line_angle(direction: SurfaceDirection) -> f64 {
     match direction {
         SurfaceDirection::Horizontal => 0.0,
@@ -1116,45 +1239,7 @@ fn render_vectors(
                 }
             }
         }
-        SurfaceTexture::Aquatint => {
-            let steps = usize::from(surface.tone_steps.max(1));
-            let band = width / steps as f64;
-            let radius = (context.canvas.unit() * (0.0015 + scale * 0.0025)).max(0.45) * size;
-            let count = ((SURFACE_MARK_MAX as f64 * cover * count_ratio) as usize).min(
-                (((18.0 + density * 90.0) * area_factor * cover * count_ratio) as usize).max(5),
-            );
-            for (index, point) in scatter(contour, count, seed).into_iter().enumerate() {
-                let step = if band > 0.0 {
-                    (((point.x - x) / band) as isize).clamp(0, steps as isize - 1) as usize
-                } else {
-                    0
-                };
-                let jitter = (hash01(step as i64, seed, "aquatint-boundary") - 0.5) * band * 0.08;
-                let shifted = Point::new(point.x + jitter, point.y);
-                let target = if point_in_polygon(shifted, contour) {
-                    shifted
-                } else {
-                    point
-                };
-                if !reaches_canvas(instruction, context, target, target, radius * 2.0) {
-                    continue;
-                }
-                group.push(dab(
-                    instruction,
-                    context,
-                    target,
-                    DabSpec {
-                        radius,
-                        color: &color,
-                        opacity: opacity * (0.35 + 0.65 * (step + 1) as f64 / steps as f64),
-                        seed,
-                        index: index as i64,
-                        class_name: &format!("surface-stroke-v1 aquatint-step-{}", step + 1),
-                        use_filters: context.use_filters,
-                    },
-                ));
-            }
-        }
+        SurfaceTexture::Aquatint => {}
         SurfaceTexture::Bleed => {
             let blur = (context.canvas.unit() * (0.010 + surface.bleed * 0.030)).max(1.0);
             let normals = centerline_normals(contour, true);
@@ -1290,6 +1375,15 @@ pub(crate) fn render_surface(
                 .attr("stroke", "none")
                 .attr("class", "surface-grain-carrier-v1"),
         );
+    } else if surface.texture == SurfaceTexture::Aquatint {
+        aquatint_surface(
+            instruction,
+            context,
+            seed,
+            &contour,
+            &mut group,
+            &mut definitions,
+        );
     } else if matches!(
         surface.texture,
         SurfaceTexture::Sweep | SurfaceTexture::Brushmarks
@@ -1415,6 +1509,76 @@ mod tests {
         );
         assert_eq!(seed_debug_text(Some(-7)), "Some(-7)");
         assert_eq!(seed_debug_text(None), "None");
+    }
+
+    #[test]
+    fn point_surfaces_and_their_fineness_and_underpainting_differ() {
+        let colors = BTreeMap::new();
+        let draw = |texture: &str, scale: f64, density: f64, filled: bool| {
+            let instruction: Instruction = serde_json::from_value(serde_json::json!({
+                "primitive":"circle", "center":[0.5,0.5], "radius":0.2,
+                "weight":"pen", "filled":filled,
+                "surface":{"texture":texture, "scale":scale, "density":density}
+            }))
+            .unwrap();
+            let rendered = render_surface(
+                &instruction,
+                MarkGeometry::of(&instruction).unwrap(),
+                context(&colors),
+            )
+            .unwrap();
+            let mut svg = crate::svg::Document::new(context(&colors).canvas);
+            for definition in rendered.definitions {
+                svg.push_definition(definition);
+            }
+            svg.push(rendered.group);
+            svg.serialize()
+        };
+        let textures = ["stipple", "grain", "aquatint"];
+        let defaults: Vec<_> = textures
+            .iter()
+            .map(|t| draw(t, 0.35, 0.35, false))
+            .collect();
+        assert_ne!(defaults[0], defaults[1]);
+        assert_ne!(defaults[0], defaults[2]);
+        assert_ne!(defaults[1], defaults[2]);
+        for (texture, default) in textures.iter().zip(defaults) {
+            for (scale, density, filled) in [
+                (0.05, 0.35, false),
+                (0.90, 0.35, false),
+                (0.35, 0.85, false),
+                (0.35, 0.05, false),
+                (0.35, 0.35, true),
+            ] {
+                assert_ne!(
+                    default,
+                    draw(texture, scale, density, filled),
+                    "{texture} {scale} {density} {filled}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn aquatint_dark_pigment_preserves_hue_and_avoids_black_mixing() {
+        for color in [
+            "#2c3e91", "#a2342a", "#2f6b3a", "#010000", "#020104", "#000010",
+        ] {
+            let lab = |c: &str| {
+                inku_score::oklab_from_srgb(hex_rgb(c).unwrap().map(|v| f64::from(v) / 255.0))
+            };
+            let original = lab(color);
+            let dark = aquatint_pigment(color);
+            let result = lab(&dark);
+            let hue = |x: [f64; 3]| x[2].datan2(x[1]).to_degrees();
+            let delta = (hue(original) - hue(result)).abs().rem_euclid(360.0);
+            assert!(delta.min(360.0 - delta) <= 2.0, "{color} {dark}");
+            assert!(
+                result[0] >= 0.15 && (original[0] < 0.15 || result[0] <= original[0]),
+                "{color} {dark}"
+            );
+        }
+        assert_eq!(aquatint_pigment("#000000"), "#000000");
     }
 
     #[test]

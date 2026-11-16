@@ -1919,7 +1919,7 @@ mod tests {
                 .unwrap()
                 .definitions
         };
-        let small = defs(0.1, [0.5, 0.5]);
+        let small = defs(0.06, [0.5, 0.5]);
         let large = defs(0.3, [0.5, 0.5]);
         let larger = defs(0.45, [0.5, 0.5]);
         // Above 0.19 of the canvas the tiles stop growing with the face.
@@ -1934,7 +1934,7 @@ mod tests {
         };
         assert!(placed(&small) < placed(&large));
         // A copy elsewhere names the same tiles, so the document keeps one set.
-        let moved = defs(0.1, [0.2, 0.7]);
+        let moved = defs(0.06, [0.2, 0.7]);
         let mut document = small.clone();
         extend_definitions(&mut document, moved);
         assert_eq!(document.len(), small.len());

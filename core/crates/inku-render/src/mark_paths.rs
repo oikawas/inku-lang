@@ -206,7 +206,12 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     } else {
         0.0
     };
-    trace.max(path).min(0.40 * representative)
+    let gain = if variation.quality == Quality::Perlin {
+        1.7
+    } else {
+        1.0
+    };
+    (trace.max(path) * gain).min(0.40 * representative)
 }
 
 /// How far a Line's varied path strays, as a share of its wavelength: the
@@ -1080,7 +1085,7 @@ mod tests {
             pen_line,
             r#""quality":"perlin","frequency":"high","amplitude":"fine""#,
         );
-        assert!((amplitude(&noise, canvas) - 0.032 * 800.0 / 14.0).abs() < 1.0e-9);
+        assert!((amplitude(&noise, canvas) - 1.7 * 0.032 * 800.0 / 14.0).abs() < 1.0e-9);
         assert!(amplitude(&noise, canvas) > 0.35 * mark_width(&noise, canvas));
         // An arc keeps the tool's widths.
         let arc = instruction(
@@ -1094,6 +1099,29 @@ mod tests {
             r#""quality":"wave","frequency":"slow","amplitude":"fine""#,
         );
         assert_eq!(amplitude(&short, canvas), 0.35 * mark_width(&short, canvas));
+    }
+
+    #[test]
+    fn perlin_gain_is_capped_before_open_and_periodic_offsets() {
+        let canvas = CanvasSize::new(1000.0, 1000.0);
+        let mark = instruction(
+            r#""primitive":"line","from":[0.49,0.5],"to":[0.51,0.5],"weight":"watercolor","thinness":"thick""#,
+            r#""quality":"perlin","frequency":"slow","amplitude":"broad""#,
+        );
+        let variation = mark.variation.as_ref().unwrap();
+        let amount = amplitude(&mark, canvas);
+        assert!((amount - 8.0).abs() < 1e-8);
+        for i in 0..=100 {
+            let t = f64::from(i) / 100.0;
+            assert!(
+                crate::geometry::sample_offset(t, variation, 42, i as usize, amount).abs()
+                    <= 8.0 + 1e-9
+            );
+            assert!(
+                crate::geometry::sample_offset_periodic(t, variation, 42, i as usize, amount).abs()
+                    <= 8.0 + 1e-9
+            );
+        }
     }
 
     #[test]

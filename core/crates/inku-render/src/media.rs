@@ -62,7 +62,7 @@ use crate::materials::{bristle_tone, layered_pigment};
 use crate::svg::{Element, format_number};
 use crate::types::{Point, Seed, SurfaceIntensity, Weight};
 
-// Kept together so the two proposed settings can be adjusted after the sheet.
+/// The chosen faint, normal and dense settings for each medium's flat fill.
 #[derive(Clone, Copy)]
 struct IntensityProfile {
     wash: f64,
@@ -78,6 +78,7 @@ struct IntensityProfile {
     etching_spacing: f64,
 }
 
+/// Fill profiles in faint, normal, dense order; normal retains the original face.
 const FILL_INTENSITY: [IntensityProfile; 3] = [
     IntensityProfile {
         wash: 0.55,
@@ -120,6 +121,7 @@ const FILL_INTENSITY: [IntensityProfile; 3] = [
     },
 ];
 
+/// Select a medium's flat-fill settings for the handling word.
 fn fill_intensity(intensity: SurfaceIntensity) -> IntensityProfile {
     FILL_INTENSITY[match intensity {
         SurfaceIntensity::Faint => 0,
@@ -128,28 +130,30 @@ fn fill_intensity(intensity: SurfaceIntensity) -> IntensityProfile {
     }]
 }
 
-// edge tooth, core tooth, knife tooth, knife opacity, knife ridge
+/// Stroke settings in faint, normal, dense order: pastel edge and core tooth,
+/// then knife tooth, opacity and ridge strength.
 const STROKE_INTENSITY: [(f64, f64, f64, f64, f64); 3] = [
     (0.48, 0.20, 0.43, 0.65, 0.0),
     (0.34, 0.05, 0.28, 1.0, 0.0),
     (0.12, 0.01, 0.10, 1.0, 0.40),
 ];
-const DENSE_ACCENTS: [(f64, f64, [f64; 2]); 3] = [
-    (0.08, 0.40, [-0.35, 0.35]), // pooled ink and its sheen
-    (0.08, 0.40, [-0.35, 0.35]), // raised oil ridges
-    (0.08, 0.40, [-0.35, 0.35]), // pastel rubbed over itself
-];
+/// Position, width and tones of the dense pen, oil and pastel stroke accents.
+const DENSE_ACCENTS: (f64, f64, [f64; 2]) = (0.08, 0.40, [-0.35, 0.35]);
+/// Pen pools and the widths of the knife and pastel accents.
 const PEN_POOL_TONE: f64 = -0.7;
 const PEN_POOL_TURN_COS: f64 = 0.94;
 const PEN_POOL_SPAN: f64 = 0.06;
 const KNIFE_RIDGE_WIDTH: f64 = 0.30;
 const PASTEL_OVERLAP_WIDTH: f64 = 0.65;
+/// Dense fill layers keep their pigment's hue and chroma, moving its lightness
+/// by at most these fractions and limits, without mixing black or white.
 const PIGMENT_DARK_FRACTION: f64 = 0.20;
 const PIGMENT_DARK_LIMIT: f64 = 0.10;
 const PIGMENT_LIGHT_FRACTION: f64 = 1.0;
 const PIGMENT_LIGHT_LIMIT: f64 = 0.06;
 const FILL_KNIFE_RIDGE_WIDTH: f64 = 0.60;
 
+/// Select the pastel and knife line settings for this handling word.
 fn stroke_intensity(intensity: SurfaceIntensity) -> (f64, f64, f64, f64, f64) {
     STROKE_INTENSITY[match intensity {
         SurfaceIntensity::Faint => 0,
@@ -422,12 +426,7 @@ pub(crate) fn dense_stroke_accents(
     closed: bool,
     color: &str,
 ) -> Element {
-    let index = match weight {
-        Weight::OilPaint => 1,
-        Weight::OilPastel => 2,
-        _ => 0,
-    };
-    let (offset, width, tones) = DENSE_ACCENTS[index];
+    let (offset, width, tones) = DENSE_ACCENTS;
     let mut group = Element::new("g").attr("class", "dense-stroke-accents");
     for (center, tone) in [offset, 1.0 - offset - width].into_iter().zip(tones) {
         if let Some(band) = streak_band(left, right, closed, center, width, 0.0, 1.0) {

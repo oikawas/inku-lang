@@ -263,7 +263,8 @@ fn adjust_pigment(color: &str, change: impl Fn(f64, f64, f64) -> (f64, f64, f64)
     format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])
 }
 
-/// Change a layer's lightness only as far as the same chroma and hue fit in sRGB.
+/// A layered pigment retains hue and chroma and moves lightness by a bounded
+/// fraction, without mixing black or white; gamut and quantisation bound the move.
 pub(crate) fn layered_pigment(color: &str, fraction: f64, limit: f64) -> String {
     let Some(rgb) = parse_pigment(color) else {
         return color.to_owned();

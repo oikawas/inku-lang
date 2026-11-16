@@ -2,11 +2,11 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.353",
   "build": "1429",
-  "buildDate": "2026-11-15T05:35:40.040Z",
+  "buildDate": "2026-11-16T23:40:13.700Z",
   "versions": {
     "ddlSpec": "30",
     "ddlEngine": "78",
-    "renderEngine": "101"
+    "renderEngine": "103"
   },
   "canvasMetadata": {
     "square": {
@@ -1904,12 +1904,8 @@
           "meaning": "作者が書く詩歌的な入力。作品の最上層（inku 固有）"
         },
         {
-          "term": "解釈",
-          "meaning": "記述を指示書へ読み解くこと（型を埋める・書く）"
-        },
-        {
           "term": "指示書（正規化DDL）",
-          "meaning": "解釈が生む実行仕様。LeWitt の指示書に相当する"
+          "meaning": "記述をもとに作る、絵を描くための指示"
         },
         {
           "term": "楽譜（JSON Score）",
@@ -3802,12 +3798,8 @@
           "meaning": "Your poem-like input — the top, authored layer (inku's own)."
         },
         {
-          "term": "Interpret",
-          "meaning": "Reading a description into instructions (filling the plan or writing)."
-        },
-        {
           "term": "Instructions (normalized DDL)",
-          "meaning": "The executable spec interpretation produces — LeWitt's instruction sheet."
+          "meaning": "Directions for drawing a picture, made from the description."
         },
         {
           "term": "Score (JSON Score)",
@@ -4556,7 +4548,7 @@
     }
   },
   "source": {
-    "commit": "82353e897db2f22022a1f68fc8a508037a982568",
+    "commit": "059dcfbd267d7e2a44bd5f336b5425987f432585",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "001f310fbd4454ee8336877ec7b36e7dd85b3baf3e7a08727ee0c5e943820e8b",
@@ -4566,9 +4558,9 @@
       "web/APP_VERSION": "5fb36a22678fa85cbec31fb03359b5ccc1fb839052ef45dad71d659133c80e4d",
       "web/BUILD_NUMBER": "5db58c6cd40a6a7a3eecbdd57f5204e3364949a020fd807787bdcc60da2cb90e",
       "server/src/inku_server/layer_versions.py": "07ac2c29547d1921adf33eb4f8536a2ad45dfdd12a29d1b975b38e2ba2a143a2",
-      "core/crates/inku-render/src/lib.rs": "2c07f89ffefefb7dcbda467ae788e2394bb4cd0a28e05c3e2ee10b53ce6cf75b",
-      "web/src/lib/i18n/ja.ts": "bb7131f366a50ed9df4cc7b95fbcacded8e3f50029a1926707bfa9bd0bd0ae8e",
-      "web/src/lib/i18n/en.ts": "c80db8ae775b77af18de7e62437a923c350e2e39bf1249f566e4e505e6c5f49d"
+      "core/crates/inku-render/src/lib.rs": "7005f745e98126fb17dd0496759a47ed7f51daca2ecefad4182339683ef0618f",
+      "web/src/lib/i18n/ja.ts": "ce607be19323d7e5fe68c551004cb3950da81afacb2d4323cbfaafa9c5f06233",
+      "web/src/lib/i18n/en.ts": "3914b740db6d14d197bf07eac905046a0e530af3e955ad3542a1ec0429bedb3f"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

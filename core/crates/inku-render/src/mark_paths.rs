@@ -260,6 +260,34 @@ pub(crate) fn connected_line_centerline(
         amplitude(instruction, canvas),
         canvas,
     );
+    if uses_hand_stroke(instruction.weight) && instruction.weight != Weight::Computer {
+        let count = stroke_sample_count((end.x - start.x).dhypot(end.y - start.y), canvas);
+        centerline = resample_line(&centerline, count);
+        let width = mark_width(instruction, canvas);
+        let hand = if is_open_band(instruction) && width > 0.0 {
+            BandHand {
+                sway_share: round_width(instruction, canvas) / width,
+                smooth: true,
+            }
+        } else {
+            BandHand::ROUND
+        };
+        let stroke = synthesize_stroke_by(
+            StrokeRequest {
+                start,
+                end,
+                base_width: width,
+                weight: instruction.weight,
+                seed,
+                sample_count: count,
+                wild: false,
+                grid_step: grid_step(instruction.weight, canvas),
+                support: crate::support::DEFAULT_SUPPORT,
+            },
+            hand,
+        );
+        add_line_hand(&mut centerline, &stroke.samples, start, end);
+    }
     if let Some(degrees) = instruction
         .rotation
         .filter(|degrees| degrees.abs() >= 1.0e-9)
@@ -501,6 +529,42 @@ fn band_hand(instruction: &Instruction, style: &MarkStyle, context: MarkContext<
     }
 }
 
+/// Sample a varied straight-line path at the hand's regular stroke parameters.
+fn resample_line(points: &[Point], count: usize) -> Vec<Point> {
+    if points.len() < 2 || count < 2 {
+        return points.to_vec();
+    }
+    (0..count)
+        .map(|i| {
+            let at = i as f64 * (points.len() - 1) as f64 / (count - 1) as f64;
+            let left = (at.floor() as usize).min(points.len() - 2);
+            let t = at - left as f64;
+            Point::new(
+                points[left].x + (points[left + 1].x - points[left].x) * t,
+                points[left].y + (points[left + 1].y - points[left].y) * t,
+            )
+        })
+        .collect()
+}
+
+/// Add the straight hand's transverse sway and gesture to the varied path.
+fn add_line_hand(centerline: &mut [Point], samples: &[StrokeSample], start: Point, end: Point) {
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let length = dx.dhypot(dy);
+    if length < 1.0e-9 {
+        return;
+    }
+    let normal = Point::new(-dy / length, dx / length);
+    for (point, sample) in centerline.iter_mut().zip(samples) {
+        let t = sample.t;
+        let offset = (sample.point.x - (start.x + dx * t)) * normal.x
+            + (sample.point.y - (start.y + dy * t)) * normal.y;
+        point.x += normal.x * offset;
+        point.y += normal.y * offset;
+    }
+}
+
 pub(crate) fn hand_line(
     instruction: &Instruction,
     start: Point,
@@ -527,8 +591,10 @@ pub(crate) fn hand_line(
         .as_deref()
         .and_then(|points| points.first().copied().zip(points.last().copied()))
         .unwrap_or((start, end));
-    let sample_count =
-        stroke_sample_count((end.x - start.x).dhypot(end.y - start.y), context.canvas);
+    let sample_count = connected_centerline.as_ref().map_or_else(
+        || stroke_sample_count((end.x - start.x).dhypot(end.y - start.y), context.canvas),
+        Vec::len,
+    );
     let support = instruction_support(instruction, context.support);
     let centerline = connected_centerline.or_else(|| {
         instruction
@@ -569,6 +635,7 @@ pub(crate) fn hand_line(
     // Only the computer rounds onto a lattice; its cells follow the path drawn.
     let step = grid_step(instruction.weight, context.canvas);
     let (outline, event_count, band, cells) = if let Some(centerline) = centerline {
+        let mut centerline = resample_line(&centerline, sample_count);
         let varied = synthesize_stroke_by(
             StrokeRequest {
                 start,
@@ -576,13 +643,16 @@ pub(crate) fn hand_line(
                 base_width: style.width,
                 weight: instruction.weight,
                 seed,
-                sample_count: centerline.len(),
+                sample_count,
                 wild: context.wild,
                 grid_step: grid_step(instruction.weight, context.canvas),
                 support,
             },
             hand,
         );
+        if !has_connected_centerline && instruction.weight != Weight::Computer {
+            add_line_hand(&mut centerline, &varied.samples, start, end);
+        }
         let event_count = stroke_event_count(instruction.weight, seed, sample_count);
         let band = if flat {
             let energies = varied
@@ -944,6 +1014,49 @@ pub(crate) fn cloudform_path(points: &[Point]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn varied_line_keeps_the_hand() {
+        let canvas = CanvasSize::new(1000.0, 1000.0);
+        let start = Point::new(100.0, 500.0);
+        let end = Point::new(900.0, 500.0);
+        let instruction = instruction(
+            r#""primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"weight":"pencil""#,
+            r#""quality":"wave","frequency":"medium","amplitude":"medium""#,
+        );
+        let count = stroke_sample_count(800.0, canvas);
+        let path = open_line_with_variation(
+            start,
+            end,
+            instruction.variation.as_ref().unwrap(),
+            42,
+            amplitude(&instruction, canvas),
+            canvas,
+        );
+        let mut varied = resample_line(&path, count);
+        let before = varied.clone();
+        let request = StrokeRequest {
+            start,
+            end,
+            base_width: 1.5,
+            weight: Weight::Pencil,
+            seed: 42,
+            sample_count: count,
+            wild: false,
+            grid_step: 0.0,
+            support: crate::support::DEFAULT_SUPPORT,
+        };
+        let hand = synthesize_stroke_by(request, BandHand::ROUND);
+        add_line_hand(&mut varied, &hand.samples, start, end);
+        assert_eq!(varied.first(), Some(&start));
+        assert_eq!(varied.last(), Some(&end));
+        assert!(
+            varied
+                .iter()
+                .zip(before)
+                .any(|(a, b)| (a.y - b.y).abs() > 0.01)
+        );
+    }
 
     fn instruction(fields: &str, variation: &str) -> Instruction {
         serde_json::from_str(&format!(

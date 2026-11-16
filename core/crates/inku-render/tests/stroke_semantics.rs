@@ -8,6 +8,51 @@ use inku_render::support::{DEFAULT_SUPPORT, support_for_ground, support_with_mar
 use inku_render::types::{GroundMaterial, Point, SurfaceTexture, Weight};
 
 #[test]
+fn pencil_cut_expectation_matches_with_and_without_variation() {
+    use inku_render::render::render;
+    use inku_render::types::{CanvasSize, RenderOptions, RenderRequest, SvgProfile};
+    let mut sums = [0_usize; 2];
+    for seed in 0..128 {
+        for (i, varied) in [false, true].into_iter().enumerate() {
+            let mut mark = serde_json::json!({"primitive":"line", "from":[0.1,0.5], "to":[0.9,0.5], "weight":"pencil"});
+            if varied {
+                mark["variation"] = serde_json::json!({"quality":"perlin", "frequency":"medium", "amplitude":"medium", "dimensions":["position_x", "position_y"]});
+            }
+            let request = RenderRequest {
+                score: serde_json::from_value(serde_json::json!({"instructions":[mark]})).unwrap(),
+                options: RenderOptions {
+                    resolved_color_map: Default::default(),
+                    catalog_id: None,
+                    canvas: CanvasSize::new(1000.0, 1000.0),
+                    canvas_aspect_id: "square".into(),
+                    svg_profile: SvgProfile::Display,
+                    render_seed: Some(seed),
+                    composition_seed: None,
+                    wild: false,
+                    error_policy: Default::default(),
+                },
+            };
+            let svg = render(request).unwrap().svg;
+            let group = svg
+                .split("class=\"stroke-engine-v1 ")
+                .nth(1)
+                .expect("pencil stroke");
+            let d = group
+                .split(" d=\"")
+                .nth(1)
+                .expect("stroke path")
+                .split('"')
+                .next()
+                .unwrap();
+            sums[i] += d.matches(" Z M ").count();
+        }
+    }
+    assert!(sums[0] > 0 && sums[1] > 0, "missing pencil cuts: {sums:?}");
+    let ratio = sums[0].max(sums[1]) as f64 / sums[0].min(sums[1]) as f64;
+    assert!(ratio <= 1.3, "pencil cut totals {sums:?}, ratio {ratio}");
+}
+
+#[test]
 fn support_resolution_is_typed_and_capped() {
     let washi = support_for_ground(GroundMaterial::Washi);
     assert_eq!(washi.absorb, 2.2);

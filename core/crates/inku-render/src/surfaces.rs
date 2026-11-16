@@ -1650,10 +1650,16 @@ mod tests {
                 "surface":{"texture":texture, "scale":scale, "density":density}
             }))
             .unwrap();
+            // The point faces are noise filters on Display (render engine 104).
+            let display = MarkContext {
+                profile: SvgProfile::Display,
+                use_filters: true,
+                ..context(&colors)
+            };
             let rendered = render_surface(
                 &instruction,
                 MarkGeometry::of(&instruction).unwrap(),
-                context(&colors),
+                display,
             )
             .unwrap();
             let mut svg = crate::svg::Document::new(context(&colors).canvas);
@@ -1942,7 +1948,12 @@ mod tests {
             .unwrap();
             let instruction = &score.instructions[0];
             let geometry = MarkGeometry::of(instruction).unwrap();
-            let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
+            let display = MarkContext {
+                profile: SvgProfile::Display,
+                use_filters: true,
+                ..context(&colors)
+            };
+            let rendered = render_surface(instruction, geometry, display).unwrap();
             let filters = rendered
                 .definitions
                 .iter()
@@ -1987,11 +1998,17 @@ mod tests {
             .unwrap();
             let instruction = &score.instructions[0];
             let geometry = MarkGeometry::of(instruction).unwrap();
-            render_surface(instruction, geometry, context(&colors))
+            let display = MarkContext {
+                profile: SvgProfile::Display,
+                use_filters: true,
+                ..context(&colors)
+            };
+            render_surface(instruction, geometry, display)
                 .unwrap()
                 .definitions
         };
         let small = defs(0.06, [0.5, 0.5]);
+        assert!(small.iter().any(|element| element.name() == "filter"));
         let large = defs(0.45, [0.5, 0.5]);
         // The same filter, whatever the size of the face.
         assert_eq!(format!("{small:?}"), format!("{large:?}"));

@@ -21,8 +21,8 @@ use crate::geometry::{
 };
 use crate::mark_geometry::{ArcSpan, MarkGeometry};
 use crate::mark_paths::{
-    amplitude, cloudform_path, hand_contour, hand_line, points_attribute, polygon_path, rotate,
-    uses_hand_stroke,
+    amplitude, amplitude_for_length, cloudform_path, hand_contour, hand_line, measured_path_length,
+    points_attribute, polygon_path, rotate, uses_hand_stroke,
 };
 use crate::palette::resolve_color;
 use crate::planning::instruction_anchor_on_canvas;
@@ -746,7 +746,7 @@ fn arc_centerline_points(
             },
             variation,
             context.seed_for(instruction),
-            amplitude(instruction, context.canvas),
+            amplitude_for_length(instruction, context.canvas, length),
             context.canvas,
         )
     } else {
@@ -1017,7 +1017,7 @@ fn render_affine_round(
             center,
             variation,
             context.seed_for(instruction),
-            amplitude(instruction, context.canvas),
+            amplitude_for_length(instruction, context.canvas, radii.perimeter()),
         );
     }
     render_affine_closed(instruction, &contour, &BTreeSet::new(), style, context)
@@ -1036,7 +1036,11 @@ fn render_affine_corners(
             .as_ref()
             .filter(|variation| needs_contour_variation(variation)),
         context.seed_for(instruction),
-        amplitude(instruction, context.canvas),
+        amplitude_for_length(
+            instruction,
+            context.canvas,
+            measured_path_length(corners, true),
+        ),
         context.canvas,
     );
     render_affine_closed(
@@ -1222,7 +1226,7 @@ fn render_round(
             center,
             variation,
             context.seed_for(instruction),
-            amplitude(instruction, context.canvas),
+            amplitude_for_length(instruction, context.canvas, radii.perimeter()),
         );
     }
     let geometry = match radii {
@@ -1536,7 +1540,7 @@ pub(crate) fn free_line_centerline(
             &points,
             variation,
             context.seed_for(instruction),
-            amplitude(instruction, canvas),
+            amplitude_for_length(instruction, canvas, measured_path_length(&points, false)),
         ),
         None => points,
     };
@@ -1675,7 +1679,11 @@ fn render_corner_shape(
         corners,
         variation,
         context.seed_for(instruction),
-        amplitude(instruction, context.canvas),
+        amplitude_for_length(
+            instruction,
+            context.canvas,
+            measured_path_length(corners, true),
+        ),
         context.canvas,
     );
     let points = if varied { &contour.points } else { corners };
@@ -2005,6 +2013,7 @@ mod tests {
             context.seed_for(&varied),
             context.canvas,
             crate::affine::AffineTransform::identity(),
+            context.wild,
         )
         .unwrap();
         let connected = points(&draw(&varied, Some(&centerline)));

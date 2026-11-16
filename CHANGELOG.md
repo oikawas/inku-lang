@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Drawing (render engine 103, I-743): following the author's selection, varied straight lines retain hand sway, frequency and amplitude are half-coupled, and arcs, closed shapes and free lines use length-based sway too. Connected targets retain the wild hand gesture. Reperformance of works with sway changes; saved SVGs do not.
+
 - Drawing (render engine 102, I-740): faint and dense handling now reaches watercolor, oil-pastel, painting-knife and etching fills and oil-pastel and knife lines. Temperate keeps the former fill. Dense fill layers retain the pigment's hue and chroma, and dense pen and oil-paint lines gain pools or streaks without widening the outline. Reperformance of works with these words can change; saved SVGs do not.
 
 - Swift (macOS and iOS): the composition and laws update arrives in the same shape as on the Web (the author's instruction).

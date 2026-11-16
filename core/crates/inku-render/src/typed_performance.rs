@@ -1639,12 +1639,13 @@ fn resolve(
 ) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
     let digest = inku_score::canonical_score_digest(request.score)
         .expect("finalized compact Score is canonical");
-    resolve_with_digest(request, &digest)
+    resolve_with_digest(request, &digest, false)
 }
 
 pub(crate) fn resolve_with_digest(
     request: PerformanceRequest<'_>,
     input_digest: &str,
+    wild: bool,
 ) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
     let performance_seed = request.performance_seed;
     let composition_seed = request.composition_seed;
@@ -1658,19 +1659,22 @@ pub(crate) fn resolve_with_digest(
         composition_seed,
         canvas,
     };
-    let mut performance =
-        match crate::checked_performance::anchor_execution::resolve_typed(dense_request, typed) {
-            Ok(performance) => performance,
-            Err(mut error) => {
-                remap_dense_diagnostics(
-                    &mut error.diagnostics,
-                    &source_diagnostics,
-                    &dense_to_original,
-                    &dense_anchor_to_original,
-                );
-                return Err(error);
-            }
-        };
+    let mut performance = match crate::checked_performance::anchor_execution::resolve_typed(
+        dense_request,
+        typed,
+        wild,
+    ) {
+        Ok(performance) => performance,
+        Err(mut error) => {
+            remap_dense_diagnostics(
+                &mut error.diagnostics,
+                &source_diagnostics,
+                &dense_to_original,
+                &dense_anchor_to_original,
+            );
+            return Err(error);
+        }
+    };
     if let Some(execution) = &mut performance.execution {
         remap_dense_diagnostics(
             &mut execution.diagnostics,
@@ -2002,6 +2006,7 @@ mod tests {
                 &policy,
                 operational,
                 &[2],
+                false,
             )
             .unwrap();
         assert_eq!(
@@ -2021,6 +2026,7 @@ mod tests {
                 &policy,
                 operational,
                 &[0, 2, 4],
+                false,
             )
             .unwrap();
         assert!(empty.score.instructions.is_empty());

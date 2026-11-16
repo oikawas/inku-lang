@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::affine::AffineTransform;
 use crate::arrangement::{ArrangedCopy, ArrangementRequest, expand_arrangement};
-use crate::checked_performance::resolve_checked_performance_with_resources;
+use crate::checked_performance::resolve_checked_performance_with_resources_and_omissions;
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
 use crate::geometry::{
     crescent_contour_points, open_line_with_variation, point_to_pixels, polygon_points,
@@ -351,7 +351,7 @@ pub fn export_geometry(
         .score
         .validate_work_ranges()
         .map_err(|e| format!("invalid_score_range: {e}"))?;
-    let plan = resolve_checked_performance_with_resources(
+    let plan = resolve_checked_performance_with_resources_and_omissions(
         PerformanceRequest {
             score: &request.score,
             performance_seed: request.options.render_seed,
@@ -361,6 +361,8 @@ pub fn export_geometry(
         ScoreErrorPolicy::Stop,
         hard,
         budget,
+        &[],
+        request.options.wild,
     )
     .map_err(|e| format!("score_execution: {e:?}"))?;
     let mut colors = request.options.resolved_color_map.clone();

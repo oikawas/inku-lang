@@ -542,6 +542,204 @@ fn interior_path_connections_are_reproducible_and_follow_transformed_line_and_ar
 }
 
 #[test]
+fn points_on_varied_pen_and_pencil_lines_follow_the_rendered_center() {
+    let canvas = CanvasSize::new(1000.0, 1000.0);
+    for (weight, width) in [("pen", 2.0_f64), ("pencil", 1.5_f64)] {
+        let input: Score = serde_json::from_value(serde_json::json!({"version":"0.13.0", "instructions":[
+            {"primitive":"line", "from":[0.1,0.5], "to":[0.9,0.5], "weight":weight,
+             "variation":{"amplitude":"medium","frequency":"medium","quality":"perlin", "dimensions":["position_x","position_y"]}},
+            {"primitive":"point", "center":[0.2,0.2], "radius":0.003,
+             "relation":{"type":"connected", "target_instruction_index":0, "target_path_position":0.5, "position_authority":"named_movable"}},
+            {"primitive":"point", "center":[0.2,0.2], "radius":0.003,
+             "relation":{"type":"connected", "target_instruction_index":0, "target_endpoint":"start", "position_authority":"named_movable"}},
+            {"primitive":"point", "center":[0.2,0.2], "radius":0.003,
+             "relation":{"type":"connected", "target_instruction_index":0, "target_endpoint":"end", "position_authority":"named_movable"}}
+        ]})).unwrap();
+        let plan = resolve_checked_performance(
+            PerformanceRequest {
+                canvas: Some(canvas),
+                ..request(&input)
+            },
+            ScoreErrorPolicy::Stop,
+        )
+        .unwrap();
+        let targets = [start(&plan, 1), start(&plan, 2), start(&plan, 3)];
+        let output = render(RenderRequest {
+            score: input,
+            options: RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas,
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(71),
+                composition_seed: Some(71),
+                wild: false,
+                error_policy: ScoreErrorPolicy::Stop,
+            },
+        })
+        .unwrap();
+        let group = output
+            .svg
+            .split("class=\"stroke-engine-v1 ")
+            .nth(1)
+            .unwrap();
+        let d = group
+            .split(" d=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap();
+        let mut best = [f64::INFINITY; 3];
+        for run in d.split('Z') {
+            let nums = run
+                .split_ascii_whitespace()
+                .filter_map(|s| s.parse::<f64>().ok())
+                .collect::<Vec<_>>();
+            let points = nums
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|p| Point::new(p[0], p[1]))
+                .collect::<Vec<_>>();
+            let half = points.len() / 2;
+            let centers = (0..half)
+                .map(|i| {
+                    Point::new(
+                        (points[i].x + points[points.len() - 1 - i].x) * 0.5,
+                        (points[i].y + points[points.len() - 1 - i].y) * 0.5,
+                    )
+                })
+                .collect::<Vec<_>>();
+            for pair in centers.windows(2) {
+                let (dx, dy) = (pair[1].x - pair[0].x, pair[1].y - pair[0].y);
+                for (index, target) in targets.iter().enumerate() {
+                    let (x, y) = (target.x * 1000.0 - pair[0].x, target.y * 1000.0 - pair[0].y);
+                    let t = ((x * dx + y * dy) / (dx * dx + dy * dy).max(1e-12)).clamp(0.0, 1.0);
+                    best[index] = best[index].min((x - t * dx).dhypot(y - t * dy));
+                }
+            }
+        }
+        assert!(
+            best.iter().all(|d| *d <= width * 0.5),
+            "{weight}: point distances from drawn center: {best:?} px"
+        );
+    }
+}
+
+#[test]
+fn wild_varied_line_keeps_its_connected_point_on_the_drawn_center() {
+    let input: Score = serde_json::from_value(serde_json::json!({"version":"0.13.0", "instructions":[
+        {"primitive":"line", "from":[0.1,0.5], "to":[0.9,0.5], "weight":"pen",
+         "variation":{"amplitude":"medium","frequency":"medium","quality":"perlin", "dimensions":["position_x","position_y"]}},
+        {"primitive":"point", "center":[0.2,0.2], "radius":0.003,
+         "relation":{"type":"connected", "target_instruction_index":0, "target_path_position":0.5, "position_authority":"named_movable"}}
+    ]})).unwrap();
+    let draw = |wild| {
+        render(RenderRequest {
+            score: input.clone(),
+            options: RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(71),
+                composition_seed: Some(71),
+                wild,
+                error_policy: ScoreErrorPolicy::Stop,
+            },
+        })
+        .unwrap()
+        .svg
+    };
+    let centers = |svg: &str| {
+        let path = svg
+            .split("class=\"stroke-engine-v1 ")
+            .nth(1)
+            .unwrap()
+            .split(" d=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap();
+        let points: Vec<_> = path
+            .split_ascii_whitespace()
+            .filter_map(|s| s.parse::<f64>().ok())
+            .collect::<Vec<_>>()
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|p| Point::new(p[0], p[1]))
+            .collect();
+        (0..points.len() / 2)
+            .map(|i| {
+                Point::new(
+                    (points[i].x + points[points.len() - 1 - i].x) / 2.0,
+                    (points[i].y + points[points.len() - 1 - i].y) / 2.0,
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let ordinary = centers(&draw(false));
+    let svg = draw(true);
+    let wild_centers = centers(&svg);
+    assert!(
+        ordinary
+            .iter()
+            .zip(&wild_centers)
+            .any(|(a, b)| (a.x - b.x).dhypot(a.y - b.y) > 1.0)
+    );
+    let point_path = svg
+        .split("class=\"contour-stroke-v1 ")
+        .nth(1)
+        .unwrap()
+        .split(" d=\"")
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap()
+        .split('Z')
+        .next()
+        .unwrap();
+    let coords: Vec<_> = point_path
+        .split_ascii_whitespace()
+        .filter_map(|s| s.parse::<f64>().ok())
+        .collect();
+    let points = coords.as_chunks::<2>().0;
+    let target = Point::new(
+        (points.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min)
+            + points
+                .iter()
+                .map(|p| p[0])
+                .fold(f64::NEG_INFINITY, f64::max))
+            / 2.0,
+        (points.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min)
+            + points
+                .iter()
+                .map(|p| p[1])
+                .fold(f64::NEG_INFINITY, f64::max))
+            / 2.0,
+    );
+    let distance = wild_centers
+        .windows(2)
+        .map(|p| {
+            let (dx, dy) = (p[1].x - p[0].x, p[1].y - p[0].y);
+            let (x, y) = (target.x - p[0].x, target.y - p[0].y);
+            let t = ((x * dx + y * dy) / (dx * dx + dy * dy).max(1e-12)).clamp(0.0, 1.0);
+            (x - t * dx).dhypot(y - t * dy)
+        })
+        .fold(f64::INFINITY, f64::min);
+    assert!(
+        distance <= 1.0,
+        "connected point is {distance}px from the center"
+    );
+}
+
+#[test]
 fn selected_line_and_arc_endpoints_keep_identity_through_outer_reflection_and_rotation() {
     let canvas = CanvasSize::new(1200.0, 800.0);
     let input = score(

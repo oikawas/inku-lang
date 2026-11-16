@@ -193,16 +193,15 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
         }
         .max(canvas.unit() * 0.02);
     let trace = widths * mark_width(instruction, canvas);
-    // A line's variation also shapes its path: a wave, a noise or a jitter
-    // strays by a share of its wavelength, so a stated wave stays one on a long
-    // line, and the tool's width stays the floor (render engine 83).
+    // Path sway follows length with a half-coupled frequency adjustment;
+    // the tool's mark width remains the floor (render engine 103).
     let path = if instruction.primitive == Primitive::Line
         && matches!(
             variation.quality,
             Quality::Wave | Quality::Perlin | Quality::White
         ) {
-        line_path_share(variation.amplitude) * representative
-            / frequency_cycles(variation.frequency)
+        line_path_share(variation.amplitude) * representative / 6.0
+            * (6.0 / frequency_cycles(variation.frequency)).sqrt()
     } else {
         0.0
     };
@@ -214,8 +213,49 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     (trace.max(path) * gain).min(0.40 * representative)
 }
 
-/// How far a Line's varied path strays, as a share of its wavelength: the
-/// line's length over the frequency's cycles (render engine 83).
+/// Apply the line's half-coupled rule to an explicitly measured path length.
+/// Cloudforms retain their own variation; crescents retain their existing path.
+pub(crate) fn amplitude_for_length(
+    instruction: &Instruction,
+    canvas: CanvasSize,
+    length: f64,
+) -> f64 {
+    let Some(variation) = instruction.variation.as_ref() else {
+        return 0.0;
+    };
+    let length = length.max(canvas.unit() * 0.02);
+    let trace = amplitude_width(variation.amplitude) * mark_width(instruction, canvas);
+    let path = if matches!(
+        variation.quality,
+        Quality::Wave | Quality::Perlin | Quality::White
+    ) {
+        line_path_share(variation.amplitude) * length / 6.0
+            * (6.0 / frequency_cycles(variation.frequency)).sqrt()
+    } else {
+        0.0
+    };
+    let gain = if variation.quality == Quality::Perlin {
+        1.7
+    } else {
+        1.0
+    };
+    (trace.max(path) * gain).min(0.40 * length)
+}
+
+/// Length of a sampled path, including its closing edge where appropriate.
+pub(crate) fn measured_path_length(points: &[Point], closed: bool) -> f64 {
+    let mut length = points
+        .windows(2)
+        .map(|pair| (pair[1].x - pair[0].x).dhypot(pair[1].y - pair[0].y))
+        .sum::<f64>();
+    if closed && points.len() > 1 {
+        let (a, b) = (points[0], points[points.len() - 1]);
+        length += (b.x - a.x).dhypot(b.y - a.y);
+    }
+    length
+}
+
+/// Base share of a path's length for the half-coupled frequency rule.
 pub(crate) const fn line_path_share(amplitude: Amplitude) -> f64 {
     match amplitude {
         Amplitude::Fine => 0.032,
@@ -243,6 +283,7 @@ pub(crate) fn connected_line_centerline(
     seed: crate::types::Seed,
     canvas: CanvasSize,
     transform: crate::affine::AffineTransform,
+    wild: bool,
 ) -> Option<Vec<Point>> {
     let variation = instruction
         .variation
@@ -285,7 +326,7 @@ pub(crate) fn connected_line_centerline(
                 weight: instruction.weight,
                 seed,
                 sample_count: count,
-                wild: false,
+                wild,
                 grid_step: grid_step(instruction.weight, canvas),
                 support: crate::support::DEFAULT_SUPPORT,
             },
@@ -365,7 +406,7 @@ pub(crate) fn connected_arc_centerline(
                     },
                     variation,
                     seed,
-                    amplitude(instruction, canvas),
+                    amplitude_for_length(instruction, canvas, length),
                     canvas,
                 )
             },
@@ -1074,25 +1115,33 @@ mod tests {
     fn a_line_variation_strays_by_a_share_of_its_wavelength_above_the_tool_width() {
         let canvas = CanvasSize::new(1000.0, 1000.0);
         let pen_line = r#""primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"weight":"pen""#;
-        // An 800px slow medium wave: 0.054 of its 400px wavelength.
+        // The slow medium wave uses the square root of the frequency ratio.
         let wave = instruction(
             pen_line,
             r#""quality":"wave","frequency":"slow","amplitude":"medium""#,
         );
-        assert!((amplitude(&wave, canvas) - 21.6).abs() < 1.0e-9);
-        // A high fine noise: 0.032 of 800 / 14, above the pen's 0.35 widths.
+        assert!((amplitude(&wave, canvas) - 0.054 * 800.0 / 6.0 * 3.0_f64.sqrt()).abs() < 1.0e-9);
+        // High fine noise remains above the pen's 0.35 widths.
         let noise = instruction(
             pen_line,
             r#""quality":"perlin","frequency":"high","amplitude":"fine""#,
         );
-        assert!((amplitude(&noise, canvas) - 1.7 * 0.032 * 800.0 / 14.0).abs() < 1.0e-9);
+        assert!(
+            (amplitude(&noise, canvas) - 1.7 * 0.032 * 800.0 / 6.0 * (6.0_f64 / 14.0).sqrt()).abs()
+                < 1.0e-9
+        );
         assert!(amplitude(&noise, canvas) > 0.35 * mark_width(&noise, canvas));
-        // An arc keeps the tool's widths.
+        // An arc uses its actual length with the same wavelength rule.
         let arc = instruction(
             r#""primitive":"arc","center":[0.5,0.5],"radius":0.3,"angle_start":0,"angle_end":180,"weight":"pen""#,
             r#""quality":"wave","frequency":"slow","amplitude":"medium""#,
         );
-        assert_eq!(amplitude(&arc, canvas), 0.6 * mark_width(&arc, canvas));
+        assert!(
+            (amplitude_for_length(&arc, canvas, std::f64::consts::PI * 300.0)
+                - 0.054 * std::f64::consts::PI * 300.0 / 6.0 * 3.0_f64.sqrt())
+            .abs()
+                < 1.0e-9
+        );
         // A short thick brush line keeps its width-based value as the floor.
         let short = instruction(
             r#""primitive":"line","from":[0.45,0.5],"to":[0.55,0.5],"weight":"brush_thick""#,
@@ -1111,6 +1160,7 @@ mod tests {
         let variation = mark.variation.as_ref().unwrap();
         let amount = amplitude(&mark, canvas);
         assert!((amount - 8.0).abs() < 1e-8);
+        assert!((amplitude_for_length(&mark, canvas, 20.0) - 8.0).abs() < 1e-8);
         for i in 0..=100 {
             let t = f64::from(i) / 100.0;
             assert!(

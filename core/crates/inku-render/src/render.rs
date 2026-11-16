@@ -6,9 +6,9 @@ use std::fmt;
 use crate::accepted_fills;
 use crate::arrangement::{ArrangedCopy, ArrangementRequest, expand_arrangement};
 use crate::checked_performance::{
-    CheckedPerformanceError, CheckedPerformanceWithResourcesError, resolve_checked_performance,
-    resolve_checked_performance_with_resources,
+    CheckedPerformanceError, CheckedPerformanceWithResourcesError,
     resolve_checked_performance_with_resources_and_omissions,
+    resolve_checked_performance_with_wild,
 };
 use crate::determinism::hash01;
 use crate::fills::{is_noncomputer_solid_fill, solid_mottle_filter, solid_mottle_filter_id};
@@ -485,13 +485,16 @@ fn paint_object_body(
                 body_request,
                 finalized,
                 digest,
+                request.options.wild,
             )
         } else {
-            resolve_checked_performance_with_resources(
+            resolve_checked_performance_with_resources_and_omissions(
                 body_request,
                 request.options.error_policy,
                 &policy.hard_policy,
                 policy.operational_budget,
+                &[],
+                request.options.wild,
             )
         };
         result.map_err(|error| match error {
@@ -503,8 +506,12 @@ fn paint_object_body(
             }
         })
     } else {
-        resolve_checked_performance(body_request, request.options.error_policy)
-            .map_err(RenderError::CheckedPerformance)
+        resolve_checked_performance_with_wild(
+            body_request,
+            request.options.error_policy,
+            request.options.wild,
+        )
+        .map_err(RenderError::CheckedPerformance)
     };
     let performed = match performed {
         Ok(performed) => performed,
@@ -960,6 +967,7 @@ fn render_impl(
             hard,
             operational,
             omitted_instructions,
+            request.options.wild,
         )
         .map_err(|error| match error {
             CheckedPerformanceWithResourcesError::Resources(error) => {
@@ -969,8 +977,12 @@ fn render_impl(
                 RenderError::CheckedPerformance(error)
             }
         }),
-        None => resolve_checked_performance(performance_request, request.options.error_policy)
-            .map_err(RenderError::CheckedPerformance),
+        None => resolve_checked_performance_with_wild(
+            performance_request,
+            request.options.error_policy,
+            request.options.wild,
+        )
+        .map_err(RenderError::CheckedPerformance),
     }?;
     let ground = canvas_ground(&performance.score);
     let support = ground.as_ref().map_or(DEFAULT_SUPPORT, |ground| {

@@ -3018,31 +3018,22 @@ The JSON Score's `variation` field is structured by dimension.
 **The writer never writes this structure directly.** The structuring layer of
 the second phase generates it from the combination of motion words, weight, and plugins.
 
-In the current implementation the sway of a line is expressed by turning it into a
-polyline in the renderer. Amplitude is a multiple of **the stroke's own width** —
-`fine=0.35` / `medium=0.6` / `broad=2.0` (render engine 28; from v2.1.0 through
-engine 27 it was a ratio against the shape's representative dimension, 0.025 /
-0.08 / 0.18, and before that absolute pixels of 7 / 12 / 30 against a 1000px
-canvas). **A sway happens where the tool meets the paper, so it is measured in
-marks, not in figures** — read against the representative dimension, the same 8%
-was invisible under a brush and a different line under a thin pencil. The clamp at
-0.40 of the representative dimension stays, as the safety valve for a figure
-smaller than its own mark.
+The renderer expresses path sway as a polyline. The stroke-width amplitude is
+`fine=0.35` / `medium=0.6` / `broad=2.0` times the mark width and provides a
+floor for the path-length amplitude (values retained since render engine 28).
 
-A sway that moves a line's path (`wave`, `perlin` or `white`) is also read as the
-shape of that path (render engine 83). Its amplitude is the larger of the
-mark-width amplitude above and a share of the wavelength, the line's length over
-its cycles (loosely 2, medium 6, tightly 14): narrowly 0.032, medium 0.054,
-broadly 0.135, still clamped at 0.40 of the line's length. Measured in marks
-alone, a long pen line "undulating loosely" swayed by 1.2px and looked nearly
-straight. The shares are render engine 3's 7 / 12 / 30px over the wavelength of a
-line in a work drawn with it (443px long, 2 cycles, a 221.5px wavelength), so a
-line of that length undulating loosely sways by 12px again. Arcs, closed shapes,
-free lines and points keep the mark-width amplitude. A rotring line (saved Scores only) has no hand
-stroke, but with a sway that moves its path it is drawn as a `<polyline>` along
-the path a hand line follows, with the same seed, amplitude and settled ends, and
-a path connection that targets it uses the same centerline fixed during
-execution. A rotring line without one stays a `<line>`.
+For path-moving sway (`wave`, `perlin`, or `white`), straight lines, arcs, closed
+shapes and free lines use `share × length ÷ 6 × (6 ÷ cycles)^0.5` (render engine
+103, author decision 2026-11-16). Shares are 0.032 / 0.054 / 0.135 for narrow /
+medium / broad, and cycles 2 / 6 / 14 for loose / medium / tight. Loose is about
+1.7 times medium and tight about 0.65 times; this replaces the 2026-10-16 k=1
+rule. The greater of this and the mark-width amplitude is multiplied by 1.7 for
+`perlin` to match waves, then capped at 0.40 of the length. Cloudforms, crescents
+and points retain their existing behavior. Straight lines add the hand's sideways
+sway and gesture to the varied path; expected breaks and hand events are the same
+with or without sway. A connection's centerline has the same hand sway, including
+wild, as the drawn line. A rotring line (saved Scores only) has no hand stroke;
+it uses a `<polyline>` with path sway and a `<line>` without it.
 
 Open lines and arcs keep their start and end where the Score puts them and let the
 sway settle to nothing towards both (render engine 76): over the shorter of 0.16 of

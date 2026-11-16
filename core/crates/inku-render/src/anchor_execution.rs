@@ -46,6 +46,8 @@ struct Source {
 
 struct Execution<'a> {
     request: PerformanceRequest<'a>,
+    /// Render-time hand gesture setting for connected path hosts.
+    wild: bool,
     /// Node order with cyclic relations already dropped.
     schedule: AnchorSchedule,
     /// What execution knows about each source instruction, by its index.
@@ -533,6 +535,7 @@ impl Execution<'_> {
                 seed,
                 canvas,
                 self.sources[index].transform,
+                self.wild,
             ),
             Primitive::Arc if self.sources[index].interior_path_host => {
                 crate::mark_paths::connected_arc_centerline(
@@ -2508,6 +2511,7 @@ fn mark_closed_arc_pairs(
 fn resolve_impl(
     request: PerformanceRequest<'_>,
     typed: Option<TypedExecutionPlan>,
+    wild: bool,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
     let policy = ScoreErrorPolicy::OmitAndContinue;
     let transform_groups_valid = if typed.is_some() {
@@ -2699,6 +2703,7 @@ fn resolve_impl(
         .collect();
     let mut execution = Execution {
         request,
+        wild,
         schedule: dependency_schedule,
         sources,
         anchors,
@@ -2975,13 +2980,15 @@ fn resolve_impl(
 
 pub(super) fn resolve(
     request: PerformanceRequest<'_>,
+    wild: bool,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
-    resolve_impl(request, None)
+    resolve_impl(request, None, wild)
 }
 
 pub(crate) fn resolve_typed(
     request: PerformanceRequest<'_>,
     typed: TypedExecutionPlan,
+    wild: bool,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
-    resolve_impl(request, Some(typed))
+    resolve_impl(request, Some(typed), wild)
 }

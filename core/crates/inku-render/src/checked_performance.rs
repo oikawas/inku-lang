@@ -570,7 +570,16 @@ fn in_any_transform_group(groups: &[TransformGroup], index: usize) -> bool {
 /// Resolve checked relations and transform scopes through one dependency executor.
 pub fn resolve_checked_performance(
     request: PerformanceRequest<'_>,
+    policy: ScoreErrorPolicy,
+) -> Result<PerformancePlan, CheckedPerformanceError> {
+    resolve_checked_performance_with_wild(request, policy, false)
+}
+
+/// Resolve relations with the same hand gesture setting used for painting.
+pub(crate) fn resolve_checked_performance_with_wild(
+    request: PerformanceRequest<'_>,
     _policy: ScoreErrorPolicy,
+    wild: bool,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
     if request.score.uses_compact_resource_contract() {
         return Err(CheckedPerformanceError {
@@ -597,7 +606,7 @@ pub fn resolve_checked_performance(
             })
         });
     if needs_checked_execution {
-        anchor_execution::resolve(request)
+        anchor_execution::resolve(request, wild)
     } else {
         Ok(resolve_performance(request))
     }
@@ -617,6 +626,7 @@ pub fn resolve_checked_performance_with_resources(
         hard_policy,
         operational_budget,
         &[],
+        false,
     )
 }
 
@@ -650,10 +660,11 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
     hard_policy: &inku_score::HardResourcePolicy,
     operational_budget: inku_score::OperationalResourceBudget,
     omitted_original_instruction_indices: &[usize],
+    wild: bool,
 ) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
     if !request.score.uses_compact_resource_contract() {
         inku_score::check_legacy_resource_demand(request.score, hard_policy, operational_budget)?;
-        return resolve_checked_performance(request, policy).map_err(Into::into);
+        return resolve_checked_performance_with_wild(request, policy, wild).map_err(Into::into);
     }
     let finalized = inku_score::finalize_saved_score_with_omitted_instructions(
         request.score,
@@ -666,13 +677,14 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
             owner: inku_score::SavedScoreResourceOwner::Score,
             reason: inku_score::SavedScoreResourceFailure::InvalidContract("non-canonical Score"),
         })?;
-    resolve_finalized_performance(request, &finalized, &input_digest)
+    resolve_finalized_performance(request, &finalized, &input_digest, wild)
 }
 
 pub(crate) fn resolve_finalized_performance(
     request: PerformanceRequest<'_>,
     finalized: &inku_score::FinalizedScore,
     input_digest: &str,
+    wild: bool,
 ) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
     let mut new_to_old = vec![0; finalized.score.instructions.len()];
     for (old, new) in finalized.index_maps.instructions.iter().enumerate() {
@@ -690,18 +702,17 @@ pub(crate) fn resolve_finalized_performance(
         score: &finalized.score,
         ..request
     };
-    let mut performance =
-        match crate::typed_performance::resolve_with_digest(finalized_request, input_digest) {
-            Ok(performance) => performance,
-            Err(mut error) => {
-                remap_finalized_diagnostics(
-                    &mut error.diagnostics,
-                    &new_to_old,
-                    &new_anchor_to_old,
-                );
-                return Err(error.into());
-            }
-        };
+    let mut performance = match crate::typed_performance::resolve_with_digest(
+        finalized_request,
+        input_digest,
+        wild,
+    ) {
+        Ok(performance) => performance,
+        Err(mut error) => {
+            remap_finalized_diagnostics(&mut error.diagnostics, &new_to_old, &new_anchor_to_old);
+            return Err(error.into());
+        }
+    };
     for entry in &mut performance.performed {
         entry.original_instruction_index = new_to_old[entry.original_instruction_index];
     }

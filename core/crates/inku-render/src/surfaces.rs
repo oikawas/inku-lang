@@ -64,6 +64,8 @@ const STIPPLE_MAX: usize = 2400;
 const STIPPLE_OPACITY_MIN: f64 = 0.8;
 /// The share of the tool's opacity a 粒 face deposits (render engine 104).
 const GRAIN_DEPOSIT: f64 = 0.6;
+/// The finest noise period a face draws, in mm at a 30 cm sheet (render engine 104).
+const NOISE_PERIOD_MIN_MM: f64 = 0.33;
 const AQUATINT_DARKEN_FRACTION: f64 = -0.30;
 const AQUATINT_DARKEN_LIMIT: f64 = 0.15;
 const AQUATINT_LIGHT_OPACITY: f64 = 0.18;
@@ -789,7 +791,7 @@ fn noise_spec(kind: NoiseKind, scale: f64, density: f64) -> NoiseSpec {
     match kind {
         // Only the noise's peaks: small, round, separate dots.
         NoiseKind::Stipple => NoiseSpec {
-            period: (0.3 * size, 0.3 * size),
+            period: (0.45 * size, 0.45 * size),
             octaves: 1,
             tooth: None,
             cover: (0.3 * packing).clamp(0.08, 0.6),
@@ -807,7 +809,7 @@ fn noise_spec(kind: NoiseKind, scale: f64, density: f64) -> NoiseSpec {
         },
         // The ink the tone keeps: the rest is paper showing as light specks.
         NoiseKind::Rocker => NoiseSpec {
-            period: (0.2 * size, 0.3 * size),
+            period: (0.45 * size, 0.6 * size),
             octaves: 3,
             tooth: None,
             cover: (0.92 * packing.dpowf(0.1)).clamp(0.75, 0.97),
@@ -824,10 +826,14 @@ fn noise_filter(spec: &NoiseSpec, context: MarkContext<'_>, seed: i64) -> Elemen
     let spread = if spec.tooth.is_some() { 0.083 } else { 0.118 };
     let cut = 0.5 + spread * cover_quantile(spec.cover);
     let slope = 1.0 / spec.edge;
+    // A renderer computes the noise at the canvas's own unit (0.33 mm at a 30 cm
+    // sheet), so a finer period draws no texture at all: the fine words keep
+    // the finest the canvas shows.
+    let period = |mm_long: f64| mm_long.max(NOISE_PERIOD_MIN_MM) * unit;
     let frequency = format!(
         "{} {}",
-        format_number(1.0 / (spec.period.0 * unit)),
-        format_number(1.0 / (spec.period.1 * unit))
+        format_number(1.0 / period(spec.period.0)),
+        format_number(1.0 / period(spec.period.1))
     );
     let payload = format!(
         "{frequency}|{}|{:?}|{:.4}|{:.4}|{:.4}|{seed}",

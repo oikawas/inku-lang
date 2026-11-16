@@ -1480,6 +1480,7 @@ mod tests {
 
     use super::*;
     use crate::support::DEFAULT_SUPPORT;
+    use crate::surface_geometry::point_in_polygon;
     use crate::types::{CanvasSize, Score};
 
     fn context<'a>(colors: &'a BTreeMap<String, String>) -> MarkContext<'a> {

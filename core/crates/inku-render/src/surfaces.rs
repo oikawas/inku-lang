@@ -50,9 +50,6 @@ const SURFACE_SWEEP_OPACITY: f64 = 0.5;
 /// 1.2 of one band's opacity, which keeps a face's mean tone (calibrated on the
 /// author's batch of Build 1309).
 const SURFACE_SWEEP_PASS_FACTOR: f64 = 1.2;
-/// The dab shapes one grain face places, its sizes split evenly over 0.55 to
-/// 1.65 of the grain radius (render engine 90).
-const SURFACE_GRAIN_SHAPES: usize = 12;
 const SURFACE_BLEED_RINGS: usize = 3;
 /// A surface's default density and scale (the Score's `SurfaceSpec`). The
 /// fineness words (DDL 24) move a named texture away from them, and the units'
@@ -65,23 +62,12 @@ const STIPPLE_RADIUS_FACTOR: f64 = 2.4;
 const STIPPLE_COUNT_FACTOR: f64 = 1.5;
 const STIPPLE_MAX: usize = 2400;
 const STIPPLE_OPACITY_MIN: f64 = 0.8;
-const GRAIN_RADIUS_FACTOR: f64 = 0.55;
-const GRAIN_COUNT_FACTOR: f64 = 38.0;
-const GRAIN_OPACITY_FACTOR: f64 = 0.8;
-/// The grain lies on three repeating tiles whose sides do not divide one
-/// another, each carrying a third of the points. The largest tile is as wide
-/// as the face, between 0.08 and 0.19 of the canvas, so a small face carries
-/// fewer points than its area and a large face no more than the tiles, and no
-/// single repeat shows as a lattice (render engine 104; one face-sized tile
-/// grew with the face).
-const GRAIN_TILE_SIDE_MIN: f64 = 0.08;
-const GRAIN_TILE_SIDE_MAX: f64 = 0.19;
-const GRAIN_TILE_SCALES: [f64; 3] = [0.58, 0.76, 1.0];
+/// The share of the tool's opacity a 粒 face deposits (render engine 104).
+const GRAIN_DEPOSIT: f64 = 0.6;
 const AQUATINT_DARKEN_FRACTION: f64 = -0.30;
 const AQUATINT_DARKEN_LIMIT: f64 = 0.15;
 const AQUATINT_LIGHT_OPACITY: f64 = 0.18;
 const AQUATINT_DARK_OPACITY: f64 = 0.97;
-const AQUATINT_TEXTURE_OPACITY: f64 = 0.85;
 const AQUATINT_RADIUS_BASE: f64 = 0.95;
 const AQUATINT_RADIUS_DENSITY: f64 = 0.55;
 const AQUATINT_STOPS_PER_STEP: usize = 4;
@@ -338,11 +324,6 @@ fn sweep_bleed_filter(instruction: &Instruction, context: MarkContext<'_>) -> El
         format_number(sweep_bleed(instruction.weight) * context.canvas.unit() / 1000.0),
     ));
     filter
-}
-
-/// Hundredths are enough for a placed grain point.
-fn hundredths(value: f64) -> String {
-    format_number((value * 100.0).round() / 100.0)
 }
 
 fn surface_color(instruction: &Instruction, context: MarkContext<'_>) -> String {
@@ -741,175 +722,274 @@ fn sweep_parts(
     Some((vec![body.into()], Vec::new()))
 }
 
-/// The grain of one face, laid on `GRAIN_TILE_SCALES.len()` repeating tiles.
-/// Each tile carries a third of the points at the density the 0.08-unit tile
-/// once set (render engine 89; a finer grain sets more, smaller points at the
-/// same cover, and the density multiplies them). The tiles' sides do not divide
-/// one another and their origins move with the seed, so the repeats never line
-/// up into the lattice one small tile showed (render engine 90). A point near a
-/// tile's edge is drawn again across the opposite edge, so the tile has no
-/// seam. The face places `SURFACE_GRAIN_SHAPES` dab shapes, turned, by `use`.
-///
-/// The tiles hang from the canvas origin, not from the face, and their ids
-/// name their content, so every face of one instruction (a row of copies, a
-/// scatter) fills from the same tiles: the document carries each set once
-/// (`extend_definitions`), and its size no longer grows with the faces or their
-/// area (render engine 104). Returns the definitions and the ids of the
-/// patterns, lowest layer first.
-fn grain_pattern(
-    instruction: &Instruction,
-    context: MarkContext<'_>,
-    color: &str,
-    opacity: f64,
-    contour: &[Point],
-) -> (Vec<Element>, Vec<String>) {
-    let surface = instruction
-        .surface
-        .as_ref()
-        .expect("surface checked by caller");
-    // The face's width, rounded to whole pixels so that copies of one size
-    // share their tiles.
-    let extent = {
-        let (xs, ys): (Vec<f64>, Vec<f64>) = contour.iter().map(|p| (p.x, p.y)).unzip();
-        let span = |values: &[f64]| {
-            values.iter().copied().fold(f64::NEG_INFINITY, f64::max)
-                - values.iter().copied().fold(f64::INFINITY, f64::min)
-        };
-        span(&xs).max(span(&ys)).round()
-    };
-    // A hand's pressure turns each face's opacity a little; the tiles take it
-    // in steps of 0.02, so the faces of one instruction share a few sets.
-    let opacity = ((opacity * 50.0).round() / 50.0).max(0.02);
-    // The tiles seed from what every face of the instruction shares (its
-    // index, tool, texture and the render seed), not from a face's place, so
-    // the copies of a row fill from one set; each face's own seed
-    // (`surface_seed`) is unchanged.
-    let seed = {
-        let digest = Sha256::digest(
-            format!(
-                "surface-grain-tiles:{}:{:?}:{}:{}",
-                context.instruction_index,
-                instruction.weight,
-                surface.texture.as_str(),
-                seed_debug_text(context.render_seed)
-            )
-            .as_bytes(),
-        );
-        i128::from(u64::from_le_bytes(
-            digest[..8].try_into().expect("eight digest bytes"),
-        ))
-    };
-    let tile = context.canvas.unit() * 0.08;
-    let size = texture_size_factor(surface.scale.max(0.04));
-    let radius = (context.canvas.unit() * (0.002 + SURFACE_DEFAULT_SCALE * 0.004)).max(0.45)
-        * size
-        * GRAIN_RADIUS_FACTOR;
-    let tile_area = tile * tile;
-    let reference_area = context.canvas.unit().powi(2) * 0.18;
-    let cover = 1.0 / (size * size);
-    let per_tile = (((22.0 + SURFACE_DEFAULT_DENSITY * 120.0) * tile_area / reference_area
-        * cover
-        * texture_count_ratio(surface.density.max(0.02))
-        * GRAIN_COUNT_FACTOR)
-        .ceil() as usize)
-        .max(1);
-    let density = per_tile as f64 / tile_area;
-    let width = mark_width(instruction, context.canvas);
-    let reach = (radius * 1.65 * 2.0).max(width * 0.75);
-    let base = (extent + 2.0 * reach).clamp(
-        context.canvas.unit() * GRAIN_TILE_SIDE_MIN,
-        context.canvas.unit() * GRAIN_TILE_SIDE_MAX,
+/// The point faces drawn from noise (render engine 104). Prints and drawings
+/// were measured at a sheet 30 cm across the canvas's short side (2026-11-17,
+/// the Met's open-access stipple engravings, mezzotints and chalk drawings):
+/// their texture is 0.1 to 0.3 mm fine, far below a point per element, so the
+/// faces are laid by an SVG noise filter, cut to a cover, inside the contour.
+#[derive(Clone, Copy)]
+enum NoiseKind {
+    /// 点描: round dots, each its own, on an even field.
+    Stipple,
+    /// 粒: the tool's strokes caught by the paper's tooth, along one direction.
+    Grain,
+    /// The fine rocked ground of a mezzotint (the face 「アクアチント」 draws).
+    Rocker,
+}
+
+/// Millimetres per canvas unit at a 30 cm short side.
+fn mm(context: MarkContext<'_>) -> f64 {
+    context.canvas.unit() / 300.0
+}
+
+/// The standard normal quantile at `1 - cover`, read off a table: the noise is
+/// near-normal around 0.5 (measured in resvg, 2026-11-17).
+fn cover_quantile(cover: f64) -> f64 {
+    const TABLE: [(f64, f64); 13] = [
+        (0.05, 1.645),
+        (0.10, 1.2816),
+        (0.15, 1.0364),
+        (0.20, 0.8416),
+        (0.25, 0.6745),
+        (0.30, 0.5244),
+        (0.35, 0.3853),
+        (0.40, 0.2533),
+        (0.45, 0.1257),
+        (0.50, 0.0),
+        (0.55, -0.1257),
+        (0.60, -0.2533),
+        (0.70, -0.5244),
+    ];
+    let cover = cover.clamp(TABLE[0].0, TABLE[TABLE.len() - 1].0);
+    for pair in TABLE.windows(2) {
+        let ((c0, z0), (c1, z1)) = (pair[0], pair[1]);
+        if cover <= c1 {
+            return z0 + (z1 - z0) * (cover - c0) / (c1 - c0);
+        }
+    }
+    TABLE[TABLE.len() - 1].1
+}
+
+struct NoiseSpec {
+    /// Periods along the face's x and y, in mm.
+    period: (f64, f64),
+    octaves: u32,
+    /// The paper's tooth mixed in (period in mm), for 粒.
+    tooth: Option<f64>,
+    cover: f64,
+    /// The width of the cut in noise value: small is a crisp edge.
+    edge: f64,
+    /// A blur before the cut (mm), rounding the noise's peaks into round dots.
+    smooth: f64,
+}
+
+fn noise_spec(kind: NoiseKind, scale: f64, density: f64) -> NoiseSpec {
+    let size = texture_size_factor(scale.max(0.04));
+    let packing = texture_count_ratio(density.max(0.02)).dpowf(0.5);
+    match kind {
+        // Only the noise's peaks: small, round, separate dots.
+        NoiseKind::Stipple => NoiseSpec {
+            period: (0.3 * size, 0.3 * size),
+            octaves: 1,
+            tooth: None,
+            cover: (0.3 * packing).clamp(0.08, 0.6),
+            edge: 0.02,
+            smooth: 0.05 * size,
+        },
+        // A soft grey deposit along the strokes, broken by the paper's tooth.
+        NoiseKind::Grain => NoiseSpec {
+            period: (0.35 * size, 1.5 * size),
+            octaves: 2,
+            tooth: Some(0.4 * size),
+            cover: (0.35 * packing).clamp(0.08, 0.7),
+            edge: 0.25,
+            smooth: 0.0,
+        },
+        // The ink the tone keeps: the rest is paper showing as light specks.
+        NoiseKind::Rocker => NoiseSpec {
+            period: (0.2 * size, 0.3 * size),
+            octaves: 3,
+            tooth: None,
+            cover: (0.92 * packing.dpowf(0.1)).clamp(0.75, 0.97),
+            edge: 0.2,
+            smooth: 0.0,
+        },
+    }
+}
+
+/// The filter that keeps the face's colour only where the noise rises above
+/// the cut. Its id names its content, so the faces of one instruction share it.
+fn noise_filter(spec: &NoiseSpec, context: MarkContext<'_>, seed: i64) -> Element {
+    let unit = mm(context);
+    let spread = if spec.tooth.is_some() { 0.083 } else { 0.118 };
+    let cut = 0.5 + spread * cover_quantile(spec.cover);
+    let slope = 1.0 / spec.edge;
+    let frequency = format!(
+        "{} {}",
+        format_number(1.0 / (spec.period.0 * unit)),
+        format_number(1.0 / (spec.period.1 * unit))
     );
     let payload = format!(
-        "{color}|{opacity:.6}|{radius:.6}|{density:.9}|{width:.6}|{base:.6}|{:?}|{}|{:?}",
-        instruction.weight,
-        seed_debug_text(Some(seed)),
-        context.profile
+        "{frequency}|{}|{:?}|{:.4}|{:.4}|{:.4}|{seed}",
+        spec.octaves, spec.tooth, spec.cover, spec.edge, spec.smooth
     );
     let digest = Sha256::digest(payload.as_bytes());
-    let pattern_id = format!(
-        "surface_grain_{}",
+    let id = format!(
+        "surface_noise_{}",
         digest[..6]
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>()
     );
-    let mut definitions = Vec::new();
-    for shape in 0..SURFACE_GRAIN_SHAPES {
-        let factor = 0.55 + 1.1 * (shape as f64 + 0.5) / SURFACE_GRAIN_SHAPES as f64;
-        definitions.push(
-            dab(
-                instruction,
-                context,
-                Point::new(0.0, 0.0),
-                DabSpec {
-                    radius: radius * factor,
-                    color,
-                    opacity,
-                    seed,
-                    index: shape as i64,
-                    class_name: "surface-grain-dab",
-                    use_filters: false,
-                },
-            )
-            .attr("id", format!("{pattern_id}_dab_{shape}")),
+    let mut filter = Element::new("filter")
+        .attr("id", id)
+        .attr("x", "-5%")
+        .attr("y", "-5%")
+        .attr("width", "110%")
+        .attr("height", "110%")
+        .attr("color-interpolation-filters", "sRGB");
+    filter.push(
+        Element::new("feTurbulence")
+            .attr("type", "fractalNoise")
+            .attr("baseFrequency", frequency)
+            .attr("numOctaves", spec.octaves.to_string())
+            .attr("seed", seed.to_string())
+            .attr("result", "noise"),
+    );
+    if let Some(tooth) = spec.tooth {
+        filter.push(
+            Element::new("feTurbulence")
+                .attr("type", "fractalNoise")
+                .attr("baseFrequency", format_number(1.0 / (tooth * unit)))
+                .attr("numOctaves", "1")
+                .attr("seed", (seed + 1).to_string())
+                .attr("result", "tooth"),
+        );
+        filter.push(
+            Element::new("feComposite")
+                .attr("in", "noise")
+                .attr("in2", "tooth")
+                .attr("operator", "arithmetic")
+                .attr("k1", "0")
+                .attr("k2", "0.6")
+                .attr("k3", "0.4")
+                .attr("k4", "0")
+                .attr("result", "noise"),
         );
     }
-    let layers = GRAIN_TILE_SCALES.len();
-    let mut ids = Vec::with_capacity(layers);
-    for (layer, scale) in GRAIN_TILE_SCALES.iter().enumerate() {
-        let side = base * scale;
-        let id = format!("{pattern_id}_{layer}");
-        let shift_x = hash01(layer as i64, seed, "surface-grain-tile-x") * side;
-        let shift_y = hash01(layer as i64, seed, "surface-grain-tile-y") * side;
-        let mut pattern = Element::new("pattern")
-            .attr("id", &id)
-            .attr("patternUnits", "userSpaceOnUse")
-            .attr("x", format_number(-shift_x))
-            .attr("y", format_number(-shift_y))
-            .attr("width", format_number(side))
-            .attr("height", format_number(side));
-        if context.profile != SvgProfile::Compat {
-            pattern.set_attr("class", "surface-grain-pattern-v3");
-        }
-        let count = ((density * side * side / layers as f64).round() as usize).max(1);
-        for point_index in 0..count {
-            let index = (layer * 1_000_000 + point_index) as i64;
-            let point = Point::new(
-                hash01(index, seed, "surface-grain-x") * side,
-                hash01(index, seed, "surface-grain-y") * side,
-            );
-            let shape = ((hash01(index, seed, "surface-r") * SURFACE_GRAIN_SHAPES as f64) as usize)
-                .min(SURFACE_GRAIN_SHAPES - 1);
-            let turn =
-                format_number((hash01(index, seed, "surface-grain-turn") * 3600.0).round() / 10.0);
-            let mark_opacity = hundredths(0.45 + hash01(index, seed, "surface-o") * 0.55);
-            for dx in [-side, 0.0, side] {
-                for dy in [-side, 0.0, side] {
-                    let (x, y) = (point.x + dx, point.y + dy);
-                    if x < -reach || x > side + reach || y < -reach || y > side + reach {
-                        continue;
-                    }
-                    pattern.push(
-                        Element::new("use")
-                            .attr("href", format!("#{pattern_id}_dab_{shape}"))
-                            .attr(
-                                "transform",
-                                format!(
-                                    "translate({} {}) rotate({turn})",
-                                    hundredths(x),
-                                    hundredths(y)
-                                ),
-                            )
-                            .attr("opacity", &mark_opacity),
-                    );
-                }
-            }
-        }
-        definitions.push(pattern);
-        ids.push(id);
+    if spec.smooth > 0.0 {
+        filter.push(
+            Element::new("feGaussianBlur")
+                .attr("in", "noise")
+                .attr("stdDeviation", format_number(spec.smooth * unit))
+                .attr("result", "noise"),
+        );
     }
-    (definitions, ids)
+    filter.push(
+        Element::new("feColorMatrix")
+            .attr("in", "noise")
+            .attr("type", "matrix")
+            .attr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0")
+            .attr("result", "level"),
+    );
+    let mut transfer = Element::new("feComponentTransfer")
+        .attr("in", "level")
+        .attr("result", "cut");
+    transfer.push(
+        Element::new("feFuncA")
+            .attr("type", "linear")
+            .attr("slope", format_number(slope))
+            .attr("intercept", format_number(-slope * (cut - spec.edge / 2.0))),
+    );
+    filter.push(transfer);
+    filter.push(
+        Element::new("feComposite")
+            .attr("in", "SourceGraphic")
+            .attr("in2", "cut")
+            .attr("operator", "in"),
+    );
+    filter
+}
+
+/// One noise face: the contour filled with `color` at `opacity`, kept where the
+/// noise rises. 粒 turns its noise along the strokes' direction; the face
+/// stays in place. Compat (no filter) lays the cover as a flat tone instead.
+fn noise_face(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    contour: &[Point],
+    kind: NoiseKind,
+    color: &str,
+    opacity: f64,
+    class_name: &str,
+) -> (Element, Option<Element>) {
+    let surface = instruction
+        .surface
+        .as_ref()
+        .expect("surface checked by caller");
+    let spec = noise_spec(kind, surface.scale, surface.density);
+    if context.profile == SvgProfile::Compat || !context.use_filters {
+        return (
+            Element::new("path")
+                .attr("d", closed_path(contour))
+                .attr("fill", color)
+                .attr("fill-opacity", format_number(opacity * spec.cover))
+                .attr("stroke", "none")
+                .attr("class", class_name),
+            None,
+        );
+    }
+    // The noise seeds from what every face of the instruction shares, so its
+    // copies draw from one filter; each face's own seed is unchanged.
+    let digest = Sha256::digest(
+        format!(
+            "surface-noise:{}:{:?}:{}:{}",
+            context.instruction_index,
+            instruction.weight,
+            surface.texture.as_str(),
+            seed_debug_text(context.render_seed)
+        )
+        .as_bytes(),
+    );
+    let seed = i64::from(u16::from_le_bytes([digest[0], digest[1]]));
+    let filter = noise_filter(&spec, context, seed);
+    let id = filter.attribute("id").expect("filter id").to_owned();
+    let angle = match kind {
+        NoiseKind::Grain => 20.0 + 50.0 * f64::from(digest[2]) / 255.0,
+        // The tone's light comes from the upper left; turning the face would turn it.
+        NoiseKind::Rocker => 0.0,
+        NoiseKind::Stipple => 0.0,
+    };
+    let center = points_center(contour);
+    let (sin, cos) = ((-angle).to_radians().dsin(), (-angle).to_radians().dcos());
+    let turned = contour
+        .iter()
+        .map(|point| {
+            let (dx, dy) = (point.x - center.x, point.y - center.y);
+            Point::new(
+                center.x + dx * cos - dy * sin,
+                center.y + dx * sin + dy * cos,
+            )
+        })
+        .collect::<Vec<_>>();
+    let face = Element::new("path")
+        .attr("d", closed_path(&turned))
+        .attr("fill", color)
+        .attr("fill-opacity", format_number(opacity))
+        .attr("stroke", "none")
+        .attr("filter", format!("url(#{id})"))
+        .attr("class", class_name);
+    let mut group = Element::new("g").attr(
+        "transform",
+        format!(
+            "rotate({} {} {})",
+            format_number(angle),
+            format_number(center.x),
+            format_number(center.y)
+        ),
+    );
+    group.push(face);
+    (group, Some(filter))
 }
 
 /// Add a face's definitions to the document's, leaving out any whose id the
@@ -1014,30 +1094,21 @@ fn aquatint_surface(
         );
     }
     definitions.push(gradient);
-    group.push(
-        Element::new("path")
-            .attr("d", closed_path(contour))
-            .attr("fill", format!("url(#{id})"))
-            .attr("stroke", "none")
-            .attr("class", "surface-aquatint-tone-v1"),
-    );
-    let (rocker, ids) = grain_pattern(
+    // The tone itself holds the rocked ground: where the burr held no ink the
+    // paper shows through as fine light specks, so the deep tone sparkles and
+    // the lights are grained (the measured mezzotints, 2026-11-17). No white is
+    // laid; the specks are the paper.
+    let (tone, filter) = noise_face(
         instruction,
         context,
-        &pigment,
-        (AQUATINT_TEXTURE_OPACITY * strength * underpaint_boost(instruction)).min(1.0),
         contour,
+        NoiseKind::Rocker,
+        &format!("url(#{id})"),
+        1.0,
+        "surface-aquatint-tone-v2",
     );
-    definitions.extend(rocker);
-    for pattern in ids {
-        group.push(
-            Element::new("path")
-                .attr("d", closed_path(contour))
-                .attr("fill", format!("url(#{pattern})"))
-                .attr("stroke", "none")
-                .attr("class", "surface-aquatint-rocker-v1"),
-        );
-    }
+    definitions.extend(filter);
+    group.push(tone);
 }
 
 fn line_angle(direction: SurfaceDirection) -> f64 {
@@ -1407,28 +1478,38 @@ pub(crate) fn render_surface(
         );
     }
     let mut definitions = Vec::new();
-    if surface.texture == SurfaceTexture::Grain {
+    if matches!(
+        surface.texture,
+        SurfaceTexture::Grain | SurfaceTexture::Stipple
+    ) {
+        let (kind, class_name) = if surface.texture == SurfaceTexture::Grain {
+            (NoiseKind::Grain, "surface-grain-noise-v1")
+        } else {
+            (NoiseKind::Stipple, "surface-stipple-noise-v1")
+        };
         let color = texture_color(instruction, context);
-        let (grain, ids) = grain_pattern(
+        // Chalk leaves a grey deposit, not the tool's full line; a stipple dot
+        // is the full ink of the point.
+        let deposit = if surface.texture == SurfaceTexture::Grain {
+            GRAIN_DEPOSIT
+        } else {
+            1.0
+        };
+        let opacity = (mark_style(instruction, context).stroke_opacity
+            * deposit
+            * underpaint_boost(instruction))
+        .min(1.0);
+        let (face, filter) = noise_face(
             instruction,
             context,
-            &color,
-            (mark_style(instruction, context).stroke_opacity
-                * GRAIN_OPACITY_FACTOR
-                * underpaint_boost(instruction))
-            .min(1.0),
             &contour,
+            kind,
+            &color,
+            opacity,
+            class_name,
         );
-        definitions.extend(grain);
-        for pattern in ids {
-            group.push(
-                Element::new("path")
-                    .attr("d", closed_path(&contour))
-                    .attr("fill", format!("url(#{pattern})"))
-                    .attr("stroke", "none")
-                    .attr("class", "surface-grain-carrier-v1"),
-            );
-        }
+        definitions.extend(filter);
+        group.push(face);
     } else if surface.texture == SurfaceTexture::Aquatint {
         aquatint_surface(instruction, context, &contour, &mut group, &mut definitions);
     } else if matches!(
@@ -1852,60 +1933,51 @@ mod tests {
     }
 
     #[test]
-    fn grain_lays_shared_tiles_through_portable_carriers() {
-        let score: Score = serde_json::from_str(
-            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{"texture":"grain"}}]}"#,
-        )
-        .unwrap();
+    fn point_faces_lay_one_noise_filter_and_compat_lays_a_flat_tone() {
         let colors = BTreeMap::new();
-        let instruction = &score.instructions[0];
-        let geometry = MarkGeometry::of(instruction).unwrap();
-        let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
-        // Twelve dab shapes, and the three tiles that place them.
-        assert_eq!(
-            rendered.definitions.len(),
-            SURFACE_GRAIN_SHAPES + GRAIN_TILE_SCALES.len()
-        );
-        let patterns = rendered
-            .definitions
-            .iter()
-            .filter(|element| element.name() == "pattern")
-            .collect::<Vec<_>>();
-        assert_eq!(patterns.len(), GRAIN_TILE_SCALES.len());
-        let mut sides = Vec::new();
-        for pattern in &patterns {
-            let width: f64 = pattern.attribute("width").unwrap().parse().unwrap();
-            let height: f64 = pattern.attribute("height").unwrap().parse().unwrap();
-            assert_eq!(width, height);
-            // The tiles are smaller than the face (400 px across): they repeat.
-            assert!(width < 400.0);
-            sides.push(width);
-            // Each tile places its third of the points, and more than a few.
-            let placed = pattern
-                .children()
+        for texture in ["grain", "stipple", "aquatint"] {
+            let score: Score = serde_json::from_str(&format!(
+                r#"{{"instructions":[{{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{{"texture":"{texture}"}}}}]}}"#
+            ))
+            .unwrap();
+            let instruction = &score.instructions[0];
+            let geometry = MarkGeometry::of(instruction).unwrap();
+            let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
+            let filters = rendered
+                .definitions
                 .iter()
-                .filter(|node| matches!(node, Node::Element(element) if element.name() == "use"))
-                .count();
-            assert!((20..=5000).contains(&placed), "{placed}");
+                .filter(|element| element.name() == "filter")
+                .collect::<Vec<_>>();
+            assert_eq!(filters.len(), 1, "{texture}");
+            let filter = format!("{:?}", filters[0]);
+            assert!(filter.contains("feTurbulence"), "{texture}");
+            assert!(!filter.contains("tableValues"), "{texture}");
+            let id = filters[0].attribute("id").unwrap();
+            assert!(id.starts_with("surface_noise_"), "{texture}");
+            let group = format!("{:?}", rendered.group);
+            assert!(group.contains(&format!("url(#{id})")), "{texture}");
+            // No point is written as its own element any more.
+            assert!(!group.contains("\"use\""), "{texture}");
+            assert!(!group.contains("clipPath"), "{texture}");
+
+            let compat = MarkContext {
+                profile: SvgProfile::Compat,
+                use_filters: false,
+                ..context(&colors)
+            };
+            let flat = render_surface(instruction, geometry, compat).unwrap();
+            assert!(
+                flat.definitions
+                    .iter()
+                    .all(|element| element.name() != "filter"),
+                "{texture}"
+            );
+            assert!(!format!("{:?}", flat.group).contains("filter"), "{texture}");
         }
-        // No tile's side divides another's, so their repeats never line up.
-        for (i, a) in sides.iter().enumerate() {
-            for b in &sides[i + 1..] {
-                let ratio = a.max(*b) / a.min(*b);
-                assert!((ratio - ratio.round()).abs() > 0.05, "{a} {b}");
-            }
-        }
-        let group = format!("{:?}", rendered.group);
-        assert_eq!(
-            group.matches("surface-grain-carrier-v1").count(),
-            GRAIN_TILE_SCALES.len()
-        );
-        assert!(!group.contains("clipPath"));
-        assert!(!group.contains("filter"));
     }
 
     #[test]
-    fn grain_tiles_do_not_grow_with_the_face_and_are_shared_by_its_copies() {
+    fn a_noise_filter_does_not_grow_with_the_face_and_is_shared_by_its_copies() {
         let colors = BTreeMap::new();
         let defs = |radius: f64, center: [f64; 2]| {
             let score: Score = serde_json::from_str(&format!(
@@ -1920,23 +1992,23 @@ mod tests {
                 .definitions
         };
         let small = defs(0.06, [0.5, 0.5]);
-        let large = defs(0.3, [0.5, 0.5]);
-        let larger = defs(0.45, [0.5, 0.5]);
-        // Above 0.19 of the canvas the tiles stop growing with the face.
-        assert_eq!(format!("{large:?}"), format!("{larger:?}"));
-        // A small face carries fewer points than a large one.
-        let placed = |definitions: &[Element]| {
-            definitions
-                .iter()
-                .filter(|element| element.name() == "pattern")
-                .map(|pattern| pattern.children().len())
-                .sum::<usize>()
-        };
-        assert!(placed(&small) < placed(&large));
-        // A copy elsewhere names the same tiles, so the document keeps one set.
+        let large = defs(0.45, [0.5, 0.5]);
+        // The same filter, whatever the size of the face.
+        assert_eq!(format!("{small:?}"), format!("{large:?}"));
+        // A copy elsewhere names the same filter, so the document keeps one.
         let moved = defs(0.06, [0.2, 0.7]);
         let mut document = small.clone();
         extend_definitions(&mut document, moved);
         assert_eq!(document.len(), small.len());
+    }
+
+    #[test]
+    fn the_cover_quantile_reads_the_normal_table() {
+        assert!((cover_quantile(0.25) - 0.6745).abs() < 1e-9);
+        assert!((cover_quantile(0.5)).abs() < 1e-9);
+        assert!(cover_quantile(0.3) < cover_quantile(0.2));
+        // Outside the table it holds the end values.
+        assert!((cover_quantile(0.01) - 1.645).abs() < 1e-9);
+        assert!((cover_quantile(0.99) + 0.5244).abs() < 1e-9);
     }
 }

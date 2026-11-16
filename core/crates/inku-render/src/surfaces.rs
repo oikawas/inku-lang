@@ -17,7 +17,7 @@ use crate::materials::{texture_filter_id, with_texture_filter};
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::surface_geometry::{
-    line_spans, point_in_polygon, scanline_segments, scatter, shape_bbox, surface_contour,
+    line_spans, scanline_segments, scatter, shape_bbox, surface_contour,
 };
 use crate::svg::{Element, Node, format_number};
 use crate::types::{
@@ -68,6 +68,12 @@ const STIPPLE_OPACITY_MIN: f64 = 0.8;
 const GRAIN_RADIUS_FACTOR: f64 = 0.55;
 const GRAIN_COUNT_FACTOR: f64 = 38.0;
 const GRAIN_OPACITY_FACTOR: f64 = 0.8;
+/// The grain lies on three repeating tiles whose sides do not divide one
+/// another, each carrying a third of the points, so the face's SVG stays the
+/// same size however large the face is and no single repeat shows as a
+/// lattice (render engine 104; one face-sized tile grew with the face).
+const GRAIN_TILE_SIDE: f64 = 0.19;
+const GRAIN_TILE_SCALES: [f64; 3] = [1.0, 1.31, 1.73];
 const AQUATINT_DARKEN_FRACTION: f64 = -0.30;
 const AQUATINT_DARKEN_LIMIT: f64 = 0.15;
 const AQUATINT_LIGHT_OPACITY: f64 = 0.18;
@@ -334,24 +340,6 @@ fn sweep_bleed_filter(instruction: &Instruction, context: MarkContext<'_>) -> El
 /// Hundredths are enough for a placed grain point.
 fn hundredths(value: f64) -> String {
     format_number((value * 100.0).round() / 100.0)
-}
-
-/// Whether a point lies inside the contour or within `reach` of it.
-fn near_inside(point: Point, reach: f64, contour: &[Point]) -> bool {
-    let diagonal = reach * std::f64::consts::FRAC_1_SQRT_2;
-    point_in_polygon(point, contour)
-        || [
-            (reach, 0.0),
-            (-reach, 0.0),
-            (0.0, reach),
-            (0.0, -reach),
-            (diagonal, diagonal),
-            (-diagonal, diagonal),
-            (diagonal, -diagonal),
-            (-diagonal, -diagonal),
-        ]
-        .iter()
-        .any(|(dx, dy)| point_in_polygon(Point::new(point.x + dx, point.y + dy), contour))
 }
 
 fn surface_color(instruction: &Instruction, context: MarkContext<'_>) -> String {
@@ -750,25 +738,53 @@ fn sweep_parts(
     Some((vec![body.into()], Vec::new()))
 }
 
-/// The grain of one face: one tile as large as the face, not repeated, its
-/// points laid at random at the density the 0.08-unit tile once repeated
-/// (render engine 90; the repeating tile showed as a lattice). A finer grain
-/// sets more, smaller points at the same cover, and the density multiplies
-/// them (render engine 89). The face places `SURFACE_GRAIN_SHAPES` dab shapes,
-/// turned, by `use`.
+/// The grain of one face, laid on `GRAIN_TILE_SCALES.len()` repeating tiles.
+/// Each tile carries a third of the points at the density the 0.08-unit tile
+/// once set (render engine 89; a finer grain sets more, smaller points at the
+/// same cover, and the density multiplies them). The tiles' sides do not divide
+/// one another and their origins move with the seed, so the repeats never line
+/// up into the lattice one small tile showed (render engine 90). A point near a
+/// tile's edge is drawn again across the opposite edge, so the tile has no
+/// seam. The face places `SURFACE_GRAIN_SHAPES` dab shapes, turned, by `use`.
+///
+/// The tiles hang from the canvas origin, not from the face, and their ids
+/// name their content, so every face of one instruction (a row of copies, a
+/// scatter) fills from the same tiles: the document carries each set once
+/// (`extend_definitions`), and its size no longer grows with the faces or their
+/// area (render engine 104). Returns the definitions and the ids of the
+/// patterns, lowest layer first.
 fn grain_pattern(
     instruction: &Instruction,
     context: MarkContext<'_>,
-    seed: Seed,
     color: &str,
     opacity: f64,
-    pattern_id: &str,
-    contour: &[Point],
-) -> Vec<Element> {
+) -> (Vec<Element>, Vec<String>) {
     let surface = instruction
         .surface
         .as_ref()
         .expect("surface checked by caller");
+    // A hand's pressure turns each face's opacity a little; the tiles take it
+    // in steps of 0.02, so the faces of one instruction share a few sets.
+    let opacity = ((opacity * 50.0).round() / 50.0).max(0.02);
+    // The tiles seed from what every face of the instruction shares (its
+    // index, tool, texture and the render seed), not from a face's place, so
+    // the copies of a row fill from one set; each face's own seed
+    // (`surface_seed`) is unchanged.
+    let seed = {
+        let digest = Sha256::digest(
+            format!(
+                "surface-grain-tiles:{}:{:?}:{}:{}",
+                context.instruction_index,
+                instruction.weight,
+                surface.texture.as_str(),
+                seed_debug_text(context.render_seed)
+            )
+            .as_bytes(),
+        );
+        i128::from(u64::from_le_bytes(
+            digest[..8].try_into().expect("eight digest bytes"),
+        ))
+    };
     let tile = context.canvas.unit() * 0.08;
     let size = texture_size_factor(surface.scale.max(0.04));
     let radius = (context.canvas.unit() * (0.002 + SURFACE_DEFAULT_SCALE * 0.004)).max(0.45)
@@ -784,29 +800,23 @@ fn grain_pattern(
         .ceil() as usize)
         .max(1);
     let density = per_tile as f64 / tile_area;
-    let reach = (radius * 1.65 * 2.0).max(mark_width(instruction, context.canvas) * 0.75);
-    let min_x = contour
-        .iter()
-        .map(|point| point.x)
-        .fold(f64::INFINITY, f64::min)
-        - reach;
-    let max_x = contour
-        .iter()
-        .map(|point| point.x)
-        .fold(f64::NEG_INFINITY, f64::max)
-        + reach;
-    let min_y = contour
-        .iter()
-        .map(|point| point.y)
-        .fold(f64::INFINITY, f64::min)
-        - reach;
-    let max_y = contour
-        .iter()
-        .map(|point| point.y)
-        .fold(f64::NEG_INFINITY, f64::max)
-        + reach;
-    let (width, height) = (max_x - min_x, max_y - min_y);
-    let candidates = (density * width * height).round() as usize;
+    let width = mark_width(instruction, context.canvas);
+    let reach = (radius * 1.65 * 2.0).max(width * 0.75);
+    let base = context.canvas.unit() * GRAIN_TILE_SIDE;
+    let payload = format!(
+        "{color}|{opacity:.6}|{radius:.6}|{density:.9}|{width:.6}|{base:.6}|{:?}|{}|{:?}",
+        instruction.weight,
+        seed_debug_text(Some(seed)),
+        context.profile
+    );
+    let digest = Sha256::digest(payload.as_bytes());
+    let pattern_id = format!(
+        "surface_grain_{}",
+        digest[..6]
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
     let mut definitions = Vec::new();
     for shape in 0..SURFACE_GRAIN_SHAPES {
         let factor = 0.55 + 1.1 * (shape as f64 + 0.5) / SURFACE_GRAIN_SHAPES as f64;
@@ -828,46 +838,77 @@ fn grain_pattern(
             .attr("id", format!("{pattern_id}_dab_{shape}")),
         );
     }
-    let mut pattern = Element::new("pattern")
-        .attr("id", pattern_id)
-        .attr("patternUnits", "userSpaceOnUse")
-        .attr("x", format_number(min_x))
-        .attr("y", format_number(min_y))
-        .attr("width", format_number(width))
-        .attr("height", format_number(height));
-    if context.profile != SvgProfile::Compat {
-        pattern.set_attr("class", "surface-grain-pattern-v2");
-    }
-    for index in 0..candidates {
-        let index = index as i64;
-        let point = Point::new(
-            min_x + hash01(index, seed, "surface-grain-x") * width,
-            min_y + hash01(index, seed, "surface-grain-y") * height,
-        );
-        if !near_inside(point, reach, contour) {
-            continue;
+    let layers = GRAIN_TILE_SCALES.len();
+    let mut ids = Vec::with_capacity(layers);
+    for (layer, scale) in GRAIN_TILE_SCALES.iter().enumerate() {
+        let side = base * scale;
+        let id = format!("{pattern_id}_{layer}");
+        let shift_x = hash01(layer as i64, seed, "surface-grain-tile-x") * side;
+        let shift_y = hash01(layer as i64, seed, "surface-grain-tile-y") * side;
+        let mut pattern = Element::new("pattern")
+            .attr("id", &id)
+            .attr("patternUnits", "userSpaceOnUse")
+            .attr("x", format_number(-shift_x))
+            .attr("y", format_number(-shift_y))
+            .attr("width", format_number(side))
+            .attr("height", format_number(side));
+        if context.profile != SvgProfile::Compat {
+            pattern.set_attr("class", "surface-grain-pattern-v3");
         }
-        let shape = ((hash01(index, seed, "surface-r") * SURFACE_GRAIN_SHAPES as f64) as usize)
-            .min(SURFACE_GRAIN_SHAPES - 1);
-        let turn = hash01(index, seed, "surface-grain-turn") * 360.0;
-        let mark_opacity = 0.45 + hash01(index, seed, "surface-o") * 0.55;
-        pattern.push(
-            Element::new("use")
-                .attr("href", format!("#{pattern_id}_dab_{shape}"))
-                .attr(
-                    "transform",
-                    format!(
-                        "translate({} {}) rotate({})",
-                        hundredths(point.x - min_x),
-                        hundredths(point.y - min_y),
-                        format_number((turn * 10.0).round() / 10.0)
-                    ),
-                )
-                .attr("opacity", hundredths(mark_opacity)),
-        );
+        let count = ((density * side * side / layers as f64).round() as usize).max(1);
+        for point_index in 0..count {
+            let index = (layer * 1_000_000 + point_index) as i64;
+            let point = Point::new(
+                hash01(index, seed, "surface-grain-x") * side,
+                hash01(index, seed, "surface-grain-y") * side,
+            );
+            let shape = ((hash01(index, seed, "surface-r") * SURFACE_GRAIN_SHAPES as f64) as usize)
+                .min(SURFACE_GRAIN_SHAPES - 1);
+            let turn =
+                format_number((hash01(index, seed, "surface-grain-turn") * 3600.0).round() / 10.0);
+            let mark_opacity = hundredths(0.45 + hash01(index, seed, "surface-o") * 0.55);
+            for dx in [-side, 0.0, side] {
+                for dy in [-side, 0.0, side] {
+                    let (x, y) = (point.x + dx, point.y + dy);
+                    if x < -reach || x > side + reach || y < -reach || y > side + reach {
+                        continue;
+                    }
+                    pattern.push(
+                        Element::new("use")
+                            .attr("href", format!("#{pattern_id}_dab_{shape}"))
+                            .attr(
+                                "transform",
+                                format!(
+                                    "translate({} {}) rotate({turn})",
+                                    hundredths(x),
+                                    hundredths(y)
+                                ),
+                            )
+                            .attr("opacity", &mark_opacity),
+                    );
+                }
+            }
+        }
+        definitions.push(pattern);
+        ids.push(id);
     }
-    definitions.push(pattern);
-    definitions
+    (definitions, ids)
+}
+
+/// Add a face's definitions to the document's, leaving out any whose id the
+/// document already carries: the grain tiles of one instruction's faces are
+/// one set, named by their content (render engine 104).
+pub(crate) fn extend_definitions(target: &mut Vec<Element>, definitions: Vec<Element>) {
+    for definition in definitions {
+        let known = definition.attribute("id").is_some_and(|id| {
+            target
+                .iter()
+                .any(|existing| existing.attribute("id") == Some(id))
+        });
+        if !known {
+            target.push(definition);
+        }
+    }
 }
 
 /// A colored mezzotint holds one pigment, letting the paper show in the light.
@@ -919,7 +960,6 @@ fn aquatint_pigment(color: &str) -> String {
 fn aquatint_surface(
     instruction: &Instruction,
     context: MarkContext<'_>,
-    seed: Seed,
     contour: &[Point],
     group: &mut Element,
     definitions: &mut Vec<Element>,
@@ -964,23 +1004,22 @@ fn aquatint_surface(
             .attr("stroke", "none")
             .attr("class", "surface-aquatint-tone-v1"),
     );
-    let pattern_id = format!("{id}_rocker");
-    definitions.extend(grain_pattern(
+    let (rocker, ids) = grain_pattern(
         instruction,
         context,
-        seed,
         &pigment,
         (AQUATINT_TEXTURE_OPACITY * strength * underpaint_boost(instruction)).min(1.0),
-        &pattern_id,
-        contour,
-    ));
-    group.push(
-        Element::new("path")
-            .attr("d", closed_path(contour))
-            .attr("fill", format!("url(#{pattern_id})"))
-            .attr("stroke", "none")
-            .attr("class", "surface-aquatint-rocker-v1"),
     );
+    definitions.extend(rocker);
+    for pattern in ids {
+        group.push(
+            Element::new("path")
+                .attr("d", closed_path(contour))
+                .attr("fill", format!("url(#{pattern})"))
+                .attr("stroke", "none")
+                .attr("class", "surface-aquatint-rocker-v1"),
+        );
+    }
 }
 
 fn line_angle(direction: SurfaceDirection) -> f64 {
@@ -1351,39 +1390,28 @@ pub(crate) fn render_surface(
     }
     let mut definitions = Vec::new();
     if surface.texture == SurfaceTexture::Grain {
-        let pattern_id = format!(
-            "surface_pattern_{:03}_{:03}_grain",
-            context.instruction_index, context.mark_index
-        );
         let color = texture_color(instruction, context);
-        definitions.extend(grain_pattern(
+        let (grain, ids) = grain_pattern(
             instruction,
             context,
-            seed,
             &color,
             (mark_style(instruction, context).stroke_opacity
                 * GRAIN_OPACITY_FACTOR
                 * underpaint_boost(instruction))
             .min(1.0),
-            &pattern_id,
-            &contour,
-        ));
-        group.push(
-            Element::new("path")
-                .attr("d", closed_path(&contour))
-                .attr("fill", format!("url(#{pattern_id})"))
-                .attr("stroke", "none")
-                .attr("class", "surface-grain-carrier-v1"),
         );
+        definitions.extend(grain);
+        for pattern in ids {
+            group.push(
+                Element::new("path")
+                    .attr("d", closed_path(&contour))
+                    .attr("fill", format!("url(#{pattern})"))
+                    .attr("stroke", "none")
+                    .attr("class", "surface-grain-carrier-v1"),
+            );
+        }
     } else if surface.texture == SurfaceTexture::Aquatint {
-        aquatint_surface(
-            instruction,
-            context,
-            seed,
-            &contour,
-            &mut group,
-            &mut definitions,
-        );
+        aquatint_surface(instruction, context, &contour, &mut group, &mut definitions);
     } else if matches!(
         surface.texture,
         SurfaceTexture::Sweep | SurfaceTexture::Brushmarks

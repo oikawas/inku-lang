@@ -689,7 +689,7 @@ fn paint_object_body(
                 let mut combined = Element::new("g");
                 combined.push(mark);
                 combined.push(surface.group);
-                surface_definitions.extend(surface.definitions);
+                crate::surfaces::extend_definitions(surface_definitions, surface.definitions);
                 combined
             } else {
                 mark
@@ -1295,7 +1295,7 @@ fn render_impl(
                 let mut combined = Element::new("g");
                 combined.push(base_mark);
                 combined.push(surface.group);
-                surface_definitions.extend(surface.definitions);
+                crate::surfaces::extend_definitions(&mut surface_definitions, surface.definitions);
                 combined
             } else {
                 base_mark

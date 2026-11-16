@@ -953,13 +953,13 @@ Sweep has no faintness of its own. Add faint handling for `薄い刷き` / `fain
 
 ### 4.6. Handling — さばき
 
-Handling sets opacity relative to the tool; it does not change the number of dots or lines. Lines, arcs, free lines, closed faces, and points accept it. Do not put several handling words on one mark.
+Handling sets intensity relative to the tool; it does not change the number or placement of dots or lines in named textures such as stipple and hatch, whose size and packing are governed by fineness. Some media show intensity through layers or streaks: etching fills space lines closer and add cross lines, oil pastel rubs over its marks, the knife adds raised ridges, and dense pen and oil-paint lines add pools and streaks. Lines, arcs, free lines, closed faces, and points accept it. Do not put several handling words on one mark.
 
 | Japanese | English | Meaning | Short usage |
 |---|---|---|---|
-| 濃い | `dense` | Lays the tool more densely than its own opacity. | `鉛筆の濃い点描の四角を置く。` / `Place a dense stipple pencil square.` |
-| 程よい | `temperate` | Uses the tool's own opacity, as when handling is omitted, while retaining an explicit source word. | `鉛筆の程よい点描の四角を置く。` / `Place a temperate stipple pencil square.` |
-| 薄い | `faint` | Lays the tool more faintly than its own opacity. | `鉛筆の薄い点描の四角を置く。` / `Place a faint stipple pencil square.` |
+| 濃い | `dense` | Lays the tool more densely than its own intensity. | `鉛筆の濃い点描の四角を置く。` / `Place a dense stipple pencil square.` |
+| 程よい | `temperate` | Uses the tool's own intensity, as when handling is omitted, while retaining an explicit source word. | `鉛筆の程よい点描の四角を置く。` / `Place a temperate stipple pencil square.` |
+| 薄い | `faint` | Lays the tool more faintly than its own intensity. | `鉛筆の薄い点描の四角を置く。` / `Place a faint stipple pencil square.` |
 
 ### 4.7. Fineness — きめ
 

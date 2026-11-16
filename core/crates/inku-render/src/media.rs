@@ -58,9 +58,109 @@ use std::cell::RefCell;
 use inku_score::math::DetFloat;
 
 use crate::determinism::hash01;
-use crate::materials::bristle_tone;
+use crate::materials::{bristle_tone, layered_pigment};
 use crate::svg::{Element, format_number};
-use crate::types::{Point, Seed, Weight};
+use crate::types::{Point, Seed, SurfaceIntensity, Weight};
+
+/// The chosen faint, normal and dense settings for each medium's flat fill.
+#[derive(Clone, Copy)]
+struct IntensityProfile {
+    wash: f64,
+    pastel_base_tooth: f64,
+    pastel_stroke_tooth: f64,
+    pastel_width: f64,
+    pastel_overlap: f64,
+    pastel_coverage: f64,
+    knife_tooth: f64,
+    knife_opacity: f64,
+    knife_ridge: f64,
+    etching: f64,
+    etching_spacing: f64,
+}
+
+/// Fill profiles in faint, normal, dense order; normal retains the original face.
+const FILL_INTENSITY: [IntensityProfile; 3] = [
+    IntensityProfile {
+        wash: 0.55,
+        pastel_base_tooth: 0.36,
+        pastel_stroke_tooth: 0.30,
+        pastel_width: 0.75,
+        pastel_overlap: 0.0,
+        pastel_coverage: 0.0,
+        knife_tooth: 0.43,
+        knife_opacity: 0.68,
+        knife_ridge: 0.0,
+        etching: 0.55,
+        etching_spacing: 1.0,
+    },
+    IntensityProfile {
+        wash: 1.0,
+        pastel_base_tooth: 0.18,
+        pastel_stroke_tooth: 0.14,
+        pastel_width: 1.0,
+        pastel_overlap: 0.0,
+        pastel_coverage: 0.0,
+        knife_tooth: 0.28,
+        knife_opacity: 1.0,
+        knife_ridge: 0.0,
+        etching: 1.0,
+        etching_spacing: 1.0,
+    },
+    IntensityProfile {
+        wash: 1.55,
+        pastel_base_tooth: 0.04,
+        pastel_stroke_tooth: 0.03,
+        pastel_width: 1.3,
+        pastel_overlap: 0.20,
+        pastel_coverage: 1.0,
+        knife_tooth: 0.10,
+        knife_opacity: 1.0,
+        knife_ridge: 0.34,
+        etching: 1.3,
+        etching_spacing: 0.7,
+    },
+];
+
+/// Select a medium's flat-fill settings for the handling word.
+fn fill_intensity(intensity: SurfaceIntensity) -> IntensityProfile {
+    FILL_INTENSITY[match intensity {
+        SurfaceIntensity::Faint => 0,
+        SurfaceIntensity::Normal => 1,
+        SurfaceIntensity::Dense => 2,
+    }]
+}
+
+/// Stroke settings in faint, normal, dense order: pastel edge and core tooth,
+/// then knife tooth, opacity and ridge strength.
+const STROKE_INTENSITY: [(f64, f64, f64, f64, f64); 3] = [
+    (0.48, 0.20, 0.43, 0.65, 0.0),
+    (0.34, 0.05, 0.28, 1.0, 0.0),
+    (0.12, 0.01, 0.10, 1.0, 0.40),
+];
+/// Position, width and tones of the dense pen, oil and pastel stroke accents.
+const DENSE_ACCENTS: (f64, f64, [f64; 2]) = (0.08, 0.40, [-0.35, 0.35]);
+/// Pen pools and the widths of the knife and pastel accents.
+const PEN_POOL_TONE: f64 = -0.7;
+const PEN_POOL_TURN_COS: f64 = 0.94;
+const PEN_POOL_SPAN: f64 = 0.06;
+const KNIFE_RIDGE_WIDTH: f64 = 0.30;
+const PASTEL_OVERLAP_WIDTH: f64 = 0.65;
+/// Dense fill layers keep their pigment's hue and chroma, moving its lightness
+/// by at most these fractions and limits, without mixing black or white.
+const PIGMENT_DARK_FRACTION: f64 = 0.20;
+const PIGMENT_DARK_LIMIT: f64 = 0.10;
+const PIGMENT_LIGHT_FRACTION: f64 = 1.0;
+const PIGMENT_LIGHT_LIMIT: f64 = 0.06;
+const FILL_KNIFE_RIDGE_WIDTH: f64 = 0.60;
+
+/// Select the pastel and knife line settings for this handling word.
+fn stroke_intensity(intensity: SurfaceIntensity) -> (f64, f64, f64, f64, f64) {
+    STROKE_INTENSITY[match intensity {
+        SurfaceIntensity::Faint => 0,
+        SurfaceIntensity::Normal => 1,
+        SurfaceIntensity::Dense => 2,
+    }]
+}
 
 thread_local! {
     /// The resolved colours of the Score being drawn, once each, for the media's mixing.
@@ -316,6 +416,61 @@ fn streak_band(
     }
     near.extend(far.into_iter().rev());
     Some(near)
+}
+
+/// Add pigment inside the original banks, never widening the stroke.
+pub(crate) fn dense_stroke_accents(
+    weight: Weight,
+    left: &[Point],
+    right: &[Point],
+    closed: bool,
+    color: &str,
+) -> Element {
+    let (offset, width, tones) = DENSE_ACCENTS;
+    let mut group = Element::new("g").attr("class", "dense-stroke-accents");
+    for (center, tone) in [offset, 1.0 - offset - width].into_iter().zip(tones) {
+        if let Some(band) = streak_band(left, right, closed, center, width, 0.0, 1.0) {
+            group.push(
+                path(&closed_d(&band))
+                    .attr("fill", bristle_tone(color, tone))
+                    .attr("fill-opacity", "1"),
+            );
+        }
+    }
+    if weight == Weight::Pen {
+        for (start, end) in [(0.0, 0.22), (0.78, 1.0)] {
+            if let Some(band) = streak_band(left, right, closed, 0.10, 0.80, start, end) {
+                group.push(path(&closed_d(&band)).attr("fill", bristle_tone(color, PEN_POOL_TONE)));
+            }
+        }
+        let centers = left
+            .iter()
+            .zip(right)
+            .map(|(a, b)| Point::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5))
+            .collect::<Vec<_>>();
+        for (index, points) in centers.windows(3).enumerate() {
+            let (ax, ay) = (points[1].x - points[0].x, points[1].y - points[0].y);
+            let (bx, by) = (points[2].x - points[1].x, points[2].y - points[1].y);
+            let lengths = ax.dhypot(ay) * bx.dhypot(by);
+            if lengths > 1e-9 && (ax * bx + ay * by) / lengths < PEN_POOL_TURN_COS {
+                let t = (index + 1) as f64 / (centers.len() - usize::from(!closed)) as f64;
+                if let Some(band) = streak_band(
+                    left,
+                    right,
+                    closed,
+                    0.10,
+                    0.80,
+                    (t - PEN_POOL_SPAN).max(0.0),
+                    (t + PEN_POOL_SPAN).min(1.0),
+                ) {
+                    group.push(
+                        path(&closed_d(&band)).attr("fill", bristle_tone(color, PEN_POOL_TONE)),
+                    );
+                }
+            }
+        }
+    }
+    group
 }
 
 /// Colour mixing in an oil pass (`INKU_PROTO_MIX`): a share of the passes,
@@ -683,6 +838,7 @@ fn finite(point: &Point) -> bool {
 /// A straight stroke's outline: closed polygons (left bank, then the right
 /// bank backwards) for each run, runs separated by a non-finite point where
 /// the paper's tooth cut the stroke.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn stroke_outline(
     weight: Weight,
     outline: &[Point],
@@ -690,6 +846,7 @@ pub(crate) fn stroke_outline(
     opacity: f64,
     seed: Seed,
     unit: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
     let mut group = Element::new("g").attr("class", "proto-stroke-runs");
     let mut order = 0_i128;
@@ -708,6 +865,7 @@ pub(crate) fn stroke_outline(
             opacity,
             seed.wrapping_add(order),
             unit,
+            intensity,
         ));
         order += 1;
     }
@@ -727,6 +885,7 @@ pub(crate) fn stroke(
     opacity: f64,
     seed: Seed,
     unit: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
     let count = left.len().min(right.len());
     let (left, right) = (&left[..count], &right[..count]);
@@ -747,6 +906,7 @@ pub(crate) fn stroke(
                         opacity,
                         seed.wrapping_add(order),
                         unit,
+                        intensity,
                     ));
                     order += 1;
                 }
@@ -755,7 +915,9 @@ pub(crate) fn stroke(
         }
         return group;
     }
-    one_stroke(weight, left, right, closed, color, opacity, seed, unit)
+    one_stroke(
+        weight, left, right, closed, color, opacity, seed, unit, intensity,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -768,11 +930,12 @@ fn one_stroke(
     opacity: f64,
     seed: Seed,
     unit: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
     match weight {
         Weight::Watercolor => watercolor_stroke(left, right, closed, color, opacity, seed, unit),
-        Weight::OilPastel => oil_pastel_stroke(left, right, closed, color, seed, unit),
-        Weight::PaintingKnife => knife_stroke(left, right, closed, color, seed, unit),
+        Weight::OilPastel => oil_pastel_stroke(left, right, closed, color, seed, unit, intensity),
+        Weight::PaintingKnife => knife_stroke(left, right, closed, color, seed, unit, intensity),
         Weight::Etching => etching_stroke(left, right, closed, color, opacity, seed, unit),
         other => {
             debug_assert!(!owns(other), "every medium draws its own stroke");
@@ -914,6 +1077,7 @@ fn oil_pastel_stroke(
     color: &str,
     seed: Seed,
     unit: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
     let d = banks_d(left, right, closed);
     let (core_left, core_right) = narrowed(left, right, 0.62);
@@ -929,7 +1093,7 @@ fn oil_pastel_stroke(
     defs.push(tooth_filter(
         &edge_tooth,
         frequency,
-        0.34,
+        stroke_intensity(intensity).0,
         &noise_seed(seed, "op-edge"),
         Some(rough),
         region,
@@ -937,7 +1101,7 @@ fn oil_pastel_stroke(
     defs.push(tooth_filter(
         &core_tooth,
         frequency,
-        0.05,
+        stroke_intensity(intensity).1,
         &noise_seed(seed, "op-core"),
         None,
         region,
@@ -983,6 +1147,15 @@ fn oil_pastel_stroke(
             );
         }
     }
+    if intensity == SurfaceIntensity::Dense {
+        group.push(dense_stroke_accents(
+            Weight::OilPastel,
+            left,
+            right,
+            closed,
+            color,
+        ));
+    }
     group
 }
 
@@ -1013,6 +1186,8 @@ fn knife_pull(
     unit: f64,
     whole: bool,
     tooth: &str,
+    ridge: f64,
+    ridge_clip: Option<&str>,
 ) -> Element {
     let mut mark = Element::new("g").attr("class", "proto-knife-mark");
     let count = spine.len();
@@ -1071,11 +1246,14 @@ fn knife_pull(
         None
     };
     let mut base = bristle_tone(color, (h(0, "pk-tone") - 0.5) * 0.10);
+    let mut ridge_pigment = color.to_owned();
     if let Some(other) = other.as_deref()
         && whole
         && h(0, "pk-mix") < share
     {
-        base = mix(&base, other, 0.55 + 0.35 * h(0, "pk-mix-amount"));
+        let amount = 0.55 + 0.35 * h(0, "pk-mix-amount");
+        base = mix(&base, other, amount);
+        ridge_pigment = mix(color, other, amount);
     }
     let dry = h(0, "pk-dry") < 0.4;
     let head = 0.10 + 0.08 * h(0, "pk-head");
@@ -1398,6 +1576,38 @@ fn knife_pull(
                 .attr("stroke-opacity", "0.75"),
         );
     }
+    if ridge > 0.0 {
+        for (side, tone) in [(-0.48, -ridge), (0.35, ridge)] {
+            let points = (1..=9)
+                .map(|k| at(f64::from(k) / 10.0, side, 0.0))
+                .collect::<Vec<_>>();
+            let pigment = if whole {
+                if tone < 0.0 {
+                    layered_pigment(&ridge_pigment, -PIGMENT_DARK_FRACTION, PIGMENT_DARK_LIMIT)
+                } else {
+                    layered_pigment(&ridge_pigment, PIGMENT_LIGHT_FRACTION, PIGMENT_LIGHT_LIMIT)
+                }
+            } else {
+                bristle_tone(&base, tone)
+            };
+            let width = if whole {
+                FILL_KNIFE_RIDGE_WIDTH
+            } else {
+                KNIFE_RIDGE_WIDTH
+            };
+            let mut accent = polyline_path(&points)
+                .attr("stroke", pigment)
+                .attr("stroke-width", n(half0 * width))
+                .attr("stroke-opacity", "1");
+            if whole {
+                accent.set_attr("class", "knife-dense-pigment-ridge");
+            }
+            if let Some(clip) = ridge_clip {
+                accent.set_attr("clip-path", format!("url(#{clip})"));
+            }
+            mark.push(accent);
+        }
+    }
     mark
 }
 
@@ -1408,6 +1618,7 @@ fn knife_stroke(
     color: &str,
     seed: Seed,
     unit: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
     let centre = left
         .iter()
@@ -1420,6 +1631,9 @@ fn knife_stroke(
         })
         .collect::<Vec<_>>();
     let mut group = Element::new("g").attr("class", "proto-knife-stroke");
+    if intensity == SurfaceIntensity::Faint {
+        group.set_attr("opacity", n(stroke_intensity(intensity).3));
+    }
     if centre.len() < 2 {
         return group;
     }
@@ -1465,9 +1679,18 @@ fn knife_stroke(
     defs.push(local_tooth_filter(
         &tooth,
         260.0 / unit.max(1.0),
-        0.28,
+        stroke_intensity(intensity).2,
         &noise_seed(seed, "pk-tooth"),
     ));
+    let ridge_clip = if intensity == SurfaceIntensity::Dense {
+        let id = fresh("pk-ridge-clip");
+        let mut clip = Element::new("clipPath").attr("id", &id);
+        clip.push(path(&banks_d(left, right, closed)).attr("fill-rule", "evenodd"));
+        defs.push(clip);
+        Some(id)
+    } else {
+        None
+    };
     group.push(defs);
     let mut start = 0.0;
     let mut order = 0_i64;
@@ -1495,7 +1718,17 @@ fn knife_stroke(
                 )
             })
             .collect::<Vec<_>>();
-        group.push(knife_pull(&spine, color, seed, order, unit, false, &tooth));
+        group.push(knife_pull(
+            &spine,
+            color,
+            seed,
+            order,
+            unit,
+            false,
+            &tooth,
+            stroke_intensity(intensity).4,
+            ridge_clip.as_deref(),
+        ));
         // Pulls overlap a little where the knife was set down again.
         start = end - (end - start) * 0.12;
         if end >= total {
@@ -1510,6 +1743,7 @@ fn knife_stroke(
 // Flat fills of closed shapes (塗り).
 
 /// The face of a closed shape (pixels). `stroke_width` is the tool's width.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn fill(
     weight: Weight,
     contour: &[Point],
@@ -1518,12 +1752,15 @@ pub(crate) fn fill(
     seed: Seed,
     unit: f64,
     stroke_width: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
     match weight {
-        Weight::Watercolor => watercolor_fill(contour, color, opacity, seed, unit),
-        Weight::OilPastel => oil_pastel_fill(contour, color, seed, unit, stroke_width),
-        Weight::PaintingKnife => knife_fill(contour, color, seed, unit),
-        Weight::Etching => etching_fill(contour, color, opacity, seed, unit, stroke_width),
+        Weight::Watercolor => watercolor_fill(contour, color, opacity, seed, unit, intensity),
+        Weight::OilPastel => oil_pastel_fill(contour, color, seed, unit, stroke_width, intensity),
+        Weight::PaintingKnife => knife_fill(contour, color, seed, unit, intensity),
+        Weight::Etching => {
+            etching_fill(contour, color, opacity, seed, unit, stroke_width, intensity)
+        }
         other => {
             debug_assert!(!owns(other), "every medium lays its own face");
             Element::new("g")
@@ -1531,7 +1768,16 @@ pub(crate) fn fill(
     }
 }
 
-fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, unit: f64) -> Element {
+fn watercolor_fill(
+    contour: &[Point],
+    color: &str,
+    opacity: f64,
+    seed: Seed,
+    unit: f64,
+    intensity: SurfaceIntensity,
+) -> Element {
+    let factor = fill_intensity(intensity).wash;
+    let opacity = opacity * factor;
     let d = closed_d(contour);
     let (x0, y0, x1, y1) = bounds(contour);
     let size = (x1 - x0).min(y1 - y0).max(1.0);
@@ -1580,7 +1826,10 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
     group.push(
         path(&d)
             .attr("fill", color)
-            .attr("fill-opacity", n((opacity * 0.62).min(0.62)))
+            .attr(
+                "fill-opacity",
+                n((opacity * 0.62).min((0.62 * factor).min(1.0))),
+            )
             .attr("filter", format!("url(#{wash})")),
     );
     // Pigment carried to the edge as the wash dried: darker just inside the
@@ -1591,7 +1840,10 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
             .attr("fill", "none")
             .attr("stroke", bristle_tone(color, -0.08))
             .attr("stroke-width", n(size * 0.08))
-            .attr("stroke-opacity", n((opacity * 0.75).min(0.7)))
+            .attr(
+                "stroke-opacity",
+                n((opacity * 0.75).min((0.7 * factor).min(1.0))),
+            )
             .attr("filter", format!("url(#{rim_blur})")),
     );
     group.push(rim);
@@ -1680,7 +1932,9 @@ fn oil_pastel_fill(
     seed: Seed,
     unit: f64,
     stroke_width: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
+    let profile = fill_intensity(intensity);
     let d = closed_d(contour);
     let (x0, y0, x1, y1) = bounds(contour);
     let size = (x1 - x0).min(y1 - y0).max(1.0);
@@ -1698,7 +1952,7 @@ fn oil_pastel_fill(
     defs.push(tooth_filter(
         &base_tooth,
         frequency,
-        0.18,
+        profile.pastel_base_tooth,
         &noise_seed(seed, "op-base"),
         None,
         Region::around(contour, 0.0, unit),
@@ -1706,7 +1960,7 @@ fn oil_pastel_fill(
     defs.push(tooth_filter(
         &stroke_tooth,
         frequency,
-        0.14,
+        profile.pastel_stroke_tooth,
         &noise_seed(seed, "op-strokes"),
         Some(rough),
         Region::around(contour, rough.reach(), unit),
@@ -1800,17 +2054,48 @@ fn oil_pastel_fill(
             )
             .attr(
                 "stroke-width",
-                n(width * (0.7 + 0.25 * hash01(i, seed, "op-width"))),
+                n(width * profile.pastel_width * (0.7 + 0.25 * hash01(i, seed, "op-width"))),
             )
             .attr("stroke-linecap", "round"),
         );
+        if profile.pastel_overlap > 0.0 && hash01(i, seed, "op-overlap") < profile.pastel_coverage {
+            strokes.push(
+                path(&format!(
+                    "M {} {} Q {} {} {} {}",
+                    n(a.x),
+                    n(a.y),
+                    n(control.x),
+                    n(control.y),
+                    n(b.x),
+                    n(b.y)
+                ))
+                .attr("class", "pastel-dense-pigment-layer")
+                .attr("fill", "none")
+                .attr(
+                    "stroke",
+                    layered_pigment(&pigment, -profile.pastel_overlap, PIGMENT_DARK_LIMIT),
+                )
+                .attr(
+                    "stroke-width",
+                    n(width * profile.pastel_width * PASTEL_OVERLAP_WIDTH),
+                )
+                .attr("stroke-linecap", "round"),
+            );
+        }
     }
     face.push(strokes);
     group.push(face);
     group
 }
 
-fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element {
+fn knife_fill(
+    contour: &[Point],
+    color: &str,
+    seed: Seed,
+    unit: f64,
+    intensity: SurfaceIntensity,
+) -> Element {
+    let profile = fill_intensity(intensity);
     let d = closed_d(contour);
     let (x0, y0, x1, y1) = bounds(contour);
     let size = (x1 - x0).min(y1 - y0).max(1.0);
@@ -1823,12 +2108,15 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
     defs.push(local_tooth_filter(
         &tooth,
         260.0 / unit.max(1.0),
-        0.28,
+        profile.knife_tooth,
         &noise_seed(seed, "pk-tooth"),
     ));
     let mut group = Element::new("g").attr("class", "proto-knife-face");
     group.push(defs);
     let mut face = Element::new("g").attr("clip-path", format!("url(#{clip})"));
+    if profile.knife_opacity < 1.0 {
+        face.set_attr("opacity", n(profile.knife_opacity));
+    }
     // A thin, darker first layer: what shows between the planes.
     face.push(
         path(&d)
@@ -1912,7 +2200,17 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
     }
     planes.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.total_cmp(&b.1)));
     for (_, _, spine, i) in planes {
-        face.push(knife_pull(&spine, color, seed, i, unit, true, &tooth));
+        face.push(knife_pull(
+            &spine,
+            color,
+            seed,
+            i,
+            unit,
+            true,
+            &tooth,
+            profile.knife_ridge,
+            None,
+        ));
     }
     group.push(face);
     group
@@ -2044,8 +2342,18 @@ fn etching_fill(
     seed: Seed,
     unit: f64,
     stroke_width: f64,
+    intensity: SurfaceIntensity,
 ) -> Element {
-    etching_fill_varied(contour, color, opacity, seed, unit, stroke_width)
+    let profile = fill_intensity(intensity);
+    etching_fill_varied(
+        contour,
+        color,
+        (opacity * profile.etching).min(1.0),
+        seed,
+        unit,
+        stroke_width,
+        profile.etching_spacing,
+    )
 }
 
 /// An etched face with light and dark (てざわりの整理 step 6). Each face is
@@ -2054,6 +2362,7 @@ fn etching_fill(
 /// The lines grow heavier towards one side of the face, away from the light
 /// for a dark ink, towards it for a pale ink on a dark ground, and are
 /// crossed only on that side.
+#[allow(clippy::too_many_arguments)]
 fn etching_fill_varied(
     contour: &[Point],
     color: &str,
@@ -2061,6 +2370,7 @@ fn etching_fill_varied(
     seed: Seed,
     unit: f64,
     stroke_width: f64,
+    spacing_factor: f64,
 ) -> Element {
     let d = closed_d(contour);
     let (x0, y0, x1, y1) = bounds(contour);
@@ -2069,7 +2379,8 @@ fn etching_fill_varied(
     let line = (stroke_width * 0.55).max(unit * 0.0009);
     let spacing = line
         * if opacity < 0.7 { 3.9 } else { 2.6 }
-        * (0.9 + 0.25 * hash01(key, seed, "et-face-spacing"));
+        * (0.9 + 0.25 * hash01(key, seed, "et-face-spacing"))
+        * spacing_factor;
     let angle = std::f64::consts::PI * hash01(key, seed, "et-face-angle");
     let towards_light = light();
     let heavy = if lightness(color) > 0.6 {

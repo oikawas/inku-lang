@@ -13,6 +13,10 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 
 [SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated. Record a new version's values, reasons, and results in [CHANGELOG.md](../../CHANGELOG.md).
 
+## engine 102 — handling for media (I-740)
+
+Faint and dense handling had not reached the flat fills of Saijiki v3 watercolor, oil pastel, painting knife and etching, or oil-pastel and knife lines. The author kept the former fill as temperate and chose layered pigment that retains hue and chroma for dense fills. Dense pen and oil-paint lines gain pooling and streaks without a wider outline. Reperformance can change works that state handling on these fills or on pastel or knife lines, or dense on pen or oil-paint lines. Other works and saved SVGs do not change. See [SPEC.md §13.5](../../SPEC.md#135-weight-decides-the-quality-of-sway) and Unreleased in the changelog.
+
 ## engine 99 — shallow arc extent
 
 Check an open arc's extent against its swept stroke instead of the whole circle, allowing shallow arcs previously refused. See Unreleased in the changelog.

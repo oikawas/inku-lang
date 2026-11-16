@@ -515,6 +515,7 @@ pub(crate) fn render_interior_fill(
             context.seed_for(instruction),
             context.canvas.unit(),
             style.width,
+            instruction.surface_intensity,
         ));
     }
     if instruction.weight == Weight::OilPaint {

@@ -647,9 +647,16 @@ fn display_grain_tile_is_reusable_and_not_filtered_per_dab() {
         },
     };
     let output = render(request).unwrap();
-    let pattern_start = output.svg.find("<pattern id=\"surface_pattern_").unwrap();
-    let pattern_end = pattern_start + output.svg[pattern_start..].find("</pattern>").unwrap();
-    assert!(!output.svg[pattern_start..pattern_end].contains("filter=\""));
+    // The grain lies on three shared tiles (render engine 104); none filters a dab.
+    let mut tiles = 0;
+    let mut rest = output.svg.as_str();
+    while let Some(start) = rest.find("<pattern id=\"surface_grain_") {
+        let end = start + rest[start..].find("</pattern>").unwrap();
+        assert!(!rest[start..end].contains("filter=\""));
+        tiles += 1;
+        rest = &rest[end..];
+    }
+    assert_eq!(tiles, 3);
     assert!(output.svg.contains("surface-grain-carrier-v1"));
 }
 

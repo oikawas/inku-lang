@@ -23,6 +23,35 @@ class SaijikiMigrationTest {
         ).forEach(host.db::execSQL)
     }
 
+    @Test fun v3MacroReportsApproximatedReferences() {
+        HostSqlite().use { host ->
+            schema(host)
+            host.db.execSQL("INSERT INTO app_settings VALUES ('saijiki_v3_saved_records', '{}', 0)")
+            val definition = JSONObject("""{
+                "schema":"inku.macro-definition.v1", "namespace":"Saved", "heading":"Mark",
+                "version":"1.0.0", "parameters":{}, "components":{},
+                "body":[{"op":"emit", "binding":null, "fields":{
+                    "shape":{"expr":"semantic_ref", "category":"shape", "id":"line"},
+                    "movement":{"expr":"semantic_ref", "category":"movement", "id":"place"},
+                    "continuity":{"expr":"semantic_ref", "category":"continuity", "id":"dash_dot"}
+                }}]
+            }""")
+            val context = JSONObject().put("ddl_digest", "old").put("config", JSONObject().put("definitions", org.json.JSONArray().put(definition)))
+                .put("macro_catalog", JSONObject().put("definition_locks", org.json.JSONArray()))
+            val bytes = app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(context).toByteArray()
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            host.db.execSQL("INSERT INTO pipeline_history_links VALUES ('u', 'orphan', 'v', ?, ?, 'old')", arrayOf<Any>(bytes, digest))
+            val report = migration().runOnce(host.db)!!
+            assertEquals(0, report.getJSONArray("refused_records").length())
+            val entries = report.getJSONArray("approximated_ref_records")
+            assertEquals(1, entries.length())
+            assertEquals("Saved.Mark", entries.getJSONObject(0).getString("qualified_name"))
+            assertEquals("$.body[0].fields.continuity", entries.getJSONObject(0).getJSONArray("approximated_refs").getString(0))
+            assertEquals("dashed", entries.getJSONObject(0).getJSONObject("definition").getJSONArray("body")
+                .getJSONObject(0).getJSONObject("fields").getJSONObject("continuity").getString("id"))
+        }
+    }
+
     @Test fun v3DocumentAndMacroReportApproximatedWords() {
         HostSqlite().use { host ->
             schema(host)

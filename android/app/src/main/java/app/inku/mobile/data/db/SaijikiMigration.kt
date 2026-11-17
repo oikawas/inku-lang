@@ -125,6 +125,7 @@ internal class SaijikiMigration(
         val sweeps = JSONArray()
         val tools = JSONArray()
         val thinness = JSONArray()
+        val approximatedRefs = JSONArray()
         val approximated = JSONArray()
         val historyEdition = db.query("SELECT key FROM app_settings WHERE key IN ('saijiki_v2_saved_records', 'saijiki_v3_saved_records')").use {
             val editions = mutableSetOf<String>()
@@ -200,6 +201,7 @@ internal class SaijikiMigration(
             } else {
                 count("definitions", if (answer.optBoolean("changed")) "changed" else "unchanged")
                 if ((answer.optJSONArray("unadjusted_thinness")?.length() ?: 0) > 0) thinness.put(answer)
+                if ((answer.optJSONArray("approximated_refs")?.length() ?: 0) > 0) approximatedRefs.put(answer)
             }
         }
 
@@ -416,7 +418,8 @@ internal class SaijikiMigration(
                 .put("refused_records", refused)
                 .put("unassociated_sweep_records", sweeps)
                 .put("unassociated_tool_records", tools)
-                .put("unadjusted_thinness_records", thinness),
+                .put("unadjusted_thinness_records", thinness)
+                .put("approximated_ref_records", approximatedRefs),
         )
     }
 

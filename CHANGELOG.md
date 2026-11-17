@@ -8,25 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server, Web, and CLI: unlinked documents are cleaned up when requests finish or candidates are discarded. Cleanup after verified backups is enabled by default with a seven-day grace period.
-
 - Swift (macOS and iOS): words inserted from Saijiki follow the displayed instructions' language. When the instructions are empty, they use the UI language.
 
 - Swift (macOS and iOS): Saijiki previews show the shared asset's Japanese and English descriptions for vocabulary and relation words.
-
-- Server and Web: Saijiki word and relation descriptions now come from the shared asset, while examples and illustrations remain in the previews. The Android snapshot also includes descriptions in both languages.
 
 - Swift (macOS and iOS): when migrating Saijiki v3, waxing and waning arcs whose direction cannot be expressed are approximated as semicircles and their locations are retained in the migration result. “Start”, “end”, and “partway” remain recognized without appearing in the vocabulary display.
 
 - Swift (macOS and iOS): the Saijiki window and the description editor group vocabulary categories under the same bundle headings as the Web. A word's asset description takes precedence, falling back to the preview text when absent.
 
 - Swift (macOS and iOS): adopts Saijiki v4 and migrates saved works in DB v10. Imports of v3 DDL exports migrate as well and retain approximated word locations and the count of approximated definition references. The DB migration report also retains the paths inside definitions.
-
-- Server and Web: Saijiki v4 vocabulary is generated from the shared asset and displayed in seven bundles. Migration of older exports and saved records, diagnostics, and rehearsal tools are updated. Production data has not been migrated.
-
-- Saijiki v4 (DDL 31, DDL engine 79): vocabulary and categories are reorganized. Migration uses an author-chosen near word where no identical meaning exists and records its position. Saved Scores and SVGs are not rewritten, so saved pictures do not change.
-
-- Drawing (render engine 104): grain, stipple and aquatint now draw as strokes broken by paper tooth, round dots with a sloping tone, and a burnished mezzotint face. Reperformance changes works with these textures on closed shapes; saved SVGs do not.
 
 - Swift: the About vocabulary table now has updated descriptions of the description, instructions, score, and performance.
 
@@ -753,6 +743,18 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.356 (2026-11-17 / Build 1432)
+
+- Server, Web, and CLI: unlinked documents are cleaned up when requests finish or candidates are discarded. Cleanup after verified backups is enabled by default with a seven-day grace period.
+
+- Server and Web: Saijiki word and relation descriptions now come from the shared asset, while examples and illustrations remain in the previews. The Android snapshot also includes descriptions in both languages.
+
+- Server and Web: Saijiki v4 vocabulary is generated from the shared asset and displayed in seven bundles. Migration of older exports and saved records, diagnostics, and rehearsal tools are updated.
+
+- Saijiki v4 (DDL 31, DDL engine 79): vocabulary and categories are reorganized. Migration uses an author-chosen near word where no identical meaning exists and records its position. Saved Scores and SVGs are not rewritten, so saved pictures do not change.
+
+- Drawing (render engine 104): grain, stipple and aquatint now draw as strokes broken by paper tooth, round dots with a sloping tone, and a burnished mezzotint face. Reperformance changes works with these textures on closed shapes; saved SVGs do not.
 
 ## v2.15.355 (2026-11-17 / Build 1431)
 

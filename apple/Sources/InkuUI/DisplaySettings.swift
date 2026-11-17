@@ -38,6 +38,14 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var imageIncludeExif: Bool?
     public var colophonModelReference: String?
     public var automaticBackup = false
+    public var cleanupAfterBackup = true
+    public var cleanupGraceDays = 7
+    public var cleanupLastAt: Date?
+    public var cleanupLastBackup: String?
+    public var cleanupLastDeleted: Int?
+    public var cleanupLastKept: Int?
+    public var cleanupLastSkipped: Bool?
+    public var cleanupLastError: String?
     public var backupIntervalHours = 24
     public var backupGenerations = 7
     public var backupSchedule = BackupSchedule()

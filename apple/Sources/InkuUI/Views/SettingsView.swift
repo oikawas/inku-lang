@@ -653,15 +653,26 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Button(model.display.localized("バックアップを保存…")) {
                     guard let url = NativeFilePanels.backup(language: model.display.preferences.language) else { return }
                     Task {
-                        let written = await model.backup(to: url)
+                        let backupTime = Date()
+                        let written = await model.backup(to: url, cleanup: false)
                         // iOS wrote it to a temporary folder; the author moves it out (or the folder is removed).
                         let placed = await NativeFilePanels.handOff([url], dialogs: fileDialogs)
                         if written, placed == nil { model.reportExportStatus("保存を取り消しました。") }
+                        if written, let destination = placed?.first { await model.cleanupAfterBackup(url: destination, backupTime: backupTime) }
                     }
                 }
                 Button(model.display.localized("バックアップから復元…")) { confirmRestore = true }
                 Text(model.display.localized("作品・系譜・作業状態をSQLiteへ保存します。接続設定とKeychainのAPIキーは別です。"))
                     .inkuFont(13).foregroundStyle(.secondary)
+                Toggle(display.label("バックアップの後に、作品にしなかった実行の記録を片付ける", "Clean up unsaved executions after a backup"), isOn: $display.preferences.cleanupAfterBackup)
+                Stepper(display.label("猶予: \(display.preferences.cleanupGraceDays)日", "Grace period: \(display.preferences.cleanupGraceDays) days"), value: $display.preferences.cleanupGraceDays, in: 1...365)
+                if let date = display.preferences.cleanupLastAt {
+                    Text(display.label("最終片付け", "Last cleanup") + ": " + date.formatted(date: .numeric, time: .shortened))
+                    Text(display.label("バックアップ", "Backup") + ": " + (display.preferences.cleanupLastBackup ?? ""))
+                    Text(display.label("削除: \(display.preferences.cleanupLastDeleted ?? 0)、保持: \(display.preferences.cleanupLastKept ?? 0)", "Deleted: \(display.preferences.cleanupLastDeleted ?? 0), kept: \(display.preferences.cleanupLastKept ?? 0)"))
+                    if display.preferences.cleanupLastSkipped == true { Text(display.label("処理中のため一部を飛ばしました。", "Cleanup was skipped while the app was busy.")) }
+                    if let error = display.preferences.cleanupLastError { Text(error).foregroundStyle(.red) }
+                }
             }.disabled(model.isBusy || automation.isOccupied)
             Section(model.display.localized("自動バックアップ")) {
                 Toggle(model.display.localized("自動バックアップ"), isOn: $display.preferences.automaticBackup)

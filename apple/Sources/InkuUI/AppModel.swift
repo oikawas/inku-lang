@@ -563,7 +563,7 @@ public final class AppModel {
             }
         } catch { report(error); return }
         let initialStatus = runningMode == "description" && drawRoute == "read_and_draw" ? display.webCopy(sketchMode == "on" ? "readDrawReading" : "readDrawWriting", sketchMode == "on" ? "記述を読んでいます…" : "指示書を書いています…") : "生成中"
-        _ = await performSerialized(status: initialStatus, singleInputMode: runningMode, clearProgressJournals: true) { [weak self] token in
+        _ = await performSerialized(status: initialStatus, singleInputMode: runningMode, clearProgressJournals: true, discardPreviousExecution: true) { [weak self] token in
             guard let self else { return }
             await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID,
                                      runningMode: runningMode, image: runningImage, freshRequest: freshRequest)
@@ -620,6 +620,7 @@ public final class AppModel {
 
     public func selectWork(_ work: SavedWork, adoptDrawOptions: Bool = true) async {
         guard !isBrowsingLocked else { return }
+        if let currentExecutionID { discardUnsavedExecutions([currentExecutionID]) }
         stopFollowingRun()
         if !isBusy && !backgroundDrawing {
             providerProgress = nil
@@ -1011,6 +1012,16 @@ public final class AppModel {
         guard !isBusy else { return }
         if let selectedWork { await selectWork(selectedWork, adoptDrawOptions: false) }
         else { clearWorkOutput() }
+    }
+
+    func discardUnsavedExecutions(_ ids: [String]) {
+        guard let host, !ids.isEmpty else { return }
+        Task {
+            for id in Set(ids) {
+                do { _ = try await host.discardUnsavedExecution(id: id) }
+                catch { NSLog("Could not clean up an unsaved execution: %@", error.localizedDescription) }
+            }
+        }
     }
 
     public func savePreview() async {
@@ -2026,8 +2037,10 @@ public final class AppModel {
     @discardableResult
     public func performSerialized(status: String, background: Bool = false, locksBrowsing: Bool = false, singleInputMode: String? = nil,
                                   clearProgressJournals: Bool = false,
+                                  discardPreviousExecution: Bool = false,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
+        if discardPreviousExecution, !background, let currentExecutionID { discardUnsavedExecutions([currentExecutionID]) }
         let token = UUID()
         generationToken = token
         activeSingleInputMode = singleInputMode
@@ -2071,7 +2084,7 @@ public final class AppModel {
                               onExecutionStarted: (@MainActor @Sendable (String) async throws -> Void)? = nil) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
-        _ = await performSerialized(status: "生成中", background: background, locksBrowsing: locksBrowsing, singleInputMode: singleInputMode) { [weak self] token in
+        _ = await performSerialized(status: "生成中", background: background, locksBrowsing: locksBrowsing, singleInputMode: singleInputMode, discardPreviousExecution: true) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
@@ -2145,6 +2158,7 @@ public final class AppModel {
 
     private func clearWorkOutput() {
         guard !isBusy else { return }
+        if let currentExecutionID { discardUnsavedExecutions([currentExecutionID]) }
         backgroundDrawing = false
         displayToken = UUID()
         library.clearSelectedAnnotation()
@@ -2349,9 +2363,10 @@ public final class AppModel {
     }
 
     @discardableResult
-    public func backup(to url: URL) async -> Bool {
+    public func backup(to url: URL, cleanup: Bool = true) async -> Bool {
         guard let database else { return false }
-        return await performComparison(status: "バックアップ中") { [weak self] _ in
+        let backupTime = Date()
+        let saved = await performComparison(status: "バックアップ中") { [weak self] _ in
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             try Task.checkCancellation()
@@ -2359,6 +2374,41 @@ public final class AppModel {
             try Task.checkCancellation()
             self?.status = "バックアップを保存しました"
         }
+        if saved && cleanup && display.preferences.cleanupAfterBackup {
+            await cleanupAfterBackup(url: url, backupTime: backupTime)
+        }
+        return saved
+    }
+
+    func cleanupAfterBackup(url: URL, backupTime: Date) async {
+        guard display.preferences.cleanupAfterBackup else { return }
+        var preferences = display.preferences
+        preferences.cleanupLastAt = Date(); preferences.cleanupLastBackup = url.lastPathComponent
+        preferences.cleanupLastDeleted = 0; preferences.cleanupLastKept = 0
+        preferences.cleanupLastSkipped = false; preferences.cleanupLastError = nil
+        guard !isBusy, let database, let host else {
+            preferences.cleanupLastSkipped = true; display.preferences = preferences; return
+        }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let days = min(365, max(1, preferences.cleanupGraceDays))
+        let cutoff = Int64(min(backupTime.timeIntervalSince1970, Date().timeIntervalSince1970 - Double(days) * 86400) * 1000)
+        do {
+            let ids = try await database.executionIDs(olderThan: cutoff)
+            for id in ids {
+                if isBusy { preferences.cleanupLastSkipped = true; break }
+                let result = try await host.discardUnsavedExecution(id: id, olderThan: cutoff, backupURL: url)
+                if result == .discarded { preferences.cleanupLastDeleted! += 1 }
+                else { preferences.cleanupLastKept! += 1 }
+            }
+        } catch { preferences.cleanupLastError = error.localizedDescription }
+        // Merge only cleanup fields so changes made while the task awaited are retained.
+        display.preferences.cleanupLastAt = preferences.cleanupLastAt
+        display.preferences.cleanupLastBackup = preferences.cleanupLastBackup
+        display.preferences.cleanupLastDeleted = preferences.cleanupLastDeleted
+        display.preferences.cleanupLastKept = preferences.cleanupLastKept
+        display.preferences.cleanupLastSkipped = preferences.cleanupLastSkipped
+        display.preferences.cleanupLastError = preferences.cleanupLastError
     }
 
     public func restore(from url: URL) async {
@@ -2725,6 +2775,7 @@ public final class AppModel {
 
     public func failureMessage(_ error: Error) -> String {
         switch (error as? HostError)?.code {
+        case "candidate_not_found": return display.label("案が見つかりません。もう一度作ってください。", "The candidate was not found. Please create it again.")
         case "saijiki_migration_required": return display.label("この作品は旧い歳時記の語で保存されていて、移行が済むまで開けません。", "This work was saved in the words of an older Saijiki and cannot be opened until it is migrated.")
         case "image_missing", "image_expired": return display.webCopy("imageMissing", "画像を読み直してください。画像ファイルを選び直してから描いてください。")
         case "image_invalid": return display.webCopy("imageInvalid", "画像を読めません。JPEG・PNG・GIF・TIFF のファイルを選んでください。")

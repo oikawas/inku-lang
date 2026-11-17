@@ -38,6 +38,7 @@ public final class SavedScoreVariantModel {
     public private(set) var failures: [String] = []
     public private(set) var lanes: [ComparisonLaneState] = []
     @ObservationIgnored private var initialized = false
+    @ObservationIgnored private weak var cleanupApp: AppModel?
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -52,6 +53,7 @@ public final class SavedScoreVariantModel {
     }
 
     public func generate(app: AppModel) async {
+        cleanupApp = app
         guard !running, !app.isBusy, !exhausted else { return }
         let fanoutLimit: Int
         do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
@@ -85,6 +87,7 @@ public final class SavedScoreVariantModel {
             }
         }
         if runID == run, !stopping {
+            app.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
             candidates = prepared.sorted { $0.order < $1.order }; previewID = nil
             if !succeeded { errorText = app.errorText }
         }
@@ -97,6 +100,7 @@ public final class SavedScoreVariantModel {
     }
     public func discardCandidates() {
         guard !running else { return }
+        cleanupApp?.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
         candidates.removeAll { $0.savedWork == nil }; previewID = nil
     }
 
@@ -124,7 +128,10 @@ public final class SavedScoreVariantModel {
         return complete
     }
 
-    private func discardUnsavedAfterSave() { candidates.removeAll { $0.savedWork == nil }; previewID = nil }
+    private func discardUnsavedAfterSave() {
+        cleanupApp?.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
+        candidates.removeAll { $0.savedWork == nil }; previewID = nil
+    }
 
     public func stop(app: AppModel) async {
         guard running, !stopping else { return }

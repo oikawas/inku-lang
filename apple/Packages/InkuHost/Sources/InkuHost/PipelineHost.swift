@@ -13,6 +13,9 @@ public actor PipelineHost {
     private let svgLimitBytes: @Sendable () async throws -> UInt64
     private var executions: [String: ExecutionDriver] = [:]
     private var executionUsers: [String: Int] = [:]
+    private var discardingExecutions: Set<String> = []
+    private var pendingExecutionReleases: [String: [UUID: Task<Void, Never>]] = [:]
+    var discardingExecutionIDs: Set<String> { discardingExecutions }
     var activeExecutionCount: Int { executions.count }
     public init(database: InkuDatabase, transport: (any ProviderTransport)? = nil,
                 credentials: any CredentialStore = KeychainCredentialStore(),
@@ -22,6 +25,16 @@ public actor PipelineHost {
         else { self.transport = transport ?? URLSessionProviderTransport(database: database) }
         self.credentials = credentials
         self.svgLimitBytes = svgLimitBytes
+    }
+
+    public func discardUnsavedExecution(id: String, expectedRevision: Int64? = nil,
+                                        olderThan: Int64? = nil, backupURL: URL? = nil) async throws -> InkuDatabase.DiscardExecutionResult {
+        guard !discardingExecutions.contains(id), executionUsers[id] == nil, executions[id] == nil else { return .kept(.busy) }
+        discardingExecutions.insert(id)
+        defer { discardingExecutions.remove(id) }
+        let releases = pendingExecutionReleases[id].map { Array($0.values) } ?? []
+        for release in releases { await release.value }
+        return try await database.discardUnsavedExecution(id: id, expectedRevision: expectedRevision, olderThan: olderThan, backupURL: backupURL)
     }
 
     /// Send the core's schema-bearing thesis prompt through the work's pinned provider.
@@ -103,6 +116,7 @@ public actor PipelineHost {
         let started = try await driver.start(progress: progress)
         executions[started.executionID] = driver
         executionUsers[started.executionID, default: 0] += 1
+        await database.beginExecutionUse(started.executionID)
         defer { releaseExecution(started.executionID) }
         defer { Task { await driver.clearImages() } }
         try await onStarted?(started.executionID)
@@ -129,6 +143,7 @@ public actor PipelineHost {
         }
     }
     public func cancel(executionID: String) async throws -> PipelineView {
+        guard !discardingExecutions.contains(executionID) else { throw HostError("busy") }
         if let record = try await database.loadExecution(id: executionID),
            let stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot), stored.schema == "inku.swift-candidate.v1" {
             // Pure replay/compilation has already completed; it has no live provider effect to cancel.
@@ -170,6 +185,7 @@ public actor PipelineHost {
 
     /// A committed work and its execution snapshot are saved together; never infer completion from a request alone.
     public func savedWorkForExecution(_ id: String) async throws -> SavedWork? {
+        guard !discardingExecutions.contains(id) else { throw HostError("busy") }
         guard let record = try await database.loadExecution(id: id) else { return nil }
         let execution = try JSONDecoder().decode(StoredExecution.self, from: record.snapshot)
         guard execution.schema == "inku.swift-pipeline-execution.v1" else { throw HostError("invalid_execution_snapshot") }
@@ -192,6 +208,7 @@ public actor PipelineHost {
 
     /// Metrics are safe for ordinary presentation. Raw records have a separate developer-only boundary.
     public func providerMetrics(executionID: String) async throws -> [ProviderAttemptMetric] {
+        guard !discardingExecutions.contains(executionID) else { throw HostError("busy") }
         guard let record = try await database.loadExecution(id: executionID) else { throw HostError("execution_not_found") }
         if let stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot) {
             return try metrics(in: ExactJSON(data: stored.candidate.context))
@@ -208,6 +225,7 @@ public actor PipelineHost {
     }
 
     public func providerObservations(executionID: String) async throws -> [ProviderAttemptObservation] {
+        guard !discardingExecutions.contains(executionID) else { throw HostError("busy") }
         guard ProviderObservationPolicy.developerModeEnabled else { throw HostError("developer_provider_observations_not_available") }
         guard let record = try await database.loadExecution(id: executionID) else { throw HostError("execution_not_found") }
         if let stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot) {
@@ -503,6 +521,18 @@ public actor PipelineHost {
 
     /// Explicit adoption is idempotent; previews never enter the history table.
     public func saveCandidate(executionID: String, expectedWorkID: String? = nil) async throws -> SavedWork {
+        guard !discardingExecutions.contains(executionID) else { throw HostError("busy") }
+        executionUsers[executionID, default: 0] += 1
+        await database.beginExecutionUse(executionID)
+        defer { releaseExecution(executionID) }
+        do { return try await saveCandidateClaimed(executionID: executionID, expectedWorkID: expectedWorkID) }
+        catch PersistenceError.revisionConflict {
+            if try await database.loadExecution(id: executionID) == nil { throw HostError("candidate_not_found") }
+            throw PersistenceError.revisionConflict
+        }
+    }
+
+    private func saveCandidateClaimed(executionID: String, expectedWorkID: String?) async throws -> SavedWork {
         guard let record = try await database.loadExecution(id: executionID) else { throw HostError("candidate_not_found") }
         if var stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot), stored.schema == "inku.swift-candidate.v1" {
             guard expectedWorkID == nil || expectedWorkID == stored.candidate.work.id else { throw HostError("candidate_identity_changed") }
@@ -523,6 +553,7 @@ public actor PipelineHost {
     }
 
     public func candidateComposition(executionID: String) async throws -> ExactJSON? {
+        guard !discardingExecutions.contains(executionID) else { throw HostError("busy") }
         guard let record = try await database.loadExecution(id: executionID) else { throw HostError("candidate_not_found") }
         let decoder = JSONDecoder()
         let candidate = (try? decoder.decode(StandaloneCandidate.self, from: record.snapshot))?.candidate
@@ -665,18 +696,34 @@ public actor PipelineHost {
     }
 
     private func acquireExecution(_ id: String) async throws -> ExecutionDriver {
-        if let current = executions[id] { executionUsers[id, default: 0] += 1; return current }
+        guard !discardingExecutions.contains(id) else { throw HostError("busy") }
+        executionUsers[id, default: 0] += 1
+        await database.beginExecutionUse(id)
+        var acquired = false
+        defer { if !acquired { releaseExecution(id) } }
+        if let current = executions[id] { acquired = true; return current }
         guard let record = try await database.loadExecution(id: id) else { throw HostError("execution_not_found") }
         // Another reentrant load may already have installed the current actor.
-        if let current = executions[id] { executionUsers[id, default: 0] += 1; return current }
+        if let current = executions[id] { acquired = true; return current }
         let driver = try ExecutionDriver(record: record, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
-        executions[id] = driver; executionUsers[id, default: 0] += 1; return driver
+        executions[id] = driver; acquired = true; return driver
     }
 
     private func releaseExecution(_ id: String) {
         guard let count = executionUsers[id] else { return }
+        let token = UUID()
+        let release = Task { [database] in
+            await database.endExecutionUse(id)
+            self.finishExecutionRelease(id, token: token)
+        }
+        pendingExecutionReleases[id, default: [:]][token] = release
         if count > 1 { executionUsers[id] = count - 1 }
         else { executionUsers.removeValue(forKey: id); executions.removeValue(forKey: id) }
+    }
+
+    private func finishExecutionRelease(_ id: String, token: UUID) {
+        pendingExecutionReleases[id]?[token] = nil
+        if pendingExecutionReleases[id]?.isEmpty == true { pendingExecutionReleases[id] = nil }
     }
 }
 

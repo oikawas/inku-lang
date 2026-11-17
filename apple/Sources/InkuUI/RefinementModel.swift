@@ -65,11 +65,18 @@ public final class RefinementModel {
     @ObservationIgnored private var operation: Task<Bool, Never>?
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var ownsAppOperation = false
+    @ObservationIgnored private weak var cleanupApp: AppModel?
 
     public var recomposeMode = Recomposition.Mode.principled
 
     public init(work: SavedWork) {
         self.work = work
+    }
+
+    init(work: SavedWork, candidates: [RefinementCandidate], app: AppModel) {
+        self.work = work
+        self.candidates = candidates
+        self.cleanupApp = app
     }
 
     public var selectedCount: Int { candidates.filter { $0.selected && $0.savedWork == nil }.count }
@@ -83,6 +90,7 @@ public final class RefinementModel {
     }
 
     public func initialize(app: AppModel) async {
+        cleanupApp = app
         guard !initialized, !initializing, !closed else { return }
         initializing = true
         defer { initializing = false }
@@ -115,6 +123,7 @@ public final class RefinementModel {
 
     public func discardCandidates() {
         guard !running else { return }
+        cleanupApp?.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
         candidates = []; slots = []; previewID = nil
         errorText = nil
         status = "採用していない候補を破棄しました。"
@@ -169,6 +178,7 @@ public final class RefinementModel {
                     guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
                     guard plans.count == count else { throw HostError("invalid_adjustment_plan_count") }
                     self.saving = false
+                    app.discardUnsavedExecutions(self.candidates.filter { $0.savedWork == nil }.map(\.id))
                     self.candidates = []; self.previewID = nil
                     self.slots = (1...count).map { RefinementSlot(id: $0) }
                     replacedCandidates = true
@@ -247,6 +257,7 @@ public final class RefinementModel {
                     self.errorText = app.errorText ?? "候補を保存できませんでした。未保存の候補を確認してください。"
                     return false
                 }
+                app.discardUnsavedExecutions(self.candidates.filter { $0.savedWork == nil }.map(\.id))
                 self.candidates = []; self.slots = []; self.previewID = nil
                 self.status = "選択した候補を採用しました。"
                 return true

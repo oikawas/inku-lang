@@ -70,6 +70,23 @@ import XCTest
         XCTAssertEqual(later.backupGenerations.filter(\.isManual).map(\.name), [manual])
         XCTAssertEqual(later.backupGenerations.filter { !$0.isManual }.count, 1)
     }
+
+    func testRestoreSafetyBackupDoesNotRunCleanup() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-backup-safety-cleanup-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"))
+        await app.initialize()
+        let maintenance = LocalMaintenance(directory: root)
+        var preferences = DisplayPreferences(); preferences.automaticBackup = true
+        await maintenance.checkAutomaticBackup(preferences: preferences) { url in await app.backup(to: url) }
+        let source = try XCTUnwrap(maintenance.backupGenerations.first?.name)
+        let marker = Date(timeIntervalSince1970: 1234)
+        app.display.preferences.cleanupLastAt = marker
+        await maintenance.restoreRetainedBackup(name: source, app: app)
+        XCTAssertEqual(app.restorationRevision, 1)
+        XCTAssertEqual(app.display.preferences.cleanupLastAt, marker)
+    }
     func testOnlyTrackedRegularBackupCanBeDeleted() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-backup-delete-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

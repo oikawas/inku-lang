@@ -1311,6 +1311,8 @@ DB v9 は effect ごとの snapshot と保存 payload の全文を SHA-256 diges
 
 ### backupとrestore
 
+DB v11 は実行の最終書込時刻を記録する。未保存の案を手放した時と作品を完全削除した時に、保存や実行中の参照、保存後に進んだ版を保護して実行と ACK を片付ける。検証済みバックアップ後の片付けは既定で有効、猶予は 7 日（1〜365 日）で、バックアップ内の全行と照合する。復元前の安全バックアップでは片付けない。
+
 manual backupはSQLite Backup APIでWALを含む整合snapshotを作り、schema／integrity／保存値を検証した単一SQLiteファイルを新規保存先へ公開する。既存backupを上書きしない。DB本体だけのfile copyをbackupとしない。
 
 restoreは生成中のUIから開始できず、hostの実行を停止してから行う。原backupを読み取り専用に保ち、隔離snapshotを検証してBackup APIでactive DBを置き換える。成功後はapp modelのexecutionと選択・表示をresetし、作品を再読出しする。Contentの復元revisionでlibrary previewを閉じ、demo／batchの観測作品、制作・プレゼンテーションの一時snapshotを破棄し、library状態・世代一覧・選択位置を復元DBから読み直す。DB backupには作品・系譜・execution／snapshot／ACKが入り、隣接provider JSONとKeychain credentialは含まれない。

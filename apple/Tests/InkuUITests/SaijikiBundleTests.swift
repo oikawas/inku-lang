@@ -43,4 +43,43 @@ final class SaijikiBundleTests: XCTestCase {
         XCTAssertEqual(word.effect(language: "ja"), "説明")
         XCTAssertEqual(word.effect(language: "en"), "Preview")
     }
+
+    func testAssetDescriptionsAppearForCategoryAndRelationInBothLanguages() throws {
+        let bootstrap = try Bootstrap()
+        let ground = try XCTUnwrap(bootstrap.saijiki.first { $0.id == "ji" })
+        let paper = try XCTUnwrap(ground.words.first { $0.japanese == "紙" })
+        XCTAssertEqual(paper.effect(language: "ja"), "地を無地の紙にする。細かな繊維の点がうっすら見える。")
+        XCTAssertEqual(paper.effect(language: "en"), "Makes the ground plain paper, with faint specks of fiber.")
+        let relations = try XCTUnwrap(bootstrap.saijiki.first { $0.id == "aida" })
+        let along = try XCTUnwrap(relations.words.first { $0.japanese == "沿う" })
+        XCTAssertEqual(along.effect(language: "ja"), "直前の線を参照する関係。")
+        XCTAssertEqual(along.effect(language: "en"), "A relation that refers to the preceding line.")
+
+        let appleRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let asset = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: appleRoot.appendingPathComponent("Sources/InkuUI/Resources/saijiki.json"))) as? [String: Any])
+        let categories = try XCTUnwrap(asset["categories"] as? [[String: Any]])
+        var checked = 0
+        for category in categories {
+            let id = try XCTUnwrap(category["key"] as? String)
+            let actualCategory = try XCTUnwrap(bootstrap.saijiki.first { $0.id == id })
+            for entry in try XCTUnwrap(category["words"] as? [[String: Any]]) where entry["display"] as? Bool == true {
+                let ja = try XCTUnwrap(entry["surface_ja"] as? String)
+                let description = try XCTUnwrap(entry["description"] as? [String: String])
+                let word = try XCTUnwrap(actualCategory.words.first { $0.japanese == ja })
+                XCTAssertEqual(word.effect(language: "ja"), description["ja"])
+                XCTAssertEqual(word.effect(language: "en"), description["en"])
+                checked += 1
+            }
+        }
+        XCTAssertEqual(checked, 103)
+        let entries = try XCTUnwrap(asset["relations"] as? [[String: Any]])
+        for entry in entries {
+            let ja = try XCTUnwrap(entry["surface_ja"] as? String)
+            let description = try XCTUnwrap(entry["description"] as? [String: String])
+            let word = try XCTUnwrap(relations.words.first { $0.japanese == ja })
+            XCTAssertEqual(word.effect(language: "ja"), description["ja"])
+            XCTAssertEqual(word.effect(language: "en"), description["en"])
+        }
+        XCTAssertEqual(entries.count, 11)
+    }
 }

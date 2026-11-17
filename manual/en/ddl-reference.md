@@ -34,7 +34,7 @@ Japanese joins noun modifiers with `の` and uses accepted adjective forms for a
 |---|---|---|
 | Color, tool, continuity, surface | `赤いペンの実線の空の` | `円` |
 | Color, tool, surface | `青いチョークの塗りの` | `四角` |
-| Sway, color, width | `細かく揺れる黒い細い` | `線` |
+| Sway, color, width | `小さく揺れる黒い細い` | `線` |
 
 Japanese accepts color adjectives `赤い`, `青い`, `白い`, and `黒い`. Colors also attach as nouns, including `灰の`, `黄の`, `橙の`, `紫の`, and `緑の`. Use the listed surface forms rather than inventing compound vocabulary.
 
@@ -267,33 +267,17 @@ A free line has two ends like a line; performance decides the path between them.
 
 ### 3.6 Line width and relative size
 
-| English | Japanese |
-|---|---|
-| extra-fine | ごく細い |
-| thin | 細い |
-| thick | 太い |
-| extra-thick | ごく太い |
+Width and size are the Saijiki categories `widths` and `sizes`. Size multiplies normal geometry independently of count.
 
-Width is separate from tool identity, and a tool's name does not state a width. In `thick gouache`, `gouache` names a tool and `thick` modifies its mark. `faint` controls handling rather than making a line thin.
-
-Relative size is finite core grammar, rather than a Saijiki category. Its factor applies to normal geometry independently of count.
-
-| English | Accepted Japanese forms | Factor |
+| English | Japanese | Factor |
 |---|---|---|
-| very small | とても小さな, とても小さい | 3/8 |
-| small | 小さな, 小さい | 1/2 |
-| slightly small | 小さめ | 3/4 |
+| very small | ごく小さな | 3/8 |
+| small | 小さな | 1/2 |
 | normal-sized | 普通の大きさ | 1 |
-| slightly large | 大きめ | 5/4 |
-| large | 大きな, 大きい | 3/2 |
-| very large | とても大きな, とても大きい | 7/4 |
-| extra-large | 特大の | 2 |
-| huge | 巨大な | 8/3 |
+| large | 大きな | 3/2 |
+| very large | ごく大きな | 7/4 |
 
-The factor changes line/free-line length, ordinary arc chord and sagitta together, and point diameter. Increasing count does not automatically shrink individual shapes. Fitting does not authorize inferred changes to count or dimensions.
-
-**Multiple size specifications:** Numeric dimensions, relative sizes, and full/half width remain independent candidates. The current implementation reports `ConflictingSizeSpecifications` and draws at the smallest reference extent while preserving aspect. It does not multiply `small` into an explicit radius. Use one size specification to state one unambiguous intention.
-
+Widths are very thin, thin, thick and very thick. Multiple numeric dimensions, sizes and full/half width are diagnosed as `ConflictingSizeSpecifications` and use the smaller candidate.
 ### 3.7 Numeric dimensions
 
 Dimensions use the canvas's short side as one unit. On a 1,000-pixel short side, radius 0.1 is equivalent to 100 pixels. The paper (canvas format) and output resolution are host choices. A DDL declares only the ratio it was laid out in, with `Aspect ratio W:H.` ([3.27](#327-aspect-ratio-declare-the-ratio-the-ddl-was-laid-out-in)).
@@ -587,18 +571,18 @@ A current free line supports endpoint-connected and touching relationships. A co
 
 Tools are independent modifiers, such as `pencil` and `gouache`, or Japanese 鉛筆の and ガッシュの. Omitted tool resolves to pen during execution; a texture or bleeding word does not silently make a tool explicit (bleeding is not read as watercolor, nor sweep as gouache).
 
-Continuity is solid, dashed, dotted, or dash-dot. It describes the continuity of a mark's line, separately from a surface. English `solid` is continuity, while `flat` names the filled surface.
+Continuity is solid, dashed or dotted. Dashed and dotted on arcs and closed forms are omitted with `unsupported_continuity_without_line`; lines and free lines retain their behavior.
 
-Surfaces are empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, and aquatint. On a closed form, a named texture supplies the face itself, without a silently added flat base. Underpainted explicitly adds the tool's fill below it.
+Surfaces are empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch and mezzotint. Underpainted explicitly adds the tool's fill beneath a closed face.
 
 | Combination | Current behavior |
 |---|---|
 | Closed form with empty | Unfilled |
 | Closed form with flat or omitted surface | Filled |
 | Closed form with named texture | Texture belongs to that face |
-| Line, ordinary arc, or free line with sweep | A band three times the tool width (thick and extra-thick: three default widths plus what the thinness word adds), at 0.8 times its opacity |
+| Line, ordinary arc, or free line with sweep | A band three times the tool width (thick and very thick: three default widths plus what the thinness word adds), at 0.8 times its opacity |
 | Line, ordinary arc, or free line with grain | Increased ground tooth for that mark |
-| Line, ordinary arc, or free line with stipple, hatch, crosshatch, or aquatint | Accepted and retained in Score, but the current renderer paints no open-mark texture face; it does not transfer the texture to another shape |
+| Line, ordinary arc, or free line with stipple, hatch, crosshatch or mezzotint | `unsupported_surface_without_face` omits only the word |
 | Line, ordinary arc, or free line with brushmarks | `unsupported_surface_brushmarks`; only the word is omitted |
 | Point with an explicit surface | Unsupported surface diagnostic; omit that field |
 | Crescent arc with flat | A filled crescent face |
@@ -606,7 +590,8 @@ Surfaces are empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, 
 
 Stipple is a surface technique; point is a drawing head. Placing many points differs from giving a circle a stipple face. Do not use the retired Japanese 点 spelling for stipple.
 
-Handling is dense, temperate, or faint: 濃い, 程よい, 薄い. It controls intensity relative to each tool. Temperate means the tool's native intensity and performs like omitted handling. Multiple intensity words on one mark conflict.
+Handling is dense, moderate, faint and bleeding. Bleeding is independent of intensity and sway.
+Diagnostics: `unsupported_surface_without_face` covers flat on lines/free lines and unsupported open-mark surfaces; `unsupported_fluctuation_on_point` covers point sway; `unsupported_surface_intensity_for_digital` covers handling on digital lines/outlines; `unsupported_continuity_without_line` covers dashed/dotted arcs and closed shapes. Only the offending word is omitted.
 
 ### 3.18 Fineness and underpainting
 
@@ -622,17 +607,17 @@ Handling is dense, temperate, or faint: 濃い, 程よい, 薄い. It controls i
 中心に、赤の太いガッシュの下塗りの密な交差線の薄い四角を1個置く。
 ```
 
-These apply to the seven named textures of closed forms: sweep, brushmarks, grain, stipple, hatch, crosshatch, and aquatint. They do not apply to line, arc, free line, point, empty, flat, or an omitted surface. Invalid combinations retain the mark and omit the modifier with `unsupported_surface_fineness` or `unsupported_surface_underlayer`.
+These apply to the seven named textures of closed forms, including mezzotint. Other combinations omit the word with `unsupported_surface_fineness` or `unsupported_surface_underlayer`.
 
-Choose one of the four fineness words per mark and optionally one underlayer word. Fine-grained plus packed occupies the same fineness field twice; both are diagnosed and omitted. This is not an independent arbitrary size-and-density parameter syntax. External fineness or underpainting does not override marks emitted by a plugin.
+A mark can take one word from each of three fields: size (fine-grained or coarse-grained), packing (packed or sparse), and underpainted. Fine-grained and packed work together. These cannot override Macro-emitted marks.
 
-Japanese 細かい is fineness, while 細かく is sway amplitude. 大きな is shape size, while 大きく is sway amplitude.
+Japanese 細かい is fineness, while 小さく is sway amplitude. 大きな is shape size, while 大きく is sway amplitude.
 
 ### 3.19 Sway and bleeding
 
 | Dimension | English | Japanese |
 |---|---|---|
-| Amplitude | narrowly, broadly | 細かく, 大きく |
+| Amplitude | narrowly, broadly | 小さく, 大きく |
 | Frequency | loosely, tightly | ゆるやかに, 小刻みに |
 | Quality | swaying, undulating | 揺れる, 波打つ |
 | Ink spread | bleeding | にじみ |
@@ -653,12 +638,12 @@ Arc-form words modify an arc head:
 
 ```text
 semicircle arc / 半円の弧
-waxing arc / 上弦の弧
-waning arc / 下弦の弧
+
+
 crescent arc / 三日月の弧
 ```
 
-Semicircle is an upper open 180-degree arc; waxing and waning give right- and left-side open arcs. Waxing/waning add their quarter-turn offsets, and numeric rotation may add to those. Explicit chord and sagitta for a semicircle form must have sagitta equal to half the chord.
+Semicircle is an upper open 180-degree arc; its direction can be rotated. Explicit chord and sagitta for a semicircle form must have sagitta equal to half the chord.
 
 A crescent has a specific closed face between two curves, unlike an ordinary open arc. Tall, wide, regularity, and arbitrary chord/sagitta do not transfer to a crescent. Explicit width and height must match its defined aspect.
 
@@ -816,7 +801,7 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 ## 4. Saijiki: complete vocabulary and accepted spellings
 
-Japanese is canonical. Spellings follow `inku.saijiki.v3` in `core/crates/inku-ddl/assets/saijiki-v3.json`. This section covers all 101 rows in its 15 categories and all 11 rows in the separate relations table. The 101 include 97 displayed rows, three hidden rows accepted in direct DDL, and one retired row that is not accepted. The interface shows relations as the sixteenth category.
+Japanese is canonical. Spellings follow `inku.saijiki.v4` in `core/crates/inku-ddl/assets/saijiki-v4.json`: 106 rows in 16 categories (103 displayed and three marker-only) and 11 separate relation words.
 
 ### Reading and writing the words
 
@@ -824,7 +809,7 @@ The Japanese and English columns give the canonical spellings of the same word. 
 
 Use a form as the head noun, attach attributes to it, and join it to an action. For example: `赤の鉛筆の薄い点描の円を置く。` A ground is a separate sentence, such as `和紙。` / `Washi.`, rather than an attribute of a form. Do not use headings such as `地: 和紙` or `面: 点描`. Write a surface as a modifier: `点描の円を置く。` / `Place a stipple circle.`
 
-Several words for the same attribute on one mark can conflict. Fine-grained and packed occupy the same fineness field, so do not specify both. Underpainted occupies a separate field and can be combined with packed: `下塗りの密な点描の円` / `an underpainted packed stipple circle`. An invalid attribute or relation is omitted with a diagnostic while independently drawable content continues. Recognition of a word, acceptance into the Score, and a visible effect on that form are separate facts.
+Words in the same field conflict. Fineness has separate size, packing and underpainting fields, so fine-grained, packed and underpainted may be combined.
 
 The `default=true` flags on pen, solid, empty, and black annotate the reference data. `（既定）` and `(default)` are not part of a DDL word. An unwritten attribute remains unspecified during reading; do not insert the table's annotations into the instructions. Current Score resolution uses pen for an omitted tool, solid for omitted continuity, and a flat fill for an omitted surface on a closed form. It chooses an omitted color from black and white by lightness contrast with the actual background or ground. The empty row's annotation therefore does not mean an omitted surface becomes empty.
 
@@ -832,21 +817,22 @@ The `default=true` flags on pen, solid, empty, and black annotate the reference 
 
 | Key | Japanese | English | Asset rows | Status |
 |---|---|---|---:|---|
-| `katachi` | かたち | forms | 10 | Nine public, one hidden accepted word |
-| `katamuki` | かたむき | angles | 8 | Six public, two hidden accepted words |
+| `katachi` | かたち | forms | 12 | Public |
+| `katamuki` | かたむき | angles | 8 | Public |
 | `tezawari` | てざわり | touches | 11 | Public |
-| `tsuranari` | つらなり | continuity | 4 | Public |
+| `tsuranari` | つらなり | continuity | 3 | Public |
 | `omote` | おもて | surfaces | 9 | Public |
-| `sabaki` | さばき | handling | 3 | Public |
-| `kime` | きめ | fineness | 4 | Public |
-| `shitaji` | したじ | underlayer | 1 | Public |
-| `ji` | じ | grounds | 7 | Public; the aspect ratio declaration (3.27) is also displayed last |
+| `sabaki` | さばき | handling | 4 | Public |
+| `kime` | きめ | fineness | 5 | Public |
+| `futosa` | ふとさ | widths | 4 | Public |
+| `ookisa` | おおきさ | sizes | 5 | Public |
+| `ji` | じ | grounds | 7 | Public |
 | `iro` | いろ | colors | 9 | Public |
-| `yuragi` | ゆらぎ | movements | 7 | Public |
-| `basho` | ばしょ | places | 11 | Public; endpoint words belong in relation phrases |
-| `ugoki` | うごき | motions | 7 | Six public, one retired |
+| `yuragi` | ゆらぎ | movements | 6 | Public |
+| `basho` | ばしょ | places | 11 | Eight public; start, end and partway are marker-only |
+| `ugoki` | うごき | motions | 6 | Public |
 | `jun` | じゅん | order | 2 | Public |
-| `wariai` | わりあい | proportions | 8 | Public |
+| `wariai` | わりあい | proportions | 4 | Public |
 | `aida` | あいだ | relations | 11 | Displayed from the separate `relations` table |
 
 ### 4.1. Forms — かたち
@@ -860,11 +846,13 @@ These are form nouns. A closed form below means circle, ellipse, triangle, squar
 | 三角 | `triangle` | A closed form with three vertices. Accepts tall, wide, width, and height. An equilateral triangle uses the separate shape constraint grammar. | `上に三角を置く。` / `Place a triangle at top.` |
 | 四角 | `square` | A closed rectangle. Accepts tall and wide. Its canonical English word is square; a rectangle is not a separate primitive. | `横長の四角を置く。` / `Place a wide square.` |
 | 線 | `line` | A straight line from its start to its end. Accepts draw, place, and the distribution actions. | `水平の線を引く。` / `Draw a horizontal line.` |
-| 弧 | `arc` | A circular arc, normally open. Semicircle, waxing, waning, and crescent modify this noun. | `半円の弧を引く。` / `Draw a semicircle arc.` |
+| 弧 | `arc` | A circular arc, normally open. Semicircle and crescent modify this noun. | `半円の弧を引く。` / `Draw a semicircle arc.` |
 | 自由線 | `free line` | A path between its ends, assembled for each performance from straight parts, arcs, and free bends. Accepts only connected and touching relations. | `右上がりの自由線を引く。` / `Draw a rising free line.` |
 | 点 | `point` | A small, round, filled mark with its own identity, separate from circle. Accepts no surface, mark angle, or sway. Bleeding is allowed. | `緑の点を置く。` / `Place a green point.` |
 | 雲形 | `cloudform` | A closed irregular form whose contour is decided for each performance. Accepts tall and wide. | `横長の雲形を置く。` / `Place a wide cloudform.` |
-| 多角形 | `polygon` | **Hidden accepted word.** `prompt=false`, `display=false`, `marker=true`. Valid in direct DDL. Currently accepts five to eight sides, with five when omitted. | `多角形を置く。` / `Place a polygon.` |
+| 多角形 | `polygon` | Five to eight sides; five when omitted. | `多角形を置く。` / `Place a polygon.` |
+| 半円 | `semicircle` | Makes an arc's sagitta half its chord length, producing an open 180-degree arc. Only modifies arc. | `半円の弧を引く。` / `Draw a semicircle arc.` |
+| 三日月 | `crescent` | Turns an arc into a thin closed moon form. Accepts flat as its only surface, and accepts neither fineness nor underlayer. | `三日月の弧を引く。` / `Draw a crescent arc.` |
 
 Direct DDL also reads 三角形 as 三角, 四角形 and 長方形 as 四角, `rectangle` as `square`, and `lines` as `line`. These are parser spellings of the same rows. Registered English form nouns also accept regular plurals, such as `circles` and `free lines`; a plural alone does not establish a count.
 
@@ -881,8 +869,8 @@ An angle turns the mark itself. A point has no direction and cannot take an angl
 | 斜め | `diagonal` | Selects 45, 135, 225, or 315 degrees using the composition seed. For a row, selects one of two diagonal directions. | `斜めの四角を置く。` / `Place a diagonal square.` |
 | 右上がり | `rising` | From lower left toward upper right; selects an integer from −37 through −23 degrees. Also a row direction in direct DDL. | `右上がりの線を引く。` / `Draw a rising line.` |
 | 右下がり | `falling` | From upper left toward lower right; selects an integer from 23 through 37 degrees. Also a row direction in direct DDL. | `右下がりの線を引く。` / `Draw a falling line.` |
-| 左上がり | `left-rising` | **Hidden accepted word.** Points from lower right toward upper left at 203–217 degrees. Retains an identity distinct from rising. | `左上がりの線を引く。` / `Draw a left-rising line.` |
-| 左下がり | `left-falling` | **Hidden accepted word.** Points from upper right toward lower left at 143–157 degrees. Retains an identity distinct from falling. | `左下がりの線を引く。` / `Draw a left-falling line.` |
+| 左上がり | `left-rising` | Points from lower right to upper left. | `左上がりの線を引く。` / `Draw a left-rising line.` |
+| 左下がり | `left-falling` | Points from upper right to lower left. | `左下がりの線を引く。` / `Draw a left-falling line.` |
 | 回転 | `rotated` | Selects an integer angle more than five degrees from each 45-degree boundary. Not a row direction. | `回転の四角を置く。` / `Place a rotated square.` |
 
 Left-rising and left-falling both have `prompt=false`, `display=false`, and `marker=true`; direct DDL and Macro references accept them. 横 for horizontal and 縦 for vertical are parser spellings. English also accepts `horizontally`, `vertically`, and `diagonally` as grammatical forms of their rows. This does not allow arbitrary adverbs or synonyms for rotated.
@@ -905,7 +893,7 @@ Touches describe the tool's trace, rather than line width itself. All ten primit
 | 油彩 | `oil paint` | Oil-bound paint laid on thickly, with bristle ridges, raised impasto, and glossy overlapping strokes. | `油彩の線を引く。` / `Draw an oil paint line.` |
 | ペインティングナイフ | `painting knife` | Paint heaped and spread with a knife into flat planes, leaving ridges, edges, and dry streaks. | `ペインティングナイフの線を引く。` / `Draw a painting knife line.` |
 | エッチング | `etching` | Acid-bitten lines of even width with slightly rough edges and round ends; shading is built by layering lines. | `エッチングの線を引く。` / `Draw an etching line.` |
-| コンピュータ | `computer` | Line sway that repeats exactly at the same period. | `コンピュータの線を引く。` / `Draw a computer line.` |
+| デジタル | `digital` | Line sway repeating at the same period. | `デジタルの線を引く。` / `Draw a digital line.` |
 
 Saijiki v3 (2026-10-31) reduced the touches from twelve to eleven. `rotring` merged into `pen`, `crayon` into `chalk`, `fine-brush` and `thick-brush` into `gouache`, and `burin` and `drypoint` into `etching`; `oil pastel`, `watercolor`, and `painting knife` were added. Current instructions do not read the six retired words. Saved instructions and plugin definitions are rewritten once into the new words by the edition migration, which also moves each width word to the step nearest the original width (for example, `rotring line` becomes `thin pen line`, and `thick-brush line` becomes `thick gouache line`). A saved Score's retired tools are performed as before. English also reads `oil-pastel`, `painting-knife`, and `watercolour` as the same words.
 
@@ -920,7 +908,6 @@ Continuity describes a line or contour's breaks. Every primitive accepts these w
 | 実線 | `solid` | An unbroken line. Carries the reference's default annotation. | `実線の線を引く。` / `Draw a solid line.` |
 | 破線 | `dashed` | Short segments separated by gaps. | `破線の線を引く。` / `Draw a dashed line.` |
 | 点線 | `dotted` | A contour made of a run of dots. | `点線の円を置く。` / `Place a dotted circle.` |
-| 一点鎖線 | `dash-dot` | Alternating long dashes and dots. | `一点鎖線の線を引く。` / `Draw a dash-dot line.` |
 
 `solid` is a continuity word. The English surface word for 塗り is `flat`; do not use the internal Score value `solid` as the surface word in the instructions.
 
@@ -938,16 +925,16 @@ Surfaces are state nouns describing a closed face or a trace. Handling describes
 | 点描 | `stipple` | Equal round dots build a tone that darkens from upper left to lower right. Separate from the point form. | `点描の円を置く。` / `Place a stipple circle.` |
 | 平行線 | `hatch` | Parallel lines filling a face; not a request for several line primitives. | `平行線の四角を置く。` / `Place a hatch square.` |
 | 交差線 | `crosshatch` | A second set of lines crossing the first. | `交差線の四角を置く。` / `Place a crosshatch square.` |
-| アクアチント | `aquatint` | A mezzotint face with fine light specks in a deep tone, brightening toward the upper left. | `アクアチントの四角を置く。` / `Place an aquatint square.` |
+| メゾチント | `mezzotint` | A deep tone with fine light specks, brightening toward upper left. | `メゾチントの四角を置く。` / `Place a mezzotint square.` |
 
 | Target | Acceptance and performance restrictions |
 |---|---|
 | Circle, ellipse, triangle, square, polygon, cloudform | Accept all nine words and perform the face. The seven named textures, alone, do not add a flat fill underneath. |
-| Line, ordinary arc, free line | Sweep and grain affect the trace. The compiler also accepts empty, flat, stipple, hatch, crosshatch, and aquatint into the Score, but an open mark has no closed face on which to perform these textures. They are not transferred to another closed form. Brushmarks is omitted with a diagnostic. |
+| Line, ordinary arc, free line | Sweep and grain affect the trace. Stipple, hatch, crosshatch and mezzotint are omitted with `unsupported_surface_without_face`; flat on a line or free line is omitted too. Brushmarks uses `unsupported_surface_brushmarks`. |
 | A point mark | Accepts none of the nine surface words. The point remains a round filled mark. |
 | A crescent arc | Accepts only flat as an explicit surface. Empty and the seven textures are not accepted. |
 
-Sweep has no faintness of its own. Add faint handling for `薄い刷き` / `faint sweep`. An open mark's sweep is a band three times the tool width at 0.8 of the tool opacity. A thick or extra-thick band adds to three default widths only what the thinness word adds to a round mark (for example, an extra-thick oil paint sweep is 84 per 1000 of the short side, not 180). On a face, sweep makes two films at 0.6 opacity per pass; brushmarks layers each band at 0.5. The tool and handling also affect the result.
+Sweep has no faintness of its own. Add faint handling for `薄い刷き` / `faint sweep`. An open mark's sweep is a band three times the tool width at 0.8 of the tool opacity. A thick or very thick band adds to three default widths only what the thinness word adds to a round mark (for example, an very thick oil paint sweep is 84 per 1000 of the short side, not 180). On a face, sweep makes two films at 0.6 opacity per pass; brushmarks layers each band at 0.5. The tool and handling also affect the result.
 
 `塗りの弧` / `a flat arc` can also express the fill inside a closed contour made by two touching arcs. Adding flat to an ordinary arc or line alone does not invent another closed form.
 
@@ -958,25 +945,26 @@ Handling sets intensity relative to the tool; it does not change the number or p
 | Japanese | English | Meaning | Short usage |
 |---|---|---|---|
 | 濃い | `dense` | Lays the tool more densely than its own intensity. | `鉛筆の濃い点描の四角を置く。` / `Place a dense stipple pencil square.` |
-| 程よい | `temperate` | Uses the tool's own intensity, as when handling is omitted, while retaining an explicit source word. | `鉛筆の程よい点描の四角を置く。` / `Place a temperate stipple pencil square.` |
+| 程よい | `moderate` | Uses the tool's own intensity, as when handling is omitted, while retaining an explicit source word. | `鉛筆の程よい点描の四角を置く。` / `Place a moderate stipple pencil square.` |
+| にじみ | `bleeding` | Uneven spread at the ink's edge, independent of sway. Alone, adds no sway. | `にじみの円を置く。` / `Place a bleeding circle.` |
 | 薄い | `faint` | Lays the tool more faintly than its own intensity. | `鉛筆の薄い点描の四角を置く。` / `Place a faint stipple pencil square.` |
 
 ### 4.7. Fineness — きめ
 
-Use fineness only on the seven named textures of the six closed forms: sweep, brushmarks, grain, stipple, hatch, crosshatch, and aquatint. It does not apply to empty, flat, an omitted surface, a line, arc, free line, point, or a mark emitted by a Macro. An invalid word is omitted with a diagnostic. Choose one word from this table for a mark; fine-grained and packed cannot be combined either.
+Use fineness on the seven named textures of the six closed forms, including mezzotint. Choose one word each for size, packing and underpainting; fine-grained and packed can be combined.
 
 | Japanese | English | Meaning | Short usage |
 |---|---|---|---|
 | 細かい | `fine-grained` | Makes each texture dot or line smaller and adds more, retaining the covered area. | `細かい点描の円を置く。` / `Place a fine-grained stipple circle.` |
 | 粗い | `coarse-grained` | Makes each texture dot or line larger and lays fewer, retaining the covered area. | `粗い粒の楕円を置く。` / `Place a coarse-grained grain ellipse.` |
 | 密な | `packed` | Packs more dots or lines of the same size into the texture. | `密な平行線の四角を置く。` / `Place a packed hatch square.` |
-| 疎な | `sparse` | Lays fewer dots or lines of the same size in the texture. | `疎なアクアチントの雲形を置く。` / `Place a sparse aquatint cloudform.` |
+| 疎な | `sparse` | Lays fewer dots or lines of the same size in the texture. | `疎なメゾチントの雲形を置く。` / `Place a sparse mezzotint cloudform.` |
 
-細かい describes texture fineness, while 細かく describes sway amplitude. 密な describes packing, while 濃い describes opacity relative to the tool. Internally, fine-grained and coarse-grained set `scale` to 0.05 and 0.90; packed and sparse set `density` to 0.85 and 0.05. These numbers need not be written into DDL.
+細かい describes texture fineness, while 小さく describes sway amplitude. 密な describes packing, while 濃い describes opacity relative to the tool. Internally, fine-grained and coarse-grained set `scale` to 0.05 and 0.90; packed and sparse set `density` to 0.85 and 0.05. These numbers need not be written into DDL.
 
-### 4.8. Underlayer — したじ
+### 4.8. Underpainting in fineness
 
-The acceptance range is the same as fineness: only the seven named textures of the six closed forms. It can be combined with one handling word and one fineness word.
+The acceptance range is the same as fineness: only the seven named textures of the six closed forms. It can be combined with handling and the size and packing fields of fineness.
 
 | Japanese | English | Meaning | Short usage |
 |---|---|---|---|
@@ -1024,13 +1012,12 @@ Movements describe unevenness in a trace. One amplitude, one spacing, and one sw
 
 | Japanese | English | Meaning and combinations | Short usage |
 |---|---|---|---|
-| 細かく | `narrowly` | A smaller sway amplitude. Must accompany swaying or undulating. | `細かく揺れる線を引く。` / `Draw a narrowly swaying line.` |
+| 小さく | `narrowly` | Smaller sway amplitude. | `小さく揺れる線を引く。` / `Draw a narrowly swaying line.` |
 | 大きく | `broadly` | A larger sway amplitude, separate from a form's size. Must accompany swaying or undulating. | `大きく波打つ線を引く。` / `Draw a broadly undulating line.` |
 | ゆるやかに | `loosely` | More space between waves; not drawing time or speed. | `ゆるやかに波打つ線を引く。` / `Draw a loosely undulating line.` |
 | 小刻みに | `tightly` | Less space between waves; not drawing time or speed. | `小刻みに揺れる線を引く。` / `Draw a tightly swaying line.` |
 | 揺れる | `swaying` | Continuous irregular sway. | `揺れる線を引く。` / `Draw a swaying line.` |
 | 波打つ | `undulating` | Regular wave-shaped undulation. | `波打つ線を引く。` / `Draw an undulating line.` |
-| にじみ | `bleeding` | Uneven spread at the ink's edge, independent of sway. Alone, adds no sway. | `にじみの円を置く。` / `Place a bleeding circle.` |
 
 Narrowly or broadly without a sway quality is omitted alone with `fluctuation_amplitude_without_quality`. Loosely and tightly have no such restriction: when quality is omitted, they use irregular sway. Other omitted components of an explicit sway resolve to medium. This does not add an explicit sway to a mark with no movement words at all.
 
@@ -1038,7 +1025,7 @@ English `sways` and `undulates` are permitted grammatical forms of their rows. `
 
 ### 4.12. Places — ばしょ
 
-A place can name a region, rather than a fixed point. Coordinates below run from the canvas's top left at (0,0) to its bottom right at (1,1). Place and draw select an anchor after shrinking the region to two thirds about its center. Line-up, scatter, and tile distribute marks using the region. Start, end, and partway are not independent canvas placement regions.
+A place can name a region, rather than a fixed point. Coordinates below run from the canvas's top left at (0,0) to its bottom right at (1,1). Place and draw select an anchor after shrinking the region to two thirds about its center. Line-up, scatter, and tile distribute marks using the region. Start, end and partway are marker-only words omitted from the displayed list; they are read in relation phrases, and their reading alone remains as in v3. They are not independent canvas placement regions.
 
 | Japanese | English | Meaning and acceptance | Short usage |
 |---|---|---|---|
@@ -1049,14 +1036,11 @@ A place can name a region, rather than a fixed point. Coordinates below run from
 | 右端 | `right-edge` | The right tenth: `[9/10,0,1,1]`. | `右端に円を置く。` / `Place a circle at right-edge.` |
 | 上端 | `top-edge` | The upper tenth: `[0,0,1,1/10]`. | `上端に線を引く。` / `Draw a line at top-edge.` |
 | 下端 | `bottom-edge` | The lower tenth: `[0,9/10,1,1]`. | `下端に線を引く。` / `Draw a line at bottom-edge.` |
-| 始点 | `start` | Selects the start of a preceding line or arc as the connection target. Not an independent canvas location. | `前の線の始点につながる弧を引く。` / `Draw an arc connected to the start of the previous line.` |
-| 終点 | `end` | Selects the end of a preceding line or arc as the connection target. Not an independent canvas location. | `前の弧の終点につながる線を引く。` / `Draw a line connected to the end of the previous arc.` |
-| 途中 | `partway` | Selects a point other than the two ends of a preceding line or arc, chosen during performance. A free line's interior is not a target. | `前の線の途中につながる弧を引く。` / `Draw an arc connected partway along the previous line.` |
 | 隅 | `corner` | Selects one of four corner regions, each one fifth of the canvas in width and height, using the composition seed. | `隅に円を置く。` / `Place a circle in a corner.` |
 
 English `left edge`, `right edge`, `top edge`, and `bottom edge` are parser spellings of the same rows. A named place conflicts with a numeric position, range, or pair of endpoints on the same mark. With no place, place and draw use the center region; line-up, scatter, tile, and fill use the whole canvas.
 
-The table's start, end, and partway examples require a target drawn by the preceding sentence. Precede the start and partway examples with `赤い線を引く。` / `Draw a red line.`, and the end example with `赤い弧を引く。` / `Draw a red arc.` Pasting a relation phrase alone into empty instructions reports a missing preceding target.
+Start, end and partway in relation phrases require a preceding target. For example, write `Draw a red line.` before `Draw an arc connected to the start of the previous line.` A relation phrase alone reports a missing preceding target.
 
 ### 4.13. Motions — うごき
 
@@ -1097,16 +1081,16 @@ Proportions specify aspect, size relative to the canvas, or an arc form. These a
 | 横長 | `wide` | Makes the same four forms wider; the normal ratio is 2:1. Not combined with a regular form. | `横長の楕円を置く。` / `Place a wide ellipse.` |
 | 全幅 | `full-width` | Sets the mark's reference extent to the canvas width; for a free line, this is chord length. Does not prevent overflow after rotation or named placement. | `全幅の線を引く。` / `Draw a full-width line.` |
 | 半幅 | `half-width` | Sets the reference extent to half the canvas width. | `半幅の線を引く。` / `Draw a half-width line.` |
-| 半円 | `semicircle` | Makes an arc's sagitta half its chord length, producing an open 180-degree arc. Only modifies arc. | `半円の弧を引く。` / `Draw a semicircle arc.` |
-| 上弦 | `waxing` | An open 180-degree arc bulging right. Adds 90 degrees to its specified angle. | `上弦の弧を引く。` / `Draw a waxing arc.` |
-| 下弦 | `waning` | An open 180-degree arc bulging left. Adds 270 degrees to its specified angle. | `下弦の弧を引く。` / `Draw a waning arc.` |
-| 三日月 | `crescent` | Turns an arc into a thin closed moon form. Accepts flat as its only surface, and accepts neither fineness nor underlayer. | `三日月の弧を引く。` / `Draw a crescent arc.` |
 
 縦に長い and 細長い are parser spellings of tall; 横に長い is a spelling of wide. When numeric width and height are also written, those numbers are retained and checked: height must exceed width for tall, and width must exceed height for wide.
 
-Full-width and half-width apply to all ten ordinary primitives. Several size candidates, including numeric dimensions, size words, and width extents, retain a diagnostic and use the smaller candidate. A single line or free line defined by two numeric endpoints cannot also take full-width or half-width because its endpoints determine the length. Semicircle, waxing, waning, and crescent must modify arc; they are not independent head nouns.
+Full-width and half-width apply to all ten ordinary primitives. Conflicting size candidates are diagnosed and the smaller is used. Semicircle and crescent are form words modifying arc.
 
-### 4.16. Relations — あいだ
+### 4.16. Widths and sizes
+
+Widths are very thin, thin, thick and very thick (ごく細い・細い・太い・ごく太い). Sizes are very small, small, normal-sized, large and very large (ごく小さな・小さな・普通の大きさ・大きな・ごく大きな). See 3.6 for their factors.
+
+### 4.17. Relations — あいだ
 
 A short word names a relation without establishing a preceding target. Use a full phrase from the table to write the relation. The current mark refers to the immediately preceding mark; between refers to the preceding two. An omitted target is never replaced by a different surviving mark. One instruction takes at most one relation.
 
@@ -1148,8 +1132,8 @@ Each canonical word appears in one row above. The current asset has no configure
 |---|---|---|
 | Current parser spellings | 三角形, 四角形, 長方形, `rectangle`, `lines`, 横, 縦, the four English edge words with spaces, `arrange`, `line up`, 縦に長い, 細長い, 横に長い, `oil-pastel`, `painting-knife`, `watercolour` | The same identities as their canonical rows; public spellings remain those in the tables. |
 | Current grammatical forms | 白い, 赤色, regular English form plurals, `horizontally`, `vertically`, `diagonally`, `sways`, `undulates` | Permitted grammar changes, rather than additional words or counts. |
-| Hidden accepted words | 多角形, 左上がり, 左下がり | Absent from `prompt` and display projections, but recognized in direct DDL because their markers are enabled. |
-| Retired row | 描く | Remains as a tombstone in the asset; not a parser candidate. Has no English surface. |
+| Displayed words | 多角形, 左上がり, 左下がり | Displayed in Saijiki and the reader's vocabulary. |
+| Retired words | 描く, dash-dot, waxing, waning | Not accepted as current words. |
 | Words used only in v1 migration | 薄墨 / `pale ink wash`, ゆっくり / `slowly`, 速く / `quickly`, 震える / `trembling`, `trembles`, 滲む / `blurring`, 中央 / `middle`, and 点 meaning stipple | Not aliases in current instructions. Saved documents migrate to the current words. The point form and ink wash ground remain distinct current words. |
 | Words used only in v2 migration | ロットリング / `rotring`, クレヨン / `crayon`, 細筆 / `fine-brush`, 太筆 / `thick-brush`, ビュラン / `burin`, ドライポイント / `drypoint` | Not aliases in current instructions. The edition migration of saved documents and plugin definitions rewrites them to pen, chalk, gouache, and etching, and corrects the width words (4.3). |
 | v1 amplitude spellings | `fine`, `finely`, `large`, `largely` | Migrate to `narrowly` and `broadly` when they mean amplitude. Current `large` has the separate grammatical role of form size. |
@@ -1162,8 +1146,8 @@ The following constructions are available grammar, rather than new rows in the 1
 
 | Grammar owner | Representative surfaces | Distinction |
 |---|---|---|
-| Line width | ごく細い, 細い, ごく太い, 太い / `extra-fine`, `thin`, `extra-thick`, `thick` | Separate from touches. Current English `fine` is neither the canonical width surface nor an amplitude alias. |
-| Relative size | とても小さな, 普通の大きさ, とても大きな, 特大の, 巨大な, 小さめ, 小さな, 大きめ, 大きな and their permitted adjective forms / `slightly small`, `small`, `very small`, `normal-sized`, `slightly large`, `large`, `very large`, `extra-large`, `huge` | Nine finite local sizes, separate from broadly. Does not allow arbitrary degree adverbs. |
+| Line width | ごく細い, 細い, 太い, ごく太い / `very thin`, `thin`, `thick`, `very thick` | Saijiki widths. |
+| Relative size | ごく小さな, 小さな, 普通の大きさ, 大きな, ごく大きな / `very small`, `small`, `normal-sized`, `large`, `very large` | Saijiki sizes. |
 | Shape constraints | 正三角形, 正方形, 五角形 through 八角形, `regular` | Regularity and side count, without new Saijiki primitive identities. |
 | Counts and counters | Japanese つ counts one through nine; 十, 10, とお, 本, 個, 枚; English `one`, `five`, and other counts | Quantity belongs to grammar. 少し, 数個, いくつか, たくさん, 多数, 無数, `a few`, `several`, `many`, `numerous`, and `countless` are also parser quantity candidates, rather than Saijiki words or exact counts. |
 | Numeric geometry | Radius, diameter, length, side, width and height, chord and sagitta, numeric position, range, endpoints, and rotation in degrees | Finite constructions connecting numbers to dimensions and owners. Distinguish the rotated word from a numeric angle. |
@@ -1324,7 +1308,7 @@ Japanese DDL (reference):
 
 ### 5.07. Four kinds of continuity
 
-Aim: Keep the dimensions and tool of each line the same while writing solid, dashed, dotted, and dash-dot.
+Aim: Keep the dimensions and tool of each line the same while writing solid, dashed and dotted.
 
 English DDL:
 
@@ -1333,7 +1317,7 @@ Paper.
 Draw one black thin pen solid horizontal line length 0.6 at horizontal 0.5, vertical 0.2.
 Draw one black thin pen dashed horizontal line length 0.6 at horizontal 0.5, vertical 0.4.
 Draw one black thin pen dotted horizontal line length 0.6 at horizontal 0.5, vertical 0.6.
-Draw one black thin pen dash-dot horizontal line length 0.6 at horizontal 0.5, vertical 0.8.
+
 ```
 
 Japanese DDL (reference):
@@ -1343,7 +1327,7 @@ Japanese DDL (reference):
 画面の横0.5、縦0.2の位置に、長さ0.6の黒の細いペンの実線の水平の線を1個引く。
 画面の横0.5、縦0.4の位置に、長さ0.6の黒の細いペンの破線の水平の線を1個引く。
 画面の横0.5、縦0.6の位置に、長さ0.6の黒の細いペンの点線の水平の線を1個引く。
-画面の横0.5、縦0.8の位置に、長さ0.6の黒の細いペンの一点鎖線の水平の線を1個引く。
+
 ```
 
 ### 5.08. Alternating tools and a mirror
@@ -1487,8 +1471,8 @@ English DDL:
 ```text
 Mezzotint.
 Fill the background with white.
-Place one red pen sparse aquatint cloudform at the top.
-Line up 3 yellow thick gouache underpainted fine-grained aquatint triangles at the bottom.
+Place one red pen sparse mezzotint cloudform at the top.
+Line up 3 yellow thick gouache underpainted fine-grained mezzotint triangles at the bottom.
 ```
 
 Japanese DDL (reference):
@@ -1496,8 +1480,8 @@ Japanese DDL (reference):
 ```text
 メゾチント。
 背景を白で埋める。
-上に、赤のペンの疎なアクアチントの雲形を1個置く。
-下に、黄の太いガッシュの下塗りの細かいアクアチントの三角を3個並べる。
+上に、赤のペンの疎なメゾチントの雲形を1個置く。
+下に、黄の太いガッシュの下塗りの細かいメゾチントの三角を3個並べる。
 ```
 
 ### 5.15. Different amplitudes of sway
@@ -1517,7 +1501,7 @@ Japanese DDL (reference):
 
 ```text
 和紙。
-上に、細かく揺れる青のガッシュの水平の線を1個引く。
+上に、小さく揺れる青のガッシュの水平の線を1個引く。
 下に、大きく揺れる赤のガッシュの水平の線を1個引く。
 中心に、黒の細いペンの小さな空の円を5個並べる。
 ```
@@ -1539,8 +1523,8 @@ Japanese DDL (reference):
 
 ```text
 画用紙。
-上に、細かくゆるやかに波打つ青のペンの水平の線を1個引く。
-下に、細かく小刻みに波打つ赤のペンの水平の線を1個引く。
+上に、小さくゆるやかに波打つ青のペンの水平の線を1個引く。
+下に、小さく小刻みに波打つ赤のペンの水平の線を1個引く。
 中心に、灰の太いガッシュの薄い塗りの横長の楕円を1個置く。
 ```
 
@@ -1566,16 +1550,16 @@ Japanese DDL (reference):
 下に、灰の鉛筆の小さな空の円を7個並べる。
 ```
 
-### 5.18. A waxing and waning pair
+### 5.18. A semicircle and crescent pair
 
-Aim: Give separate arcs waxing and waning forms, with a row of points between them.
+Aim: Give separate arcs semicircle and crescent forms, with a row of points between them.
 
 English DDL:
 
 ```text
 Washi.
-Place one black gouache half-width waxing arc at the top.
-Place one black gouache half-width waning arc at the bottom.
+Place one black gouache half-width semicircle arc at the top.
+Place one black gouache half-width crescent arc at the bottom.
 Line up 9 small red pen points at the center.
 ```
 
@@ -1583,8 +1567,8 @@ Japanese DDL (reference):
 
 ```text
 和紙。
-上に、黒のガッシュの半幅の上弦の弧を1個置く。
-下に、黒のガッシュの半幅の下弦の弧を1個置く。
+上に、黒のガッシュの半幅の半円の弧を1個置く。
+下に、黒のガッシュの半幅の三日月の弧を1個置く。
 中心に、赤のペンの小さな点を9個並べる。
 ```
 

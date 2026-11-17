@@ -640,3 +640,38 @@ fn embedded_asset_keeps_hidden_pruned_nullable_override_and_score_semantics() {
         ])
     );
 }
+
+// The Saijiki screen shows the categories by bundle, under the bundle's heading and in the
+// bundle order (RECUT-PLAN §3, the author's choice 2026-11-17 15:4x). The hosts read both
+// from the asset, so every category names a bundle the asset lists, once.
+#[test]
+fn every_category_belongs_to_one_listed_bundle_in_the_screen_order() {
+    let asset = saijiki_asset();
+    let keys = asset
+        .bundles
+        .iter()
+        .map(|bundle| bundle.key.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        keys,
+        ["what", "with", "face", "sway", "color", "where", "ground"]
+    );
+    assert_eq!(asset.bundles[0].name_ja, "何を");
+    assert_eq!(asset.bundles[6].name_ja, "何の上に");
+    for category in &asset.categories {
+        let bundle = category
+            .bundle
+            .as_deref()
+            .unwrap_or_else(|| panic!("{}", category.key));
+        assert!(keys.contains(&bundle), "{} {bundle}", category.key);
+    }
+    for bundle in &keys {
+        assert!(
+            asset
+                .categories
+                .iter()
+                .any(|category| category.bundle.as_deref() == Some(*bundle)),
+            "{bundle}"
+        );
+    }
+}

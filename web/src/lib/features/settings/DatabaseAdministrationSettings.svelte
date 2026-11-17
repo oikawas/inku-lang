@@ -17,7 +17,7 @@
 		backupStatus: string | null;
 		isAdmin: boolean;
 		onReload: () => void | Promise<void>;
-		onUpdateBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => void | Promise<void>;
+		onUpdateBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number, cleanup: boolean, graceDays: number) => void | Promise<void>;
 		onRunBackupNow: () => void | Promise<void>;
 		onDeleteBackup: (entry: DbBackupEntry) => void;
 		onRestoreBackup: (entry: DbBackupEntry) => void;
@@ -97,13 +97,15 @@
 		status ? (status.database.file_size_bytes ?? 0) * status.db_backup.max_generations : 0
 	);
 
-	function saveDbBackupSettings(patch: { intervalDays?: number; maxGenerations?: number; hour?: number; minute?: number }): void {
+	function saveDbBackupSettings(patch: { intervalDays?: number; maxGenerations?: number; hour?: number; minute?: number; cleanup?: boolean; graceDays?: number }): void {
 		const current = status?.db_backup;
 		void onUpdateBackupSettings(
 			patch.intervalDays ?? current?.interval_days ?? 7,
 			patch.maxGenerations ?? current?.max_generations ?? 4,
 			patch.hour ?? current?.backup_hour ?? 3,
-			patch.minute ?? current?.backup_minute ?? 0
+			patch.minute ?? current?.backup_minute ?? 0,
+			patch.cleanup ?? current?.cleanup_unlinked_drafts ?? true,
+			patch.graceDays ?? current?.cleanup_grace_days ?? 7
 		);
 	}
 </script>
@@ -196,6 +198,11 @@
 				</div>
 			</div>
 			<div class="db-backup-hint">{t().settingsDbBackupTimeHint}</div>
+			<label><input type="checkbox" checked={status.db_backup.cleanup_unlinked_drafts} disabled={!isAdmin || !status.db_backup.supported} onchange={(event) => saveDbBackupSettings({ cleanup: event.currentTarget.checked })} /> {t().settingsDbCleanupEnabled}</label>
+			<NumberStepper label={t().settingsDbCleanupGrace} min={1} max={365} value={status.db_backup.cleanup_grace_days} disabled={!isAdmin || !status.db_backup.supported} onChange={(value) => saveDbBackupSettings({ graceDays: value })} />
+			{#if status.db_backup.last_cleanup}
+				<div class="db-backup-hint">{t().settingsDbCleanupResult(formatTimestamp(status.db_backup.last_cleanup.at), status.db_backup.last_cleanup.deleted, status.db_backup.last_cleanup.kept, status.db_backup.last_cleanup.backup, status.db_backup.last_cleanup.skipped)}</div>
+			{/if}
 			<div class="settings-readonly-grid compact">
 				<span>{t().settingsDbBackupLastAuto}</span><strong>{formatTimestamp(status.db_backup.last_auto_backup_at)}</strong>
 				<span>{t().settingsDbBackupNextAuto}</span><strong>{formatTimestamp(status.db_backup.next_auto_backup_at)}</strong>

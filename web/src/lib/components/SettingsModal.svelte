@@ -156,7 +156,7 @@
 	const onSelectSettingsTab = (tab: SettingsTab) => settings.selectTab(tab);
 	const onSetSettingsDetail = (detail: SettingsDetailLevel) => settings.setDetail(detail);
 	const onLoadSettingsStatus = () => void settings.loadStatus();
-	const onUpdateDbBackupSettings = (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => settings.updateDbBackupSettings(intervalDays, maxGenerations, backupHour, backupMinute);
+	const onUpdateDbBackupSettings = (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number, cleanup: boolean, graceDays: number) => settings.updateDbBackupSettings(intervalDays, maxGenerations, backupHour, backupMinute, cleanup, graceDays);
 	const onRunDbBackupNow = () => settings.runDbBackupNow();
 	const onUpdateOutputSaveSettings = (enabled: boolean, outputDir: string, pngSize: number) => settings.updateOutputSaveSettings(enabled, outputDir, pngSize);
 	const onUpdateRenderConcurrencySettings = (serverLimit: number, clientLimit: number) => settings.updateRenderConcurrencySettings(serverLimit, clientLimit);

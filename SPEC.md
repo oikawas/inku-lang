@@ -4779,7 +4779,9 @@ and four generations. Manual backups can be created immediately and are stored
 separately from the automatic generation limit. Backup and restore use the
 SQLite file boundary.
 
-An administrator may explicitly compact the database; writes stop during compaction and its size before and after is shown. Execution records are retained indefinitely by default. Saving a retention period removes older finished executions and provider observations; busy executions, works, lineage, history links, and variation authority remain.
+An administrator may explicitly compact the database; writes stop during compaction and its size before and after is shown. Execution records are retained indefinitely by default. Saving a retention period removes older finished executions and provider observations. Documents linked to works remain. Unlinked documents can be removed at the end of a request, through the discard endpoint, or after a verified backup. Documents needed by children or running executions remain, and backup cleanup has a seven-day default grace period.
+
+`POST /api/pipeline/executions/{execution_id}/discard` discards an owner's unwanted execution. An optional `revision` keeps a document that has since changed. The outcome is `discarded`, `absent`, or `kept` with a reason. Documents needed by saved works, children, or active executions are kept.
 
 **The interval decides which day and the time of day decides when on that day.**
 The next due moment is derived from the last backup taken, not from the moment

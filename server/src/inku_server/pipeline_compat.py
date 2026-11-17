@@ -36,6 +36,18 @@ def _service():
     return get_service()
 
 
+def _discard(owner: str, view: dict) -> None:
+    try:
+        service = _service()
+        with service._lock:
+            job = service._jobs.get((owner, view["execution_id"]))
+        if job is not None and not view.get("busy"):
+            job.result()
+        service.discard_execution(owner, view["execution_id"])
+    except Exception:
+        _logger.exception("could not discard finished candidate")
+
+
 def composition_ranges() -> CompositionRanges:
     """Read the core's display table without creating a run or drawing."""
     from .pipeline_runtime import get_binding
@@ -223,7 +235,7 @@ def interpret(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] 
     context = _service().execution(owner, view["execution_id"]).context
     host_options = context.get("host_options", {})
     metrics = context.get("metrics", {})
-    return {
+    result = {
         "ddl": view["document"]["source"],
         "thinking": None,
         "stage1_model": host_options.get("stage1_model"),
@@ -235,6 +247,8 @@ def interpret(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] 
         "elapsed_ms": metrics.get("stage1", 0),
         **_identity(view),
     }
+    _discard(owner, view)
+    return result
 
 
 def _recompose(
@@ -307,9 +321,11 @@ def draw_plugin_example(owner: str, ddl: str, language: str, imported: list[dict
     options["count_generation"] = False
     options["imported_plugins"] = imported
     service = _service()
+    view = None
     try:
-        view = _wait(owner, service.start(owner, "direct_ddl", ddl, parent=None, source_work={"description": ""},
-                                          canvas_aspect=None, options=options, prepared=None), None)
+        view = service.start(owner, "direct_ddl", ddl, parent=None, source_work={"description": ""},
+                             canvas_aspect=None, options=options, prepared=None)
+        view = _wait(owner, view, None)
         delivery = view.get("delivery") or {}
         reasons = tuple(
             item["reason"]
@@ -325,6 +341,9 @@ def draw_plugin_example(owner: str, ddl: str, language: str, imported: list[dict
             view = _wait(owner, service.command(owner, view["execution_id"], {"tag": "perform"}), None)
     except CandidateHostError as error:
         return ExampleDrawing(reasons=(str(error) or "example_not_drawn",))
+    finally:
+        if view is not None:
+            _discard(owner, view)
     result = view.get("result") or {}
     if not reasons and not result:
         reasons = (str((view.get("phase") or {}).get("reason") or "example_not_drawn"),)
@@ -384,7 +403,9 @@ def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | 
         perform=True,
         reader_left=reader_left,
     )
-    return {**view["result"], **_identity(view), **({"recomposition": recomposition} if recomposition is not None else {})}
+    result = {**view["result"], **_identity(view), **({"recomposition": recomposition} if recomposition is not None else {})}
+    _discard(owner, view)
+    return result
 
 
 def _start_paint(owner: str, data: dict[str, Any], idempotency_key: str | None) -> dict:
@@ -411,7 +432,10 @@ def paint(
         if replay is not None:
             return replay
     view = _settled(owner, _start_paint(owner, data, idempotency_key), perform=True, reader_left=reader_left)
-    return {**view["result"], **_identity(view)}
+    result = {**view["result"], **_identity(view)}
+    if not data.get("save_history", False):
+        _discard(owner, view)
+    return result
 
 
 _SKETCH_SETTLED = {"supplemented": "supplemented", "supplied": "supplemented",
@@ -504,7 +528,10 @@ def paint_events(owner: str, data: dict[str, Any], idempotency_key: str | None) 
     except GeneratorExit:
         _end_abandoned_run(owner, view)
         raise
-    yield {"event": "done", **view["result"], **_identity(view)}
+    result = {"event": "done", **view["result"], **_identity(view)}
+    if not data.get("save_history", False):
+        _discard(owner, view)
+    yield result
 
 
 def _end_abandoned_run(owner: str, view: dict) -> None:

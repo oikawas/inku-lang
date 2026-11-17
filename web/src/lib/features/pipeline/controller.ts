@@ -126,6 +126,10 @@ export class PipelineController {
 	}
 
 	clear(): void {
+		const previous = this.view;
+		if (previous && !previous.busy && !previous.result?.history_id) {
+			void this.api.discard(previous.execution_id, previous.authority?.revision).catch(() => undefined);
+		}
 		this.requestOrdinal += 1;
 		this.historySelection = null;
 		this.legacyHistoryId = null;

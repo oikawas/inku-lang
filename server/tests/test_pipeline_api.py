@@ -28,6 +28,132 @@ _fixture_config = runpy.run_path(
 )["_fixture_config"]
 
 
+@pytest.mark.parametrize("route", ["interpret", "compose", "paint", "paint_stream", "plugin", "saved_paint"])
+def test_finished_compatibility_routes_discard_only_unsaved(monkeypatch, tmp_path, route):
+    import threading
+    from types import SimpleNamespace
+    from inku_server import pipeline_compat
+    engine = create_engine(f"sqlite:///{tmp_path / 'finished.db'}")
+    store = VariationAuthorityStore(engine)
+    store.install_schema()
+    make_action = runpy.run_path(str(Path(__file__).with_name("test_persistence_variation_authority.py")))["_action"]
+    store.commit_effect("owner", make_action(action_digit="1", source="x", expected_revision="0", next_revision="1"), create_if_missing=True)
+    view = {"execution_id": "execution", "variation_id": "variation", "authority": {"revision": "1"},
+            "busy": False, "document": {"source": "circle"}, "phase": {"tag": "ready"},
+            "delivery": {"outcome": "ok", "score": {"instructions": []}},
+            "result": {"svg": "example", "score": {"instructions": []}}}
+    class Service:
+        _lock = threading.RLock()
+        _jobs = {}
+        def start(self, *_args, **_kwargs): return dict(view)
+        def execution(self, *_args): return SimpleNamespace(context={})
+        def discard_execution(self, owner, _execution): return store.discard_unlinked_draft(owner, "variation-1")
+    service = Service()
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
+    if route == "interpret":
+        result = pipeline_compat.interpret("owner", {"description": "hello"})
+        assert result["ddl"] == "circle"
+    elif route == "compose":
+        result = pipeline_compat.compose("owner", {"ddl": "circle"})
+        assert result["svg"] == "example"
+    elif route in {"paint", "saved_paint"}:
+        result = pipeline_compat.paint("owner", {"description": "hello", "save_history": route == "saved_paint"}, None)
+        assert result["svg"] == "example"
+    elif route == "paint_stream":
+        result = list(pipeline_compat.paint_events("owner", {"description": "hello"}, None))[-1]
+        assert result["event"] == "done"
+    else:
+        result = pipeline_compat.draw_plugin_example("owner", "circle", "ja", [])
+        assert result.svg == "example"
+    assert (store.read("owner", "variation-1") is not None) == (route == "saved_paint")
+
+
+def test_save_that_read_execution_before_discard_rolls_back_and_returns_404(tmp_path, monkeypatch):
+    import threading
+    from types import SimpleNamespace
+    from sqlalchemy import func
+    from sqlalchemy.orm import sessionmaker
+    from inku_server import db
+    from inku_server.persistence import variation_authority as authority
+    from inku_server.persistence.schema import PipelineHistoryLinkRow
+    from inku_server.pipeline_api import SaveCompositionFormBody
+    import inku_render
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'race.db'}")
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine)
+    store = VariationAuthorityStore(engine)
+    make_action = runpy.run_path(str(Path(__file__).with_name("test_persistence_variation_authority.py")))["_action"]
+    store.commit_effect("owner", make_action(action_digit="1", source="x", expected_revision="0", next_revision="1"), create_if_missing=True)
+    class LookupSession:
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+        def get(self, _model, _id): return SimpleNamespace(history_id="parent", user_id="owner")
+    monkeypatch.setattr(db, "SessionLocal", LookupSession)
+    monkeypatch.setattr(db, "get_items", lambda *_args: [{"description_ddl": {}}])
+    monkeypatch.setattr(db, "history_description_locked", lambda _id: False)
+    monkeypatch.setattr(inku_render, "pipeline_composition_rules", lambda _request: b'{"outcome":"ok","result":{"metadata":{}}}')
+    monkeypatch.setattr(authority, "_history_fork_context_bytes", lambda *_args, **_kwargs: (b"context", "digest"))
+    run = SimpleNamespace(_lock=threading.RLock(), context={"parent": {"kind": "variation", "id": "parent-variation"}, "host_options": {}},
+                          _rendered={}, snapshot=lambda: {}, view=lambda: {"busy": False})
+    service = PipelineService.__new__(PipelineService)
+    service.store = SimpleNamespace(history_link=lambda *_args: {"variation_id": "parent-variation"})
+    # Delete after the caller obtains the in-memory execution, before save.
+    def read_then_discard(*_args):
+        assert store.discard_unlinked_draft("owner", "variation-1")["outcome"] == "discarded"
+        return run
+    service.execution = read_then_discard
+    def save(_owner, _snapshot, _context, _rendered):
+        with sessions.begin() as session:
+            session.add(HistoryRow(id="new", user_id="owner", at=1, input="x", ddl="x"))
+            session.flush()
+            store.link_history("owner", "new", "variation-1", "1", "missing", snapshot={}, context={}, pipeline_diagnostics={}, connection=session.connection())
+    service.project_result = save
+    with pytest.raises(HTTPException) as error:
+        service.save_composition_form("owner", "execution", SaveCompositionFormBody(lineage_parent_node_id="parent-node", derivation_kind="layout_change"))
+    assert (error.value.status_code, error.value.detail) == (404, "variation_not_found")
+    with engine.connect() as connection:
+        assert connection.scalar(select(func.count()).select_from(HistoryRow)) == 0
+        assert connection.scalar(select(func.count()).select_from(PipelineHistoryLinkRow)) == 0
+
+
+def test_discard_then_save_is_404_without_partial_work(tmp_path):
+    import threading
+    from types import SimpleNamespace
+    from sqlalchemy import func
+    from inku_server.persistence.schema import PipelineCandidateExecutionRow, PipelineHistoryLinkRow, ProviderObservationRow, VariationAuthorityActionRow
+    engine = create_engine(f"sqlite:///{tmp_path / 'discard-save.db'}")
+    Base.metadata.create_all(engine)
+    store = VariationAuthorityStore(engine)
+    make_action = runpy.run_path(str(Path(__file__).with_name("test_persistence_variation_authority.py")))["_action"]
+    store.commit_effect("owner", make_action(action_digit="1", source="x", expected_revision="0", next_revision="1"), create_if_missing=True)
+    executions = PipelineCandidateExecutionRow.__table__
+    with engine.begin() as connection:
+        connection.execute(executions.insert().values(owner_id="owner", execution_id="execution", variation_id="variation-1", sequence="1", state_bytes=b"{}", state_digest="unused", created_at=1, updated_at=1))
+        connection.execute(ProviderObservationRow.__table__.insert().values(owner_id="owner", execution_id="execution", action_id="attempt", request_digest="x", action_tag="x", stage="x", provider_id="x", model="x", attempt=1, timeout_ms=1, request_body="x", created_at=1, updated_at=1))
+    class Store:
+        def read_execution(self, owner, execution):
+            with engine.connect() as connection:
+                variation = connection.execute(select(executions.c.variation_id).where(executions.c.owner_id == owner, executions.c.execution_id == execution)).scalar_one_or_none()
+            return SimpleNamespace(variation_id=variation) if variation else None
+        def discard_unlinked_draft(self, *args, **kwargs): return store.discard_unlinked_draft(*args, **kwargs)
+    service = PipelineService.__new__(PipelineService)
+    service.store, service._lock, service._starting = Store(), threading.RLock(), 0
+    service._runs, service._jobs = {}, {}
+    app = FastAPI()
+    app.include_router(pipeline_router(lambda: service, _actor))
+    client = TestClient(app)
+    headers = {"x-owner": "owner"}
+    assert client.post("/api/pipeline/executions/execution/discard", json={}, headers=headers).json() == {"outcome": "discarded"}
+    assert client.post("/api/pipeline/executions/execution/save", json={"lineage_parent_node_id": "parent", "derivation_kind": "layout_change"}, headers=headers).status_code == 404
+    assert client.post("/api/pipeline/executions/execution/discard", json={}, headers=headers).json() == {"outcome": "absent"}
+    with engine.connect() as connection:
+        assert connection.scalar(select(func.count()).select_from(HistoryRow)) == 0
+        assert connection.scalar(select(func.count()).select_from(PipelineHistoryLinkRow)) == 0
+        assert connection.scalar(select(func.count()).select_from(ProviderObservationRow)) == 0
+        assert connection.scalar(select(func.count()).select_from(VariationAuthorityActionRow)) == 0
+
+
 def _actor(x_owner: str = Header(...)) -> dict[str, str]:
     return {"id": x_owner}
 

@@ -104,6 +104,9 @@ export type SettingsStatus = {
 		supported: boolean;
 		interval_days: number;
 		max_generations: number;
+		cleanup_unlinked_drafts: boolean;
+		cleanup_grace_days: number;
+		last_cleanup: { at: number; backup: string; deleted: number; kept: number; skipped: boolean } | null;
 		backup_hour: number;
 		backup_minute: number;
 		last_auto_backup_at: number;
@@ -194,7 +197,7 @@ export type ServerAdministration = {
 	installPluginPackage: (upload: PluginPackageUpload, replace: boolean) => Promise<PluginPackageReport | true | null>;
 	exportPluginPackage: (id: string) => Promise<{ name: string; blob: Blob } | null>;
 	setPluginWordPicture: (id: string, heading: string, pngBase64: string | null) => Promise<boolean>;
-	updateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => Promise<void>;
+	updateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number, cleanup: boolean, graceDays: number) => Promise<void>;
 	runDbBackupNow: () => Promise<void>;
 	deleteDbBackup: (entry: DbBackupEntry) => void;
 	restoreDbBackup: (entry: DbBackupEntry) => void;
@@ -403,13 +406,13 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		}
 	}
 
-	async function updateDbBackupSettings(intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number): Promise<void> {
+	async function updateDbBackupSettings(intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number, cleanup: boolean, graceDays: number): Promise<void> {
 		dbBackupStatus = null;
 		try {
 			const response = await deps.apiFetch('/api/settings/db-backup', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations, backup_hour: backupHour, backup_minute: backupMinute })
+				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations, backup_hour: backupHour, backup_minute: backupMinute, cleanup_unlinked_drafts: cleanup, cleanup_grace_days: graceDays })
 			});
 			if (!response.ok) {
 				const body = await response.json().catch(() => ({})) as { detail?: unknown };

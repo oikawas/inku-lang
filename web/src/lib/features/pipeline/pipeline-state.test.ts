@@ -20,6 +20,19 @@ function view(overrides: Partial<PipelineView> = {}): PipelineView {
 	};
 }
 
+test('clear discards only idle unsaved executions', () => {
+	const calls: string[] = [];
+	const api = { discard: async (id: string) => { calls.push(id); } };
+	const controller = new PipelineController(api as never, () => ({}), () => {});
+	controller.adopt(view({ busy: true }));
+	controller.clear();
+	controller.adopt(view({ result: { history_id: 'saved' } as PipelineView['result'] }));
+	controller.clear();
+	controller.adopt(view());
+	controller.clear();
+	assert.deepEqual(calls, ['execution-1']);
+});
+
 test('the run reports local rendering while the perform response is pending', async () => {
 	const ready = view({ phase: { tag: 'ready' }, delivery: { score: {}, upstream_diagnostics: [],
 		downstream_diagnostics: [], resource_omissions: [], relation_omissions: [] },

@@ -15,6 +15,18 @@ from inku_server.persistence.backup import (
 )
 
 
+def test_restore_safety_backup_does_not_run_cleanup(tmp_path, monkeypatch):
+    from inku_server import db
+    service = _service(tmp_path, [1_700_000_000_000])
+    backup = service.create_backup(manual=True)
+    monkeypatch.setattr(db, "_backup_service", lambda: service)
+    monkeypatch.setattr(db, "_cleanup_after_db_backup", lambda _backup: pytest.fail("cleanup during restore"))
+    # The safety copy must have a distinct timestamp.
+    object.__setattr__(service, "now_ms", lambda: 1_700_000_002_000)
+    result = db.restore_db_backup("manual", Path(backup["path"]).name)
+    assert result["restored"] == Path(backup["path"]).name
+
+
 def _service(tmp_path: Path, clock: list[int]) -> BackupService:
     live = tmp_path / "live.db"
     with sqlite3.connect(live) as connection:

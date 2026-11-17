@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server, Web, and CLI: unlinked documents are cleaned up when requests finish or candidates are discarded. Cleanup after verified backups is enabled by default with a seven-day grace period.
+
 - Swift (macOS and iOS): words inserted from Saijiki follow the displayed instructions' language. When the instructions are empty, they use the UI language.
 
 - Swift (macOS and iOS): Saijiki previews show the shared asset's Japanese and English descriptions for vocabulary and relation words.

@@ -2620,6 +2620,13 @@ def _command_paint_image(args: argparse.Namespace) -> int:
                 pass
         raise
     result = _image_run_result(view)
+    if not args.save_history:
+        execution = urllib.parse.quote(str(view["execution_id"]), safe="")
+        try:
+            client.request("POST", f"/api/pipeline/executions/{execution}/discard",
+                           data={"revision": view.get("authority", {}).get("revision")})
+        except CliError:
+            pass
     prefix = args.prefix or f"inku-{started_at}"
     output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
     paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)

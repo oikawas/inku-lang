@@ -126,9 +126,19 @@ export class RefinementSessionState implements RefinementSession {
 
 	private activeController: AbortController | null = null;
 	private readonly elapsed: Elapsed;
+	private readonly discard?: (id: string, revision?: string) => Promise<unknown>;
 
-	constructor(elapsed: Elapsed = createElapsed()) {
+	constructor(elapsed: Elapsed = createElapsed(), discard?: (id: string, revision?: string) => Promise<unknown>) {
 		this.elapsed = elapsed;
+		this.discard = discard;
+	}
+
+	private discardUnwanted(candidates: readonly VariationCandidate[]): void {
+		for (const candidate of candidates) {
+			if (!candidate.saved && candidate.executionId && this.discard) {
+				void this.discard(candidate.executionId).catch(() => undefined);
+			}
+		}
 	}
 
 	get elapsedMs(): number {
@@ -206,6 +216,8 @@ export class RefinementSessionState implements RefinementSession {
 
 	commitCandidates(controller: AbortController, candidates: VariationCandidate[]): boolean {
 		if (!this.isActive(controller)) return false;
+		const kept = new Set(candidates.map((candidate) => candidate.executionId));
+		this.discardUnwanted(this.candidates.filter((candidate) => !kept.has(candidate.executionId)));
 		this.candidates = candidates;
 		this.previewId = null;
 		return true;
@@ -245,6 +257,7 @@ export class RefinementSessionState implements RefinementSession {
 
 	reset(options: ResetOptions = {}): void {
 		if (options.preserveCandidates) return;
+		this.discardUnwanted(this.candidates);
 		// Target changes invalidate the controller before clearing projections;
 		// late callbacks then fail the identity checks above and cannot perform
 		// their usual lock or elapsed cleanup, so reset owns both here.
@@ -279,6 +292,7 @@ export class RefinementSessionState implements RefinementSession {
 
 	/** Drop the options; the saved ones are already in the history. */
 	discardCandidates(): void {
+		this.discardUnwanted(this.candidates);
 		this.candidates = [];
 		this.previewId = null;
 		this.status = null;

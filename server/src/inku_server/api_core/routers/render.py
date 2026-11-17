@@ -849,13 +849,13 @@ def _reader_left(request: Request) -> Callable[[], bool]:
 
 @router.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True, summary="Compose a score from instructions")
 def api_compose(req: ComposeRequest, request: Request, actor: dict = Depends(_current_user)) -> dict:
-    """Draw from DDL: compile it into a score and render it through the same pipeline as a new work. Nothing is saved. Requires a signed-in user."""
+    """Draw from DDL: compile it into a score and render it through the same pipeline as a new work. Nothing is saved after success. An execution waiting for author action remains available. Requires a signed-in user."""
     return _pipeline_compat.compose(actor["id"], req.model_dump(mode="json"), _reader_left(request))
 
 
 @router.post("/api/interpret", summary="Interpret a description")
 def api_interpret(req: InterpretRequest, request: Request, actor: dict = Depends(_current_user)) -> dict:
-    """Interpret a description into DDL with Stage 1 and return the DDL without drawing it. Nothing is saved. Requires a signed-in user."""
+    """Interpret a description into DDL with Stage 1 and return the DDL without drawing it. Nothing is saved after success. An execution waiting for author action remains available. Requires a signed-in user."""
     return _pipeline_compat.interpret(actor["id"], req.model_dump(mode="json"), _reader_left(request))
 
 
@@ -871,10 +871,10 @@ def _refuse_a_description_redraw_of_a_locked_parent(req: "PaintRequest") -> None
 def api_paint(
     req: PaintRequest,
     request: Request,
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200, description="Client-chosen key that identifies this drawing. Stored only when save_history is true: a repeated key then returns the drawing already saved with it, and reusing it for a different drawing is refused with 409. Without save_history nothing is stored, and a repeated key starts a new drawing."),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200, description="Client-chosen key that identifies this drawing. Stored only when save_history is true: a repeated key then returns the drawing already saved with it, and reusing it for a different drawing is refused with 409. Without save_history nothing is stored after success, and a repeated key starts a new drawing. An execution waiting for author action remains available."),
     actor: dict = Depends(_current_user),
 ) -> dict:
-    """Draw a work from a description: interpret it into instructions, compose a score, and render it. Returns the description, instructions, score, SVG and generation metadata. Requires a signed-in user. Raises 409 when the parent work's description is locked."""
+    """Draw a work from a description: interpret it into instructions, compose a score, and render it. Returns the description, instructions, score, SVG and generation metadata. An execution waiting for author action remains available. Requires a signed-in user. Raises 409 when the parent work's description is locked."""
     _refuse_a_description_redraw_of_a_locked_parent(req)
     return _pipeline_compat.paint(
         actor["id"], req.model_dump(mode="json"), idempotency_key, _reader_left(request)
@@ -904,10 +904,10 @@ async def _closing_in_threadpool(iterator: Iterator[str]) -> AsyncIterator[str]:
 @router.post("/api/paint/stream", summary="Paint a work and stream progress")
 def api_paint_stream(
     req: PaintRequest,
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200, description="Client-chosen key that identifies this drawing. Stored only when save_history is true: a repeated key then returns the drawing already saved with it, and reusing it for a different drawing is refused with 409. Without save_history nothing is stored, and a repeated key starts a new drawing."),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200, description="Client-chosen key that identifies this drawing. Stored only when save_history is true: a repeated key then returns the drawing already saved with it, and reusing it for a different drawing is refused with 409. Without save_history nothing is stored after success, and a repeated key starts a new drawing. An execution waiting for author action remains available."),
     actor: dict = Depends(_current_user),
 ) -> StreamingResponse:
-    """Draw a work from a description and stream the progress as newline-delimited JSON events, ending with the result. A refusal before the first event is returned as an HTTP status; a failure after that arrives as an error event. Requires a signed-in user. Raises 409 when the parent work's description is locked."""
+    """Draw a work from a description and stream the progress as newline-delimited JSON events, ending with the result. An execution waiting for author action remains available. A refusal before the first event is returned as an HTTP status; a failure after that arrives as an error event. Requires a signed-in user. Raises 409 when the parent work's description is locked."""
     _refuse_a_description_redraw_of_a_locked_parent(req)
     # The response is committed once the first event is written. Pulling it
     # here lets a refusal before any layer settles (a label-only description,

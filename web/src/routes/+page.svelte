@@ -27,6 +27,7 @@
 	import { applyMeterSwitches, registerMeterTransport } from '$lib/descriptionMeter.svelte';
 	import { acknowledgeUploadNotice, applyImageUploadNotice, forgetUploadNotice, uploadNoticeDue } from '$lib/features/image-provenance/upload-notice';
 	import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
+	import { PipelineApi } from '$lib/features/pipeline/api';
 	import { LineageQueryState, LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { LineageNode } from '$lib/features/history/types';
@@ -187,7 +188,8 @@
 	let statusHashCopied = $state(false);
 	let previousInputMode = $state<'single' | 'image' | 'batch'>('single');
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
-	const refinementSession = new RefinementSessionState();
+	const refinementSession = new RefinementSessionState(undefined, (id, revision) =>
+		new PipelineApi(apiFetch).discard(id, revision));
 	let historyStarredFilterNotice = $state<string | null>(null);
 	let historyStarredFilterNoticeTimer: number | null = null;
 

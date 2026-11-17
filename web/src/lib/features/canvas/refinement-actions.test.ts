@@ -35,6 +35,17 @@ function candidate(
 	};
 }
 
+test('discarding candidates leaves saved ones alone', async () => {
+	(globalThis as unknown as Record<string, unknown>).$state = <T>(value: T) => value;
+	const { RefinementSessionState } = await import('./refinement-session.svelte.ts');
+	const calls: string[] = [];
+	const session = new RefinementSessionState({ ms: 0, start() {}, stop() {} }, async (id) => { calls.push(id); });
+	const run = session.beginGrid({ includesReading: false, taskLabel: '', count: 2 });
+	session.commitCandidates(run, [{ ...candidate('a'), executionId: 'a' }, { ...candidate('b'), executionId: 'b', saved: true }]);
+	session.discardCandidates();
+	assert.deepEqual(calls, ['a']);
+});
+
 test('a selected pipeline candidate saves its own execution rather than redrawing its score', async () => {
 	const selected = { ...candidate('a'), executionId: 'execution-a' };
 	const calls: string[] = [];

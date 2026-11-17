@@ -868,6 +868,76 @@ def _execution_record(row: Mapping[str, Any]) -> PipelineExecutionRecord:
 
 @dataclass(frozen=True)
 class VariationAuthorityStore:
+    def discard_unlinked_draft(self, owner_id: str, variation_id: str, *, revision: str | None = None,
+                               before_ms: int | None = None, backup_path: str | None = None) -> dict:
+        """Remove one unreachable authority and its records under the SQLite write lock."""
+        mine = (variation_authority.c.owner_id == owner_id,
+                variation_authority.c.variation_id == variation_id)
+        with self.engine.connect() as connection:
+            if backup_path is not None:
+                connection.exec_driver_sql("ATTACH DATABASE ? AS cleanup_backup", (backup_path,))
+            if connection.dialect.name == "sqlite":
+                connection.exec_driver_sql("BEGIN IMMEDIATE")
+            else:
+                connection.begin()
+            try:
+                row = connection.execute(select(variation_authority).where(*mine)).mappings().one_or_none()
+                if row is None:
+                    return {"outcome": "absent"}
+                if connection.execute(select(pipeline_history_links.c.history_id).where(
+                    pipeline_history_links.c.owner_id == owner_id,
+                    pipeline_history_links.c.variation_id == variation_id).limit(1)).first():
+                    return {"outcome": "kept", "reason": "linked"}
+                if connection.execute(select(variation_authority.c.variation_id).where(
+                    variation_authority.c.owner_id == owner_id,
+                    variation_authority.c.parent_variation_id == variation_id).limit(1)).first():
+                    return {"outcome": "kept", "reason": "has_child"}
+                if revision is not None and str(row["revision"]) != revision:
+                    return {"outcome": "kept", "reason": "revision_moved"}
+                executions = connection.execute(select(pipeline_candidate_executions.c.execution_id,
+                    pipeline_candidate_executions.c.updated_at).where(
+                    pipeline_candidate_executions.c.owner_id == owner_id,
+                    pipeline_candidate_executions.c.variation_id == variation_id)).all()
+                if before_ms is not None and (row["updated_at"] >= before_ms or
+                        any(item.updated_at >= before_ms for item in executions)):
+                    return {"outcome": "kept", "reason": "too_recent"}
+                if backup_path is not None:
+                    # Timestamps alone cannot prove that an independently written
+                    # observation was present in the snapshot. Compare every row
+                    # to be removed while the live database write lock is held.
+                    where = "owner_id = ? AND variation_id = ?"
+                    for table in ("variation_authority", "variation_authority_actions", "pipeline_candidate_executions"):
+                        sql = (f"SELECT * FROM main.{table} WHERE {where} EXCEPT "
+                               f"SELECT * FROM cleanup_backup.{table} WHERE {where} LIMIT 1")
+                        if connection.exec_driver_sql(sql, (owner_id, variation_id, owner_id, variation_id)).first():
+                            return {"outcome": "kept", "reason": "too_recent"}
+                    observed = ("owner_id = ? AND execution_id IN (SELECT execution_id FROM "
+                                "main.pipeline_candidate_executions WHERE owner_id = ? AND variation_id = ?)")
+                    sql = (f"SELECT * FROM main.provider_observations WHERE {observed} EXCEPT "
+                           f"SELECT * FROM cleanup_backup.provider_observations WHERE {observed} LIMIT 1")
+                    args = (owner_id, owner_id, variation_id) * 2
+                    if connection.exec_driver_sql(sql, args).first():
+                        return {"outcome": "kept", "reason": "too_recent"}
+                ids = [item.execution_id for item in executions]
+                if ids:
+                    observations = ProviderObservationRow.__table__
+                    connection.execute(observations.delete().where(observations.c.owner_id == owner_id,
+                                       observations.c.execution_id.in_(ids)))
+                    connection.execute(pipeline_candidate_executions.delete().where(
+                        pipeline_candidate_executions.c.owner_id == owner_id,
+                        pipeline_candidate_executions.c.variation_id == variation_id))
+                connection.execute(variation_authority_actions.delete().where(
+                    variation_authority_actions.c.owner_id == owner_id,
+                    variation_authority_actions.c.variation_id == variation_id))
+                connection.execute(variation_authority.delete().where(*mine))
+                connection.commit()
+                return {"outcome": "discarded"}
+            finally:
+                if connection.in_transaction():
+                    connection.rollback()
+                if backup_path is not None:
+                    connection.exec_driver_sql("DETACH DATABASE cleanup_backup")
+
     """Atomic owner-scoped storage for shared-core commit effects."""
 
     engine: Engine

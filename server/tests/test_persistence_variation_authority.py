@@ -21,6 +21,36 @@ from inku_server.persistence.schema import Base, HistoryRow, PipelineHistoryLink
 from inku_server.pipeline_candidate import CandidateExecution
 
 
+@pytest.mark.parametrize("protection", ["linked", "has_child", "busy", "parent_of_running", "revision_moved"])
+def test_discard_protects_reachable_variations(tmp_path, protection) -> None:
+    import threading
+    from types import SimpleNamespace
+    from inku_server.pipeline_api import PipelineService
+    from inku_server.persistence.schema import VariationAuthorityRow, PipelineHistoryLinkRow
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'discard.db'}")
+    store = VariationAuthorityStore(engine, now_ms=lambda: 100)
+    store.install_schema()
+    store.commit_effect("owner", _action(action_digit="1", source="circle", expected_revision="0", next_revision="1"), create_if_missing=True)
+    table = VariationAuthorityRow.__table__
+    with engine.begin() as connection:
+        if protection == "linked":
+            connection.execute(PipelineHistoryLinkRow.__table__.insert().values(owner_id="owner", history_id="work", variation_id="variation-1", revision="1", ddl_digest="digest", fork_context_bytes=b"x", fork_context_digest="digest"))
+        if protection == "has_child":
+            row = dict(connection.execute(select(table)).mappings().one())
+            row.update(variation_id="child", derivation_kind="description_fork", parent_variation_id="variation-1")
+            connection.execute(table.insert().values(**row))
+    service = PipelineService.__new__(PipelineService)
+    service.store, service._lock, service._starting = store, threading.RLock(), 0
+    service._runs, service._jobs = {}, {}
+    if protection in {"busy", "parent_of_running"}:
+        run = SimpleNamespace(busy=protection == "busy", context={"parent": {"kind": "variation", "id": "variation-1"}} if protection == "parent_of_running" else {}, snapshot=lambda: {"variation_id": "child" if protection == "parent_of_running" else "variation-1"})
+        service._runs[("owner", "exec")] = run
+    result = service.discard_variation("owner", "variation-1", "2" if protection == "revision_moved" else None)
+    assert result == {"outcome": "kept", "reason": protection}
+    assert store.read("owner", "variation-1") is not None
+
+
 def _core_digest(
     value: object,
     *,

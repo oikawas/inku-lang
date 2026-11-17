@@ -1089,6 +1089,9 @@ export interface LangPack {
 	settingsDbBackupStoredCounts: (autoCount: number, manualCount: number) => string;
 	settingsDbBackupTime: string;
 	settingsDbBackupTimeHint: string;
+	settingsDbCleanupEnabled: string;
+	settingsDbCleanupGrace: string;
+	settingsDbCleanupResult: (at: string, deleted: number, kept: number, backup: string, skipped: boolean) => string;
 	settingsDbBackupTimeHourUnit: string;
 	settingsDbBackupTimeMinuteUnit: string;
 	settingsDbBackupTimeHourLabel: string;

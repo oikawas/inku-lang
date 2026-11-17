@@ -19,6 +19,9 @@ DB_BACKUP_DEFAULT_SETTINGS = {
     "backup_hour": 3,
     "backup_minute": 0,
     "last_auto_backup_at": 0,
+    "cleanup_unlinked_drafts": True,
+    "cleanup_grace_days": 7,
+    "last_cleanup": None,
 }
 # How many entries the status payload carries. The counts and the total size are
 # reported for every file, so a truncated list never hides how much disk is used.
@@ -168,6 +171,17 @@ class BackupService:
                 clean["last_auto_backup_at"] = max(0, int(settings["last_auto_backup_at"]))
             except (TypeError, ValueError):
                 clean["last_auto_backup_at"] = 0
+        if "cleanup_unlinked_drafts" in settings:
+            if type(settings["cleanup_unlinked_drafts"]) is not bool:
+                raise ValueError("cleanup selection must be a boolean")
+            clean["cleanup_unlinked_drafts"] = settings["cleanup_unlinked_drafts"]
+        if "cleanup_grace_days" in settings:
+            days = settings["cleanup_grace_days"]
+            if type(days) is not int or not 1 <= days <= 365:
+                raise ValueError("cleanup grace days must be between 1 and 365")
+            clean["cleanup_grace_days"] = days
+        if isinstance(settings.get("last_cleanup"), dict):
+            clean["last_cleanup"] = settings["last_cleanup"]
         return clean
 
     def get_settings(self) -> dict:
@@ -179,6 +193,8 @@ class BackupService:
         max_generations: int,
         backup_hour: int | None = None,
         backup_minute: int | None = None,
+        cleanup_unlinked_drafts: bool | None = None,
+        cleanup_grace_days: int | None = None,
     ) -> dict:
         current = self.get_settings()
         current["interval_days"] = interval_days
@@ -187,6 +203,10 @@ class BackupService:
             current["backup_hour"] = backup_hour
         if backup_minute is not None:
             current["backup_minute"] = backup_minute
+        if cleanup_unlinked_drafts is not None:
+            current["cleanup_unlinked_drafts"] = cleanup_unlinked_drafts
+        if cleanup_grace_days is not None:
+            current["cleanup_grace_days"] = cleanup_grace_days
         clean = self.normalize_settings(current)
         return self.write_setting(DB_BACKUP_SETTINGS_KEY, clean)
 

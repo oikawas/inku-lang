@@ -778,12 +778,16 @@ def update_db_backup_settings(
     max_generations: int,
     backup_hour: int | None = None,
     backup_minute: int | None = None,
+    cleanup_unlinked_drafts: bool | None = None,
+    cleanup_grace_days: int | None = None,
 ) -> dict:
     return _backup_service().update_settings(
         interval_days,
         max_generations,
         backup_hour,
         backup_minute,
+        cleanup_unlinked_drafts,
+        cleanup_grace_days,
     )
 
 
@@ -960,7 +964,51 @@ def _prune_auto_backups(max_generations: int) -> None:
 
 
 def create_db_backup(*, manual: bool = False) -> dict:
-    return _backup_service().create_backup(manual=manual)
+    result = _backup_service().create_backup(manual=manual)
+    _cleanup_after_db_backup(result)
+    return result
+
+
+def _cleanup_after_db_backup(backup: dict) -> None:
+    from .persistence.backup import DB_BACKUP_SETTINGS_KEY
+    from .persistence.schema import VariationAuthorityRow
+    from .pipeline_runtime import get_service
+
+    try:
+        settings = get_db_backup_settings()
+    except Exception:
+        _logger.exception("could not read cleanup settings after backup")
+        return
+    if not settings["cleanup_unlinked_drafts"]:
+        return
+    result = {"at": _now_ms(), "backup": Path(backup["path"]).name,
+              "deleted": 0, "kept": 0, "skipped": False}
+    try:
+        require_background_write()
+        service = get_service()
+        cutoff = min(backup["at"], _now_ms() - settings["cleanup_grace_days"] * 86400000)
+        with SessionLocal() as session:
+            remaining = {(owner, variation) for owner, variation in session.query(
+                VariationAuthorityRow.owner_id, VariationAuthorityRow.variation_id).all()}
+        while remaining:
+            deleted = set()
+            for owner, variation in remaining:
+                outcome = service.discard_variation(owner, variation, before_ms=cutoff, backup_path=backup["path"])
+                if outcome["outcome"] in {"discarded", "absent"}:
+                    deleted.add((owner, variation))
+                    result["deleted"] += outcome["outcome"] == "discarded"
+            if not deleted:
+                break
+            remaining -= deleted
+        result["kept"] = len(remaining)
+    except Exception:
+        result["skipped"] = True
+        _logger.exception("unlinked draft cleanup skipped after backup")
+    try:
+        settings["last_cleanup"] = result
+        _write_app_setting(DB_BACKUP_SETTINGS_KEY, settings)
+    except Exception:
+        _logger.exception("could not record backup cleanup result")
 
 
 def delete_db_backup(kind: str, name: str) -> None:
@@ -1097,7 +1145,10 @@ def next_scheduled_db_backup_at(settings: dict | None = None) -> int:
 
 
 def ensure_scheduled_db_backup() -> dict | None:
-    return _backup_service().ensure_scheduled_backup()
+    result = _backup_service().ensure_scheduled_backup()
+    if result is not None:
+        _cleanup_after_db_backup(result)
+    return result
 
 
 def list_db_backups(limit: int = _DB_BACKUP_LIST_LIMIT) -> dict:

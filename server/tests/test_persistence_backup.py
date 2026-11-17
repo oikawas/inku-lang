@@ -16,6 +16,58 @@ from inku_server import db
 from inku_server.persistence import backup
 
 
+def test_cleanup_keeps_recent_and_parent_of_saved_child(tmp_path, monkeypatch):
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import sessionmaker
+    from inku_server.persistence.schema import VariationAuthorityRow, PipelineHistoryLinkRow, ProviderObservationRow
+    from inku_server.persistence.variation_authority import VariationAuthorityStore
+    from inku_server import pipeline_runtime
+    engine = create_engine(f"sqlite:///{tmp_path / 'cleanup.db'}")
+    store = VariationAuthorityStore(engine, now_ms=lambda: 1)
+    store.install_schema()
+    ProviderObservationRow.__table__.create(engine)
+    table = VariationAuthorityRow.__table__
+    base = dict(owner_id="owner", protocol_version="inku.variation-authority.v1", revision="1",
+                origin="stage1_generated", authority="description_authoritative", source="x", document_json="{}",
+                ddl_digest="x", authority_digest="x", description="", derivation_kind="new",
+                parent_legacy_history_id=None, parent_variation_id=None, updated_at=1)
+    with engine.begin() as connection:
+        connection.execute(table.insert(), [dict(base, variation_id="old"), dict(base, variation_id="parent"),
+            dict(base, variation_id="child", derivation_kind="description_fork", parent_variation_id="parent"),
+            dict(base, variation_id="recent", updated_at=900_000_000)])
+        connection.execute(PipelineHistoryLinkRow.__table__.insert().values(owner_id="owner", history_id="saved", variation_id="child", revision="1", ddl_digest="x", fork_context_bytes=b"x", fork_context_digest="x"))
+    class Service:
+        def discard_variation(self, owner, variation, *, before_ms, backup_path):
+            return store.discard_unlinked_draft(owner, variation, before_ms=before_ms, backup_path=backup_path)
+    settings = {**backup.DB_BACKUP_DEFAULT_SETTINGS}
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(db, "get_db_backup_settings", lambda: settings)
+    monkeypatch.setattr(db, "_write_app_setting", lambda key, value: value)
+    monkeypatch.setattr(db, "require_background_write", lambda: None)
+    monkeypatch.setattr(db, "_now_ms", lambda: 1_000_000_000)
+    monkeypatch.setattr(pipeline_runtime, "get_service", lambda: Service())
+    snapshot = tmp_path / "backup.db"
+    backup.create_sqlite_snapshot(tmp_path / "cleanup.db", snapshot)
+    with engine.begin() as connection:
+        connection.execute(table.insert().values(**dict(base, variation_id="after-snapshot")))
+    db._cleanup_after_db_backup({"at": 1_000_000_000, "path": str(snapshot)})
+    with engine.connect() as connection:
+        assert set(connection.execute(select(table.c.variation_id)).scalars()) == {"parent", "child", "recent", "after-snapshot"}
+    assert settings["last_cleanup"]["deleted"] == 1
+
+
+def test_cleanup_is_recorded_as_skipped_when_writes_are_locked(monkeypatch):
+    settings = {**backup.DB_BACKUP_DEFAULT_SETTINGS}
+    monkeypatch.setattr(db, "get_db_backup_settings", lambda: settings)
+    monkeypatch.setattr(db, "_write_app_setting", lambda key, value: value)
+    def locked():
+        raise RuntimeError("database_write_locked")
+    monkeypatch.setattr(db, "require_background_write", locked)
+    db._cleanup_after_db_backup({"at": 1, "path": "backup.db"})
+    assert settings["last_cleanup"]["skipped"] is True
+    assert settings["last_cleanup"]["backup"] == "backup.db"
+
+
 class _SettingStore:
     def __init__(self, value: dict | None = None) -> None:
         self.value = None if value is None else dict(value)
@@ -67,6 +119,9 @@ def _defaults(**overrides: int) -> dict:
         "backup_hour": 3,
         "backup_minute": 0,
         "last_auto_backup_at": 0,
+        "cleanup_unlinked_drafts": True,
+        "cleanup_grace_days": 7,
+        "last_cleanup": None,
     }
     value.update(overrides)
     return value

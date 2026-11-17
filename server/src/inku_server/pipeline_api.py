@@ -137,6 +137,11 @@ class SaveCompositionFormBody(BaseModel):
     derivation_metadata: dict = Field(default_factory=dict)
 
 
+class DiscardBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: str | None = Field(default=None, description="Last known revision; a changed document is kept. 最後に読んだ版。変更されていれば残します。")
+
+
 class NewVariationBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["description", "direct_ddl", "image"] = Field(
@@ -410,6 +415,39 @@ class PipelineService:
     def prepare_image(self, owner: str, raw: bytes) -> dict:
         from .pipeline_images import prepare_image
         return self._images.add(owner, prepare_image(self.binding, raw))
+
+    def discard_variation(self, owner: str, variation_id: str, revision: str | None = None,
+                          *, before_ms: int | None = None, backup_path: str | None = None) -> dict:
+        from .chatgpt_runtime import retire_execution
+        with self._lock:
+            # A child may be starting before it enters _runs.
+            if self._starting:
+                return {"outcome": "kept", "reason": "busy"}
+            matching = []
+            for key, run in self._runs.items():
+                if key[0] != owner:
+                    continue
+                if run.snapshot().get("variation_id") == variation_id:
+                    job = self._jobs.get(key)
+                    if run.busy or (job is not None and not job.done()):
+                        return {"outcome": "kept", "reason": "busy"}
+                    matching.append((key, run))
+                elif run.context.get("parent") == {"kind": "variation", "id": variation_id}:
+                    return {"outcome": "kept", "reason": "parent_of_running"}
+            result = self.store.discard_unlinked_draft(owner, variation_id, revision=revision, before_ms=before_ms, backup_path=backup_path)
+            if result["outcome"] == "discarded":
+                for key, run in matching:
+                    retire_execution(*key)
+                    run.image_data.clear()
+                    self._runs.pop(key, None)
+                    self._jobs.pop(key, None)
+            return result
+
+    def discard_execution(self, owner: str, execution_id: str, revision: str | None = None) -> dict:
+        record = self.store.read_execution(owner, execution_id)
+        if record is None:
+            return {"outcome": "absent"}
+        return self.discard_variation(owner, record.variation_id, revision)
 
     @staticmethod
     def _stop_missing_image(run: CandidateExecution) -> None:
@@ -1106,7 +1144,10 @@ class PipelineService:
             context = deepcopy(run.context)
             context["host_options"] = {**settings, "save_history": True, "save_artifacts": True, "count_generation": False,
                                        "derivation_kind": body.derivation_kind, "derivation_metadata": metadata}
-            result = self.project_result(owner, snapshot, context, run._rendered)
+            try:
+                result = self.project_result(owner, snapshot, context, run._rendered)
+            except VariationAuthorityAdapterError as error:
+                raise HTTPException(404, "variation_not_found") from error
         # The saved child as listings read it: one that keeps its parent's
         # composition shows it at once, as after a reload (step 3, 2026-11-13).
         saved_id = result.get("history_id") if isinstance(result, dict) else None
@@ -1321,6 +1362,16 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
     def save_composition_form(body: SaveCompositionFormBody, execution_id: str = Path(description="ID of the rendered execution."), actor: dict = Depends(actor_dependency)):
         """Save an owned, completed candidate (another composition form, or another model) as a child without rendering it again. The kind must be the one the execution was started with and the parent its parent; returns 409 when it was saved already, is not ready, or its parent is held by its DDL, and 422 for another kind or parent."""
         return current_service().save_composition_form(actor["id"], execution_id, body)
+
+    @router.post("/executions/{execution_id}/discard", summary="Discard an unlinked candidate")
+    def discard_execution(execution_id: str, body: DiscardBody = DiscardBody(), actor: dict = Depends(actor_dependency)):
+        """Discard an owned unlinked candidate if no work, child, or running execution needs it.
+
+        Returns discarded, absent, or kept with reason linked, has_child, busy,
+        parent_of_running, or revision_moved. Repeating the request is safe.
+        作品・子・実行が必要としない候補を破棄します。未存在は absent、保持時は理由を返します。
+        """
+        return current_service().discard_execution(actor["id"], execution_id, body.revision)
 
     @router.post("/executions/{execution_id}/commands", summary="Send a command to an execution")
     def command(body: dict, execution_id: str = Path(description="ID of the execution."), actor: dict = Depends(actor_dependency)):

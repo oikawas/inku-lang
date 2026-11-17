@@ -268,6 +268,12 @@ export class PipelineApi {
 	command(view: PipelineView, command: Record<string, unknown>, signal?: AbortSignal) {
 		return this.request<PipelineView>(`/executions/${encodeURIComponent(view.execution_id)}/commands`, command, signal);
 	}
+
+	discard(executionId: string, revision?: string) {
+		return this.request<{ outcome: string; reason?: string }>(
+			`/executions/${encodeURIComponent(executionId)}/discard`, revision ? { revision } : {},
+		);
+	}
 }
 
 export function pipelineDiagnostics(

@@ -131,6 +131,9 @@ class DbBackupStatus(BaseModel):
     supported: bool = Field(description="Whether backups can be made; true only for a SQLite file database")
     interval_days: int = Field(description="Days between automatic backups")
     max_generations: int = Field(description="Number of automatic copies kept; older automatic copies are deleted after each new one")
+    cleanup_unlinked_drafts: bool = Field(default=True, description="Clean unlinked drafts after a verified backup")
+    cleanup_grace_days: int = Field(default=7, description="Days to keep unlinked drafts before cleanup")
+    last_cleanup: dict | None = Field(default=None, description="Last cleanup time, counts, backup name and skipped status")
     backup_hour: int = Field(
         default=3,
         description="Hour of the day, from 0 to 23 in the server's local time, at which an automatic backup is due",
@@ -165,6 +168,8 @@ class DbBackupStatus(BaseModel):
 
 
 class DbBackupSettingsBody(BaseModel):
+    cleanup_unlinked_drafts: bool = True
+    cleanup_grace_days: int = Field(default=7, ge=1, le=365)
     interval_days: int = Field(
         default=7,
         ge=1,
@@ -824,6 +829,8 @@ def api_settings_update_db_backup(
             body.max_generations,
             body.backup_hour,
             body.backup_minute,
+            body.cleanup_unlinked_drafts,
+            body.cleanup_grace_days,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

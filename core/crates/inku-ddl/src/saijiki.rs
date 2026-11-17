@@ -99,6 +99,18 @@ pub struct SaijikiAsset {
     pub relation_marker_order: MarkerOrder,
     pub relation_display_order: Vec<String>,
     pub marker_class_order: Vec<String>,
+    /// The bundles a sentence is composed in, in the order the Saijiki screen shows them
+    /// (Saijiki v4; earlier editions have none). Every category's `bundle` is one of them.
+    #[serde(default)]
+    pub bundles: Vec<SaijikiBundleAsset>,
+}
+
+/// One bundle of categories (Saijiki v4, RECUT-PLAN §3): its key and its heading.
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+pub struct SaijikiBundleAsset {
+    pub key: String,
+    pub name_ja: String,
+    pub name_en: String,
 }
 
 /// A named Saijiki category and its canonical word order.

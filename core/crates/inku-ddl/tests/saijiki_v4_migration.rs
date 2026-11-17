@@ -127,10 +127,27 @@ fn a_v3_document_is_rewritten_word_by_word_and_reads_cleanly_in_v4() {
     }
 }
 
+// Concrete failure (V1f, 10 of the author's works): a 上弦・下弦 whose turn cannot be
+// written beside the mark's own refused the whole document. v3 drew no turn there either,
+// so the word becomes the bare semicircle and is reported as moved to a near word.
 #[test]
-fn a_waxing_arc_that_also_turns_is_left_for_the_author() {
-    let error = migrate("中心に、黒のペンの右上がりの上弦の弧を1本引く。", JA).unwrap_err();
-    assert_eq!(error.code(), "unmigratable_arc_turn");
+fn a_waxing_arc_whose_turn_cannot_be_written_becomes_a_semicircle() {
+    for (v3, v4) in [
+        (
+            "中心に、黒のペンの右上がりの上弦の弧を1本引く。",
+            "中心に、黒のペンの右上がりの半円の弧を1本引く。",
+        ),
+        (
+            "白いガッシュの雲形を中心に三つ、三日月、上弦、半円の順に並べる。",
+            "白いガッシュの雲形を中心に三つ、三日月、半円、半円の順に並べる。",
+        ),
+    ] {
+        let migration = migrate(v3, JA).unwrap_or_else(|error| panic!("{v3}: {error:?}"));
+        assert_eq!(migration.source, v4);
+        assert_eq!(migration.approximated_words.len(), 1, "{v3}");
+        let span = migration.approximated_words[0];
+        assert_eq!(&migration.source[span.start_byte..span.end_byte], "半円");
+    }
 }
 
 fn definition(fields: serde_json::Value) -> serde_json::Value {

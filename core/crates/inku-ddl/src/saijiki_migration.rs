@@ -98,10 +98,6 @@ pub enum SaijikiMigrationError {
     AmbiguousSurfaceParameter { path: String },
     /// The rewritten definition does not validate against the current edition.
     MigratedDefinitionInvalid { codes: Vec<String> },
-    /// A 上弦・下弦 arc (Saijiki v3) whose mark also turns by an angle word or a number,
-    /// or whose mark the association cannot name: the turn of the semicircle cannot be
-    /// written beside the mark's own (Saijiki v4).
-    UnmigratableArcTurn { span: SourceSpan, surface: String },
 }
 
 impl SaijikiMigrationError {
@@ -114,7 +110,6 @@ impl SaijikiMigrationError {
             Self::IndirectRetiredWord { .. } => "indirect_retired_word",
             Self::AmbiguousSurfaceParameter { .. } => "ambiguous_surface_parameter",
             Self::MigratedDefinitionInvalid { .. } => "migrated_definition_invalid",
-            Self::UnmigratableArcTurn { .. } => "unmigratable_arc_turn",
         }
     }
 }
@@ -848,34 +843,31 @@ fn migrate_document_to_current(
             .unwrap_or_default();
         let token_at = |span: SourceSpan| provisional_spans.iter().position(|each| *each == span);
         for (index, degrees) in arc_turns {
-            let unmigratable = || SaijikiMigrationError::UnmigratableArcTurn {
-                span: spans[index],
-                surface: old.tokens[index].surface.clone(),
-            };
-            let entity = entities
+            // Where the turn cannot be written beside the mark's own (an arc form the
+            // association does not give a mark, as in a list of cloud forms, or a mark that
+            // already turns by a word or a number), v3 drew no turn either: the word becomes
+            // the bare semicircle and is reported as moved to a near word (the author's
+            // choice, 2026-11-17).
+            let placement = entities
                 .iter()
                 .find(|entity| {
                     entity.proportion.arc_form.as_ref().is_some_and(|arc_form| {
                         token_at(arc_form.provenance.source.span) == Some(index)
                     })
                 })
-                .ok_or_else(unmigratable)?;
-            if entity.angle.is_some() || entity.numeric_angle.is_some() {
-                return Err(unmigratable());
-            }
-            let (at, prefix, suffix) = match language {
-                ResolvedInstructionLanguage::Ja => {
-                    let first = entity_word_spans(entity)
+                .filter(|entity| entity.angle.is_none() && entity.numeric_angle.is_none())
+                .and_then(|entity| match language {
+                    ResolvedInstructionLanguage::Ja => entity_word_spans(entity)
                         .into_iter()
                         .filter_map(token_at)
                         .min()
-                        .ok_or_else(unmigratable)?;
-                    (first, format!("回転{degrees}度の"), String::new())
-                }
-                ResolvedInstructionLanguage::En => {
-                    let head = token_at(entity.head.source().span).ok_or_else(unmigratable)?;
-                    (head, String::new(), format!(" rotated {degrees} degrees"))
-                }
+                        .map(|first| (first, format!("回転{degrees}度の"), String::new())),
+                    ResolvedInstructionLanguage::En => token_at(entity.head.source().span)
+                        .map(|head| (head, String::new(), format!(" rotated {degrees} degrees"))),
+                });
+            let Some((at, prefix, suffix)) = placement else {
+                approximated.insert(index);
+                continue;
             };
             let written = replacements
                 .get(&at)

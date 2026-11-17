@@ -176,6 +176,34 @@ fn plan_term(category_key: &str, word: &crate::SaijikiWordAsset) -> Option<(Stri
     ))
 }
 
+/// Whether a layer's mark has neither a fill nor a textured face, as the compiler lowers it:
+/// an explicitly empty surface, or a line, a free line or an open arc whose surface is not
+/// one of the marks a stroke keeps (粒・刷き). A closed shape without a surface is filled.
+fn digital_mark_is_bare(layer: &WorkPlanLayer) -> bool {
+    let surface = layer.attribute(WorkPlanSlot::Surface);
+    if surface == Some("empty") {
+        return true;
+    }
+    let open = match layer.shape.as_str() {
+        "line" | "free_line" => true,
+        "arc" => !matches!(
+            layer.attribute(WorkPlanSlot::Proportion),
+            Some("semicircle" | "crescent")
+        ),
+        _ => false,
+    };
+    open && !matches!(surface, Some("grain" | "sweep"))
+        && !(layer.shape == "arc" && surface == Some("flat"))
+}
+
+/// Whether the printer leaves out a layer's handling: a digital mark with neither a fill nor
+/// a textured face does not show it (Saijiki v4), and the compiler would leave it out.
+fn handling_unseen(layer: &WorkPlanLayer, slot: WorkPlanSlot) -> bool {
+    slot == WorkPlanSlot::Handling
+        && layer.attribute(WorkPlanSlot::Tool) == Some("digital")
+        && digital_mark_is_bare(layer)
+}
+
 /// The plan slot of a きめ word: the size (細かい・粗い) or the packing (密な・疎な) of a
 /// named texture, two slots in Saijiki v4.
 fn kime_slot(slot: WorkPlanSlot, canonical: &str) -> WorkPlanSlot {
@@ -877,6 +905,15 @@ pub fn normalize_work_plan_with_plugins(
                 }
             }
         }
+        // The digital tool draws a mark with neither a fill nor a textured face from grid
+        // cells whose tone does not follow the handling, and the compiler leaves the word
+        // out (Saijiki v4); the plan does not print it there.
+        if out.attribute(WorkPlanSlot::Tool) == Some("digital")
+            && digital_mark_is_bare(&out)
+            && let Some(value) = out.attributes.remove(&WorkPlanSlot::Handling)
+        {
+            note(Some(index), "handling", value, "unsupported_for_tool");
+        }
         plan.layers.push(out);
     }
     (plan, diagnostics)
@@ -1281,7 +1318,7 @@ fn print_layer_ja(
         ]
     };
     for &slot in order {
-        if slot == WorkPlanSlot::Color && cycle.is_some() {
+        if slot == WorkPlanSlot::Color && cycle.is_some() || handling_unseen(layer, slot) {
             continue;
         }
         if let Some(value) = layer.attribute(slot) {
@@ -1358,7 +1395,7 @@ fn print_layer_en(
         WorkPlanSlot::Surface,
         WorkPlanSlot::Angle,
     ] {
-        if slot == WorkPlanSlot::Color && cycle.is_some() {
+        if slot == WorkPlanSlot::Color && cycle.is_some() || handling_unseen(layer, slot) {
             continue;
         }
         if let Some(value) = layer.attribute(slot) {

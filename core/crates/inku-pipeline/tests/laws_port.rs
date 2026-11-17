@@ -246,20 +246,6 @@ fn the_laws_print_as_the_prototype_printed_them() {
     );
 }
 
-/// The shippo case prints its tile as circles with no fill, and a digital mark
-/// with a handling and neither a fill nor a texture is not drawn in Saijiki v4
-/// (`unsupported_surface_intensity_for_digital`, left out with a diagnostic).
-/// The cleanly-compiling checks draw that case's first layer with the pen.
-fn with_the_pen_for_digital(case: &Case, definitions: &[MacroDefinition]) -> Case {
-    let mut case = case.clone();
-    case.composed.plan.layers[0]
-        .attributes
-        .insert(WorkPlanSlot::Tool, "pen".to_owned());
-    case.source = case
-        .composed
-        .source(language(&case.lang), &work_plan_plugins(definitions));
-    case
-}
 
 /// Every printed document compiles with its run's options as cleanly as a
 /// committed document must: a Score whose lowering did not stop, no resource
@@ -276,13 +262,6 @@ fn the_printed_documents_compile_to_a_score() {
         .filter(|case| case.answer.is_some() && case.off_canvas.is_none())
         .collect();
     let failures: Vec<String> = common::par_map(&cases, |case| {
-        let drawn;
-        let case = if case.id == "ja-12-shippo" {
-            drawn = with_the_pen_for_digital(case, &definitions);
-            &drawn
-        } else {
-            case
-        };
         let (context, plugins, compiler) = context(case, None, &definitions);
         let answer = case.answer.as_ref().expect("an answer");
         let chosen = apply_laws_without_count_rule(answer, &context, &case.composed)
@@ -932,9 +911,6 @@ fn a_pattern_keeps_the_texture_words_only_with_the_texture() {
             .find(|case| case.id == id)
             .expect("the case")
             .clone();
-        if id == "ja-12-shippo" {
-            case = with_the_pen_for_digital(&case, &definitions);
-        }
         for (slot, value) in [
             (WorkPlanSlot::Surface, texture),
             (WorkPlanSlot::Fineness, "packed"),

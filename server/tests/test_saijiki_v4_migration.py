@@ -72,7 +72,12 @@ def test_v3_document_and_history_report_approximation_and_v4_is_untouched(tmp_pa
         connection.exec_driver_sql("UPDATE variation_authority SET source=?,document_json=?,ddl_digest=?", (source, json.dumps(doc, ensure_ascii=False), digest))
         connection.exec_driver_sql("UPDATE pipeline_history_links SET ddl_digest=?,fork_context_bytes=?,fork_context_digest=?", (digest, raw, hashlib.sha256(raw).hexdigest()))
         doc4 = {"source": "赤い円を置く。", "language": "ja", "macro_locks": [], "saijiki": "inku.saijiki.v4"}
-        connection.exec_driver_sql("INSERT INTO variation_authority (owner_id,variation_id,protocol_version,revision,origin,authority,source,document_json,ddl_digest,authority_digest,updated_at) SELECT owner_id, 'v4', protocol_version, revision, origin, authority, ?, ?, ?, authority_digest, updated_at FROM variation_authority WHERE variation_id='v'", (doc4["source"], json.dumps(doc4, ensure_ascii=False), hashlib.sha256(doc4["source"].encode()).hexdigest()))
+        from inku_server.persistence.schema import VariationAuthorityRow
+        connection.execute(VariationAuthorityRow.__table__.insert().values(
+            owner_id="u", variation_id="v4", protocol_version="inku.variation-authority.v1",
+            revision="1", origin="user_authored_ddl", authority="ddl_authoritative", source=doc4["source"],
+            document_json=json.dumps(doc4, ensure_ascii=False), ddl_digest=hashlib.sha256(doc4["source"].encode()).hexdigest(),
+            authority_digest="0" * 64, updated_at=1))
     engine.dispose()
     report = _migrate_once_database(database, migrate_unit_v4)
     assert {(x["kind"], x["id"]) for x in report["approximated_word_records"]} == {("history", "h:ddl"), ("variation_documents", "u/v")}

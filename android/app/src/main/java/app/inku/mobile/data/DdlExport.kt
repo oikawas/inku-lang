@@ -46,7 +46,7 @@ object DdlExport {
         }
         return DdlSource.putJson(JSONObject(), source, ddlSourceOrigin)
             .put("schema", SCHEMA)
-            .put("saijiki", "inku.saijiki.v3")
+            .put("saijiki", "inku.saijiki.v4")
             .put("language", language)
             .put("plugins", plugins)
             .put("exported_from", exportedFrom)
@@ -77,13 +77,17 @@ object DdlExport {
         var selected = DdlSource.fromJson(file)
         var migratedChanges = 0
         val edition = file.optString("saijiki")
-        require(edition.isEmpty() || edition == "inku.saijiki.v2" || edition == "inku.saijiki.v3") { "other_edition" }
-        if (edition != "inku.saijiki.v3") {
+        require(edition.isEmpty() || edition in setOf("inku.saijiki.v2", "inku.saijiki.v3", "inku.saijiki.v4")) { "other_edition" }
+        if (edition != "inku.saijiki.v4") {
             val items = file.optJSONArray("plugins") ?: JSONArray()
             require(items.length() <= MAX_IMPORTED_PLUGINS) { "ddl_export_too_many_plugins" }
             val definitions = JSONArray()
             for (index in 0 until items.length()) definitions.put(items.getJSONObject(index).getJSONObject("definition"))
-            fun ask(input: JSONObject): JSONObject = JSONObject(NativePipelineBridge.migrateSaijikiV2(input.toString().toByteArray(Charsets.UTF_8)).toString(Charsets.UTF_8))
+            fun ask(input: JSONObject): JSONObject {
+                val bytes = input.toString().toByteArray(Charsets.UTF_8)
+                val output = if (edition == "inku.saijiki.v3") NativePipelineBridge.migrateSaijikiV3(bytes) else NativePipelineBridge.migrateSaijikiV2(bytes)
+                return JSONObject(output.toString(Charsets.UTF_8))
+            }
             val first = ask(JSONObject().put("definitions", definitions))
             require(!first.has("error")) { "invalid_export_definitions" }
             val entries = first.getJSONArray("definitions")
@@ -98,7 +102,7 @@ object DdlExport {
                 ?: InstructionLanguages.ofDdl(selected.ddl.orEmpty(), null, null, fallbackLanguage)
             val answer = ask(JSONObject().put("definitions", definitions).put("document", JSONObject()
                 .put("source", selected.ddl.orEmpty()).put("language", migrationLanguage)
-                .put("saijiki", "inku.saijiki.v2").put("macro_locks", locks)))
+                .put("saijiki", if (edition == "inku.saijiki.v3") edition else "inku.saijiki.v2").put("macro_locks", locks)))
             require(!answer.has("error")) { "saijiki_export_migration_refused" }
             val document = answer.getJSONObject("document")
             require(!document.has("error")) { "saijiki_export_migration_refused" }

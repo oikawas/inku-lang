@@ -22,7 +22,7 @@ AFFINITIES = {"INTEGER", "REAL", "TEXT", "BLOB", "NUMERIC"}
 CLASSIFICATIONS = {"required_common", "optional_common", "host_only"}
 # The Swift database's own version (InkuDatabase.swift's last migration), independent of the
 # logical contract, Room and the Server registry.
-SWIFT_SCHEMA_VERSION = 9
+SWIFT_SCHEMA_VERSION = 10
 CONSTRAINT_STATUSES = {"enforced", "gap"}
 CONSTRAINT_MECHANISMS = {"database", "application_transaction", "none"}
 SERVER_AFFINITIES = {

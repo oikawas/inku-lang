@@ -63,7 +63,7 @@ enum CoreCheck {
         let compileInput = try bytes([
             "document": [
                 "source": "place one red circle at center.", "language": "en",
-                "macro_locks": [], "saijiki": "inku.saijiki.v3",
+                "macro_locks": [], "saijiki": "inku.saijiki.v4",
             ],
             "definitions": [], "compiler": compiler,
         ])

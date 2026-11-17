@@ -281,23 +281,89 @@ pub struct CoreModifierSurfaceForms {
     pub relative_scale: &'static [(&'static str, CoreModifierValue)],
 }
 
+/// The modifier forms the current edition reads.
 pub fn core_modifier_surface_forms(
     language: ResolvedInstructionLanguage,
 ) -> CoreModifierSurfaceForms {
-    match language {
-        ResolvedInstructionLanguage::Ja => CoreModifierSurfaceForms {
-            regular: "正形",
-            sides_prefix: "辺数",
-            thinness: THINNESS_SURFACES_JA,
-            relative_scale: RELATIVE_SCALE_SURFACES_JA,
-        },
-        ResolvedInstructionLanguage::En => CoreModifierSurfaceForms {
-            regular: "regular",
-            sides_prefix: "sides ",
-            thinness: THINNESS_SURFACES_EN,
-            relative_scale: RELATIVE_SCALE_SURFACES_EN,
-        },
+    core_modifier_surface_forms_in(SaijikiEdition::CURRENT, language)
+}
+
+/// The modifier forms one edition reads. Saijiki v4 owns its thinness and relative-scale
+/// words (ふとさ・おおきさ) and the forms are built from them; the retired editions read the
+/// fixed tables the migration needs to recognize their documents.
+pub(crate) fn core_modifier_surface_forms_in(
+    edition: SaijikiEdition,
+    language: ResolvedInstructionLanguage,
+) -> CoreModifierSurfaceForms {
+    let (regular, sides_prefix) = match language {
+        ResolvedInstructionLanguage::Ja => ("正形", "辺数"),
+        ResolvedInstructionLanguage::En => ("regular", "sides "),
+    };
+    let (thinness, relative_scale) = match (edition, language) {
+        (SaijikiEdition::V4, _) => (
+            asset_core_modifier_forms(language, "thinness"),
+            asset_core_modifier_forms(language, "relative_scale"),
+        ),
+        (_, ResolvedInstructionLanguage::Ja) => (THINNESS_SURFACES_JA, RELATIVE_SCALE_SURFACES_JA),
+        (_, ResolvedInstructionLanguage::En) => (THINNESS_SURFACES_EN, RELATIVE_SCALE_SURFACES_EN),
+    };
+    CoreModifierSurfaceForms {
+        regular,
+        sides_prefix,
+        thinness,
+        relative_scale,
     }
+}
+
+/// The surfaces of the current asset's words of one core modifier dimension, longest first
+/// so a longer form is tried before a shorter one it contains (`very small` before `small`).
+/// The canonical surface of a word comes before its other forms.
+fn asset_core_modifier_forms(
+    language: ResolvedInstructionLanguage,
+    dimension: &str,
+) -> &'static [(&'static str, CoreModifierValue)] {
+    use std::sync::OnceLock;
+    static FORMS: OnceLock<[Vec<(&'static str, CoreModifierValue)>; 4]> = OnceLock::new();
+    let forms = FORMS.get_or_init(|| {
+        let build = |language: ResolvedInstructionLanguage, dimension: &str| {
+            let mut forms = crate::saijiki::saijiki_asset()
+                .categories
+                .iter()
+                .filter(|category| category.core_modifier.as_deref() == Some(dimension))
+                .flat_map(|category| &category.words)
+                .flat_map(|word| {
+                    let value = word
+                        .core_modifier_value
+                        .as_deref()
+                        .and_then(|id| CoreModifierValue::from_semantic_ref(dimension, id))
+                        .expect("embedded core modifier words must name a modifier value");
+                    parser_candidate_surfaces(word, language)
+                        .into_iter()
+                        .map(move |surface| match surface {
+                            std::borrow::Cow::Borrowed(surface) => (surface, value),
+                            std::borrow::Cow::Owned(_) => {
+                                unreachable!("core modifier words have no derived English forms")
+                            }
+                        })
+                })
+                .collect::<Vec<_>>();
+            forms.sort_by_key(|(surface, _)| std::cmp::Reverse(surface.chars().count()));
+            forms
+        };
+        [
+            build(ResolvedInstructionLanguage::Ja, "thinness"),
+            build(ResolvedInstructionLanguage::Ja, "relative_scale"),
+            build(ResolvedInstructionLanguage::En, "thinness"),
+            build(ResolvedInstructionLanguage::En, "relative_scale"),
+        ]
+    });
+    let index = match (language, dimension) {
+        (ResolvedInstructionLanguage::Ja, "thinness") => 0,
+        (ResolvedInstructionLanguage::Ja, _) => 1,
+        (ResolvedInstructionLanguage::En, "thinness") => 2,
+        (ResolvedInstructionLanguage::En, _) => 3,
+    };
+    &forms[index]
 }
 
 const PRIORITY_FUNCTION: u8 = 1;
@@ -413,6 +479,7 @@ pub(crate) fn parse_neutral_lexemes_in(
             }
         }
     }
+    read_shared_surfaces_by_place(edition, source, &mut tokens, &diagnostics);
 
     NeutralParseResult {
         tokens,
@@ -686,6 +753,8 @@ fn asset_relation_candidates(
     static V2_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
     static V3_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
     static V3_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V4_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V4_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
     let cache = match (edition, language) {
         (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
         (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
@@ -693,6 +762,8 @@ fn asset_relation_candidates(
         (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::Ja) => &V4_JA,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::En) => &V4_EN,
     };
     cache.get_or_init(|| {
         let mut entries = Vec::new();
@@ -731,6 +802,92 @@ fn asset_relation_candidates(
     })
 }
 
+/// Read each word whose surface two categories share (Saijiki v4: じ and おもて メゾチント)
+/// by where it stands (SPEC §3.3): a sentence of the word alone, like `メゾチント。`, is the
+/// partner's word (the ground), and the word anywhere else, like `メゾチントの円`, is the
+/// sharing word (the surface). The lexer delivered the partner's word.
+fn read_shared_surfaces_by_place(
+    edition: SaijikiEdition,
+    source: &str,
+    tokens: &mut [NeutralToken],
+    diagnostics: &[NeutralDiagnostic],
+) {
+    let asset = edition.asset();
+    let sharing = asset
+        .categories
+        .iter()
+        .flat_map(|category| {
+            category.words.iter().filter_map(move |word| {
+                let partner_key = word.shared_surface_with.as_deref()?;
+                crate::saijiki::shared_surface_partner(asset, partner_key, word)?;
+                Some((partner_key, category.key.as_str(), word.surface_ja.as_str()))
+            })
+        })
+        .collect::<Vec<_>>();
+    if sharing.is_empty() {
+        return;
+    }
+    let sentence_of = |byte: usize| {
+        let start = source[..byte]
+            .char_indices()
+            .rev()
+            .find(|(index, character)| ends_sentence(source, *index, *character))
+            .map_or(0, |(index, character)| index + character.len_utf8());
+        let end = source[byte..]
+            .char_indices()
+            .find(|(offset, character)| ends_sentence(source, byte + offset, *character))
+            .map_or(source.len(), |(offset, _)| byte + offset);
+        (start, end)
+    };
+    let readings = tokens
+        .iter()
+        .enumerate()
+        .filter_map(|(index, token)| {
+            let NeutralTokenKind::SaijikiWord {
+                category_key,
+                canonical_surface_ja,
+                ..
+            } = &token.kind
+            else {
+                return None;
+            };
+            let (_, sharing_key, _) = sharing.iter().find(|(partner_key, _, surface_ja)| {
+                partner_key == category_key && surface_ja == canonical_surface_ja
+            })?;
+            let (start, end) = sentence_of(token.span.start_byte);
+            let inside = |span: SourceSpan| start <= span.start_byte && span.end_byte <= end;
+            let alone = tokens.iter().enumerate().all(|(other, candidate)| {
+                other == index
+                    || !inside(candidate.span)
+                    || matches!(candidate.kind, NeutralTokenKind::FunctionWord)
+            }) && !diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.recognized && inside(diagnostic.span));
+            (!alone).then_some((index, *sharing_key))
+        })
+        .collect::<Vec<_>>();
+    for (index, sharing_key) in readings {
+        if let NeutralTokenKind::SaijikiWord { category_key, .. } = &mut tokens[index].kind {
+            *category_key = sharing_key.to_owned();
+        }
+    }
+}
+
+/// Whether the character at `index` ends a sentence. A full stop between digits is a
+/// decimal point.
+fn ends_sentence(source: &str, index: usize, character: char) -> bool {
+    match character {
+        '。' | '！' | '!' | '？' | '?' | '\n' | '\r' => true,
+        '.' => {
+            let before = source[..index].chars().next_back();
+            let after = source[index + 1..].chars().next();
+            !(before.is_some_and(|c| c.is_ascii_digit())
+                && after.is_some_and(|c| c.is_ascii_digit()))
+        }
+        _ => false,
+    }
+}
+
 fn asset_word_candidates(
     edition: SaijikiEdition,
     language: ResolvedInstructionLanguage,
@@ -742,6 +899,8 @@ fn asset_word_candidates(
     static V2_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
     static V3_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
     static V3_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V4_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V4_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
     let cache = match (edition, language) {
         (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
         (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
@@ -749,11 +908,23 @@ fn asset_word_candidates(
         (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::Ja) => &V4_JA,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::En) => &V4_EN,
     };
     cache.get_or_init(|| {
         let mut entries = Vec::new();
-        for category in &edition.asset().categories {
+        // Core modifier words (ふとさ・おおきさ) are read by the modifier grammar.
+        for category in edition
+            .asset()
+            .categories
+            .iter()
+            .filter(|category| category.core_modifier.is_none())
+        {
             for word in &category.words {
+                if word.shared_surface_with.is_some() {
+                    // Delivered as its partner's word and read by place afterwards.
+                    continue;
+                }
                 let surfaces = parser_candidate_surfaces(word, language);
                 let mut add = |surface: String, suffix| {
                     entries.push(AssetWordCandidate {
@@ -1065,7 +1236,7 @@ fn candidates_at_uncached(
         ResolvedInstructionLanguage::Ja => crate::shape_constraint::SHAPE_HEADS_JA,
         ResolvedInstructionLanguage::En => crate::shape_constraint::SHAPE_HEADS_EN,
     };
-    let modifier_forms = core_modifier_surface_forms(language);
+    let modifier_forms = core_modifier_surface_forms_in(edition, language);
     push_surface_candidate(
         edition,
         &mut candidates,

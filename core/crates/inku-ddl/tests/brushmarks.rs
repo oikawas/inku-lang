@@ -301,7 +301,15 @@ fn brushmarks_for_a_sweep_changes_only_the_texture_and_the_edition() {
     assert_eq!(after.score, rewritten);
 }
 
-const CLOSED: [&str; 5] = ["circle", "ellipse", "triangle", "square", "cloudform"];
+// Saijiki v4 offers the polygon to the plan (D10).
+const CLOSED: [&str; 6] = [
+    "circle",
+    "ellipse",
+    "triangle",
+    "square",
+    "polygon",
+    "cloudform",
+];
 
 /// The plan offers brushmarks next to sweep, and only the closed shapes take
 /// it; a line's brushmarks is dropped as a value its form does not take.
@@ -321,7 +329,7 @@ fn the_plan_offers_brushmarks_on_closed_shapes_only() {
             "stipple",
             "hatch",
             "crosshatch",
-            "aquatint"
+            "mezzotint"
         ])
     );
     let capabilities = work_plan_capabilities();
@@ -337,18 +345,18 @@ fn the_plan_offers_brushmarks_on_closed_shapes_only() {
             assert!(!slots[&WorkPlanSlot::Fineness].is_empty(), "{form}");
         }
     }
-    assert_eq!(closed, 23);
+    assert_eq!(closed, 26);
 
     let (plan, diagnostics) = normalize_work_plan(&json!({"layers": [
         {"shape": "square", "action": "place", "count": 1, "surface": "brushmarks",
-         "fineness": "packed", "underlayer": "underpainted"},
+         "density": "packed", "underlayer": "underpainted"},
         {"shape": "line", "action": "draw", "count": 1, "surface": "brushmarks"},
     ]}));
     let attribute = |layer: usize, slot: WorkPlanSlot| {
         plan.layers[layer].attributes.get(&slot).map(String::as_str)
     };
     assert_eq!(attribute(0, WorkPlanSlot::Surface), Some("brushmarks"));
-    assert_eq!(attribute(0, WorkPlanSlot::Fineness), Some("packed"));
+    assert_eq!(attribute(0, WorkPlanSlot::Density), Some("packed"));
     assert_eq!(attribute(0, WorkPlanSlot::Underlayer), Some("underpainted"));
     assert_eq!(attribute(1, WorkPlanSlot::Surface), None);
     let reasons: Vec<(Option<usize>, &str, &str)> = diagnostics

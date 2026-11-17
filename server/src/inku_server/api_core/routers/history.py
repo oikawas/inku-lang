@@ -310,7 +310,7 @@ def _line_animation_request(owner: str, item: dict, show_ddl: bool) -> dict:
         if not lock["digest"].startswith("sha256:"):
             lock["digest"] = "sha256:" + lock["digest"]
     return {"document": {"source": item.get("ddl") or "", "language": item.get("instruction_lang_resolved") or config.get("language") or "ja",
-                         "macro_locks": locks, "saijiki": "inku.saijiki.v3"},
+                         "macro_locks": locks, "saijiki": "inku.saijiki.v4"},
             "definitions": config.get("definitions", []), "compiler": compiler, "options": render["options"],
             "clip": render["clip"], "saved_svg": item["svg"], "show_ddl": show_ddl}
 

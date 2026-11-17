@@ -4,7 +4,7 @@ import android.app.Application
 import android.util.Log
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.RoomV10ResetCoordinator
-import app.inku.mobile.data.db.SaijikiV3Migration
+import app.inku.mobile.data.db.SaijikiMigration
 import app.inku.mobile.data.db.PluginNamesV2Migration
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.pipeline.NativePipelineBridge
@@ -16,8 +16,8 @@ import kotlinx.coroutines.launch
 
 private const val MIGRATION_LOG_TAG = "InkuMigration"
 
-/** The report of the Saijiki v2 migration, kept in the app's files for the count. */
-internal const val MIGRATION_REPORT = "saijiki-v3-migration.json"
+/** The report of the Saijiki v4 migration, kept in the app's files for the count. */
+internal const val MIGRATION_REPORT = "saijiki-v4-migration.json"
 
 class InkuApplication : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -92,20 +92,20 @@ class InkuApplication : Application() {
     }
 
     /**
-     * Moves the saved records to Saijiki v2 once, before any screen reads a work.
+     * Moves the saved records to Saijiki v4 once, before any screen reads a work.
      * A failure writes nothing and is logged; the app opens, an unmoved work is
      * refused with `saijiki_migration_required`, and the next start tries again.
      */
     private fun migrateSavedRecords(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         val report = runCatching {
-            SaijikiV3Migration(NativePipelineBridge::migrateSaijikiV1, NativePipelineBridge::migrateSaijikiV2, discardExecutions = true).runOnce(db)
+            SaijikiMigration(NativePipelineBridge::migrateSaijikiV1, NativePipelineBridge::migrateSaijikiV2, discardExecutions = true, migrateV3 = NativePipelineBridge::migrateSaijikiV3).runOnce(db)
         }.getOrElse { error ->
-            Log.e(MIGRATION_LOG_TAG, "Saijiki v3 migration failed; nothing was written", error)
+            Log.e(MIGRATION_LOG_TAG, "Saijiki v4 migration failed; nothing was written", error)
             return
         }
         if (report != null) {
             runCatching { filesDir.resolve(MIGRATION_REPORT).writeText(report.toString(1)) }
-            Log.i(MIGRATION_LOG_TAG, "Saijiki v3 migration written: ${report.optLong("total_ms")} ms, " +
+            Log.i(MIGRATION_LOG_TAG, "Saijiki v4 migration written: ${report.optLong("total_ms")} ms, " +
                 "${report.optInt("statements")} statements, ${report.optJSONArray("refused_records")?.length() ?: 0} refused records")
         }
         val pluginReport = runCatching { PluginNamesV2Migration(NativePipelineBridge::migratePluginNames).runOnce(db) }

@@ -12,11 +12,7 @@ use serde::{
 };
 use sha2::{Digest, Sha256};
 
-use crate::{
-    MacroInvocation,
-    saijiki::{canonical_semantic_id, canonical_wire_id},
-    saijiki_asset,
-};
+use crate::{MacroInvocation, saijiki::canonical_semantic_id, saijiki_asset};
 
 /// Exact schema and digest domain for this semantic definition edition.
 pub const MACRO_DEFINITION_SCHEMA_ID: &str = "inku.macro-definition.v1";
@@ -75,16 +71,15 @@ pub fn project_macro_semantic_ref(
             };
             let mut words = BTreeMap::new();
             for word in &asset.words {
-                let lexical = word
-                    .score_value
-                    .clone()
-                    .or_else(|| word.surface_en.as_deref().map(canonical_wire_id));
+                let lexical = crate::saijiki::word_id(word);
                 let projection = lexical
                     .and_then(|id| {
                         canonical_semantic_id(asset_key, &id)
                             .expect("embedded Saijiki semantic aliases must validate")
                     })
                     .map(|canonical_id| {
+                        // A word Saijiki v4 moved keeps its Macro semantic category.
+                        let category = word.semantic_category.as_deref().unwrap_or(category);
                         debug_assert!(known_semantic_id(category, &canonical_id));
                         MacroSemanticRefProjection {
                             category: category.to_owned(),
@@ -1174,8 +1169,9 @@ impl MacroDefinition {
     }
 
     /// The identity a saved definition was locked by under a retired Saijiki edition
-    /// (`inku.saijiki.v1` or `inku.saijiki.v2`): its canonical form with each semantic word
-    /// spelled through that edition's asset, as the cores of that edition computed it. It is
+    /// (`inku.saijiki.v1`, `inku.saijiki.v2` or `inku.saijiki.v3`): its canonical form with
+    /// each semantic word spelled through that edition's asset, as the cores of that edition
+    /// computed it. It is
     /// not validated against the current vocabulary, whose retired words it may hold; a
     /// migration compares it with a saved lock before moving the lock (SPEC §3.3). `None`
     /// for another edition, or when a word is not in that edition or a value does not read.
@@ -1183,6 +1179,7 @@ impl MacroDefinition {
         let edition = match edition {
             crate::saijiki::SAIJIKI_V1_ASSET_ID => crate::saijiki::SaijikiEdition::V1,
             crate::saijiki::SAIJIKI_V2_ASSET_ID => crate::saijiki::SaijikiEdition::V2,
+            crate::saijiki::SAIJIKI_V3_ASSET_ID => crate::saijiki::SaijikiEdition::V3,
             _ => return None,
         };
         self.qualified_name()?;
@@ -2283,9 +2280,28 @@ pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<Stri
             crate::CoreModifierValue::from_semantic_ref(category, id)
                 .map(|value| value.as_str().to_owned())
         }
-        SemanticCategoryAuthority::Asset(asset_key) => canonical_semantic_id(asset_key, id)
-            .expect("embedded Saijiki semantic aliases must validate"),
+        // Saijiki v4 has no したじ category; its word is moved (`moved_word_semantic_id`).
+        SemanticCategoryAuthority::Asset(asset_key) => match canonical_semantic_id(asset_key, id) {
+            Ok(id) => id,
+            Err(crate::SaijikiProjectionError::MissingCategory { .. }) => None,
+            Err(error) => panic!("embedded Saijiki semantic aliases must validate: {error}"),
+        }
+        .or_else(|| moved_word_semantic_id(category, id)),
     }
+}
+
+/// A word Saijiki v4 moved to another category keeps its Macro semantic category
+/// (`semantic_category`): its id under that category, wherever the asset now holds it.
+fn moved_word_semantic_id(category: &str, id: &str) -> Option<String> {
+    saijiki_asset()
+        .categories
+        .iter()
+        .flat_map(|asset_category| &asset_category.words)
+        .find(|word| {
+            word.semantic_category.as_deref() == Some(category)
+                && crate::saijiki::word_id(word).as_deref() == Some(id)
+        })
+        .and_then(crate::saijiki::word_id)
 }
 
 fn is_ascii_identifier(value: &str) -> bool {

@@ -125,7 +125,11 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
             continue;
         }
         let role = match &token.kind {
-            NeutralTokenKind::SaijikiWord { category_key, .. } => role_for_category(category_key),
+            NeutralTokenKind::SaijikiWord {
+                category_key,
+                canonical_surface_ja,
+                ..
+            } => role_for_word(category_key, canonical_surface_ja),
             NeutralTokenKind::ConstrainedShape { .. }
             | NeutralTokenKind::CoreModifier(_)
             | NeutralTokenKind::GeometryKeyword { .. }
@@ -190,9 +194,11 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
 
     for token in deferred_tokens {
         let role = match &token.kind {
-            NeutralTokenKind::SaijikiWord { category_key, .. } => {
-                remaining_role_for_category(category_key)
-            }
+            NeutralTokenKind::SaijikiWord {
+                category_key,
+                canonical_surface_ja,
+                ..
+            } => remaining_role_for_word(category_key, canonical_surface_ja),
             NeutralTokenKind::ConstrainedShape { .. }
             | NeutralTokenKind::CoreModifier(_)
             | NeutralTokenKind::GeometryKeyword { .. }
@@ -256,6 +262,35 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
         diagnostics,
         delivery_conservation_count,
     }
+}
+
+/// The slots a word is carried by when its category has several (Saijiki v4): the arc forms
+/// of かたち modify an arc as the proportions did, and the bleeding of さばき is carried as
+/// the bleeding of ゆらぎ was. Every other word takes its category's role.
+fn moved_word_role(category_key: &str, canonical_surface_ja: &str) -> Option<RemainingRoleKind> {
+    match (
+        category_key,
+        crate::saijiki::word_facet(category_key, canonical_surface_ja),
+    ) {
+        ("katachi", Some("arc_form")) => Some(RemainingRoleKind::Proportion),
+        ("sabaki", Some("spread")) => Some(RemainingRoleKind::Fluctuation),
+        _ => None,
+    }
+}
+
+fn role_for_word(category_key: &str, canonical_surface_ja: &str) -> Option<CoreRoleKind> {
+    if moved_word_role(category_key, canonical_surface_ja).is_some() {
+        return None;
+    }
+    role_for_category(category_key)
+}
+
+fn remaining_role_for_word(
+    category_key: &str,
+    canonical_surface_ja: &str,
+) -> Option<RemainingRoleKind> {
+    moved_word_role(category_key, canonical_surface_ja)
+        .or_else(|| remaining_role_for_category(category_key))
 }
 
 fn role_for_category(category_key: &str) -> Option<CoreRoleKind> {

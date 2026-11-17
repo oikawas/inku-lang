@@ -56,9 +56,11 @@ pub mod saijiki;
 pub mod saijiki_migration;
 pub use saijiki_migration::{
     InvalidDocumentStage, SAIJIKI_V1_MIGRATION_SCHEMA_ID, SAIJIKI_V2_MIGRATION_SCHEMA_ID,
-    SaijikiDefinitionMigration, SaijikiDocumentMigration, SaijikiMigrationEdit,
-    SaijikiMigrationError, migrate_document_from_saijiki_v1, migrate_document_from_saijiki_v2,
+    SAIJIKI_V3_MIGRATION_SCHEMA_ID, SaijikiDefinitionMigration, SaijikiDocumentMigration,
+    SaijikiMigrationEdit, SaijikiMigrationError, migrate_document_from_saijiki_v1,
+    migrate_document_from_saijiki_v2, migrate_document_from_saijiki_v3,
     migrate_macro_definition_from_saijiki_v1, migrate_macro_definition_from_saijiki_v2,
+    migrate_macro_definition_from_saijiki_v3,
 };
 mod score_angle;
 pub mod score_diagnostics;
@@ -228,12 +230,13 @@ pub use saijiki::{
     CanonicalPreviousReference, CanonicalRelationForm, CanonicalRelationIdentity,
     CanonicalRelationKind, DisplayCategoryProjection, MarkerClassProjection, MarkerOrder,
     ReferenceCategoryProjection, RelationAsset, RelationLiteralProjection, SAIJIKI_ASSET_BYTES,
-    SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, SAIJIKI_V2_ASSET_ID, SaijikiAsset, SaijikiCategoryAsset,
-    SaijikiDerivedProjection, SaijikiPhysicalDescriptionAsset, SaijikiProjectionError,
-    SaijikiScoreWireMaps, SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset,
-    saijiki_asset_sha256_hex, saijiki_derived_projection, saijiki_derived_projection_from_asset,
-    saijiki_marker_class_table, saijiki_relation_literal_table, saijiki_score_wire_maps,
-    saijiki_tool_guidance, saijiki_v2_asset,
+    SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, SAIJIKI_V2_ASSET_ID, SAIJIKI_V3_ASSET_ID, SaijikiAsset,
+    SaijikiBundleAsset, SaijikiCategoryAsset, SaijikiDerivedProjection,
+    SaijikiPhysicalDescriptionAsset, SaijikiProjectionError, SaijikiScoreWireMaps,
+    SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset, saijiki_asset_sha256_hex,
+    saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
+    saijiki_relation_literal_table, saijiki_score_wire_maps, saijiki_tool_guidance,
+    saijiki_v2_asset,
 };
 pub use score_diagnostics::{
     ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,

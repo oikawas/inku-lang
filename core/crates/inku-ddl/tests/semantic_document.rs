@@ -470,7 +470,7 @@ fn multi_head_continuation_predicate_occurrences_have_one_exclusive_owner() {
     for (language, source, expected_claims) in [
         (
             ResolvedInstructionLanguage::Ja,
-            "線 円。線は 円は 細かく 揺れる。",
+            "線 円。線は 円は 小さく 揺れる。",
             2,
         ),
         (
@@ -805,7 +805,7 @@ fn marked_subject_predicate_continues_the_unique_prior_entity() {
     for (language, source) in [
         (
             ResolvedInstructionLanguage::Ja,
-            "中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。",
+            "中心に鉛筆の細い線をひとつ置く。線は小さく揺れる。",
         ),
         (
             ResolvedInstructionLanguage::En,
@@ -969,7 +969,7 @@ fn continuation_target_cardinality_and_boundary_fail_closed_without_order_fallba
 #[test]
 fn leading_marked_predicate_is_missing_target_but_head_only_remains_independent() {
     for (language, source) in [
-        (ResolvedInstructionLanguage::Ja, "線は細かく揺れる。"),
+        (ResolvedInstructionLanguage::Ja, "線は小さく揺れる。"),
         (
             ResolvedInstructionLanguage::En,
             "the line swaying narrowly.",
@@ -1656,8 +1656,8 @@ fn declared_core_values_keep_exact_non_asset_owner_and_ordinary_modifiers() {
         }),
     );
     for source in [
-        "thin small ｛Core｝! extra-fine large circle.",
-        "small ｛Core｝ thin. extra-fine large circle.",
+        "thin small ｛Core｝! very thin large circle.",
+        "small ｛Core｝ thin. very thin large circle.",
     ] {
         let document = document_macro_document(source, std::slice::from_ref(&definition));
         let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();

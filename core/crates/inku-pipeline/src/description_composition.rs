@@ -1880,7 +1880,7 @@ pub fn composition_targets(
                 let degree = text(value, "so_degree");
                 out.push(if ja {
                     format!(
-                        "{thing}の形を{split}、{order}の順に描き分ける（真は揺らぎ無し、行は細かくゆるやかに波打つ、草は大きく揺れる。草の度合い {degree}）。{thing}は、3 つ以上の同じ形の列か格子を 1 文で書く。道具がその文から描き分ける（C6 真行草）。"
+                        "{thing}の形を{split}、{order}の順に描き分ける（真は揺らぎ無し、行は小さくゆるやかに波打つ、草は大きく揺れる。草の度合い {degree}）。{thing}は、3 つ以上の同じ形の列か格子を 1 文で書く。道具がその文から描き分ける（C6 真行草）。"
                     )
                 } else {
                     format!(

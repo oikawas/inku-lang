@@ -1099,6 +1099,11 @@ fn record_entity_associations(
             nested_field("surface", "fineness"),
         ),
         (
+            "surface_density",
+            entity.surface.density.as_ref(),
+            nested_field("surface", "density"),
+        ),
+        (
             "surface_underlayer",
             entity.surface.underlayer.as_ref(),
             nested_field("surface", "underlayer"),

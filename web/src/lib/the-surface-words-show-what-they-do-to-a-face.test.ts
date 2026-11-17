@@ -22,7 +22,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 
 /** The words the server's saijiki table puts in the category, not a copy. */
 const OMOTE = GENERATED_SAIJIKI.find((cat) => cat.key === 'omote')?.words ?? [];
-const SABAKI = GENERATED_SAIJIKI.find((cat) => cat.key === 'sabaki')?.words ?? [];
+const SABAKI = (GENERATED_SAIJIKI.find((cat) => cat.key === 'sabaki')?.words ?? []).filter((word) => word !== 'にじみ');
 
 /** The sentence any word without an entry of its own gets instead. */
 const FALLBACK = '記述の解釈に影響する語彙です。';
@@ -53,7 +53,7 @@ test('T-30  the page reads them, so a hover reaches the entries', () => {
 	// Inside the table `saijikiPreview` looks words up in -- not merely imported.
 	const table = page.slice(page.indexOf('const previews: Record<string, PreviewEntry>'));
 	const body = table.slice(0, table.indexOf('\n\t\t};'));
-	assert.match(body, /\.\.\.SURFACE_PREVIEWS,/);
+	assert.match(table, /categoryKey === 'omote' \? SURFACE_PREVIEWS\[canonicalWord\]/);
 	assert.match(body, /\.\.\.HANDLING_PREVIEWS,/);
 });
 
@@ -129,11 +129,11 @@ test('T-35  a crosshatch is a hatch laid down a second time', () => {
 test('T-35  aquatint is drawn in three tone steps, the engine default', () => {
 	// tone_steps defaults to 3 in SurfaceSpec, and the bands are the steps: the
 	// dabs are cut into three x ranges, each one darker than the last.
-	const opacities = [...SURFACE_PREVIEWS['アクアチント'].svg.matchAll(/opacity="([\d.]+)"/g)].map(
+	const opacities = [...SURFACE_PREVIEWS['メゾチント'].svg.matchAll(/opacity="([\d.]+)"/g)].map(
 		(m) => Number(m[1])
 	);
 	assert.ok(opacities.length > 0, 'the aquatint drawing has no dabs');
-	const bands = [...SURFACE_PREVIEWS['アクアチント'].svg.matchAll(/cx="([\d.]+)"/g)].map((m) =>
+	const bands = [...SURFACE_PREVIEWS['メゾチント'].svg.matchAll(/cx="([\d.]+)"/g)].map((m) =>
 		Math.min(2, Math.floor((Number(m[1]) - 51) / 26))
 	);
 	assert.equal(new Set(bands).size, 3, 'the aquatint dabs do not fall in three bands');

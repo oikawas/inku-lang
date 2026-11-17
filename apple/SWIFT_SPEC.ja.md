@@ -1,5 +1,11 @@
 # inku Swift 実装仕様
 
+## 2026-11-17 歳時記 v4 と DB v10
+
+歳時記の窓と記述欄は、共有資産から束の順・見出しと類の並びを読み、同じ束の下に類を示す。あいだの束は資産の `relations_bundle`（現在 `where`）から読み、未定義の束は断る。画面比は `ground` の「じ」の末尾。語の説明は資産の `description` を優先し、無ければ Web の見本の効果の文に戻る。プラグインの語は最後に置く。
+
+macOS・iOS は歳時記 v4 を使う。DB v10 は検証済みの控えを作ってから v3 の保存作品を共通 core で移し、断った作品、寄せた語の位置と定義内で寄せた参照の位置を記録する。Score・SVG・実行記録と effect の digest は変えない。v3 の DDL 書き出しも読み込み時に移し、変更数、寄せた語の位置と定義内で寄せた参照の数を結果に残す。寄せた語は画面に表示しない。
+
 macOS の履歴帯は矢印キーでページをまたいで移動し、キャンバスとライブラリの `#` は作品 UUID をコピーする。生成情報にはコメントと段ごとのプロンプト digest を表示し、診断は Web の文で示す。自動バックアップの保持世代は確認のうえ削除または復元でき、復元前には現行 DB の控えを残す。作品編集メニューは Web と同じ3群・10項目で、AI自動推敲プロセスと取り合わせは無い（2026-11-13）。推敲の子はすべて通常の履歴に保存し、既存の中間作品は DB 移行で通常の履歴へ移す。移行前に SQLite の控えを作る。
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
@@ -1291,7 +1297,7 @@ provider requestの開始前にpending claimを保存し、旧responseが取消�
 
 ### 保存、読出し、保存Scoreの再演奏
 
-保存の意味は[共通保存契約](../persistence/README.ja.md)、[contract.json](../persistence/contract.json)、[論理projection v2](../persistence/reference/logical-projection-v2.sql)に従う。Swiftの物理schemaは独立しており、現行は v9 である。[bundled SQL の v1 土台](Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)と順次 migration、[v1 schema export](../persistence/reference/swift-schema-v1.json)、[record mapping](Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)を参照する。物理schemaの版をportable契約や他hostのschema版と同一視しない。
+保存の意味は[共通保存契約](../persistence/README.ja.md)、[contract.json](../persistence/contract.json)、[論理projection v2](../persistence/reference/logical-projection-v2.sql)に従う。Swiftの物理schemaは独立しており、現行は v10 である。[bundled SQL の v1 土台](Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)と順次 migration、[v10 schema export](../persistence/reference/swift-schema-v10.json)、[record mapping](Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)を参照する。物理schemaの版をportable契約や他hostのschema版と同一視しない。
 
 保存・表示・編集・再演奏の指示書本文は`ddl`だけとする。optionalな`ddl_source_origin`は旧本文を採用した由来であり、第二の本文やauthorityではない。NULLと空文字、未知のstate／fallbackやJSON項目、元の改行と空白を保持する。`source_text`がNULLの作品は表示時に`input`へfallbackできるが、保存値を変更しない。seedは十進TEXT、`at`はUnix epoch millisecondsで保持する。
 

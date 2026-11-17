@@ -318,7 +318,8 @@ private val DeviceRotation.clockwiseDegrees: Int
         DeviceRotation.LandscapeRight -> 270
     }
 
-internal data class SaijikiGroup(val key: String, val label: String, val en: String, val words: List<String>)
+internal data class SaijikiGroup(val key: String, val bundle: String, val label: String, val en: String, val words: List<String>)
+internal data class SaijikiGroupBundle(val key: String, val label: String, val groups: List<SaijikiGroup>)
 internal data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(
@@ -398,11 +399,24 @@ internal fun saijikiGroups(lang: UiLanguage): List<SaijikiGroup> =
     SaijikiGenerated.CATEGORIES.map { category ->
         SaijikiGroup(
             key = category.key,
+            bundle = category.bundle,
             label = category.nameJa,
             en = category.nameEn,
             words = if (lang.isEnglish) category.wordsEn else category.wordsJa,
         )
     }
+
+/** Bundles follow the generated order; a selected category and its bundle lead. */
+internal fun saijikiGroupBundles(groups: List<SaijikiGroup>, lang: UiLanguage, selectedKey: String? = null): List<SaijikiGroupBundle> {
+    val selected = groups.firstOrNull { it.key == selectedKey }
+    val byKey = groups.associateBy { it.key }
+    val orderedGroups = SaijikiGenerated.CATEGORIES.mapNotNull { byKey[it.key] }
+    return SaijikiGenerated.BUNDLES.map { bundle ->
+        val members = orderedGroups.filter { it.bundle == bundle.key }
+        SaijikiGroupBundle(bundle.key, if (lang.isEnglish) bundle.nameEn else bundle.nameJa,
+            if (selected?.bundle == bundle.key) members.sortedByDescending { it.key == selectedKey } else members)
+    }.let { bundles -> if (selected == null) bundles else bundles.sortedByDescending { it.key == selected.bundle } }
+}
 
 /**
  * Every surface of every word, in both languages, paired with its category.
@@ -422,25 +436,24 @@ internal fun saijikiDetectionWords(lang: UiLanguage): List<Pair<String, SaijikiG
     }
 }
 
-private val saijikiGroupColors = listOf(
-    SaijikiGroupSand,
-    SaijikiGroupSky,
-    SaijikiGroupLeaf,
-    SaijikiGroupClay,
-    SaijikiGroupIris,
-    SaijikiGroupMint,
-    // きめ / fineness and したじ / underlayer follow さばき in the generated table.
-    // Inserting their colours here preserves every existing category's colour.
-    SaijikiGroupLilac,
-    SaijikiGroupFlax,
-    SaijikiGroupAmber,
-    SaijikiGroupSlate,
-    SaijikiGroupBlossom,
-    SaijikiGroupMoss,
-    SaijikiGroupShell,
-    SaijikiGroupMist,
-    SaijikiGroupLemon,
-    SaijikiGroupPeach,
+private val saijikiGroupColors = mapOf(
+    "katachi" to SaijikiGroupSand,
+    "katamuki" to SaijikiGroupSky,
+    "tezawari" to SaijikiGroupLeaf,
+    "tsuranari" to SaijikiGroupClay,
+    "omote" to SaijikiGroupIris,
+    "sabaki" to SaijikiGroupMint,
+    "kime" to SaijikiGroupLilac,
+    "futosa" to SaijikiGroupFlax,
+    "ji" to SaijikiGroupAmber,
+    "iro" to SaijikiGroupSlate,
+    "yuragi" to SaijikiGroupBlossom,
+    "basho" to SaijikiGroupMoss,
+    "ugoki" to SaijikiGroupShell,
+    "jun" to SaijikiGroupMist,
+    "wariai" to SaijikiGroupLemon,
+    "aida" to SaijikiGroupPeach,
+    "ookisa" to SaijikiGroupSage,
 )
 
 /**
@@ -468,8 +481,8 @@ internal fun derivationKindLabel(kind: String?): String {
 private val S: InkuStrings
     @Composable @ReadOnlyComposable get() = LocalStrings.current
 
-/** The pill colour for the category declared at [index]. */
-internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index % saijikiGroupColors.size]
+/** The pill colour follows the category key, independently of its position. */
+internal fun saijikiGroupColor(key: String): Color = saijikiGroupColors.getValue(key)
 
 @Composable
 fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
@@ -1088,9 +1101,9 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
 @Composable
 internal fun rememberDdlVocabularyTokens(lang: UiLanguage): List<DdlVocabularyToken> {
     return remember(lang) {
-        val colorForKey = SaijikiGenerated.CATEGORIES.mapIndexed { index, category ->
-            category.key to saijikiGroupColorAt(index)
-        }.toMap()
+        val colorForKey = SaijikiGenerated.CATEGORIES.associate { category ->
+            category.key to saijikiGroupColor(category.key)
+        }
         saijikiDetectionWords(lang).map { (word, group) ->
             DdlVocabularyToken(word = word, group = group, color = colorForKey.getValue(group.key))
         }.distinctBy { it.word }.sortedByDescending { it.word.length }
@@ -1209,17 +1222,8 @@ private fun DdlVocabularyBar(
                 .filter { it.word != selectedWord.word }
         }
     }
-    val prioritizedGroups = remember(groups, selectedWord) {
-        if (selectedWord == null) {
-            groups
-        } else {
-            // Ordered by category key, not by the displayed name: the name is
-            // one of the things that changes with the language.
-            groups.sortedWith(
-                compareByDescending<SaijikiGroup> { it.key == selectedWord.group.key }
-                    .thenBy { group -> SaijikiGenerated.CATEGORIES.indexOfFirst { it.key == group.key }.let { if (it < 0) Int.MAX_VALUE else it } },
-            )
-        }
+    val prioritizedGroups = remember(groups, selectedWord, uiLanguage) {
+        saijikiGroupBundles(groups, uiLanguage, selectedWord?.group?.key)
     }
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         Row(
@@ -1271,26 +1275,29 @@ private fun DdlVocabularyBar(
                         placeholder = S.search,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    prioritizedGroups.forEach { group ->
-                        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                            Text(
-                                if (selectedWord?.group?.label == group.label) S.groupAlternatives(group.label) else group.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-                                group.words.forEach { word ->
-                                    val token = tokenForWord(word)
-                                    if (token != null) {
-                                        DdlVocabularyPill(token = token, onClick = {
-                                            selectPreview(group, word)
-                                            onInsert(word)
-                                        })
-                                    } else {
-                                        MiniPill(word, onClick = {
-                                            selectPreview(group, word)
-                                            onInsert(word)
-                                        })
+                    prioritizedGroups.forEach { bundle ->
+                        Text(bundle.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        bundle.groups.forEach { group ->
+                            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                                Text(
+                                    if (selectedWord?.group?.label == group.label) S.groupAlternatives(group.label) else group.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
+                                    group.words.forEach { word ->
+                                        val token = tokenForWord(word)
+                                        if (token != null) {
+                                            DdlVocabularyPill(token = token, onClick = {
+                                                selectPreview(group, word)
+                                                onInsert(word)
+                                            })
+                                        } else {
+                                            MiniPill(word, onClick = {
+                                                selectPreview(group, word)
+                                                onInsert(word)
+                                            })
+                                        }
                                     }
                                 }
                             }

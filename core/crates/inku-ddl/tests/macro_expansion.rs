@@ -754,7 +754,7 @@ fn proportion_width_extent_and_arc_form_preserve_literal_parameter_and_local_val
                     "op": "vary",
                     "binding": "arc_form",
                     "domain": "arc_form",
-                    "choices": [{"expr": "semantic_ref", "category": "ratio", "id": "waning"}],
+                    "choices": [{"expr": "semantic_ref", "category": "ratio", "id": "semicircle"}],
                     "range": null,
                     "body": [{
                         "op": "emit",
@@ -810,7 +810,7 @@ fn proportion_width_extent_and_arc_form_preserve_literal_parameter_and_local_val
         emitted[1].get("proportion_arc_form"),
         Some(&ExpandedMacroValue::SemanticRef {
             category: "ratio".to_owned(),
-            id: "waning".to_owned(),
+            id: "semicircle".to_owned(),
         })
     );
 }

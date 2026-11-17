@@ -1,10 +1,10 @@
-"""The one-time move of saved records from Saijiki v1 or v2 to v3.
+"""The one-time move of saved records from Saijiki v1, v2 or v3 to v4.
 
 Saved v2 documents name their edition; a saved document without the field was
 written with v1. The current core refuses either retired edition, and a
 saved Macro definition that only a migration makes valid, with
 ``saijiki_migration_required``. The core owns the migration itself
-(``pipeline_migrate_saijiki_v1`` or ``pipeline_migrate_saijiki_v2``): given one saved unit -- a retired document and the
+(``pipeline_migrate_saijiki_v1``, ``pipeline_migrate_saijiki_v2`` or ``pipeline_migrate_saijiki_v3``): given one saved unit -- a retired document and the
 definitions its locks name, or definitions alone -- it returns the unit in the
 current edition.
 
@@ -54,24 +54,48 @@ MigrateUnit = Callable[[bytes], bytes]
 Progress = Callable[[str], None]
 
 
-def migrate_unit_v3(unit: bytes) -> bytes:
-    """Dispatch legacy documents by edition; definitions and v2 texts use v2."""
+def migrate_unit_v4(unit: bytes) -> bytes:
+    """Dispatch documents by edition; definition-only units are v3."""
     import inku_render
 
     value = json.loads(unit)
     document = value.get("document")
-    if isinstance(document, dict) and "saijiki" not in document:
+    if not isinstance(document, dict):
+        return inku_render.pipeline_migrate_saijiki_v3(unit)
+    edition = document.get("saijiki")
+    if edition is None:
         return inku_render.pipeline_migrate_saijiki_v1(unit)
-    return inku_render.pipeline_migrate_saijiki_v2(unit)
+    if edition == "inku.saijiki.v2":
+        return inku_render.pipeline_migrate_saijiki_v2(unit)
+    if edition == "inku.saijiki.v3":
+        return inku_render.pipeline_migrate_saijiki_v3(unit)
+    raise ValueError("unsupported_saijiki_edition")
 
 # The table whose rows the migration discards instead of moving.
 DISCARDED_TABLE = "pipeline_candidate_executions"
 # The app setting that records the migration was written; a second run refuses.
-DONE_SETTING = "saijiki_v3_saved_records"
+DONE_SETTING = "saijiki_v4_saved_records"
+V3_DONE_SETTING = "saijiki_v3_saved_records"
+
+
+class SaijikiV3PrerequisiteError(ValueError):
+    """The old cutover is missing, incomplete or cannot be established."""
+
+
+def require_v3_cutover(connection: Any) -> None:
+    rows = list(_rows(connection, "SELECT value FROM app_settings WHERE key=?", (V3_DONE_SETTING,)))
+    if not rows:
+        raise SaijikiV3PrerequisiteError("saijiki_v3_cutover_missing")
+    summary = _json(rows[0][0])
+    refused = summary.get("refused_records") if isinstance(summary, Mapping) else None
+    if type(refused) is not int or refused < 0:
+        raise SaijikiV3PrerequisiteError("saijiki_v3_cutover_invalid_summary")
+    if refused != 0:
+        raise SaijikiV3PrerequisiteError("saijiki_v3_refused_records_present")
 
 
 class MigrationAlreadyWritten(RuntimeError):
-    """The saved records were already moved to Saijiki v3."""
+    """The saved records were already moved to Saijiki v4."""
 
 
 class CoreCallFailed(RuntimeError):
@@ -173,7 +197,7 @@ def _definition_unit(definition: Any) -> bytes:
 
 
 def _document_unit(source: str, language: str, locks: list[Any], definitions: list[Any],
-                   edition: str | None = "inku.saijiki.v2") -> bytes:
+                   edition: str | None = "inku.saijiki.v3") -> bytes:
     document = {"source": source, "language": language, "macro_locks": locks}
     if edition is not None:
         document["saijiki"] = edition
@@ -403,6 +427,7 @@ def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int
     read in time). The list is given explicitly; no rule by length or shape
     picks it. The work's description, Score and SVG stay.
     """
+    require_v3_cutover(connection)
     core = _Core(migrate, workers, progress, journal, timeout, abort_on_failure)
     try:
         return _plan(connection, core, sample=sample, history_ids=history_ids, blank=set(blank or ()))
@@ -420,6 +445,8 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     sweep_records: list[dict[str, object]] = []
     tool_records: list[dict[str, object]] = []
     thinness_records: list[dict[str, object]] = []
+    approximated_word_records: list[dict[str, object]] = []
+    approximated_ref_records: list[dict[str, object]] = []
     blanked_records: list[dict[str, object]] = []
     unmatched_locks: list[dict[str, object]] = []
     counts["history_links"]["unmatched_locks"] = 0
@@ -495,7 +522,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     historic = _historic_nature_definitions()
     for owner_id, variation_id, _revision, document_json, _digest in variation_rows:
         document = _json(document_json)
-        if not isinstance(document, Mapping) or document.get("saijiki") not in (None, "inku.saijiki.v2"):
+        if not isinstance(document, Mapping) or document.get("saijiki") not in (None, "inku.saijiki.v2", "inku.saijiki.v3"):
             continue
         key = (owner_id, variation_id)
         definitions = []
@@ -546,6 +573,10 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
                 thinness_records.append({"qualified_name": answer.get("qualified_name"),
                                          "version": answer.get("version"),
                                          "unadjusted_thinness": answer["unadjusted_thinness"]})
+            if answer.get("approximated_refs"):
+                approximated_ref_records.append({"qualified_name": answer.get("qualified_name"),
+                                                 "version": answer.get("version"),
+                                                 "approximated_refs": answer["approximated_refs"]})
 
     def locked(definitions: list[Any], locks: list[Any]) -> list[Any]:
         names = {(lock.get("qualified_name"), lock.get("version")) for lock in locks if isinstance(lock, Mapping)}
@@ -588,7 +619,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     variation_units: dict[tuple[str, str], bytes] = {}
     for owner_id, variation_id, _revision, document_json, _digest in variation_rows:
         document = _json(document_json)
-        if not isinstance(document, Mapping) or document.get("saijiki") not in (None, "inku.saijiki.v2"):
+        if not isinstance(document, Mapping) or document.get("saijiki") not in (None, "inku.saijiki.v2", "inku.saijiki.v3"):
             continue
         locks = document_locks(document.get("macro_locks"))
         definitions = locked(saved_by_variation.get((owner_id, variation_id), []), locks)
@@ -643,6 +674,10 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         if tools:
             counts[kind]["with_unassociated_tools"] += 1
             tool_records.append({"kind": kind, "id": record_id, "unassociated_tools": tools})
+        approximated = migrated.get("approximated_words") or []
+        if approximated:
+            counts[kind]["with_approximated_words"] += 1
+            approximated_word_records.append({"kind": kind, "id": record_id, "approximated_words": approximated})
         counts[kind]["changed" if migrated.get("edits") else "unchanged"] += 1
         return dict(migrated)
 
@@ -657,16 +692,16 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
             continue
         if not document.get("source"):
             tally["empty"] += 1
-        if document.get("saijiki") == "inku.saijiki.v3":
+        if document.get("saijiki") == "inku.saijiki.v4":
             tally["current"] += 1
             continue
-        if document.get("saijiki") not in (None, "inku.saijiki.v2"):
+        if document.get("saijiki") not in (None, "inku.saijiki.v2", "inku.saijiki.v3"):
             tally["refused"] += 1
             refused_records.append({"kind": "variation_documents", "id": f"{owner_id}/{variation_id}",
                                     "error": {"code": "other_edition", "saijiki": document.get("saijiki")},
                                     "source": document.get("source"), "locks": len(document.get("macro_locks") or [])})
             continue
-        tally["v1" if document.get("saijiki") is None else "v2"] += 1
+        tally[{None: "v1", "inku.saijiki.v2": "v2", "inku.saijiki.v3": "v3"}[document.get("saijiki")]] += 1
         unit = variation_units[(owner_id, variation_id)]
         migrated = document_answer("variation_documents", f"{owner_id}/{variation_id}", unit,
                                    str(document.get("source")), len(document.get("macro_locks") or []))
@@ -784,6 +819,8 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         "unassociated_sweep_records": sweep_records,
         "unassociated_tool_records": tool_records,
         "unadjusted_thinness_records": thinness_records,
+        "approximated_word_records": approximated_word_records,
+        "approximated_ref_records": approximated_ref_records,
     }
     return result
 
@@ -860,7 +897,7 @@ def _migrate_once_database(database: Path, migrate: MigrateUnit, *, workers: int
                  progress: Progress | None = None, journal: Path | None = None,
                  timeout: float | None = None, abort_on_failure: bool = False,
                  blank: Iterable[str] | None = None) -> dict[str, Any]:
-    """Move the saved records of one SQLite database to Saijiki v3, once.
+    """Move the saved records of one SQLite database to Saijiki v4, once.
 
     Run it while the service is stopped. It keeps a verified Backup API
     snapshot beside the database first (``migration-backups/``), then writes
@@ -879,16 +916,18 @@ def _migrate_once_database(database: Path, migrate: MigrateUnit, *, workers: int
     engine = create_engine(f"sqlite:///{database}", future=True)
     try:
         with engine.connect() as connection:
+            require_v3_cutover(connection)
             if _already_written(connection):
                 raise MigrationAlreadyWritten(str(database))
         snapshot = create_sqlite_snapshot(
-            database, database.parent / "migration-backups" / f"{database.stem}-pre-saijiki-v3-{time.time_ns()}.db")
+            database, database.parent / "migration-backups" / f"{database.stem}-pre-saijiki-v4-{time.time_ns()}.db")
         snapshot_seconds = time.monotonic() - started
         with engine.connect() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
             try:
                 if _already_written(connection):
                     raise MigrationAlreadyWritten(str(database))
+                require_v3_cutover(connection)
                 before = capture_invariants(connection)
                 report = migrate_saved_records(connection, migrate, workers=workers, progress=progress,
                                                checked=lambda: verify_invariants(connection, before),
@@ -914,7 +953,7 @@ def migrate_once(database: Path, packages: Path, recovery: Path, *, journal: Pat
                  workers: int = 4, timeout: float = 120.0,
                  allow_refused: bool = False) -> dict[str, Any]:
     """Migrate database and installed packages under the caller's stopped-service guard."""
-    from .saijiki_v3_cutover import cutover
+    from .saijiki_v4_cutover import cutover
 
     return cutover(database, packages, recovery, journal=journal, workers=workers, timeout=timeout,
                    allow_refused=allow_refused)

@@ -128,7 +128,7 @@ class AndroidWorkPipeline(
             val entries = catalog?.optJSONArray("entries") ?: JSONArray()
             for (i in 0 until entries.length()) result.put(entries.getJSONObject(i).optString("summary"))
         }
-        val locks = app.inku.mobile.data.db.SaijikiV3Migration.documentLocks(
+        val locks = app.inku.mobile.data.db.SaijikiMigration.documentLocks(
             context?.optJSONObject("macro_catalog")?.optJSONArray("definition_locks") ?: catalog?.optJSONArray("locks"))
         val work = configBuilder.wordsForDefinitions(definitions, language)
         val ids = work.map { it.qualifiedName }.toSet()

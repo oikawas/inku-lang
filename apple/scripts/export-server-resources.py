@@ -66,6 +66,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=ROOT, help="Product checkout containing the canonical Server/Web resources")
     parser.add_argument("--model-catalog-only", action="store_true", help="Remove obsolete provider and model catalog copies")
+    parser.add_argument("--skip-web-reference", action="store_true", help="Leave the Web reference unchanged")
     arguments = parser.parse_args()
     ROOT = arguments.source_root.resolve()
     SERVER = ROOT / "server/src/inku_server"
@@ -105,6 +106,7 @@ def main() -> None:
         "deepcopy": deepcopy,
         "os": SimpleNamespace(getenv=lambda _name, default: default),
         "DEFAULT_LIMITS": SimpleNamespace(**limits),
+        "request_timeout_seconds": lambda: literal_assignment(SERVER / "request_timeout.py", "DEFAULT_REQUEST_TIMEOUT_SECONDS"),
         "CANVAS_BASE_PX": literal_assignment(
             SERVER / "plugins/system/canvas_aspect/__init__.py", "CANVAS_BASE_PX"),
         "render_color_map_for_catalog": lambda name: catalog_maps[name],
@@ -139,12 +141,13 @@ def main() -> None:
     }
     macro_sources = {"maximum_entries": manifest["pipeline"]["prompt_limits"]["max_catalog_entries"],
                      "canonical": [], "legacy": [], "bundled_packages": ["Nature.leaves"]}
-    saijiki = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v3.json").read_text(encoding="utf-8"))
+    saijiki = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v4.json").read_text(encoding="utf-8"))
     for name, value in [("server-defaults.json", manifest), ("color-catalogs.json", catalogs),
                         ("macro-sources.json", macro_sources),
                         ("saijiki.json", saijiki)]:
         write_json(OUTPUT / name, value)
-    subprocess.run(["node", str(DESTINATION_ROOT / "apple/scripts/export-web-reference.mjs"), "--source-root", str(ROOT)], check=True)
+    if not arguments.skip_web_reference:
+        subprocess.run(["node", str(DESTINATION_ROOT / "apple/scripts/export-web-reference.mjs"), "--source-root", str(ROOT)], check=True)
     print(f"Generated Server defaults, {len(catalogs)} catalogs and canonical Saijiki.")
 
 

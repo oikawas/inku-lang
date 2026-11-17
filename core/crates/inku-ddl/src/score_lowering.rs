@@ -321,6 +321,12 @@ fn project_source_instruction<'a>(
             .fineness
             .as_ref()
             .map(|term| (&term.identity).into()),
+        surface_density: instruction
+            .entity
+            .surface
+            .density
+            .as_ref()
+            .map(|term| (&term.identity).into()),
         surface_underlayer: instruction
             .entity
             .surface
@@ -1703,6 +1709,10 @@ fn append_macro_caller_diagnostics(
             instruction.entity.surface.fineness.is_some(),
         ),
         (
+            ScoreAppearanceField::SurfaceDensity,
+            instruction.entity.surface.density.is_some(),
+        ),
+        (
             ScoreAppearanceField::SurfaceUnderlayer,
             instruction.entity.surface.underlayer.is_some(),
         ),
@@ -2153,6 +2163,7 @@ fn project_macro_emit<'a>(
         surface_intensity,
         // A Macro emits no fineness or underlayer (DDL 24).
         surface_fineness: None,
+        surface_density: None,
         surface_underlayer: None,
         thinness: thinness.map(|identity| match identity.id {
             "fine" => CoreModifierValue::Fine,
@@ -3378,6 +3389,7 @@ fn lower_verified_stage15_shared<'a>(
                     input.surface = None;
                     input.surface_intensity = None;
                     input.surface_fineness = None;
+                    input.surface_density = None;
                     input.surface_underlayer = None;
                     input.thinness = None;
                     input.fluctuation = [None; 3];
@@ -4802,15 +4814,24 @@ fn appearance_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField>
     match gap {
         ScoreFieldGap::UnsupportedColorIdentity { .. } => Some(ScoreAppearanceField::Color),
         ScoreFieldGap::UnsupportedTouchIdentity { .. } => Some(ScoreAppearanceField::Touch),
-        ScoreFieldGap::UnsupportedContinuityIdentity { .. } => {
+        ScoreFieldGap::UnsupportedContinuityIdentity { .. }
+        | ScoreFieldGap::UnsupportedContinuityWithoutLine { .. } => {
             Some(ScoreAppearanceField::Continuity)
         }
         ScoreFieldGap::UnsupportedSurfaceIdentity { .. }
-        | ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. } => {
+        | ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. }
+        | ScoreFieldGap::UnsupportedSurfaceWithoutFace { .. } => {
             Some(ScoreAppearanceField::SurfaceQuality)
         }
-        ScoreFieldGap::UnsupportedSurfaceIntensity { .. } => {
+        ScoreFieldGap::UnsupportedSurfaceIntensity { .. }
+        | ScoreFieldGap::UnsupportedSurfaceIntensityForDigital { .. } => {
             Some(ScoreAppearanceField::SurfaceIntensity)
+        }
+        // One diagnostic serves both fields; the word's id says which one.
+        ScoreFieldGap::UnsupportedSurfaceFineness { id, .. }
+            if matches!(id.as_str(), "packed" | "sparse") =>
+        {
+            Some(ScoreAppearanceField::SurfaceDensity)
         }
         ScoreFieldGap::UnsupportedSurfaceFineness { .. } => {
             Some(ScoreAppearanceField::SurfaceFineness)
@@ -4830,6 +4851,9 @@ fn instruction_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreInstructionFiel
         ScoreFieldGap::FluctuationAmplitudeWithoutQuality { .. } => {
             Some(ScoreInstructionField::FluctuationAmplitude)
         }
+        ScoreFieldGap::UnsupportedFluctuationOnPoint { .. } => {
+            Some(ScoreInstructionField::Fluctuation)
+        }
         _ => None,
     }
 }
@@ -4842,6 +4866,7 @@ fn omit_appearance_field(input: &mut ScoreLoweringInput<'_>, field: ScoreAppeara
         ScoreAppearanceField::SurfaceQuality => input.surface = None,
         ScoreAppearanceField::SurfaceIntensity => input.surface_intensity = None,
         ScoreAppearanceField::SurfaceFineness => input.surface_fineness = None,
+        ScoreAppearanceField::SurfaceDensity => input.surface_density = None,
         ScoreAppearanceField::SurfaceUnderlayer => input.surface_underlayer = None,
     }
 }
@@ -4850,6 +4875,7 @@ fn omit_instruction_field(input: &mut ScoreLoweringInput<'_>, field: ScoreInstru
     match field {
         ScoreInstructionField::LayoutDirection => input.layout_direction = None,
         ScoreInstructionField::FluctuationAmplitude => input.fluctuation[0] = None,
+        ScoreInstructionField::Fluctuation => input.fluctuation = [None; 3],
     }
 }
 
@@ -4866,14 +4892,16 @@ fn default_resolution(
             ScoreAppearanceResolution::PreserveExplicitSurfaceQuality
         }
         ScoreAppearanceField::SurfaceIntensity => ScoreAppearanceResolution::Filled,
-        ScoreAppearanceField::SurfaceFineness | ScoreAppearanceField::SurfaceUnderlayer
+        ScoreAppearanceField::SurfaceFineness
+        | ScoreAppearanceField::SurfaceDensity
+        | ScoreAppearanceField::SurfaceUnderlayer
             if surface_quality_survives =>
         {
             ScoreAppearanceResolution::PreserveExplicitSurfaceQuality
         }
-        ScoreAppearanceField::SurfaceFineness | ScoreAppearanceField::SurfaceUnderlayer => {
-            ScoreAppearanceResolution::Unchanged
-        }
+        ScoreAppearanceField::SurfaceFineness
+        | ScoreAppearanceField::SurfaceDensity
+        | ScoreAppearanceField::SurfaceUnderlayer => ScoreAppearanceResolution::Unchanged,
     }
 }
 
@@ -4885,7 +4913,11 @@ fn resolution_for_gap(
     field: ScoreAppearanceField,
     surface_quality_survives: bool,
 ) -> ScoreAppearanceResolution {
-    if matches!(reason, ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. }) {
+    if matches!(
+        reason,
+        ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. }
+            | ScoreFieldGap::UnsupportedSurfaceWithoutFace { .. }
+    ) {
         ScoreAppearanceResolution::Unchanged
     } else {
         default_resolution(field, surface_quality_survives)
@@ -5036,6 +5068,15 @@ fn source_span_for_gap(
             .amplitude
             .as_ref()
             .map(|term| term.provenance.source.span),
+        ScoreFieldGap::UnsupportedFluctuationOnPoint { .. } => {
+            let fluctuation = &instruction.entity.fluctuation;
+            fluctuation
+                .quality
+                .as_ref()
+                .or(fluctuation.amplitude.as_ref())
+                .or(fluctuation.frequency.as_ref())
+                .map(|term| term.provenance.source.span)
+        }
         _ => None,
     }
     .unwrap_or(instruction.entity.head.source().span)
@@ -5052,6 +5093,7 @@ fn source_span_for_appearance(
         ScoreAppearanceField::SurfaceQuality => instruction.entity.surface.quality.as_ref(),
         ScoreAppearanceField::SurfaceIntensity => instruction.entity.surface.intensity.as_ref(),
         ScoreAppearanceField::SurfaceFineness => instruction.entity.surface.fineness.as_ref(),
+        ScoreAppearanceField::SurfaceDensity => instruction.entity.surface.density.as_ref(),
         ScoreAppearanceField::SurfaceUnderlayer => instruction.entity.surface.underlayer.as_ref(),
     }
     .map(|term| term.provenance.source.span)
@@ -5184,7 +5226,9 @@ fn macro_key_for_appearance(field: ScoreAppearanceField) -> Option<&'static str>
         ScoreAppearanceField::SurfaceQuality => Some("surface"),
         ScoreAppearanceField::SurfaceIntensity => Some("surface_intensity"),
         // A Macro emits no fineness or underlayer (DDL 24).
-        ScoreAppearanceField::SurfaceFineness | ScoreAppearanceField::SurfaceUnderlayer => None,
+        ScoreAppearanceField::SurfaceFineness
+        | ScoreAppearanceField::SurfaceDensity
+        | ScoreAppearanceField::SurfaceUnderlayer => None,
     }
 }
 
@@ -5204,13 +5248,17 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedTouchIdentity { .. } | ScoreFieldGap::MissingTouch => {
             Some("touch".to_owned())
         }
-        ScoreFieldGap::UnsupportedContinuityIdentity { .. } | ScoreFieldGap::MissingContinuity => {
-            Some("continuity".to_owned())
-        }
+        ScoreFieldGap::UnsupportedContinuityIdentity { .. }
+        | ScoreFieldGap::UnsupportedContinuityWithoutLine { .. }
+        | ScoreFieldGap::MissingContinuity => Some("continuity".to_owned()),
         ScoreFieldGap::UnsupportedSurfaceIdentity { .. }
         | ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. }
+        | ScoreFieldGap::UnsupportedSurfaceWithoutFace { .. }
         | ScoreFieldGap::MissingEmptySurface => Some("surface".to_owned()),
-        ScoreFieldGap::UnsupportedSurfaceIntensity { .. } => Some("surface_intensity".to_owned()),
+        ScoreFieldGap::UnsupportedSurfaceIntensity { .. }
+        | ScoreFieldGap::UnsupportedSurfaceIntensityForDigital { .. } => {
+            Some("surface_intensity".to_owned())
+        }
         ScoreFieldGap::UnsupportedActionIdentity { .. } | ScoreFieldGap::MissingPlaceAction => {
             Some("movement".to_owned())
         }
@@ -5296,6 +5344,9 @@ struct ScoreLoweringInput<'a> {
     /// A fineness word (きめ, DDL 24): the size or the spacing of a named
     /// texture's units on a closed shape.
     surface_fineness: Option<SemanticInputIdentity<'a>>,
+    /// A packing word (密な・疎な, DDL 24): how many units a named texture lays
+    /// on a closed shape, apart from their size.
+    surface_density: Option<SemanticInputIdentity<'a>>,
     /// An underlayer word (したじ, DDL 24): the tool's paint under a named
     /// texture on a closed shape.
     surface_underlayer: Option<SemanticInputIdentity<'a>>,
@@ -6671,6 +6722,19 @@ fn resolve_complete_object<'a>(
         Some(_) => map_score_enum::<LineStyle>(input.continuity, "continuity", &mut gaps),
         None => Some(LineStyle::Solid),
     };
+    // Every tool of Saijiki v4 draws an arc and an outline as one hand contour, which has
+    // no dashes (inku-render marks.rs `hand_contour`); only a line and a free line lay a
+    // dashed line over their stroke. A dashed or dotted arc or closed shape leaves out
+    // only the word (the author's choice, 2026-11-17).
+    if let Some(identity) = input.continuity
+        && style.is_some_and(|style| style != LineStyle::Solid)
+        && !matches!(primitive, Primitive::Line | Primitive::FreeLine)
+    {
+        gaps.push(ScoreFieldGap::UnsupportedContinuityWithoutLine {
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
     let arc_form = match input.proportion_arc_form {
         Some(identity)
             if primitive != Primitive::Arc
@@ -6729,9 +6793,31 @@ fn resolve_complete_object<'a>(
                 (false, None)
             }
             Some(identity) if identity.category == "surface" && identity.id == "solid" => {
-                // An explicit fill can belong to the closed contour formed by
-                // two checked Touching arcs. Keep that intent for performance.
-                (closes_area || primitive == Primitive::Arc, None)
+                if !closes_area && primitive != Primitive::Arc {
+                    // A line or a free line has no face to fill (Saijiki v4).
+                    gaps.push(ScoreFieldGap::UnsupportedSurfaceWithoutFace {
+                        category: identity.category.to_owned(),
+                        id: identity.id.to_owned(),
+                    });
+                    (false, None)
+                } else {
+                    // An explicit fill can belong to the closed contour formed by
+                    // two checked Touching arcs. Keep that intent for performance.
+                    (closes_area || primitive == Primitive::Arc, None)
+                }
+            }
+            // 点描・平行線・交差線・メゾチント lay a face (I-741, Saijiki v4). A line, an
+            // open arc or a free line has none: only the word is left out, as 刷毛目 is.
+            Some(identity)
+                if !closes_area
+                    && identity.category == "surface"
+                    && matches!(identity.id, "stipple" | "hatch" | "crosshatch" | "aquatint") =>
+            {
+                gaps.push(ScoreFieldGap::UnsupportedSurfaceWithoutFace {
+                    category: identity.category.to_owned(),
+                    id: identity.id.to_owned(),
+                });
+                (false, None)
             }
             // 刷毛目 lays the bands of a closed shape's face one by one (DDL
             // 25). A line, an open arc or a free line has no face, so only the
@@ -6783,6 +6869,23 @@ fn resolve_complete_object<'a>(
             SurfaceIntensity::Normal
         }
     };
+    // The digital tool draws a line, an arc, a free line and an outline from grid cells
+    // whose tone does not follow the handling (inku-render mark_paths.rs); only its fills
+    // and the textured faces read it. On a mark with neither the word says nothing, so it
+    // is left out with its reason (Saijiki v4).
+    if let Some(identity) = input.surface_intensity
+        && input
+            .touch
+            .is_some_and(|touch| touch.category == "touch" && touch.id == "computer")
+        && identity.category == "handling"
+        && !filled
+        && surface.is_none()
+    {
+        gaps.push(ScoreFieldGap::UnsupportedSurfaceIntensityForDigital {
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
     let thinness = match input.thinness {
         None => None,
         Some(CoreModifierValue::Fine) => Some(Thinness::Fine),
@@ -6991,7 +7094,20 @@ fn resolve_complete_object<'a>(
                 | Primitive::FreeLine
         )
     {
-        gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+        if primitive == Primitive::Point {
+            // A point does not sway (Saijiki v4): only the sway words are left out and
+            // the point is drawn. Before v4 the whole sentence was left undrawn.
+            let identity = input.fluctuation[2]
+                .or(input.fluctuation[0])
+                .or(input.fluctuation[1])
+                .expect("a variation has a sway word");
+            gaps.push(ScoreFieldGap::UnsupportedFluctuationOnPoint {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            });
+        } else {
+            gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+        }
     }
     if !gaps.is_empty() {
         return Err(gaps);
@@ -7356,7 +7472,10 @@ fn lay_texture_words(
                     | SurfaceTexture::Aquatint
             )
         });
-    if let Some(identity) = input.surface_fineness {
+    for identity in [input.surface_fineness, input.surface_density]
+        .into_iter()
+        .flatten()
+    {
         match (
             identity.category,
             texture_fineness(identity.id),

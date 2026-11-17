@@ -124,6 +124,7 @@ pub enum SemanticDeliveryOwner {
     SurfaceQuality,
     SurfaceIntensity,
     SurfaceFineness,
+    SurfaceDensity,
     SurfaceUnderlayer,
     FluctuationAmplitude,
     FluctuationFrequency,
@@ -168,6 +169,7 @@ impl SemanticDeliveryOwner {
             Self::SurfaceQuality => "surface_quality",
             Self::SurfaceIntensity => "surface_intensity",
             Self::SurfaceFineness => "surface_fineness",
+            Self::SurfaceDensity => "surface_density",
             Self::SurfaceUnderlayer => "surface_underlayer",
             Self::FluctuationAmplitude => "fluctuation_amplitude",
             Self::FluctuationFrequency => "fluctuation_frequency",
@@ -1194,6 +1196,7 @@ fn project_deliveries(
             | SemanticAssociationIssueKind::ConflictingSurfaceQualities
             | SemanticAssociationIssueKind::ConflictingSurfaceIntensities
             | SemanticAssociationIssueKind::ConflictingSurfaceFinenesses
+            | SemanticAssociationIssueKind::ConflictingSurfaceDensities
             | SemanticAssociationIssueKind::ConflictingSurfaceUnderlayers
             | SemanticAssociationIssueKind::ConflictingFluctuationAmplitudes
             | SemanticAssociationIssueKind::ConflictingFluctuationFrequencies
@@ -2057,6 +2060,10 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
         (
             SemanticDeliveryOwner::SurfaceFineness,
             instruction.entity.surface.fineness.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::SurfaceDensity,
+            instruction.entity.surface.density.as_ref(),
         ),
         (
             SemanticDeliveryOwner::SurfaceUnderlayer,
@@ -3042,6 +3049,7 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
             entity.surface.quality.as_ref(),
             entity.surface.intensity.as_ref(),
             entity.surface.fineness.as_ref(),
+            entity.surface.density.as_ref(),
             entity.surface.underlayer.as_ref(),
             entity.fluctuation.amplitude.as_ref(),
             entity.fluctuation.frequency.as_ref(),
@@ -3420,9 +3428,12 @@ fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
         );
     }
     // Written only when present (DDL 24), so a document without these words
-    // keeps its lock bytes.
+    // keeps its lock bytes; a density alone keeps its v3 fineness slot.
+    let (fineness, density) =
+        crate::semantic_association::v3_compatible_texture_slots(&entity.surface);
     for (field, term) in [
-        ("surface_fineness", entity.surface.fineness.as_ref()),
+        ("surface_fineness", fineness),
+        ("surface_density", density),
         ("surface_underlayer", entity.surface.underlayer.as_ref()),
     ] {
         if let Some(term) = term {

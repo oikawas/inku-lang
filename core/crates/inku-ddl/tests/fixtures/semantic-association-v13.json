@@ -812,7 +812,7 @@
     {
       "id": "ja-fluctuation-order-one",
       "language": "ja",
-      "source": "八つ、青、ペン、破線、水平、粒、濃い、細かく、ゆるやかに、波打つ、円。",
+      "source": "八つ、青、ペン、破線、水平、粒、濃い、小さく、ゆるやかに、波打つ、円。",
       "entity_count": 1,
       "issue_kinds": [
 
@@ -847,7 +847,7 @@
     {
       "id": "ja-fluctuation-order-two",
       "language": "ja",
-      "source": "波打つ、ゆるやかに、細かく、濃い、粒、水平、破線、ペン、青、八つ、円。",
+      "source": "波打つ、ゆるやかに、小さく、濃い、粒、水平、破線、ペン、青、八つ、円。",
       "entity_count": 1,
       "issue_kinds": [
 
@@ -1099,7 +1099,7 @@
     {
       "id": "conflicting-fluctuation-amplitudes",
       "language": "ja",
-      "source": "細かく 大きく 円。",
+      "source": "小さく 大きく 円。",
       "entity_count": 1,
       "issue_kinds": [
         "conflicting_fluctuation_amplitudes"

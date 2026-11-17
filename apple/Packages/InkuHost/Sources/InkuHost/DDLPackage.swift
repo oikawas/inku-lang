@@ -21,13 +21,17 @@ public struct DDLPackageImport: Sendable, Equatable {
     public let language: String?
     public let plugins: [ImportedMacroDefinition]
     public let migratedEdits: Int?
+    public let approximatedWords: [ExactJSON]
+    public let approximatedDefinitionReferenceCount: Int
     public private(set) var names: [String] = []
 
-    private init(source: String, language: String?, plugins: [ImportedMacroDefinition], migratedEdits: Int?) {
+    private init(source: String, language: String?, plugins: [ImportedMacroDefinition], migratedEdits: Int?, approximatedWords: [ExactJSON] = [], approximatedDefinitionReferenceCount: Int = 0) {
         self.source = source
         self.language = language
         self.plugins = plugins
         self.migratedEdits = migratedEdits
+        self.approximatedWords = approximatedWords
+        self.approximatedDefinitionReferenceCount = approximatedDefinitionReferenceCount
         names = resolveNames()
     }
 
@@ -67,10 +71,14 @@ public struct DDLPackageImport: Sendable, Equatable {
     }
 
     public static func parse(_ data: Data) throws -> Self {
-        try parse(data, migrate: InkuCore.migrateSaijikiV2)
+        try parse(data, migrate: InkuCore.migrateSaijikiV2, migrateV3: InkuCore.migrateSaijikiV3)
     }
 
     static func parse(_ data: Data, migrate: (Data) -> Data) throws -> Self {
+        try parse(data, migrate: migrate, migrateV3: InkuCore.migrateSaijikiV3)
+    }
+
+    static func parse(_ data: Data, migrate: (Data) -> Data, migrateV3: (Data) -> Data) throws -> Self {
         try Task.checkCancellation()
         guard data.count <= maximumBytes else { throw HostError("ddl_import_too_large") }
         guard let text = String(data: data, encoding: .utf8) else { throw HostError("ddl_import_invalid_utf8") }
@@ -91,7 +99,12 @@ public struct DDLPackageImport: Sendable, Equatable {
         let language = file["language"].string.flatMap { ["ja", "en"].contains($0) ? $0 : nil }
         var outputSource = source
         var migratedEdits: Int?
-        if file.object?["saijiki"] == nil {
+        var approximatedWords: [ExactJSON] = []
+        var approximatedDefinitionReferenceCount = 0
+        let edition = file["saijiki"].string
+        if file.object?["saijiki"] == nil || edition == "inku.saijiki.v3" {
+            let migrate = edition == "inku.saijiki.v3" ? migrateV3 : migrate
+            let oldEdition = edition ?? "inku.saijiki.v2"
             let definitions = plugins.map(\.definition)
             let first = try ExactJSON(data: migrate(ExactJSON.object(["definitions": .array(definitions)]).data))
             guard first["error"] == .null, let entries = first["definitions"].array,
@@ -106,7 +119,7 @@ public struct DDLPackageImport: Sendable, Equatable {
             let resolvedLanguage = language ?? InkuCore.resolveInstructionLanguage(text: source, requested: "auto", fallback: "ja") ?? "ja"
             let request: ExactJSON = .object(["definitions": .array(definitions), "document": .object([
                 "source": .string(source), "language": .string(resolvedLanguage), "macro_locks": .array(locks),
-                "saijiki": .string("inku.saijiki.v2")])])
+                "saijiki": .string(oldEdition)])])
             let result = try ExactJSON(data: migrate(request.data))
             guard result["error"] == .null, result["document"]["error"] == .null,
                   let migratedSource = result["document"]["document"]["source"].string,
@@ -118,12 +131,14 @@ public struct DDLPackageImport: Sendable, Equatable {
             }
             outputSource = migratedSource
             migratedEdits = edits.count
+            approximatedWords = result["document"]["approximated_words"].array ?? []
+            approximatedDefinitionReferenceCount = (entries + recovered).reduce(0) { $0 + ($1["approximated_refs"].array?.count ?? 0) }
             plugins = zip(entries, plugins).map { ImportedMacroDefinition(definition: $0.0["definition"], note: $0.1.note) }
             plugins += recovered.map { ImportedMacroDefinition(definition: $0["definition"], note: "") }
         } else if file["saijiki"].string != SaijikiEdition.current {
             throw HostError("ddl_export_invalid")
         }
-        let value = Self(source: outputSource, language: language, plugins: plugins, migratedEdits: migratedEdits)
+        let value = Self(source: outputSource, language: language, plugins: plugins, migratedEdits: migratedEdits, approximatedWords: approximatedWords, approximatedDefinitionReferenceCount: approximatedDefinitionReferenceCount)
         // Reject the whole carried catalog on any omitted/invalid definition or duplicate name.
         let resolved = try value.resolveCatalog(language: language ?? "ja")
         try Task.checkCancellation()

@@ -19,7 +19,7 @@ fn embedded_asset_has_stable_identity_and_exact_digest() {
 
     assert_eq!(asset.schema_version, 1);
     assert_eq!(asset.asset_id, SAIJIKI_ASSET_ID);
-    assert_eq!(SAIJIKI_ASSET_ID, "inku.saijiki.v3");
+    assert_eq!(SAIJIKI_ASSET_ID, "inku.saijiki.v4");
     assert_eq!(
         saijiki_asset_sha256_hex(),
         Sha256::digest(SAIJIKI_ASSET_BYTES)
@@ -54,13 +54,14 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
     assert!(angles.words[0].marker_surfaces_ja.is_none());
 
     assert_eq!(asset.languages, ["ja", "en"]);
-    assert_eq!(asset.categories.len(), 15);
+    assert_eq!(asset.categories.len(), 16);
     let shape = asset
         .categories
         .iter()
         .find(|category| category.key == "katachi")
         .unwrap();
-    assert_eq!(shape.words.len(), 10);
+    // v4: 半円 and 三日月 moved into かたち (field arc_form), and 多角形 is offered.
+    assert_eq!(shape.words.len(), 12);
     assert_eq!(
         shape
             .words
@@ -77,7 +78,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        101
+        // ばしょ keeps 始点・終点・途中 as marker-only rows, read as in v3.
+        106
     );
     assert_eq!(asset.relations.len(), 11);
     assert_eq!(
@@ -94,7 +96,6 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "omote",
             "sabaki",
             "kime",
-            "shitaji",
             "ji",
             "iro",
             "yuragi",
@@ -102,6 +103,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "ugoki",
             "jun",
             "wariai",
+            "futosa",
+            "ookisa",
         ]
     );
     assert_eq!(
@@ -187,7 +190,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .iter()
         .map(|relation| relation.relation_type.as_str())
         .collect::<HashSet<_>>();
-    assert_eq!(category_keys.len(), 15);
+    assert_eq!(category_keys.len(), 16);
     assert_eq!(relation_types.len(), 11);
 
     let aliases = asset
@@ -214,8 +217,9 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .find(|word| word.surface_ja == ja)
             .unwrap();
         assert_eq!(word.surface_en.as_deref(), Some(en));
-        assert!(!word.prompt);
-        assert!(!word.display);
+        // v4 offers both to the list and the reader (prompt and display).
+        assert!(word.prompt);
+        assert!(word.display);
         assert_eq!(word.marker, Some(true));
         assert!(word.score_value.is_none());
     }
@@ -241,7 +245,8 @@ fn invalid_semantic_aliases_fail_closed_with_distinct_stable_kinds() {
         }),
         ("conflicting_semantic_alias", |asset: &mut SaijikiAsset| {
             place_word_mut(asset, "中心").semantic_alias = Some("center".to_owned());
-            place_word_mut(asset, "上").surface_en = Some("center".to_owned());
+            // The id is the word's own field (Saijiki v4, D1), not derived from its English.
+            place_word_mut(asset, "上").id = Some("center".to_owned());
         }),
     ];
 
@@ -259,7 +264,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
     let asset_value: Value = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
     // The amplitude words are adverbs only (narrowly, broadly) and carry no
     // grammar of their own; an adjective form would read as a shape's width or size.
-    for surface_ja in ["細かく", "大きく", "ゆるやかに", "小刻みに"] {
+    for surface_ja in ["小さく", "大きく", "ゆるやかに", "小刻みに"] {
         assert_eq!(
             word_value(&asset_value, "yuragi", surface_ja).get("english_grammar"),
             None
@@ -312,7 +317,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
     // The v1 aliases were rewritten to their words by the v2 migration (SPEC §3.3).
     for (category, word) in [
         ("yuragi", "揺れる"),
-        ("yuragi", "にじみ"),
+        ("sabaki", "にじみ"),
         ("basho", "中心"),
         ("omote", "点描"),
     ] {
@@ -366,7 +371,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
         );
     }
     for (surface_ja, canonical_id) in [
-        ("細かく", "narrowly"),
+        ("小さく", "narrowly"),
         ("大きく", "broadly"),
         ("ゆるやかに", "loosely"),
         ("小刻みに", "tightly"),
@@ -413,7 +418,12 @@ fn invalid_typed_english_grammar_fails_closed_with_stable_kinds() {
             word.as_object_mut().unwrap().remove("english_grammar");
         }),
         ("ineligible_english_grammar", |asset| {
-            word_value_mut(asset, "ugoki", "描く")["english_grammar"] = json!({
+            // v4 has no disabled row (the 描く tombstone is gone): disable one for the case.
+            let word = word_value_mut(asset, "ugoki", "引く");
+            word["prompt"] = json!(false);
+            word["display"] = json!(false);
+            word["marker"] = json!(false);
+            word["english_grammar"] = json!({
                 "lemma": "draw",
                 "lexical_class": "verb",
                 "canonical_form": "base",
@@ -468,16 +478,28 @@ fn invalid_typed_english_grammar_fails_closed_with_stable_kinds() {
 
 #[test]
 fn alias_free_rows_keep_their_existing_lexical_semantic_identity() {
-    for category in &saijiki_asset().categories {
+    // futosa and ookisa are core-modifier categories: syntax modifiers, not Saijiki
+    // words, so they have no Macro semantic ref projection.
+    for category in saijiki_asset()
+        .categories
+        .iter()
+        .filter(|category| category.core_modifier.is_none())
+    {
         for word in &category.words {
             if word.semantic_alias.is_some() {
                 continue;
             }
-            let expected = word.score_value.clone().or_else(|| {
-                word.surface_en
-                    .as_deref()
-                    .map(|surface| surface.replace(['-', ' '], "_"))
-            });
+            // The word's own id (Saijiki v4, D1): the identity v3 derived from the Score
+            // value or the English surface, kept when the English surface was renamed.
+            let expected = word
+                .id
+                .clone()
+                .or_else(|| word.score_value.clone())
+                .or_else(|| {
+                    word.surface_en
+                        .as_deref()
+                        .map(|surface| surface.replace(['-', ' '], "_"))
+                });
             assert_eq!(
                 project_macro_semantic_ref(&category.key, &word.surface_ja)
                     .map(|projection| projection.canonical_id),
@@ -557,15 +579,19 @@ fn embedded_asset_keeps_hidden_pruned_nullable_override_and_score_semantics() {
     };
 
     let polygon = word("katachi", "多角形");
-    assert!(!polygon.prompt);
-    assert!(!polygon.display);
+    // v4 offers 多角形 to the list and the reader (prompt and display), still a marker.
+    assert!(polygon.prompt);
+    assert!(polygon.display);
     assert_eq!(polygon.marker, Some(true));
 
-    let draw_tombstone = word("ugoki", "描く");
-    assert_eq!(draw_tombstone.surface_en, None);
-    assert!(!draw_tombstone.prompt);
-    assert!(!draw_tombstone.display);
-    assert_eq!(draw_tombstone.marker, Some(false));
+    // 描く was withdrawn in v4: 引く is the one drawing verb.
+    assert!(
+        category("ugoki")
+            .words
+            .iter()
+            .all(|word| word.surface_ja != "描く")
+    );
+    assert_eq!(word("ugoki", "引く").surface_en.as_deref(), Some("draw"));
 
     let line_up = word("ugoki", "並べる");
     assert_eq!(line_up.surface_en.as_deref(), Some("line-up"));
@@ -597,6 +623,9 @@ fn embedded_asset_keeps_hidden_pruned_nullable_override_and_score_semantics() {
             "自由線".to_owned(),
             "点".to_owned(),
             "雲形".to_owned(),
+            // Saijiki v4 moved the arc forms from わりあい to かたち.
+            "半円".to_owned(),
+            "三日月".to_owned(),
         ])
     );
     assert_eq!(
@@ -610,4 +639,41 @@ fn embedded_asset_keeps_hidden_pruned_nullable_override_and_score_semantics() {
             "fill".to_owned(),
         ])
     );
+}
+
+// The Saijiki screen shows the categories by bundle, under the bundle's heading and in the
+// bundle order (RECUT-PLAN §3, the author's choice 2026-11-17 15:4x). The hosts read both
+// from the asset, so every category names a bundle the asset lists, once.
+#[test]
+fn every_category_belongs_to_one_listed_bundle_in_the_screen_order() {
+    let asset = saijiki_asset();
+    let keys = asset
+        .bundles
+        .iter()
+        .map(|bundle| bundle.key.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        keys,
+        ["what", "with", "face", "sway", "color", "where", "ground"]
+    );
+    assert_eq!(asset.bundles[0].name_ja, "何を");
+    assert_eq!(asset.bundles[6].name_ja, "何の上に");
+    for category in &asset.categories {
+        let bundle = category
+            .bundle
+            .as_deref()
+            .unwrap_or_else(|| panic!("{}", category.key));
+        assert!(keys.contains(&bundle), "{} {bundle}", category.key);
+    }
+    // あいだ (the relation words) is shown under どこに置くか (RECUT-PLAN §3).
+    assert_eq!(asset.relations_bundle.as_deref(), Some("where"));
+    for bundle in &keys {
+        assert!(
+            asset
+                .categories
+                .iter()
+                .any(|category| category.bundle.as_deref() == Some(*bundle)),
+            "{bundle}"
+        );
+    }
 }

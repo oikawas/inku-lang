@@ -3,7 +3,7 @@
 //! underlayer word (したじ: 下塗り) lays the tool's paint under it. On any other
 //! mark the word says nothing: only that word is left out, with its own
 //! reason, and the rest of the sentence lowers as it does without it. An
-//! amplitude word (細かく・大きく) without a sway word (揺れる・波打つ) makes no
+//! amplitude word (小さく・大きく) without a sway word (揺れる・波打つ) makes no
 //! sway, and is left out the same way.
 
 use inku_ddl::{
@@ -161,7 +161,7 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
             },
         ),
         (
-            "中心に、赤のペンの疎なアクアチントの雲形を1個置く。",
+            "中心に、赤のペンの疎なメゾチントの雲形を1個置く。",
             JA,
             Expected {
                 density: 0.05,
@@ -169,7 +169,7 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
             },
         ),
         (
-            "Place one red pen sparse aquatint cloudform at the center.",
+            "Place one red pen sparse mezzotint cloudform at the center.",
             EN,
             Expected {
                 density: 0.05,
@@ -210,6 +210,25 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
                 filled: true,
                 intensity: SurfaceIntensity::Faint,
                 ..texture(SurfaceTexture::Crosshatch)
+            },
+        ),
+        // Saijiki v4: the size and the packing are two slots of きめ, so both stand.
+        (
+            "中心に、赤のペンの細かい密な点描の円を1個置く。",
+            JA,
+            Expected {
+                scale: 0.05,
+                density: 0.85,
+                ..texture(SurfaceTexture::Stipple)
+            },
+        ),
+        (
+            "Place one red pen coarse-grained sparse stipple circle at the center.",
+            EN,
+            Expected {
+                scale: 0.90,
+                density: 0.05,
+                ..texture(SurfaceTexture::Stipple)
             },
         ),
     ];
@@ -300,13 +319,17 @@ fn a_texture_word_without_a_named_texture_is_left_out_alone() {
     }
 }
 
-/// One mark takes one word of each class: two conflict, and both are left out
-/// as two handling words are.
+/// One mark takes one word of each slot: two conflict, and both are left out
+/// as two handling words are (the size and the packing of きめ are two slots).
 #[test]
 fn two_words_of_one_class_conflict_and_both_are_left_out() {
     for (source, without) in [
         (
-            "中心に、赤のペンの細かい密な点描の円を1個置く。",
+            "中心に、赤のペンの細かい粗い点描の円を1個置く。",
+            "中心に、赤のペンの点描の円を1個置く。",
+        ),
+        (
+            "中心に、赤のペンの密な疎な点描の円を1個置く。",
             "中心に、赤のペンの点描の円を1個置く。",
         ),
         (
@@ -334,7 +357,7 @@ fn two_words_of_one_class_conflict_and_both_are_left_out() {
 fn an_amplitude_word_without_a_sway_word_makes_no_sway() {
     for (source, without, language, id) in [
         (
-            "中心に、赤のペンの細かく点描の円を1個置く。",
+            "中心に、赤のペンの小さく点描の円を1個置く。",
             "中心に、赤のペンの点描の円を1個置く。",
             JA,
             "narrowly",
@@ -382,7 +405,7 @@ fn an_amplitude_word_without_a_sway_word_makes_no_sway() {
 fn an_amplitude_word_with_a_sway_word_sways_as_before() {
     for (source, language, amplitude, quality) in [
         (
-            "中心に、赤のペンの細かく揺れる点描の円を1個置く。",
+            "中心に、赤のペンの小さく揺れる点描の円を1個置く。",
             JA,
             Amplitude::Fine,
             Quality::Perlin,
@@ -410,4 +433,112 @@ fn an_amplitude_word_with_a_sway_word_sways_as_before() {
         assert_eq!(variation.amplitude, amplitude, "{source}");
         assert_eq!(variation.quality, quality, "{source}");
     }
+}
+
+/// Saijiki v4 (I-741 and the author's 2026-11-17 choice): a word a mark cannot show is
+/// left out with its reason, and the mark is drawn as it is without the word.
+// Concrete failure: the word stays in the Score and is not drawn (a face word on a line),
+// is dropped without a word (a flat on a line, a handling word on a digital line), or
+// takes the whole sentence with it (a sway word on a point).
+#[test]
+fn a_word_the_mark_cannot_show_is_left_out_with_its_reason() {
+    let gap = |kind: fn(String, String) -> ScoreFieldGap, category: &str, id: &str| {
+        kind(category.into(), id.into())
+    };
+    let without_face = |category: String, id: String| {
+        ScoreFieldGap::UnsupportedSurfaceWithoutFace { category, id }
+    };
+    let on_point = |category: String, id: String| ScoreFieldGap::UnsupportedFluctuationOnPoint {
+        category,
+        id,
+    };
+    let digital = |category: String, id: String| {
+        ScoreFieldGap::UnsupportedSurfaceIntensityForDigital { category, id }
+    };
+    let without_line = |category: String, id: String| {
+        ScoreFieldGap::UnsupportedContinuityWithoutLine { category, id }
+    };
+    for (source, without, expected) in [
+        (
+            "中心に、黒のペンの破線の弧を1本引く。",
+            "中心に、黒のペンの弧を1本引く。",
+            gap(without_line, "continuity", "dashed"),
+        ),
+        (
+            "中心に、黒の鉛筆の点線の円を1個置く。",
+            "中心に、黒の鉛筆の円を1個置く。",
+            gap(without_line, "continuity", "dotted"),
+        ),
+        (
+            "中心に、黒のペンの点描の線を1本引く。",
+            "中心に、黒のペンの線を1本引く。",
+            gap(without_face, "surface", "stipple"),
+        ),
+        (
+            "中心に、黒のペンのメゾチントの弧を1本引く。",
+            "中心に、黒のペンの弧を1本引く。",
+            gap(without_face, "surface", "aquatint"),
+        ),
+        (
+            "中心に、黒のペンの塗りの自由線を1本引く。",
+            "中心に、黒のペンの自由線を1本引く。",
+            gap(without_face, "surface", "solid"),
+        ),
+        (
+            "中心に、黒のペンの大きく波打つ点を1個置く。",
+            "中心に、黒のペンの点を1個置く。",
+            gap(on_point, "variation", "undulating"),
+        ),
+        (
+            "中心に、黒のデジタルの薄い線を1本引く。",
+            "中心に、黒のデジタルの線を1本引く。",
+            gap(digital, "handling", "faint"),
+        ),
+    ] {
+        let compiled = compile(source, JA);
+        let reference = compile(without, JA);
+        assert_eq!(compiled.gaps, vec![expected], "{source}");
+        assert_eq!(compiled.upstream, 0, "{source}");
+        assert_eq!(
+            compiled.score.instructions, reference.score.instructions,
+            "{source}"
+        );
+    }
+    // The handling word still lays a digital fill and a textured face.
+    for source in [
+        "中心に、黒のデジタルの濃い円を1個置く。",
+        "中心に、黒のデジタルの薄い点描の円を1個置く。",
+    ] {
+        assert!(compile(source, JA).gaps.is_empty(), "{source}");
+    }
+}
+
+fn canonical(source: &str) -> String {
+    let compilation = inku_ddl::compile_typed_ddl(
+        NormalizedDdlDocument::new(source, JA, Vec::new()).unwrap(),
+        &[],
+        Some(1),
+        LIMITS,
+    );
+    String::from_utf8(
+        compilation
+            .semantic_document
+            .and_then(|document| document.canonical_bytes)
+            .unwrap(),
+    )
+    .unwrap()
+}
+
+// Concrete failure (V1f, 14 of the author's works): moving 密な・疎な to a density field
+// changed the meaning digest, so a work's rotated, diagonal and rising angles and its leaf
+// counts were drawn again on a recompile. A density alone keeps its Saijiki v3 slot in the
+// canonical bytes (the author's choice, 2026-11-17); a mark with both, which v3 could not
+// write, has a density field.
+#[test]
+fn a_density_alone_keeps_its_v3_place_in_the_meaning_digest() {
+    let alone = canonical("中心に、黒のチョークの疎な粒の円を1個置く。");
+    assert!(alone.contains("\"surface\":{\"fineness\":"), "{alone}");
+    assert!(!alone.contains("\"density\":"), "{alone}");
+    let both = canonical("中心に、黒のチョークの細かい疎な粒の円を1個置く。");
+    assert!(both.contains("\"density\":"), "{both}");
 }

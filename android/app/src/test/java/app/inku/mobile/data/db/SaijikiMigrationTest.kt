@@ -8,9 +8,9 @@ import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 
-class SaijikiV3MigrationTest {
+class SaijikiMigrationTest {
     private fun migration(v1: (ByteArray) -> ByteArray = NativePipelineBridge::migrateSaijikiV1) =
-        SaijikiV3Migration(v1, NativePipelineBridge::migrateSaijikiV2, true)
+        SaijikiMigration(v1, NativePipelineBridge::migrateSaijikiV2, true)
 
     private fun schema(host: HostSqlite) {
         listOf(
@@ -23,10 +23,92 @@ class SaijikiV3MigrationTest {
         ).forEach(host.db::execSQL)
     }
 
+    @Test fun v3MacroReportsApproximatedReferences() {
+        HostSqlite().use { host ->
+            schema(host)
+            host.db.execSQL("INSERT INTO app_settings VALUES ('saijiki_v3_saved_records', '{}', 0)")
+            val definition = JSONObject("""{
+                "schema":"inku.macro-definition.v1", "namespace":"Saved", "heading":"Mark",
+                "version":"1.0.0", "parameters":{}, "components":{},
+                "body":[{"op":"emit", "binding":null, "fields":{
+                    "shape":{"expr":"semantic_ref", "category":"shape", "id":"line"},
+                    "movement":{"expr":"semantic_ref", "category":"movement", "id":"place"},
+                    "continuity":{"expr":"semantic_ref", "category":"continuity", "id":"dash_dot"}
+                }}]
+            }""")
+            val context = JSONObject().put("ddl_digest", "old").put("config", JSONObject().put("definitions", org.json.JSONArray().put(definition)))
+                .put("macro_catalog", JSONObject().put("definition_locks", org.json.JSONArray()))
+            val bytes = app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(context).toByteArray()
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            host.db.execSQL("INSERT INTO pipeline_history_links VALUES ('u', 'orphan', 'v', ?, ?, 'old')", arrayOf<Any>(bytes, digest))
+            val report = migration().runOnce(host.db)!!
+            assertEquals(0, report.getJSONArray("refused_records").length())
+            val entries = report.getJSONArray("approximated_ref_records")
+            assertEquals(1, entries.length())
+            assertEquals("Saved.Mark", entries.getJSONObject(0).getString("qualified_name"))
+            assertEquals("$.body[0].fields.continuity", entries.getJSONObject(0).getJSONArray("approximated_refs").getString(0))
+            assertEquals("dashed", entries.getJSONObject(0).getJSONObject("definition").getJSONArray("body")
+                .getJSONObject(0).getJSONObject("fields").getJSONObject("continuity").getString("id"))
+        }
+    }
+
+    @Test fun v3DocumentAndMacroReportApproximatedWords() {
+        HostSqlite().use { host ->
+            schema(host)
+            host.db.execSQL("INSERT INTO app_settings VALUES ('saijiki_v3_saved_records', '{}', 0)")
+            val definition = JSONObject("""{
+                "schema":"inku.macro-definition.v1", "namespace":"Saved", "heading":"Mark",
+                "version":"1.0.0", "parameters":{}, "components":{},
+                "body":[{"op":"emit", "binding":null, "fields":{
+                    "shape":{"expr":"semantic_ref", "category":"shape", "id":"line"},
+                    "movement":{"expr":"semantic_ref", "category":"movement", "id":"place"},
+                    "continuity":{"expr":"semantic_ref", "category":"continuity", "id":"dash_dot"}
+                }}]
+            }""")
+            val answer = JSONObject(NativePipelineBridge.migrateSaijikiV3(
+                JSONObject().put("definitions", org.json.JSONArray().put(definition)).toString().toByteArray(),
+            ).decodeToString()).getJSONArray("definitions").getJSONObject(0)
+            assertFalse(answer.has("error"))
+            assertEquals("dashed", answer.getJSONObject("definition").getJSONArray("body").getJSONObject(0)
+                .getJSONObject("fields").getJSONObject("continuity").getString("id"))
+            val lock = JSONObject().put("qualified_name", answer.getString("qualified_name"))
+                .put("version", answer.getString("version")).put("digest", answer.getString("old_digest"))
+            val context = JSONObject().put("ddl_digest", "old").put("config", JSONObject().put("definitions", org.json.JSONArray().put(definition)))
+                .put("macro_catalog", JSONObject().put("definition_locks", org.json.JSONArray().put(lock)))
+            val bytes = app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(context).toByteArray()
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            host.db.execSQL("INSERT INTO pipeline_history_links VALUES ('u', 'orphan', 'v', ?, ?, 'old')", arrayOf<Any>(bytes, digest))
+            val source = "一点鎖線の線を引く。"
+            val doc = JSONObject().put("source", source).put("language", "ja")
+                .put("saijiki", "inku.saijiki.v3").put("macro_locks", org.json.JSONArray().put(lock))
+            host.db.execSQL("INSERT INTO variation_authority VALUES ('u', 'v', '1', ?, ?, 'old')", arrayOf<Any>(source, doc.toString()))
+            val report = migration().runOnce(host.db)!!
+            assertEquals(0, report.getJSONArray("refused_records").length())
+            val approximated = report.getJSONArray("approximated_word_records").getJSONObject(0)
+            assertEquals("u/v", approximated.getString("id"))
+            assertEquals(1, approximated.getJSONArray("approximated_words").length())
+            host.db.query("SELECT document_json FROM variation_authority").use {
+                assertTrue(it.moveToFirst())
+                val moved = JSONObject(it.getString(0))
+                assertEquals("inku.saijiki.v4", moved.getString("saijiki"))
+                assertEquals("破線の線を引く。", moved.getString("source"))
+                assertEquals(answer.getString("digest"), moved.getJSONArray("macro_locks").getJSONObject(0).getString("digest"))
+            }
+            host.db.query("SELECT fork_context_bytes FROM pipeline_history_links").use {
+                assertTrue(it.moveToFirst())
+                val saved = JSONObject(it.getBlob(0).decodeToString())
+                assertEquals(answer.getString("digest").removePrefix("sha256:"), saved.getJSONObject("macro_catalog").getJSONArray("definition_locks").getJSONObject(0).getString("digest"))
+                assertEquals(app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(answer.getJSONObject("definition")),
+                    app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(saved.getJSONObject("config").getJSONArray("definitions").getJSONObject(0)))
+            }
+            assertTrue(host.rows("SELECT key FROM app_settings WHERE key = 'saijiki_v3_saved_records'").contains("saijiki_v3_saved_records"))
+        }
+    }
+
     @Test fun editionsAndIdempotenceUseRealCore() {
         HostSqlite().use { host ->
             schema(host)
-            for ((id, edition) in listOf("v1" to null, "v2" to "inku.saijiki.v2", "v3" to "inku.saijiki.v3", "other" to "inku.saijiki.v4")) {
+            for ((id, edition) in listOf("v1" to null, "v2" to "inku.saijiki.v2", "v3" to "inku.saijiki.v3", "current" to "inku.saijiki.v4", "other" to "inku.saijiki.v5")) {
                 val doc = JSONObject().put("source", "青の細筆の線を3個引く。").put("language", "ja").put("macro_locks", org.json.JSONArray())
                 if (edition != null) doc.put("saijiki", edition)
                 host.db.execSQL("INSERT INTO variation_authority VALUES (?, ?, ?, ?, ?, ?)", arrayOf<Any>("u", id, "1", doc.getString("source"), doc.toString(), "old"))
@@ -34,10 +116,10 @@ class SaijikiV3MigrationTest {
             val report = migration().runOnce(host.db)!!
             assertEquals(1, report.getJSONArray("refused_records").length())
             assertEquals("other_edition", report.getJSONArray("refused_records").getJSONObject(0).getJSONObject("error").getString("code"))
-            assertEquals(2, report.getJSONObject("variation_documents").getInt("written"))
+            assertEquals(3, report.getJSONObject("variation_documents").getInt("written"))
             host.db.query("SELECT document_json FROM variation_authority WHERE variation_id = 'v2'").use {
                 assertTrue(it.moveToFirst()); val doc = JSONObject(it.getString(0))
-                assertEquals("inku.saijiki.v3", doc.getString("saijiki")); assertTrue(doc.getString("source").contains("ガッシュ"))
+                assertEquals("inku.saijiki.v4", doc.getString("saijiki")); assertTrue(doc.getString("source").contains("ガッシュ"))
             }
             assertNull(migration().runOnce(host.db))
         }
@@ -49,7 +131,7 @@ class SaijikiV3MigrationTest {
             host.db.execSQL("INSERT INTO history_items VALUES ('h', '黒い太筆の線。', 'ja')")
             try { migration { error("injected core failure") }.runOnce(host.db); fail() } catch (_: IllegalStateException) { }
             assertEquals("[[\"黒い太筆の線。\"]]", host.rows("SELECT normalized_ddl FROM history_items"))
-            assertFalse(SaijikiV3Migration.alreadyWritten(host.db))
+            assertFalse(SaijikiMigration.alreadyWritten(host.db))
             assertNotNull(migration().runOnce(host.db))
         }
     }
@@ -195,29 +277,33 @@ class SaijikiV3MigrationTest {
     /** Explicit opt-in, on a separately copied database only. No device access. */
     @Test fun copiedDatabaseRehearsal() {
         val path = System.getenv("INKU_SAIJIKI_REHEARSAL_DB") ?: return
-        require(path.contains("/local/evidence/android/tools-v3-step5-20261101/"))
+        require(path.contains("/local/evidence/android/saijiki-v4-v3-20261117/"))
         val folder = requireNotNull(File(path).parentFile)
         val journal = folder.resolve("journal.jsonl")
         journal.createNewFile()
         Files.setPosixFilePermissions(journal.toPath(), PosixFilePermissions.fromString("rw-------"))
         fun call(version: Int, input: ByteArray): ByteArray {
-            val answer = if (version == 1) NativePipelineBridge.migrateSaijikiV1(input) else NativePipelineBridge.migrateSaijikiV2(input)
+            val answer = when (version) {
+                1 -> NativePipelineBridge.migrateSaijikiV1(input)
+                2 -> NativePipelineBridge.migrateSaijikiV2(input)
+                else -> NativePipelineBridge.migrateSaijikiV3(input)
+            }
             journal.appendText(JSONObject().put("version", version).put("input", JSONObject(input.decodeToString())).put("answer", JSONObject(answer.decodeToString())).toString() + "\n")
             return answer
         }
         HostSqlite(path).use { host ->
             if (System.getenv("INKU_SAIJIKI_ORPHAN_ONLY") == "1") {
-                check(SaijikiV3Migration.alreadyWritten(host.db))
+                check(SaijikiMigration.alreadyWritten(host.db))
                 inspectOrphanLocks(host, folder)
                 return
             }
             if (System.getenv("INKU_SAIJIKI_COMPILE_ONLY") == "1") {
-                check(SaijikiV3Migration.alreadyWritten(host.db))
+                check(SaijikiMigration.alreadyWritten(host.db))
                 compileMigratedRecords(host, folder)
                 inspectOrphanLocks(host, folder)
                 return
             }
-            val report = SaijikiV3Migration({ call(1, it) }, { call(2, it) }, true).runOnce(host.db)!!
+            val report = SaijikiMigration({ call(1, it) }, { call(2, it) }, true, migrateV3 = { call(3, it) }).runOnce(host.db)!!
             val file = folder.resolve("report.json")
             file.createNewFile()
             Files.setPosixFilePermissions(file.toPath(), PosixFilePermissions.fromString("rw-------"))

@@ -111,10 +111,12 @@ const RESTRICTED = [
 		texts: [],
 	},
 	{
-		// One word, one sense: Moderate is the historical middle variation amplitude and nothing else.
+		// Moderate is also the Saijiki v4 spelling of 程よい, not a speed label.
 		word: 'Moderate', re: /\bmoderate\b/i, instead: 'for speed use Medium',
 		keys: ['retiredVariationMedium'],
-		texts: [],
+		texts: ['On a digital mark, a handling word (dense, moderate, faint)',
+			'Left: moderate pencil stipple', 'Both halves show moderate pencil stipple',
+			'Place a moderate stipple pencil square'],
 	},
 ];
 

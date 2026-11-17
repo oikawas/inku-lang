@@ -1014,7 +1014,7 @@ fn declared_core_binding_failure_and_unbound_caller_keep_their_policy_owners() {
     let definition = definition_from(&data.to_string());
     for source in [
         "place one red circle at center. ｛One｝",
-        "place one red circle at center. thin extra-fine ｛One｝",
+        "place one red circle at center. thin very thin ｛One｝",
     ] {
         let stop = execute_locked(
             source,

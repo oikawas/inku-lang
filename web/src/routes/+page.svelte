@@ -16,7 +16,7 @@
 	import { ddlWorkKey } from '$lib/features/ddl-editor/work-key';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
-	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
+	import { hydrateSaijiki, hydrateSaijikiEn, hydrateSaijikiBundles, type SaijikiBundle } from '$lib/saijiki';
 	import { SURFACE_PREVIEWS, HANDLING_PREVIEWS, FINENESS_PREVIEWS, UNDERLAYER_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
 	import { instructionLangOf, resolveInstructionLang, type ResolvedInstructionLang } from '$lib/instructionLang';
 	import AppRail from '$lib/components/AppRail.svelte';
@@ -339,7 +339,7 @@
 			三角: { effect: '三つの頂点を持つ形を描く。', example: '上に三角を置く', effectEn: 'Draws a form with three vertices.', exampleEn: 'Place a triangle at the top', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>') },
 			四角: { effect: '矩形を描く。比率語で縦長・横長にもなる。', example: '中心に四角を置く', effectEn: 'Draws a rectangle. Proportion words make it tall or wide.', exampleEn: 'Place a square at center', svg: shapeSvg('<rect x="58" y="24" width="64" height="44" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/>') },
 			線: { effect: '始点から終点へ線を引く。', example: '水平の線を引く', effectEn: 'Draws a line from a start point to an end point.', exampleEn: 'Draw a horizontal line', svg: lineSvg() },
-			弧: { effect: '円周の一部を描く。半円や三日月の基礎になる。', example: '上弦の弧を引く', effectEn: 'Draws part of a circumference. The basis for semicircles and crescents.', exampleEn: 'Draw a waxing arc', svg: shapeSvg('<path d="M44 58 Q90 18 136 58" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			弧: { effect: '円周の一部を描く。半円や三日月の基礎になる。', example: '半円の弧を引く', effectEn: 'Draws part of a circumference. The basis for semicircles and crescents.', exampleEn: 'Draw a semicircle arc', svg: shapeSvg('<path d="M44 58 Q90 18 136 58" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
 			// The product's own rotring free line (render seed 6902696091315696, a
 			// horizontal free line at center), its path scaled into the frame (I-715 B2).
 			自由線: { effect: '始点と終点のあいだの道筋を、演奏ごとに直線・円弧・自由な曲がりで組んで引く。', example: '右上がりの自由線を引く', effectEn: 'Draws the path between a start and an end point, built anew for each performance from straight parts, arcs, and free bends.', exampleEn: 'Draw a rising free line', svg: shapeSvg('<path d="M22.0 60.3 L22.4 57.1 L23.2 54.0 L24.2 50.9 L25.6 48.0 L27.3 45.3 L29.2 42.7 L31.4 40.4 L33.8 38.2 L36.5 36.4 L39.3 34.8 L42.3 33.6 L45.3 32.6 L48.5 32.0 L51.7 31.7 L54.9 31.7 L58.1 32.1 L61.3 32.8 L64.3 33.8 L67.3 35.1 L70.0 36.8 L72.6 38.7 L76.4 41.7 L80.1 44.8 L83.8 47.8 L87.6 50.9 L91.3 53.9 L95.0 57.0 L99.2 55.0 L103.5 53.0 L107.7 51.0 L111.9 48.9 L116.2 46.9 L120.4 44.9 L124.6 42.9 L128.9 40.9 L133.1 38.9 L137.3 36.9 L141.6 34.8 L145.8 32.8 L147.8 37.4 L149.9 42.0 L151.9 46.6 L153.9 51.2 L156.0 55.7 L158.0 60.3" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>') },
@@ -355,7 +355,7 @@
 			ペン: { effect: '明瞭さを保ちながら、わずかな幅と軌道の変化を持つ。', example: 'ペンの線を引く', effectEn: 'Stays clear while varying slightly in width and path.', exampleEn: 'Draw a pen line', svg: touchSvg('pen') },
 			チョーク: { effect: '幅の崩れ、途切れ、粉状の粒を含む淡い線。', example: '白いチョークの線', effectEn: 'A pale line with broken width, gaps, and powdery grain.', exampleEn: 'A white chalk line', svg: touchSvg('chalk') },
 			油彩: { effect: '厚みのある色層と筆筋を重ね、一部の運びに楽譜のほかの色の筋が混ざる。', example: '油彩の赤い線を引く', effectEn: 'Layers a dense paint body with visible brush streaks; some strokes carry thin streaks of the work\'s other colors.', exampleEn: 'Draw a red oil paint line', svg: touchSvg('oil_paint') },
-			コンピュータ: { effect: '幅と軌道を格子と段に落とし、同じ周期と破線を誤差なく反復する。', example: 'コンピュータの線', effectEn: 'Snaps width and path to a grid and steps, repeating the same cycle and dashes without error.', exampleEn: 'A computer line', svg: touchSvg('computer') },
+			デジタル: { effect: '幅と軌道を格子と段に落とし、同じ周期と破線を誤差なく反復する。', example: 'デジタルの線', effectEn: 'Snaps width and path to a grid and steps, repeating the same cycle and dashes without error.', exampleEn: 'A digital line', svg: touchSvg('computer') },
 			オイルパステル: { effect: '紙の目が抜ける縁と、詰まった芯の二層で引く、蝋の不透明な線。', example: 'オイルパステルの線を引く', effectEn: 'An opaque waxy line in two layers: an edge where the paper\'s tooth shows through and a dense core.', exampleEn: 'Draw an oil pastel line', svg: touchSvg('oil_pastel') },
 			ガッシュ: { effect: '不透明でつやの無い平らな色。入りと抜きが細く、筆圧で幅が変わる。', example: 'ガッシュの線を引く', effectEn: 'Flat, matte, opaque color, thin at entry and release, with width changing under pressure.', exampleEn: 'Draw a gouache line', svg: touchSvg('gouache') },
 			水彩: { effect: '透ける色を重ね、重なると濃くなる。縁の内側に色が溜まり、楽譜のほかの色が少し混ざる。', example: '青い水彩の塗りの円を置く', effectEn: 'Layers transparent color that deepens where it overlaps and pools inside the edge, taking in a little of the work\'s other colors.', exampleEn: 'Place a blue watercolor flat circle', svg: touchSvg('watercolor') },
@@ -364,9 +364,7 @@
 			実線: { effect: '切れ目のない線。', example: '実線の線を引く', effectEn: 'An unbroken line.', exampleEn: 'Draw a solid line', svg: lineSvg() },
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', effectEn: 'Places short segments with gaps between them.', exampleEn: 'A dashed arc', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線の円を置く', effectEn: 'Draws as a run of dots.', exampleEn: 'Place a dotted circle', svg: lineSvg('stroke-dasharray="1 12"') },
-			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線の線を引く', effectEn: 'Alternates long dashes with dots.', exampleEn: 'Draw a dash-dot line', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
 			// Surface, handling, fineness and underlayer follow the current Saijiki categories.
-			...SURFACE_PREVIEWS,
 			...HANDLING_PREVIEWS,
 			...FINENESS_PREVIEWS,
 			...UNDERLAYER_PREVIEWS,
@@ -379,10 +377,8 @@
 			黄: { effect: '黄色系の色で描く。', example: '黄の円', effectEn: 'Draws in a yellow tone.', exampleEn: 'A yellow circle', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#d8a51d"/>') },
 			橙: { effect: '橙色系の色で描く。', example: '橙色の楕円', effectEn: 'Draws in an orange tone.', exampleEn: 'An orange ellipse', svg: shapeSvg('<ellipse cx="90" cy="46" rx="38" ry="22" fill="#d66a28"/>') },
 			紫: { effect: '紫系の色で描く。', example: '紫の三角', effectEn: 'Draws in a purple tone.', exampleEn: 'A purple triangle', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="#7650a6"/>') },
-			細かく: { effect: '小さな揺らぎを加える。', example: '細かく揺れる線', effectEn: 'Adds a small-amplitude sway.', exampleEn: 'A narrowly swaying line', svg: lineSvg() },
+			小さく: { effect: '小さな揺らぎを加える。', example: '小さく揺れる線', effectEn: 'Adds a small-amplitude sway.', exampleEn: 'A narrowly swaying line', svg: lineSvg() },
 			大きく: { effect: '振幅の大きな揺らぎを加える。', example: '大きく波打つ線', effectEn: 'Adds a large-amplitude sway.', exampleEn: 'A broadly undulating line', svg: shapeSvg('<path d="M20 48 C42 8 64 84 88 48 S134 8 160 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
-			ゆっくり: { effect: 'ゆったりした周期の動きとして解釈する。', example: 'ゆっくり波打つ線', effectEn: 'Read as motion with a long period.', exampleEn: 'A slowly undulating line', svg: shapeSvg('<path d="M22 48 C62 20 112 76 158 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
-			速く: { effect: '揺れの周期を短くする。', example: '速く揺れる線', effectEn: 'Shortens the period of the sway.', exampleEn: 'A quickly swaying line', svg: shapeSvg('<path d="M20 48 L32 40 L44 56 L56 40 L68 56 L80 40 L92 56 L104 40 L116 56 L128 40 L140 56 L158 48" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>') },
 			揺れる: { effect: '線や輪郭に連続した揺れを与える。', example: '揺れる線', effectEn: 'Gives lines and contours a continuous sway.', exampleEn: 'A swaying line', svg: lineSvg() },
 			波打つ: { effect: '波形のうねりを作る。', example: '波打つ青い線', effectEn: 'Makes a wave-shaped undulation.', exampleEn: 'An undulating blue line', svg: shapeSvg('<path d="M20 48 C42 22 66 74 88 48 S134 22 160 48" fill="none" stroke="#2c5fb8" stroke-width="5" stroke-linecap="round"/>') },
 			にじみ: { effect: '墨の縁から不均一な広がりを加える。', example: 'にじみの黒い円を置く。', effectEn: 'Adds irregular spread at the edges of the ink.', exampleEn: 'Place a bleeding black circle.', svg: shapeSvg('<defs><filter id="pblur"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="90" cy="46" r="24" fill="#2b2b2b" opacity="0.72" filter="url(#pblur)"/><circle cx="90" cy="46" r="20" fill="#2b2b2b" opacity="0.62"/>') },
@@ -393,9 +389,6 @@
 			右端: { effect: '右端近くへ寄せる。', example: '右端に線を置く', effectEn: 'Pulls close to the right edge.', exampleEn: 'Place a line at the right edge', svg: shapeSvg('<path d="M90 16 V76" stroke="#d7d1c4" stroke-width="2"/><path d="M150 18 V74" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
 			上端: { effect: '上の縁へ寄せる。', example: '上端に線を引く', effectEn: 'Pulls to the upper margin.', exampleEn: 'Draw a line at the top edge', svg: shapeSvg('<path d="M30 18 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/><path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/>') },
 			下端: { effect: '下の縁へ寄せる。', example: '下端に線を引く', effectEn: 'Pulls to the lower margin.', exampleEn: 'Draw a line at the bottom edge', svg: shapeSvg('<path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/><path d="M30 74 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
-			始点: { effect: '線または弧の始点を選ぶ。', example: '前の線の始点につながる青い弧を引く', effectEn: 'Selects the start of a line or arc.', exampleEn: 'Place a blue arc connected to the start of the previous line', svg: shapeSvg('<path d="M35 62 H145" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/><circle cx="35" cy="62" r="6" fill="#2b2b2b"/>') },
-			終点: { effect: '線または弧の終点を選ぶ。', example: '前の線の終点につながる青い弧を引く', effectEn: 'Selects the end of a line or arc.', exampleEn: 'Place a blue arc connected to the end of the previous line', svg: shapeSvg('<path d="M35 62 H145" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/><circle cx="145" cy="62" r="6" fill="#2b2b2b"/>') },
-			途中: { effect: '線や弧の両端以外につなぐ。接ぐ位置は演奏で決まる。', example: '赤い線を置く。前の線の途中につながる小さな青い弧を置く。', effectEn: 'Connects along a line or arc, excluding both ends. The position is decided during performance.', exampleEn: 'Place a red line. Place a small blue arc connected partway along the previous line.', svg: shapeSvg('<path d="M30 62 H150" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/><path d="M72 62 Q94 20 116 46" fill="none" stroke="#2c5fb8" stroke-width="5" stroke-linecap="round"/>') },
 			隅: { effect: '四隅のいずれかへ配置する。', example: '隅に小さな円を置く', effectEn: 'Places at one of the four corners.', exampleEn: 'Place a small circle in a corner', svg: shapeSvg('<circle cx="36" cy="25" r="11" fill="#2b2b2b"/><circle cx="144" cy="67" r="11" fill="#2b2b2b" opacity="0.28"/>') },
 			置く: { effect: '指定した場所に一つ置く。', example: '中心に円を置く', effectEn: 'Places one element at the given location.', exampleEn: 'Place a circle at center', svg: shapeSvg('<circle cx="90" cy="46" r="22" fill="#2b2b2b"/>') },
 			並べる: { effect: '図形や組を列として並べる。', example: '円を横に並べる', effectEn: 'Lines shapes or groups up as a row.', exampleEn: 'Line up circles', svg: shapeSvg('<circle cx="55" cy="46" r="12" fill="#2b2b2b"/><circle cx="90" cy="46" r="12" fill="#2b2b2b"/><circle cx="125" cy="46" r="12" fill="#2b2b2b"/>') },
@@ -410,8 +403,6 @@
 			全幅: { effect: '画面幅いっぱいに広げる。', example: '全幅の線', effectEn: 'Spreads across the full width of the frame.', exampleEn: 'A full-width line', svg: shapeSvg('<path d="M14 46 H166" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
 			半幅: { effect: '画面の半分程度の幅にする。', example: '半幅の線', effectEn: 'Sets the width to about half the frame.', exampleEn: 'A half-width line', svg: shapeSvg('<path d="M45 46 H135" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/><path d="M14 72 H166" stroke="#d7d1c4" stroke-width="2"/>') },
 			半円: { effect: '円の半分を描く。', example: '半円の弧を引く', effectEn: 'Draws half of a circle.', exampleEn: 'Draw a semicircle arc', svg: shapeSvg('<path d="M50 60 A40 40 0 0 1 130 60" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
-			上弦: { effect: '右に膨らむ180度の開弧として扱う。', example: '上弦の青い弧を引く', effectEn: 'Read as a 180-degree open arc bulging to the right.', exampleEn: 'Draw a blue waxing arc', svg: shapeSvg('<path d="M90 18 A28 28 0 0 1 90 74" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
-			下弦: { effect: '左に膨らむ180度の開弧として扱う。', example: '下弦の青い弧を引く', effectEn: 'Read as a 180-degree open arc bulging to the left.', exampleEn: 'Draw a blue waning arc', svg: shapeSvg('<path d="M90 18 A28 28 0 0 0 90 74" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
 			三日月: { effect: '細い月形を描く。', example: '三日月の弧を引く', effectEn: 'Draws a thin moon form.', exampleEn: 'Draw a crescent arc', svg: shapeSvg('<path d="M106 18 C76 24 62 52 82 74 C52 63 50 27 82 14 C92 12 100 14 106 18 Z" fill="#2b2b2b"/>') },
 			沿う: { effect: `直前の線を参照する関係。`, example: `前の線に沿って`, effectEn: `A relation that refers to the preceding line.`, exampleEn: `along the previous line`, svg: shapeSvg(`<path d="M24 56 C58 28 104 70 156 34" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/><circle cx="62" cy="45" r="5" fill="#c9362d"/><circle cx="94" cy="51" r="5" fill="#c9362d"/><circle cx="126" cy="43" r="5" fill="#c9362d"/>`) },
 			触れない: { effect: `直前の形に接触しない関係。`, example: `前の形に触れない`, effectEn: `A relation that makes no contact with the preceding shape.`, exampleEn: `not touching the previous shape`, svg: shapeSvg(`<circle cx="78" cy="46" r="22" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="124" cy="46" r="10" fill="none" stroke="#c9362d" stroke-width="5"/>`) },
@@ -424,7 +415,17 @@
 			横切る: { effect: `直前の形を、片方の縁から反対の縁まで越えて置く関係。`, example: `前の形を横切る`, effectEn: `A relation that crosses the preceding shape from one edge past the other.`, exampleEn: `crossing the previous shape`, svg: shapeSvg(`<rect x="68" y="18" width="44" height="56" fill="none" stroke="#2b2b2b" stroke-width="5"/><path d="M36 50 H144" stroke="#c9362d" stroke-width="6" stroke-linecap="round"/>`) },
 			鏡写し: { effect: '二つの形の間の軸を挟んで、位置と向きを鏡像にする。', example: '上に斜めの小さな赤い弧を置く。下に前の形と鏡写しの青い弧を置く。', effectEn: 'Mirrors the positions and orientations across the axis between two shapes.', exampleEn: 'Place a small diagonal red arc at top. Place a blue arc at bottom, mirrored with the previous shape.', svg: shapeSvg('<path d="M55 30 Q92 6 125 28" fill="none" stroke="#c9362d" stroke-width="5" stroke-linecap="round"/><path d="M55 62 Q92 86 125 64" fill="none" stroke="#2c5fb8" stroke-width="5" stroke-linecap="round"/>') },
 		};
-		const entry = previews[canonicalWord] ?? previews[word];
+		const widths: Record<string, [number, string]> = { 'ごく細い': [1, 'very thin'], '細い': [2, 'thin'], '太い': [7, 'thick'], 'ごく太い': [11, 'very thick'] };
+		const sizes: Record<string, [number, string]> = { 'ごく小さな': [5, 'very small'], '小さな': [10, 'small'], '普通の大きさ': [16, 'normal-sized'], '大きな': [24, 'large'], 'ごく大きな': [32, 'very large'] };
+		if (categoryKey === 'futosa' && widths[canonicalWord]) {
+			const [width, english] = widths[canonicalWord];
+			return { ...base, ...localized({ effect: '線の太さを指定する。', effectEn: 'Sets the width of a line.', example: `${canonicalWord}線を引く`, exampleEn: `Draw a ${english} line`, svg: lineSvg('', width) }) };
+		}
+		if (categoryKey === 'ookisa' && sizes[canonicalWord]) {
+			const [radius, english] = sizes[canonicalWord];
+			return { ...base, ...localized({ effect: '形の大きさを指定する。', effectEn: 'Sets the size of a shape.', example: `${canonicalWord}円を置く`, exampleEn: `Place a ${english} circle`, svg: shapeSvg(`<circle cx="90" cy="46" r="${radius}" fill="#2b2b2b"/>`) }) };
+		}
+		const entry = categoryKey === 'omote' ? SURFACE_PREVIEWS[canonicalWord] : categoryKey === 'ji' ? undefined : previews[canonicalWord];
 		if (entry) return { ...base, ...localized(entry) };
 		// A word without a drawing of its own still shows a fragment of DDL that
 		// reads, rather than "use this word" (2026-10-15).
@@ -1230,7 +1231,8 @@
 
 	async function loadPluginVocabulary() {
 		type SaijikiPayload = {
-			categories: { key: string; name_ja: string; name_en: string; words: string[] }[];
+			bundles?: SaijikiBundle[];
+			categories: { key: string; name_ja: string; name_en: string; bundle: string; words: string[]; ids: string[]; facets: (string | null)[]; descriptions: (string | null)[] }[];
 			plugins: PluginEntry[];
 		};
 		const fetchSaijiki = async (lang: 'ja' | 'en'): Promise<SaijikiPayload> => {
@@ -1242,11 +1244,12 @@
 			// Both languages: highlighting matches the DDL's own language, which
 			// follows instruction_lang and need not agree with the UI language.
 			const [ja, en] = await Promise.all([fetchSaijiki('ja'), fetchSaijiki('en')]);
+			if (Array.isArray(ja.bundles)) hydrateSaijikiBundles(ja.bundles);
 			hydrateSaijiki(
-				ja.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
+				ja.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, bundle: c.bundle, words: c.words, ids: c.ids, facets: c.facets, descriptions: c.descriptions }))
 			);
 			hydrateSaijikiEn(
-				en.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
+				en.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, bundle: c.bundle, words: c.words, ids: c.ids, facets: c.facets, descriptions: c.descriptions }))
 			);
 			pluginEntries = ja.plugins ?? [];
 		} catch (error) {

@@ -1,4 +1,4 @@
-"""Coordinate one stopped-service Saijiki v3 database and package cutover.
+"""Coordinate one stopped-service Saijiki v4 database and package cutover.
 
 The operator owns service stopping and the durable one-attempt guard. Recovery
 uses the committed database marker to distinguish rollback from completion.
@@ -19,11 +19,11 @@ from sqlalchemy import create_engine
 
 from .backup import create_sqlite_snapshot
 from .invariants import capture_invariants, require_integrity, verify_invariants
-from .saijiki_v3_migration import (
+from .saijiki_v4_migration import (
     DONE_SETTING, MigrationAlreadyWritten, _already_written, _canonical, _execute,
-    migrate_saved_records, migrate_unit_v3,
+    migrate_saved_records, migrate_unit_v4, require_v3_cutover,
 )
-from .saijiki_v3_plugins import plan_packages
+from .saijiki_v4_plugins import plan_packages
 
 
 def _hash(data: bytes) -> str:
@@ -31,7 +31,7 @@ def _hash(data: bytes) -> str:
 
 
 def _atomic(path: Path, value: bytes, mode: int) -> None:
-    descriptor, temporary = tempfile.mkstemp(prefix=".saijiki-v3-", dir=path.parent)
+    descriptor, temporary = tempfile.mkstemp(prefix=".saijiki-v4-", dir=path.parent)
     try:
         os.fchmod(descriptor, mode)
         with os.fdopen(descriptor, "wb") as output:
@@ -102,6 +102,8 @@ def cutover(database: Path, packages: Path, recovery: Path, *, journal: Path,
     """Migrate once; caller must stop every writer and guard this attempt externally."""
     started = time.monotonic()
     database = database.resolve(strict=True)
+    with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as connection:
+        require_v3_cutover(connection)
     if packages.is_symlink():
         raise ValueError("invalid_package_root")
     packages = packages.resolve(strict=True)
@@ -135,8 +137,9 @@ def cutover(database: Path, packages: Path, recovery: Path, *, journal: Path,
             try:
                 if _already_written(connection):
                     raise MigrationAlreadyWritten(str(database))
+                require_v3_cutover(connection)
                 before = capture_invariants(connection)
-                report = migrate_saved_records(connection, migrate_unit_v3, workers=workers,
+                report = migrate_saved_records(connection, migrate_unit_v4, workers=workers,
                                                checked=lambda: verify_invariants(connection, before),
                                                journal=journal, timeout=timeout, abort_on_failure=not allow_refused,
                                                blank=blank)

@@ -1,8 +1,8 @@
-//! Regenerate `assets/work-plan-capabilities-v2.json` from the current compiler.
+//! Regenerate `assets/work-plan-capabilities-v3.json` from the current compiler.
 //!
 //! ```sh
 //! scripts/rust-toolchain.sh run -p inku-ddl --example work-plan-capabilities --locked --offline \
-//!   > core/crates/inku-ddl/assets/work-plan-capabilities-v2.json
+//!   > core/crates/inku-ddl/assets/work-plan-capabilities-v3.json
 //! ```
 
 fn main() {

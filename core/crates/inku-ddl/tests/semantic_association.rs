@@ -801,9 +801,9 @@ fn spec_core_thinness_has_language_independent_entity_meaning_and_source_provena
             "extra_fine",
         ),
         (
-            "Place one extra-fine pencil line at the center.",
+            "Place one very thin pencil line at the center.",
             ResolvedInstructionLanguage::En,
-            "extra-fine",
+            "very thin",
             "extra_fine",
         ),
     ] {
@@ -879,7 +879,7 @@ fn core_thinness_uses_pre_head_ownership_without_default_or_nearest_fallback() {
     ));
 
     let conflict = NormalizedDdlDocument::new(
-        "thin extra-fine line",
+        "thin very thin line",
         ResolvedInstructionLanguage::En,
         Vec::new(),
     )
@@ -1341,7 +1341,8 @@ fn every_accepted_surface_and_handling_row_belongs_to_exactly_one_closed_dimensi
     let mut intensity_ids = HashSet::new();
     // Surface words name a technique; handling words (さばき) how the medium is laid.
     // 刷毛目 (DDL 25) is the ninth surface word.
-    for (key, semantic_category, rows) in [("omote", "surface", 9), ("sabaki", "handling", 3)] {
+    // v4: さばき also holds にじみ (field spread, semantic category `variation`).
+    for (key, semantic_category, rows) in [("omote", "surface", 9), ("sabaki", "handling", 4)] {
         let category = saijiki_asset()
             .categories
             .iter()
@@ -1351,7 +1352,15 @@ fn every_accepted_surface_and_handling_row_belongs_to_exactly_one_closed_dimensi
         for word in &category.words {
             let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
                 .expect("accepted row has canonical identity");
-            assert_eq!(projection.category, semantic_category);
+            let spread = word.semantic_category.as_deref() == Some("variation");
+            assert_eq!(
+                projection.category,
+                if spread {
+                    "variation"
+                } else {
+                    semantic_category
+                }
+            );
             let source = format!(
                 "{} circle.",
                 word.surface_en
@@ -1365,6 +1374,17 @@ fn every_accepted_surface_and_handling_row_belongs_to_exactly_one_closed_dimensi
                 associate_semantic_entities(&document).expect("accepted row forms a clause stream");
             assert!(result.issues.is_empty(), "{}", projection.canonical_id);
             let entity = result.ast.entities.first().expect("one entity");
+            if spread {
+                let term = entity
+                    .fluctuation
+                    .spread
+                    .as_ref()
+                    .expect("the moved spread word keeps its Fluctuation spread field");
+                assert_eq!(term.identity.category, "variation");
+                assert_eq!(term.identity.id, projection.canonical_id);
+                assert!(entity.surface.quality.is_none() && entity.surface.intensity.is_none());
+                continue;
+            }
             match (&entity.surface.quality, &entity.surface.intensity) {
                 (Some(term), None) if key == "omote" => {
                     assert_eq!(term.identity.category, "surface");
@@ -1416,7 +1436,9 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
         .iter()
         .find(|category| category.key == "yuragi")
         .expect("accepted asset has the Fluctuation category");
-    assert_eq!(category.words.len(), 7);
+    // v4 moved にじみ (the spread word) to さばき; it keeps the `variation` category
+    // and is checked in the surface-and-handling test below.
+    assert_eq!(category.words.len(), 6);
 
     let mut amplitude_ids = HashSet::new();
     let mut frequency_ids = HashSet::new();
@@ -1524,10 +1546,7 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
             .into_iter()
             .collect()
     );
-    assert_eq!(
-        spread_ids,
-        ["bleeding"].map(str::to_owned).into_iter().collect()
-    );
+    assert!(spread_ids.is_empty());
     assert_eq!(
         quality_ids,
         ["swaying", "undulating"]
@@ -1544,12 +1563,28 @@ fn every_accepted_proportion_row_belongs_to_exactly_one_closed_dimension() {
         .iter()
         .find(|category| category.key == "wariai")
         .expect("accepted asset has the Proportion category");
-    assert_eq!(category.words.len(), 8);
+    assert_eq!(category.words.len(), 4);
+
+    // Saijiki v4 moved the arc-form words (半円・三日月) into かたち, where they keep
+    // the Macro semantic category `ratio`; the Proportion rows are counted by it.
+    let moved = saijiki_asset()
+        .categories
+        .iter()
+        .filter(|category| category.key != "wariai")
+        .flat_map(|category| category.words.iter().map(move |word| (category, word)))
+        .filter(|(_, word)| word.semantic_category.as_deref() == Some("ratio"))
+        .collect::<Vec<_>>();
+    assert_eq!(moved.len(), 2);
 
     let mut aspect_ids = HashSet::new();
     let mut width_extent_ids = HashSet::new();
     let mut arc_form_ids = HashSet::new();
-    for word in &category.words {
+    for (category, word) in category
+        .words
+        .iter()
+        .map(|word| (category, word))
+        .chain(moved)
+    {
         let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
             .expect("accepted Proportion row has canonical identity");
         let source = format!(
@@ -1605,7 +1640,7 @@ fn every_accepted_proportion_row_belongs_to_exactly_one_closed_dimension() {
     );
     assert_eq!(
         arc_form_ids,
-        ["semicircle", "waxing", "waning", "crescent"]
+        ["semicircle", "crescent"]
             .map(str::to_owned)
             .into_iter()
             .collect()

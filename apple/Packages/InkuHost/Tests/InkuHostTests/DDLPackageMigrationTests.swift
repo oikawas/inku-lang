@@ -4,6 +4,42 @@ import Testing
 @testable import InkuHost
 
 struct DDLPackageMigrationTests {
+    @Test func v3ImportReportsApproximationOfRotatedWaxingArc() throws {
+        let file: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),
+            "language": .string("ja"), "ddl": .string("中心に、黒のペンの右上がりの上弦の弧を1本引く。"), "plugins": .array([])])
+        let result = try DDLPackageImport.parse(file.data)
+        #expect(result.source == "中心に、黒のペンの右上がりの半円の弧を1本引く。")
+        #expect(result.approximatedWords.count == 1)
+    }
+
+    @Test func v3ImportCountsApproximationsInsideDefinitions() throws {
+        let definition = try ExactJSON(data: Data(#"{"schema":"inku.macro-definition.v1","namespace":"Saved","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"continuity":{"expr":"semantic_ref","category":"continuity","id":"dash_dot"}}}]}"#.utf8))
+        let file: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),
+            "language": .string("ja"), "ddl": .string("青い線を引く。"),
+            "plugins": .array([.object(["definition": definition, "note": .string("")])])])
+        let migrated = try DDLPackageImport.parse(file.data)
+        #expect(migrated.approximatedDefinitionReferenceCount == 1)
+        #expect(migrated.approximatedWords.isEmpty)
+        let unchanged = try DDLPackageImport.parse(Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v4","ddl":"青い線を引く。","plugins":[]}"#.utf8))
+        #expect(unchanged.approximatedDefinitionReferenceCount == 0)
+    }
+
+    @Test func v3PackageMigratesCarriedDefinitionAndApproximatedSource() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let fixture = try ExactJSON(data: Data(contentsOf: root.appendingPathComponent("core/crates/inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json")))
+        let definition = try #require(fixture["entries"].array?.first?["definition"])
+        let input: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),
+            "language": .string("ja"), "ddl": .string("｛若葉｝。青い小さめの線を引く。"),
+            "plugins": .array([.object(["definition": definition, "note": .string("keep")])])])
+        let result = try DDLPackageImport.parse(input.data)
+        #expect(result.source.contains("小さな"))
+        #expect(!result.approximatedWords.isEmpty)
+        #expect(result.plugins.count == 1)
+        #expect(result.plugins[0].note == "keep")
+        #expect(try result.resolveCatalog(language: "ja")["entries"].array?.count == 1)
+    }
+
     @Test func importAdoptsRecoveredDefinitionsFromCoreAnswer() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -26,6 +62,19 @@ struct DDLPackageMigrationTests {
         #expect(result.plugins.count == 1)
         #expect(result.plugins.first?.definition == recovered?.first?["definition"])
         #expect(result.plugins.first?.note == "")
+        var answer = try #require(JSONSerialization.jsonObject(with: response) as? [String: Any])
+        var doc = try #require(answer["document"] as? [String: Any])
+        var recoveredRows = try #require(doc["recovered_definitions"] as? [[String: Any]])
+        recoveredRows[0]["approximated_refs"] = ["$.body[0].fields.continuity"]
+        doc["recovered_definitions"] = recoveredRows
+        answer["document"] = doc
+        let responseWithReference = try JSONSerialization.data(withJSONObject: answer)
+        var replayCall = 0
+        let replay = try DDLPackageImport.parse(file.data) { input in
+            replayCall += 1
+            return replayCall == 1 ? InkuCore.migrateSaijikiV2(input) : responseWithReference
+        }
+        #expect(replay.approximatedDefinitionReferenceCount == 1)
     }
 
     @Test func legacyPackageMigratesBundledDefinitionBeforeResolvingCatalog() throws {
@@ -45,12 +94,16 @@ struct DDLPackageMigrationTests {
         #expect(try output.resolveCatalog(language: "ja")["entries"].array?.count == 1)
     }
 
-    @Test func legacyPackageMigratesButPlainTextAndV3DoNot() throws {
+    @Test func legacyAndV3PackagesMigrateButPlainTextAndV4DoNot() throws {
         let old = Data(#"{"schema":"inku.ddl-export.v2","language":"ja","ddl":"青い細筆の線を引く。","plugins":[]}"#.utf8)
         let migrated = try DDLPackageImport.parse(old)
         #expect(migrated.source.contains("ガッシュ"))
         #expect((migrated.migratedEdits ?? 0) > 0)
-        let current = Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v3","language":"ja","ddl":"青い水彩の線を引く。","plugins":[]}"#.utf8)
+        let v3 = Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v3","language":"ja","ddl":"青い小さめの線を引く。","plugins":[]}"#.utf8)
+        let migratedV3 = try DDLPackageImport.parse(v3)
+        #expect(migratedV3.source.contains("小さな"))
+        #expect(!migratedV3.approximatedWords.isEmpty)
+        let current = Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v4","language":"ja","ddl":"青い水彩の線を引く。","plugins":[]}"#.utf8)
         let unchanged = try DDLPackageImport.parse(current)
         #expect(unchanged.source == "青い水彩の線を引く。")
         #expect(unchanged.migratedEdits == nil)

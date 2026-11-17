@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 
 import pytest
 
@@ -51,6 +52,31 @@ def test_generated_kotlin_matches_the_table() -> None:
 
 
 @android_only
+def test_bundle_names_and_order_match_core_asset() -> None:
+    import json
+
+    bundles = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v4.json").read_text())["bundles"]
+    text = _load_generator()._OUTPUT.read_text(encoding="utf-8")
+    declarations = [f'Bundle("{item["key"]}", "{item["name_ja"]}", "{item["name_en"]}")' for item in bundles]
+    positions = [text.index(declaration) for declaration in declarations]
+    assert positions == sorted(positions)
+
+
+@android_only
+def test_category_bundles_match_web_snapshot() -> None:
+    kotlin = _load_generator()._OUTPUT.read_text(encoding="utf-8")
+    web = (ROOT / "web/src/lib/saijiki.generated.ts").read_text(encoding="utf-8").split(
+        "export const GENERATED_SAIJIKI_EN:", 1
+    )[0]
+    kt_pairs = re.findall(r'Category\(\s*key = "([^"]+)",\s*bundle = "([^"]+)",', kotlin)
+    web_pairs = re.findall(r"\{\s*key: '([^']+)',\s*label: '[^']*',\s*en: '[^']*',\s*bundle: '([^']+)',", web)
+    assert len(kt_pairs) == len(web_pairs) == 17
+    assert kt_pairs == web_pairs
+    from inku_server.saijiki_generated import RELATIONS_BUNDLE
+    assert dict(kt_pairs)["aida"] == RELATIONS_BUNDLE
+
+
+@android_only
 def test_snapshot_carries_both_language_surfaces_for_every_category() -> None:
     """Calibration: a generator that emitted one language would still be current.
 
@@ -73,7 +99,7 @@ def test_snapshot_carries_both_language_surfaces_for_every_category() -> None:
     # Fifteen saijiki categories (じゅん joined them, then さばき with Saijiki
     # v2, then きめ and したじ with DDL 24) plus あいだ, which display_categories
     # appends. 画面比 (DDL 26) is shown inside じ, not as a category of its own.
-    assert len(ja) == 16, f"expected sixteen display categories, table has {len(ja)}"
+    assert len(ja) == 17, f"expected seventeen display categories, table has {len(ja)}"
 
     for cat_ja, cat_en in zip(ja, en):
         assert f'key = "{cat_ja["key"]}"' in text, f"category missing: {cat_ja['key']}"

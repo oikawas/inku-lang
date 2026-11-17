@@ -279,7 +279,7 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
                 (
                     expected_surfaces[1],
                     "yuragi",
-                    "細かく",
+                    "小さく",
                     expected_surfaces[1]
                 ),
             ],
@@ -466,14 +466,22 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
     let mut marker_only = 0;
     let mut disabled = 0;
 
-    for category in &asset.categories {
+    // futosa and ookisa are core-modifier categories: the lexer carries them as
+    // syntax modifiers, so they are not Saijiki words with a Macro semantic ref.
+    for category in asset
+        .categories
+        .iter()
+        .filter(|category| category.core_modifier.is_none())
+    {
         for word in &category.words {
             let enabled = word.prompt || word.display || word.marker == Some(true);
             if enabled {
                 active += 1;
                 assert!(
                     project_macro_semantic_ref(&category.key, &word.surface_ja).is_some(),
-                    "eligible asset row must have one canonical semantic identity"
+                    "eligible asset row must have one canonical semantic identity: {} {}",
+                    category.key,
+                    word.surface_ja
                 );
                 if !word.prompt && !word.display {
                     marker_only += 1;
@@ -484,10 +492,11 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
         }
     }
 
-    // I-715 B2 offers 自由線 to the list and the reader, so three words stay
-    // marker-only. DDL 24 offers the five words of きめ and したじ, and DDL 25
-    // 刷毛目.
-    assert_eq!((active, marker_only, disabled), (100, 3, 1));
+    // v4 offers every remaining word to the list and the reader except ばしょ's
+    // 始点・終点・途中 (start, end, partway): they are read as in v3 but shown only inside
+    // the relation phrases, so they stay marker-only. No row is disabled, and the two
+    // core-modifier categories (futosa, ookisa) are out of the Saijiki word count.
+    assert_eq!((active, marker_only, disabled), (97, 3, 0));
 }
 
 #[test]
@@ -537,7 +546,18 @@ fn japanese_point_is_only_the_point_shape_and_stipple_is_its_own_word() {
 #[test]
 fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
     let asset = saijiki_asset();
-    let disabled = asset
+    // v4 keeps no disabled tombstone and no marker-only row. A word retired in
+    // v4 is absent from the asset and is read as an unknown word the same way.
+    let retired = "上弦".to_owned();
+    assert!(
+        asset
+            .categories
+            .iter()
+            .flat_map(|category| &category.words)
+            .all(|word| word.surface_ja != retired),
+        "{retired} is retired in v4"
+    );
+    let jiyusen = asset
         .categories
         .iter()
         .flat_map(|category| {
@@ -546,19 +566,8 @@ fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
                 .iter()
                 .map(move |word| (category.key.as_str(), word))
         })
-        .find(|(_, word)| !word.prompt && !word.display && word.marker != Some(true))
-        .expect("accepted asset has one disabled tombstone");
-    let marker_only = asset
-        .categories
-        .iter()
-        .flat_map(|category| {
-            category
-                .words
-                .iter()
-                .map(move |word| (category.key.as_str(), word))
-        })
-        .find(|(_, word)| !word.prompt && !word.display && word.marker == Some(true))
-        .expect("accepted asset has one marker-only active row");
+        .find(|(_, word)| word.surface_ja == "自由線")
+        .expect("自由線 is an ordinary active row in v4");
     let normal = asset
         .categories
         .iter()
@@ -571,12 +580,9 @@ fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
         .find(|(_, word)| (word.prompt || word.display) && word.surface_en.is_some())
         .expect("accepted asset has a bilingual normal active row");
 
-    let disabled_document = NormalizedDdlDocument::new(
-        disabled.1.surface_ja.clone(),
-        ResolvedInstructionLanguage::Ja,
-        Vec::new(),
-    )
-    .unwrap();
+    let disabled_document =
+        NormalizedDdlDocument::new(retired.clone(), ResolvedInstructionLanguage::Ja, Vec::new())
+            .unwrap();
     let disabled_result = parse_neutral_lexemes(&disabled_document);
     assert!(disabled_result.tokens.is_empty());
     assert_eq!(disabled_result.diagnostics.len(), 1);
@@ -584,13 +590,10 @@ fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
         disabled_result.diagnostics[0].kind,
         NeutralDiagnosticKind::Unknown
     );
-    assert_eq!(
-        disabled_result.diagnostics[0].surface,
-        disabled.1.surface_ja
-    );
+    assert_eq!(disabled_result.diagnostics[0].surface, retired);
     assert!(!disabled_result.diagnostics[0].recognized);
 
-    for (category_key, word) in [marker_only, normal] {
+    for (category_key, word) in [jiyusen, normal] {
         for (language, surface) in [
             (
                 ResolvedInstructionLanguage::Ja,
@@ -620,7 +623,7 @@ fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
         }
     }
 
-    let source = format!("{} {}", disabled.1.surface_ja, normal.1.surface_ja);
+    let source = format!("{} {}", retired, normal.1.surface_ja);
     let document =
         NormalizedDdlDocument::new(source.clone(), ResolvedInstructionLanguage::Ja, Vec::new())
             .unwrap();
@@ -635,7 +638,7 @@ fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
     }));
     assert!(result.diagnostics.iter().any(|diagnostic| {
         diagnostic.kind == NeutralDiagnosticKind::Unknown
-            && diagnostic.surface == disabled.1.surface_ja
+            && diagnostic.surface == retired
             && source[diagnostic.span.start_byte..diagnostic.span.end_byte] == diagnostic.surface
     }));
     for token in &result.tokens {
@@ -906,9 +909,9 @@ fn core_thinness_has_two_closed_bilingual_source_preserving_identities() {
         ),
         ("thin line", ResolvedInstructionLanguage::En, "thin", "fine"),
         (
-            "EXTRA-FINE line",
+            "VERY THIN line",
             ResolvedInstructionLanguage::En,
-            "EXTRA-FINE",
+            "VERY THIN",
             "extra_fine",
         ),
     ] {
@@ -946,8 +949,8 @@ fn core_thinness_respects_ja_and_en_word_boundaries() {
         ("極細い", ResolvedInstructionLanguage::Ja),
         ("xthiny", ResolvedInstructionLanguage::En),
         ("thinner", ResolvedInstructionLanguage::En),
-        ("xextra-finey", ResolvedInstructionLanguage::En),
-        ("extra-finer", ResolvedInstructionLanguage::En),
+        ("xvery thiny", ResolvedInstructionLanguage::En),
+        ("very thinner", ResolvedInstructionLanguage::En),
     ] {
         let document = NormalizedDdlDocument::new(source.to_owned(), language, Vec::new())
             .expect("negative boundary source forms a document");
@@ -966,12 +969,6 @@ fn core_thinness_respects_ja_and_en_word_boundaries() {
 fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
     for (source, language, expected_surface, expected_value) in [
         (
-            "小さめの円",
-            ResolvedInstructionLanguage::Ja,
-            "小さめ",
-            "slightly_small",
-        ),
-        (
             "小さな円",
             ResolvedInstructionLanguage::Ja,
             "小さな",
@@ -984,9 +981,15 @@ fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
             "small",
         ),
         (
-            "とても小さな円",
+            "ごく小さな円",
             ResolvedInstructionLanguage::Ja,
-            "とても小さな",
+            "ごく小さな",
+            "very_small",
+        ),
+        (
+            "ごく小さい円",
+            ResolvedInstructionLanguage::Ja,
+            "ごく小さい",
             "very_small",
         ),
         (
@@ -994,12 +997,6 @@ fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
             ResolvedInstructionLanguage::Ja,
             "普通の大きさ",
             "normal",
-        ),
-        (
-            "大きめの円",
-            ResolvedInstructionLanguage::Ja,
-            "大きめ",
-            "slightly_large",
         ),
         (
             "大きな円",
@@ -1014,16 +1011,16 @@ fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
             "large",
         ),
         (
-            "とても大きな円",
+            "ごく大きな円",
             ResolvedInstructionLanguage::Ja,
-            "とても大きな",
+            "ごく大きな",
             "very_large",
         ),
         (
-            "slightly small circle",
-            ResolvedInstructionLanguage::En,
-            "slightly small",
-            "slightly_small",
+            "ごく大きい円",
+            ResolvedInstructionLanguage::Ja,
+            "ごく大きい",
+            "very_large",
         ),
         (
             "SMALL circle",
@@ -1044,12 +1041,6 @@ fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
             "normal",
         ),
         (
-            "slightly large circle",
-            ResolvedInstructionLanguage::En,
-            "slightly large",
-            "slightly_large",
-        ),
-        (
             "large circle",
             ResolvedInstructionLanguage::En,
             "large",
@@ -1062,16 +1053,16 @@ fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
             "very_large",
         ),
         (
-            "小さめの赤いペンの円",
+            "小さな赤いペンの円",
             ResolvedInstructionLanguage::Ja,
-            "小さめ",
-            "slightly_small",
+            "小さな",
+            "small",
         ),
         (
-            "slightly large red pen circle",
+            "large red pen circle",
             ResolvedInstructionLanguage::En,
-            "slightly large",
-            "slightly_large",
+            "large",
+            "large",
         ),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();

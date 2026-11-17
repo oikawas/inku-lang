@@ -44,6 +44,9 @@ fn v2_document_migrates_all_six_tools_and_width_steps_in_both_languages() {
     ];
     let ja = ["ごく細い", "細い", "", "太い", "ごく太い"];
     let en = ["extra-fine ", "thin ", "", "thick ", "extra-thick "];
+    // The migrated document is Saijiki v4, which spells the outer steps very thin and very
+    // thick.
+    let en_v4 = ["very thin ", "thin ", "", "thick ", "very thick "];
     for (old_ja, old_en, new_ja, new_en, map) in tools {
         for i in 0..5 {
             let before = format!("黒い{}{old_ja}の線を引く。", ja[i]);
@@ -52,7 +55,7 @@ fn v2_document_migrates_all_six_tools_and_width_steps_in_both_languages() {
             assert_eq!(actual.source, after, "{before}");
             assert!(actual.unassociated_tools.is_empty(), "{before}");
             let before = format!("Draw a {}{old_en} line.", en[i]);
-            let after = format!("Draw a {}{new_en} line.", en[map[i]]);
+            let after = format!("Draw a {}{new_en} line.", en_v4[map[i]]);
             let actual = migrate_document_from_saijiki_v2(&doc(&before, Lang::En)).unwrap();
             assert_eq!(actual.source, after, "{before}");
             assert!(actual.unassociated_tools.is_empty(), "{before}");

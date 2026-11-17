@@ -108,11 +108,12 @@ public struct SaijikiView: View {
 
     private func inlineWords(columns: Int) -> some View {
         ScrollView {
-            HStack(alignment: .top, spacing: 8) {
-                ForEach(0..<columns, id: \.self) { column in
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(model.saijiki.indices.filter { $0 % columns == column }, id: \.self) { index in
-                            let category = model.saijiki[index]
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count: columns), alignment: .leading, spacing: 8) {
+                ForEach(bundles) { bundle in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(bundle.label(language: uiLanguage))
+                            .inkuFont(12, weight: .medium)
+                        ForEach(bundle.categories(in: model.saijiki)) { category in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(uiLanguage == "ja" ? category.name : category.englishName ?? category.name)
                                     .inkuFont(12, weight: .medium)
@@ -122,22 +123,24 @@ public struct SaijikiView: View {
                             }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
                                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
                         }
-                        if column == columns - 1, !model.pluginWords.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Plugin").inkuFont(12, weight: .medium)
-                                SaijikiFlowLayout {
-                                    ForEach(model.pluginWords) { word in wordChip(word.displayName(language: offeredLanguage), selection: .plugin(word.id)) }
-                                }
-                            }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+                    }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+                }
+                if !model.pluginWords.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Plugin").inkuFont(12, weight: .medium)
+                        SaijikiFlowLayout {
+                            ForEach(model.pluginWords) { word in wordChip(word.displayName(language: offeredLanguage), selection: .plugin(word.id)) }
                         }
-                    }.frame(maxWidth: .infinity, alignment: .topLeading)
+                    }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
                 }
             }.padding(1)
         }
     }
 
     private var uiLanguage: String { model.display.preferences.language }
+    private var bundles: [SaijikiBundle] { model.saijikiBundles }
     private var offeredLanguage: String { wordLanguage ?? uiLanguage }
     private var copy: ProductReferenceCopy? { model.productReference?.localized(language: uiLanguage) }
     private var hint: String {
@@ -150,23 +153,29 @@ public struct SaijikiView: View {
     private var wordList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(model.saijiki) { category in
-                    let words = category.words
-                    if !words.isEmpty {
-                        VStack(alignment: .leading, spacing: 7) {
-                            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                                Text(category.name).inkuFont(13)
-                                if let english = category.englishName, !english.isEmpty {
-                                    Text(english).inkuFont(9, weight: .medium).foregroundStyle(.secondary)
+                ForEach(bundles) { bundle in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(bundle.label(language: uiLanguage)).inkuFont(13, weight: .medium)
+                            .padding(.horizontal, 18).padding(.vertical, 10)
+                        ForEach(bundle.categories(in: model.saijiki)) { category in
+                            let words = category.words
+                            if !words.isEmpty {
+                                VStack(alignment: .leading, spacing: 7) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                                        Text(category.name).inkuFont(13)
+                                        if let english = category.englishName, !english.isEmpty {
+                                            Text(english).inkuFont(9, weight: .medium).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    SaijikiFlowLayout {
+                                        ForEach(words) { word in
+                                            wordChip(name(word), selection: .builtin(word.id))
+                                        }
+                                    }
+                                }.padding(.horizontal, 18).padding(.vertical, 10)
+                                Divider()
                                 }
-                            }
-                            SaijikiFlowLayout {
-                                ForEach(words) { word in
-                                    wordChip(name(word), selection: .builtin(word.id))
-                                }
-                            }
-                        }.padding(.horizontal, 18).padding(.vertical, 10)
-                        Divider()
+                        }
                     }
                 }
                 let plugins = model.pluginWords
@@ -254,7 +263,7 @@ public struct SaijikiView: View {
         case .builtin(let id):
             guard let word = model.saijiki.lazy.flatMap(\.words).first(where: { $0.id == id }) else { return nil }
             return Preview(id: id, title: name(word),
-                effect: word.preview?.effect(language: uiLanguage) ?? (uiLanguage == "ja" ? word.detail : word.englishDetail ?? ""),
+                effect: word.effect(language: uiLanguage),
                 example: word.preview?.example(language: offeredLanguage) ?? "", svg: word.preview?.svg,
                 imageURL: nil, imageData: nil, insertable: !word.referenceOnly)
         case .plugin(let id):

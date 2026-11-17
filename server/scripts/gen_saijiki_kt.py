@@ -24,6 +24,7 @@ if str(_SERVER_SRC) not in sys.path:
     sys.path.insert(0, str(_SERVER_SRC))
 
 from inku_server.saijiki import display_categories  # noqa: E402
+from inku_server.saijiki_generated import BUNDLES  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _OUTPUT = (
@@ -62,8 +63,15 @@ def render_kt() -> str:
         " *     cd server && uv run python scripts/gen_saijiki_kt.py",
         " */",
         "object SaijikiGenerated {",
+        "    data class Bundle(val key: String, val nameJa: String, val nameEn: String)",
+        "",
+        "    val BUNDLES: List<Bundle> = listOf(",
+        *[f"        Bundle({_kt_string(b['key'])}, {_kt_string(b['name_ja'])}, {_kt_string(b['name_en'])})," for b in BUNDLES],
+        "    )",
+        "",
         "    data class Category(",
         "        val key: String,",
+        "        val bundle: String,",
         "        val nameJa: String,",
         "        val nameEn: String,",
         "        val wordsJa: List<String>,",
@@ -75,6 +83,7 @@ def render_kt() -> str:
     for cat_ja, cat_en in zip(ja, en):
         lines.append("        Category(")
         lines.append(f"            key = {_kt_string(str(cat_ja['key']))},")
+        lines.append(f"            bundle = {_kt_string(str(cat_ja['bundle']))},")
         lines.append(f"            nameJa = {_kt_string(str(cat_ja['name_ja']))},")
         lines.append(f"            nameEn = {_kt_string(str(cat_ja['name_en']))},")
         lines.append(f"            wordsJa = {_kt_list(cat_ja['words'])},")

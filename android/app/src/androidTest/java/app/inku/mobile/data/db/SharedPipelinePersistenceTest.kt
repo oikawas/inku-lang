@@ -263,7 +263,7 @@ class SharedPipelinePersistenceTest {
                     source = "赤い円と線を描く。",
                     expectedRevision = "1",
                     nextRevision = "2",
-                    saijiki = "inku.saijiki.v3",
+                    saijiki = "inku.saijiki.v4",
                 ),
                 false,
                 context,
@@ -271,7 +271,7 @@ class SharedPipelinePersistenceTest {
         )
         assertEquals("2", advanced.getString("revision"))
         assertEquals(
-            "inku.saijiki.v3",
+            "inku.saijiki.v4",
             JSONObject(store.readAuthority("local-owner", "variation-1")!!.documentJson).getString("saijiki"),
         )
 

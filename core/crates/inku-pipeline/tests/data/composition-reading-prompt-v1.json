@@ -1618,7 +1618,7 @@
       "action": "scatter",
       "attributes": {
        "color": "orange",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
@@ -1641,7 +1641,7 @@
        "motion_spacing": "tightly",
        "size": "small",
        "surface": "grain",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "pencil"
       },
       "count": 15,
@@ -1656,7 +1656,7 @@
        "position": "center",
        "size": "large",
        "surface": "flat",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -1672,7 +1672,7 @@
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
        "position": "bottom",
-       "size": "slightly_small",
+       "size": "small",
        "surface": "grain",
        "tool": "chalk"
       },
@@ -1683,7 +1683,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 20 broadly loosely swaying orange thin gouache temperate sweep small arcs.\n1 (area): Scatter 15 narrowly tightly swaying blue extra-fine pencil faint grain small lines.\n2 (bundle): Draw one black extra-thick gouache dense flat large line. [place set by the work plan: center]\n3 (row): Line up 2 narrowly tightly swaying gray chalk faint grain slightly small ellipses. [place set by the work plan: bottom]"
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 20 broadly loosely swaying orange thin gouache moderate sweep small arcs.\n1 (area): Scatter 15 narrowly tightly swaying blue very thin pencil faint grain small lines.\n2 (bundle): Draw one black very thick gouache dense flat large line. [place set by the work plan: center]\n3 (row): Line up 2 narrowly tightly swaying gray chalk faint grain small ellipses. [place set by the work plan: bottom]"
   },
   {
    "id": "en-03",
@@ -1785,7 +1785,7 @@
       "action": "scatter",
       "attributes": {
        "color": "yellow",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
@@ -1807,7 +1807,7 @@
        "motion_quality": "undulating",
        "motion_spacing": "tightly",
        "position": "bottom",
-       "size": "slightly_small",
+       "size": "small",
        "surface": "sweep",
        "tool": "gouache",
        "thinness": "thick"
@@ -1831,7 +1831,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying yellow gouache temperate flat tall normal-sized ellipses. [place set by the work plan: top]\n1 (area): Scatter 30 narrowly tightly undulating yellow thick gouache dense sweep wide slightly small ellipses. [place set by the work plan: bottom]\n2 (area): Scatter 20 gray pencil faint very small points."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying yellow gouache moderate flat tall normal-sized ellipses. [place set by the work plan: top]\n1 (area): Scatter 30 narrowly tightly undulating yellow thick gouache dense sweep wide small ellipses. [place set by the work plan: bottom]\n2 (area): Scatter 20 gray pencil faint very small points."
   },
   {
    "id": "en-07",
@@ -1867,7 +1867,7 @@
        "position": "center",
        "size": "large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 3,
@@ -1877,7 +1877,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one undulating gray chalk faint grain full-width ellipse. [place set by the work plan: bottom]\n1 (bundle): Draw 3 narrowly tightly swaying white extra-thick gouache solid dense sweep vertical large lines. [place set by the work plan: center]"
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one undulating gray chalk faint grain full-width ellipse. [place set by the work plan: bottom]\n1 (bundle): Draw 3 narrowly tightly swaying white very thick gouache solid dense sweep vertical large lines. [place set by the work plan: center]"
   },
   {
    "id": "en-08",
@@ -1891,7 +1891,7 @@
       "attributes": {
        "color": "gray",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "undulating",
        "motion_spacing": "loosely",
@@ -1942,7 +1942,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely undulating gray thin gouache solid temperate sweep large arcs.\n1 (area): Scatter 8 narrowly tightly swaying black thick gouache solid dense flat normal-sized ellipses.\n2 (area): Scatter 15 narrowly loosely swaying gray chalk solid faint grain small circles."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely undulating gray thin gouache solid moderate sweep large arcs.\n1 (area): Scatter 8 narrowly tightly swaying black thick gouache solid dense flat normal-sized ellipses.\n2 (area): Scatter 15 narrowly loosely swaying gray chalk solid faint grain small circles."
   },
   {
    "id": "en-09",
@@ -1959,7 +1959,7 @@
        "position": "center",
        "size": "large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -1970,7 +1970,7 @@
       "action": "scatter",
       "attributes": {
        "color": "gray",
-       "handling": "temperate",
+       "handling": "moderate",
        "size": "very_small",
        "tool": "pen"
       },
@@ -1986,7 +1986,7 @@
        "motion_amplitude": "broadly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "sweep",
        "thinness": "thin",
        "tool": "gouache"
@@ -1998,7 +1998,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one black extra-thick gouache dense sweep large line. [place set by the work plan: center]\n1 (area): Scatter 30 gray pen temperate very small points.\n2 (bundle): Draw 3 broadly tightly swaying gray thin gouache faint sweep semicircle extra-large arcs."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one black very thick gouache dense sweep large line. [place set by the work plan: center]\n1 (area): Scatter 30 gray pen moderate very small points.\n2 (bundle): Draw 3 broadly tightly swaying gray thin gouache faint sweep semicircle very large arcs."
   },
   {
    "id": "en-10",
@@ -2058,7 +2058,7 @@
       "action": "scatter",
       "attributes": {
        "color": "black",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -2081,7 +2081,7 @@
        "position": "center",
        "size": "very_large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -2091,7 +2091,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill 40 broadly loosely undulating green thick gouache faint sweep wide large cloudforms.\n1 (area): Scatter 15 narrowly tightly swaying black thin pen temperate grain small lines.\n2 (bundle): Draw one black extra-thick gouache solid dense sweep vertical very large line. [place set by the work plan: center]"
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill 40 broadly loosely undulating green thick gouache faint sweep wide large cloudforms.\n1 (area): Scatter 15 narrowly tightly swaying black thin pen moderate grain small lines.\n2 (bundle): Draw one black very thick gouache solid dense sweep vertical very large line. [place set by the work plan: center]"
   },
   {
    "id": "en-12",
@@ -2160,7 +2160,7 @@
        "motion_spacing": "loosely",
        "size": "small",
        "surface": "grain",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "pen"
       },
       "count": 40,
@@ -2175,7 +2175,7 @@
      }
     ]
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white. {fallen leaves}.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white. {fallen leaves}.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying black very thin pen faint grain falling small lines."
   },
   {
    "id": "en-14",
@@ -2269,7 +2269,7 @@
        "position": "center",
        "size": "normal_sized",
        "surface": "flat",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -2279,7 +2279,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with gray.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely undulating white thin gouache faint sweep horizontal full-width lines.\n1 (bundle): Place one narrowly swaying red extra-thick gouache dense flat normal-sized circle. [place set by the work plan: center]"
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with gray.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely undulating white thin gouache faint sweep horizontal full-width lines.\n1 (bundle): Place one narrowly swaying red very thick gouache dense flat normal-sized circle. [place set by the work plan: center]"
   },
   {
    "id": "en-17",
@@ -2309,12 +2309,12 @@
       "action": "draw",
       "attributes": {
        "color": "gray",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "undulating",
        "size": "large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -2324,7 +2324,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one narrowly swaying gray thin gouache dense sweep small line. [place set by the work plan: bottom]\n1 (bundle): Draw one broadly undulating gray extra-thick gouache temperate sweep large arc."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one narrowly swaying gray thin gouache dense sweep small line. [place set by the work plan: bottom]\n1 (bundle): Draw one broadly undulating gray very thick gouache moderate sweep large arc."
   },
   {
    "id": "en-18",
@@ -2350,7 +2350,7 @@
       "action": "scatter",
       "attributes": {
        "color": "gray",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
        "size": "small",
@@ -2369,7 +2369,7 @@
        "handling": "dense",
        "position": "center",
        "size": "normal_sized",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -2379,7 +2379,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one undulating white chalk faint flat full-width cloudform.\n1 (area): Scatter 20 loosely swaying gray thin pencil temperate stipple small ellipses.\n2 (bundle): Place one black extra-thick gouache dense normal-sized point. [place set by the work plan: center]"
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one undulating white chalk faint flat full-width cloudform.\n1 (area): Scatter 20 loosely swaying gray thin pencil moderate stipple small ellipses.\n2 (bundle): Place one black very thick gouache dense normal-sized point. [place set by the work plan: center]"
   },
   {
    "id": "en-19",
@@ -2410,7 +2410,7 @@
       "action": "scatter",
       "attributes": {
        "color": "black",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "undulating",
        "motion_spacing": "tightly",
@@ -2442,7 +2442,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill 3 narrowly loosely swaying gray thin pencil faint sweep horizontal large lines.\n1 (bundle): Scatter one broadly tightly undulating black thick gouache temperate flat small cloudform.\n2 (bundle): Scatter one broadly tightly undulating gray chalk faint flat small cloudform."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill 3 narrowly loosely swaying gray thin pencil faint sweep horizontal large lines.\n1 (bundle): Scatter one broadly tightly undulating black thick gouache moderate flat small cloudform.\n2 (bundle): Scatter one broadly tightly undulating gray chalk faint flat small cloudform."
   },
   {
    "id": "en-20",
@@ -2457,7 +2457,7 @@
        "color": "gray",
        "handling": "faint",
        "size": "very_small",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "pencil"
       },
       "count": 40,
@@ -2486,7 +2486,7 @@
        "handling": "dense",
        "size": "large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 3,
@@ -2496,7 +2496,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with black.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 gray extra-fine pencil faint very small points.\n1 (bundle): Place one broadly undulating white gouache dense stipple normal-sized circle.\n2 (bundle): Draw 3 gray extra-thick gouache dense sweep large lines."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with black.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 gray very thin pencil faint very small points.\n1 (bundle): Place one broadly undulating white gouache dense stipple normal-sized circle.\n2 (bundle): Draw 3 gray very thick gouache dense sweep large lines."
   },
   {
    "id": "en-21",
@@ -2527,7 +2527,7 @@
       "action": "scatter",
       "attributes": {
        "color": "black",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
@@ -2542,7 +2542,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (row): Line up 4 narrowly tightly undulating gray thin gouache faint sweep horizontal full-width lines horizontally.\n1 (area): Scatter 15 broadly loosely swaying black chalk temperate stipple small ellipses."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (row): Line up 4 narrowly tightly undulating gray thin gouache faint sweep horizontal full-width lines horizontally.\n1 (area): Scatter 15 broadly loosely swaying black chalk moderate stipple small ellipses."
   },
   {
    "id": "en-22",
@@ -2555,7 +2555,7 @@
       "action": "scatter",
       "attributes": {
        "color": "blue",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
@@ -2578,7 +2578,7 @@
        "motion_spacing": "tightly",
        "size": "small",
        "surface": "grain",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "pencil"
       },
       "count": 15,
@@ -2588,7 +2588,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely swaying blue thin gouache temperate sweep large lines.\n1 (area): Scatter 15 narrowly tightly undulating gray extra-fine pencil dense grain small lines."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely swaying blue thin gouache moderate sweep large lines.\n1 (area): Scatter 15 narrowly tightly undulating gray very thin pencil dense grain small lines."
   },
   {
    "id": "en-23",
@@ -2603,7 +2603,7 @@
        "color": "gray",
        "handling": "dense",
        "position": "bottom",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "flat",
        "tool": "gouache",
        "thinness": "thick"
@@ -2616,7 +2616,7 @@
       "action": "tile",
       "attributes": {
        "color": "red",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -2632,7 +2632,7 @@
       "action": "tile",
       "attributes": {
        "color": "blue",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -2648,7 +2648,7 @@
       "action": "tile",
       "attributes": {
        "color": "green",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -2664,7 +2664,7 @@
       "action": "tile",
       "attributes": {
        "color": "gray",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -2679,7 +2679,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one gray thick gouache dense flat wide extra-large square. [place set by the work plan: bottom]\n1 (area): Tile 12 narrowly tightly swaying red chalk temperate flat small squares.\n2 (area): Tile 12 narrowly tightly swaying blue chalk temperate flat small squares.\n3 (area): Tile 12 narrowly tightly swaying green chalk temperate flat small squares.\n4 (area): Tile 12 narrowly tightly swaying gray chalk temperate flat small squares."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one gray thick gouache dense flat wide very large square. [place set by the work plan: bottom]\n1 (area): Tile 12 narrowly tightly swaying red chalk moderate flat small squares.\n2 (area): Tile 12 narrowly tightly swaying blue chalk moderate flat small squares.\n3 (area): Tile 12 narrowly tightly swaying green chalk moderate flat small squares.\n4 (area): Tile 12 narrowly tightly swaying gray chalk moderate flat small squares."
   },
   {
    "id": "en-24",
@@ -2752,7 +2752,7 @@
       "action": "scatter",
       "attributes": {
        "color": "white",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_quality": "swaying",
        "size": "small",
        "surface": "grain",
@@ -2766,7 +2766,7 @@
     ],
     "plugins": []
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Canvas. Fill the background with gray.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one gray chalk faint stipple full-width square.\n1 (area): Scatter 12 swaying white thin chalk temperate grain small lines."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Canvas. Fill the background with gray.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one gray chalk faint stipple full-width square.\n1 (area): Scatter 12 swaying white thin chalk moderate grain small lines."
   },
   {
    "id": "ja-01",
@@ -2813,7 +2813,7 @@
       "action": "scatter",
       "attributes": {
        "color": "green",
-       "handling": "temperate",
+       "handling": "moderate",
        "size": "very_small",
        "tool": "pen"
       },
@@ -2824,7 +2824,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 灰の鉛筆の薄い空の横長の大きな四角を1個置く。〔下絵が付けた場所: 中心〕\n1（束）: 細かく小刻みに揺れる黒の細いガッシュの実線の濃い粒の垂直の普通の大きさの線を1個引く。〔下絵が付けた場所: 下〕\n2（面）: 緑のペンの程よいとても小さな点を5個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 灰の鉛筆の薄い空の横長の大きな四角を1個置く。〔下絵が付けた場所: 中心〕\n1（束）: 小さく小刻みに揺れる黒の細いガッシュの実線の濃い粒の垂直の普通の大きさの線を1個引く。〔下絵が付けた場所: 下〕\n2（面）: 緑のペンの程よいごく小さな点を5個散らす。"
   },
   {
    "id": "ja-02",
@@ -2839,7 +2839,7 @@
        "angle": "vertical",
        "color": "gray",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -2864,7 +2864,7 @@
        "motion_spacing": "loosely",
        "size": "small",
        "surface": "sweep",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "pencil"
       },
       "count": 20,
@@ -2874,7 +2874,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: メゾチント。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 細かく小刻みに揺れる灰の細い銀筆の実線の程よい粒の垂直の大きな線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 大きくゆるやかに波打つ灰のごく細い鉛筆の実線の薄い刷きの小さな弧を20個引く。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: メゾチント。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 小さく小刻みに揺れる灰の細い銀筆の実線の程よい粒の垂直の大きな線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 大きくゆるやかに波打つ灰のごく細い鉛筆の実線の薄い刷きの小さな弧を20個引く。"
   },
   {
    "id": "ja-03",
@@ -2892,9 +2892,9 @@
        "motion_amplitude": "broadly",
        "motion_quality": "undulating",
        "motion_spacing": "loosely",
-       "size": "huge",
+       "size": "very_large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -2913,7 +2913,7 @@
        "position": "center",
        "size": "large",
        "surface": "grain",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 3,
@@ -2924,7 +2924,7 @@
       "action": "place",
       "attributes": {
        "color": "white",
-       "handling": "temperate",
+       "handling": "moderate",
        "position": "center",
        "size": "large",
        "surface": "flat",
@@ -2949,7 +2949,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 大きくゆるやかに波打つ灰のごく太いガッシュの薄い刷きの垂直の巨大な線を1個引く。\n1（束）: 細かく小刻みに揺れる黒のごく太いガッシュの濃い粒の垂直の大きな線を3個引く。〔下絵が付けた場所: 中心〕\n2（束）: 白の油彩の程よい塗りの大きな円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 白のペンの濃いとても小さな点を30個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 大きくゆるやかに波打つ灰のごく太いガッシュの薄い刷きの垂直のごく大きな線を1個引く。\n1（束）: 小さく小刻みに揺れる黒のごく太いガッシュの濃い粒の垂直の大きな線を3個引く。〔下絵が付けた場所: 中心〕\n2（束）: 白の油彩の程よい塗りの大きな円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 白のペンの濃いごく小さな点を30個散らす。"
   },
   {
    "id": "ja-04",
@@ -2969,7 +2969,7 @@
        "motion_quality": "undulating",
        "motion_spacing": "tightly",
        "surface": "grain",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -2980,7 +2980,7 @@
       "action": "place",
       "attributes": {
        "color": "black",
-       "handling": "temperate",
+       "handling": "moderate",
        "size": "small",
        "surface": "flat",
        "tool": "pen"
@@ -3011,7 +3011,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 細かく小刻みに波打つ灰のごく太いガッシュの実線の濃い粒の右上がりの全幅の線を1個引く。\n1（束）: 黒のペンの程よい塗りの縦長の小さな楕円を3個置く。\n2（束）: 大きくゆるやかに揺れる黒の細い鉛筆の薄い空の垂直の普通の大きさの線を5個引く。〔下絵が付けた場所: 上端〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 小さく小刻みに波打つ灰のごく太いガッシュの実線の濃い粒の右上がりの全幅の線を1個引く。\n1（束）: 黒のペンの程よい塗りの縦長の小さな楕円を3個置く。\n2（束）: 大きくゆるやかに揺れる黒の細い鉛筆の薄い空の垂直の普通の大きさの線を5個引く。〔下絵が付けた場所: 上端〕"
   },
   {
    "id": "ja-05",
@@ -3042,9 +3042,9 @@
       "action": "place",
       "attributes": {
        "color": "gray",
-       "handling": "temperate",
+       "handling": "moderate",
        "position": "bottom",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "flat",
        "tool": "gouache",
        "thinness": "thick"
@@ -3074,7 +3074,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 細かくゆるやかに波打つ灰の細いガッシュの薄い刷きの水平の全幅の線を1個引く。〔下絵が付けた場所: 下〕\n1（束）: 灰の太いガッシュの程よい塗りの横長の特大の雲形を1個置く。〔下絵が付けた場所: 下〕\n2（面）: 細かく小刻みに揺れる白の油彩の濃い塗りの垂直の縦長の普通の大きさの四角を7個散らす。〔下絵が付けた場所: 中心〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 小さくゆるやかに波打つ灰の細いガッシュの薄い刷きの水平の全幅の線を1個引く。〔下絵が付けた場所: 下〕\n1（束）: 灰の太いガッシュの程よい塗りの横長のごく大きな雲形を1個置く。〔下絵が付けた場所: 下〕\n2（面）: 小さく小刻みに揺れる白の油彩の濃い塗りの垂直の縦長の普通の大きさの四角を7個散らす。〔下絵が付けた場所: 中心〕"
   },
   {
    "id": "ja-06",
@@ -3090,7 +3090,7 @@
        "color": "gray",
        "handling": "faint",
        "position": "bottom",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "flat",
        "tool": "gouache",
        "thinness": "thick"
@@ -3124,14 +3124,14 @@
        "angle": "rotated",
        "color": "yellow",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
        "position": "center",
        "size": "very_small",
        "surface": "empty",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "silverpoint"
       },
       "count": 40,
@@ -3155,7 +3155,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 画用紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い塗りの垂直の横長の特大の四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く。〔下絵が付けた場所: 中心〕\n2（束）: 大きくゆるやかに揺れる黄のごく細い銀筆の実線の程よい空の回転のとても小さな弧を40個引く。〔下絵が付けた場所: 中心〕\n3（束）: 黄のチョークの実線の濃い普通の大きさの点を6個置く。〔下絵が付けた場所: 中心〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 画用紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い塗りの垂直の横長のごく大きな四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 小さく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く。〔下絵が付けた場所: 中心〕\n2（束）: 大きくゆるやかに揺れる黄のごく細い銀筆の実線の程よい空の回転のごく小さな弧を40個引く。〔下絵が付けた場所: 中心〕\n3（束）: 黄のチョークの実線の濃い普通の大きさの点を6個置く。〔下絵が付けた場所: 中心〕"
   },
   {
    "id": "ja-07",
@@ -3220,7 +3220,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かく小刻みに波打つ灰の太いガッシュの薄い刷きの水平の横長の大きな楕円を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 大きくゆるやかに揺れる赤の細い鉛筆の実線の濃い粒の水平の小さな線を1個引く。〔下絵が付けた場所: 中心〕\n2（束）: 赤の油彩の濃い塗りのとても小さな円を1個置く。〔下絵が付けた場所: 中心〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 小さく小刻みに波打つ灰の太いガッシュの薄い刷きの水平の横長の大きな楕円を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 大きくゆるやかに揺れる赤の細い鉛筆の実線の濃い粒の水平の小さな線を1個引く。〔下絵が付けた場所: 中心〕\n2（束）: 赤の油彩の濃い塗りのごく小さな円を1個置く。〔下絵が付けた場所: 中心〕"
   },
   {
    "id": "ja-08",
@@ -3250,7 +3250,7 @@
       "action": "scatter",
       "attributes": {
        "color": "orange",
-       "handling": "temperate",
+       "handling": "moderate",
        "size": "very_small",
        "tool": "gouache"
       },
@@ -3261,7 +3261,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かく小刻みに揺れる灰のチョークの濃い粒の横長の大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（面）: 橙のガッシュの程よいとても小さな点を10個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 小さく小刻みに揺れる灰のチョークの濃い粒の横長の大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（面）: 橙のガッシュの程よいごく小さな点を10個散らす。"
   },
   {
    "id": "ja-09",
@@ -3280,7 +3280,7 @@
        "motion_quality": "undulating",
        "motion_spacing": "loosely",
        "position": "center",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "sweep",
        "tool": "gouache",
        "thinness": "thick"
@@ -3304,7 +3304,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ黄の太いガッシュの薄い刷きの垂直の縦長の特大の四角を1個埋める。〔下絵が付けた場所: 中心〕\n1（面）: 白の鉛筆の濃いとても小さな点を40個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 小さくゆるやかに波打つ黄の太いガッシュの薄い刷きの垂直の縦長のごく大きな四角を1個埋める。〔下絵が付けた場所: 中心〕\n1（面）: 白の鉛筆の濃いごく小さな点を40個散らす。"
   },
   {
    "id": "ja-10",
@@ -3339,7 +3339,7 @@
        "position": "center",
        "size": "large",
        "surface": "grain",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 2,
@@ -3366,7 +3366,7 @@
       "action": "scatter",
       "attributes": {
        "color": "gray",
-       "handling": "temperate",
+       "handling": "moderate",
        "size": "very_small",
        "tool": "pencil"
       },
@@ -3382,7 +3382,7 @@
      }
     ]
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。 ｛落葉｝。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い刷きの全幅の雲形を1個埋める。\n1（束）: 細かく小刻みに揺れる橙のごく太いガッシュの実線の濃い粒の斜めの大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 灰の鉛筆の程よいとても小さな点を15個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。 ｛落葉｝。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い刷きの全幅の雲形を1個埋める。\n1（束）: 小さく小刻みに揺れる橙のごく太いガッシュの実線の濃い粒の斜めの大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 灰の鉛筆の程よいごく小さな点を15個散らす。"
   },
   {
    "id": "ja-11",
@@ -3397,7 +3397,7 @@
        "color": "gray",
        "handling": "faint",
        "position": "bottom",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "sweep",
        "tool": "gouache",
        "thinness": "thick"
@@ -3442,7 +3442,7 @@
       "attributes": {
        "angle": "rotated",
        "color": "white",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -3459,7 +3459,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い刷きの横長の特大の雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに揺れる白のペンの実線の濃い粒の垂直の大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（面）: 青の鉛筆の薄いとても小さな点を12個散らす。\n3（束）: 細かく小刻みに揺れる白の細いガッシュの程よい粒の回転の小さな弧を8個引く。〔下絵が付けた場所: 上〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い刷きの横長のごく大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 小さく小刻みに揺れる白のペンの実線の濃い粒の垂直の大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（面）: 青の鉛筆の薄いごく小さな点を12個散らす。\n3（束）: 小さく小刻みに揺れる白の細いガッシュの程よい粒の回転の小さな弧を8個引く。〔下絵が付けた場所: 上〕"
   },
   {
    "id": "ja-12",
@@ -3476,7 +3476,7 @@
        "motion_amplitude": "broadly",
        "motion_quality": "undulating",
        "motion_spacing": "loosely",
-       "surface": "aquatint",
+       "surface": "mezzotint",
        "tool": "gouache",
        "thinness": "thick"
       },
@@ -3490,7 +3490,7 @@
        "angle": "rising",
        "color": "blue",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -3511,7 +3511,7 @@
        "handling": "faint",
        "position": "bottom",
        "size": "very_small",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "silverpoint"
       },
       "count": 12,
@@ -3521,7 +3521,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 大きくゆるやかに波打つ灰の太いガッシュの薄いアクアチントの全幅の雲形を1個埋める。\n1（束）: 細かく小刻みに揺れる青の太い鉛筆の実線の程よい粒の右上がりの縦長の大きな三角を3個置く。〔下絵が付けた場所: 中心〕\n2（面）: 黒のごく細い銀筆の薄いとても小さな点を12個散らす。〔下絵が付けた場所: 下〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 大きくゆるやかに波打つ灰の太いガッシュの薄いメゾチントの全幅の雲形を1個埋める。\n1（束）: 小さく小刻みに揺れる青の太い鉛筆の実線の程よい粒の右上がりの縦長の大きな三角を3個置く。〔下絵が付けた場所: 中心〕\n2（面）: 黒のごく細い銀筆の薄いごく小さな点を12個散らす。〔下絵が付けた場所: 下〕"
   },
   {
    "id": "ja-13",
@@ -3569,7 +3569,7 @@
       "attributes": {
        "angle": "diagonal",
        "color": "white",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
@@ -3594,7 +3594,7 @@
        "position": "center",
        "size": "normal_sized",
        "surface": "grain",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "chalk"
       },
       "count": 8,
@@ -3604,7 +3604,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: カンバス。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ青の太いガッシュの薄い塗りの水平の横長の大きな四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 白の太いガッシュの濃い塗りの大きな円を1個置く。〔下絵が付けた場所: 上〕\n2（束）: 大きくゆるやかに揺れる白の細い鉛筆の程よい刷きの斜めの小さな線を12個引く。\n3（束）: 細かく小刻みに波打つ白のごく太いチョークの濃い粒の斜めの普通の大きさの線を8個引く。〔下絵が付けた場所: 中心〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: カンバス。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 小さくゆるやかに波打つ青の太いガッシュの薄い塗りの水平の横長の大きな四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 白の太いガッシュの濃い塗りの大きな円を1個置く。〔下絵が付けた場所: 上〕\n2（束）: 大きくゆるやかに揺れる白の細い鉛筆の程よい刷きの斜めの小さな線を12個引く。\n3（束）: 小さく小刻みに波打つ白のごく太いチョークの濃い粒の斜めの普通の大きさの線を8個引く。〔下絵が付けた場所: 中心〕"
   },
   {
    "id": "ja-14",
@@ -3631,7 +3631,7 @@
        "angle": "vertical",
        "color": "gray",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "position": "center",
@@ -3660,7 +3660,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 白のチョークの濃いとても小さな点を40個散らす。\n1（束）: 細かく揺れる灰の細い鉛筆の実線の程よい粒の垂直の普通の大きさの線を3個引く。〔下絵が付けた場所: 中心〕\n2（束）: 白のガッシュの薄い空のとても小さな円を1個置く。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 白のチョークの濃いごく小さな点を40個散らす。\n1（束）: 小さく揺れる灰の細い鉛筆の実線の程よい粒の垂直の普通の大きさの線を3個引く。〔下絵が付けた場所: 中心〕\n2（束）: 白のガッシュの薄い空のごく小さな円を1個置く。"
   },
   {
    "id": "ja-15",
@@ -3675,7 +3675,7 @@
        "color": "gray",
        "handling": "faint",
        "position": "bottom",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "flat",
        "tool": "gouache",
        "thinness": "thick"
@@ -3725,12 +3725,12 @@
        "angle": "rotated",
        "color": "yellow",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
        "position": "center",
-       "size": "slightly_small",
+       "size": "small",
        "surface": "grain",
        "thinness": "thin",
        "tool": "gouache"
@@ -3742,7 +3742,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 画用紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い塗りの横長の特大の四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに揺れる黒のペンの実線の濃い粒の垂直の大きな線を6個引く。\n2（面）: 細かく小刻みに波打つ黄のチョークの濃い塗りの小さな円を24個散らす。〔下絵が付けた場所: 中心〕\n3（束）: 細かくゆるやかに揺れる黄の細いガッシュの実線の程よい粒の回転の小さめの弧を40個引く。〔下絵が付けた場所: 中心〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 画用紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄い塗りの横長のごく大きな四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 小さく小刻みに揺れる黒のペンの実線の濃い粒の垂直の大きな線を6個引く。\n2（面）: 小さく小刻みに波打つ黄のチョークの濃い塗りの小さな円を24個散らす。〔下絵が付けた場所: 中心〕\n3（束）: 小さくゆるやかに揺れる黄の細いガッシュの実線の程よい粒の回転の小さな弧を40個引く。〔下絵が付けた場所: 中心〕"
   },
   {
    "id": "ja-16",
@@ -3773,7 +3773,7 @@
       "action": "place",
       "attributes": {
        "color": "white",
-       "handling": "temperate",
+       "handling": "moderate",
        "position": "top_edge",
        "size": "large",
        "surface": "flat",
@@ -3786,7 +3786,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 細かく揺れる灰の細い鉛筆の実線の薄い粒の水平の半幅の線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの大きな円を1個置く。〔下絵が付けた場所: 上端〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 小さく揺れる灰の細い鉛筆の実線の薄い粒の水平の半幅の線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの大きな円を1個置く。〔下絵が付けた場所: 上端〕"
   },
   {
    "id": "ja-17",
@@ -3841,7 +3841,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 細かく小刻みに波打つ黒のペンの濃い塗りの水平の全幅の線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 赤のチョークの濃い塗りの小さな楕円を1個置く。〔下絵が付けた場所: 隅〕\n2（面）: 灰の鉛筆の薄いとても小さな点を30個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 小さく小刻みに波打つ黒のペンの濃い塗りの水平の全幅の線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 赤のチョークの濃い塗りの小さな楕円を1個置く。〔下絵が付けた場所: 隅〕\n2（面）: 灰の鉛筆の薄いごく小さな点を30個散らす。"
   },
   {
    "id": "ja-18",
@@ -3868,7 +3868,7 @@
        "angle": "horizontal",
        "color": "black",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "broadly",
        "motion_quality": "undulating",
        "motion_spacing": "loosely",
@@ -3900,7 +3900,7 @@
       "attributes": {
        "angle": "rising",
        "color": "black",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "tightly",
@@ -3915,7 +3915,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の鉛筆の薄いとても小さな点を40個散らす。\n1（全幅の線）: 大きくゆるやかに波打つ黒の細いガッシュの実線の程よい刷きの水平の全幅の線を3個引く。\n2（束）: 黒の太いガッシュの濃い塗りの横長の大きな雲形を1個置く。〔下絵が付けた場所: 下〕\n3（面）: 細かく小刻みに揺れる黒のガッシュの程よい塗りの右上がりの小さな楕円を15個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の鉛筆の薄いごく小さな点を40個散らす。\n1（全幅の線）: 大きくゆるやかに波打つ黒の細いガッシュの実線の程よい刷きの水平の全幅の線を3個引く。\n2（束）: 黒の太いガッシュの濃い塗りの横長の大きな雲形を1個置く。〔下絵が付けた場所: 下〕\n3（面）: 小さく小刻みに揺れる黒のガッシュの程よい塗りの右上がりの小さな楕円を15個散らす。"
   },
   {
    "id": "ja-19",
@@ -3933,7 +3933,7 @@
        "motion_quality": "undulating",
        "motion_spacing": "loosely",
        "position": "bottom",
-       "size": "extra_large",
+       "size": "very_large",
        "surface": "sweep",
        "tool": "gouache",
        "thinness": "thick"
@@ -3967,7 +3967,7 @@
       "attributes": {
        "color": "black",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "position": "center",
        "size": "very_small",
        "surface": "flat",
@@ -3988,7 +3988,7 @@
        "motion_quality": "swaying",
        "position": "center",
        "surface": "sweep",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "silverpoint"
       },
       "count": 1,
@@ -3998,7 +3998,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ灰の太いガッシュの薄い刷きの横長の特大の雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに揺れる黒の細い鉛筆の実線の濃い粒の垂直の小さな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の程よい塗りのとても小さな円を2個置く。〔下絵が付けた場所: 中心〕\n3（束）: 細かく揺れる黒のごく細い銀筆の実線の薄い刷きの水平の半幅の弧を1個引く。〔下絵が付けた場所: 中心〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 小さくゆるやかに波打つ灰の太いガッシュの薄い刷きの横長のごく大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 小さく小刻みに揺れる黒の細い鉛筆の実線の濃い粒の垂直の小さな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の程よい塗りのごく小さな円を2個置く。〔下絵が付けた場所: 中心〕\n3（束）: 小さく揺れる黒のごく細い銀筆の実線の薄い刷きの水平の半幅の弧を1個引く。〔下絵が付けた場所: 中心〕"
   },
   {
    "id": "ja-20",
@@ -4015,7 +4015,7 @@
        "handling": "dense",
        "position": "center",
        "surface": "flat",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "pen"
       },
       "count": 1,
@@ -4068,7 +4068,7 @@
       "action": "scatter",
       "attributes": {
        "color": "black",
-       "handling": "temperate",
+       "handling": "moderate",
        "size": "small",
        "tool": "pen"
       },
@@ -4079,7 +4079,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ灰の太いガッシュの薄い刷きの横長の大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（面）: 白の鉛筆の濃いとても小さな点を40個散らす。\n2（面）: 黒のペンの程よい小さな点を15個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 小さくゆるやかに波打つ灰の太いガッシュの薄い刷きの横長の大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（面）: 白の鉛筆の濃いごく小さな点を40個散らす。\n2（面）: 黒のペンの程よい小さな点を15個散らす。"
   },
   {
    "id": "ja-22",
@@ -4111,7 +4111,7 @@
       "action": "place",
       "attributes": {
        "color": "white",
-       "handling": "temperate",
+       "handling": "moderate",
        "position": "top_edge",
        "size": "normal_sized",
        "surface": "flat",
@@ -4124,7 +4124,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 細かくゆるやかに揺れる灰の細い鉛筆の薄い粒の水平の大きな線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの普通の大きさの円を1個置く。〔下絵が付けた場所: 上端〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 小さくゆるやかに揺れる灰の細い鉛筆の薄い粒の水平の大きな線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの普通の大きさの円を1個置く。〔下絵が付けた場所: 上端〕"
   },
   {
    "id": "ja-23",
@@ -4138,7 +4138,7 @@
       "attributes": {
        "color": "orange",
        "handling": "faint",
-       "surface": "aquatint",
+       "surface": "mezzotint",
        "tool": "gouache",
        "thinness": "thick"
       },
@@ -4168,10 +4168,10 @@
        "angle": "horizontal",
        "color": "black",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "size": "large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -4200,7 +4200,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黄で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 橙の太いガッシュの薄いアクアチントの全幅の雲形を1個埋める。\n1（面）: 大きくゆるやかに揺れる赤の油彩の濃い塗りの縦長の普通の大きさの楕円を12個散らす。\n2（束）: 黒のごく太いガッシュの実線の程よい刷きの水平の大きな線を1個引く。\n3（束）: 細かく小刻みに波打つ灰の細い鉛筆の薄い粒の斜めの小さな線を4個引く。〔下絵が付けた場所: 下〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黄で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 橙の太いガッシュの薄いメゾチントの全幅の雲形を1個埋める。\n1（面）: 大きくゆるやかに揺れる赤の油彩の濃い塗りの縦長の普通の大きさの楕円を12個散らす。\n2（束）: 黒のごく太いガッシュの実線の程よい刷きの水平の大きな線を1個引く。\n3（束）: 小さく小刻みに波打つ灰の細い鉛筆の薄い粒の斜めの小さな線を4個引く。〔下絵が付けた場所: 下〕"
   },
   {
    "id": "ja-24",
@@ -4215,8 +4215,8 @@
        "color": "gray",
        "handling": "faint",
        "position": "center",
-       "size": "huge",
-       "surface": "aquatint",
+       "size": "very_large",
+       "surface": "mezzotint",
        "tool": "gouache",
        "thinness": "thick"
       },
@@ -4230,7 +4230,7 @@
        "angle": "falling",
        "color": "black",
        "continuity": "solid",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "swaying",
        "motion_spacing": "loosely",
@@ -4267,7 +4267,7 @@
        "motion_spacing": "tightly",
        "size": "small",
        "surface": "sweep",
-       "thinness": "extra_fine",
+       "thinness": "very_thin",
        "tool": "silverpoint"
       },
       "count": 20,
@@ -4277,7 +4277,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄いアクアチントの横長の巨大な雲形を1個埋める。〔下絵が付けた場所: 中心〕\n1（束）: 細かくゆるやかに揺れる黒の細い鉛筆の実線の程よい粒の右下がりの大きな線を15個引く。\n2（束）: 黒のペンの濃いとても小さな点を3個置く。〔下絵が付けた場所: 下〕\n3（束）: 大きく小刻みに波打つ灰のごく細い銀筆の破線の薄い刷きの小さな弧を20個引く。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太いガッシュの薄いメゾチントの横長のごく大きな雲形を1個埋める。〔下絵が付けた場所: 中心〕\n1（束）: 小さくゆるやかに揺れる黒の細い鉛筆の実線の程よい粒の右下がりの大きな線を15個引く。\n2（束）: 黒のペンの濃いごく小さな点を3個置く。〔下絵が付けた場所: 下〕\n3（束）: 大きく小刻みに波打つ灰のごく細い銀筆の破線の薄い刷きの小さな弧を20個引く。"
   },
   {
    "id": "ja-25",
@@ -4306,7 +4306,7 @@
       "action": "place",
       "attributes": {
        "color": "white",
-       "handling": "temperate",
+       "handling": "moderate",
        "position": "top_edge",
        "size": "normal_sized",
        "surface": "flat",
@@ -4351,7 +4351,7 @@
       "action": "place",
       "attributes": {
        "angle": "rotated",
-       "handling": "temperate",
+       "handling": "moderate",
        "position": "bottom_edge",
        "size": "small",
        "surface": "grain",
@@ -4384,7 +4384,7 @@
        "position": "top_edge",
        "size": "large",
        "surface": "sweep",
-       "thinness": "extra_thick",
+       "thinness": "very_thick",
        "tool": "gouache"
       },
       "count": 1,
@@ -4395,7 +4395,7 @@
       "action": "draw",
       "attributes": {
        "angle": "horizontal",
-       "handling": "temperate",
+       "handling": "moderate",
        "motion_amplitude": "narrowly",
        "motion_quality": "undulating",
        "motion_spacing": "tightly",
@@ -4412,7 +4412,7 @@
     ],
     "plugins": []
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの普通の大きさの円を1個置く。〔下絵が付けた場所: 上端〕\n2（束）: 細かく揺れる細いガッシュの薄い刷きの小さな弧を1個引く。〔下絵が付けた場所: 右端〕\n3（束）: 緑の太いガッシュの濃い塗りの横長の大きな楕円を1個置く。〔下絵が付けた場所: 下〕\n4（束）: チョークの程よい粒の回転の小さな四角を1個置く。〔下絵が付けた場所: 下端〕\n5（束）: 黒の太いエッチングの濃いとても小さな点を1個置く。〔下絵が付けた場所: 上〕\n6（束）: 黄のごく太いガッシュの濃い刷きの垂直の大きな線を1個引く。〔下絵が付けた場所: 上端〕\n7（束）: 細かく小刻みに波打つ細いエッチングの程よい粒の水平の普通の大きさの線を1個引く。〔下絵が付けた場所: 下〕"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの普通の大きさの円を1個置く。〔下絵が付けた場所: 上端〕\n2（束）: 小さく揺れる細いガッシュの薄い刷きの小さな弧を1個引く。〔下絵が付けた場所: 右端〕\n3（束）: 緑の太いガッシュの濃い塗りの横長の大きな楕円を1個置く。〔下絵が付けた場所: 下〕\n4（束）: チョークの程よい粒の回転の小さな四角を1個置く。〔下絵が付けた場所: 下端〕\n5（束）: 黒の太いエッチングの濃いごく小さな点を1個置く。〔下絵が付けた場所: 上〕\n6（束）: 黄のごく太いガッシュの濃い刷きの垂直の大きな線を1個引く。〔下絵が付けた場所: 上端〕\n7（束）: 小さく小刻みに波打つ細いエッチングの程よい粒の水平の普通の大きさの線を1個引く。〔下絵が付けた場所: 下〕"
   }
  ]
 }

@@ -23,9 +23,9 @@ use crate::parser::{CoreModifierValue, core_modifier_surface_forms};
 use crate::saijiki::{canonical_wire_id, saijiki_asset};
 
 pub const WORK_PLAN_SCHEMA_ID: &str = "inku.work-plan.v2";
-pub const WORK_PLAN_CAPABILITIES_ASSET_ID: &str = "inku.work-plan-capabilities.v2";
+pub const WORK_PLAN_CAPABILITIES_ASSET_ID: &str = "inku.work-plan-capabilities.v3";
 pub const WORK_PLAN_CAPABILITIES_ASSET_BYTES: &[u8] =
-    include_bytes!("../assets/work-plan-capabilities-v2.json");
+    include_bytes!("../assets/work-plan-capabilities-v3.json");
 pub const UNSPECIFIED: &str = "unspecified";
 /// One layer draws this many marks at most (the shipping hard policy's marks
 /// per instruction).
@@ -48,7 +48,10 @@ pub enum WorkPlanSlot {
     Continuity,
     Surface,
     Handling,
+    /// The size of a named texture's dots or lines (きめ: 細かい・粗い).
     Fineness,
+    /// The packing of a named texture's dots or lines (きめ: 密な・疎な; Saijiki v4).
+    Density,
     Underlayer,
     Angle,
     LineUpDirection,
@@ -60,7 +63,7 @@ pub enum WorkPlanSlot {
 }
 
 impl WorkPlanSlot {
-    pub const LAYER_ATTRIBUTES: [Self; 17] = [
+    pub const LAYER_ATTRIBUTES: [Self; 18] = [
         Self::Position,
         Self::Size,
         Self::Color,
@@ -70,6 +73,7 @@ impl WorkPlanSlot {
         Self::Surface,
         Self::Handling,
         Self::Fineness,
+        Self::Density,
         Self::Underlayer,
         Self::Angle,
         Self::LineUpDirection,
@@ -95,6 +99,7 @@ impl WorkPlanSlot {
             Self::Surface => "surface",
             Self::Handling => "handling",
             Self::Fineness => "fineness",
+            Self::Density => "density",
             Self::Underlayer => "underlayer",
             Self::Angle => "angle",
             Self::LineUpDirection => "line_up_direction",
@@ -140,7 +145,8 @@ impl WorkPlanVocabulary {
 }
 
 /// Each prompt word of one category with its canonical semantic ID, which
-/// decides the slot of a word whose category spans several slots.
+/// decides the slot of a word whose category spans several slots. A word Saijiki v4
+/// moved to the category keeps the slot it had (`moved_terms`).
 fn saijiki_terms(category_key: &str) -> Vec<(String, WorkPlanTerm)> {
     let Some(category) = saijiki_asset()
         .categories
@@ -152,19 +158,82 @@ fn saijiki_terms(category_key: &str) -> Vec<(String, WorkPlanTerm)> {
     category
         .words
         .iter()
-        .filter(|word| word.prompt)
-        .filter_map(|word| {
-            let canonical =
-                project_macro_semantic_ref(category_key, &word.surface_ja)?.canonical_id;
-            let en = word.surface_en.clone()?;
-            Some((
-                canonical,
-                WorkPlanTerm {
-                    id: canonical_wire_id(&en),
-                    ja: word.surface_ja.clone(),
-                    en,
-                },
-            ))
+        .filter(|word| word.prompt && word.semantic_category.is_none())
+        .filter_map(|word| plan_term(category_key, word))
+        .collect()
+}
+
+fn plan_term(category_key: &str, word: &crate::SaijikiWordAsset) -> Option<(String, WorkPlanTerm)> {
+    let canonical = project_macro_semantic_ref(category_key, &word.surface_ja)?.canonical_id;
+    let en = word.surface_en.clone()?;
+    Some((
+        canonical,
+        WorkPlanTerm {
+            id: canonical_wire_id(&en),
+            ja: word.surface_ja.clone(),
+            en,
+        },
+    ))
+}
+
+/// Whether a layer's mark has neither a fill nor a textured face, as the compiler lowers it:
+/// an explicitly empty surface, or a line, a free line or an open arc whose surface is not
+/// one of the marks a stroke keeps (粒・刷き). A closed shape without a surface is filled.
+fn digital_mark_is_bare(layer: &WorkPlanLayer) -> bool {
+    let surface = layer.attribute(WorkPlanSlot::Surface);
+    if surface == Some("empty") {
+        return true;
+    }
+    let open = match layer.shape.as_str() {
+        "line" | "free_line" => true,
+        "arc" => !matches!(
+            layer.attribute(WorkPlanSlot::Proportion),
+            Some("semicircle" | "crescent")
+        ),
+        _ => false,
+    };
+    open && !matches!(surface, Some("grain" | "sweep"))
+        && !(layer.shape == "arc" && surface == Some("flat"))
+}
+
+/// Whether the printer leaves out a layer's handling: a digital mark with neither a fill nor
+/// a textured face does not show it (Saijiki v4), and the compiler would leave it out.
+fn handling_unseen(layer: &WorkPlanLayer, slot: WorkPlanSlot) -> bool {
+    slot == WorkPlanSlot::Handling
+        && layer.attribute(WorkPlanSlot::Tool) == Some("digital")
+        && digital_mark_is_bare(layer)
+}
+
+/// The plan slot of a きめ word: the size (細かい・粗い) or the packing (密な・疎な) of a
+/// named texture, two slots in Saijiki v4.
+fn kime_slot(slot: WorkPlanSlot, canonical: &str) -> WorkPlanSlot {
+    if slot == WorkPlanSlot::Fineness && matches!(canonical, "packed" | "sparse") {
+        WorkPlanSlot::Density
+    } else {
+        slot
+    }
+}
+
+/// The words Saijiki v4 moved to another category (半円・三日月 to かたち, にじみ to
+/// さばき, 下塗り to きめ), in the plan slot they had: the plan keeps its slots.
+fn moved_terms() -> Vec<(WorkPlanSlot, String, WorkPlanTerm)> {
+    saijiki_asset()
+        .categories
+        .iter()
+        .flat_map(|category| {
+            category.words.iter().filter_map(move |word| {
+                let slot = match word.semantic_category.as_deref()? {
+                    "ratio" => WorkPlanSlot::Proportion,
+                    "variation" => WorkPlanSlot::Bleeding,
+                    "underlayer" => WorkPlanSlot::Underlayer,
+                    _ => return None,
+                };
+                if !word.prompt {
+                    return None;
+                }
+                let (canonical, term) = plan_term(&category.key, word)?;
+                Some((slot, canonical, term))
+            })
         })
         .collect()
 }
@@ -239,11 +308,14 @@ pub fn work_plan_vocabulary() -> &'static WorkPlanVocabulary {
             (WorkPlanSlot::Surface, "omote"),
             (WorkPlanSlot::Handling, "sabaki"),
             (WorkPlanSlot::Fineness, "kime"),
-            (WorkPlanSlot::Underlayer, "shitaji"),
         ] {
-            for (_, term) in saijiki_terms(key) {
-                vocabulary.push(slot, term);
+            for (canonical, term) in saijiki_terms(key) {
+                vocabulary.push(kime_slot(slot, &canonical), term);
             }
+        }
+        // Each moved word was the last of its v3 slot, so the slot keeps its order.
+        for (slot, _, term) in moved_terms() {
+            vocabulary.push(slot, term);
         }
         for (canonical, term) in saijiki_terms("yuragi") {
             let slot = match classify_fluctuation_dimension(&canonical) {
@@ -341,6 +413,7 @@ impl WorkPlanLayer {
         self.attributes
             .insert(WorkPlanSlot::Surface, surface.to_owned());
         self.attributes.remove(&WorkPlanSlot::Fineness);
+        self.attributes.remove(&WorkPlanSlot::Density);
         self.attributes.remove(&WorkPlanSlot::Underlayer);
     }
 }
@@ -782,6 +855,7 @@ pub fn normalize_work_plan_with_plugins(
                         | WorkPlanSlot::Surface
                         | WorkPlanSlot::Handling
                         | WorkPlanSlot::Fineness
+                        | WorkPlanSlot::Density
                         | WorkPlanSlot::Underlayer
                         | WorkPlanSlot::MotionQuality
                         | WorkPlanSlot::MotionAmplitude
@@ -821,11 +895,24 @@ pub fn normalize_work_plan_with_plugins(
             .attribute(WorkPlanSlot::Surface)
             .is_none_or(|surface| !texture_surfaces().iter().any(|texture| texture == surface))
         {
-            for slot in [WorkPlanSlot::Fineness, WorkPlanSlot::Underlayer] {
+            for slot in [
+                WorkPlanSlot::Fineness,
+                WorkPlanSlot::Density,
+                WorkPlanSlot::Underlayer,
+            ] {
                 if let Some(value) = out.attributes.remove(&slot) {
                     note(Some(index), slot.field(), value, "requires_texture");
                 }
             }
+        }
+        // The digital tool draws a mark with neither a fill nor a textured face from grid
+        // cells whose tone does not follow the handling, and the compiler leaves the word
+        // out (Saijiki v4); the plan does not print it there.
+        if out.attribute(WorkPlanSlot::Tool) == Some("digital")
+            && digital_mark_is_bare(&out)
+            && let Some(value) = out.attributes.remove(&WorkPlanSlot::Handling)
+        {
+            note(Some(index), "handling", value, "unsupported_for_tool");
         }
         plan.layers.push(out);
     }
@@ -1203,6 +1290,7 @@ fn print_layer_ja(
     // 円」), so that two attributive adjectives do not stand in a row (「薄い細かい
     // 点描の」) and the handling is not read as the underlayer's alone.
     let lays_texture = layer.attribute(WorkPlanSlot::Fineness).is_some()
+        || layer.attribute(WorkPlanSlot::Density).is_some()
         || layer.attribute(WorkPlanSlot::Underlayer).is_some();
     let order: &[WorkPlanSlot] = if lays_texture {
         &[
@@ -1211,7 +1299,9 @@ fn print_layer_ja(
             WorkPlanSlot::Tool,
             WorkPlanSlot::Continuity,
             WorkPlanSlot::Underlayer,
+            // 「細かい密な点描」: the size, then the packing (Saijiki v4).
             WorkPlanSlot::Fineness,
+            WorkPlanSlot::Density,
             WorkPlanSlot::Surface,
             WorkPlanSlot::Handling,
             WorkPlanSlot::Angle,
@@ -1228,7 +1318,7 @@ fn print_layer_ja(
         ]
     };
     for &slot in order {
-        if slot == WorkPlanSlot::Color && cycle.is_some() {
+        if slot == WorkPlanSlot::Color && cycle.is_some() || handling_unseen(layer, slot) {
             continue;
         }
         if let Some(value) = layer.attribute(slot) {
@@ -1301,10 +1391,11 @@ fn print_layer_en(
         WorkPlanSlot::Handling,
         WorkPlanSlot::Underlayer,
         WorkPlanSlot::Fineness,
+        WorkPlanSlot::Density,
         WorkPlanSlot::Surface,
         WorkPlanSlot::Angle,
     ] {
-        if slot == WorkPlanSlot::Color && cycle.is_some() {
+        if slot == WorkPlanSlot::Color && cycle.is_some() || handling_unseen(layer, slot) {
             continue;
         }
         if let Some(value) = layer.attribute(slot) {
@@ -1447,13 +1538,17 @@ fn plan_ids_by_semantic_id() -> &'static BTreeMap<WorkPlanSlot, BTreeMap<String,
             (WorkPlanSlot::Angle, "katamuki"),
             (WorkPlanSlot::Handling, "sabaki"),
             (WorkPlanSlot::Fineness, "kime"),
-            (WorkPlanSlot::Underlayer, "shitaji"),
             (WorkPlanSlot::Ground, "ji"),
         ] {
-            let table = tables.entry(slot).or_default();
             for (canonical, term) in saijiki_terms(key) {
-                table.insert(canonical, term.id);
+                tables
+                    .entry(kime_slot(slot, &canonical))
+                    .or_default()
+                    .insert(canonical, term.id);
             }
+        }
+        for (slot, canonical, term) in moved_terms() {
+            tables.entry(slot).or_default().insert(canonical, term.id);
         }
         for (canonical, term) in saijiki_terms("yuragi") {
             let slot = match classify_fluctuation_dimension(&canonical) {
@@ -1530,6 +1625,7 @@ pub fn plan_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLa
         (WorkPlanSlot::Angle, entity.angle.as_ref()),
         (WorkPlanSlot::Handling, entity.surface.intensity.as_ref()),
         (WorkPlanSlot::Fineness, entity.surface.fineness.as_ref()),
+        (WorkPlanSlot::Density, entity.surface.density.as_ref()),
         (WorkPlanSlot::Underlayer, entity.surface.underlayer.as_ref()),
         (
             WorkPlanSlot::MotionQuality,
@@ -1997,7 +2093,10 @@ fn derive_shape_capabilities(
                     }
                     // A fineness or underlayer word lays a named texture
                     // (DDL 24), so it is asked of a form with one.
-                    if matches!(slot, WorkPlanSlot::Fineness | WorkPlanSlot::Underlayer) {
+                    if matches!(
+                        slot,
+                        WorkPlanSlot::Fineness | WorkPlanSlot::Density | WorkPlanSlot::Underlayer
+                    ) {
                         let Some(texture) = texture_surfaces().first() else {
                             continue;
                         };

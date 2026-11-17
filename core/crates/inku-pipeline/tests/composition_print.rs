@@ -1,14 +1,17 @@
 //! A composed placement prints as the prototype printed it, and the printed DDL
 //! compiles with no diagnostic: a range replaces a guessed place, a stated place
 //! keeps its word, and every composition range and corner reads in both languages.
-//! The expected lines write the size 特大の with one の (I-709); the prototype's
-//! output, printed before that fix, had 特大のの.
+//! The expected lines are written in the Saijiki v4 words (the size 特大の of the
+//! prototype's output is ごく大きな, I-709 / v4); the fixture's layers keep the
+//! Score values the solver port reads, and `plan_values` gives the values the work
+//! plan writes in v4 (`computer` is `digital`, `huge` is `very_large`, ...).
 
 mod common;
 
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{
-    WorkPlan, WorkPlanLayer, print_work_plan_composed, work_plan_source_compiles_cleanly,
+    WorkPlan, WorkPlanLayer, WorkPlanSlot, print_work_plan_composed,
+    work_plan_source_compiles_cleanly,
 };
 use inku_pipeline::composition;
 use serde::Deserialize;
@@ -63,13 +66,58 @@ fn language(lang: &str) -> ResolvedInstructionLanguage {
     }
 }
 
+/// The layers the fixture records hold the Score values of the prototype; the v4
+/// work plan writes the English of the word (the author's decision of Saijiki v4).
+fn plan_values(layers: &[WorkPlanLayer]) -> Vec<WorkPlanLayer> {
+    layers
+        .iter()
+        .map(|layer| {
+            let mut layer = layer.clone();
+            for value in layer.attributes.values_mut() {
+                let plan = match value.as_str() {
+                    "extra_large" | "huge" => "very_large",
+                    "slightly_small" => "small",
+                    "slightly_large" => "large",
+                    "aquatint" => "mezzotint",
+                    "computer" => "digital",
+                    "temperate" => "moderate",
+                    "extra_fine" => "very_thin",
+                    "extra_thick" => "very_thick",
+                    other => other,
+                };
+                *value = plan.to_owned();
+            }
+            layer
+        })
+        .collect()
+}
+
+/// Two words are not drawn in Saijiki v4, and the compiler leaves them out with a
+/// diagnostic: a fill (塗り) on a line (`unsupported_surface_without_face`) and a
+/// dashed or dotted stroke on an arc or a closed shape
+/// (`unsupported_continuity_without_line`). The printed sentence of such a layer is
+/// checked for its text only (the diagnostics are tested in inku-ddl).
+fn is_line_fill(layer: &WorkPlanLayer) -> bool {
+    let attribute = |slot: WorkPlanSlot| layer.attributes.get(&slot).map(String::as_str);
+    (layer.shape == "line" && attribute(WorkPlanSlot::Surface) == Some("flat"))
+        || (layer.shape != "line"
+            && matches!(
+                attribute(WorkPlanSlot::Continuity),
+                Some("dashed" | "dotted")
+            ))
+}
+
+fn fills_a_line(layers: &[WorkPlanLayer]) -> bool {
+    layers.iter().any(is_line_fill)
+}
+
 fn composed_source(
     layers: &[WorkPlanLayer],
     regions: &[String],
     language: ResolvedInstructionLanguage,
 ) -> String {
     let plan = WorkPlan {
-        layers: layers.to_vec(),
+        layers: plan_values(layers),
         ..WorkPlan::default()
     };
     let chosen: Vec<usize> = regions
@@ -97,7 +145,9 @@ fn composed_placements_print_as_the_prototype_and_compile_cleanly() {
                     source,
                     solved.ddl_layers.join("\n")
                 ));
-            } else if !work_plan_source_compiles_cleanly(&source, language) {
+            } else if !fills_a_line(&case.layers)
+                && !work_plan_source_compiles_cleanly(&source, language)
+            {
                 failures.push(format!(
                     "{} {seed}: does not compile cleanly\n{source}",
                     case.id
@@ -130,7 +180,7 @@ fn every_range_and_corner_compiles_cleanly_for_each_action() {
     let mut examples: Vec<WorkPlanLayer> = Vec::new();
     for case in &cases {
         for layer in &case.layers {
-            if !examples.iter().any(|seen| seen.action == layer.action) {
+            if !is_line_fill(layer) && !examples.iter().any(|seen| seen.action == layer.action) {
                 examples.push(layer.clone());
             }
         }

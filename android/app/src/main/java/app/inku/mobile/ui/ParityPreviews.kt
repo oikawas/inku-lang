@@ -118,14 +118,14 @@ private val surfaceAndHandling: Map<String, PreviewEntry> by lazy {
         "点描" to PreviewEntry("点を面に撒いて濃淡を作る。", "点描の円を置く", "Scatters dots across the face to build tone.", "Place a stipple square", surfaceSvg(surfaceDabs(34, 2.6, 0.62, 5.3))),
         "平行線" to PreviewEntry("平行な線で面を埋める。密度が上がるほど線の間隔が詰まる。", "平行線の四角を置く", "Fills the face with parallel lines; the denser it is, the tighter the spacing.", "Place a hatch square", surfaceSvg(surfaceHatch(listOf(45), 8, 2, 0.62))),
         "交差線" to PreviewEntry("平行線にもう一組を交差させて重ねる。", "交差線の四角を置く", "Lays a second set of lines across the first.", "Place a crosshatch square", surfaceSvg(surfaceHatch(listOf(45, 115), 9, 2, 0.5))),
-        "アクアチント" to PreviewEntry("粒の濃さを段に分ける。既定は三段。", "アクアチントの四角を置く", "Divides the grain into discrete tone steps, three by default.", "Place an aquatint square", surfaceSvg(
+        "メゾチント" to PreviewEntry("粒の濃さを段に分ける。既定は三段。", "メゾチントの四角を置く", "Divides the grain into discrete tone steps, three by default.", "Place a mezzotint square", surfaceSvg(
             surfaceDabs(26, 1.5, 0.28, 2.3, 51, 76) + surfaceDabs(26, 1.5, 0.56, 6.1, 77, 103) + surfaceDabs(26, 1.5, 0.84, 9.7, 104, 129))),
         "濃い" to PreviewEntry("道具の本来の濃さより濃く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が濃い点描。", "鉛筆の濃い点描の四角を置く",
-            "Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: dense stipple.", "Place a dense stipple pencil square", surfaceSvg(handlingRelative(0.66 * 1.35))),
+            "Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: dense stipple.", "Place a dense stipple pencil square", surfaceSvg(handlingRelative(0.66 * 1.35))),
         "程よい" to PreviewEntry("道具の本来の濃さで置く。さばきを省略した痕と同じ。図は左右とも程よい鉛筆の点描。", "鉛筆の程よい点描の四角を置く",
-            "Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show temperate pencil stipple.", "Place a temperate stipple pencil square", surfaceSvg(handlingRelative(0.66))),
+            "Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show moderate pencil stipple.", "Place a moderate stipple pencil square", surfaceSvg(handlingRelative(0.66))),
         "薄い" to PreviewEntry("道具の本来の濃さより淡く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が薄い点描。", "鉛筆の薄い点描の四角を置く",
-            "Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: faint stipple.", "Place a faint stipple pencil square", surfaceSvg(handlingRelative(0.66 * 0.55))),
+            "Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: faint stipple.", "Place a faint stipple pencil square", surfaceSvg(handlingRelative(0.66 * 0.55))),
     )
 }
 

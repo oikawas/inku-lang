@@ -13,10 +13,10 @@ use sha2::{Digest, Sha256};
 use crate::ResolvedInstructionLanguage;
 
 /// Stable identity for the Saijiki asset semantics.
-pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v3";
+pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v4";
 
 /// The exact embedded UTF-8 source bytes for this asset edition.
-pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v3.json");
+pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v4.json");
 
 /// Identity of the retired first edition. Its asset is embedded only so that saved documents
 /// and Macro definitions written with it can be migrated once to the current edition (SPEC
@@ -32,6 +32,12 @@ pub const SAIJIKI_V2_ASSET_ID: &str = "inku.saijiki.v2";
 
 const SAIJIKI_V2_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v2.json");
 
+/// Identity of the retired third edition (2026-10-31 to Saijiki v4). Like the others, it is
+/// embedded only for the one-time migration of saved documents and Macro definitions.
+pub const SAIJIKI_V3_ASSET_ID: &str = "inku.saijiki.v3";
+
+const SAIJIKI_V3_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v3.json");
+
 /// The Saijiki edition a reader recognizes words from.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SaijikiEdition {
@@ -39,12 +45,14 @@ pub(crate) enum SaijikiEdition {
     V1,
     /// The retired second edition, read only by the migration.
     V2,
+    /// The retired third edition, read only by the migration.
     V3,
+    V4,
 }
 
 impl SaijikiEdition {
     /// The edition every compilation reads.
-    pub(crate) const CURRENT: Self = Self::V3;
+    pub(crate) const CURRENT: Self = Self::V4;
 
     pub(crate) fn asset(self) -> &'static SaijikiAsset {
         match self {
@@ -53,7 +61,11 @@ impl SaijikiEdition {
                     .expect("embedded inku.saijiki.v1 asset must remain valid JSON")
             }),
             Self::V2 => saijiki_v2_asset(),
-            Self::V3 => saijiki_asset(),
+            Self::V3 => SAIJIKI_V3_ASSET.get_or_init(|| {
+                serde_json::from_slice(SAIJIKI_V3_ASSET_BYTES)
+                    .expect("embedded inku.saijiki.v3 asset must remain valid JSON")
+            }),
+            Self::V4 => saijiki_asset(),
         }
     }
 
@@ -61,7 +73,8 @@ impl SaijikiEdition {
         match self {
             Self::V1 => SAIJIKI_V1_ASSET_ID,
             Self::V2 => SAIJIKI_V2_ASSET_ID,
-            Self::V3 => SAIJIKI_ASSET_ID,
+            Self::V3 => SAIJIKI_V3_ASSET_ID,
+            Self::V4 => SAIJIKI_ASSET_ID,
         }
     }
 }
@@ -86,6 +99,21 @@ pub struct SaijikiAsset {
     pub relation_marker_order: MarkerOrder,
     pub relation_display_order: Vec<String>,
     pub marker_class_order: Vec<String>,
+    /// The bundles a sentence is composed in, in the order the Saijiki screen shows them
+    /// (Saijiki v4; earlier editions have none). Every category's `bundle` is one of them.
+    #[serde(default)]
+    pub bundles: Vec<SaijikiBundleAsset>,
+    /// The bundle the relation words (あいだ) are shown in (Saijiki v4: `where`).
+    #[serde(default)]
+    pub relations_bundle: Option<String>,
+}
+
+/// One bundle of categories (Saijiki v4, RECUT-PLAN §3): its key and its heading.
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+pub struct SaijikiBundleAsset {
+    pub key: String,
+    pub name_ja: String,
+    pub name_en: String,
 }
 
 /// A named Saijiki category and its canonical word order.
@@ -94,6 +122,15 @@ pub struct SaijikiCategoryAsset {
     pub key: String,
     pub name_ja: String,
     pub name_en: String,
+    /// The group of categories a sentence is composed in (Saijiki v4; earlier editions have
+    /// none): `what`, `with`, `face`, `sway`, `color`, `where`, `ground`.
+    #[serde(default)]
+    pub bundle: Option<String>,
+    /// The syntactic modifier dimension the category's words are read as (Saijiki v4: ふとさ
+    /// `thinness` and おおきさ `relative_scale`). Such words are carried as core modifiers,
+    /// not as Saijiki words; the parser builds its modifier forms from them.
+    #[serde(default)]
+    pub core_modifier: Option<String>,
     pub marker_class: Option<String>,
     pub words: Vec<SaijikiWordAsset>,
     pub marker_order_ja: Option<Vec<String>>,
@@ -103,6 +140,10 @@ pub struct SaijikiCategoryAsset {
 /// One bilingual Saijiki word, including all source flags and marker overrides.
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 pub struct SaijikiWordAsset {
+    /// The word's stable id (Saijiki v4, D1). Earlier editions have none; their id is derived
+    /// from the Score value or the English surface, which is the id v4 keeps.
+    #[serde(default)]
+    pub id: Option<String>,
     pub surface_ja: String,
     pub surface_en: Option<String>,
     #[serde(default)]
@@ -119,6 +160,28 @@ pub struct SaijikiWordAsset {
     pub semantic_alias: Option<String>,
     pub marker_surfaces_ja: Option<Vec<String>>,
     pub marker_surfaces_en: Option<Vec<String>>,
+    /// The slot of its category the word fills, where a category has several (Saijiki v4):
+    /// one word per slot may stand on a mark.
+    #[serde(default)]
+    pub facet: Option<String>,
+    /// What the word does, in both languages (Saijiki v4; written in V2).
+    #[serde(default)]
+    pub description: Option<SaijikiPhysicalDescriptionAsset>,
+    /// The category whose word writes the same surfaces (Saijiki v4: the おもて メゾチント
+    /// shares the じ メゾチント). The parser reads the surface once, as the partner's word;
+    /// a sentence of the word alone is the partner's, and any other place is this word's.
+    #[serde(default)]
+    pub shared_surface_with: Option<String>,
+    /// The core modifier value of a word of a `core_modifier` category, named as a Macro
+    /// semantic reference names it (`extra_fine`, `very_small`, ...).
+    #[serde(default)]
+    pub core_modifier_value: Option<String>,
+    /// The Macro semantic category of a word Saijiki v4 moved to another category
+    /// (半円・三日月 `ratio`, にじみ `variation`, 下塗り `underlayer`). The author and the
+    /// reader see the new category; Macro definitions and the compiler keep the name they
+    /// have always used, so no saved definition changes.
+    #[serde(default)]
+    pub semantic_category: Option<String>,
 }
 
 /// Bilingual physical trace description attached to one Saijiki word.
@@ -472,6 +535,7 @@ static SAIJIKI_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 static SAIJIKI_ASSET_SHA256_HEX: OnceLock<String> = OnceLock::new();
 static SAIJIKI_V1_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 static SAIJIKI_V2_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
+static SAIJIKI_V3_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 
 /// Return the parsed embedded asset, parsing it exactly once per process.
 ///
@@ -480,7 +544,7 @@ static SAIJIKI_V2_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 pub fn saijiki_asset() -> &'static SaijikiAsset {
     SAIJIKI_ASSET.get_or_init(|| {
         serde_json::from_slice(SAIJIKI_ASSET_BYTES)
-            .expect("embedded inku.saijiki.v3 asset must remain valid JSON")
+            .expect("embedded inku.saijiki.v4 asset must remain valid JSON")
     })
 }
 
@@ -606,10 +670,12 @@ pub(crate) fn canonical_semantic_id_in(
     static V1: OnceLock<Ids> = OnceLock::new();
     static V2: OnceLock<Ids> = OnceLock::new();
     static V3: OnceLock<Ids> = OnceLock::new();
+    static V4: OnceLock<Ids> = OnceLock::new();
     let cache = match edition {
         SaijikiEdition::V1 => &V1,
         SaijikiEdition::V2 => &V2,
         SaijikiEdition::V3 => &V3,
+        SaijikiEdition::V4 => &V4,
     };
     let asset = edition.asset();
     let categories = cache.get_or_init(|| {
@@ -725,8 +791,16 @@ fn validate_semantic_aliases(asset: &SaijikiAsset) -> Result<(), SaijikiProjecti
 
 fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
     let mut owners = HashMap::<String, (String, String)>::new();
-    for category in &asset.categories {
+    for category in asset
+        .categories
+        .iter()
+        .filter(|category| category.core_modifier.is_none())
+    {
         for word in &category.words {
+            if word.shared_surface_with.is_some() {
+                // Its surfaces are its partner's; the partner registers them once.
+                continue;
+            }
             let eligible = word.prompt || word.display || word.marker == Some(true);
             let mut derived_forms = Vec::new();
             if let Some(grammar) = &word.english_grammar {
@@ -827,9 +901,24 @@ fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectio
 /// row a reader can recognize are distinct across the asset, so no word is read by position.
 fn validate_japanese_surfaces(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
     let mut owners = HashMap::<&str, (&str, &str)>::new();
-    for category in &asset.categories {
+    // Core modifier words are read by the parser's modifier grammar, not as Saijiki words.
+    for category in asset
+        .categories
+        .iter()
+        .filter(|category| category.core_modifier.is_none())
+    {
         for word in &category.words {
             if !(word.prompt || word.display || word.marker == Some(true)) {
+                continue;
+            }
+            if let Some(partner_key) = &word.shared_surface_with {
+                if shared_surface_partner(asset, partner_key, word).is_none() {
+                    return Err(SaijikiProjectionError::SharedSurfaceWithoutPartner {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                        partner_category_key: partner_key.clone(),
+                    });
+                }
                 continue;
             }
             for surface in std::iter::once(word.surface_ja.as_str())
@@ -850,6 +939,30 @@ fn validate_japanese_surfaces(asset: &SaijikiAsset) -> Result<(), SaijikiProject
         }
     }
     Ok(())
+}
+
+/// The word of `partner_key` that writes the same surfaces in both languages as `word`, a
+/// word that shares its surface with that category (Saijiki v4: おもて and じ share
+/// メゾチント). Which of the two a mark reads is decided by where the word stands, not by
+/// the words around it (SPEC §3.3).
+pub(crate) fn shared_surface_partner<'a>(
+    asset: &'a SaijikiAsset,
+    partner_key: &str,
+    word: &SaijikiWordAsset,
+) -> Option<&'a SaijikiWordAsset> {
+    asset
+        .categories
+        .iter()
+        .find(|category| category.key == partner_key)?
+        .words
+        .iter()
+        .find(|partner| {
+            partner.shared_surface_with.is_none()
+                && partner.surface_ja == word.surface_ja
+                && partner.surface_en == word.surface_en
+                && partner.parser_surfaces_ja == word.parser_surfaces_ja
+                && partner.parser_surfaces_en == word.parser_surfaces_en
+        })
 }
 
 fn register_parser_surface(
@@ -887,9 +1000,30 @@ fn register_parser_surface(
     Ok(())
 }
 
+/// The slot of its category a current-edition word fills (`arc_form`, `spread`, `scale`,
+/// `density`, `underlayer`, ...), or `None` for a word of a one-slot category.
+pub(crate) fn word_facet(category_key: &str, canonical_surface_ja: &str) -> Option<&'static str> {
+    saijiki_asset()
+        .categories
+        .iter()
+        .find(|category| category.key == category_key)?
+        .words
+        .iter()
+        .find(|word| word.surface_ja == canonical_surface_ja)?
+        .facet
+        .as_deref()
+}
+
+/// The word's stable id (D1): the asset's `id`, or for an earlier edition the id derived
+/// from its Score value or English surface.
+pub(crate) fn word_id(word: &SaijikiWordAsset) -> Option<String> {
+    semantic_wire_id(word)
+}
+
 fn semantic_wire_id(word: &SaijikiWordAsset) -> Option<String> {
-    word.score_value
+    word.id
         .clone()
+        .or_else(|| word.score_value.clone())
         .or_else(|| word.surface_en.as_deref().map(canonical_wire_id))
 }
 
@@ -1001,6 +1135,11 @@ pub enum SaijikiProjectionError {
         category_key: String,
         identity: String,
     },
+    SharedSurfaceWithoutPartner {
+        category_key: String,
+        surface_ja: String,
+        partner_category_key: String,
+    },
 }
 
 impl SaijikiProjectionError {
@@ -1027,6 +1166,7 @@ impl SaijikiProjectionError {
             Self::SemanticAliasCategoryCrossing { .. } => "semantic_alias_category_crossing",
             Self::SemanticAliasCycle { .. } => "semantic_alias_cycle",
             Self::ConflictingSemanticAlias { .. } => "conflicting_semantic_alias",
+            Self::SharedSurfaceWithoutPartner { .. } => "shared_surface_without_partner",
         }
     }
 }
@@ -1186,6 +1326,15 @@ impl fmt::Display for SaijikiProjectionError {
             } => write!(
                 formatter,
                 "Saijiki semantic alias declaration is conflicting: {category_key}/{identity}"
+            ),
+            Self::SharedSurfaceWithoutPartner {
+                category_key,
+                surface_ja,
+                partner_category_key,
+            } => write!(
+                formatter,
+                "Saijiki word {category_key}/{surface_ja} shares its surface with \
+                 {partner_category_key}, which has no word of the same surfaces"
             ),
         }
     }
@@ -1759,7 +1908,7 @@ mod tests {
             "油彩",
             "ペインティングナイフ",
             "エッチング",
-            "コンピュータ",
+            "デジタル",
         ];
         let expected_en = [
             "silverpoint",
@@ -1772,7 +1921,7 @@ mod tests {
             "oil paint",
             "painting knife",
             "etching",
-            "computer",
+            "digital",
         ];
         let ja_lines = ja.lines().collect::<Vec<_>>();
         let en_lines = en.lines().collect::<Vec<_>>();
@@ -1801,7 +1950,7 @@ mod tests {
         tools
             .words
             .iter_mut()
-            .find(|word| word.surface_ja == "コンピュータ")
+            .find(|word| word.surface_ja == "デジタル")
             .unwrap()
             .prompt = false;
 
@@ -1812,7 +1961,7 @@ mod tests {
 
         assert_eq!(filtered_ja.lines().count(), expected_ja.len() - 1);
         assert_eq!(filtered_en.lines().count(), expected_en.len() - 1);
-        assert!(!filtered_ja.contains("コンピュータ"));
-        assert!(!filtered_en.contains("computer"));
+        assert!(!filtered_ja.contains("デジタル"));
+        assert!(!filtered_en.contains("digital"));
     }
 }

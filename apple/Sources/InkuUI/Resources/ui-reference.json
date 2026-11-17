@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.354",
-  "build": "1430",
-  "buildDate": "2026-11-17T01:16:38.058Z",
+  "version": "v2.15.355",
+  "build": "1431",
+  "buildDate": "2026-11-17T07:37:43.259Z",
   "versions": {
-    "ddlSpec": "30",
-    "ddlEngine": "78",
-    "renderEngine": "103"
+    "ddlSpec": "31",
+    "ddlEngine": "79",
+    "renderEngine": "104"
   },
   "canvasMetadata": {
     "square": {
@@ -1518,12 +1518,17 @@
         "diagnosticReason.unsupported_color_shift": "色を段々に移す（〜の順に段々に移して）のは、並べる列と敷き詰めだけです。",
         "diagnosticReason.color_shift_longer_than_count": "段々に移す色が、痕の数より多くなっています。痕を色の数以上にしてください。",
         "diagnosticReason.shift_needs_colors": "段々に移せるのは色の列だけです。形や組の列は「〜の順に繰り返して」で書いてください。",
-        "diagnosticReason.conflicting_surface_finenesses": "一つの痕に、きめの語（細かい・粗い・密な・疎な）が二つ書かれています。一つにしてください。",
-        "diagnosticReason.conflicting_surface_underlayers": "一つの痕に、したじの語（下塗り）が二つ書かれています。一つにしてください。",
-        "diagnosticReason.unsupported_surface_fineness": "きめの語（細かい・粗い・密な・疎な）は、閉じた形の質感（刷き・刷毛目・粒・点描・平行線・交差線・アクアチント）にだけ使えます。",
-        "diagnosticReason.unsupported_surface_underlayer": "したじの語（下塗り）は、閉じた形の質感（刷き・刷毛目・粒・点描・平行線・交差線・アクアチント）にだけ使えます。",
+        "diagnosticReason.conflicting_surface_finenesses": "一つの痕に、大きさの語（細かい・粗い）が二つ書かれています。一つにしてください。",
+        "diagnosticReason.conflicting_surface_densities": "一つの痕に、詰まり方の語（密な・疎な）が二つ書かれています。一つにしてください。",
+        "diagnosticReason.conflicting_surface_underlayers": "一つの痕に、きめの下塗りが二つ書かれています。一つにしてください。",
+        "diagnosticReason.unsupported_surface_fineness": "きめの語（細かい・粗い・密な・疎な）は、閉じた形の質感（刷き・刷毛目・粒・点描・平行線・交差線・メゾチント）にだけ使えます。",
+        "diagnosticReason.unsupported_surface_underlayer": "きめの下塗りは、閉じた形の質感（刷き・刷毛目・粒・点描・平行線・交差線・メゾチント）にだけ使えます。",
+        "diagnosticReason.unsupported_surface_without_face": "面を敷く語（点描・平行線・交差線・メゾチント・塗り）は、閉じた形にだけ効きます。線・弧・自由線では、その語を外して描きます。",
+        "diagnosticReason.unsupported_fluctuation_on_point": "揺れの語は点には効きません。その語を外して点を描きます。",
+        "diagnosticReason.unsupported_surface_intensity_for_digital": "デジタルの痕のさばき（濃い・程よい・薄い）は、塗りか質感の面がある時だけ効きます。ここでは、その語を外して描きます。",
+        "diagnosticReason.unsupported_continuity_without_line": "破線・点線は、線と自由線にだけ効きます。弧・閉じた形では、その語を外して描きます。",
         "diagnosticReason.unsupported_surface_brushmarks": "刷毛目は、閉じた形（円・楕円・三角・四角・多角形・雲形）の面にだけ使えます。線・弧・自由線では外して描きます。",
-        "diagnosticReason.fluctuation_amplitude_without_quality": "揺れの幅の語（細かく・大きく）は、揺れる・波打つと一緒に書いてください。それだけでは揺れを作りません。",
+        "diagnosticReason.fluctuation_amplitude_without_quality": "揺れの幅の語（小さく・大きく）は、揺れる・波打つと一緒に書いてください。それだけでは揺れを作りません。",
         "diagnosticReason.ambiguous_entity_ownership": "この言葉がどの形のものか決められませんでした。",
         "diagnosticPart.source_instruction": "原文の指示",
         "diagnosticPart.instruction": "描画指示",
@@ -3412,10 +3417,15 @@
         "diagnosticReason.unsupported_color_shift": "Colors shifting through in order are only for marks that line up or a tile.",
         "diagnosticReason.color_shift_longer_than_count": "More colors shift through the marks than there are marks. Use at least as many marks as colors.",
         "diagnosticReason.shift_needs_colors": "Only colors shift through in order. Write a sequence of shapes or groups with repeating … in order.",
-        "diagnosticReason.conflicting_surface_finenesses": "Two fineness words (fine-grained, coarse-grained, packed, sparse) are written on one mark. Write one.",
-        "diagnosticReason.conflicting_surface_underlayers": "The underlayer word (underpainted) is written twice on one mark. Write it once.",
-        "diagnosticReason.unsupported_surface_fineness": "A fineness word (fine-grained, coarse-grained, packed, sparse) goes only on the texture of a closed shape (sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint).",
-        "diagnosticReason.unsupported_surface_underlayer": "The underlayer word (underpainted) goes only on the texture of a closed shape (sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint).",
+        "diagnosticReason.conflicting_surface_finenesses": "Two size words (fine-grained, coarse-grained) are written on one mark. Write one.",
+        "diagnosticReason.conflicting_surface_densities": "Two packing words (packed, sparse) are written on one mark. Write one.",
+        "diagnosticReason.conflicting_surface_underlayers": "The texture word underpainted is written twice on one mark. Write it once.",
+        "diagnosticReason.unsupported_surface_fineness": "A texture word (fine-grained, coarse-grained, packed, sparse) goes only on the texture of a closed shape (sweep, brushmarks, grain, stipple, hatch, crosshatch, mezzotint).",
+        "diagnosticReason.unsupported_surface_underlayer": "The texture word underpainted goes only on the texture of a closed shape (sweep, brushmarks, grain, stipple, hatch, crosshatch, mezzotint).",
+        "diagnosticReason.unsupported_surface_without_face": "A word that lays a face (stipple, hatch, crosshatch, mezzotint, flat) works only on a closed shape. On a line, an arc or a free line, the word is left out.",
+        "diagnosticReason.unsupported_fluctuation_on_point": "A sway word does not work on a point. The word is left out and the point is drawn.",
+        "diagnosticReason.unsupported_surface_intensity_for_digital": "On a digital mark, a handling word (dense, moderate, faint) works only with a fill or a textured face. Here the word is left out.",
+        "diagnosticReason.unsupported_continuity_without_line": "Dashed and dotted work only on a line and a free line. On an arc or a closed shape, the word is left out.",
         "diagnosticReason.unsupported_surface_brushmarks": "Brushmarks goes only on the face of a closed shape (circle, ellipse, triangle, square, polygon, cloudform); on a line, an arc or a free line it is left out.",
         "diagnosticReason.fluctuation_amplitude_without_quality": "Write an amplitude word (narrowly, broadly) with swaying or undulating. Alone it makes no sway.",
         "diagnosticReason.ambiguous_entity_ownership": "Which shape these words belong to could not be decided.",
@@ -3906,8 +3916,8 @@
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M44 58 Q90 18 136 58\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"6\" stroke-linecap=\"round\"/></svg>",
       "effectJa": "円周の一部を描く。半円や三日月の基礎になる。",
       "effectEn": "Draws part of a circumference. The basis for semicircles and crescents.",
-      "exampleJa": "上弦の弧を引く",
-      "exampleEn": "Draw a waxing arc"
+      "exampleJa": "半円の弧を引く",
+      "exampleEn": "Draw a semicircle arc"
     },
     "katachi:自由線": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22.0 60.3 L22.4 57.1 L23.2 54.0 L24.2 50.9 L25.6 48.0 L27.3 45.3 L29.2 42.7 L31.4 40.4 L33.8 38.2 L36.5 36.4 L39.3 34.8 L42.3 33.6 L45.3 32.6 L48.5 32.0 L51.7 31.7 L54.9 31.7 L58.1 32.1 L61.3 32.8 L64.3 33.8 L67.3 35.1 L70.0 36.8 L72.6 38.7 L76.4 41.7 L80.1 44.8 L83.8 47.8 L87.6 50.9 L91.3 53.9 L95.0 57.0 L99.2 55.0 L103.5 53.0 L107.7 51.0 L111.9 48.9 L116.2 46.9 L120.4 44.9 L124.6 42.9 L128.9 40.9 L133.1 38.9 L137.3 36.9 L141.6 34.8 L145.8 32.8 L147.8 37.4 L149.9 42.0 L151.9 46.6 L153.9 51.2 L156.0 55.7 L158.0 60.3\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>",
@@ -3929,6 +3939,27 @@
       "effectEn": "A closed irregular form whose contour is decided anew for each performance.",
       "exampleJa": "中心に横長の雲形を置く",
       "exampleEn": "Place a wide cloudform at center"
+    },
+    "katachi:多角形": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\" /></svg>",
+      "effectJa": "記述の解釈に影響する語彙です。",
+      "effectEn": "A vocabulary word that shapes how the description is read.",
+      "exampleJa": "多角形を使う",
+      "exampleEn": "Use \"polygon\""
+    },
+    "katachi:半円": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M50 60 A40 40 0 0 1 130 60\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"6\" stroke-linecap=\"round\"/></svg>",
+      "effectJa": "円の半分を描く。",
+      "effectEn": "Draws half of a circle.",
+      "exampleJa": "半円の弧を引く",
+      "exampleEn": "Draw a semicircle arc"
+    },
+    "katachi:三日月": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M106 18 C76 24 62 52 82 74 C52 63 50 27 82 14 C92 12 100 14 106 18 Z\" fill=\"#2b2b2b\"/></svg>",
+      "effectJa": "細い月形を描く。",
+      "effectEn": "Draws a thin moon form.",
+      "exampleJa": "三日月の弧を引く",
+      "exampleEn": "Draw a crescent arc"
     },
     "katamuki:水平": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><g transform=\"rotate(0 90 46)\"><path d=\"M42 46 H138\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"6\" stroke-linecap=\"round\"/></g><circle cx=\"90\" cy=\"46\" r=\"2.5\" fill=\"#c9c2b5\"/></svg>",
@@ -3964,6 +3995,20 @@
       "effectEn": "A tilt running from upper left to lower right.",
       "exampleJa": "右下がりの線",
       "exampleEn": "A falling line"
+    },
+    "katamuki:左上がり": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\" /></svg>",
+      "effectJa": "記述の解釈に影響する語彙です。",
+      "effectEn": "A vocabulary word that shapes how the description is read.",
+      "exampleJa": "左上がりを使う",
+      "exampleEn": "Use \"left-rising\""
+    },
+    "katamuki:左下がり": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\" /></svg>",
+      "effectJa": "記述の解釈に影響する語彙です。",
+      "effectEn": "A vocabulary word that shapes how the description is read.",
+      "exampleJa": "左下がりを使う",
+      "exampleEn": "Use \"left-falling\""
     },
     "katamuki:回転": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><g transform=\"rotate(30 90 46)\"><rect x=\"58\" y=\"29\" width=\"64\" height=\"34\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" rx=\"2\"/></g><circle cx=\"90\" cy=\"46\" r=\"2.5\" fill=\"#c9c2b5\"/></svg>",
@@ -4042,12 +4087,12 @@
       "exampleJa": "エッチングの線を引く",
       "exampleEn": "Draw an etching line"
     },
-    "tezawari:コンピュータ": {
+    "tezawari:デジタル": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 52 H34 V46 H46 V40 H58 V46 H70 V52 H82 V58 H94 V64 H106 V58 H118 V52 H130 V46 H142 V40 H158\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"2.4\" stroke-linejoin=\"round\"/><path d=\"M22 36 H158 M22 68 H158\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"0.9\" stroke-dasharray=\"22 9\" stroke-linecap=\"round\" opacity=\"0.576\"/></svg>",
       "effectJa": "幅と軌道を格子と段に落とし、同じ周期と破線を誤差なく反復する。",
       "effectEn": "Snaps width and path to a grid and steps, repeating the same cycle and dashes without error.",
-      "exampleJa": "コンピュータの線",
-      "exampleEn": "A computer line"
+      "exampleJa": "デジタルの線",
+      "exampleEn": "A digital line"
     },
     "tsuranari:実線": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\" /></svg>",
@@ -4069,13 +4114,6 @@
       "effectEn": "Draws as a run of dots.",
       "exampleJa": "点線の円を置く",
       "exampleEn": "Place a dotted circle"
-    },
-    "tsuranari:一点鎖線": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-dasharray=\"18 7 2 7\"/></svg>",
-      "effectJa": "長線と点を交互に並べる。",
-      "effectEn": "Alternates long dashes with dots.",
-      "exampleJa": "一点鎖線の線を引く",
-      "exampleEn": "Draw a dash-dot line"
     },
     "omote:空": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
@@ -4133,33 +4171,40 @@
       "exampleJa": "交差線の四角を置く",
       "exampleEn": "Place a crosshatch square"
     },
-    "omote:アクアチント": {
+    "omote:メゾチント": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><circle cx=\"65.7\" cy=\"34.4\" r=\"1.76\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"65.1\" cy=\"52.8\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.25\"/><circle cx=\"57.0\" cy=\"33.4\" r=\"1.39\" fill=\"#2b2b2b\" opacity=\"0.27\"/><circle cx=\"70.3\" cy=\"37.4\" r=\"1.91\" fill=\"#2b2b2b\" opacity=\"0.16\"/><circle cx=\"71.3\" cy=\"51.7\" r=\"1.29\" fill=\"#2b2b2b\" opacity=\"0.24\"/><circle cx=\"63.1\" cy=\"36.2\" r=\"1.03\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"70.8\" cy=\"67.5\" r=\"1.45\" fill=\"#2b2b2b\" opacity=\"0.19\"/><circle cx=\"70.3\" cy=\"63.1\" r=\"1.64\" fill=\"#2b2b2b\" opacity=\"0.26\"/><circle cx=\"69.9\" cy=\"37.2\" r=\"1.94\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"51.8\" cy=\"65.1\" r=\"1.46\" fill=\"#2b2b2b\" opacity=\"0.27\"/><circle cx=\"71.2\" cy=\"29.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.17\"/><circle cx=\"63.8\" cy=\"55.1\" r=\"1.88\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"55.1\" cy=\"30.9\" r=\"1.06\" fill=\"#2b2b2b\" opacity=\"0.18\"/><circle cx=\"55.8\" cy=\"53.1\" r=\"2.00\" fill=\"#2b2b2b\" opacity=\"0.15\"/><circle cx=\"64.3\" cy=\"42.8\" r=\"1.46\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"74.0\" cy=\"26.0\" r=\"0.98\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"68.5\" cy=\"36.0\" r=\"0.91\" fill=\"#2b2b2b\" opacity=\"0.19\"/><circle cx=\"56.5\" cy=\"70.6\" r=\"1.63\" fill=\"#2b2b2b\" opacity=\"0.15\"/><circle cx=\"64.7\" cy=\"61.8\" r=\"1.09\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"73.7\" cy=\"41.0\" r=\"2.06\" fill=\"#2b2b2b\" opacity=\"0.26\"/><circle cx=\"52.5\" cy=\"63.0\" r=\"1.31\" fill=\"#2b2b2b\" opacity=\"0.27\"/><circle cx=\"66.3\" cy=\"39.2\" r=\"1.62\" fill=\"#2b2b2b\" opacity=\"0.16\"/><circle cx=\"57.3\" cy=\"48.7\" r=\"0.96\" fill=\"#2b2b2b\" opacity=\"0.21\"/><circle cx=\"62.7\" cy=\"46.0\" r=\"0.92\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"64.9\" cy=\"22.1\" r=\"1.88\" fill=\"#2b2b2b\" opacity=\"0.27\"/><circle cx=\"51.3\" cy=\"58.9\" r=\"1.83\" fill=\"#2b2b2b\" opacity=\"0.15\"/><circle cx=\"100.3\" cy=\"69.4\" r=\"0.98\" fill=\"#2b2b2b\" opacity=\"0.45\"/><circle cx=\"100.6\" cy=\"56.5\" r=\"1.04\" fill=\"#2b2b2b\" opacity=\"0.43\"/><circle cx=\"95.5\" cy=\"61.8\" r=\"1.67\" fill=\"#2b2b2b\" opacity=\"0.34\"/><circle cx=\"79.8\" cy=\"60.1\" r=\"1.26\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"89.6\" cy=\"70.7\" r=\"1.79\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"100.9\" cy=\"47.0\" r=\"1.66\" fill=\"#2b2b2b\" opacity=\"0.35\"/><circle cx=\"93.4\" cy=\"53.7\" r=\"1.66\" fill=\"#2b2b2b\" opacity=\"0.35\"/><circle cx=\"77.2\" cy=\"37.2\" r=\"1.37\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"86.1\" cy=\"39.5\" r=\"1.58\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"89.2\" cy=\"27.4\" r=\"1.88\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"87.6\" cy=\"23.6\" r=\"1.85\" fill=\"#2b2b2b\" opacity=\"0.32\"/><circle cx=\"97.9\" cy=\"22.5\" r=\"1.09\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"91.0\" cy=\"32.2\" r=\"1.57\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"97.0\" cy=\"34.2\" r=\"1.68\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"100.5\" cy=\"27.5\" r=\"1.03\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"86.9\" cy=\"37.1\" r=\"1.58\" fill=\"#2b2b2b\" opacity=\"0.34\"/><circle cx=\"79.3\" cy=\"68.2\" r=\"1.74\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"88.1\" cy=\"22.6\" r=\"1.10\" fill=\"#2b2b2b\" opacity=\"0.35\"/><circle cx=\"80.8\" cy=\"49.8\" r=\"1.64\" fill=\"#2b2b2b\" opacity=\"0.43\"/><circle cx=\"78.6\" cy=\"58.1\" r=\"1.77\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"80.0\" cy=\"46.2\" r=\"1.07\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"86.0\" cy=\"37.8\" r=\"1.55\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"97.9\" cy=\"47.5\" r=\"1.60\" fill=\"#2b2b2b\" opacity=\"0.53\"/><circle cx=\"82.3\" cy=\"26.5\" r=\"2.03\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"78.4\" cy=\"48.1\" r=\"1.24\" fill=\"#2b2b2b\" opacity=\"0.53\"/><circle cx=\"83.6\" cy=\"63.9\" r=\"1.23\" fill=\"#2b2b2b\" opacity=\"0.42\"/><circle cx=\"107.3\" cy=\"56.5\" r=\"0.94\" fill=\"#2b2b2b\" opacity=\"0.62\"/><circle cx=\"112.2\" cy=\"37.2\" r=\"2.04\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"115.1\" cy=\"45.7\" r=\"1.18\" fill=\"#2b2b2b\" opacity=\"0.53\"/><circle cx=\"107.5\" cy=\"61.7\" r=\"1.14\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"112.6\" cy=\"30.9\" r=\"1.11\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"118.5\" cy=\"69.6\" r=\"1.49\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"118.6\" cy=\"63.9\" r=\"1.45\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"108.1\" cy=\"63.9\" r=\"1.37\" fill=\"#2b2b2b\" opacity=\"0.68\"/><circle cx=\"108.7\" cy=\"63.6\" r=\"1.63\" fill=\"#2b2b2b\" opacity=\"0.62\"/><circle cx=\"107.3\" cy=\"33.8\" r=\"1.41\" fill=\"#2b2b2b\" opacity=\"0.75\"/><circle cx=\"117.3\" cy=\"65.9\" r=\"1.07\" fill=\"#2b2b2b\" opacity=\"0.78\"/><circle cx=\"106.7\" cy=\"21.9\" r=\"0.97\" fill=\"#2b2b2b\" opacity=\"0.82\"/><circle cx=\"121.3\" cy=\"56.2\" r=\"1.49\" fill=\"#2b2b2b\" opacity=\"0.81\"/><circle cx=\"125.3\" cy=\"34.1\" r=\"1.77\" fill=\"#2b2b2b\" opacity=\"0.70\"/><circle cx=\"122.0\" cy=\"37.7\" r=\"0.97\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"115.2\" cy=\"40.1\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.81\"/><circle cx=\"115.4\" cy=\"43.6\" r=\"1.13\" fill=\"#2b2b2b\" opacity=\"0.73\"/><circle cx=\"125.1\" cy=\"58.5\" r=\"1.57\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"107.8\" cy=\"33.9\" r=\"1.10\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"104.0\" cy=\"66.3\" r=\"1.25\" fill=\"#2b2b2b\" opacity=\"0.62\"/><circle cx=\"120.0\" cy=\"52.7\" r=\"1.14\" fill=\"#2b2b2b\" opacity=\"0.42\"/><circle cx=\"126.0\" cy=\"64.9\" r=\"1.11\" fill=\"#2b2b2b\" opacity=\"0.66\"/><circle cx=\"124.4\" cy=\"56.9\" r=\"1.45\" fill=\"#2b2b2b\" opacity=\"0.64\"/><circle cx=\"128.4\" cy=\"26.2\" r=\"1.29\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"120.2\" cy=\"54.5\" r=\"0.92\" fill=\"#2b2b2b\" opacity=\"0.81\"/><circle cx=\"108.9\" cy=\"29.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.62\"/></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
       "effectJa": "粒の濃さを段に分ける。既定は三段。",
       "effectEn": "Divides the grain into discrete tone steps, three by default.",
-      "exampleJa": "アクアチントの四角を置く",
-      "exampleEn": "Place an aquatint square"
+      "exampleJa": "メゾチントの四角を置く",
+      "exampleEn": "Place a mezzotint square"
     },
     "sabaki:濃い": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><circle cx=\"62.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"69.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"70.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"60.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"71.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"64.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"53.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"53.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"63.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"61.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"70.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"55.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"67.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"58.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"58.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"55.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"72.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"86.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"83.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"77.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"86.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"102.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.81\"/><circle cx=\"109.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"110.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.87\"/><circle cx=\"100.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.62\"/><circle cx=\"111.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"104.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.74\"/><circle cx=\"93.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"93.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.68\"/><circle cx=\"103.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.79\"/><circle cx=\"101.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.88\"/><circle cx=\"110.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"95.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"107.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.77\"/><circle cx=\"98.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.78\"/><circle cx=\"98.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"95.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.70\"/><circle cx=\"112.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.71\"/><circle cx=\"126.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.76\"/><circle cx=\"123.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"117.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"126.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.86\"/><path d=\"M90 20 V72\" stroke=\"#d7d1c4\" stroke-width=\"1.5\"/></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
       "effectJa": "道具の本来の濃さより濃く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が濃い点描。",
-      "effectEn": "Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: dense stipple.",
+      "effectEn": "Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: dense stipple.",
       "exampleJa": "鉛筆の濃い点描の四角を置く",
       "exampleEn": "Place a dense stipple pencil square"
     },
     "sabaki:程よい": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><circle cx=\"62.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"69.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"70.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"60.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"71.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"64.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"53.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"53.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"63.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"61.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"70.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"55.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"67.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"58.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"58.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"55.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"72.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"86.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"83.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"77.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"86.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"102.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"109.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"110.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"100.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"111.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"104.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"93.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"93.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"103.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"101.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"110.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"95.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"107.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"98.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"98.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"95.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"112.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"126.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"123.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"117.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"126.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.63\"/><path d=\"M90 20 V72\" stroke=\"#d7d1c4\" stroke-width=\"1.5\"/></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
       "effectJa": "道具の本来の濃さで置く。さばきを省略した痕と同じ。図は左右とも程よい鉛筆の点描。",
-      "effectEn": "Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show temperate pencil stipple.",
+      "effectEn": "Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show moderate pencil stipple.",
       "exampleJa": "鉛筆の程よい点描の四角を置く",
-      "exampleEn": "Place a temperate stipple pencil square"
+      "exampleEn": "Place a moderate stipple pencil square"
     },
     "sabaki:薄い": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><circle cx=\"62.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"69.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"70.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"60.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"71.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"64.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"53.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"53.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"63.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"61.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"70.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"55.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"67.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"58.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"58.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"55.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"72.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"86.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"83.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"77.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"86.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"102.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"109.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.26\"/><circle cx=\"110.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"100.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.25\"/><circle cx=\"111.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.20\"/><circle cx=\"104.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.30\"/><circle cx=\"93.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.24\"/><circle cx=\"93.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"103.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.32\"/><circle cx=\"101.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"110.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.21\"/><circle cx=\"95.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.21\"/><circle cx=\"107.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.31\"/><circle cx=\"98.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.32\"/><circle cx=\"98.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.20\"/><circle cx=\"95.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"112.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"126.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.31\"/><circle cx=\"123.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.24\"/><circle cx=\"117.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.22\"/><circle cx=\"126.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.35\"/><path d=\"M90 20 V72\" stroke=\"#d7d1c4\" stroke-width=\"1.5\"/></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
       "effectJa": "道具の本来の濃さより淡く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が薄い点描。",
-      "effectEn": "Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: faint stipple.",
+      "effectEn": "Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: faint stipple.",
       "exampleJa": "鉛筆の薄い点描の四角を置く",
       "exampleEn": "Place a faint stipple pencil square"
+    },
+    "sabaki:にじみ": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><filter id=\"pblur\"><feGaussianBlur stdDeviation=\"3\"/></filter></defs><circle cx=\"90\" cy=\"46\" r=\"24\" fill=\"#2b2b2b\" opacity=\"0.72\" filter=\"url(#pblur)\"/><circle cx=\"90\" cy=\"46\" r=\"20\" fill=\"#2b2b2b\" opacity=\"0.62\"/></svg>",
+      "effectJa": "墨の縁から不均一な広がりを加える。",
+      "effectEn": "Adds irregular spread at the edges of the ink.",
+      "exampleJa": "にじみの黒い円を置く。",
+      "exampleEn": "Place a bleeding black circle."
     },
     "kime:細かい": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><circle cx=\"62.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"69.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"70.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"60.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"71.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"64.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"53.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"53.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"63.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"61.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"70.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"55.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"67.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"58.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"58.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"55.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"72.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"86.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"83.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"77.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"86.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"102.5\" cy=\"59.6\" r=\"1.24\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"109.1\" cy=\"30.4\" r=\"1.25\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"110.8\" cy=\"52.1\" r=\"1.30\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"100.2\" cy=\"63.6\" r=\"1.43\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"111.6\" cy=\"32.2\" r=\"0.86\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"104.2\" cy=\"40.7\" r=\"1.30\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"93.9\" cy=\"37.2\" r=\"1.09\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"93.3\" cy=\"55.9\" r=\"1.10\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"103.1\" cy=\"44.8\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"101.5\" cy=\"58.0\" r=\"1.01\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"110.7\" cy=\"56.0\" r=\"0.92\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"95.8\" cy=\"31.4\" r=\"1.09\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"107.8\" cy=\"26.1\" r=\"0.68\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"98.6\" cy=\"42.7\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"98.5\" cy=\"36.3\" r=\"1.41\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"95.1\" cy=\"26.5\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"112.6\" cy=\"63.8\" r=\"1.27\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"126.8\" cy=\"42.4\" r=\"1.01\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"123.3\" cy=\"67.3\" r=\"0.85\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"117.5\" cy=\"39.8\" r=\"0.76\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"126.4\" cy=\"23.0\" r=\"0.68\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"106.9\" cy=\"47.7\" r=\"1.38\" fill=\"#2b2b2b\" opacity=\"0.62\"/><circle cx=\"106.4\" cy=\"59.0\" r=\"1.14\" fill=\"#2b2b2b\" opacity=\"0.34\"/><circle cx=\"101.8\" cy=\"30.5\" r=\"0.73\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"112.3\" cy=\"32.8\" r=\"0.90\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"128.2\" cy=\"50.2\" r=\"0.75\" fill=\"#2b2b2b\" opacity=\"0.45\"/><circle cx=\"127.8\" cy=\"57.8\" r=\"1.03\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"112.7\" cy=\"28.9\" r=\"0.81\" fill=\"#2b2b2b\" opacity=\"0.62\"/><circle cx=\"119.2\" cy=\"54.7\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.40\"/><circle cx=\"104.8\" cy=\"30.0\" r=\"0.99\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"121.4\" cy=\"65.6\" r=\"1.19\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"97.2\" cy=\"32.0\" r=\"1.32\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"91.7\" cy=\"49.5\" r=\"1.26\" fill=\"#2b2b2b\" opacity=\"0.66\"/><circle cx=\"120.7\" cy=\"44.2\" r=\"0.89\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"94.0\" cy=\"42.5\" r=\"0.93\" fill=\"#2b2b2b\" opacity=\"0.53\"/><circle cx=\"119.1\" cy=\"41.0\" r=\"1.23\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"107.4\" cy=\"39.6\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"91.7\" cy=\"70.3\" r=\"1.25\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"126.1\" cy=\"44.8\" r=\"0.69\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"93.7\" cy=\"25.5\" r=\"0.65\" fill=\"#2b2b2b\" opacity=\"0.34\"/><circle cx=\"98.4\" cy=\"61.0\" r=\"0.99\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"98.6\" cy=\"66.0\" r=\"0.71\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"118.0\" cy=\"62.7\" r=\"1.31\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"98.3\" cy=\"24.2\" r=\"0.95\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"118.6\" cy=\"40.4\" r=\"1.13\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"94.4\" cy=\"45.4\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"125.9\" cy=\"50.5\" r=\"0.71\" fill=\"#2b2b2b\" opacity=\"0.51\"/><circle cx=\"129.0\" cy=\"57.5\" r=\"1.42\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"96.0\" cy=\"54.3\" r=\"1.08\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"94.3\" cy=\"50.3\" r=\"1.18\" fill=\"#2b2b2b\" opacity=\"0.54\"/><circle cx=\"117.3\" cy=\"39.6\" r=\"0.67\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"97.6\" cy=\"59.8\" r=\"1.03\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"120.8\" cy=\"37.4\" r=\"1.21\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"114.4\" cy=\"31.0\" r=\"1.00\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"105.3\" cy=\"49.4\" r=\"1.01\" fill=\"#2b2b2b\" opacity=\"0.61\"/><circle cx=\"124.5\" cy=\"65.0\" r=\"1.03\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"101.3\" cy=\"35.8\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"115.9\" cy=\"27.2\" r=\"1.03\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"120.8\" cy=\"23.0\" r=\"1.39\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"123.9\" cy=\"58.7\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"121.4\" cy=\"38.2\" r=\"0.80\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"121.7\" cy=\"70.2\" r=\"1.06\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"120.7\" cy=\"45.9\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.40\"/><circle cx=\"92.3\" cy=\"33.4\" r=\"1.44\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"111.6\" cy=\"50.8\" r=\"1.07\" fill=\"#2b2b2b\" opacity=\"0.40\"/><circle cx=\"108.3\" cy=\"51.5\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.42\"/><circle cx=\"114.4\" cy=\"43.3\" r=\"1.30\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"110.9\" cy=\"67.5\" r=\"1.38\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"111.0\" cy=\"27.8\" r=\"0.82\" fill=\"#2b2b2b\" opacity=\"0.63\"/><circle cx=\"111.8\" cy=\"30.3\" r=\"1.02\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"124.7\" cy=\"23.3\" r=\"0.88\" fill=\"#2b2b2b\" opacity=\"0.48\"/><circle cx=\"104.1\" cy=\"57.2\" r=\"0.98\" fill=\"#2b2b2b\" opacity=\"0.35\"/><circle cx=\"113.0\" cy=\"32.0\" r=\"1.03\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"125.0\" cy=\"56.1\" r=\"0.78\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"106.8\" cy=\"70.3\" r=\"0.78\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"124.4\" cy=\"60.1\" r=\"0.76\" fill=\"#2b2b2b\" opacity=\"0.61\"/><circle cx=\"97.5\" cy=\"32.3\" r=\"1.29\" fill=\"#2b2b2b\" opacity=\"0.40\"/><circle cx=\"128.2\" cy=\"59.9\" r=\"1.23\" fill=\"#2b2b2b\" opacity=\"0.35\"/><circle cx=\"119.3\" cy=\"29.8\" r=\"1.16\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"120.0\" cy=\"24.1\" r=\"0.78\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"109.0\" cy=\"57.7\" r=\"0.66\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"116.4\" cy=\"21.7\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.54\"/><circle cx=\"128.0\" cy=\"69.0\" r=\"0.90\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"112.7\" cy=\"29.0\" r=\"0.68\" fill=\"#2b2b2b\" opacity=\"0.55\"/><path d=\"M90 20 V72\" stroke=\"#d7d1c4\" stroke-width=\"1.5\"/></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
@@ -4189,7 +4234,7 @@
       "exampleJa": "ペンの疎な点描の四角を置く",
       "exampleEn": "Place a pen sparse stipple square"
     },
-    "shitaji:下塗り": {
+    "kime:下塗り": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><circle cx=\"62.5\" cy=\"59.6\" r=\"2.48\" fill=\"#2b2b2b\" opacity=\"0.60\"/><circle cx=\"69.1\" cy=\"30.4\" r=\"2.49\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"70.8\" cy=\"52.1\" r=\"2.59\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"60.2\" cy=\"63.6\" r=\"2.87\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"71.6\" cy=\"32.2\" r=\"1.73\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"64.2\" cy=\"40.7\" r=\"2.60\" fill=\"#2b2b2b\" opacity=\"0.55\"/><circle cx=\"53.9\" cy=\"37.2\" r=\"2.18\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"53.3\" cy=\"55.9\" r=\"2.20\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"63.1\" cy=\"44.8\" r=\"2.69\" fill=\"#2b2b2b\" opacity=\"0.59\"/><circle cx=\"61.5\" cy=\"58.0\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.65\"/><circle cx=\"70.7\" cy=\"56.0\" r=\"1.84\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"55.8\" cy=\"31.4\" r=\"2.19\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"67.8\" cy=\"26.1\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.57\"/><circle cx=\"58.6\" cy=\"42.7\" r=\"2.70\" fill=\"#2b2b2b\" opacity=\"0.58\"/><circle cx=\"58.5\" cy=\"36.3\" r=\"2.81\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"55.1\" cy=\"26.5\" r=\"1.65\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"72.6\" cy=\"63.8\" r=\"2.53\" fill=\"#2b2b2b\" opacity=\"0.52\"/><circle cx=\"86.8\" cy=\"42.4\" r=\"2.01\" fill=\"#2b2b2b\" opacity=\"0.56\"/><circle cx=\"83.3\" cy=\"67.3\" r=\"1.71\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"77.5\" cy=\"39.8\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"86.4\" cy=\"23.0\" r=\"1.35\" fill=\"#2b2b2b\" opacity=\"0.63\"/><rect x=\"91\" y=\"20\" width=\"39\" height=\"52\" fill=\"#2b2b2b\"/><circle cx=\"102.5\" cy=\"59.6\" r=\"2.48\" fill=\"#8a8a8a\" opacity=\"0.68\"/><circle cx=\"109.1\" cy=\"30.4\" r=\"2.49\" fill=\"#8a8a8a\" opacity=\"0.53\"/><circle cx=\"110.8\" cy=\"52.1\" r=\"2.59\" fill=\"#8a8a8a\" opacity=\"0.74\"/><circle cx=\"100.2\" cy=\"63.6\" r=\"2.87\" fill=\"#8a8a8a\" opacity=\"0.52\"/><circle cx=\"111.6\" cy=\"32.2\" r=\"1.73\" fill=\"#8a8a8a\" opacity=\"0.41\"/><circle cx=\"104.2\" cy=\"40.7\" r=\"2.60\" fill=\"#8a8a8a\" opacity=\"0.62\"/><circle cx=\"93.9\" cy=\"37.2\" r=\"2.18\" fill=\"#8a8a8a\" opacity=\"0.50\"/><circle cx=\"93.3\" cy=\"55.9\" r=\"2.20\" fill=\"#8a8a8a\" opacity=\"0.57\"/><circle cx=\"103.1\" cy=\"44.8\" r=\"2.69\" fill=\"#8a8a8a\" opacity=\"0.67\"/><circle cx=\"101.5\" cy=\"58.0\" r=\"2.01\" fill=\"#8a8a8a\" opacity=\"0.74\"/><circle cx=\"110.7\" cy=\"56.0\" r=\"1.84\" fill=\"#8a8a8a\" opacity=\"0.44\"/><circle cx=\"95.8\" cy=\"31.4\" r=\"2.19\" fill=\"#8a8a8a\" opacity=\"0.44\"/><circle cx=\"107.8\" cy=\"26.1\" r=\"1.36\" fill=\"#8a8a8a\" opacity=\"0.65\"/><circle cx=\"98.6\" cy=\"42.7\" r=\"2.70\" fill=\"#8a8a8a\" opacity=\"0.65\"/><circle cx=\"98.5\" cy=\"36.3\" r=\"2.81\" fill=\"#8a8a8a\" opacity=\"0.42\"/><circle cx=\"95.1\" cy=\"26.5\" r=\"1.65\" fill=\"#8a8a8a\" opacity=\"0.59\"/><circle cx=\"112.6\" cy=\"63.8\" r=\"2.53\" fill=\"#8a8a8a\" opacity=\"0.60\"/><circle cx=\"126.8\" cy=\"42.4\" r=\"2.01\" fill=\"#8a8a8a\" opacity=\"0.64\"/><circle cx=\"123.3\" cy=\"67.3\" r=\"1.71\" fill=\"#8a8a8a\" opacity=\"0.50\"/><circle cx=\"117.5\" cy=\"39.8\" r=\"1.52\" fill=\"#8a8a8a\" opacity=\"0.46\"/><circle cx=\"126.4\" cy=\"23.0\" r=\"1.35\" fill=\"#8a8a8a\" opacity=\"0.72\"/><path d=\"M90 20 V72\" stroke=\"#d7d1c4\" stroke-width=\"1.5\"/></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
       "effectJa": "質感の下に画材の色を塗り、質感を塗りと逆の明るさで重ねる。閉じた形の質感の面に添えられる。図は左が既定の点描、右が下塗りの点描。",
       "effectEn": "Paints the tool’s colour under a texture and lays the texture over it in the opposite lightness. On the textured face of a closed shape. Left: default stipple; right: underpainted stipple.",
@@ -4308,11 +4353,11 @@
       "exampleJa": "紫の三角",
       "exampleEn": "A purple triangle"
     },
-    "yuragi:細かく": {
+    "yuragi:小さく": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\" /></svg>",
       "effectJa": "小さな揺らぎを加える。",
       "effectEn": "Adds a small-amplitude sway.",
-      "exampleJa": "細かく揺れる線",
+      "exampleJa": "小さく揺れる線",
       "exampleEn": "A narrowly swaying line"
     },
     "yuragi:大きく": {
@@ -4349,13 +4394,6 @@
       "effectEn": "Makes a wave-shaped undulation.",
       "exampleJa": "波打つ青い線",
       "exampleEn": "An undulating blue line"
-    },
-    "yuragi:にじみ": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><filter id=\"pblur\"><feGaussianBlur stdDeviation=\"3\"/></filter></defs><circle cx=\"90\" cy=\"46\" r=\"24\" fill=\"#2b2b2b\" opacity=\"0.72\" filter=\"url(#pblur)\"/><circle cx=\"90\" cy=\"46\" r=\"20\" fill=\"#2b2b2b\" opacity=\"0.62\"/></svg>",
-      "effectJa": "墨の縁から不均一な広がりを加える。",
-      "effectEn": "Adds irregular spread at the edges of the ink.",
-      "exampleJa": "にじみの黒い円を置く。",
-      "exampleEn": "Place a bleeding black circle."
     },
     "basho:上": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"90\" cy=\"25\" r=\"14\" fill=\"#2b2b2b\"/><path d=\"M28 70 H152\" stroke=\"#d7d1c4\" stroke-width=\"2\"/></svg>",
@@ -4405,27 +4443,6 @@
       "effectEn": "Pulls to the lower margin.",
       "exampleJa": "下端に線を引く",
       "exampleEn": "Draw a line at the bottom edge"
-    },
-    "basho:始点": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M35 62 H145\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\"/><circle cx=\"35\" cy=\"62\" r=\"6\" fill=\"#2b2b2b\"/></svg>",
-      "effectJa": "線または弧の始点を選ぶ。",
-      "effectEn": "Selects the start of a line or arc.",
-      "exampleJa": "前の線の始点につながる青い弧を引く",
-      "exampleEn": "Place a blue arc connected to the start of the previous line"
-    },
-    "basho:終点": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M35 62 H145\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\"/><circle cx=\"145\" cy=\"62\" r=\"6\" fill=\"#2b2b2b\"/></svg>",
-      "effectJa": "線または弧の終点を選ぶ。",
-      "effectEn": "Selects the end of a line or arc.",
-      "exampleJa": "前の線の終点につながる青い弧を引く",
-      "exampleEn": "Place a blue arc connected to the end of the previous line"
-    },
-    "basho:途中": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M30 62 H150\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\"/><path d=\"M72 62 Q94 20 116 46\" fill=\"none\" stroke=\"#2c5fb8\" stroke-width=\"5\" stroke-linecap=\"round\"/></svg>",
-      "effectJa": "線や弧の両端以外につなぐ。接ぐ位置は演奏で決まる。",
-      "effectEn": "Connects along a line or arc, excluding both ends. The position is decided during performance.",
-      "exampleJa": "赤い線を置く。前の線の途中につながる小さな青い弧を置く。",
-      "exampleEn": "Place a red line. Place a small blue arc connected partway along the previous line."
     },
     "basho:隅": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"36\" cy=\"25\" r=\"11\" fill=\"#2b2b2b\"/><circle cx=\"144\" cy=\"67\" r=\"11\" fill=\"#2b2b2b\" opacity=\"0.28\"/></svg>",
@@ -4518,49 +4535,84 @@
       "exampleJa": "半幅の線",
       "exampleEn": "A half-width line"
     },
-    "wariai:半円": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M50 60 A40 40 0 0 1 130 60\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"6\" stroke-linecap=\"round\"/></svg>",
-      "effectJa": "円の半分を描く。",
-      "effectEn": "Draws half of a circle.",
-      "exampleJa": "半円の弧を引く",
-      "exampleEn": "Draw a semicircle arc"
+    "futosa:ごく細い": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"1\" stroke-linecap=\"round\" /></svg>",
+      "effectJa": "線の太さを指定する。",
+      "effectEn": "Sets the width of a line.",
+      "exampleJa": "ごく細い線を引く",
+      "exampleEn": "Draw a very thin line"
     },
-    "wariai:上弦": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M90 18 A28 28 0 0 1 90 74\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"6\" stroke-linecap=\"round\"/></svg>",
-      "effectJa": "右に膨らむ180度の開弧として扱う。",
-      "effectEn": "Read as a 180-degree open arc bulging to the right.",
-      "exampleJa": "上弦の青い弧を引く",
-      "exampleEn": "Draw a blue waxing arc"
+    "futosa:細い": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"2\" stroke-linecap=\"round\" /></svg>",
+      "effectJa": "線の太さを指定する。",
+      "effectEn": "Sets the width of a line.",
+      "exampleJa": "細い線を引く",
+      "exampleEn": "Draw a thin line"
     },
-    "wariai:下弦": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M90 18 A28 28 0 0 0 90 74\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"6\" stroke-linecap=\"round\"/></svg>",
-      "effectJa": "左に膨らむ180度の開弧として扱う。",
-      "effectEn": "Read as a 180-degree open arc bulging to the left.",
-      "exampleJa": "下弦の青い弧を引く",
-      "exampleEn": "Draw a blue waning arc"
+    "futosa:太い": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"7\" stroke-linecap=\"round\" /></svg>",
+      "effectJa": "線の太さを指定する。",
+      "effectEn": "Sets the width of a line.",
+      "exampleJa": "太い線を引く",
+      "exampleEn": "Draw a thick line"
     },
-    "wariai:三日月": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M106 18 C76 24 62 52 82 74 C52 63 50 27 82 14 C92 12 100 14 106 18 Z\" fill=\"#2b2b2b\"/></svg>",
-      "effectJa": "細い月形を描く。",
-      "effectEn": "Draws a thin moon form.",
-      "exampleJa": "三日月の弧を引く",
-      "exampleEn": "Draw a crescent arc"
+    "futosa:ごく太い": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"11\" stroke-linecap=\"round\" /></svg>",
+      "effectJa": "線の太さを指定する。",
+      "effectEn": "Sets the width of a line.",
+      "exampleJa": "ごく太い線を引く",
+      "exampleEn": "Draw a very thick line"
+    },
+    "ookisa:ごく小さな": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"90\" cy=\"46\" r=\"5\" fill=\"#2b2b2b\"/></svg>",
+      "effectJa": "形の大きさを指定する。",
+      "effectEn": "Sets the size of a shape.",
+      "exampleJa": "ごく小さな円を置く",
+      "exampleEn": "Place a very small circle"
+    },
+    "ookisa:小さな": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"90\" cy=\"46\" r=\"10\" fill=\"#2b2b2b\"/></svg>",
+      "effectJa": "形の大きさを指定する。",
+      "effectEn": "Sets the size of a shape.",
+      "exampleJa": "小さな円を置く",
+      "exampleEn": "Place a small circle"
+    },
+    "ookisa:普通の大きさ": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"90\" cy=\"46\" r=\"16\" fill=\"#2b2b2b\"/></svg>",
+      "effectJa": "形の大きさを指定する。",
+      "effectEn": "Sets the size of a shape.",
+      "exampleJa": "普通の大きさ円を置く",
+      "exampleEn": "Place a normal-sized circle"
+    },
+    "ookisa:大きな": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"90\" cy=\"46\" r=\"24\" fill=\"#2b2b2b\"/></svg>",
+      "effectJa": "形の大きさを指定する。",
+      "effectEn": "Sets the size of a shape.",
+      "exampleJa": "大きな円を置く",
+      "exampleEn": "Place a large circle"
+    },
+    "ookisa:ごく大きな": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"90\" cy=\"46\" r=\"32\" fill=\"#2b2b2b\"/></svg>",
+      "effectJa": "形の大きさを指定する。",
+      "effectEn": "Sets the size of a shape.",
+      "exampleJa": "ごく大きな円を置く",
+      "exampleEn": "Place a very large circle"
     }
   },
   "source": {
-    "commit": "41b2a531cc651fcbe20251b1edeae27fef8b554a",
+    "commit": "20343243f8a63b3cf36c19ac6b60a27031fe6c27",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "001f310fbd4454ee8336877ec7b36e7dd85b3baf3e7a08727ee0c5e943820e8b",
-      "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
+      "web/src/routes/+page.svelte": "027f8df8ea83bb8e77fd9e83ec95c6bf5bf152d6ebbca7ee54ae318cde39f4a8",
+      "web/src/lib/saijiki-surface.ts": "ba6640c75fa57284800b99127eecde2103f2f8d9035228ad945d8ea8d90e56bb",
       "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
       "web/src/lib/features/composition-record/figures.ts": "e15595d28b095c0d655bdad44e64fabb7766a2b7be9961d10f2526a3a40891d0",
-      "web/APP_VERSION": "152ff9e9fb60bcd9a38e0f49aaa79b663e666d138fa6558ebe03db9ad0cc2b55",
-      "web/BUILD_NUMBER": "e043c662bc456d809131f79ac8444973f9aed48a3287965dab7964a5f080c180",
-      "server/src/inku_server/layer_versions.py": "07ac2c29547d1921adf33eb4f8536a2ad45dfdd12a29d1b975b38e2ba2a143a2",
-      "core/crates/inku-render/src/lib.rs": "7005f745e98126fb17dd0496759a47ed7f51daca2ecefad4182339683ef0618f",
-      "web/src/lib/i18n/ja.ts": "9b20af6a8e42b6a3ef6b32430d3979242d5375ed330ee612195279180093c563",
-      "web/src/lib/i18n/en.ts": "5759bb781e6742fcab445b1c40dd9a5998ddf5c29a92ec6adb2771f58ca6b875"
+      "web/APP_VERSION": "58ec05a9a20b3a257a401fe6c6c51ba0b8a9c08b626ef1a7eb178fd69e45259c",
+      "web/BUILD_NUMBER": "4dde49033139f34c6835a1937c22c7d79d84446d36e44610fd0ffed2c2b372b1",
+      "server/src/inku_server/layer_versions.py": "70301a81b5ba1ae142f9dae3df4a64bd410df426a1ec8f5d2a5560982f36cea3",
+      "core/crates/inku-render/src/lib.rs": "0ee241c98fca778d14b2eebef989d0e65829ed2d69b51a193be9799794d4a5b4",
+      "web/src/lib/i18n/ja.ts": "52fdfbba24eb6bab9d45f4b1651e3565bc01c69abbdfc0aeec12a37b6af6a970",
+      "web/src/lib/i18n/en.ts": "07014633ce89d0efeb496c5f4a1e66d0faa0d1b556cb68c87ee240c99032a424"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

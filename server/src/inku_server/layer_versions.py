@@ -444,7 +444,8 @@
 # 78: The compiler computes its sines, cosines and arcsines with the core's
 # pure-Rust libm instead of the host's C library (I-733); 78 of 7,119 works
 # saved on 5173 compile arc angles differing in their last bits (2026-11-07).
-DDL_ENGINE_VERSION = "78"
+# 79 (2026-11-17): Saijiki v4 vocabulary and typed compiler semantics.
+DDL_ENGINE_VERSION = "79"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -532,4 +533,5 @@ DDL_ENGINE_VERSION = "78"
 # saved documents and Macro definitions move once (SPEC §3.3).
 # 30 (2026-11-01): Color and tool phrases may use Japanese で or English with
 # and in, binding to the shape when a clause contains exactly one shape.
-DDL_VERSION = "30"
+# 31 (2026-11-17): Saijiki v4 vocabulary.
+DDL_VERSION = "31"

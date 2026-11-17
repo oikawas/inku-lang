@@ -325,7 +325,7 @@ fn unique_complete_assignments_bind_typed_same_clause_facts_without_changing_i58
                 ..
             } = &actual.value
             {
-                assert_eq!(source_asset_id, "inku.saijiki.v3", "{}", case.id);
+                assert_eq!(source_asset_id, "inku.saijiki.v4", "{}", case.id);
                 assert!(!canonical_surface_ja.is_empty(), "{}", case.id);
             }
         }
@@ -492,7 +492,7 @@ fn declared_core_binding_requires_a_unique_complete_assignment() {
             MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
         ),
         (
-            "thin extra-fine small ｛Mark｝",
+            "thin very thin small ｛Mark｝",
             MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment,
         ),
         (

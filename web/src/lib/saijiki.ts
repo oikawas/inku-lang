@@ -1,10 +1,16 @@
-import { GENERATED_SAIJIKI, GENERATED_SAIJIKI_EN } from './saijiki.generated';
+import { GENERATED_SAIJIKI, GENERATED_SAIJIKI_EN, GENERATED_SAIJIKI_BUNDLES } from './saijiki.generated';
+
+export type SaijikiBundle = { key: string; name_ja: string; name_en: string };
 
 export type SaijikiCategory = {
 	key: string;
 	label: string;
 	en: string;
+	bundle: string;
 	words: string[];
+	ids: string[];
+	facets: (string | null)[];
+	descriptions: (string | null)[];
 };
 
 // Module-level mutable vocabulary store (v1.92 Phase 3). The single source is
@@ -40,4 +46,19 @@ export function hydrateSaijikiEn(categories: SaijikiCategory[]): void {
 export function saijikiWordsFor(categoryKey: string, isJapanese: boolean): string[] {
 	const source = isJapanese ? SAIJIKI : SAIJIKI_EN;
 	return source.find((cat) => cat.key === categoryKey)?.words ?? [];
+}
+
+export let SAIJIKI_BUNDLES: SaijikiBundle[] = GENERATED_SAIJIKI_BUNDLES.map((bundle) => ({ ...bundle }));
+
+export function hydrateSaijikiBundles(bundles: SaijikiBundle[]): void {
+	SAIJIKI_BUNDLES = bundles.map((bundle) => ({ ...bundle }));
+}
+
+export function saijikiGroups(categories: SaijikiCategory[]) {
+	return SAIJIKI_BUNDLES.map(({ key }) => ({ key, categories: categories.filter((category) => category.bundle === key) }));
+}
+
+export function bundleLabel(key: string, japanese: boolean): string {
+	const bundle = SAIJIKI_BUNDLES.find((item) => item.key === key);
+	return (japanese ? bundle?.name_ja : bundle?.name_en) ?? key;
 }

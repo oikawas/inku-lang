@@ -25,6 +25,9 @@ pub const SAIJIKI_V1_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v1-migration.v1";
 /// Stable identity of the v2 migration contract (Saijiki v3, 2026-10-31).
 pub const SAIJIKI_V2_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v2-migration.v1";
 
+/// Stable identity of the v3 migration contract (Saijiki v4, 2026-11-17).
+pub const SAIJIKI_V3_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v3-migration.v1";
+
 /// One v1 word and the current word written in its place.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct SaijikiMigrationEdit {
@@ -47,6 +50,10 @@ pub struct SaijikiDocumentMigration {
     /// the association could not name, as in a sequence or a Macro argument, so its thinness
     /// word could not follow the new tool's widths (PLAN-PRODUCT §3.3).
     pub unassociated_tools: Vec<SourceSpan>,
+    /// Spans in the migrated source of each word Saijiki v4 retired and the migration wrote
+    /// a near word in place of (一点鎖線 → 破線, 小さめ → 小さな, 巨大な → ごく大きな, ...;
+    /// SPEC §3.3), so the host can show the author where the drawing may change.
+    pub approximated_words: Vec<SourceSpan>,
 }
 
 /// A saved Macro definition rewritten from Saijiki v1 to the current edition. Its version is
@@ -60,6 +67,10 @@ pub struct SaijikiDefinitionMigration {
     /// its thinness following the new tool's widths, because the tool or the thinness is
     /// written through a parameter, a local or a cycle (Saijiki v3).
     pub unadjusted_thinness: Vec<String>,
+    /// The semantic references (JSON paths in the definition) Saijiki v4 moved to a near
+    /// word (一点鎖線 → 破線, 小さめ → 小さな, ...; SPEC §3.3), so the host can show the
+    /// author where the drawing may change, as `approximated_words` does for a document.
+    pub approximated_refs: Vec<String>,
 }
 
 /// Why a document or definition could not be migrated.
@@ -290,11 +301,121 @@ fn thinness_word(language: ResolvedInstructionLanguage, value: CoreModifierValue
         (ResolvedInstructionLanguage::Ja, CoreModifierValue::Fine) => "細い",
         (ResolvedInstructionLanguage::Ja, CoreModifierValue::ExtraThick) => "ごく太い",
         (ResolvedInstructionLanguage::Ja, _) => "太い",
-        (ResolvedInstructionLanguage::En, CoreModifierValue::ExtraFine) => "extra-fine",
+        // Saijiki v4 spells the outer steps very thin and very thick.
+        (ResolvedInstructionLanguage::En, CoreModifierValue::ExtraFine) => "very thin",
         (ResolvedInstructionLanguage::En, CoreModifierValue::Fine) => "thin",
-        (ResolvedInstructionLanguage::En, CoreModifierValue::ExtraThick) => "extra-thick",
+        (ResolvedInstructionLanguage::En, CoreModifierValue::ExtraThick) => "very thick",
         (ResolvedInstructionLanguage::En, _) => "thick",
     }
+}
+
+/// What Saijiki v4 writes for a v3 word (STUDY-WORDS §2–§14, IMPL-PLAN §4 V1, the author's
+/// choices of 2026-11-16 and 11-17), read by the word's category and its v3 surface. The
+/// flag says the word is moved to a near word rather than respelled (SPEC §3.3), and the
+/// angle is the turn a retired arc form (上弦・下弦) adds to its semicircle.
+fn v4_word_rewrite(
+    language: ResolvedInstructionLanguage,
+    category_key: &str,
+    surface: &str,
+) -> Option<(&'static str, bool, Option<u32>)> {
+    let rows: &[(&str, &str, &str, bool, Option<u32>)] = match language {
+        ResolvedInstructionLanguage::Ja => &[
+            ("yuragi", "細かく", "小さく", false, None),
+            ("tezawari", "コンピュータ", "デジタル", false, None),
+            ("omote", "アクアチント", "メゾチント", false, None),
+            ("tsuranari", "一点鎖線", "破線", true, None),
+            ("wariai", "上弦", "半円", false, Some(90)),
+            ("wariai", "下弦", "半円", false, Some(270)),
+        ],
+        ResolvedInstructionLanguage::En => &[
+            ("tezawari", "computer", "digital", false, None),
+            ("omote", "aquatint", "mezzotint", false, None),
+            ("sabaki", "temperate", "moderate", false, None),
+            ("tsuranari", "dash-dot", "dashed", true, None),
+            ("wariai", "waxing", "semicircle", false, Some(90)),
+            ("wariai", "waning", "semicircle", false, Some(270)),
+        ],
+    };
+    rows.iter()
+        .find(|(category, from, ..)| {
+            *category == category_key && same_surface(language, from, surface)
+        })
+        .map(|(_, _, to, approximated, turn)| (*to, *approximated, *turn))
+}
+
+/// What Saijiki v4 writes for a v3 thinness or size word (ふとさ・おおきさ, STUDY-WORDS §5):
+/// the same step respelled, or for the four sizes v4 drops, the nearest of the five.
+fn v4_modifier_rewrite(
+    language: ResolvedInstructionLanguage,
+    value: CoreModifierValue,
+    surface: &str,
+) -> Option<(&'static str, bool)> {
+    use CoreModifierValue::{
+        ExtraFine, ExtraLarge, ExtraThick, Huge, SlightlyLarge, SlightlySmall, VeryLarge, VerySmall,
+    };
+    let rows: &[(CoreModifierValue, &str, &str, bool)] = match language {
+        ResolvedInstructionLanguage::Ja => &[
+            (VerySmall, "とても小さな", "ごく小さな", false),
+            (VerySmall, "とても小さい", "ごく小さい", false),
+            (VeryLarge, "とても大きな", "ごく大きな", false),
+            (VeryLarge, "とても大きい", "ごく大きい", false),
+            (SlightlySmall, "小さめ", "小さな", true),
+            (SlightlyLarge, "大きめ", "大きな", true),
+            (ExtraLarge, "特大の", "ごく大きな", true),
+            (Huge, "巨大な", "ごく大きな", true),
+        ],
+        ResolvedInstructionLanguage::En => &[
+            (ExtraFine, "extra-fine", "very thin", false),
+            (ExtraThick, "extra-thick", "very thick", false),
+            (SlightlySmall, "slightly small", "small", true),
+            (SlightlyLarge, "slightly large", "large", true),
+            (ExtraLarge, "extra-large", "very large", true),
+            (Huge, "huge", "very large", true),
+        ],
+    };
+    rows.iter()
+        .find(|(row_value, from, ..)| *row_value == value && same_surface(language, from, surface))
+        .map(|(_, _, to, approximated)| (*to, *approximated))
+}
+
+/// Every span an entity's own words stand at, its head included.
+fn entity_word_spans(entity: &crate::SemanticEntity) -> Vec<SourceSpan> {
+    let terms = [
+        &entity.color,
+        &entity.touch,
+        &entity.continuity,
+        &entity.angle,
+        &entity.surface.quality,
+        &entity.surface.intensity,
+        &entity.surface.fineness,
+        &entity.surface.density,
+        &entity.surface.underlayer,
+        &entity.fluctuation.spread,
+        &entity.fluctuation.amplitude,
+        &entity.fluctuation.frequency,
+        &entity.fluctuation.quality,
+        &entity.proportion.aspect,
+        &entity.proportion.width_extent,
+        &entity.proportion.arc_form,
+    ];
+    terms
+        .into_iter()
+        .flatten()
+        .map(|term| term.provenance.source.span)
+        .chain(
+            entity
+                .thinness
+                .iter()
+                .map(|thinness| thinness.provenance.span),
+        )
+        .chain(
+            entity
+                .relative_scale
+                .iter()
+                .map(|scale| scale.provenance.span),
+        )
+        .chain(std::iter::once(entity.head.source().span))
+        .collect()
 }
 
 fn thinness_id(value: CoreModifierValue) -> Option<&'static str> {
@@ -454,6 +575,15 @@ pub fn migrate_document_from_saijiki_v2(
     migrate_document_to_current(document, SaijikiEdition::V2)
 }
 
+/// Rewrite one saved v3 document to the current edition, word by word at its positions.
+/// The result is read again with the current edition and refused if it reads with more
+/// diagnostics than the v3 source did.
+pub fn migrate_document_from_saijiki_v3(
+    document: &NormalizedDdlDocument,
+) -> Result<SaijikiDocumentMigration, SaijikiMigrationError> {
+    migrate_document_to_current(document, SaijikiEdition::V3)
+}
+
 fn migrate_document_to_current(
     document: &NormalizedDdlDocument,
     from: SaijikiEdition,
@@ -520,6 +650,57 @@ fn migrate_document_to_current(
             washes.push(index);
         }
         replacements.insert(index, in_source_case(language, &token.surface, rewrite.to));
+    }
+
+    // Saijiki v4 (2026-11-17): every retired edition's document reaches v4 through this
+    // pass, over the words the pass above already wrote. It comes before the association
+    // below, which reads a provisional document with the current edition: a v3 thinness or
+    // size it does not read would be taken for none.
+    let mut approximated = BTreeSet::new();
+    let mut arc_turns = Vec::new();
+    for (index, token) in old.tokens.iter().enumerate() {
+        let written = replacements
+            .get(&index)
+            .cloned()
+            .unwrap_or_else(|| token.surface.clone());
+        match &token.kind {
+            NeutralTokenKind::SaijikiWord { category_key, .. } => {
+                let Some((word, near, turn)) = v4_word_rewrite(language, category_key, &written)
+                else {
+                    continue;
+                };
+                replacements.insert(index, in_source_case(language, &written, word));
+                if near {
+                    approximated.insert(index);
+                }
+                if let Some(degrees) = turn {
+                    arc_turns.push((index, degrees));
+                }
+            }
+            NeutralTokenKind::CoreModifier(identity) => {
+                let Some((word, near)) = v4_modifier_rewrite(language, identity.value, &written)
+                else {
+                    continue;
+                };
+                replacements.insert(index, in_source_case(language, &written, word));
+                if near {
+                    approximated.insert(index);
+                }
+                // 小さめの円 → 小さな円: the particle goes with the word it followed.
+                if language == ResolvedInstructionLanguage::Ja
+                    && matches!(
+                        identity.value,
+                        CoreModifierValue::SlightlySmall | CoreModifierValue::SlightlyLarge
+                    )
+                    && let Some(next) = old.tokens.get(index + 1)
+                    && next.span.start_byte == token.span.end_byte
+                    && next.surface == "の"
+                {
+                    replacements.insert(index + 1, String::new());
+                }
+            }
+            _ => {}
+        }
     }
 
     // The current association names the mark of each sweep and any intensity it carries,
@@ -643,6 +824,59 @@ fn migrate_document_to_current(
         }
     }
 
+    // 上弦・下弦 become a semicircle turned by a number (EVIDENCE §4-4): in Japanese the
+    // number goes before the mark's first word, and in English right after the head, where
+    // both read with no diagnostic and give the v3 Score.
+    if !arc_turns.is_empty() {
+        let (provisional, provisional_spans) = rebuild(source, &spans, &replacements);
+        let provisional_document =
+            NormalizedDdlDocument::new(provisional, language, document.macro_locks().to_vec())
+                .map_err(|diagnostic| {
+                    SaijikiMigrationError::InvalidDocument(
+                        InvalidDocumentStage::ProvisionalDocument {
+                            cause: diagnostic.code(),
+                        },
+                    )
+                })?;
+        let entities = associate_semantic_entities(&provisional_document)
+            .map(|association| association.ast.entities)
+            .unwrap_or_default();
+        let token_at = |span: SourceSpan| provisional_spans.iter().position(|each| *each == span);
+        for (index, degrees) in arc_turns {
+            // Where the turn cannot be written beside the mark's own (an arc form the
+            // association does not give a mark, as in a list of cloud forms, or a mark that
+            // already turns by a word or a number), v3 drew no turn either: the word becomes
+            // the bare semicircle and is reported as moved to a near word (the author's
+            // choice, 2026-11-17).
+            let placement = entities
+                .iter()
+                .find(|entity| {
+                    entity.proportion.arc_form.as_ref().is_some_and(|arc_form| {
+                        token_at(arc_form.provenance.source.span) == Some(index)
+                    })
+                })
+                .filter(|entity| entity.angle.is_none() && entity.numeric_angle.is_none())
+                .and_then(|entity| match language {
+                    ResolvedInstructionLanguage::Ja => entity_word_spans(entity)
+                        .into_iter()
+                        .filter_map(token_at)
+                        .min()
+                        .map(|first| (first, format!("回転{degrees}度の"), String::new())),
+                    ResolvedInstructionLanguage::En => token_at(entity.head.source().span)
+                        .map(|head| (head, String::new(), format!(" rotated {degrees} degrees"))),
+                });
+            let Some((at, prefix, suffix)) = placement else {
+                approximated.insert(index);
+                continue;
+            };
+            let written = replacements
+                .get(&at)
+                .cloned()
+                .unwrap_or_else(|| old.tokens[at].surface.clone());
+            replacements.insert(at, format!("{prefix}{written}{suffix}"));
+        }
+    }
+
     // An English word taken out takes one space beside it with it.
     if language == ResolvedInstructionLanguage::En {
         for &index in &removed {
@@ -689,6 +923,10 @@ fn migrate_document_to_current(
             .into_iter()
             .map(|index| migrated_spans[index])
             .collect(),
+        approximated_words: approximated
+            .into_iter()
+            .map(|index| migrated_spans[index])
+            .collect(),
     })
 }
 
@@ -719,6 +957,14 @@ fn renamed_semantic_ref(category: &str, id: &str) -> Option<(&'static str, &'sta
         ("place", "middle") => ("place", "center"),
         ("surface", "dense") => ("handling", "dense"),
         ("surface", "faint") => ("handling", "faint"),
+        // Saijiki v4 moves the dash-dot and the four dropped sizes to the nearest word, as
+        // its documents are (SPEC §3.3). The words it moved between categories keep their
+        // semantic category and need no rewrite.
+        ("continuity", "dash_dot") => ("continuity", "dashed"),
+        ("relative_scale", "slightly_small") => ("relative_scale", "small"),
+        ("relative_scale", "slightly_large") => ("relative_scale", "large"),
+        ("relative_scale", "extra_large") => ("relative_scale", "very_large"),
+        ("relative_scale", "huge") => ("relative_scale", "very_large"),
         _ => return None,
     })
 }
@@ -1045,7 +1291,23 @@ fn rewrite_emit_tools(statements: &mut [Value], path: &str, unadjusted: &mut Vec
     }
 }
 
-fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMigrationError> {
+/// Whether a context-free rename moves the word to a near word rather than respelling it.
+fn is_near_word_rename(category: &str, id: &str) -> bool {
+    matches!(
+        (category, id),
+        ("continuity", "dash_dot")
+            | (
+                "relative_scale",
+                "slightly_small" | "slightly_large" | "extra_large" | "huge"
+            )
+    )
+}
+
+fn rewrite_semantic_refs(
+    value: &mut Value,
+    path: &str,
+    approximated: &mut Vec<String>,
+) -> Result<(), SaijikiMigrationError> {
     match value {
         Value::Object(object) => {
             if object.get("expr").and_then(Value::as_str) == Some("semantic_ref") {
@@ -1059,12 +1321,20 @@ fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMig
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_owned();
-                if let Some((category, id)) = renamed_semantic_ref(&category, &id) {
+                if let Some((new_category, new_id)) = renamed_semantic_ref(&category, &id) {
+                    if is_near_word_rename(&category, &id) {
+                        approximated.push(path.to_owned());
+                    }
+                    let (category, id) = (new_category, new_id);
                     object.insert("category".to_owned(), Value::String(category.to_owned()));
                     object.insert("id".to_owned(), Value::String(id.to_owned()));
                 } else if matches!(
                     (category.as_str(), id.as_str()),
-                    ("surface", "wash") | ("variation", "blurring")
+                    ("surface", "wash")
+                        | ("variation", "blurring")
+                        // 上弦・下弦 need a turn beside the semicircle (Saijiki v4), which a
+                        // definition's emit fields do not say for a reference on its own.
+                        | ("ratio", "waxing" | "waning")
                 ) {
                     return Err(SaijikiMigrationError::IndirectRetiredWord {
                         path: path.to_owned(),
@@ -1075,12 +1345,12 @@ fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMig
                 return Ok(());
             }
             for (key, child) in object.iter_mut() {
-                rewrite_semantic_refs(child, &format!("{path}.{key}"))?;
+                rewrite_semantic_refs(child, &format!("{path}.{key}"), approximated)?;
             }
         }
         Value::Array(items) => {
             for (index, child) in items.iter_mut().enumerate() {
-                rewrite_semantic_refs(child, &format!("{path}[{index}]"))?;
+                rewrite_semantic_refs(child, &format!("{path}[{index}]"), approximated)?;
             }
         }
         _ => {}
@@ -1114,6 +1384,14 @@ pub fn migrate_macro_definition_from_saijiki_v2(
     migrate_macro_definition_to_current(definition)
 }
 
+/// Rewrite one saved v3 Macro definition to the current edition. The version is kept; a
+/// definition with no word v4 rewrites is returned unchanged.
+pub fn migrate_macro_definition_from_saijiki_v3(
+    definition: &Value,
+) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
+    migrate_macro_definition_to_current(definition)
+}
+
 fn migrate_macro_definition_to_current(
     definition: &Value,
 ) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
@@ -1132,7 +1410,8 @@ fn migrate_macro_definition_to_current(
             rewrite_emit_tools(body, &format!("{scope}.body"), &mut unadjusted_thinness);
         }
     }
-    rewrite_semantic_refs(&mut migrated, "$")?;
+    let mut approximated_refs = Vec::new();
+    rewrite_semantic_refs(&mut migrated, "$", &mut approximated_refs)?;
 
     let typed = MacroDefinition::from_json(&migrated.to_string())
         .map_err(|_| SaijikiMigrationError::UnreadableDefinition)?;
@@ -1160,6 +1439,7 @@ fn migrate_macro_definition_to_current(
         definition: migrated,
         identity,
         unadjusted_thinness,
+        approximated_refs,
     })
 }
 

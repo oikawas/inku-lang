@@ -169,7 +169,7 @@ def models(actor: str, *, force: bool = False) -> dict:
     try:
         profile_id, generation = pin(actor)
         asyncio.run(catalog(actor, profile_id, generation, time.monotonic() + 15, force=force))
-        return saved_publication(actor, profile_id, generation)
+        return _publication_answer(actor, saved_publication(actor, profile_id, generation))
     except ChatGPTError as error:
         # A time limit or a broken connection, named by the core, is not a refusal.
         if error.code in {transport_error(kind).code for kind in ("timeout", "unavailable")}:
@@ -188,6 +188,7 @@ def models(actor: str, *, force: bool = False) -> dict:
 def get_models(actor: str = Depends(owner)) -> dict:
     """Return the model list of the active Sign in with ChatGPT profile with its saved publication settings.
 
+    The answer includes `service`, `group`, and the registration's `state`, as in the saved settings.
     The list is fetched from ChatGPT only when it is not already cached. Returns 403 for ownership
     or session errors, including an unreachable sign-in service (`chatgpt_auth_unavailable`). Returns
     503 when the model list request itself cannot reach ChatGPT.
@@ -199,6 +200,7 @@ def get_models(actor: str = Depends(owner)) -> dict:
 def refresh_models(actor: str = Depends(owner)) -> dict:
     """Fetch the model list of the active Sign in with ChatGPT profile from ChatGPT again, ignoring the cache.
 
+    The answer includes `service`, `group`, and the registration's `state`, as in the saved settings.
     Returns the same result and error statuses as the model list: 403 for ownership or session
     errors, including an unreachable sign-in service, and 503 when the model list request itself
     cannot reach ChatGPT.

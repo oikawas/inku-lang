@@ -78,6 +78,14 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         assert client.get("/api/me/chatgpt/models/settings").json()["models"] == []
         assert calls == []
         fetched = client.post("/api/me/chatgpt/models/refresh").json()
+        saved = client.get("/api/me/chatgpt/models/settings").json()
+        assert {key: fetched[key] for key in ("group", "service", "state")} == {
+            key: saved[key] for key in ("group", "service", "state")
+        }
+        cached = client.get("/api/me/chatgpt/models").json()
+        assert {key: cached[key] for key in ("group", "service", "state")} == {
+            key: saved[key] for key in ("group", "service", "state")
+        }
         assert [model["id"] for model in fetched["models"]] == ["luna", "other"]
         assert fetched["enabled_models"] == {"luna": False, "other": False}
         assert all(model["purposes"] == ["llm", "vision"] for model in fetched["models"])

@@ -147,18 +147,14 @@ class SharedPipelineHost(
     }
 
     /** Serializes the idle check and deletion against session acquisition and starts. */
-    suspend fun <T> withIdleVariation(ownerId: String, variationId: String, busy: (String) -> T, block: suspend () -> T): T {
-        // A start owns this mutex from before creating its execution until its session is registered.
-        if (!sessionsMutex.tryLock()) return busy("busy")
-        try {
+    suspend fun <T> withIdleVariation(ownerId: String, variationId: String, busy: (String) -> T, block: suspend () -> T): T =
+        sessionsMutex.withLock {
+            // A start holds this same mutex until its session is registered.
             val active = sessions.values.filter { it.ownerId == ownerId && it.users > 0 }
-            if (active.any { it.snapshot().requiredString("variation_id") == variationId }) return busy("busy")
-            if (active.any { it.context.parentVariationId == variationId }) return busy("parent_of_running")
-            return block()
-        } finally {
-            sessionsMutex.unlock()
+            if (active.any { it.snapshot().requiredString("variation_id") == variationId }) return@withLock busy("busy")
+            if (active.any { it.context.parentVariationId == variationId }) return@withLock busy("parent_of_running")
+            block()
         }
-    }
 
     suspend fun command(
         ownerId: String,

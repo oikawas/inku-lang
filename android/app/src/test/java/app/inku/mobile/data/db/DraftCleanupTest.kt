@@ -29,6 +29,7 @@ class DraftCleanupTest {
 
     @Test fun linkedDraftIsKept() = HostSqlite().use { h ->
         schema(h); draft(h); h.db.execSQL("INSERT INTO pipeline_history_links VALUES ('o','v','h')")
+        h.db.execSQL("INSERT INTO history_items VALUES ('h')")
         assertEquals(DraftDiscardResult.Kept("linked"), discard(h))
     }
     @Test fun parentOfSavedDraftIsKept() = HostSqlite().use { h ->
@@ -74,6 +75,21 @@ class DraftCleanupTest {
         assertEquals(DraftDiscardResult.Kept("revision_moved"), discard(h, revision = "0", excluded = "other"))
         assertEquals(DraftDiscardResult.Discarded, discard(h, revision = "1", excluded = "other"))
         assertEquals(2, h.db.query("SELECT * FROM pipeline_history_links").use { it.count })
+    }
+    @Test fun startupRemovesDraftLeftByPermanentDeleteAndKeepsRestorationMarker() = HostSqlite().use { h ->
+        schema(h); draft(h)
+        h.db.execSQL("INSERT INTO pipeline_history_links VALUES ('o','v','deleted')")
+        h.db.execSQL("INSERT INTO history_items VALUES ('deleted')")
+        h.db.beginTransaction()
+        try {
+            h.db.execSQL("DELETE FROM history_items WHERE id = 'deleted'")
+            assertEquals(DraftDiscardResult.Kept("revision_moved"),
+                discardDraftInTransaction(h.db, "o", "v", revision = "0", excludedHistoryId = "deleted"))
+            h.db.setTransactionSuccessful()
+        } finally { h.db.endTransaction() }
+        assertEquals(DraftDiscardResult.Discarded, discard(h, before = 10))
+        assertEquals("[[\"deleted\"]]", h.rows("SELECT history_id FROM pipeline_history_links"))
+        assertEquals("[]", h.rows("SELECT * FROM variation_authority"))
     }
     @Test fun deletedAuthorityCannotBeSavedAfterEarlierCheck() = HostSqlite().use { h ->
         schema(h); draft(h); requireCommittedVariation(h.db, "o", "v", "1", "d")

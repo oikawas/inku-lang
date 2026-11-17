@@ -60,13 +60,46 @@ class SharedPipelineHostTest {
         val job = async { runCatching { host.start(startRequest(PipelineAuthoring.Description("mist", false)).copy(
             context = AuthoringContext("mist", parentVariationId = "parent"))) } }
         starting.await()
-        assertEquals("busy", host.withIdleVariation(OWNER, "parent", { it }) { "removed" })
+        val cleanup = async { host.withIdleVariation(OWNER, "parent", { it }) { "removed" } }
+        yield()
+        assertFalse("cleanup waits while the start holds the gate", cleanup.isCompleted)
         register.complete(Unit)
         driving.await()
+        assertEquals("parent_of_running", withTimeout(5000) { cleanup.await() })
         assertEquals("parent_of_running", host.withIdleVariation(OWNER, "parent", { it }) { "removed" })
         assertEquals("busy", host.withIdleVariation(OWNER, "variation", { it }) { "removed" })
         finish.complete(Unit)
         job.await()
+        Unit
+    }
+
+    @Test fun cleanupGateReleasesWaitingCommandAndSessionFinally() = runBlocking {
+        val driving = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val delegate = RecordingEffectProvider()
+        val provider = object : PipelineProviderEffect {
+            override suspend fun perform(actionJson: String, models: PipelineModelSelection): String {
+                driving.complete(Unit)
+                finish.await()
+                return delegate.perform(actionJson, models)
+            }
+        }
+        val host = host(ScriptedBinding(), provider, RecordingCommitStore(), MemoryExecutionStore())
+        val running = async { host.start(startRequest(PipelineAuthoring.Description("mist", false))) }
+        driving.await()
+        val cleanup = async { host.withIdleVariation(OWNER, "unrelated", { it }) {
+            entered.complete(Unit); release.await(); "done"
+        } }
+        entered.await()
+        val command = async { host.cancel(OWNER, EXECUTION_ID) }
+        finish.complete(Unit)
+        repeat(3) { yield() }
+        assertFalse("session command waits for cleanup", command.isCompleted)
+        release.complete(Unit)
+        assertEquals("done", withTimeout(5000) { cleanup.await() })
+        withTimeout(5000) { command.await(); running.await() }
         Unit
     }
     @Test

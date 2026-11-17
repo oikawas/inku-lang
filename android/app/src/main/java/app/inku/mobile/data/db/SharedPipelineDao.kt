@@ -14,7 +14,7 @@ interface SharedPipelineDao {
     @Query("SELECT COUNT(*) FROM variation_authority WHERE owner_id = :ownerId AND parent_variation_id = :variationId")
     suspend fun countChildren(ownerId: String, variationId: String): Int
 
-    @Query("SELECT COUNT(*) FROM pipeline_history_links WHERE owner_id = :ownerId AND variation_id = :variationId AND (:excludedHistoryId IS NULL OR history_id != :excludedHistoryId)")
+    @Query("SELECT COUNT(*) FROM pipeline_history_links l INNER JOIN history_items h ON h.id = l.history_id WHERE l.owner_id = :ownerId AND l.variation_id = :variationId AND (:excludedHistoryId IS NULL OR l.history_id != :excludedHistoryId)")
     suspend fun countLinksExcept(ownerId: String, variationId: String, excludedHistoryId: String?): Int
 
     @Query("SELECT COUNT(*) FROM pipeline_history_links l INNER JOIN history_items h ON h.id = l.history_id WHERE l.owner_id = :ownerId AND l.variation_id = :variationId AND l.history_id != :excludedHistoryId")

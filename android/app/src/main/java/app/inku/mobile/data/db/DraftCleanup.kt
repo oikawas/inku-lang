@@ -12,19 +12,17 @@ internal fun discardDraftInTransaction(
         if (!it.moveToFirst()) return DraftDiscardResult.Absent
         it.getString(0) to it.getLong(1)
     }
-    fun exists(sql: String, values: Array<Any>) = db.query(sql, values).use { it.moveToFirst() }
-    val linked = if (excludedHistoryId == null) exists(
-        "SELECT 1 FROM pipeline_history_links WHERE owner_id = ? AND variation_id = ? LIMIT 1", args,
-    ) else exists(
-        "SELECT 1 FROM pipeline_history_links l JOIN history_items h ON h.id = l.history_id WHERE l.owner_id = ? AND l.variation_id = ? AND l.history_id != ? LIMIT 1",
-        arrayOf(ownerId, variationId, excludedHistoryId),
+    fun exists(sql: String, values: Array<out Any?>) = db.query(sql, values).use { it.moveToFirst() }
+    val linked = exists(
+        "SELECT 1 FROM pipeline_history_links l JOIN history_items h ON h.id = l.history_id WHERE l.owner_id = ? AND l.variation_id = ? AND (? IS NULL OR l.history_id != ?) LIMIT 1",
+        arrayOf<Any?>(ownerId, variationId, excludedHistoryId, excludedHistoryId),
     )
     if (linked) return DraftDiscardResult.Kept("linked")
     if (exists("SELECT 1 FROM variation_authority WHERE owner_id = ? AND parent_variation_id = ? LIMIT 1", args)) return DraftDiscardResult.Kept("has_child")
     if (revision != null && authority.first != revision) return DraftDiscardResult.Kept("revision_moved")
     if (before != null && (authority.second >= before || exists(
             "SELECT 1 FROM pipeline_candidate_executions WHERE owner_id = ? AND variation_id = ? AND updated_at >= ? LIMIT 1",
-            arrayOf(ownerId, variationId, before),
+            arrayOf<Any>(ownerId, variationId, before),
         ))) return DraftDiscardResult.Kept("too_recent")
     if (restoredExecutionId != null && exists(
             "SELECT 1 FROM pipeline_candidate_executions WHERE owner_id = ? AND variation_id = ? AND execution_id = ? LIMIT 1",

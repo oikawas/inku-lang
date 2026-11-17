@@ -42,6 +42,10 @@ def _kt_list(values) -> str:
     return "listOf(" + ", ".join(_kt_string(str(v)) for v in values) + ")"
 
 
+def _kt_nullable_list(values) -> str:
+    return "listOf(" + ", ".join("null" if v is None else _kt_string(str(v)) for v in values) + ")"
+
+
 def render_kt() -> str:
     ja = display_categories("ja")
     en = display_categories("en")
@@ -76,6 +80,8 @@ def render_kt() -> str:
         "        val nameEn: String,",
         "        val wordsJa: List<String>,",
         "        val wordsEn: List<String>,",
+        "        val descriptionsJa: List<String?>,",
+        "        val descriptionsEn: List<String?>,",
         "    )",
         "",
         "    val CATEGORIES: List<Category> = listOf(",
@@ -88,6 +94,8 @@ def render_kt() -> str:
         lines.append(f"            nameEn = {_kt_string(str(cat_ja['name_en']))},")
         lines.append(f"            wordsJa = {_kt_list(cat_ja['words'])},")
         lines.append(f"            wordsEn = {_kt_list(cat_en['words'])},")
+        lines.append(f"            descriptionsJa = {_kt_nullable_list(cat_ja['descriptions'])},")
+        lines.append(f"            descriptionsEn = {_kt_nullable_list(cat_en['descriptions'])},")
         lines.append("        ),")
     lines.append("    )")
     lines.append("}")

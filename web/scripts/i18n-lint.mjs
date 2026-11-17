@@ -9,7 +9,8 @@
 //   2. isJapanese ? '…' : '…'           (ternaries inside components)
 //   3. getLang() === 'ja' ? '…' : '…'   (branches in +page.svelte and friends)
 //   4. 日本語 / English                  (bilingual labels in component markup)
-//   5. effectEn / exampleEn              (English Saijiki preview prose)
+//   5. exampleEn                         (English Saijiki examples)
+//   6. generated English Saijiki descriptions from the shared asset
 //
 // Every rule below has its prose counterpart in GLOSSARY.md. When you change one,
 // change the other in the same commit — the file and this script are one pair.
@@ -194,6 +195,16 @@ for (const file of walk(SRC)) {
 				text: m[2],
 			});
 		}
+	}
+}
+
+// Descriptions now come from the generated asset, not effectEn fields.
+const generated = readFileSync(join(SRC, 'lib/saijiki.generated.ts'), 'utf8');
+const englishSaijiki = generated.split('export const GENERATED_SAIJIKI_EN:', 2)[1];
+if (!englishSaijiki) throw new Error('English Saijiki snapshot is missing');
+for (const match of englishSaijiki.matchAll(/^\s*descriptions: (\[.*\]),$/gm)) {
+	for (const value of JSON.parse(match[1])) {
+		if (typeof value === 'string') strings.push({ where: 'saijiki.generated.ts description', key: null, text: value });
 	}
 }
 

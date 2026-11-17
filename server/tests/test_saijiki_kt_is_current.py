@@ -77,6 +77,26 @@ def test_category_bundles_match_web_snapshot() -> None:
 
 
 @android_only
+def test_category_descriptions_match_web_in_both_languages() -> None:
+    import json
+
+    kotlin = _load_generator()._OUTPUT.read_text(encoding="utf-8")
+    web = (ROOT / "web/src/lib/saijiki.generated.ts").read_text(encoding="utf-8")
+    matches = re.findall(
+        r'Category\(\s*key = "([^"]+)".*?descriptionsJa = listOf\((.*?)\),\s*descriptionsEn = listOf\((.*?)\),\s*\),',
+        kotlin, re.S,
+    )
+    android = {key: (json.loads("[" + ja + "]"), json.loads("[" + en + "]")) for key, ja, en in matches}
+    assert len(android) == 17
+    for index, array in enumerate(("GENERATED_SAIJIKI", "GENERATED_SAIJIKI_EN")):
+        section = web.split(f"export const {array}: SaijikiCategory[] = [", 1)[1].split("\n];", 1)[0]
+        categories = re.findall(r"\{\s*key: '([^']+)',.*?\n\s*descriptions: (\[.*?\]),\s*\}", section, re.S)
+        assert len(categories) == 17
+        for key, descriptions in categories:
+            assert android[key][index] == json.loads(descriptions), key
+
+
+@android_only
 def test_snapshot_carries_both_language_surfaces_for_every_category() -> None:
     """Calibration: a generator that emitted one language would still be current.
 

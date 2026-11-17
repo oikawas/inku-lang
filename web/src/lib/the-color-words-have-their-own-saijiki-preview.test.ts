@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { saijikiDescription } from './saijiki.ts';
 
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const tableStart = PAGE.indexOf('const previews: Record<string, PreviewEntry> = {');
@@ -14,9 +15,11 @@ test('T-341  yellow, orange, and purple have built-in bilingual preview drawings
 	for (const word of ['黄', '橙', '紫']) {
 		const entry = PREVIEWS.match(new RegExp(`^\\t\\t\\t${word}: \\{([^\\n]+)\\},$`, 'm'))?.[1];
 		assert.ok(entry, `${word} must have a dedicated built-in preview entry`);
-		for (const field of ['effect', 'example', 'effectEn', 'exampleEn']) {
+		for (const field of ['example', 'exampleEn']) {
 			assert.match(entry, new RegExp(`${field}: ['\\"][^'\\"]+['\\"]`), `${word} must have a non-empty ${field}`);
 		}
+		assert.ok(saijikiDescription('iro', word, true));
+		assert.ok(saijikiDescription('iro', word, false));
 		assert.match(entry, /svg: (?:shapeSvg|lineSvg|scatter)/, `${word} must have a closed preview SVG`);
 	}
 });

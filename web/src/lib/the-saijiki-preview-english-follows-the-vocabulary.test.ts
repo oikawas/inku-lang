@@ -21,6 +21,8 @@ test('I-241  the vocabulary lint reads both English Saijiki preview fields', () 
 			join(root, 'src/routes/+page.svelte'),
 			"const previews = { bad: { effectEn: 'An artwork.', exampleEn: 'A magic image.' } };\n"
 		);
+		writeFileSync(join(root, 'src/lib/saijiki.generated.ts'),
+			'export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [\n\tdescriptions: ["An artwork."],\n];\n');
 
 		const run = spawnSync(process.execPath, ['scripts/i18n-lint.mjs'], {
 			cwd: root,
@@ -32,6 +34,7 @@ test('I-241  the vocabulary lint reads both English Saijiki preview fields', () 
 		assert.match(output, /routes\/\+page\.svelte:1 effectEn: "artwork"/);
 		assert.match(output, /routes\/\+page\.svelte:1 exampleEn: "magic"/);
 		assert.match(output, /routes\/\+page\.svelte:1 exampleEn: "image"/);
+		assert.match(output, /saijiki\.generated\.ts description: "artwork"/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

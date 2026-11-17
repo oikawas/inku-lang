@@ -12,7 +12,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['円', '楕円', '三角', '四角', '線', '弧', '自由線', '点', '雲形', '多角形', '半円', '三日月'],
 		ids: ["circle", "ellipse", "triangle", "square", "line", "arc", "free_line", "point", "cloudform", "polygon", "semicircle", "crescent"],
 		facets: [null, null, null, null, null, null, null, null, null, null, "arc_form", "arc_form"],
-		descriptions: [null, null, null, null, null, null, null, null, null, null, null, null],
+		descriptions: ["正円を描く。中心と半径で配置される。", "横に長い円を描く（幅と高さは 5:3）。縦長を添えると縦に長くなる。", "頂点を上にした三角を描く。", "正方形を描く。縦長・横長を添えると長方形になる。", "始点から終点へ、まっすぐな線を引く。", "円周の一部を描く。半円・三日月を添えると、その形の弧になる。", "始点と終点のあいだを、直線・円弧・自由な曲がりをつないだ道筋で引く。道筋は描くたびに組み直す。", "塗った小さな丸を置く（直径は画面の短い辺の約 1.2%）。向きと揺れの語は効かない。", "輪郭がゆるく膨らみ、ところどころくびれる閉じた形を描く。輪郭は描くたびに決まる。", "頂点を上にした正多角形を描く。五角形が既定で、六角形〜八角形とも書ける。", "円の半分の弧を描く。", "細い三日月の形を描く。"],
 	},
 	{
 		key: 'katamuki',
@@ -22,7 +22,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['水平', '垂直', '斜め', '右上がり', '右下がり', '左上がり', '左下がり', '回転'],
 		ids: ["horizontal", "vertical", "diagonal", "rising", "falling", "left_rising", "left_falling", "rotated"],
 		facets: [null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null],
+		descriptions: ["0度の向き。線なら横線として扱う。", "90度の向き。線なら縦線として扱う。", "45 度・135 度・225 度・315 度のどれかに傾ける。", "左下から右上へ、23〜37 度上がる傾きにする。", "左上から右下へ、23〜37 度下がる傾きにする。", "右下から左上へ、23〜37 度上がる傾きにする。線は右下がりの線と同じに見え、始点と終点が入れ替わる。", "右上から左下へ、23〜37 度下がる傾きにする。線は右上がりの線と同じに見え、始点と終点が入れ替わる。", "形全体を中心まわりに回す。角度は、45 度の倍数から 6 度以上離れた所から選ぶ。"],
 	},
 	{
 		key: 'tezawari',
@@ -32,7 +32,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['銀筆', '鉛筆', 'ペン', 'チョーク', 'オイルパステル', 'ガッシュ', '水彩', '油彩', 'ペインティングナイフ', 'エッチング', 'デジタル'],
 		ids: ["silverpoint", "pencil", "pen", "chalk", "oil_pastel", "gouache", "watercolor", "oil_paint", "painting_knife", "etching", "computer"],
 		facets: [null, null, null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null, null, null],
+		descriptions: ["非常に細く、筆致の変化をほぼ抑えた線。", "幅と横揺れが連動し、細かな副線と紙目の粒を伴う。", "明瞭さを保ちながら、わずかな幅と軌道の変化を持つ。", "幅の崩れ、途切れ、粉状の粒を含む淡い線。", "紙の目が抜ける縁と、詰まった芯の二層で引く、蝋の不透明な線。", "不透明でつやの無い平らな色。入りと抜きが細く、筆圧で幅が変わる。", "透ける色を重ね、重なると濃くなる。縁の内側に色が溜まり、作品のほかの色が少し混ざる。", "厚みのある色層と筆筋を重ね、一部の運びに作品のほかの色の筋が混ざる。", "ナイフの一引きで絵具を平らに盛って伸ばし、稜と影、かすれて割れる終わりを残す。ほかの色が面に混ざることもある。", "太さのそろった線に、腐食の細かな荒れと丸い端。面は向きを変えた細い平行線で陰を作る。", "方眼の升を並べて線を描く。塗りは升の点描に明るい走査線を重ねる。線と輪郭は太さを変えても升の大きさが同じで、濃い・薄いは効かない。"],
 	},
 	{
 		key: 'tsuranari',
@@ -42,7 +42,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['実線', '破線', '点線'],
 		ids: ["solid", "dashed", "dotted"],
 		facets: [null, null, null],
-		descriptions: [null, null, null],
+		descriptions: ["切れ目のない線で描く。書かない時と同じ。", "短い線分を、間を空けて並べて引く。線と自由線に効き、弧と閉じた形には効かない。", "点を連ねて引く。線と自由線に効き、弧と閉じた形には効かない。"],
 	},
 	{
 		key: 'omote',
@@ -52,7 +52,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['空', '塗り', '刷き', '刷毛目', '粒', '点描', '平行線', '交差線', 'メゾチント'],
 		ids: ["none", "solid", "sweep", "brushmarks", "grain", "stipple", "hatch", "crosshatch", "aquatint"],
 		facets: [null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null],
+		descriptions: ["面には何も置かず、輪郭を残す。", "閉じた形の面を一様に塗る。線・弧・自由線には効かない。", "少し向きを変えて、面を二度掃く。一度の掃きは、帯が溶け合った一枚の淡い膜になる。薄いを添えるとさらに淡くなる。線や弧では幅広い帯になる。", "刷きと同じ帯を、溶け合わせずに一本ずつ重ねる。帯の重なった所が段をなして濃くなる。閉じた形の面に効く。", "一方に流れる細かな粒が、紙の歯で途切れた面を作る。線や弧では、線のかすれが増える。", "同じ大きさの丸い点を置き、点の数で、左上の明るい側から右下の暗い側へ調子を傾ける。閉じた形の面に効く。", "平行な細い線で面を埋める。閉じた形の面に効く。", "平行線に、向きを変えたもう一組を重ねる。閉じた形の面に効く。", "深い調子の面に、紙の白が細かな点でのぞき、左上が磨き出したように明るむ。閉じた形の面に効く。「メゾチント。」だけの文は、じの語になる。"],
 	},
 	{
 		key: 'sabaki',
@@ -62,7 +62,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['濃い', '程よい', '薄い', 'にじみ'],
 		ids: ["dense", "temperate", "faint", "bleeding"],
 		facets: ["intensity", "intensity", "intensity", "spread"],
-		descriptions: [null, null, null, null],
+		descriptions: ["道具の本来の濃さより濃く置く。線・弧・質感の面・塗りに効き、デジタルの線と輪郭には効かない。図は左が程よい鉛筆の点描、右が濃い点描。", "道具の本来の濃さで置く。さばきを省略した痕と同じ。図は左右とも程よい鉛筆の点描。", "道具の本来の濃さより淡く置く。線・弧・質感の面・塗りに効き、デジタルの線と輪郭には効かない。図は左が程よい鉛筆の点描、右が薄い点描。", "痕の縁の外へ、同じ色の淡いにじみを不ぞろいに広げる。痕の形は変えない。"],
 	},
 	{
 		key: 'kime',
@@ -72,7 +72,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['細かい', '粗い', '密な', '疎な', '下塗り'],
 		ids: ["fine_grained", "coarse_grained", "packed", "sparse", "underpainted"],
 		facets: ["scale", "scale", "density", "density", "underlayer"],
-		descriptions: [null, null, null, null, null],
+		descriptions: ["質感の点や線を小さくし、その分だけ数を増やす（覆う広さは変えない）。閉じた形の質感の面に添えられる。図は左が既定の点描、右が細かい点描。", "質感の点や線を大きくし、その分だけ数を減らす（覆う広さは変えない）。閉じた形の質感の面に添えられる。図は左が既定の点描、右が粗い点描。", "質感の点や線を詰めて、数を増やして置く。閉じた形の質感の面に添えられる。図は左が既定の点描、右が密な点描。", "質感の点や線の間を空けて、数を減らして置く。閉じた形の質感の面に添えられる。図は左が既定の点描、右が疎な点描。", "質感の下に画材の色を塗り、質感を塗りと逆の明るさで重ねる。閉じた形の質感の面に添えられる。図は左が既定の点描、右が下塗りの点描。"],
 	},
 	{
 		key: 'ji',
@@ -82,7 +82,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['紙', '和紙', '薄墨地', '木炭地', 'カンバス', '画用紙', 'メゾチント', '画面比'],
 		ids: ["paper", "washi", "ink_wash", "charcoal_ground", "canvas", "drawing_paper", "mezzotint", "aspect_ratio"],
 		facets: [null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null],
+		descriptions: ["地を無地の紙にする。細かな繊維の点がうっすら見える。", "地を和紙にする。簀の目の細い筋と長い繊維が見える。描いた痕はにじみやすく、かすれにくい。", "地を薄墨で淡く染め、一方に流れる墨のむらを置く。背景の色は透けて残る。描いた痕は少しにじみやすい。", "地を木炭で擦った濃い灰にし、一方に流れる擦れを残す。背景の色は隠れる。描いた線はかすれやすく、にじみにくい。", "地を平織りの布目にする。描いた痕は、じの中でいちばんかすれやすく、にじみにくい。", "地を画用紙にする。細かな粒が見え、描いた線は少しかすれやすい。", "地を黒に近い版にし、磨いて明るんだ所と、目立ての跡を置く。背景の色は隠れ、色を書かない痕は白で描かれる。「メゾチント。」だけの文で、じの語になる。", null],
 	},
 	{
 		key: 'iro',
@@ -92,7 +92,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['白', '黒', '青', '赤', '緑', '灰', '黄', '橙', '紫'],
 		ids: ["white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple"],
 		facets: [null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null],
+		descriptions: ["白系の色で描く。", "黒で描く。", "青系の色で描く。", "赤系の色で描く。", "緑系の色で描く。", "灰色で描く。", "黄色系の色で描く。", "橙色系の色で描く。", "紫系の色で描く。"],
 	},
 	{
 		key: 'yuragi',
@@ -102,7 +102,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['小さく', '大きく', 'ゆるやかに', '小刻みに', '揺れる', '波打つ'],
 		ids: ["narrowly", "broadly", "loosely", "tightly", "swaying", "undulating"],
 		facets: ["amplitude", "amplitude", "frequency", "frequency", "quality", "quality"],
-		descriptions: [null, null, null, null, null, null],
+		descriptions: ["揺れの振れ幅を小さくする。揺れる・波打つと一緒に書く。", "揺れの振れ幅を大きくする。揺れる・波打つと一緒に書く。", "揺れの間隔を長くする（痕の端から端までに二度ほどうねる）。振れ幅も少し大きくなる。", "揺れの間隔を短くする（痕の端から端までに十数回振れる）。振れ幅は少し小さくなる。", "線や輪郭を、不規則に揺らす。線と弧の端は動かさない。点には効かない。", "線や輪郭を、規則的な波でうねらせる。線と弧の端は動かさない。点には効かない。"],
 	},
 	{
 		key: 'basho',
@@ -112,7 +112,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['上', '下', '中心', '左端', '右端', '上端', '下端', '隅'],
 		ids: ["top", "bottom", "center", "left_edge", "right_edge", "top_edge", "bottom_edge", "corner"],
 		facets: [null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null],
+		descriptions: ["画面の上の 3 分の 1 に置く。", "画面の下の 3 分の 1 に置く。", "画面の中央（縦横とも 3 分の 1〜3 分の 2）に置く。", "画面の左の縁から幅 10 分の 1 の帯に寄せる。", "画面の右の縁から幅 10 分の 1 の帯に寄せる。", "画面の上の縁から高さ 10 分の 1 の帯に寄せる。", "画面の下の縁から高さ 10 分の 1 の帯に寄せる。", "四隅のどれかの、縦横 5 分の 1 の範囲に置く。"],
 	},
 	{
 		key: 'ugoki',
@@ -122,7 +122,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['置く', '並べる', '引く', '散らす', '埋める', '敷き詰める'],
 		ids: ["place", "line_up", "draw", "scatter", "fill", "tile"],
 		facets: [null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null],
+		descriptions: ["書いた場所に一つ置く。場所を書かなければ画面の中央に置く。", "図形や組を列として並べる。", "線や弧を描く動作。", "範囲の中に、ばらばらに散らす。数を書かなければ 8 個。", "範囲を形で埋める。数は、範囲の広さと形の大きさから決まる。", "範囲の左上から、縦横の格子に並べる。書いた数と大きさを保つ。数を書かなければ 8 個。"],
 	},
 	{
 		key: 'jun',
@@ -132,7 +132,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['交互に', '順に'],
 		ids: ["alternating", "in_order"],
 		facets: [null, null],
-		descriptions: [null, null],
+		descriptions: ["二つの色や図形、組などを交互に繰り返す。組は一つとして数える。", "記述した色や図形、組などの順を保って繰り返す。"],
 	},
 	{
 		key: 'wariai',
@@ -142,7 +142,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['縦長', '横長', '全幅', '半幅'],
 		ids: ["tall", "wide", "full_width", "half_width"],
 		facets: ["aspect", "aspect", "width_extent", "width_extent"],
-		descriptions: [null, null, null, null],
+		descriptions: ["縦に長い形にする（長い辺と短い辺は 2:1）。", "横に長い形にする（長い辺と短い辺は 2:1）。", "画面幅いっぱいに広げる。", "画面の半分程度の幅にする。"],
 	},
 	{
 		key: 'futosa',
@@ -152,7 +152,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['ごく細い', '細い', '太い', 'ごく太い'],
 		ids: ["extra_fine", "fine", "thick", "extra_thick"],
 		facets: [null, null, null, null],
-		descriptions: [null, null, null, null],
+		descriptions: ["線と輪郭の幅を、道具の普通の幅の約 3 分の 1 にする。", "線と輪郭の幅を、道具の普通の幅の 6 割にする。", "線と輪郭を、道具ごとに決めた太い幅にする（ペンでは普通の約 1.8 倍）。", "線と輪郭を、道具ごとに決めたいちばん太い幅にする（ペンでは普通の 3 倍）。"],
 	},
 	{
 		key: 'ookisa',
@@ -162,7 +162,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['ごく小さな', '小さな', '普通の大きさ', '大きな', 'ごく大きな'],
 		ids: ["very_small", "small", "normal", "large", "very_large"],
 		facets: [null, null, null, null, null],
-		descriptions: [null, null, null, null, null],
+		descriptions: ["形を普通の大きさの 8 分の 3 にする。", "形を普通の大きさの半分にする。", "普通の大きさで描く。円なら直径が画面の短い辺の約 4 分の 1。大きさを書かない時と同じ。", "形を普通の大きさの 1.5 倍にする。", "形を普通の大きさの 1.75 倍にする。"],
 	},
 	{
 		key: 'aida',
@@ -172,7 +172,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['沿う', '触れない', '切る', '間に', '触れる', 'つながる', '載る', '中に', '重なる', '横切る', '鏡写し'],
 		ids: ["along", "not_touching", "cutting", "between", "touching", "connected", "resting_on", "inside", "overlapping", "crossing", "mirrored"],
 		facets: [null, null, null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null, null, null],
+		descriptions: ["直前の線を参照する関係。", "直前の形に接触しない関係。", "直前の線を横切る関係。", "直前の二つの要素の間に置く関係。", "直前の形に接触する関係。", "線・弧・自由線・点の始点を、前の形の終点（閉じた形なら輪郭のいちばん近い所）へ動かしてつなぐ。「始点」「終点」「途中」を添えると、つなぐ所を選べる。", "直前の形の上の縁に、下端を接して載せる関係。", "直前の閉じた形の内側に置く関係。", "直前の形に一部を重ねて置く関係。", "直前の形を、片方の縁から反対の縁まで越えて置く関係。", "二つの形の間の軸を挟んで、前の形の向きを鏡に映したように写す。同じ種類の形どうしにだけ効く。"],
 	},
 ];
 
@@ -185,7 +185,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'free line', 'point', 'cloudform', 'polygon', 'semicircle', 'crescent'],
 		ids: ["circle", "ellipse", "triangle", "square", "line", "arc", "free_line", "point", "cloudform", "polygon", "semicircle", "crescent"],
 		facets: [null, null, null, null, null, null, null, null, null, null, "arc_form", "arc_form"],
-		descriptions: [null, null, null, null, null, null, null, null, null, null, null, null],
+		descriptions: ["Draws a true circle, placed by its center and radius.", "Draws a circle stretched sideways, 5:3 wide to high. Tall turns it upright.", "Draws a triangle with its apex at the top.", "Draws a square. Tall or wide makes it a rectangle.", "Draws a straight line from its start to its end.", "Draws part of a circle's rim. Semicircle or crescent gives the arc that form.", "Draws the path between its two ends from straight runs, arcs and free bends, built anew at each drawing.", "Places a small filled dot, about 1.2% of the frame's short side across. Angle and sway words do not apply.", "Draws a closed form whose outline swells and pinches here and there, decided anew at each drawing.", "Draws a regular polygon with a vertex at the top: five sides by default, or six to eight when written.", "Draws an arc of half a circle.", "Draws a thin crescent moon."],
 	},
 	{
 		key: 'katamuki',
@@ -195,7 +195,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'left-rising', 'left-falling', 'rotated'],
 		ids: ["horizontal", "vertical", "diagonal", "rising", "falling", "left_rising", "left_falling", "rotated"],
 		facets: [null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null],
+		descriptions: ["A 0-degree orientation. A line is read as horizontal.", "A 90-degree orientation. A line is read as vertical.", "Tilts the form to one of 45, 135, 225 or 315 degrees.", "Tilts the form up to the right by 23 to 37 degrees.", "Tilts the form down to the right by 23 to 37 degrees.", "Tilts the form up to the left by 23 to 37 degrees. A line looks like a falling line with its start and end swapped.", "Tilts the form down to the left by 23 to 37 degrees. A line looks like a rising line with its start and end swapped.", "Turns the whole form about its center, to an angle at least 6 degrees away from any multiple of 45."],
 	},
 	{
 		key: 'tezawari',
@@ -205,7 +205,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['silverpoint', 'pencil', 'pen', 'chalk', 'oil pastel', 'gouache', 'watercolor', 'oil paint', 'painting knife', 'etching', 'digital'],
 		ids: ["silverpoint", "pencil", "pen", "chalk", "oil_pastel", "gouache", "watercolor", "oil_paint", "painting_knife", "etching", "computer"],
 		facets: [null, null, null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null, null, null],
+		descriptions: ["A very thin line with almost no variation in touch.", "Width and lateral sway move together, with fine secondary strokes and paper grain.", "Stays clear while varying slightly in width and path.", "A pale line with broken width, gaps, and powdery grain.", "An opaque waxy line in two layers: an edge where the paper's tooth shows through and a dense core.", "Flat, matte, opaque color, thin at entry and release, with width changing under pressure.", "Layers transparent color that deepens where it overlaps and pools inside the edge, taking in a little of the work's other colors.", "Layers a dense paint body with visible brush streaks; some strokes carry thin streaks of the work's other colors.", "Each pull of the knife heaps paint and spreads it flat, leaving a ridge with its shadow and an end that breaks into dry streaks; other colors may mix into a plane.", "Lines of even width with finely bitten edges and round ends; surfaces build shade from fine parallel lines at varied angles.", "Draws lines as rows of grid squares; a fill is a dither of squares under bright scan lines. Lines and outlines keep the same square size at any width, and dense and faint do not apply to them."],
 	},
 	{
 		key: 'tsuranari',
@@ -215,7 +215,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['solid', 'dashed', 'dotted'],
 		ids: ["solid", "dashed", "dotted"],
 		facets: [null, null, null],
-		descriptions: [null, null, null],
+		descriptions: ["Draws an unbroken line, the same as writing no continuity.", "Draws short segments with gaps between them. On lines and free lines; not on arcs or closed shapes.", "Draws a run of dots. On lines and free lines; not on arcs or closed shapes."],
 	},
 	{
 		key: 'omote',
@@ -225,7 +225,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['empty', 'flat', 'sweep', 'brushmarks', 'grain', 'stipple', 'hatch', 'crosshatch', 'mezzotint'],
 		ids: ["none", "solid", "sweep", "brushmarks", "grain", "stipple", "hatch", "crosshatch", "aquatint"],
 		facets: [null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null],
+		descriptions: ["Leaves the face untouched, keeping the contour.", "Fills the face of a closed shape evenly. Not on lines, arcs or free lines.", "Sweeps the face twice at slightly different angles; each sweep is one pale film of merged bands. Faint makes it paler. On a line or arc it makes a broad band.", "Lays the bands of a sweep one by one without merging them, so overlaps darken in steps. On the face of a closed shape.", "Makes a face of fine grain streaming one way, broken by the paper's tooth. On a line or arc it adds skips to the stroke.", "Lays round dots of one size, more of them toward the lower right, so the tone runs from a light upper left to a dark lower right. On the face of a closed shape.", "Fills the face with fine parallel lines. On the face of a closed shape.", "Lays a second set of parallel lines across the first at another angle. On the face of a closed shape.", "A deep-toned face where the paper shows through in fine specks, lightening toward the upper left as if burnished. On the face of a closed shape. A sentence of mezzotint alone is the ground word."],
 	},
 	{
 		key: 'sabaki',
@@ -235,7 +235,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['dense', 'moderate', 'faint', 'bleeding'],
 		ids: ["dense", "temperate", "faint", "bleeding"],
 		facets: ["intensity", "intensity", "intensity", "spread"],
-		descriptions: [null, null, null, null],
+		descriptions: ["Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills; not on digital lines and outlines. Left: moderate pencil stipple; right: dense stipple.", "Lays ink or paint at the tool's own opacity, as when handling is omitted. Both halves show moderate pencil stipple.", "Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills; not on digital lines and outlines. Left: moderate pencil stipple; right: faint stipple.", "Spreads a pale, uneven halo of the same color beyond the mark's edge, without changing the mark's shape."],
 	},
 	{
 		key: 'kime',
@@ -245,7 +245,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['fine-grained', 'coarse-grained', 'packed', 'sparse', 'underpainted'],
 		ids: ["fine_grained", "coarse_grained", "packed", "sparse", "underpainted"],
 		facets: ["scale", "scale", "density", "density", "underlayer"],
-		descriptions: [null, null, null, null, null],
+		descriptions: ["Makes a texture's dots or lines smaller and lays more of them, covering the same area. On the textured face of a closed shape. Left: default stipple; right: fine-grained stipple.", "Makes a texture's dots or lines larger and lays fewer of them, covering the same area. On the textured face of a closed shape. Left: default stipple; right: coarse-grained stipple.", "Lays a texture's dots or lines closer together, more of them. On the textured face of a closed shape. Left: default stipple; right: packed stipple.", "Lays a texture's dots or lines farther apart, fewer of them. On the textured face of a closed shape. Left: default stipple; right: sparse stipple.", "Paints the tool's colour under a texture and lays the texture over it in the opposite lightness. On the textured face of a closed shape. Left: default stipple; right: underpainted stipple."],
 	},
 	{
 		key: 'ji',
@@ -255,7 +255,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['paper', 'washi', 'ink wash ground', 'charcoal ground', 'canvas', 'drawing paper', 'mezzotint', 'aspect ratio'],
 		ids: ["paper", "washi", "ink_wash", "charcoal_ground", "canvas", "drawing_paper", "mezzotint", "aspect_ratio"],
 		facets: [null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null],
+		descriptions: ["Makes the ground plain paper, with faint specks of fiber.", "Makes the ground washi, with fine laid lines and long fibers. Marks on it spread more and skip less.", "Tints the ground with a pale ink wash, with pooled streaks running one way; the background color shows through. Marks on it spread a little more.", "Makes the ground a dark gray rubbed with charcoal, with smudges running one way; it hides the background color. Lines on it skip more and spread less.", "Makes the ground a plain-woven canvas. Marks on it skip the most of any ground and spread less.", "Makes the ground drawing paper, with fine grain. Lines on it skip a little more.", "Makes the ground a near-black plate with burnished light patches and rocker marks; it hides the background color, and marks with no color written are drawn in white. Mezzotint alone in a sentence is this ground word.", null],
 	},
 	{
 		key: 'iro',
@@ -265,7 +265,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['white', 'black', 'blue', 'red', 'green', 'gray', 'yellow', 'orange', 'purple'],
 		ids: ["white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple"],
 		facets: [null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null],
+		descriptions: ["Draws in a white tone.", "Draws in black.", "Draws in a blue tone.", "Draws in a red tone.", "Draws in a green tone.", "Draws in gray.", "Draws in a yellow tone.", "Draws in an orange tone.", "Draws in a purple tone."],
 	},
 	{
 		key: 'yuragi',
@@ -275,7 +275,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['narrowly', 'broadly', 'loosely', 'tightly', 'swaying', 'undulating'],
 		ids: ["narrowly", "broadly", "loosely", "tightly", "swaying", "undulating"],
 		facets: ["amplitude", "amplitude", "frequency", "frequency", "quality", "quality"],
-		descriptions: [null, null, null, null, null, null],
+		descriptions: ["Makes the sway narrow. Written with swaying or undulating.", "Makes the sway broad. Written with swaying or undulating.", "Lengthens the sway's interval, to about two swells along the whole mark, and widens it a little.", "Shortens the sway's interval, to a dozen or more swings along the whole mark, and narrows it a little.", "Sways lines and outlines irregularly, keeping the ends of lines and arcs in place. Not on points.", "Makes lines and outlines undulate in a regular wave, keeping the ends of lines and arcs in place. Not on points."],
 	},
 	{
 		key: 'basho',
@@ -285,7 +285,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'corner'],
 		ids: ["top", "bottom", "center", "left_edge", "right_edge", "top_edge", "bottom_edge", "corner"],
 		facets: [null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null],
+		descriptions: ["Places it in the top third of the frame.", "Places it in the bottom third of the frame.", "Places it in the middle of the frame, a third to two thirds across and down.", "Pulls it into the strip a tenth of the width from the left edge.", "Pulls it into the strip a tenth of the width from the right edge.", "Pulls it into the strip a tenth of the height from the top edge.", "Pulls it into the strip a tenth of the height from the bottom edge.", "Places it in one of the four corners, within a fifth of the frame each way."],
 	},
 	{
 		key: 'ugoki',
@@ -295,7 +295,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['place', 'line-up', 'draw', 'scatter', 'fill', 'tile'],
 		ids: ["place", "line_up", "draw", "scatter", "fill", "tile"],
 		facets: [null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null],
+		descriptions: ["Places one at the given place, or at the middle of the frame when no place is written.", "Lines shapes or groups up as a row.", "The act of drawing a line or an arc.", "Scatters them irregularly within the range; eight when no count is written.", "Fills the range with the form; the count follows from the range's area and the form's size.", "Places them on a grid from the range's top left, keeping the written count and size; eight when no count is written."],
 	},
 	{
 		key: 'jun',
@@ -305,7 +305,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['alternating', 'in order'],
 		ids: ["alternating", "in_order"],
 		facets: [null, null],
-		descriptions: [null, null],
+		descriptions: ["Alternates two colors, shapes, or groups. Each group counts as one.", "Repeats colors, shapes, or groups in the written order."],
 	},
 	{
 		key: 'wariai',
@@ -315,7 +315,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['tall', 'wide', 'full-width', 'half-width'],
 		ids: ["tall", "wide", "full_width", "half_width"],
 		facets: ["aspect", "aspect", "width_extent", "width_extent"],
-		descriptions: [null, null, null, null],
+		descriptions: ["Makes the form tall, 2:1 long side to short.", "Makes the form wide, 2:1 long side to short.", "Spreads across the full width of the frame.", "Sets the width to about half the frame."],
 	},
 	{
 		key: 'futosa',
@@ -325,7 +325,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['very thin', 'thin', 'thick', 'very thick'],
 		ids: ["extra_fine", "fine", "thick", "extra_thick"],
 		facets: [null, null, null, null],
-		descriptions: [null, null, null, null],
+		descriptions: ["Makes lines and outlines about a third of the tool's normal width.", "Makes lines and outlines 0.6 of the tool's normal width.", "Makes lines and outlines the thick width set for each tool (about 1.8 times normal for the pen).", "Makes lines and outlines the widest width set for each tool (three times normal for the pen)."],
 	},
 	{
 		key: 'ookisa',
@@ -335,7 +335,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['very small', 'small', 'normal-sized', 'large', 'very large'],
 		ids: ["very_small", "small", "normal", "large", "very_large"],
 		facets: [null, null, null, null, null],
-		descriptions: [null, null, null, null, null],
+		descriptions: ["Makes the form 3/8 of the normal size.", "Makes the form half the normal size.", "Draws the form at its normal size: a circle about a quarter of the frame's short side across. The same as writing no size.", "Makes the form 1.5 times the normal size.", "Makes the form 1.75 times the normal size."],
 	},
 	{
 		key: 'aida',
@@ -345,6 +345,6 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		words: ['along', 'not touching', 'cutting', 'between', 'touching', 'connected', 'resting on', 'inside', 'overlaps', 'crossing', 'mirrored'],
 		ids: ["along", "not_touching", "cutting", "between", "touching", "connected", "resting_on", "inside", "overlapping", "crossing", "mirrored"],
 		facets: [null, null, null, null, null, null, null, null, null, null, null],
-		descriptions: [null, null, null, null, null, null, null, null, null, null, null],
+		descriptions: ["A relation that refers to the preceding line.", "A relation that makes no contact with the preceding shape.", "A relation that crosses the preceding line.", "A relation that places between the two preceding elements.", "A relation that makes contact with the preceding shape.", "Moves the start of a line, arc, free line or point onto the end of the previous form (for a closed shape, the nearest point of its outline). Start, end or partway picks where it joins.", "A relation that rests the shape's lower edge on the top of the preceding shape.", "A relation that places the shape inside the preceding closed shape.", "A relation that overlaps part of the preceding shape.", "A relation that crosses the preceding shape from one edge past the other.", "Mirrors the previous form's orientation across the axis between the two. Only between forms of the same kind."],
 	},
 ];

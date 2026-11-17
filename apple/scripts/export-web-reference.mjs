@@ -124,7 +124,7 @@ for (const category of vocabulary.categories) {
     previewContext.uiLanguage = 'en';
     const english = previewContext.previewFor(category.key, word.surface_ja, word.surface_en ?? word.surface_ja, 'en');
     saijikiPreviews[`${category.key}:${word.surface_ja}`] = {
-      svg: japanese.svg, effectJa: japanese.effect, effectEn: english.effect,
+      svg: japanese.svg, effectJa: word.description?.ja ?? japanese.effect, effectEn: word.description?.en ?? english.effect,
       exampleJa: japanese.example, exampleEn: english.example,
     };
   }

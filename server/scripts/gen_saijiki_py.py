@@ -17,6 +17,7 @@ def render_py() -> str:
     return ('"""Generated from saijiki-v4.json by gen_saijiki_py.py; do not edit."""\n\n'
             + 'BUNDLES = ' + pformat(asset["bundles"], width=100, sort_dicts=False) + '\n\n'
             + 'RELATIONS_BUNDLE = ' + repr(asset["relations_bundle"]) + '\n\n'
+            + 'RELATION_DESCRIPTIONS = ' + pformat({item['relation_type']: item.get('description') for item in asset['relations']}, width=100, sort_dicts=False) + '\n\n'
             + 'CATEGORIES = ' + pformat(asset["categories"], width=100, sort_dicts=False) + '\n')
 
 

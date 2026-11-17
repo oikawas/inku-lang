@@ -48,6 +48,15 @@ export function saijikiWordsFor(categoryKey: string, isJapanese: boolean): strin
 	return source.find((cat) => cat.key === categoryKey)?.words ?? [];
 }
 
+/** The description follows the UI language, independently of the DDL language. */
+export function saijikiDescription(categoryKey: string, canonical: string, japanese: boolean): string {
+	const index = SAIJIKI.find((category) => category.key === categoryKey)?.words.indexOf(canonical) ?? -1;
+	const category = (japanese ? SAIJIKI : SAIJIKI_EN).find((item) => item.key === categoryKey);
+	return category?.descriptions[index] || (japanese
+		? '記述の解釈に影響する語彙です。'
+		: 'A vocabulary word that shapes how the description is read.');
+}
+
 export let SAIJIKI_BUNDLES: SaijikiBundle[] = GENERATED_SAIJIKI_BUNDLES.map((bundle) => ({ ...bundle }));
 
 export function hydrateSaijikiBundles(bundles: SaijikiBundle[]): void {

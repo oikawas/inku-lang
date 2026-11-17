@@ -30,7 +30,7 @@ def test_all_saijiki_categories_match_the_core_v4_asset():
     assert next(c for c in saijiki.display_categories("ja") if c["key"] == "aida")["bundle"] == asset["relations_bundle"]
     assert len(asset["categories"]) == len(saijiki.SAIJIKI)
     fields = ("surface_ja", "surface_en", "score_value", "default", "prompt", "display", "marker",
-              "parser_surfaces_ja", "parser_surfaces_en", "marker_surfaces_ja", "marker_surfaces_en", "id", "facet")
+              "parser_surfaces_ja", "parser_surfaces_en", "marker_surfaces_ja", "marker_surfaces_en", "id", "facet", "description")
     for expected, category in zip(asset["categories"], saijiki.SAIJIKI, strict=True):
         assert expected["key"] == category.key
         assert len(expected["words"]) == len(category.words)
@@ -39,6 +39,10 @@ def test_all_saijiki_categories_match_the_core_v4_asset():
             assert {field: actual[field] for field in fields} == {
                 field: word_asset.get(field) for field in fields
             }
+    for lang in ("ja", "en"):
+        relations = {item["relation_type"]: item["description"][lang] for item in asset["relations"]}
+        aida = next(category for category in saijiki.display_categories(lang) if category["key"] == "aida")
+        assert list(aida["descriptions"]) == [relations[relation] for relation in aida["ids"]]
 
 
 def test_generated_python_matches_asset():

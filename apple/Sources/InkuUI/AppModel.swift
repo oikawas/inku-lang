@@ -2759,6 +2759,13 @@ extension AppModel {
         InkuCore.resolveInstructionLanguage(text: text, requested: language, fallback: display.preferences.language) ?? "ja"
     }
 
+    /// Web's shownDdlLang: no displayed text uses the UI language; otherwise prefer the work's recorded language.
+    public var shownDDLLanguage: String? {
+        guard !ddlText.isEmpty else { return nil }
+        if let recorded = displayedWork?.instructionLangResolved, ["ja", "en"].contains(recorded) { return recorded }
+        return instructionLanguage(for: ddlText)
+    }
+
     var currentInputText: String { inputMode == "ddl" ? ddlText : descriptionText }
 
     /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.

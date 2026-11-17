@@ -8,7 +8,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { SAIJIKI, SAIJIKI_BUNDLES, bundleLabel, hydrateSaijikiBundles, saijikiGroups } from '../saijiki.ts';
+import { SAIJIKI, SAIJIKI_BUNDLES, bundleLabel, hydrateSaijikiBundles, saijikiGroups, saijikiDescription } from '../saijiki.ts';
+import { GENERATED_SAIJIKI, GENERATED_SAIJIKI_EN } from '../saijiki.generated.ts';
 
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8');
 
@@ -45,4 +46,28 @@ test('the bundle names and order follow the server snapshot and hydration', () =
 	} finally {
 		hydrateSaijikiBundles(saved);
 	}
+});
+
+test('each displayed word uses the matching description in the UI language', () => {
+	let described = 0;
+	for (const [index, ja] of GENERATED_SAIJIKI.entries()) {
+		const en = GENERATED_SAIJIKI_EN[index];
+		assert.equal(ja.key, en.key);
+		assert.equal(ja.words.length, en.words.length);
+		for (const [wordIndex, word] of ja.words.entries()) {
+			if (ja.ids[wordIndex] === 'aspect_ratio') {
+				assert.equal(ja.descriptions[wordIndex], null);
+				continue;
+			}
+			assert.ok(ja.descriptions[wordIndex], `${ja.key}:${word} has no Japanese description`);
+			assert.ok(en.descriptions[wordIndex], `${ja.key}:${word} has no English description`);
+			assert.equal(saijikiDescription(ja.key, word, true), ja.descriptions[wordIndex]);
+			assert.equal(saijikiDescription(ja.key, word, false), en.descriptions[wordIndex]);
+			described++;
+		}
+	}
+	assert.equal(described, 114);
+	assert.notEqual(saijikiDescription('omote', 'メゾチント', true), saijikiDescription('ji', 'メゾチント', true));
+	assert.equal(saijikiDescription('ji', '画面比', false), 'A vocabulary word that shapes how the description is read.');
+	for (const source of Object.values(PREVIEWS)) assert.match(source, /saijikiDescription\(categoryKey, canonical,/);
 });

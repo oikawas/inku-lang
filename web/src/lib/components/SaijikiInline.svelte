@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import { pluginDisplayName } from '$lib/plugin-names';
-	import { SAIJIKI, SAIJIKI_EN, saijikiWordsFor, saijikiGroups, bundleLabel } from '$lib/saijiki';
+	import { SAIJIKI, saijikiWordsFor, saijikiGroups, bundleLabel, saijikiDescription } from '$lib/saijiki';
 	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from '$lib/features/ddl-editor/types';
 
@@ -36,9 +36,7 @@
 	const uiIsJapanese = $derived(getLang() === 'ja');
 	function preview(categoryKey: string, canonical: string, word: string): SaijikiPreview {
 		const result = previewForWord(categoryKey, canonical, word, wordLang);
-		const category = (uiIsJapanese ? SAIJIKI : SAIJIKI_EN).find((item) => item.key === categoryKey);
-		const index = SAIJIKI.find((item) => item.key === categoryKey)?.words.indexOf(canonical) ?? -1;
-		return { ...result, effect: category?.descriptions[index] || result.effect };
+		return { ...result, effect: saijikiDescription(categoryKey, canonical, uiIsJapanese) };
 	}
 </script>
 

@@ -121,27 +121,21 @@ test('T-91: the editor resolves the language from the text it is holding, live',
 
 test('T-92: the effect follows the reader and the example follows the word', () => {
 	const entry = {
-		effect: '一本の線を引きます。',
-		effectEn: 'Draws a single line.',
 		example: '太い線を引く',
 		exampleEn: 'a thick line',
 	};
 	// The case this contract is about: Japanese UI, English DDL.
 	assert.deepEqual(localizePreview(entry, { uiLang: 'ja', wordLang: 'en' }), {
-		effect: '一本の線を引きます。',
 		example: 'a thick line',
 	});
 	// The mirror, and the two where they agree.
 	assert.deepEqual(localizePreview(entry, { uiLang: 'en', wordLang: 'ja' }), {
-		effect: 'Draws a single line.',
 		example: '太い線を引く',
 	});
 	assert.deepEqual(localizePreview(entry, { uiLang: 'ja', wordLang: 'ja' }), {
-		effect: '一本の線を引きます。',
 		example: '太い線を引く',
 	});
 	assert.deepEqual(localizePreview(entry, { uiLang: 'en', wordLang: 'en' }), {
-		effect: 'Draws a single line.',
 		example: 'a thick line',
 	});
 });

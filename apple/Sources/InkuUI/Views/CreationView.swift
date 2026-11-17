@@ -432,6 +432,7 @@ struct CreationView: View {
         .sheet(isPresented: Binding(get: { phoneLayout && ui.saijikiOpen }, set: { if !$0 { ui.saijikiOpen = false } })) {
             SaijikiView(model: model, onInsertWord: canInsertIntoBox
                         ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil,
+                        wordLanguage: model.shownDDLLanguage,
                         onClose: { ui.saijikiOpen = false })
         }
     }
@@ -1415,6 +1416,7 @@ struct CreationView: View {
             // SaijikiDrawer: a chosen word goes into the instruction box when it can be edited; otherwise only the sample.
             SaijikiView(model: model, onInsertWord: canInsertIntoBox
                         ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil,
+                        wordLanguage: model.shownDDLLanguage,
                         onClose: { ui.saijikiOpen = false })
         }
         .frame(width: 460)

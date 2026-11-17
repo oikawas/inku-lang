@@ -199,7 +199,7 @@ public struct SaijikiView: View {
     private func wordChip(_ title: String, selection value: Selection) -> some View {
         Button {
             selection = value
-            if let onInsertWord, let preview = selectedPreview, preview.insertable, !model.isBusy { onInsertWord(preview.title) }
+            insertSelection(value)
         } label: {
             Text(title).inkuFont(inline ? 12 : 13).multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -258,7 +258,14 @@ public struct SaijikiView: View {
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
     }
 
-    private var selectedPreview: Preview? {
+    private var selectedPreview: Preview? { preview(for: selection) }
+
+    func insertSelection(_ value: Selection) {
+        guard let onInsertWord, let preview = preview(for: value), preview.insertable, !model.isBusy else { return }
+        onInsertWord(preview.title)
+    }
+
+    private func preview(for selection: Selection?) -> Preview? {
         switch selection {
         case .builtin(let id):
             guard let word = model.saijiki.lazy.flatMap(\.words).first(where: { $0.id == id }) else { return nil }
@@ -294,7 +301,7 @@ public struct SaijikiView: View {
         model.display.tooltip(key)
     }
 
-    private enum Selection: Hashable { case builtin(String), plugin(String) }
+    enum Selection: Hashable { case builtin(String), plugin(String) }
     private struct Preview {
         let id: String
         let title: String

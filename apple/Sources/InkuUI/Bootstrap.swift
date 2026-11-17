@@ -187,8 +187,10 @@ struct Bootstrap: @unchecked Sendable {
                   let ja = relation["surface_ja"] as? String, let en = relation["surface_en"] as? String else {
                 throw HostError("bundled_vocabulary_invalid")
             }
+            let description = relation["description"] as? [String: String]
             return SaijikiWord(id: "aida:" + ja, japanese: ja, english: en, detail: "", isDefault: false,
-                englishDetail: "", preview: reference.saijikiPreviews["aida:" + ja])
+                englishDetail: "", preview: reference.saijikiPreviews["aida:" + ja],
+                descriptionJa: description?["ja"], descriptionEn: description?["en"])
         }, englishName: "relations", bundle: relationBundle))
         let grouped = bundles.flatMap { $0.categories(in: displayCategories) }
         guard grouped.count == displayCategories.count, Set(grouped.map(\.id)).count == displayCategories.count else {

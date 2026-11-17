@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { GENERATED_SAIJIKI } from './saijiki.generated.ts';
+import { saijikiDescription } from './saijiki.ts';
 import { SURFACE_BOX, SURFACE_PREVIEWS, HANDLING_PREVIEWS } from './saijiki-surface.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -62,12 +63,13 @@ test('T-30  the page reads them, so a hover reaches the entries', () => {
 test('T-31  each word says what it does, in both UI languages', () => {
 	for (const word of [...OMOTE, ...SABAKI]) {
 		const entry = SURFACE_PREVIEWS[word] ?? HANDLING_PREVIEWS[word];
-		for (const field of ['effect', 'example', 'effectEn', 'exampleEn'] as const) {
+		for (const field of ['example', 'exampleEn'] as const) {
 			assert.ok(entry[field].trim().length > 0, `${word}: ${field} is empty`);
 		}
-		assert.notEqual(entry.effect, FALLBACK, `${word}: still the fallback sentence`);
+		const key = OMOTE.includes(word) ? 'omote' : 'sabaki';
+		assert.notEqual(saijikiDescription(key, word, true), FALLBACK, `${word}: still the fallback sentence`);
 		// The English half is English, so it cannot be the Japanese one copied over.
-		assert.doesNotMatch(entry.effectEn, /[ぁ-んァ-ヶ一-龠]/, `${word}: effectEn has kana or kanji`);
+		assert.doesNotMatch(saijikiDescription(key, word, false), /[ぁ-んァ-ヶ一-龠]/, `${word}: English description has kana or kanji`);
 		assert.doesNotMatch(entry.exampleEn, /[ぁ-んァ-ヶ一-龠]/, `${word}: exampleEn has kana or kanji`);
 	}
 });

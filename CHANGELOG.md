@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Swift (macOS and iOS): words inserted from Saijiki follow the displayed instructions' language. When the instructions are empty, they use the UI language.
+
+- Swift (macOS and iOS): Saijiki previews show the shared asset's Japanese and English descriptions for vocabulary and relation words.
+
+- Server and Web: Saijiki word and relation descriptions now come from the shared asset, while examples and illustrations remain in the previews. The Android snapshot also includes descriptions in both languages.
+
 - Swift (macOS and iOS): when migrating Saijiki v3, waxing and waning arcs whose direction cannot be expressed are approximated as semicircles and their locations are retained in the migration result. “Start”, “end”, and “partway” remain recognized without appearing in the vocabulary display.
 
 - Swift (macOS and iOS): the Saijiki window and the description editor group vocabulary categories under the same bundle headings as the Web. A word's asset description takes precedence, falling back to the preview text when absent.

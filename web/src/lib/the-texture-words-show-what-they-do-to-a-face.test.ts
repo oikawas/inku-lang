@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { GENERATED_SAIJIKI } from './saijiki.generated.ts';
+import { saijikiDescription } from './saijiki.ts';
 import { SURFACE_BOX, FINENESS_PREVIEWS, UNDERLAYER_PREVIEWS } from './saijiki-surface.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -47,11 +48,11 @@ test('T-36  the page reads them, so a hover reaches the entries', () => {
 
 test('T-37  each word says what it does, in both UI languages', () => {
 	for (const word of [...KIME, ...SHITAJI]) {
-		for (const field of ['effect', 'example', 'effectEn', 'exampleEn'] as const) {
+		for (const field of ['example', 'exampleEn'] as const) {
 			assert.ok(entry(word)[field].trim().length > 0, `${word}: ${field} is empty`);
 		}
-		assert.notEqual(entry(word).effect, FALLBACK, `${word}: still the fallback sentence`);
-		assert.doesNotMatch(entry(word).effectEn, /[ぁ-んァ-ヶ一-龠]/, `${word}: effectEn has kana or kanji`);
+		assert.notEqual(saijikiDescription('kime', word, true), FALLBACK, `${word}: still the fallback sentence`);
+		assert.doesNotMatch(saijikiDescription('kime', word, false), /[ぁ-んァ-ヶ一-龠]/, `${word}: English description has kana or kanji`);
 		assert.doesNotMatch(entry(word).exampleEn, /[ぁ-んァ-ヶ一-龠]/, `${word}: exampleEn has kana or kanji`);
 		// The example is DDL that writes the word itself.
 		assert.ok(entry(word).example.includes(word), `${word}: the example does not write it`);

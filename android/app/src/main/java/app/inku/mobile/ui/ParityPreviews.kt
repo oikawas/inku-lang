@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import app.inku.mobile.render.RustArtworkRasterizer
 import app.inku.mobile.ui.i18n.UiLanguage
+import app.inku.mobile.ui.i18n.stringsFor
+import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.ui.theme.Dimens
 import java.util.Locale
 import kotlin.math.sin
@@ -34,9 +36,7 @@ internal data class SaijikiPreview(
 )
 
 internal data class PreviewEntry(
-    val effectJa: String,
     val exampleJa: String,
-    val effectEn: String,
     val exampleEn: String,
     val svg: String,
 )
@@ -96,36 +96,25 @@ internal fun underlayerPreviewSvg(): String = surfaceSvg(textureRelative(
 /** Exact surface and handling copy and diagram recipes from the Web preview table. */
 private val surfaceAndHandling: Map<String, PreviewEntry> by lazy {
     mapOf(
-        "空" to PreviewEntry("面には何も置かず、輪郭を残す。", "空の四角を置く", "Leaves the face untouched, keeping the contour.", "Place an empty square", surfaceSvg("")),
-        "塗り" to PreviewEntry("面を一様に塗りつぶす。", "塗りの四角を置く", "Fills the face evenly.", "Place a flat square", surfaceSvg("<rect $SURFACE_BOX fill=\"$INK\"/>")),
-        "刷き" to PreviewEntry(
-            "少し角度を変えて面を二度掃く。各掃きは、帯が溶け合った一枚の膜で、道具の不透明度の0.6倍。薄いを添えると淡くなる。線や弧では幅広い帯を作る。", "刷きの四角を置く",
-            "Sweeps the face twice at slightly different angles, each sweep one film of merged bands at 0.6 of the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.", "Place a sweep square",
-            surfaceSvg("<defs><filter id=\"surface-sweep\"><feGaussianBlur stdDeviation=\"2.4\"/></filter></defs>" +
+        "空" to PreviewEntry("空の四角を置く", "Place an empty square", surfaceSvg("")),
+        "塗り" to PreviewEntry("塗りの四角を置く", "Place a flat square", surfaceSvg("<rect $SURFACE_BOX fill=\"$INK\"/>")),
+        "刷き" to PreviewEntry("刷きの四角を置く", "Place a sweep square", surfaceSvg("<defs><filter id=\"surface-sweep\"><feGaussianBlur stdDeviation=\"2.4\"/></filter></defs>" +
                 "<g filter=\"url(#surface-sweep)\" stroke=\"$INK\" stroke-width=\"15\" stroke-linecap=\"round\">" +
                 "<g opacity=\"0.6\"><path d=\"M44 26 H136\"/><path d=\"M44 39 H136\"/><path d=\"M44 52 H136\"/><path d=\"M44 65 H136\"/></g>" +
-                "<g opacity=\"0.6\" transform=\"rotate(6 90 46)\"><path d=\"M44 22 H136\"/><path d=\"M44 35 H136\"/><path d=\"M44 48 H136\"/><path d=\"M44 61 H136\"/><path d=\"M44 74 H136\"/></g></g>"),
-        ),
-        "刷毛目" to PreviewEntry(
-            "筆の帯を一本ずつ重ね、重なった所が濃い筋になる。少し角度を変えて二度掃き、輪郭の内に収める。閉じた形の面にだけ使える。", "刷毛目の四角を置く",
-            "Lays the brush's bands one by one, so they darken where they overlap; two passes at slightly different angles, kept inside the contour. Only on the face of a closed shape.", "Place a brushmarks square",
-            surfaceSvg("<g stroke=\"$INK\" stroke-linecap=\"round\">" +
+                "<g opacity=\"0.6\" transform=\"rotate(6 90 46)\"><path d=\"M44 22 H136\"/><path d=\"M44 35 H136\"/><path d=\"M44 48 H136\"/><path d=\"M44 61 H136\"/><path d=\"M44 74 H136\"/></g></g>")),
+        "刷毛目" to PreviewEntry("刷毛目の四角を置く", "Place a brushmarks square", surfaceSvg("<g stroke=\"$INK\" stroke-linecap=\"round\">" +
                 "<g><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 24 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 33 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 42 H136\"/><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 51 H136\"/><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 60 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 69 H136\"/></g>" +
                 "<g transform=\"rotate(6 90 46)\"><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 20 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 29 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 38 H136\"/><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 47 H136\"/><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 56 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 65 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 74 H136\"/></g>" +
-                "</g>"),
-        ),
-        "粒" to PreviewEntry("細かい粒を面に撒き、擦れた粗さを出す。", "粒の四角を置く", "Scatters fine grain across the face for a scuffed roughness.", "Place a grain square", surfaceSvg(surfaceDabs(78, 1.3, 0.5, 1.7))),
-        "点描" to PreviewEntry("点を面に撒いて濃淡を作る。", "点描の円を置く", "Scatters dots across the face to build tone.", "Place a stipple square", surfaceSvg(surfaceDabs(34, 2.6, 0.62, 5.3))),
-        "平行線" to PreviewEntry("平行な線で面を埋める。密度が上がるほど線の間隔が詰まる。", "平行線の四角を置く", "Fills the face with parallel lines; the denser it is, the tighter the spacing.", "Place a hatch square", surfaceSvg(surfaceHatch(listOf(45), 8, 2, 0.62))),
-        "交差線" to PreviewEntry("平行線にもう一組を交差させて重ねる。", "交差線の四角を置く", "Lays a second set of lines across the first.", "Place a crosshatch square", surfaceSvg(surfaceHatch(listOf(45, 115), 9, 2, 0.5))),
-        "メゾチント" to PreviewEntry("粒の濃さを段に分ける。既定は三段。", "メゾチントの四角を置く", "Divides the grain into discrete tone steps, three by default.", "Place a mezzotint square", surfaceSvg(
+                "</g>")),
+        "粒" to PreviewEntry("粒の四角を置く", "Place a grain square", surfaceSvg(surfaceDabs(78, 1.3, 0.5, 1.7))),
+        "点描" to PreviewEntry("点描の円を置く", "Place a stipple square", surfaceSvg(surfaceDabs(34, 2.6, 0.62, 5.3))),
+        "平行線" to PreviewEntry("平行線の四角を置く", "Place a hatch square", surfaceSvg(surfaceHatch(listOf(45), 8, 2, 0.62))),
+        "交差線" to PreviewEntry("交差線の四角を置く", "Place a crosshatch square", surfaceSvg(surfaceHatch(listOf(45, 115), 9, 2, 0.5))),
+        "メゾチント" to PreviewEntry("メゾチントの四角を置く", "Place a mezzotint square", surfaceSvg(
             surfaceDabs(26, 1.5, 0.28, 2.3, 51, 76) + surfaceDabs(26, 1.5, 0.56, 6.1, 77, 103) + surfaceDabs(26, 1.5, 0.84, 9.7, 104, 129))),
-        "濃い" to PreviewEntry("道具の本来の濃さより濃く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が濃い点描。", "鉛筆の濃い点描の四角を置く",
-            "Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: dense stipple.", "Place a dense stipple pencil square", surfaceSvg(handlingRelative(0.66 * 1.35))),
-        "程よい" to PreviewEntry("道具の本来の濃さで置く。さばきを省略した痕と同じ。図は左右とも程よい鉛筆の点描。", "鉛筆の程よい点描の四角を置く",
-            "Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show moderate pencil stipple.", "Place a moderate stipple pencil square", surfaceSvg(handlingRelative(0.66))),
-        "薄い" to PreviewEntry("道具の本来の濃さより淡く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が薄い点描。", "鉛筆の薄い点描の四角を置く",
-            "Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: faint stipple.", "Place a faint stipple pencil square", surfaceSvg(handlingRelative(0.66 * 0.55))),
+        "濃い" to PreviewEntry("鉛筆の濃い点描の四角を置く", "Place a dense stipple pencil square", surfaceSvg(handlingRelative(0.66 * 1.35))),
+        "程よい" to PreviewEntry("鉛筆の程よい点描の四角を置く", "Place a moderate stipple pencil square", surfaceSvg(handlingRelative(0.66))),
+        "薄い" to PreviewEntry("鉛筆の薄い点描の四角を置く", "Place a faint stipple pencil square", surfaceSvg(handlingRelative(0.66 * 0.55))),
     )
 }
 
@@ -152,8 +141,11 @@ internal fun saijikiPreview(
     val wordIsJapanese = ddlLanguage != "en"
     val entry = surfaceAndHandling[canonicalWord] ?: webSaijikiPreviewEntries[canonicalWord]
     val fallback = fallbackExamples[canonicalWord]
-    val effect = if (uiLanguage.isEnglish) entry?.effectEn ?: "A vocabulary word that shapes how the description is read."
-        else entry?.effectJa ?: "記述の解釈に影響する語彙です。"
+    val category = SaijikiGenerated.CATEGORIES.firstOrNull { it.key == categoryKey }
+    val index = category?.wordsJa?.indexOf(canonicalWord) ?: -1
+    val descriptions = if (uiLanguage.isEnglish) category?.descriptionsEn else category?.descriptionsJa
+    val effect = descriptions?.getOrNull(index)?.takeIf { it.isNotEmpty() }
+        ?: stringsFor(uiLanguage).saijikiDescriptionFallback
     val example = if (wordIsJapanese) entry?.exampleJa ?: fallback?.first ?: "${displayWord}を使う"
         else entry?.exampleEn ?: fallback?.second ?: "Use \"$displayWord\""
     return SaijikiPreview(categoryKey, displayWord, canonicalWord, effect, example, entry?.svg ?: genericLine)

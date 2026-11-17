@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SAIJIKI, SAIJIKI_EN, saijikiWordsFor, saijikiGroups, bundleLabel } from '$lib/saijiki';
+	import { SAIJIKI, saijikiWordsFor, saijikiGroups, bundleLabel, saijikiDescription } from '$lib/saijiki';
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { instructionLangOf, type ResolvedInstructionLang } from '$lib/instructionLang';
@@ -48,9 +48,7 @@
 	const wordLang = $derived(ddlLang ?? instructionLangOf(getLang()));
 	function preview(categoryKey: string, canonical: string, word: string): SaijikiPreview {
 		const result = previewForWord(categoryKey, canonical, word, wordLang);
-		const category = (getLang() === 'ja' ? SAIJIKI : SAIJIKI_EN).find((item) => item.key === categoryKey);
-		const index = SAIJIKI.find((item) => item.key === categoryKey)?.words.indexOf(canonical) ?? -1;
-		return { ...result, effect: category?.descriptions[index] || result.effect };
+		return { ...result, effect: saijikiDescription(categoryKey, canonical, getLang() === 'ja') };
 	}
 
 	function selectWord(word: string, preview: SaijikiPreview): void {

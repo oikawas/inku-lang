@@ -236,7 +236,7 @@ pub use saijiki::{
     SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset, saijiki_asset_sha256_hex,
     saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
     saijiki_relation_literal_table, saijiki_score_wire_maps, saijiki_tool_guidance,
-    saijiki_v2_asset,
+    saijiki_v2_asset, saijiki_word_meanings,
 };
 pub use score_diagnostics::{
     ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,

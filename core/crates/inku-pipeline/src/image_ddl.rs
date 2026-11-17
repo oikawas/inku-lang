@@ -14,6 +14,7 @@ use std::fmt;
 use inku_ddl::{
     CanvasRatioWriting, MacroDefinition, NormalizedDdlDocument, ResolvedInstructionLanguage,
     ScoreDiagnosticOwner, SourceSpan, declare_canvas_ratio, saijiki_asset, saijiki_tool_guidance,
+    saijiki_word_meanings,
 };
 use inku_score::math::DetFloat;
 use inku_score::{
@@ -443,10 +444,11 @@ pub(crate) fn writing_tail(language: ResolvedInstructionLanguage) -> Result<Stri
         ),
     };
     Ok(format!(
-        "{examples_title}\n{}\n\n{guide_title}\n{}\n\n# tool_marks\n{}",
+        "{examples_title}\n{}\n\n{guide_title}\n{}\n\n# tool_marks\n{}\n\n# saijiki_word_meanings\n{}",
         examples.join("\n"),
         ddl_writing_guide(language)?,
-        saijiki_tool_guidance(language).map_err(|_| PromptError::SaijikiProjection)?
+        saijiki_tool_guidance(language).map_err(|_| PromptError::SaijikiProjection)?,
+        saijiki_word_meanings(language).map_err(|_| PromptError::SaijikiProjection)?
     ))
 }
 

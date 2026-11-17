@@ -1,7 +1,7 @@
 use inku_ddl::{
     ResolvedInstructionLanguage, SaijikiProjectionError, saijiki_derived_projection,
     saijiki_derived_projection_from_asset, saijiki_marker_class_table,
-    saijiki_relation_literal_table, saijiki_score_wire_maps,
+    saijiki_relation_literal_table, saijiki_score_wire_maps, saijiki_word_meanings,
 };
 
 #[test]
@@ -301,4 +301,32 @@ fn malformed_asset_returns_stable_typed_errors_without_fallback() {
             .kind(),
         "duplicate_marker_member"
     );
+}
+
+#[test]
+fn word_meanings_give_the_writer_each_surface_handling_grain_and_sway_word_without_the_figure() {
+    for (language, words, figure) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            ["刷毛目: ", "薄い: ", "密な: ", "小刻みに: "],
+            ["図は"].as_slice(),
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            ["brushmarks: ", "faint: ", "packed: ", "tightly: "],
+            ["Left: ", "Both halves show"].as_slice(),
+        ),
+    ] {
+        let meanings = saijiki_word_meanings(language).unwrap();
+        assert_eq!(meanings.lines().count(), 24, "{meanings}");
+        for word in words {
+            assert!(
+                meanings.lines().any(|line| line.starts_with(word)),
+                "{word}: {meanings}"
+            );
+        }
+        for note in figure {
+            assert!(!meanings.contains(note), "{note}: {meanings}");
+        }
+    }
 }

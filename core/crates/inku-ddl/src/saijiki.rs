@@ -1446,6 +1446,52 @@ fn saijiki_tool_guidance_from_asset(
         .join("\n"))
 }
 
+/// The categories whose words' meanings a DDL-writing request reads: what a surface is
+/// (おもて), how heavily it is laid (さばき), its grain (きめ) and how a line sways (ゆらぎ).
+/// Their names alone told a writer nothing of their meaning (M1, 2026-11-18).
+const MEANING_CATEGORIES: [&str; 4] = ["omote", "sabaki", "kime", "yuragi"];
+
+/// Return the screen description of each prompt-visible word of the meaning categories, in
+/// category and asset order, as `word: description` lines.
+pub fn saijiki_word_meanings(
+    language: ResolvedInstructionLanguage,
+) -> Result<String, SaijikiProjectionError> {
+    saijiki_word_meanings_from_asset(saijiki_asset(), language)
+}
+
+fn saijiki_word_meanings_from_asset(
+    asset: &SaijikiAsset,
+    language: ResolvedInstructionLanguage,
+) -> Result<String, SaijikiProjectionError> {
+    let mut lines = Vec::new();
+    for key in MEANING_CATEGORIES {
+        let category = required_category(asset, key)?;
+        for word in category.words.iter().filter(|word| word.prompt) {
+            let (Some(surface), Some(description)) =
+                (language_surface(word, language), word.description.as_ref())
+            else {
+                continue;
+            };
+            let description = match language {
+                ResolvedInstructionLanguage::Ja => &description.ja,
+                ResolvedInstructionLanguage::En => &description.en,
+            };
+            lines.push(format!("{surface}: {}", without_figure_note(description)));
+        }
+    }
+    Ok(lines.join("\n"))
+}
+
+/// Drop the closing sentence that names the Saijiki screen's figure (「図は…」, "Left: …",
+/// "Both halves show …"): the writer sees no figure (the author's choice, 2026-11-18).
+fn without_figure_note(description: &str) -> &str {
+    ["図は", " Left: ", " Both halves show "]
+        .iter()
+        .filter_map(|marker| description.find(marker))
+        .min()
+        .map_or(description, |at| description[..at].trim_end())
+}
+
 /// Derive every language-specific projection from a typed Saijiki asset.
 ///
 /// This is public so callers that validate a separately supplied typed asset can receive the

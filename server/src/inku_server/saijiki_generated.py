@@ -1,5 +1,13 @@
 """Generated from saijiki-v4.json by gen_saijiki_py.py; do not edit."""
 
+BUNDLES = [{'key': 'what', 'name_ja': '何を', 'name_en': 'What'},
+ {'key': 'with', 'name_ja': '何で', 'name_en': 'With what'},
+ {'key': 'face', 'name_ja': 'どんな面で', 'name_en': 'What face'},
+ {'key': 'sway', 'name_ja': 'どう揺れて', 'name_en': 'How it sways'},
+ {'key': 'color', 'name_ja': '何色で', 'name_en': 'What color'},
+ {'key': 'where', 'name_ja': 'どこに置くか', 'name_en': 'Where'},
+ {'key': 'ground', 'name_ja': '何の上に', 'name_en': 'On what ground'}]
+
 CATEGORIES = [{'key': 'katachi',
   'name_ja': 'かたち',
   'name_en': 'forms',

@@ -51,6 +51,17 @@ def test_generated_kotlin_matches_the_table() -> None:
 
 
 @android_only
+def test_bundle_names_and_order_match_core_asset() -> None:
+    import json
+
+    bundles = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v4.json").read_text())["bundles"]
+    text = _load_generator()._OUTPUT.read_text(encoding="utf-8")
+    declarations = [f'Bundle("{item["key"]}", "{item["name_ja"]}", "{item["name_en"]}")' for item in bundles]
+    positions = [text.index(declaration) for declaration in declarations]
+    assert positions == sorted(positions)
+
+
+@android_only
 def test_snapshot_carries_both_language_surfaces_for_every_category() -> None:
     """Calibration: a generator that emitted one language would still be current.
 

@@ -8,9 +8,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web and Swift: the About vocabulary table now has updated descriptions of the description, instructions, score, and performance.
+- Swift: the About vocabulary table now has updated descriptions of the description, instructions, score, and performance.
 
-- Web and Swift: the About concept is shorter, and the “Vocabulary and layers” heading is now “Vocabulary” in both Japanese and English.
+- Swift: the About concept is shorter, and the “Vocabulary and layers” heading is now “Vocabulary” in both Japanese and English.
 
 - Swift: the About vocabulary table no longer lists “Interpret” and describes the instructions as directions for drawing a picture. Both Japanese and English are updated.
 
@@ -733,6 +733,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.355 (2026-11-17 / Build 1431)
+
+- Web: the About vocabulary table now has updated descriptions of the description, instructions, score, and performance.
+- Web: the About concept is shorter, and the “Vocabulary and layers” heading is now “Vocabulary” in both Japanese and English.
 
 ## v2.15.354 (2026-11-17 / Build 1430)
 

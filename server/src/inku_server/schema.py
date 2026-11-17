@@ -206,7 +206,7 @@ class SurfaceSpec(BaseModel):
         default="none",
         description=(
             "面の質感: none=なし / solid=塗り / stipple=点 / hatch=平行線 / crosshatch=交差線"
-            " / aquatint=段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / sweep=刷き / brushmarks=刷毛目"
+            " / aquatint=メゾチントの段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / sweep=刷き / brushmarks=刷毛目"
             " / bleed=端が滲む / paper_grain=紙目"
         ),
     )
@@ -228,7 +228,7 @@ class SurfaceSpec(BaseModel):
         default="none", description="ハッチ間隔の勾配"
     )
     tone_steps: int = Field(
-        default=3, ge=2, le=4, description="aquatint の離散調子段数 2-4"
+        default=3, ge=2, le=4, description="メゾチント（aquatint）の離散調子段数 2-4"
     )
     seed: Optional[int] = Field(
         default=None,
@@ -446,7 +446,7 @@ class Variation(BaseModel):
 
     amplitude: Amplitude = Field(
         default="medium",
-        description="揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく",
+        description="揺れ幅: fine=小さく / medium=中程度 / broad=大きく",
     )
     frequency: Frequency = Field(
         default="medium",
@@ -882,12 +882,12 @@ class Instruction(BaseModel):
     )
     style: LineStyle = Field(
         default="solid",
-        description="solid=実線 / dashed=破線 / dotted=点線 / dash_dot=一点鎖線",
+        description="solid=実線 / dashed=破線 / dotted=点線 / dash_dot=旧一点鎖線（保存済みScore互換）",
     )
     weight: Weight = Field(
         default="pen",
         description=(
-            "silverpoint=銀筆 / pencil=鉛筆 / pen=ペン / chalk=チョーク / oil_pastel=オイルパステル / gouache=ガッシュ / watercolor=水彩 / oil_paint=油彩 / painting_knife=ペインティングナイフ / etching=エッチング / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ。rotring・crayon・brush_thin・brush_thick・burin・drypoint は歳時記 v2 までの道具で、保存した楽譜の再演のためだけに読む"
+            "silverpoint=銀筆 / pencil=鉛筆 / pen=ペン / chalk=チョーク / oil_pastel=オイルパステル / gouache=ガッシュ / watercolor=水彩 / oil_paint=油彩 / painting_knife=ペインティングナイフ / etching=エッチング / computer=格子に乗り、段に落ち、誤差なく反復するデジタル。rotring・crayon・brush_thin・brush_thick・burin・drypoint は歳時記 v2 までの道具で、保存した楽譜の再演のためだけに読む"
         ),
     )
     mode: InstructionMode = Field(
@@ -954,8 +954,8 @@ class Instruction(BaseModel):
     thinness: Optional[Thinness] = Field(
         default=None,
         description=(
-            "線の太さの段。道具の既定より細い側はfine=細い / extra_fine=極細、"
-            "太い側はthick=太い / extra_thick=極太（Score version 0.16.0以上）。省略時は道具の既定"
+            "線の太さの段。道具の既定より細い側はfine=細い / extra_fine=ごく細い、"
+            "太い側はthick=太い / extra_thick=ごく太い（Score version 0.16.0以上）。省略時は道具の既定"
         ),
     )
     surface: Optional[SurfaceSpec] = Field(

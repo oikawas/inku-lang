@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import { pluginDisplayName } from '$lib/plugin-names';
-	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
+	import { SAIJIKI, SAIJIKI_EN, saijikiWordsFor, saijikiGroups, bundleLabel } from '$lib/saijiki';
 	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from '$lib/features/ddl-editor/types';
 
@@ -34,6 +34,12 @@
 	}: Props = $props();
 
 	const uiIsJapanese = $derived(getLang() === 'ja');
+	function preview(categoryKey: string, canonical: string, word: string): SaijikiPreview {
+		const result = previewForWord(categoryKey, canonical, word, wordLang);
+		const category = (uiIsJapanese ? SAIJIKI : SAIJIKI_EN).find((item) => item.key === categoryKey);
+		const index = SAIJIKI.find((item) => item.key === categoryKey)?.words.indexOf(canonical) ?? -1;
+		return { ...result, effect: category?.descriptions[index] || result.effect };
+	}
 </script>
 
 <aside class="saijiki-inline">
@@ -44,7 +50,10 @@
 	<div class="saijiki-body">
 		<div class="saijiki-list">
 			<div class="saijiki-list-columns">
-				{#each SAIJIKI as cat (cat.key)}
+				{#each saijikiGroups(SAIJIKI) as group (group.key)}
+				<div class="saijiki-cat">
+					<div class="saijiki-cat-head">{bundleLabel(group.key, uiIsJapanese)}</div>
+				{#each group.categories as cat (cat.key)}
 					{@const words = saijikiWordsFor(cat.key, wordLang === 'ja')}
 					<div class="saijiki-cat">
 						<div class="saijiki-cat-head">{uiIsJapanese ? cat.label : cat.en}</div>
@@ -56,12 +65,14 @@
 									{disabled}
 									onpointerdown={(e) => e.preventDefault()}
 									onclick={() => onInsertWord(word)}
-									onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
-									onfocus={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
+									onpointerenter={() => (activePreview = preview(cat.key, canonicalWord, word))}
+									onfocus={() => (activePreview = preview(cat.key, canonicalWord, word))}
 								>{word}</button>
 							{/each}
 						</div>
 					</div>
+				{/each}
+				</div>
 				{/each}
 				{#if pluginEntries.length > 0}
 					<div class="saijiki-cat plugin-cat">

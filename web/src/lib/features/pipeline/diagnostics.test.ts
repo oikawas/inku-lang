@@ -228,16 +228,16 @@ test('invalid background clauses explain the missing color and action target wit
 
 test('fineness, underlayer and an amplitude alone are said in words, in each language', () => {
 	for (const [kind, japanese, english] of [
-		['conflicting_surface_finenesses', /きめの語（細かい・粗い・密な・疎な）が二つ/, /Two fineness words/],
-		['conflicting_surface_underlayers', /したじの語（下塗り）が二つ/, /written twice on one mark/],
+		['conflicting_surface_finenesses', /大きさの語（細かい・粗い）が二つ/, /Two size words/],
+		['conflicting_surface_underlayers', /きめの下塗りが二つ/, /written twice on one mark/],
 	] as const) {
 		const upstream = { channel: 'upstream' as const, value: { issue_kind: kind } };
 		assert.match(formatPipelineDiagnostic(upstream, ja), japanese);
 		assert.match(formatPipelineDiagnostic(upstream, en), english);
 	}
 	for (const [type, japanese, english] of [
-		['unsupported_surface_fineness', /きめの語（細かい・粗い・密な・疎な）は、閉じた形の質感/, /A fineness word .* goes only on the texture of a closed shape/],
-		['unsupported_surface_underlayer', /したじの語（下塗り）は、閉じた形の質感/, /The underlayer word .* goes only on the texture of a closed shape/],
+		['unsupported_surface_fineness', /きめの語（細かい・粗い・密な・疎な）は、閉じた形の質感/, /A texture word .* goes only on the texture of a closed shape/],
+		['unsupported_surface_underlayer', /きめの下塗りは、閉じた形の質感/, /The texture word underpainted goes only on the texture of a closed shape/],
 		['fluctuation_amplitude_without_quality', /揺れる・波打つと一緒に書いてください。/, /with swaying or undulating\. Alone it makes no sway\./],
 		['unsupported_surface_brushmarks', /刷毛目は、閉じた形（円・楕円・三角・四角・多角形・雲形）の面にだけ/, /Brushmarks goes only on the face of a closed shape/],
 	] as const) {

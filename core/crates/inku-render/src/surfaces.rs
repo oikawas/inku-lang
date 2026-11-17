@@ -17,7 +17,7 @@ use crate::materials::{texture_filter_id, with_texture_filter};
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::surface_geometry::{
-    line_spans, scanline_segments, scatter, shape_bbox, surface_contour,
+    line_spans, point_in_polygon, scanline_segments, scatter, shape_bbox, surface_contour,
 };
 use crate::svg::{Element, Node, format_number};
 use crate::types::{
@@ -724,15 +724,15 @@ fn sweep_parts(
     Some((vec![body.into()], Vec::new()))
 }
 
-/// The point faces drawn from noise (render engine 104). Prints and drawings
-/// were measured at a sheet 30 cm across the canvas's short side (2026-11-17,
-/// the Met's open-access stipple engravings, mezzotints and chalk drawings):
-/// their texture is 0.1 to 0.3 mm fine, far below a point per element, so the
-/// faces are laid by an SVG noise filter, cut to a cover, inside the contour.
+/// The faces drawn from noise (render engine 104). Prints and drawings were
+/// measured at a sheet 30 cm across the canvas's short side (2026-11-17, the
+/// Met's open-access mezzotints and chalk drawings): their texture is 0.1 to
+/// 0.3 mm fine, far below a point per element, so the faces are laid by an SVG
+/// noise filter, cut to a cover, inside the contour. 点描 lays its own dots
+/// ([`stipple_face`]): at the noise's period it could not be told from the
+/// mezzotint (the author's sheet 08, 2026-11-17).
 #[derive(Clone, Copy)]
 enum NoiseKind {
-    /// 点描: round dots, each its own, on an even field.
-    Stipple,
     /// 粒: the tool's strokes caught by the paper's tooth, along one direction.
     Grain,
     /// The fine rocked ground of a mezzotint (the face 「アクアチント」 draws).
@@ -789,15 +789,6 @@ fn noise_spec(kind: NoiseKind, scale: f64, density: f64) -> NoiseSpec {
     let size = texture_size_factor(scale.max(0.04));
     let packing = texture_count_ratio(density.max(0.02)).dpowf(0.5);
     match kind {
-        // Only the noise's peaks: small, round, separate dots.
-        NoiseKind::Stipple => NoiseSpec {
-            period: (0.45 * size, 0.45 * size),
-            octaves: 1,
-            tooth: None,
-            cover: (0.3 * packing).clamp(0.08, 0.6),
-            edge: 0.02,
-            smooth: 0.05 * size,
-        },
         // A soft grey deposit along the strokes, broken by the paper's tooth.
         NoiseKind::Grain => NoiseSpec {
             period: (0.35 * size, 1.5 * size),
@@ -917,6 +908,363 @@ fn noise_filter(spec: &NoiseSpec, context: MarkContext<'_>, seed: i64) -> Elemen
     filter
 }
 
+/// 点描's dots (render engine 104, remade after the author's sheet 08,
+/// 2026-11-17): round dots of one size, each one countable, 0.8 mm across at a
+/// 30 cm sheet (×0.5 fine, ×2 coarse). A stipple engraving builds its tone by
+/// how many dots it lays, so the face is not even: the light comes from the
+/// upper left, as on the mezzotint, and the dots lie sparse there and close
+/// toward the lower right.
+const STIPPLE_DOT_RADIUS_MM: f64 = 0.4;
+/// The face's mean cover at the default density (packing moves it by its
+/// square root, as on the noise faces).
+const STIPPLE_COVER: f64 = 0.22;
+/// The cover at a position `t` (0 upper left, 1 lower right) is the mean times
+/// `STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN * t`, whose mean over `t` is one.
+const STIPPLE_TONE_LIGHT: f64 = 0.35;
+const STIPPLE_TONE_SPAN: f64 = 1.3;
+/// The dots sit on a grid shaken by this share of a cell, so they neither
+/// clump nor read as a grid.
+const STIPPLE_JITTER: f64 = 0.7;
+/// A face laying its own dots (Compat, and a face under a quarter of the tile)
+/// lays at most this many; a larger face draws larger dots at the same cover.
+/// A dot is a tenth-long move with a round cap, about 11 bytes. 12,000 made
+/// a large face's dots visibly coarser (the author's sheet 10, 2026-11-17).
+const STIPPLE_DOT_LIMIT: f64 = 24_000.0;
+
+/// The side of 点描's tile, in mm at a 30 cm sheet, at the default size: the
+/// tile scales with the dots, so it holds about the same count (about 2,600
+/// at the default density).
+const STIPPLE_TILE_MM: f64 = 60.0;
+/// The tone's steps: the tile's dots are ranked and split into this many
+/// layers, each laid from where its dots begin to show.
+const STIPPLE_LAYERS: usize = 8;
+
+/// The dots of one 点描 tile as stroked moves in tenths of a unit, starting at
+/// the tile's corner. A dot near an edge is written again past the opposite
+/// edge, so the tiles meet without a seam.
+fn stipple_tile_path(dots: &[Point], side: f64, radius: f64) -> String {
+    let mut d = String::new();
+    let mut last: Option<(i64, i64)> = None;
+    for dot in dots {
+        for oy in [-side, 0.0, side] {
+            for ox in [-side, 0.0, side] {
+                let (x, y) = (dot.x + ox, dot.y + oy);
+                if x < -radius || y < -radius || x > side + radius || y > side + radius {
+                    continue;
+                }
+                let x = (x * 10.0).round() as i64;
+                let y = (y * 10.0).round() as i64;
+                let (dx, dy) = match last {
+                    None => {
+                        d.push('M');
+                        (x, y)
+                    }
+                    Some((last_x, last_y)) => {
+                        d.push('m');
+                        (x - last_x, y - last_y)
+                    }
+                };
+                write_tenths(&mut d, dx);
+                d.push(' ');
+                write_tenths(&mut d, dy);
+                d.push_str("h.1");
+                last = Some((x + 1, y));
+            }
+        }
+    }
+    d
+}
+
+/// The part of `contour` on the lower-right side of the line where the tone
+/// position (0 upper left, 1 lower right, across the bounds) reaches `start`.
+fn tone_part(contour: &[Point], bounds: (f64, f64, f64, f64), start: f64) -> Vec<Point> {
+    let (min_x, min_y, width, height) = bounds;
+    let side = |p: Point| ((p.x - min_x) / width + (p.y - min_y) / height) / 2.0 - start;
+    let mut part = Vec::new();
+    for (index, &point) in contour.iter().enumerate() {
+        let next = contour[(index + 1) % contour.len()];
+        let (a, b) = (side(point), side(next));
+        if a >= 0.0 {
+            part.push(point);
+        }
+        if (a >= 0.0) != (b >= 0.0) {
+            let share = a / (a - b);
+            part.push(Point::new(
+                point.x + (next.x - point.x) * share,
+                point.y + (next.y - point.y) * share,
+            ));
+        }
+    }
+    part
+}
+
+/// 点描 on Display and Editable (render engine 104, for the size, 2026-11-17):
+/// the dots of sheet 09 laid from one tile that every face of the same colour,
+/// fineness and density shares, from the canvas's origin. The tile's dots are
+/// ranked into `STIPPLE_LAYERS` patterns; a layer is laid over the part of the
+/// face past the tone position its dots begin at, so the tone steps where the
+/// direct dots slope. A face smaller than the tile returns `None` and lays
+/// its own dots ([`stipple_face`]), which are then fewer.
+fn stipple_tiled_faces(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    contour: &[Point],
+    color: &str,
+    opacity: f64,
+) -> Option<(Vec<Element>, Vec<Element>)> {
+    let Some(surface) = instruction.surface.as_ref() else {
+        return Some((Vec::new(), Vec::new()));
+    };
+    let size = texture_size_factor(surface.scale.max(0.04));
+    let packing = texture_count_ratio(surface.density.max(0.02)).dpowf(0.5);
+    let mean = (STIPPLE_COVER * packing).clamp(0.05, 0.5);
+    let peak = mean * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN);
+    let (mut min_x, mut min_y) = (f64::INFINITY, f64::INFINITY);
+    let (mut max_x, mut max_y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for point in contour {
+        min_x = min_x.min(point.x);
+        min_y = min_y.min(point.y);
+        max_x = max_x.max(point.x);
+        max_y = max_y.max(point.y);
+    }
+    let (width, height) = (max_x - min_x, max_y - min_y);
+    if !(width > 0.0 && height > 0.0) {
+        return Some((Vec::new(), Vec::new()));
+    }
+    let radius = STIPPLE_DOT_RADIUS_MM * size * mm(context);
+    let side = STIPPLE_TILE_MM * size * mm(context);
+    let cells = ((side / (radius * (std::f64::consts::PI / peak).sqrt())).round() as i64).max(1);
+    let cell = side / cells as f64;
+    // A face that would lay fewer than a quarter of the tile's dots lays them
+    // itself. A larger one shares the tile: the other faces of the work in its
+    // colour (an arrangement's copies reach here as faces of their own) pay
+    // nothing more for it.
+    let direct = width * height * mean / (std::f64::consts::PI * radius * radius);
+    if direct < (cells * cells) as f64 / 4.0 {
+        return None;
+    }
+    let digest = Sha256::digest(
+        format!(
+            "surface-stipple-tile:{:.6}:{:.6}:{}",
+            size,
+            packing,
+            seed_debug_text(context.render_seed)
+        )
+        .as_bytes(),
+    );
+    let seed = Seed::from(i64::from_le_bytes(
+        digest[..8].try_into().expect("eight bytes"),
+    ));
+    let mut layers = vec![Vec::new(); STIPPLE_LAYERS];
+    for row in 0..cells {
+        for column in 0..cells {
+            let index = row * cells + column;
+            let rank = hash01(index, seed, "stipple-keep");
+            let layer = ((rank * STIPPLE_LAYERS as f64) as usize).min(STIPPLE_LAYERS - 1);
+            layers[layer].push(Point::new(
+                cell * (column as f64
+                    + 0.5
+                    + STIPPLE_JITTER * (hash01(index, seed, "stipple-x") - 0.5)),
+                cell * (row as f64
+                    + 0.5
+                    + STIPPLE_JITTER * (hash01(index, seed, "stipple-y") - 0.5)),
+            ));
+        }
+    }
+    let (mut layer_faces, mut tiles) = (Vec::new(), Vec::new());
+    let bounds = [
+        Point::new(min_x, min_y),
+        Point::new(max_x, min_y),
+        Point::new(max_x, max_y),
+        Point::new(min_x, max_y),
+    ];
+    for (layer, dots) in layers.iter().enumerate() {
+        // A dot of rank r shows where the cover's share of the peak passes r.
+        let rank = (layer as f64 + 0.5) / STIPPLE_LAYERS as f64;
+        let start = ((rank * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN) - STIPPLE_TONE_LIGHT)
+            / STIPPLE_TONE_SPAN)
+            .max(0.0);
+        if dots.is_empty() || start >= 1.0 {
+            continue;
+        }
+        // The layer covers the bounds past its start; the clip keeps it inside
+        // the contour.
+        let part = tone_part(&bounds, (min_x, min_y, width, height), start);
+        if part.len() < 3 {
+            continue;
+        }
+        // The tile holds the dots and their colour only: a face's opacity (a
+        // fade along an arrangement varies it per mark) stays on the face.
+        let d = stipple_tile_path(dots, side, radius);
+        let payload = format!(
+            "{d}|{color}|{}|{}",
+            format_number(2.0 * radius),
+            format_number(side)
+        );
+        let id = format!(
+            "surface_stipple_{}",
+            Sha256::digest(payload.as_bytes())[..6]
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        );
+        let mut tile = Element::new("pattern")
+            .attr("id", &id)
+            .attr("patternUnits", "userSpaceOnUse")
+            .attr("x", "0")
+            .attr("y", "0")
+            .attr("width", format_number(side))
+            .attr("height", format_number(side));
+        tile.push(
+            Element::new("path")
+                .attr("d", d)
+                .attr("fill", "none")
+                .attr("stroke", color)
+                .attr("stroke-width", format_number(2.0 * radius))
+                .attr("stroke-linecap", "round"),
+        );
+        tiles.push(tile);
+        layer_faces.push(
+            Element::new("path")
+                .attr("d", closed_path(&part))
+                .attr("fill", format!("url(#{id})"))
+                .attr("fill-opacity", format_number(opacity))
+                .attr("stroke", "none")
+                .attr("class", "surface-stipple-dots-v1"),
+        );
+    }
+    if layer_faces.is_empty() {
+        return Some((Vec::new(), tiles));
+    }
+    // The contour is written once, as the clip of the layers' plain parts.
+    let outline = closed_path(contour);
+    let clip_id = format!(
+        "surface_stipple_clip_{}",
+        Sha256::digest(outline.as_bytes())[..6]
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    let mut clip = Element::new("clipPath").attr("id", &clip_id);
+    clip.push(Element::new("path").attr("d", outline));
+    tiles.push(clip);
+    let mut group = Element::new("g").attr("clip-path", format!("url(#{clip_id})"));
+    for face in layer_faces {
+        group.push(face);
+    }
+    Some((vec![group], tiles))
+}
+
+/// One 点描 face: its dots as one stroked path in `color` at `opacity`, each a
+/// round cap (Compat too, since it needs no filter). One stroke paints its
+/// overlaps once, so two touching dots do not darken.
+fn stipple_face(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    contour: &[Point],
+    color: &str,
+    opacity: f64,
+    seed: Seed,
+) -> Option<Element> {
+    let surface = instruction.surface.as_ref()?;
+    let size = texture_size_factor(surface.scale.max(0.04));
+    let packing = texture_count_ratio(surface.density.max(0.02)).dpowf(0.5);
+    let mean = (STIPPLE_COVER * packing).clamp(0.05, 0.5);
+    let peak = mean * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN);
+    let (mut min_x, mut min_y) = (f64::INFINITY, f64::INFINITY);
+    let (mut max_x, mut max_y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for point in contour {
+        min_x = min_x.min(point.x);
+        min_y = min_y.min(point.y);
+        max_x = max_x.max(point.x);
+        max_y = max_y.max(point.y);
+    }
+    let (width, height) = (max_x - min_x, max_y - min_y);
+    if !(width > 0.0 && height > 0.0) {
+        return None;
+    }
+    let mut radius = STIPPLE_DOT_RADIUS_MM * size * mm(context);
+    let dots = width * height * mean / (std::f64::consts::PI * radius * radius);
+    if dots > STIPPLE_DOT_LIMIT {
+        radius *= (dots / STIPPLE_DOT_LIMIT).sqrt();
+    }
+    // A full cell holds one dot at the peak cover.
+    let cell = radius * (std::f64::consts::PI / peak).sqrt();
+    let columns = (width / cell).ceil() as i64 + 1;
+    let rows = (height / cell).ceil() as i64 + 1;
+    let mut d = String::new();
+    let mut last: Option<(i64, i64)> = None;
+    for row in 0..rows {
+        for column in 0..columns {
+            let index = row * columns + column;
+            let point = Point::new(
+                min_x
+                    + cell
+                        * (column as f64
+                            + STIPPLE_JITTER * (hash01(index, seed, "stipple-x") - 0.5)),
+                min_y
+                    + cell
+                        * (row as f64 + STIPPLE_JITTER * (hash01(index, seed, "stipple-y") - 0.5)),
+            );
+            if !point_in_polygon(point, contour) {
+                continue;
+            }
+            let t =
+                (((point.x - min_x) / width + (point.y - min_y) / height) / 2.0).clamp(0.0, 1.0);
+            let cover = mean * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN * t);
+            if hash01(index, seed, "stipple-keep") >= cover / peak {
+                continue;
+            }
+            // In tenths of a unit (0.03 mm at a 30 cm sheet), each dot moved to
+            // from the last one.
+            let x = (point.x * 10.0).round() as i64;
+            let y = (point.y * 10.0).round() as i64;
+            let (dx, dy) = match last {
+                None => {
+                    d.push('M');
+                    (x, y)
+                }
+                Some((last_x, last_y)) => {
+                    d.push('m');
+                    (x - last_x, y - last_y)
+                }
+            };
+            write_tenths(&mut d, dx);
+            d.push(' ');
+            write_tenths(&mut d, dy);
+            d.push_str("h.1");
+            last = Some((x + 1, y));
+        }
+    }
+    last?;
+    Some(
+        Element::new("path")
+            .attr("d", d)
+            .attr("fill", "none")
+            .attr("stroke", color)
+            .attr("stroke-opacity", format_number(opacity))
+            .attr("stroke-width", format_number(2.0 * radius))
+            .attr("stroke-linecap", "round")
+            .attr("class", "surface-stipple-dots-v1"),
+    )
+}
+
+/// A whole count of tenths as a short decimal (`-1.5`, `.7`, `12`).
+fn write_tenths(output: &mut String, value: i64) {
+    if value < 0 {
+        output.push('-');
+    }
+    let magnitude = value.unsigned_abs();
+    let (whole, tenth) = (magnitude / 10, magnitude % 10);
+    if whole > 0 || tenth == 0 {
+        output.push_str(&whole.to_string());
+    }
+    if tenth > 0 {
+        output.push('.');
+        output.push_str(&tenth.to_string());
+    }
+}
+
 /// One noise face: the contour filled with `color` at `opacity`, kept where the
 /// noise rises. 粒 turns its noise along the strokes' direction; the face
 /// stays in place. Compat (no filter) lays the cover as a flat tone instead.
@@ -964,7 +1312,6 @@ fn noise_face(
         NoiseKind::Grain => 20.0 + 50.0 * f64::from(digest[2]) / 255.0,
         // The tone's light comes from the upper left; turning the face would turn it.
         NoiseKind::Rocker => 0.0,
-        NoiseKind::Stipple => 0.0,
     };
     let center = points_center(contour);
     let (sin, cos) = ((-angle).to_radians().dsin(), (-angle).to_radians().dcos());
@@ -1488,11 +1835,6 @@ pub(crate) fn render_surface(
         surface.texture,
         SurfaceTexture::Grain | SurfaceTexture::Stipple
     ) {
-        let (kind, class_name) = if surface.texture == SurfaceTexture::Grain {
-            (NoiseKind::Grain, "surface-grain-noise-v1")
-        } else {
-            (NoiseKind::Stipple, "surface-stipple-noise-v1")
-        };
         let color = texture_color(instruction, context);
         // Chalk leaves a grey deposit, not the tool's full line; a stipple dot
         // is the full ink of the point.
@@ -1505,17 +1847,31 @@ pub(crate) fn render_surface(
             * deposit
             * underpaint_boost(instruction))
         .min(1.0);
-        let (face, filter) = noise_face(
-            instruction,
-            context,
-            &contour,
-            kind,
-            &color,
-            opacity,
-            class_name,
-        );
-        definitions.extend(filter);
-        group.push(face);
+        if surface.texture == SurfaceTexture::Grain {
+            let (face, filter) = noise_face(
+                instruction,
+                context,
+                &contour,
+                NoiseKind::Grain,
+                &color,
+                opacity,
+                "surface-grain-noise-v1",
+            );
+            definitions.extend(filter);
+            group.push(face);
+        } else if let Some((faces, tiles)) = (context.profile != SvgProfile::Compat)
+            .then(|| stipple_tiled_faces(instruction, context, &contour, &color, opacity))
+            .flatten()
+        {
+            definitions.extend(tiles);
+            for face in faces {
+                group.push(face);
+            }
+        } else if let Some(face) =
+            stipple_face(instruction, context, &contour, &color, opacity, seed)
+        {
+            group.push(face);
+        }
     } else if surface.texture == SurfaceTexture::Aquatint {
         aquatint_surface(instruction, context, &contour, &mut group, &mut definitions);
     } else if matches!(
@@ -1656,7 +2012,7 @@ mod tests {
                 "surface":{"texture":texture, "scale":scale, "density":density}
             }))
             .unwrap();
-            // The point faces are noise filters on Display (render engine 104).
+            // 粒 and the mezzotint are noise filters on Display (render engine 104).
             let display = MarkContext {
                 profile: SvgProfile::Display,
                 use_filters: true,
@@ -1945,9 +2301,127 @@ mod tests {
     }
 
     #[test]
+    fn stipple_tiles_share_ranked_layers_across_faces() {
+        let colors = BTreeMap::new();
+        let score: Score = serde_json::from_str(
+            r#"{"instructions":[{"primitive":"circle","center":[0.3,0.5],"radius":0.2,"surface":{"texture":"stipple"}},{"primitive":"circle","center":[0.75,0.5],"radius":0.15,"surface":{"texture":"stipple"}}]}"#,
+        )
+        .unwrap();
+        let display = MarkContext {
+            profile: SvgProfile::Display,
+            use_filters: true,
+            ..context(&colors)
+        };
+        let mut ids = Vec::new();
+        for instruction in &score.instructions {
+            let rendered =
+                render_surface(instruction, MarkGeometry::of(instruction).unwrap(), display)
+                    .unwrap();
+            let (tiles, clips): (Vec<_>, Vec<_>) = rendered
+                .definitions
+                .iter()
+                .partition(|definition| definition.name() == "pattern");
+            assert_eq!(tiles.len(), STIPPLE_LAYERS);
+            assert_eq!(clips.len(), 1);
+            assert_eq!(clips[0].name(), "clipPath");
+            for tile in &tiles {
+                let text = format!("{tile:?}");
+                assert!(text.contains("\"round\""));
+                // A face's opacity stays on the face.
+                assert!(!text.contains("opacity"));
+            }
+            let mut faces = Vec::new();
+            with_class(&rendered.group, "surface-stipple-dots-v1", &mut faces);
+            assert_eq!(faces.len(), STIPPLE_LAYERS);
+            assert!(
+                faces
+                    .iter()
+                    .all(|face| face.attribute("fill-opacity").is_some())
+            );
+            ids.push(
+                tiles
+                    .iter()
+                    .map(|tile| tile.attribute("id").unwrap().to_owned())
+                    .collect::<Vec<_>>(),
+            );
+        }
+        // The same colour, fineness and density lay one tile on both faces.
+        assert_eq!(ids[0], ids[1]);
+        let mut unique = ids[0].clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), ids[0].len());
+    }
+
+    #[test]
+    fn compat_stipple_lays_round_dots_denser_toward_the_lower_right() {
+        let colors = BTreeMap::new();
+        let score: Score = serde_json::from_str(
+            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{"texture":"stipple"}}]}"#,
+        )
+        .unwrap();
+        let instruction = &score.instructions[0];
+        let geometry = MarkGeometry::of(instruction).unwrap();
+        let rendered = render_surface(
+            instruction,
+            geometry,
+            MarkContext {
+                profile: SvgProfile::Compat,
+                use_filters: false,
+                ..context(&colors)
+            },
+        )
+        .unwrap();
+        assert!(rendered.definitions.is_empty());
+        let mut dots = Vec::new();
+        with_class(&rendered.group, "surface-stipple-dots-v1", &mut dots);
+        assert_eq!(dots.len(), 1);
+        assert_eq!(dots[0].attribute("stroke-linecap"), Some("round"));
+        let face = dots[0].attribute("d").unwrap().to_owned();
+        // Walk the moves back to the dots' centres and count each half.
+        let numbers = face
+            .split(['M', 'm', 'h'])
+            .filter(|part| !part.is_empty() && *part != ".1")
+            .map(|part| {
+                let mut pair = part.split(' ').map(|n| n.parse::<f64>().unwrap());
+                (pair.next().unwrap(), pair.next().unwrap())
+            })
+            .collect::<Vec<_>>();
+        let (mut x, mut y) = (0.0, 0.0);
+        let (mut light, mut dark) = (0, 0);
+        let center = context(&colors).canvas.width / 2.0;
+        let middle = context(&colors).canvas.height / 2.0;
+        for (index, (dx, dy)) in numbers.iter().enumerate() {
+            if index == 0 {
+                (x, y) = (*dx, *dy);
+            } else {
+                (x, y) = (x + 0.1 + dx, y + dy);
+            }
+            if (x - center) + (y - middle) < 0.0 {
+                light += 1;
+            } else {
+                dark += 1;
+            }
+        }
+        assert!(light > 100, "{light}");
+        // A circle cuts the corners, where the tone runs furthest: its halves
+        // differ by about 1.5.
+        assert!(dark * 10 > light * 13, "{light} {dark}");
+    }
+
+    #[test]
+    fn write_tenths_is_short_and_exact() {
+        for (value, text) in [(0, "0"), (7, ".7"), (-15, "-1.5"), (120, "12"), (-1, "-.1")] {
+            let mut output = String::new();
+            write_tenths(&mut output, value);
+            assert_eq!(output, text);
+        }
+    }
+
+    #[test]
     fn point_faces_lay_one_noise_filter_and_compat_lays_a_flat_tone() {
         let colors = BTreeMap::new();
-        for texture in ["grain", "stipple", "aquatint"] {
+        for texture in ["grain", "aquatint"] {
             let score: Score = serde_json::from_str(&format!(
                 r#"{{"instructions":[{{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{{"texture":"{texture}"}}}}]}}"#
             ))

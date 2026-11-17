@@ -32,7 +32,7 @@ DDL（Drawing Description Language）は、形、道具、置き場所と、そ�
 |---|---|---|
 | 色・道具・連続性・面 | `赤いペンの実線の空の` | `円` |
 | 色・道具・面 | `青いチョークの塗りの` | `四角` |
-| 揺らぎ・色・太さ | `細かく揺れる黒い細い` | `線` |
+| 揺らぎ・色・太さ | `小さく揺れる黒い細い` | `線` |
 
 `赤い`・`青い`・`白い`・`黒い`は色の形容形である。その他の色も、`灰の`・`黄の`・`橙の`・`紫の`・`緑の`のように名詞で結べる。語をつないだだけで新しい語を作らず、歳時記にある表面形を使う。
 
@@ -192,7 +192,7 @@ DDL の言語は `ja` または `en`。アプリケーションが `auto` を選
 |---|---|
 | `チョークで線と円を置く。` | 図形が二つあり、どちらの道具か決まらない |
 | `チョークでペンの線を引く。`・`赤で青い線を引く。` | 道具・色の衝突 |
-| `赤と青で線を引く。`・`チョークとコンピュータで` | 並べた色・道具は句として読まない |
+| `赤と青で線を引く。`・`チョークとデジタルで` | 並べた色・道具は句として読まない |
 | `チョークで。` | 図形が無い |
 | `ペンで書いた小さな四角を置く。` | 関係節は読まない |
 | `四角を小さな円で埋める。` | 埋めるの `で` は中に置く痕の句（§3.12） |
@@ -216,7 +216,7 @@ place a circle at center. the circle red.
 
 | 状況 | 結果 |
 |---|---|
-| 先行する線がないのに `線は細かく揺れる。` | 対象なし |
+| 先行する線がないのに `線は小さく揺れる。` | 対象なし |
 | 独立した線を二つ導入した後の `線は…` | 複数候補で曖昧 |
 | 間に未受理の文があり、継続境界を確定できない | 境界の診断 |
 | 同じ項目に異なる指定を継続する | 衝突の診断 |
@@ -272,35 +272,17 @@ place a circle at center. the circle red.
 
 ### 3.6 太さと、図形の大小
 
-太さは道具とは別の修飾である。
+太さと大きさはそれぞれ歳時記の「ふとさ」「おおきさ」の類である。大きさの倍率は個数に依存しない通常寸法に掛ける。
 
-| 日本語 | 英語 |
-|---|---|
-| ごく細い | extra-fine |
-| 細い | thin |
-| 太い | thick |
-| ごく太い | extra-thick |
-
-道具の名は太さを言わない。`太いガッシュ`の`ガッシュ`は道具の名、`太い`はその道具で残す痕の太さ。`薄い`は濃さであり、線を細くする語ではない。
-
-図形の大小は歳時記カテゴリではなく、次の有限な core 修飾である。倍率は、個数に依存しない通常寸法への倍率。
-
-| 日本語の受理形 | 英語 | 倍率 |
+| 日本語 | 英語 | 倍率 |
 |---|---|---|
-| とても小さな・とても小さい | very small | 3/8 |
-| 小さな・小さい | small | 1/2 |
-| 小さめ | slightly small | 3/4 |
+| ごく小さな | very small | 3/8 |
+| 小さな | small | 1/2 |
 | 普通の大きさ | normal-sized | 1 |
-| 大きめ | slightly large | 5/4 |
-| 大きな・大きい | large | 3/2 |
-| とても大きな・とても大きい | very large | 7/4 |
-| 特大の | extra-large | 2 |
-| 巨大な | huge | 8/3 |
+| 大きな | large | 3/2 |
+| ごく大きな | very large | 7/4 |
 
-線・自由線は長さ、通常の弧は弦長と矢高を相似に、点は直径を拡縮する。大きな数を足しても個々の形は自動では小さくならない。収まりのために個数や寸法を推測で変更しない。
-
-**寸法を複数指定する場合の回復:** 数値寸法・大小・全幅／半幅を重ねると、それぞれを独立した寸法候補として保持し、`ConflictingSizeSpecifications`を報告する。現行実装は代表寸法の小さい候補にそろえて描く。`small`を明示半径へ掛け算する意味ではない。意図を一つに決めたいときは、寸法の指定を一つにする。
-
+太さは ごく細い / very thin、細い / thin、太い / thick、ごく太い / very thick。数値寸法・大小・全幅／半幅の重複は `ConflictingSizeSpecifications` で報告し、小さい候補にそろえて描く。
 ### 3.7 数値寸法
 
 寸法の単位は画面の短辺。短辺が1,000ピクセルなら `半径0.1`は100ピクセル相当である。描く紙（画面形式）と書き出し解像度はアプリケーション側で選ぶ。DDL は、組んだときの比だけを「画面比W:H。」で宣言する（[3.27](#327-画面比組んだ比を宣言する)）。
@@ -598,9 +580,9 @@ connected partway along the previous arc
 
 道具は `鉛筆の`・`ガッシュの`などの名詞修飾。色・形と独立に指定する。道具を省略した場合の実行時解決はペンだが、にじみや質感から道具を推測して明示扱いにすることはない（にじみを水彩に、刷きをガッシュに読み替えない）。
 
-連続性は実線・破線・点線・一点鎖線。これらは痕の線の連なり方であり、面の技法とは別である。英語の `solid`は連続性の実線、面の塗りは `flat`なので、両者を区別する。
+連続性は実線・破線・点線。弧と閉じた形の破線・点線は `unsupported_continuity_without_line` で外し、線・自由線は従来どおり。
 
-おもては `空`・`塗り`・`刷き`・`刷毛目`・`粒`・`点描`・`平行線`・`交差線`・`アクアチント`。閉じた形では、明示した質感そのものが面を作り、平塗りを黙ってその下へ追加しない。下塗りを添えた場合だけ、画材の塗りを下へ敷く。
+おもては空・塗り・刷き・刷毛目・粒・点描・平行線・交差線・メゾチント。閉じた形の質感には下塗りを添えた場合だけ画材の塗りを下に敷く。
 
 | 組み合わせ | 現行の扱い |
 |---|---|
@@ -609,7 +591,7 @@ connected partway along the previous arc
 | 閉じた形＋名前付き質感 | その形の面に質感を置く |
 | 線・通常の弧・自由線＋刷き | 道具の幅の3倍の帯を作る（太い・ごく太いは、既定の幅の3倍に太さの語が足す幅を足した帯）。帯の不透明度は道具の0.8倍 |
 | 線・通常の弧・自由線＋粒 | その痕が受ける地の歯を強める |
-| 線・通常の弧・自由線＋点描・平行線・交差線・アクアチント | コンパイラが受理して Score に保持するが、現行 renderer は開いた痕の面を描かない。閉じた形へ移す処理もない |
+| 線・通常の弧・自由線＋点描・平行線・交差線・メゾチント | `unsupported_surface_without_face` で語だけを外す |
 | 線・通常の弧・自由線＋刷毛目 | `unsupported_surface_brushmarks`。刷毛目だけを外す |
 | 点＋明示したおもて | 未対応の面として診断し、その指定を外す |
 | 三日月の弧＋塗り | 三日月の閉じた面として塗る |
@@ -617,7 +599,8 @@ connected partway along the previous arc
 
 `点描`は面の技法、`点`は図形である。点を多数置くことと、円へ点描の面を付けることは別の指定。古い版の点描の意味で `点`を使わない。
 
-さばきは `濃い`・`程よい`・`薄い`（`dense`・`temperate`・`faint`）。道具ごとの相対的な濃さを決める。程よいは道具本来の濃さで、さばき省略時と同じ演奏になる。複数の濃さを同じ痕へ付けると衝突する。
+さばきは濃い・程よい・薄い・にじみ（dense・moderate・faint・bleeding）。にじみは濃淡や揺れと独立する。
+診断：線・自由線の塗りと開いた痕の面は `unsupported_surface_without_face`、点の揺れは `unsupported_fluctuation_on_point`、デジタルの線・輪郭のさばきは `unsupported_surface_intensity_for_digital`、弧と閉じた形の破線・点線は `unsupported_continuity_without_line`。該当語だけを外して残りを描く。
 
 ### 3.18 きめと下塗り
 
@@ -635,24 +618,24 @@ connected partway along the previous arc
 中心に、赤の太いガッシュの下塗りの密な交差線の薄い四角を1個置く。
 ```
 
-閉じた形の名前付き質感7種（刷き・刷毛目・粒・点描・平行線・交差線・アクアチント）に使える。線・弧・自由線・点、空、塗り、面省略には付けない。未対応の組み合わせでは `unsupported_surface_fineness`・`unsupported_surface_underlayer`を記録し、その修飾だけを外す。
+閉じた形の名前付き質感7種（刷き・刷毛目・粒・点描・平行線・交差線・メゾチント）に使える。ほかは `unsupported_surface_fineness`・`unsupported_surface_underlayer` で語だけを外す。
 
-ひとつの痕へ、きめの4語から一つ、下塗りから一つを付けられる。`細かい密な点描`のようにきめを二つ重ねると、両方を衝突として外す。大きさと密度を別々に自由指定できる構文ではない。プラグインが出す痕へ外側からきめ・下塗りを上書きすることもできない。
+一つの痕に、大きさ（細かい・粗い）、詰まり方（密な・疎な）、下塗りの3欄から各一語を付けられる。`細かい密な点描` は両方効く。Macro の出す痕には上書きできない。
 
-`細かい`はきめ、`細かく`は揺らぎの振幅。`大きな`は図形の寸法、`大きく`は揺らぎの振幅である。
+`細かい`はきめ、`小さく`は揺らぎの振幅。`大きな`は図形の寸法、`大きく`は揺らぎの振幅である。
 
 ### 3.19 揺らぎとにじみ
 
 | 次元 | 日本語 | 英語 |
 |---|---|---|
-| 振幅 | 細かく・大きく | narrowly・broadly |
+| 振幅 | 小さく・大きく | narrowly・broadly |
 | 波の間隔 | ゆるやかに・小刻みに | loosely・tightly |
 | 揺れの質 | 揺れる・波打つ | swaying・undulating |
 | 墨の広がり | にじみ | bleeding |
 
-揺らぎも図形の前の修飾にするか、一意に定まる主語継続にする。`細かく揺れる線`、`ゆるやかに波打つ線`のように書く。`揺れる`は不規則な揺れ、`波打つ`は波状の揺れである。
+揺らぎも図形の前の修飾にするか、一意に定まる主語継続にする。`小さく揺れる線`、`ゆるやかに波打つ線`のように書く。`揺れる`は不規則な揺れ、`波打つ`は波状の揺れである。
 
-振幅の `細かく`・`大きく`だけでは揺れを作らない。揺れる・波打つの語がない場合は `fluctuation_amplitude_without_quality`を出して、その振幅だけを外す。波の間隔だけを指定する場合の既存解決とは区別する。
+振幅の `小さく`・`大きく`だけでは揺れを作らない。揺れる・波打つの語がない場合は `fluctuation_amplitude_without_quality`を出して、その振幅だけを外す。波の間隔だけを指定する場合の既存解決とは区別する。
 
 にじみは揺れの質とは独立で、揺れと併用できる。にじみだけでは道筋に不規則な揺れを加えない。点への明示的な道筋の揺らぎは未対応である。道具そのものが持つ筆致や地への反応は、明示した揺らぎとは別に残る。
 
@@ -662,16 +645,16 @@ connected partway along the previous arc
 
 `全幅`・`半幅`は、回転前の幅を画面の全幅・半幅にする寸法指定。短辺の0.24を基準にする大小とは異なる。図形の比率を保ち、線・自由線では長さ、通常弧では弦長を指定する。回転後の見た目の水平幅を全幅へ戻す指定ではない。
 
-半円・上弦・下弦・三日月は弧の head へ結ぶ。
+半円・三日月は弧の head へ結ぶ。
 
 ```text
 半円の弧 / semicircle arc
-上弦の弧 / waxing arc
-下弦の弧 / waning arc
+
+
 三日月の弧 / crescent arc
 ```
 
-半円は上側の180度の開いた弧、上弦は右側、下弦は左側の開いた弧。上弦・下弦は基準方向へ四分の一回転を加え、さらに数値角度を足せる。数値弦長・矢高を併記する半円形では、矢高を弦長の半分にする。
+半円は上側の180度の開いた弧。数値弦長・矢高を併記する半円形では、矢高を弦長の半分にする。
 
 三日月は内外の曲線で閉じた面を持つ特定の形であり、一般の円弧とは異なる。縦長・横長・正形・任意の弦長矢高を三日月へ転用しない。幅と高さの明示も、その形が定める比率に合う必要がある。
 
@@ -829,7 +812,7 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 ## 4. 歳時記：全語彙と受理する別形
 
-日本語を正本とする。語の綴りは `inku.saijiki.v3`（`core/crates/inku-ddl/assets/saijiki-v3.json`）に合わせる。本節は15カテゴリの全101行と、別表の「あいだ」11行を扱う。101行には、表示される97行、表示しないが直接DDLで使える3行、受理しない廃止行1行が含まれる。「あいだ」は画面では16番目のカテゴリとして並ぶ。
+日本語を正本とする。語の綴りは `inku.saijiki.v4`（`core/crates/inku-ddl/assets/saijiki-v4.json`）に合わせる。16類103語と別表のあいだ11語を扱う。
 
 ### 読み方と書き方
 
@@ -837,7 +820,7 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 形を名詞の中心にし、その前に属性を付け、動作へ結ぶ。例えば `赤の鉛筆の薄い点描の円を置く。` と書く。地は図形の属性にせず、`和紙。` のように独立した文にする。`地: 和紙`、`面: 点描`という見出し形式は使わない。面なら `点描の円を置く。` と書く。
 
-一つの痕に対して同じ属性の複数語を併記すると衝突になりうる。「細かい」と「密な」は両方とも「きめ」の同じ欄であり、二つを一緒に指定しない。「下塗り」は別の欄なので `下塗りの密な点描の円` のように併用できる。成立しない属性や関係は診断付きで省略され、独立して描ける残りが続く。語の認識、Scoreへの受理、実際にその形で見える効果は区別する。
+同じ欄の複数語は衝突する。きめは大きさ・詰まり方・下塗りの3欄なので、細かい・密な・下塗りは併用できる。
 
 `default=true`のペン・実線・空・黒は資料上の注記である。`（既定）`や`(default)`はDDL語の一部ではない。書かれていない属性は読み取り時には未指定のままであり、語彙表の注記を本文へ補わない。現行のScore解決では、省略した道具はペン、線種は実線、閉じた形の面は塗りになる。省略色は実際の背景または地との明度差で黒・白から選ぶ。したがって「空が既定と記載されているから、面を省くと空になる」とは読まない。
 
@@ -845,21 +828,22 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 | キー | 日本語 | 英語 | asset行数 | 扱い |
 |---|---|---|---:|---|
-| `katachi` | かたち | forms | 10 | 公開9、非表示の受理語1 |
-| `katamuki` | かたむき | angles | 8 | 公開6、非表示の受理語2 |
+| `katachi` | かたち | forms | 12 | 公開 |
+| `katamuki` | かたむき | angles | 8 | 公開 |
 | `tezawari` | てざわり | touches | 11 | 公開 |
-| `tsuranari` | つらなり | continuity | 4 | 公開 |
+| `tsuranari` | つらなり | continuity | 3 | 公開 |
 | `omote` | おもて | surfaces | 9 | 公開 |
-| `sabaki` | さばき | handling | 3 | 公開 |
-| `kime` | きめ | fineness | 4 | 公開 |
-| `shitaji` | したじ | underlayer | 1 | 公開 |
-| `ji` | じ | grounds | 7 | 公開。末尾に画面比の宣言（3.27）も表示する |
+| `sabaki` | さばき | handling | 4 | 公開 |
+| `kime` | きめ | fineness | 5 | 公開 |
+| `futosa` | ふとさ | widths | 4 | 公開 |
+| `ookisa` | おおきさ | sizes | 5 | 公開 |
+| `ji` | じ | grounds | 7 | 公開 |
 | `iro` | いろ | colors | 9 | 公開 |
-| `yuragi` | ゆらぎ | movements | 7 | 公開 |
-| `basho` | ばしょ | places | 11 | 公開。端点語は関係句で使う |
-| `ugoki` | うごき | motions | 7 | 公開6、廃止1 |
+| `yuragi` | ゆらぎ | movements | 6 | 公開 |
+| `basho` | ばしょ | places | 8 | 公開 |
+| `ugoki` | うごき | motions | 6 | 公開 |
 | `jun` | じゅん | order | 2 | 公開 |
-| `wariai` | わりあい | proportions | 8 | 公開 |
+| `wariai` | わりあい | proportions | 4 | 公開 |
 | `aida` | あいだ | relations | 11 | `relations`別表から表示 |
 
 ### 4.1. かたち — forms
@@ -873,11 +857,13 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 三角 | `triangle` | 三頂点の閉じた形。縦長・横長、幅と高さを指定できる。正三角形は別の形修飾構文。 | `上に三角を置く。` / `Place a triangle at top.` |
 | 四角 | `square` | 矩形の閉じた形。縦長・横長を受ける。英語の正規語がsquareでも、長方形を別primitiveにはしない。 | `横長の四角を置く。` / `Place a wide square.` |
 | 線 | `line` | 始点から終点へ直線を引く。引く・置く、配列・散布・充填に使える。 | `水平の線を引く。` / `Draw a horizontal line.` |
-| 弧 | `arc` | 円弧。通常は開いた痕。半円・上弦・下弦・三日月はこの名詞を修飾する。 | `半円の弧を引く。` / `Draw a semicircle arc.` |
+| 弧 | `arc` | 円弧。通常は開いた痕。半円・三日月はこの名詞を修飾する。 | `半円の弧を引く。` / `Draw a semicircle arc.` |
 | 自由線 | `free line` | 両端の間の道筋を、演奏ごとに直線・円弧・自由な曲がりから組む。関係はつながる・触れるだけを受ける。 | `右上がりの自由線を引く。` / `Draw a rising free line.` |
 | 点 | `point` | 円とは別の、丸く塗られた小さな痕。面・図形自体の角度・揺れの指定を受けない。にじみは使える。 | `緑の点を置く。` / `Place a green point.` |
 | 雲形 | `cloudform` | 演奏ごとに輪郭が決まる不規則な閉じた形。縦長・横長を受ける。 | `横長の雲形を置く。` / `Place a wide cloudform.` |
-| 多角形 | `polygon` | **非表示の受理語**。`prompt=false`・`display=false`・`marker=true`。直接DDLでは有効。現行は5〜8辺、辺数省略は5。 | `多角形を置く。` / `Place a polygon.` |
+| 多角形 | `polygon` | 5〜8辺、辺数省略は5。 | `多角形を置く。` / `Place a polygon.` |
+| 半円 | `semicircle` | 弧の弦長に対する矢高を半分にし、180度の開弧にする。弧以外には使わない。 | `半円の弧を引く。` / `Draw a semicircle arc.` |
+| 三日月 | `crescent` | 弧を細い月形の閉じた特殊形にする。塗り以外の面、きめ・下塗りを受けない。 | `三日月の弧を引く。` / `Draw a crescent arc.` |
 
 直接DDLは、三角形→三角、四角形・長方形→四角、`rectangle`→`square`、`lines`→`line`も読む。これらはparserだけの別表記で、正規語の追加ではない。英語の登録形名詞は規則的な複数形（`circles`、`free lines`など）も読むが、複数形そのものから個数を推測しない。
 
@@ -894,8 +880,8 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 斜め | `diagonal` | 45・135・225・315度から構図seedで選ぶ。列では二つの斜め方向から選ぶ。 | `斜めの四角を置く。` / `Place a diagonal square.` |
 | 右上がり | `rising` | 左下から右上へ。整数−37〜−23度から選ぶ。直接DDLの列方向にも使える。 | `右上がりの線を引く。` / `Draw a rising line.` |
 | 右下がり | `falling` | 左上から右下へ。整数23〜37度から選ぶ。直接DDLの列方向にも使える。 | `右下がりの線を引く。` / `Draw a falling line.` |
-| 左上がり | `left-rising` | **非表示の受理語**。右下から左上へ向く203〜217度。右上がりと同一identityにしない。 | `左上がりの線を引く。` / `Draw a left-rising line.` |
-| 左下がり | `left-falling` | **非表示の受理語**。右上から左下へ向く143〜157度。右下がりと同一identityにしない。 | `左下がりの線を引く。` / `Draw a left-falling line.` |
+| 左上がり | `left-rising` | 右下から左上へ向く。 | `左上がりの線を引く。` / `Draw a left-rising line.` |
+| 左下がり | `left-falling` | 右上から左下へ向く。 | `左下がりの線を引く。` / `Draw a left-falling line.` |
 | 回転 | `rotated` | 各45度境界から5度を超えて離れた整数角度を選ぶ。列方向の語にはしない。 | `回転の四角を置く。` / `Place a rotated square.` |
 
 左上がり・左下がりは、いずれも`prompt=false`・`display=false`・`marker=true`で、直接DDLとMacro参照は受ける。水平の`横`、垂直の`縦`はparser別表記である。英語は`horizontally`・`vertically`・`diagonally`も同じ行の文法形として読む。任意の副詞を追加したり、`rotated`に自由な同義語を与えたりはしない。
@@ -918,11 +904,11 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 油彩 | `oil paint` | 油で練った絵具を厚く塗り重ね、刷毛筋と盛り上がり、つやのある重なりが残る。 | `油彩の線を引く。` / `Draw an oil paint line.` |
 | ペインティングナイフ | `painting knife` | ナイフで盛って伸ばした絵具の平らな面に、稜と縁、かすれが残る。 | `ペインティングナイフの線を引く。` / `Draw a painting knife line.` |
 | エッチング | `etching` | 酸で腐食させた太さのそろった線に、わずかな荒れと丸い端が残り、線の重ねで陰を作る。 | `エッチングの線を引く。` / `Draw an etching line.` |
-| コンピュータ | `computer` | 同じ周期で正確に反復する線の揺れ。 | `コンピュータの線を引く。` / `Draw a computer line.` |
+| デジタル | `digital` | 同じ周期で正確に反復する線の揺れ。 | `デジタルの線を引く。` / `Draw a digital line.` |
 
 歳時記 v3（2026-10-31）で、てざわりの語を12から11にした。ロットリングはペンに、クレヨンはチョークに、細筆・太筆はガッシュに、ビュラン・ドライポイントはエッチングにまとめ、オイルパステル・水彩・ペインティングナイフを足した。旧い6語は今の指示書では読まない。保存した指示書とプラグインの定義は、版の移行で一度だけ新しい語へ書き換え、太さの語も元の幅に最も近い段へ直す（例: `ロットリングの線` は `細いペンの線`、`太筆の線` は `太いガッシュの線`）。保存したScoreの旧い道具は、今までの描き方のまま描く。英語は `oil-pastel`・`painting-knife`・`watercolour` も同じ語として読む。
 
-コンピュータの塗りは、輪郭と同じ方眼に5色の点描と白い走査線を重ねる（render engine 96）。「濃い」は暗く、「薄い」は明るくする。線や輪郭は引き続き方眼の升で描く。
+デジタルの塗りは、輪郭と同じ方眼に5色の点描と白い走査線を重ねる（render engine 96）。「濃い」は暗く、「薄い」は明るくする。線や輪郭は引き続き方眼の升で描く。
 
 ### 4.4. つらなり — continuity
 
@@ -933,7 +919,6 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 実線 | `solid` | 切れ目のない線。資料上の既定注記がある。 | `実線の線を引く。` / `Draw a solid line.` |
 | 破線 | `dashed` | 短い線分を間隔を空けて並べる。 | `破線の線を引く。` / `Draw a dashed line.` |
 | 点線 | `dotted` | 点の連なりで輪郭を表す。 | `点線の円を置く。` / `Place a dotted circle.` |
-| 一点鎖線 | `dash-dot` | 長い線分と点を交互に置く。 | `一点鎖線の線を引く。` / `Draw a dash-dot line.` |
 
 `solid`はつらなりの語である。面の塗りの英語は`flat`であり、内部のScore値`solid`を本文の面の語にしない。
 
@@ -951,12 +936,12 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 点描 | `stipple` | 同じ大きさの丸い点で左上から右下へ濃くなる調子を作る。形の点とは別の語。 | `点描の円を置く。` / `Place a stipple circle.` |
 | 平行線 | `hatch` | 平行な線で面を埋める。線の名詞を複数置く指定とは別。 | `平行線の四角を置く。` / `Place a hatch square.` |
 | 交差線 | `crosshatch` | 平行線にもう一組を交差させる。 | `交差線の四角を置く。` / `Place a crosshatch square.` |
-| アクアチント | `aquatint` | 深い調子に細かい明るい点がのぞき、左上へ明るくなるメゾチントの面を作る。 | `アクアチントの四角を置く。` / `Place an aquatint square.` |
+| メゾチント | `mezzotint` | 深い調子に細かい明るい点がのぞき、左上へ明るくなる面。 | `メゾチントの四角を置く。` / `Place a mezzotint square.` |
 
 | 対象 | 受理と演奏の制限 |
 |---|---|
 | 円・楕円・三角・四角・多角形・雲形 | 9語を受理し、面を演奏する。名前付き7質感は、それだけなら下に平塗りを重ねない。 |
-| 線・通常の弧・自由線 | 刷き・粒は痕へ効果を持つ。空・塗り・点描・平行線・交差線・アクアチントもcompilerでは受理してScoreに残るが、開いた痕に閉じた面の質感は描かない。別の閉じた形へ転送しない。刷毛目は診断付きでその語だけを外す。 |
+| 線・通常の弧・自由線 | 刷き・粒は痕へ効く。点描・平行線・交差線・メゾチントは `unsupported_surface_without_face` で外す。線・自由線の塗りも外す。刷毛目は `unsupported_surface_brushmarks` で外す。 |
 | 点の痕 | 面の9語を受理しない。点自体は丸い塗られた痕として残る。 |
 | 三日月の弧 | 面の明示指定は塗りだけを受理する。空・7質感は受理しない。 |
 
@@ -971,25 +956,26 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 日本語 | 英語 | 意味 | 短い書き方 |
 |---|---|---|---|
 | 濃い | `dense` | 道具の本来の濃さより濃く置く。 | `鉛筆の濃い点描の四角を置く。` / `Place a dense stipple pencil square.` |
-| 程よい | `temperate` | 道具の本来の濃さで置く。省略した痕と同じ濃さだが、明示した語として残る。 | `鉛筆の程よい点描の四角を置く。` / `Place a temperate stipple pencil square.` |
+| 程よい | `moderate` | 道具の本来の濃さで置く。省略した痕と同じ濃さだが、明示した語として残る。 | `鉛筆の程よい点描の四角を置く。` / `Place a moderate stipple pencil square.` |
+| にじみ | `bleeding` | 墨の縁に不均一な広がりを加える。揺れとは独立し、単独では揺れを加えない。 | `にじみの円を置く。` / `Place a bleeding circle.` |
 | 薄い | `faint` | 道具の本来の濃さより淡く置く。 | `鉛筆の薄い点描の四角を置く。` / `Place a faint stipple pencil square.` |
 
 ### 4.7. きめ — fineness
 
-閉じた6形の名前付き7質感（刷き・刷毛目・粒・点描・平行線・交差線・アクアチント）だけに使う。空・塗り・面の省略、線・弧・自由線・点、Macroが出す痕には付けない。不成立ならその語だけを診断付きで外す。一つの痕で下表から一語を選び、「細かい」と「密な」も併記しない。
+閉じた6形の名前付き7質感（刷き・刷毛目・粒・点描・平行線・交差線・メゾチント）に使う。大きさ・詰まり方・下塗りの各欄から一語ずつ選べる。「細かい」と「密な」は併用できる。
 
 | 日本語 | 英語 | 意味 | 短い書き方 |
 |---|---|---|---|
 | 細かい | `fine-grained` | 点や線の一つを小さくし、その分数を増やして覆う広さを保つ。 | `細かい点描の円を置く。` / `Place a fine-grained stipple circle.` |
 | 粗い | `coarse-grained` | 点や線の一つを大きくし、その分数を減らして覆う広さを保つ。 | `粗い粒の楕円を置く。` / `Place a coarse-grained grain ellipse.` |
 | 密な | `packed` | 同じ大きさの点や線の詰まり方を密にする。 | `密な平行線の四角を置く。` / `Place a packed hatch square.` |
-| 疎な | `sparse` | 同じ大きさの点や線の詰まり方を疎にする。 | `疎なアクアチントの雲形を置く。` / `Place a sparse aquatint cloudform.` |
+| 疎な | `sparse` | 同じ大きさの点や線の詰まり方を疎にする。 | `疎なメゾチントの雲形を置く。` / `Place a sparse mezzotint cloudform.` |
 
-「細かい」は質感、「細かく」は揺れの振幅である。「密な」は質感の詰まり方、「濃い」は道具に対する濃さである。内部の値では細かい・粗いが`scale`を0.05・0.90、密な・疎なが`density`を0.85・0.05にするが、その値をDDL本文へ書く必要はない。
+「細かい」は質感、「小さく」は揺れの振幅である。「密な」は質感の詰まり方、「濃い」は道具に対する濃さである。内部の値では細かい・粗いが`scale`を0.05・0.90、密な・疎なが`density`を0.85・0.05にするが、その値をDDL本文へ書く必要はない。
 
-### 4.8. したじ — underlayer
+### 4.8. きめの下塗り
 
-適用範囲は「きめ」と同じで、閉じた6形の名前付き7質感だけである。さばき一語・きめ一語と併用できる。
+適用範囲は「きめ」と同じで、閉じた6形の名前付き7質感だけである。さばきと、きめの大きさ・詰まり方の各欄と併用できる。
 
 | 日本語 | 英語 | 意味 | 短い書き方 |
 |---|---|---|---|
@@ -1037,15 +1023,14 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 | 日本語 | 英語 | 意味・組合せ | 短い書き方 |
 |---|---|---|---|
-| 細かく | `narrowly` | 揺れの振幅を小さくする。揺れるか波打つと一緒に書く。 | `細かく揺れる線を引く。` / `Draw a narrowly swaying line.` |
+| 小さく | `narrowly` | 揺れの振幅を小さくする。 | `小さく揺れる線を引く。` / `Draw a narrowly swaying line.` |
 | 大きく | `broadly` | 揺れの振幅を大きくする。図形の大きさの語ではない。揺れるか波打つを伴う。 | `大きく波打つ線を引く。` / `Draw a broadly undulating line.` |
 | ゆるやかに | `loosely` | 波の間隔を広げる。描画の時間や速度ではない。 | `ゆるやかに波打つ線を引く。` / `Draw a loosely undulating line.` |
 | 小刻みに | `tightly` | 波の間隔を詰める。描画の時間や速度ではない。 | `小刻みに揺れる線を引く。` / `Draw a tightly swaying line.` |
 | 揺れる | `swaying` | 連続する不規則な揺れ。 | `揺れる線を引く。` / `Draw a swaying line.` |
 | 波打つ | `undulating` | 波形の規則的なうねり。 | `波打つ線を引く。` / `Draw an undulating line.` |
-| にじみ | `bleeding` | 墨の縁に不均一な広がりを加える。揺れとは独立し、単独では揺れを加えない。 | `にじみの円を置く。` / `Place a bleeding circle.` |
 
-振幅の細かく・大きくだけを書いたときは、`fluctuation_amplitude_without_quality`としてその語だけを省略する。ゆるやかに・小刻みにはこの制限がなく、揺れの質を省いたときは不規則な揺れを使う。揺れの他の省略成分は中程度で解決するが、ゆらぎをまったく書かない痕へ明示ゆらぎを補う規則ではない。
+振幅の小さく・大きくだけを書いたときは、`fluctuation_amplitude_without_quality`としてその語だけを省略する。ゆるやかに・小刻みにはこの制限がなく、揺れの質を省いたときは不規則な揺れを使う。揺れの他の省略成分は中程度で解決するが、ゆらぎをまったく書かない痕へ明示ゆらぎを補う規則ではない。
 
 英語の`sways`・`undulates`は同じ行の許された文法形である。`fine`や`large`を振幅の別名としては読まない。`large`は図形の大小の修飾語である。
 
@@ -1062,9 +1047,6 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 右端 | `right-edge` | 右の1/10の帯 `[9/10,0,1,1]`。 | `右端に円を置く。` / `Place a circle at right-edge.` |
 | 上端 | `top-edge` | 上の1/10の帯 `[0,0,1,1/10]`。 | `上端に線を引く。` / `Draw a line at top-edge.` |
 | 下端 | `bottom-edge` | 下の1/10の帯 `[0,9/10,1,1]`。 | `下端に線を引く。` / `Draw a line at bottom-edge.` |
-| 始点 | `start` | 先行する線・弧の始点を接続先にする。単独の`始点に円を置く`には使わない。 | `前の線の始点につながる弧を引く。` / `Draw an arc connected to the start of the previous line.` |
-| 終点 | `end` | 先行する線・弧の終点を接続先にする。単独の画面位置ではない。 | `前の弧の終点につながる線を引く。` / `Draw a line connected to the end of the previous arc.` |
-| 途中 | `partway` | 先行する線・弧の両端以外を接続先にし、場所は演奏で選ぶ。自由線の途中は対象にしない。 | `前の線の途中につながる弧を引く。` / `Draw an arc connected partway along the previous line.` |
 | 隅 | `corner` | 幅・高さが各1/5の四隅の領域から一つを構図seedで選ぶ。 | `隅に円を置く。` / `Place a circle in a corner.` |
 
 英語の`left edge`・`right edge`・`top edge`・`bottom edge`も同じ行を指すparser別表記である。名前の位置と数値の位置・範囲・両端を同じ痕に併記すると衝突する。位置を省くと、置く・引くは中心と同じ範囲、並べる・散らす・敷き詰める・埋めるは全画面を使う。
@@ -1110,16 +1092,16 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 横長 | `wide` | 同じ4形の横を長くする。通常比は2:1。正形とは併用しない。 | `横長の楕円を置く。` / `Place a wide ellipse.` |
 | 全幅 | `full-width` | 痕の基準寸法を画面の横幅にする。自由線なら弦長。回転や名前位置によるはみ出しまで防ぐ語ではない。 | `全幅の線を引く。` / `Draw a full-width line.` |
 | 半幅 | `half-width` | 痕の基準寸法を画面の横幅の半分にする。 | `半幅の線を引く。` / `Draw a half-width line.` |
-| 半円 | `semicircle` | 弧の弦長に対する矢高を半分にし、180度の開弧にする。弧以外には使わない。 | `半円の弧を引く。` / `Draw a semicircle arc.` |
-| 上弦 | `waxing` | 右へ膨らむ180度の開弧。指定角度に90度を加える。 | `上弦の弧を引く。` / `Draw a waxing arc.` |
-| 下弦 | `waning` | 左へ膨らむ180度の開弧。指定角度に270度を加える。 | `下弦の弧を引く。` / `Draw a waning arc.` |
-| 三日月 | `crescent` | 弧を細い月形の閉じた特殊形にする。塗り以外の面、きめ・下塗りを受けない。 | `三日月の弧を引く。` / `Draw a crescent arc.` |
 
 縦長の`縦に長い`・`細長い`、横長の`横に長い`はparser別表記である。数値の幅・高さも書いた場合はその数を保ち、縦長なら高さが幅より大きいこと、横長なら幅が高さより大きいことを確認する。
 
-全幅・半幅は通常の全10primitiveに使える。数値寸法・大小の語・全幅や半幅を重ねた大きさの候補は、診断を残して小さい候補を採る。二つの数値端点で定義した一本の線・自由線は端点が長さを決めるため、全幅・半幅と併用しない。半円・上弦・下弦・三日月は独立した形名詞ではなく、必ず弧に付ける。
+全幅・半幅は通常の全10primitiveに使える。寸法の候補が競合すると診断し小さい候補を採る。半円・三日月は「かたち」の語で、弧を修飾する。
 
-### 4.16. あいだ — relations
+### 4.16. ふとさとおおきさ
+
+ふとさは、ごく細い・細い・太い・ごく太い（very thin・thin・thick・very thick）。おおきさは、ごく小さな・小さな・普通の大きさ・大きな・ごく大きな（very small・small・normal-sized・large・very large）。倍率は 3.6 を参照する。
+
+### 4.17. あいだ — relations
 
 短い語は関係の名前であり、それだけでは先行対象を指定しない。実際の関係には、下表の「前の…」を含む完全な句を使う。現在の痕から直前の痕を参照し、間にだけは直前の二つを参照する。参照先が省略されても、別の残存図形へ付け替えない。一つの命令に関係は最大一つである。
 
@@ -1161,8 +1143,8 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 |---|---|---|
 | 現行parser別表記 | 三角形、四角形、長方形、`rectangle`、`lines`、横、縦、英語の4つの空白付きedge、`arrange`・`line up`、縦に長い・細長い・横に長い、`oil-pastel`・`painting-knife`・`watercolour` | 対応する正規行と同じidentity。公開の綴りは上の表のまま。 |
 | 現行文法形 | 白い・赤色など、英語形名詞の複数形、`horizontally`・`vertically`・`diagonally`、`sways`・`undulates` | 許された文法変化。語や個数の追加ではない。 |
-| 非表示の受理語 | 多角形、左上がり、左下がり | promptと表示には出さないが、markerが有効なので直接DDLで認識する。 |
-| 廃止row | 描く | assetに墓標として残り、parserの候補にならない。英語表面はない。 |
+| 表示する語 | 多角形、左上がり、左下がり | 歳時記の画面と読み手にも表示する。 |
+| 廃止語 | 描く、一点鎖線、上弦、下弦 | 現行語として受理しない。 |
 | v1移行専用の旧語 | 薄墨 / `pale ink wash`、ゆっくり / `slowly`、速く / `quickly`、震える / `trembling`・`trembles`、滲む / `blurring`、中央 / `middle`、点描の意味の点 | 今の指示書の別名としては受理しない。保存文書の版移行で現行語へ書き換える。形の点と、地の薄墨地は現役の別語。 |
 | v2移行専用の旧語 | ロットリング / `rotring`、クレヨン / `crayon`、細筆 / `fine-brush`、太筆 / `thick-brush`、ビュラン / `burin`、ドライポイント / `drypoint` | 今の指示書の別名としては受理しない。保存文書とプラグインの定義の版移行で、ペン・チョーク・ガッシュ・エッチングへ書き換え、太さの語も直す（4.3）。 |
 | v1での振幅表現 | `fine`・`finely`、`large`・`largely` | 振幅なら`narrowly`・`broadly`へ版移行する。現在の`large`は図形の大小という別の文法役割。 |
@@ -1175,8 +1157,8 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 | 所有する文法 | 代表的な表面 | 区別すること |
 |---|---|---|
-| 太さ | ごく細い・細い・ごく太い・太い / `extra-fine`・`thin`・`extra-thick`・`thick` | てざわりと別。`fine`は現在の英語の太さの正規表面でも振幅の別名でもない。 |
-| 大小 | とても小さな・普通の大きさ・とても大きな・特大の・巨大な・小さめ・小さな・大きめ・大きな、および許された形容形 / `slightly small`・`small`・`very small`・`normal-sized`・`slightly large`・`large`・`very large`・`extra-large`・`huge` | 9段階の局所修飾。揺れの大きくとは別。自由な程度副詞へ広げない。 |
+| 太さ | ごく細い・細い・太い・ごく太い / `very thin`・`thin`・`thick`・`very thick` | 歳時記のふとさ。 |
+| 大小 | ごく小さな・小さな・普通の大きさ・大きな・ごく大きな / `very small`・`small`・`normal-sized`・`large`・`very large` | 歳時記のおおきさ。 |
 | 形の制約 | 正三角形、正方形、五角形〜八角形、`regular`など | 正則性と辺数。歳時記のprimitive identityを増やさない。 |
 | 個数と助数詞 | 一〜九の「つ」、十・10・とお、本・個・枚、`one`・`five`など | 数量は文法。少し・数個・いくつか・たくさん・多数・無数、`a few`・`several`・`many`・`numerous`・`countless`もparserの数量候補で、歳時記の語でも確定数でもない。 |
 | 数値幾何 | 半径・直径・長さ・一辺・幅と高さ・弦長と矢高、数値位置・範囲・両端、回転N度 | 数と単位・対象を結ぶ有限構文。歳時記の回転という語と数値角度を区別する。 |
@@ -1335,9 +1317,9 @@ Line up 3 red gouache bleeding empty circles at the bottom.
 Draw one black pen dotted horizontal line at the center.
 ```
 
-### 5.07. 四種類のつらなり
+### 5.07. 三種類のつらなり
 
-ねらい：同じ線の寸法と画材を保ち、実線、破線、点線、一点鎖線を書き分ける。
+ねらい：同じ線の寸法と画材を保ち、実線、破線、点線を書き分ける。
 
 日本語DDL：
 
@@ -1346,7 +1328,7 @@ Draw one black pen dotted horizontal line at the center.
 画面の横0.5、縦0.2の位置に、長さ0.6の黒の細いペンの実線の水平の線を1個引く。
 画面の横0.5、縦0.4の位置に、長さ0.6の黒の細いペンの破線の水平の線を1個引く。
 画面の横0.5、縦0.6の位置に、長さ0.6の黒の細いペンの点線の水平の線を1個引く。
-画面の横0.5、縦0.8の位置に、長さ0.6の黒の細いペンの一点鎖線の水平の線を1個引く。
+
 ```
 
 英語DDL：
@@ -1356,7 +1338,7 @@ Paper.
 Draw one black thin pen solid horizontal line length 0.6 at horizontal 0.5, vertical 0.2.
 Draw one black thin pen dashed horizontal line length 0.6 at horizontal 0.5, vertical 0.4.
 Draw one black thin pen dotted horizontal line length 0.6 at horizontal 0.5, vertical 0.6.
-Draw one black thin pen dash-dot horizontal line length 0.6 at horizontal 0.5, vertical 0.8.
+
 ```
 
 ### 5.08. 画材の交互と鏡写し
@@ -1491,7 +1473,7 @@ Place one red pen sparse stipple circle diameter 0.3 at horizontal 0.7, vertical
 Line up 7 small black pen points at the bottom.
 ```
 
-### 5.14. アクアチントと雲形
+### 5.14. メゾチントと雲形
 
 ねらい：雲形を標準の閉じた図形として使い、質感と下塗りを重ねる。
 
@@ -1500,8 +1482,8 @@ Line up 7 small black pen points at the bottom.
 ```text
 メゾチント。
 背景を白で埋める。
-上に、赤のペンの疎なアクアチントの雲形を1個置く。
-下に、黄の太いガッシュの下塗りの細かいアクアチントの三角を3個並べる。
+上に、赤のペンの疎なメゾチントの雲形を1個置く。
+下に、黄の太いガッシュの下塗りの細かいメゾチントの三角を3個並べる。
 ```
 
 英語DDL：
@@ -1509,19 +1491,19 @@ Line up 7 small black pen points at the bottom.
 ```text
 Mezzotint.
 Fill the background with white.
-Place one red pen sparse aquatint cloudform at the top.
-Line up 3 yellow thick gouache underpainted fine-grained aquatint triangles at the bottom.
+Place one red pen sparse mezzotint cloudform at the top.
+Line up 3 yellow thick gouache underpainted fine-grained mezzotint triangles at the bottom.
 ```
 
 ### 5.15. 振れ幅の異なる揺れ
 
-ねらい：揺れの振れ幅を「細かく」「大きく」で指定し、大きさの語と区別する。
+ねらい：揺れの振れ幅を「小さく」「大きく」で指定し、大きさの語と区別する。
 
 日本語DDL：
 
 ```text
 和紙。
-上に、細かく揺れる青のガッシュの水平の線を1個引く。
+上に、小さく揺れる青のガッシュの水平の線を1個引く。
 下に、大きく揺れる赤のガッシュの水平の線を1個引く。
 中心に、黒の細いペンの小さな空の円を5個並べる。
 ```
@@ -1543,8 +1525,8 @@ Line up 5 small black thin pen empty circles at the center.
 
 ```text
 画用紙。
-上に、細かくゆるやかに波打つ青のペンの水平の線を1個引く。
-下に、細かく小刻みに波打つ赤のペンの水平の線を1個引く。
+上に、小さくゆるやかに波打つ青のペンの水平の線を1個引く。
+下に、小さく小刻みに波打つ赤のペンの水平の線を1個引く。
 中心に、灰の太いガッシュの薄い塗りの横長の楕円を1個置く。
 ```
 
@@ -1579,16 +1561,16 @@ Place one blue gouache full-width crescent arc at the center.
 Line up 7 small gray pencil empty circles at the bottom.
 ```
 
-### 5.18. 上弦と下弦の対
+### 5.18. 半円と三日月の対
 
-ねらい：上弦と下弦を別の弧に指定し、中央に点の列を通す。
+ねらい：半円と三日月を別の弧に指定し、中央に点の列を通す。
 
 日本語DDL：
 
 ```text
 和紙。
-上に、黒のガッシュの半幅の上弦の弧を1個置く。
-下に、黒のガッシュの半幅の下弦の弧を1個置く。
+上に、黒のガッシュの半幅の半円の弧を1個置く。
+下に、黒のガッシュの半幅の三日月の弧を1個置く。
 中心に、赤のペンの小さな点を9個並べる。
 ```
 
@@ -1596,8 +1578,8 @@ Line up 7 small gray pencil empty circles at the bottom.
 
 ```text
 Washi.
-Place one black gouache half-width waxing arc at the top.
-Place one black gouache half-width waning arc at the bottom.
+Place one black gouache half-width semicircle arc at the top.
+Place one black gouache half-width crescent arc at the bottom.
 Line up 9 small red pen points at the center.
 ```
 

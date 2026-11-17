@@ -236,7 +236,7 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   included. A saved Score's `wash` (v1's pale ink
   wash) still draws as the pale band at three times the width and 0.35 of the
   opacity. The migration turns a pale ink wash into a faint sweep, which draws a
-  little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). Stipple, hatch, crosshatch, and aquatint are also accepted on their owning line, ordinary arc, or free line and retained in Score, but the current Renderer paints surfaces only on closed shapes, so these open marks receive no texture face. No texture is transferred to a preceding closed shape. On a closed
+  little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). Stipple, hatch, crosshatch and mezzotint on lines, ordinary arcs and free lines are omitted with `unsupported_surface_without_face`. No texture is transferred to a preceding closed shape. On a closed
   shape, an explicit sweep, brushmarks, grain, stipple, hatch, crosshatch, or
   aquatint is itself the area's performance and adds no flat base fill beneath it (DDL
   engine 46). A flat fill comes only from an explicit flat surface or the
@@ -2732,13 +2732,13 @@ mark the tool makes on that scale, and `thick` is the geometric mean of the defa
 A Score with the thick side is Score version 0.16.0. Gouache is drawn as the fine brush, with only its thick side widened to the thick brush's default (8) and beyond (22). Etching has drypoint's widths (Saijiki v3, render engine 95).
 
 The finite visible DDL forms are Japanese `細い` / English `thin` for Fine,
-Japanese `ごく細い` / English `extra-fine` for ExtraFine, Japanese `太い` /
-English `thick` for Thick, and Japanese `ごく太い` / English `extra-thick` for
+Japanese `ごく細い` / English `very thin` for ExtraFine, Japanese `太い` /
+English `thick` for Thick, and Japanese `ごく太い` / English `very thick` for
 ExtraThick. The shared compiler keeps all four as typed identities independent of source spelling and carries them from supported direct
 instructions and flat Macro Emits through the common lowerer into the existing
 `Instruction.thinness`. Omission remains `None`; no open-ended degree synonym is inferred.
 
-Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). The sends that write the instructions read thinness words and write them into the normalized DDL, but they appear neither in the §3.1 vocabulary table nor in the Saijiki display.
+Saijiki v4 displays four width words in the widths category (author's ruling, 2026-11-17, replacing the 2026-07-29 ruling).
 
 #### Wild (engine 12; its reach in engine 14)
 
@@ -4189,7 +4189,7 @@ qualitative region, and an exact numeric coordinate are separate authorities.
 An exact coordinate is never silently moved, clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
 extent clips the canvas are separate matters.
 
-Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`, `一辺N`, `画面の横X、縦Yの位置`, numeric ranges, numeric segments, numeric angles and fades (§18), corresponding EN forms, and nine finite size classes in both languages. Decimal meaning retains exact signed base-10 coefficient and scale, with original spelling and source spans as provenance. The entrypoint takes a lock-verified intermediate filter v5 view and explicit host canvas/background; the matching resolved color-catalog context is required only when color is omitted. Supported standalone shapes, repeated placements, groups, and Macro Emits reach actual `Score` through the common geometry, omission, and resource-aware compact materialization rules of §18, without a count-one or center-only restriction. Omitted surfaces and `none` / `solid` retain their meanings; current `sweep`, `brushmarks`, `grain`, `stipple`, `hatch`, `crosshatch`, and `aquatint` reach the existing Renderer `SurfaceSpec`. `wash` and `bleed` are legacy saved-Score textures; the current bleeding word reaches independent `ink_spread`. Verified `paper`, `washi`, `ink_wash`, `charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach `CanvasGroundSpec` in a `Canvas::Spec` with the host-resolved aspect. Surface intensity reaches tool-relative normal/dense/faint appearance for lines, arcs, and faces. Recoverable unsupported combinations, including an explicit Point surface or brushmarks on an open mark, omit only the affected field or execution unit with its owner, spans, and diagnostics under either legacy error-policy input. The effect of textures retained on open marks follows §3.1. Ground alone is drawable content, and retaining it retains the original omission diagnostics. Integrity failure or omission of every target is stopped. The normal Server, Web, and Android runtimes use this Rust path.
+Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`, `一辺N`, `画面の横X、縦Yの位置`, numeric ranges, numeric segments, numeric angles and fades (§18), corresponding EN forms, and five Saijiki size classes in both languages. Decimal meaning retains exact signed base-10 coefficient and scale, with original spelling and source spans as provenance. The entrypoint takes a lock-verified intermediate filter v5 view and explicit host canvas/background; the matching resolved color-catalog context is required only when color is omitted. Supported standalone shapes, repeated placements, groups, and Macro Emits reach actual `Score` through the common geometry, omission, and resource-aware compact materialization rules of §18, without a count-one or center-only restriction. Omitted surfaces and `none` / `solid` retain their meanings; current `sweep`, `brushmarks`, `grain`, `stipple`, `hatch`, `crosshatch`, and `aquatint` reach the existing Renderer `SurfaceSpec`. `wash` and `bleed` are legacy saved-Score textures; the current bleeding word reaches independent `ink_spread`. Verified `paper`, `washi`, `ink_wash`, `charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach `CanvasGroundSpec` in a `Canvas::Spec` with the host-resolved aspect. Surface intensity reaches tool-relative normal/dense/faint appearance for lines, arcs, and faces. Recoverable unsupported combinations, including an explicit Point surface or brushmarks on an open mark, omit only the affected field or execution unit with its owner, spans, and diagnostics under either legacy error-policy input. The effect of textures accepted on open marks follows §3.1. Ground alone is drawable content, and retaining it retains the original omission diagnostics. Integrity failure or omission of every target is stopped. The normal Server, Web, and Android runtimes use this Rust path.
 
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation

@@ -512,3 +512,33 @@ fn a_word_the_mark_cannot_show_is_left_out_with_its_reason() {
         assert!(compile(source, JA).gaps.is_empty(), "{source}");
     }
 }
+
+fn canonical(source: &str) -> String {
+    let compilation = inku_ddl::compile_typed_ddl(
+        NormalizedDdlDocument::new(source, JA, Vec::new()).unwrap(),
+        &[],
+        Some(1),
+        LIMITS,
+    );
+    String::from_utf8(
+        compilation
+            .semantic_document
+            .and_then(|document| document.canonical_bytes)
+            .unwrap(),
+    )
+    .unwrap()
+}
+
+// Concrete failure (V1f, 14 of the author's works): moving 密な・疎な to a density field
+// changed the meaning digest, so a work's rotated, diagonal and rising angles and its leaf
+// counts were drawn again on a recompile. A density alone keeps its Saijiki v3 slot in the
+// canonical bytes (the author's choice, 2026-11-17); a mark with both, which v3 could not
+// write, has a density field.
+#[test]
+fn a_density_alone_keeps_its_v3_place_in_the_meaning_digest() {
+    let alone = canonical("中心に、黒のチョークの疎な粒の円を1個置く。");
+    assert!(alone.contains("\"surface\":{\"fineness\":"), "{alone}");
+    assert!(!alone.contains("\"density\":"), "{alone}");
+    let both = canonical("中心に、黒のチョークの細かい疎な粒の円を1個置く。");
+    assert!(both.contains("\"density\":"), "{both}");
+}

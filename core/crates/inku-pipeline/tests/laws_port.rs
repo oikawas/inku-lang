@@ -246,7 +246,6 @@ fn the_laws_print_as_the_prototype_printed_them() {
     );
 }
 
-
 /// Every printed document compiles with its run's options as cleanly as a
 /// committed document must: a Score whose lowering did not stop, no resource
 /// failure, no diagnostic and nothing left out. A mark at a numeric point the

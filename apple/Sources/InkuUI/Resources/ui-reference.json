@@ -1,8 +1,8 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.353",
-  "build": "1429",
-  "buildDate": "2026-11-16T23:40:13.700Z",
+  "version": "v2.15.354",
+  "build": "1430",
+  "buildDate": "2026-11-17T01:06:00.037Z",
   "versions": {
     "ddlSpec": "30",
     "ddlEngine": "78",
@@ -208,7 +208,7 @@
         "appInfoOpenLabel": "inku-langについて",
         "appInfoTitle": "inku",
         "appInfoConceptTitle": "コンセプト",
-        "appInfoConceptBody": "inku（インク）は、短い記述から抽象的なベクターグラフィックを生み出す描画言語 DDL（Drawing Description Language）のリファレンスとなるアプリケーションです。\n\n絵画の経験や道具が無くても、自分のイメージを形に出来ます。心に残った光景をひとつ、短く書くことが始まりで、そこから作品を作っていくことが出来ます。",
+        "appInfoConceptBody": "inku（インク）は、短い記述からベクターグラフィックを生み出す、描画言語 DDL（Drawing Description Language）のリファレンスとなるアプリケーションです。心に残った光景をひとつ短く書くと、それを形に出来ます。",
         "appInfoCreatorTitle": "制作者",
         "appInfoCreatorName": "及川 信一郎 (Shinichiro Oikawa)",
         "appInfoCreatorBody": "DDLの日本語と英語の仕様、inkuアプリケーションの設計・実装しています。",
@@ -236,7 +236,7 @@
         "noticesTextFailed": "通知の全文を読み込めません。",
         "noticesRetry": "再試行",
         "noticesSelect": "項目を選ぶと全文を表示します。",
-        "appInfoVocabTitle": "用語と層",
+        "appInfoVocabTitle": "用語",
         "appInfoVocabIntro": "inkuのUIで使われている代表的な用語。",
         "appInfoVocabColTerm": "語",
         "appInfoVocabColMeaning": "対応",
@@ -2102,7 +2102,7 @@
         "appInfoOpenLabel": "About inku-lang",
         "appInfoTitle": "inku",
         "appInfoConceptTitle": "Concept",
-        "appInfoConceptBody": "inku is the reference application for DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic.\n\nNo experience with drawing and no tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the beginning — and from there you build the work up.",
+        "appInfoConceptBody": "inku is the reference application for DDL (Drawing Description Language), a drawing language that turns short descriptions into vector graphics. Briefly describe a scene that has stayed with you, and you can give it form.",
         "appInfoCreatorTitle": "Creator",
         "appInfoCreatorName": "及川 信一郎 (Shinichiro Oikawa)",
         "appInfoCreatorBody": "Designs and implements the Japanese and English DDL specifications and the inku application.",
@@ -2130,7 +2130,7 @@
         "noticesTextFailed": "The full notice could not be loaded.",
         "noticesRetry": "Retry",
         "noticesSelect": "Select an item to read its full text.",
-        "appInfoVocabTitle": "Vocabulary and layers",
+        "appInfoVocabTitle": "Vocabulary",
         "appInfoVocabIntro": "Representative terms used in the inku UI.",
         "appInfoVocabColTerm": "Term",
         "appInfoVocabColMeaning": "Corresponds to",
@@ -4548,19 +4548,19 @@
     }
   },
   "source": {
-    "commit": "059dcfbd267d7e2a44bd5f336b5425987f432585",
+    "commit": "3d5d75d72b7a9213b8f6041ee2d9e0fad1ad21d8",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "001f310fbd4454ee8336877ec7b36e7dd85b3baf3e7a08727ee0c5e943820e8b",
       "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
       "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
       "web/src/lib/features/composition-record/figures.ts": "e15595d28b095c0d655bdad44e64fabb7766a2b7be9961d10f2526a3a40891d0",
-      "web/APP_VERSION": "5fb36a22678fa85cbec31fb03359b5ccc1fb839052ef45dad71d659133c80e4d",
-      "web/BUILD_NUMBER": "5db58c6cd40a6a7a3eecbdd57f5204e3364949a020fd807787bdcc60da2cb90e",
+      "web/APP_VERSION": "152ff9e9fb60bcd9a38e0f49aaa79b663e666d138fa6558ebe03db9ad0cc2b55",
+      "web/BUILD_NUMBER": "e043c662bc456d809131f79ac8444973f9aed48a3287965dab7964a5f080c180",
       "server/src/inku_server/layer_versions.py": "07ac2c29547d1921adf33eb4f8536a2ad45dfdd12a29d1b975b38e2ba2a143a2",
       "core/crates/inku-render/src/lib.rs": "7005f745e98126fb17dd0496759a47ed7f51daca2ecefad4182339683ef0618f",
-      "web/src/lib/i18n/ja.ts": "ce607be19323d7e5fe68c551004cb3950da81afacb2d4323cbfaafa9c5f06233",
-      "web/src/lib/i18n/en.ts": "3914b740db6d14d197bf07eac905046a0e530af3e955ad3542a1ec0429bedb3f"
+      "web/src/lib/i18n/ja.ts": "4fa999be88af7b6a0ef6da82952ed6e216a0a136b1264954a433973e3f3c185f",
+      "web/src/lib/i18n/en.ts": "57a06d9fffea44d9fb6c4f7bb027aea2115606f12711f6dc306e544a2b5fd7df"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

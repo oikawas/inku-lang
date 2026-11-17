@@ -1,5 +1,42 @@
 {
   "asset_id": "inku.saijiki.v4",
+  "bundles": [
+    {
+      "key": "what",
+      "name_en": "What",
+      "name_ja": "何を"
+    },
+    {
+      "key": "with",
+      "name_en": "With what",
+      "name_ja": "何で"
+    },
+    {
+      "key": "face",
+      "name_en": "What face",
+      "name_ja": "どんな面で"
+    },
+    {
+      "key": "sway",
+      "name_en": "How it sways",
+      "name_ja": "どう揺れて"
+    },
+    {
+      "key": "color",
+      "name_en": "What color",
+      "name_ja": "何色で"
+    },
+    {
+      "key": "where",
+      "name_en": "Where",
+      "name_ja": "どこに置くか"
+    },
+    {
+      "key": "ground",
+      "name_en": "On what ground",
+      "name_ja": "何の上に"
+    }
+  ],
   "categories": [
     {
       "bundle": "what",

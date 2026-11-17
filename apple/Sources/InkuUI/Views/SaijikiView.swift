@@ -140,7 +140,7 @@ public struct SaijikiView: View {
     }
 
     private var uiLanguage: String { model.display.preferences.language }
-    private var bundles: [SaijikiBundle] { model.productReference?.saijikiBundles ?? [] }
+    private var bundles: [SaijikiBundle] { model.saijikiBundles }
     private var offeredLanguage: String { wordLanguage ?? uiLanguage }
     private var copy: ProductReferenceCopy? { model.productReference?.localized(language: uiLanguage) }
     private var hint: String {

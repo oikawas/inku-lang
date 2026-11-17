@@ -64,6 +64,17 @@ public struct SaijikiCategory: Identifiable, Sendable {
     public var bundle: String = ""
 }
 
+public struct SaijikiBundle: Identifiable, Sendable {
+    public let key: String
+    public let labelJa: String
+    public let labelEn: String
+    public var id: String { key }
+    public func label(language: String) -> String { language == "ja" ? labelJa : labelEn }
+    public func categories(in categories: [SaijikiCategory]) -> [SaijikiCategory] {
+        categories.filter { $0.bundle == key }
+    }
+}
+
 public struct PluginWord: Identifiable, Sendable {
     public let id: String
     public let japanese: [String]
@@ -94,6 +105,7 @@ struct Bootstrap: @unchecked Sendable {
     private let registry: [String: Any]
     private let macroSources: [String: Any]
     let saijiki: [SaijikiCategory]
+    let saijikiBundles: [SaijikiBundle]
     let pluginWords: [PluginWord]
     let bundledPluginWords: [PluginWord]
     let installedPluginPackages: [InstalledPluginPackage]
@@ -122,9 +134,18 @@ struct Bootstrap: @unchecked Sendable {
         macroSources = try Self.object(resource("macro-sources"))
         let vocabulary = try Self.object(resource("saijiki"))
         guard vocabulary["asset_id"] as? String == SaijikiEdition.current,
+              let bundleRecords = vocabulary["bundles"] as? [[String: Any]], !bundleRecords.isEmpty,
               let categories = vocabulary["categories"] as? [[String: Any]] else {
             throw HostError("bundled_vocabulary_invalid")
         }
+        let bundles = try bundleRecords.map { record in
+            guard let key = record["key"] as? String, !key.isEmpty,
+                  let ja = record["name_ja"] as? String, !ja.isEmpty,
+                  let en = record["name_en"] as? String, !en.isEmpty else { throw HostError("bundled_vocabulary_invalid") }
+            return SaijikiBundle(key: key, labelJa: ja, labelEn: en)
+        }
+        guard Set(bundles.map(\.key)).count == bundles.count else { throw HostError("bundled_vocabulary_invalid") }
+        saijikiBundles = bundles
         var displayCategories = try categories.map { category in
             guard let id = category["key"] as? String, let name = category["name_ja"] as? String,
                   let bundle = category["bundle"] as? String,
@@ -154,9 +175,6 @@ struct Bootstrap: @unchecked Sendable {
             words: grounds.words + [ratio], englishName: grounds.englishName, bundle: grounds.bundle)
         guard let relations = vocabulary["relations"] as? [[String: Any]],
               let relationOrder = vocabulary["relation_display_order"] as? [String] else { throw HostError("bundled_vocabulary_invalid") }
-        guard let relationBundle = reference.saijikiBundles.first(where: { $0.categoryKeys.contains("aida") })?.key else {
-            throw HostError("bundled_vocabulary_invalid")
-        }
         displayCategories.append(SaijikiCategory(id: "aida", name: "あいだ", words: try relationOrder.map { type in
             guard let relation = relations.first(where: { $0["relation_type"] as? String == type }),
                   let ja = relation["surface_ja"] as? String, let en = relation["surface_en"] as? String else {
@@ -164,8 +182,8 @@ struct Bootstrap: @unchecked Sendable {
             }
             return SaijikiWord(id: "aida:" + ja, japanese: ja, english: en, detail: "", isDefault: false,
                 englishDetail: "", preview: reference.saijikiPreviews["aida:" + ja])
-        }, englishName: "relations", bundle: relationBundle))
-        let grouped = reference.saijikiBundles.flatMap { $0.categories(in: displayCategories) }
+        }, englishName: "relations", bundle: "where"))
+        let grouped = bundles.flatMap { $0.categories(in: displayCategories) }
         guard grouped.count == displayCategories.count, Set(grouped.map(\.id)).count == displayCategories.count else {
             throw HostError("bundled_vocabulary_invalid")
         }

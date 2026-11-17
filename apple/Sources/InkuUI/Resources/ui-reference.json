@@ -2,7 +2,7 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.355",
   "build": "1431",
-  "buildDate": "2026-11-17T06:37:47.701Z",
+  "buildDate": "2026-11-17T07:22:39.698Z",
   "versions": {
     "ddlSpec": "31",
     "ddlEngine": "79",
@@ -4599,83 +4599,13 @@
       "exampleEn": "Place a very large circle"
     }
   },
-  "saijikiBundles": [
-    {
-      "key": "what",
-      "labelJa": "かたち",
-      "labelEn": "What",
-      "categoryKeys": [
-        "katachi",
-        "wariai",
-        "ookisa"
-      ]
-    },
-    {
-      "key": "where",
-      "labelJa": "場所と動き",
-      "labelEn": "Where",
-      "categoryKeys": [
-        "katamuki",
-        "basho",
-        "ugoki",
-        "jun",
-        "aida"
-      ]
-    },
-    {
-      "key": "with",
-      "labelJa": "道具",
-      "labelEn": "With",
-      "categoryKeys": [
-        "tezawari",
-        "tsuranari",
-        "futosa"
-      ]
-    },
-    {
-      "key": "face",
-      "labelJa": "面",
-      "labelEn": "Face",
-      "categoryKeys": [
-        "omote",
-        "sabaki",
-        "kime"
-      ]
-    },
-    {
-      "key": "ground",
-      "labelJa": "地",
-      "labelEn": "Ground",
-      "categoryKeys": [
-        "ji"
-      ]
-    },
-    {
-      "key": "color",
-      "labelJa": "色",
-      "labelEn": "Color",
-      "categoryKeys": [
-        "iro"
-      ]
-    },
-    {
-      "key": "sway",
-      "labelJa": "揺れ",
-      "labelEn": "Sway",
-      "categoryKeys": [
-        "yuragi"
-      ]
-    }
-  ],
   "source": {
-    "commit": "0c96d46af667e2546172509e99b719a8b1d54a6d",
+    "commit": "e62ede6177f7907bee0416a9a06cfeceba45f432",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "bfeadaecbcbd2990efc429687c06ff442902f50bc41f5eaf4bccedeacb6dac97",
       "web/src/lib/saijiki-surface.ts": "ba6640c75fa57284800b99127eecde2103f2f8d9035228ad945d8ea8d90e56bb",
       "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
-      "web/src/lib/saijiki.generated.ts": "9ff67a0922d998cdaa321e521d2f894bde72af5add97dfa177322c5945b9d5bd",
-      "web/src/lib/saijiki.ts": "44c56efeff3cd50e85106f46fabc9713cf680e7c2fe7ac11e79769115536a193",
       "web/src/lib/features/composition-record/figures.ts": "e15595d28b095c0d655bdad44e64fabb7766a2b7be9961d10f2526a3a40891d0",
       "web/APP_VERSION": "58ec05a9a20b3a257a401fe6c6c51ba0b8a9c08b626ef1a7eb178fd69e45259c",
       "web/BUILD_NUMBER": "4dde49033139f34c6835a1937c22c7d79d84446d36e44610fd0ffed2c2b372b1",

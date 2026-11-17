@@ -19,18 +19,6 @@ public struct SaijikiPreview: Decodable, Sendable {
     public func example(language: String) -> String { language == "ja" ? exampleJa : exampleEn }
 }
 
-public struct SaijikiBundle: Decodable, Identifiable, Sendable {
-    public let key: String
-    public let labelJa: String
-    public let labelEn: String
-    public let categoryKeys: [String]
-    public var id: String { key }
-    public func label(language: String) -> String { language == "ja" ? labelJa : labelEn }
-    public func categories(in categories: [SaijikiCategory]) -> [SaijikiCategory] {
-        categoryKeys.compactMap { key in categories.first { $0.id == key && $0.bundle == self.key } }
-    }
-}
-
 public struct ReferenceVocabulary: Decodable, Sendable {
     public let term: String
     public let meaning: String
@@ -62,7 +50,6 @@ public struct ProductReference: Decodable, Sendable {
     public let canvasMetadata: [String: CanvasDisplayMetadata]
     public let copy: [String: ProductReferenceCopy]
     public let saijikiPreviews: [String: SaijikiPreview]
-    public let saijikiBundles: [SaijikiBundle]
 
     public func localized(language: String) -> ProductReferenceCopy? { copy[language] ?? copy["ja"] }
 }

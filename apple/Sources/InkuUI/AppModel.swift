@@ -207,6 +207,7 @@ public final class AppModel {
     @ObservationIgnored private(set) var ddlHighlighter = DdlHighlighter(saijiki: [])
     @ObservationIgnored private var completionCache: (disabled: [String], uiLanguage: String, language: String, value: DdlCompletions)?
     public private(set) var productReference: ProductReference?
+    public private(set) var saijikiBundles: [SaijikiBundle] = []
     public private(set) var drawingLimitDefinition: DrawingLimitDefinition?
     public private(set) var importedMacroNames: [String] = []
     public private(set) var authoringRevision = "0"
@@ -506,6 +507,7 @@ public final class AppModel {
             pruneComparisonModels()
             self.bootstrap = bootstrap
             self.productReference = bootstrap.productReference
+            self.saijikiBundles = bootstrap.saijikiBundles
             self.drawingLimitDefinition = bootstrap.drawingLimitDefinition
             display.connect(directory: url.deletingLastPathComponent())
             descriptionMeter.connect(directory: url.deletingLastPathComponent())

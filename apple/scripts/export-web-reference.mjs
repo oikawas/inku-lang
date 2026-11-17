@@ -130,20 +130,6 @@ for (const category of vocabulary.categories) {
   }
 }
 
-// Run the Web's own grouping and label functions on its generated category table.
-const generatedSaijiki = await sourceFile('web/src/lib/saijiki.generated.ts');
-const saijikiSource = await sourceFile('web/src/lib/saijiki.ts');
-const groupsContext = vm.createContext({});
-vm.runInContext(script(generatedSaijiki) + '\n' + script(saijikiSource) + `
-  globalThis.bundles = saijikiGroups(SAIJIKI).map(group => ({
-    key: group.key, labelJa: bundleLabel(group.key, true), labelEn: bundleLabel(group.key, false),
-    categoryKeys: group.categories.map(category => category.key)
-  }));`, groupsContext, { timeout: 5000 });
-const saijikiBundles = groupsContext.bundles;
-if (!saijikiBundles.length || saijikiBundles.some(group => !group.key || !group.labelJa || !group.labelEn)) {
-  throw new Error('saijiki_bundles_unavailable');
-}
-
 const figuresSource = await sourceFile('web/src/lib/features/composition-record/figures.ts');
 const figuresContext = vm.createContext({});
 vm.runInContext(`${script(figuresSource)}\nglobalThis.figures = FIGURES;`, figuresContext, { timeout: 5000 });
@@ -166,7 +152,6 @@ const reference = {
   canvasMetadata: canvasContext.metadata,
   copy: { ja: await copyFor('ja'), en: await copyFor('en') },
   saijikiPreviews,
-  saijikiBundles,
 };
 if (Object.values(reference.versions).some(value => !value)) throw new Error('product_layer_versions_unavailable');
 reference.source = {

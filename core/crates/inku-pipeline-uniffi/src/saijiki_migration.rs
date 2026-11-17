@@ -278,6 +278,7 @@ fn migrate_document(retired: Retired, document: SavedDocument, definitions: &[Su
             "edits": migration.edits,
             "unassociated_sweeps": migration.unassociated_sweeps,
             "unassociated_tools": migration.unassociated_tools,
+            "approximated_words": migration.approximated_words,
             "recovered_definitions": recovered,
         }),
         Err(error) => json!({"error": error_value(&error)}),

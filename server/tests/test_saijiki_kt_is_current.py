@@ -73,7 +73,7 @@ def test_snapshot_carries_both_language_surfaces_for_every_category() -> None:
     # Fifteen saijiki categories (じゅん joined them, then さばき with Saijiki
     # v2, then きめ and したじ with DDL 24) plus あいだ, which display_categories
     # appends. 画面比 (DDL 26) is shown inside じ, not as a category of its own.
-    assert len(ja) == 16, f"expected sixteen display categories, table has {len(ja)}"
+    assert len(ja) == 17, f"expected seventeen display categories, table has {len(ja)}"
 
     for cat_ja, cat_en in zip(ja, en):
         assert f'key = "{cat_ja["key"]}"' in text, f"category missing: {cat_ja['key']}"

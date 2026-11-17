@@ -4,7 +4,11 @@ export type SaijikiCategory = {
 	key: string;
 	label: string;
 	en: string;
+	bundle: string;
 	words: string[];
+	ids: string[];
+	facets: (string | null)[];
+	descriptions: (string | null)[];
 };
 
 // Module-level mutable vocabulary store (v1.92 Phase 3). The single source is

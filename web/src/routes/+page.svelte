@@ -1230,7 +1230,7 @@
 
 	async function loadPluginVocabulary() {
 		type SaijikiPayload = {
-			categories: { key: string; name_ja: string; name_en: string; words: string[] }[];
+			categories: { key: string; name_ja: string; name_en: string; bundle: string; words: string[]; ids: string[]; facets: (string | null)[]; descriptions: (string | null)[] }[];
 			plugins: PluginEntry[];
 		};
 		const fetchSaijiki = async (lang: 'ja' | 'en'): Promise<SaijikiPayload> => {
@@ -1243,10 +1243,10 @@
 			// follows instruction_lang and need not agree with the UI language.
 			const [ja, en] = await Promise.all([fetchSaijiki('ja'), fetchSaijiki('en')]);
 			hydrateSaijiki(
-				ja.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
+				ja.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, bundle: c.bundle, words: c.words, ids: c.ids, facets: c.facets, descriptions: c.descriptions }))
 			);
 			hydrateSaijikiEn(
-				en.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
+				en.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, bundle: c.bundle, words: c.words, ids: c.ids, facets: c.facets, descriptions: c.descriptions }))
 			);
 			pluginEntries = ja.plugins ?? [];
 		} catch (error) {

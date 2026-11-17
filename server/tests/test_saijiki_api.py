@@ -22,12 +22,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GENERATED_TS = _REPO_ROOT / "web" / "src" / "lib" / "saijiki.generated.ts"
 
 
-def test_all_saijiki_categories_match_the_core_v3_asset():
-    asset = json.loads((_REPO_ROOT / "core/crates/inku-ddl/assets/saijiki-v3.json").read_text())
-    assert asset["asset_id"] == "inku.saijiki.v3"
+def test_all_saijiki_categories_match_the_core_v4_asset():
+    asset = json.loads((_REPO_ROOT / "core/crates/inku-ddl/assets/saijiki-v4.json").read_text())
+    assert asset["asset_id"] == "inku.saijiki.v4"
     assert len(asset["categories"]) == len(saijiki.SAIJIKI)
     fields = ("surface_ja", "surface_en", "score_value", "default", "prompt", "display", "marker",
-              "parser_surfaces_ja", "parser_surfaces_en", "marker_surfaces_ja", "marker_surfaces_en")
+              "parser_surfaces_ja", "parser_surfaces_en", "marker_surfaces_ja", "marker_surfaces_en", "id", "facet")
     for expected, category in zip(asset["categories"], saijiki.SAIJIKI, strict=True):
         assert expected["key"] == category.key
         assert len(expected["words"]) == len(category.words)
@@ -36,6 +36,15 @@ def test_all_saijiki_categories_match_the_core_v3_asset():
             assert {field: actual[field] for field in fields} == {
                 field: word_asset.get(field) for field in fields
             }
+
+
+def test_generated_python_matches_asset():
+    path = _REPO_ROOT / "server/scripts/gen_saijiki_py.py"
+    spec = importlib.util.spec_from_file_location("gen_saijiki_py", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(module)
+    assert module.render_py() == module.OUTPUT.read_text(encoding="utf-8")
 
 
 def _load_codegen():
@@ -94,90 +103,109 @@ def test_generated_ts_matches_table():
 # 表示リストの ja↔en 対応。web へは言語別リストとして配信するため、最終表現の
 # 位置対応を固定する。サーバー正本では1語が両言語表面を所有し、並べ替えによる
 # 引く/埋める と draw/fill の入れ違いを構造上起こせない。
-_EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
-    "katachi": (
-        ("円", "circle"), ("楕円", "ellipse"), ("三角", "triangle"), ("四角", "square"),
-        ("線", "line"), ("弧", "arc"), ("自由線", "free line"), ("点", "point"), ("雲形", "cloudform"),
-    ),
-    "katamuki": (
-        ("水平", "horizontal"), ("垂直", "vertical"), ("斜め", "diagonal"),
-        ("右上がり", "rising"), ("右下がり", "falling"), ("回転", "rotated"),
-    ),
-    "tezawari": (
-        ("銀筆", "silverpoint"), ("鉛筆", "pencil"), ("ペン", "pen"),
-        ("チョーク", "chalk"), ("オイルパステル", "oil pastel"), ("ガッシュ", "gouache"),
-        ("水彩", "watercolor"), ("油彩", "oil paint"),
-        ("ペインティングナイフ", "painting knife"), ("エッチング", "etching"),
-        ("コンピュータ", "computer"),
-    ),
-    "tsuranari": (
-        ("実線", "solid"), ("破線", "dashed"), ("点線", "dotted"), ("一点鎖線", "dash-dot"),
-    ),
-    # おもて (2026-08-12).
-    # おもて's 塗り is `flat` and not `solid`: つらなり's 実線 already holds `solid`,
-    # and one word in two adjacent lines of the vocabulary block meaning two
-    # different things is a collision the author ruled out (2026-08-12). The
-    # Japanese is the noun 塗り, not the verb 塗る, by the same ruling.
-    # Saijiki v2 (2026-09-29): 刷き / sweep is a technique with no paleness of its
-    # own, and 濃い / 薄い left おもて for さばき, which says how the ink is laid.
-    # DDL 25 (2026-10-22): 刷毛目 / brushmarks lays the sweep's bands one by one.
-    "omote": (
-        ("空", "empty"), ("塗り", "flat"), ("刷き", "sweep"), ("刷毛目", "brushmarks"),
-        ("粒", "grain"), ("点描", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
-        ("アクアチント", "aquatint"),
-    ),
-    # さばき (2026-09-30): 程よい / temperate lays the medium at the tool's own
-    # density, so a reader who must name the handling of every mark need not
-    # choose dense or faint where the description says neither.
-    "sabaki": (("濃い", "dense"), ("程よい", "temperate"), ("薄い", "faint")),
-    # きめ and したじ (2026-10-22, DDL 24) lay a named texture of a closed shape:
-    # the size or the spacing of its units, and the paint under it.
-    "kime": (
-        ("細かい", "fine-grained"), ("粗い", "coarse-grained"), ("密な", "packed"), ("疎な", "sparse"),
-    ),
-    "shitaji": (("下塗り", "underpainted"),),
-    # じ (2026-08-14, ddl-engine 19). Seven supports and no `plain`: asking for
-    # no ground is not a word you can say. 「カンバス」 and not 「キャンバス」 --
-    # the web already spells the sheet's own proportion キャンバス, and one screen
-    # must not use one word for two things.
-    # 画面比 (2026-10-23, DDL 26): the canvas ratio declaration a host writes,
-    # shown last in じ because it speaks of the canvas itself, but no Saijiki word.
-    "ji": (
-        ("紙", "paper"), ("和紙", "washi"), ("薄墨地", "ink wash ground"),
-        ("木炭地", "charcoal ground"), ("カンバス", "canvas"),
-        ("画用紙", "drawing paper"), ("メゾチント", "mezzotint"),
-        ("画面比", "aspect ratio"),
-    ),
-    "iro": (
-        ("白", "white"), ("黒", "black"), ("青", "blue"),
-        ("赤", "red"), ("緑", "green"), ("灰", "gray"),
-        ("黄", "yellow"), ("橙", "orange"), ("紫", "purple"),
-    ),
-    "yuragi": (
-        ("細かく", "narrowly"), ("大きく", "broadly"), ("ゆるやかに", "loosely"), ("小刻みに", "tightly"),
-        ("揺れる", "swaying"), ("波打つ", "undulating"), ("にじみ", "bleeding"),
-    ),
-    "basho": (
-        ("上", "top"), ("下", "bottom"), ("中心", "center"), ("左端", "left-edge"),
-        ("右端", "right-edge"), ("上端", "top-edge"), ("下端", "bottom-edge"),
-        ("始点", "start"), ("終点", "end"), ("途中", "partway"), ("隅", "corner"),
-    ),
-    "ugoki": (
-        ("置く", "place"), ("並べる", "line-up"), ("引く", "draw"),
-        ("散らす", "scatter"), ("埋める", "fill"), ("敷き詰める", "tile"),
-    ),
-    "jun": (("交互に", "alternating"), ("順に", "in order")),
-    "wariai": (
-        ("縦長", "tall"), ("横長", "wide"), ("全幅", "full-width"), ("半幅", "half-width"),
-        ("半円", "semicircle"), ("上弦", "waxing"), ("下弦", "waning"), ("三日月", "crescent"),
-    ),
-    "aida": (
-        ("沿う", "along"), ("触れない", "not touching"), ("切る", "cutting"),
-        ("間に", "between"), ("触れる", "touching"), ("つながる", "connected"),
-        ("載る", "resting on"), ("中に", "inside"), ("重なる", "overlaps"), ("横切る", "crossing"),
-        ("鏡写し", "mirrored"),
-    ),
-}
+_EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {'katachi': (('円', 'circle'),
+             ('楕円', 'ellipse'),
+             ('三角', 'triangle'),
+             ('四角', 'square'),
+             ('線', 'line'),
+             ('弧', 'arc'),
+             ('自由線', 'free line'),
+             ('点', 'point'),
+             ('雲形', 'cloudform'),
+             ('多角形', 'polygon'),
+             ('半円', 'semicircle'),
+             ('三日月', 'crescent')),
+ 'katamuki': (('水平', 'horizontal'),
+              ('垂直', 'vertical'),
+              ('斜め', 'diagonal'),
+              ('右上がり', 'rising'),
+              ('右下がり', 'falling'),
+              ('左上がり', 'left-rising'),
+              ('左下がり', 'left-falling'),
+              ('回転', 'rotated')),
+ 'tezawari': (('銀筆', 'silverpoint'),
+              ('鉛筆', 'pencil'),
+              ('ペン', 'pen'),
+              ('チョーク', 'chalk'),
+              ('オイルパステル', 'oil pastel'),
+              ('ガッシュ', 'gouache'),
+              ('水彩', 'watercolor'),
+              ('油彩', 'oil paint'),
+              ('ペインティングナイフ', 'painting knife'),
+              ('エッチング', 'etching'),
+              ('デジタル', 'digital')),
+ 'tsuranari': (('実線', 'solid'), ('破線', 'dashed'), ('点線', 'dotted')),
+ 'omote': (('空', 'empty'),
+           ('塗り', 'flat'),
+           ('刷き', 'sweep'),
+           ('刷毛目', 'brushmarks'),
+           ('粒', 'grain'),
+           ('点描', 'stipple'),
+           ('平行線', 'hatch'),
+           ('交差線', 'crosshatch'),
+           ('メゾチント', 'mezzotint')),
+ 'sabaki': (('濃い', 'dense'), ('程よい', 'moderate'), ('薄い', 'faint'), ('にじみ', 'bleeding')),
+ 'kime': (('細かい', 'fine-grained'),
+          ('粗い', 'coarse-grained'),
+          ('密な', 'packed'),
+          ('疎な', 'sparse'),
+          ('下塗り', 'underpainted')),
+ 'ji': (('紙', 'paper'),
+        ('和紙', 'washi'),
+        ('薄墨地', 'ink wash ground'),
+        ('木炭地', 'charcoal ground'),
+        ('カンバス', 'canvas'),
+        ('画用紙', 'drawing paper'),
+        ('メゾチント', 'mezzotint'),
+        ('画面比', 'aspect ratio')),
+ 'iro': (('白', 'white'),
+         ('黒', 'black'),
+         ('青', 'blue'),
+         ('赤', 'red'),
+         ('緑', 'green'),
+         ('灰', 'gray'),
+         ('黄', 'yellow'),
+         ('橙', 'orange'),
+         ('紫', 'purple')),
+ 'yuragi': (('小さく', 'narrowly'),
+            ('大きく', 'broadly'),
+            ('ゆるやかに', 'loosely'),
+            ('小刻みに', 'tightly'),
+            ('揺れる', 'swaying'),
+            ('波打つ', 'undulating')),
+ 'basho': (('上', 'top'),
+           ('下', 'bottom'),
+           ('中心', 'center'),
+           ('左端', 'left-edge'),
+           ('右端', 'right-edge'),
+           ('上端', 'top-edge'),
+           ('下端', 'bottom-edge'),
+           ('隅', 'corner')),
+ 'ugoki': (('置く', 'place'),
+           ('並べる', 'line-up'),
+           ('引く', 'draw'),
+           ('散らす', 'scatter'),
+           ('埋める', 'fill'),
+           ('敷き詰める', 'tile')),
+ 'jun': (('交互に', 'alternating'), ('順に', 'in order')),
+ 'wariai': (('縦長', 'tall'), ('横長', 'wide'), ('全幅', 'full-width'), ('半幅', 'half-width')),
+ 'futosa': (('ごく細い', 'very thin'), ('細い', 'thin'), ('太い', 'thick'), ('ごく太い', 'very thick')),
+ 'ookisa': (('ごく小さな', 'very small'),
+            ('小さな', 'small'),
+            ('普通の大きさ', 'normal-sized'),
+            ('大きな', 'large'),
+            ('ごく大きな', 'very large')),
+ 'aida': (('沿う', 'along'),
+          ('触れない', 'not touching'),
+          ('切る', 'cutting'),
+          ('間に', 'between'),
+          ('触れる', 'touching'),
+          ('つながる', 'connected'),
+          ('載る', 'resting on'),
+          ('中に', 'inside'),
+          ('重なる', 'overlaps'),
+          ('横切る', 'crossing'),
+          ('鏡写し', 'mirrored'))}
 
 
 def test_display_lists_pair_ja_and_en_by_position():

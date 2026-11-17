@@ -147,6 +147,11 @@ pub struct SaijikiWordAsset {
     /// What the word does, in both languages (Saijiki v4; written in V2).
     #[serde(default)]
     pub description: Option<SaijikiPhysicalDescriptionAsset>,
+    /// The category whose word writes the same surfaces (Saijiki v4: the おもて メゾチント
+    /// shares the じ メゾチント). The parser reads the surface once, as the partner's word;
+    /// a sentence of the word alone is the partner's, and any other place is this word's.
+    #[serde(default)]
+    pub shared_surface_with: Option<String>,
 }
 
 /// Bilingual physical trace description attached to one Saijiki word.
@@ -758,6 +763,10 @@ fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectio
     let mut owners = HashMap::<String, (String, String)>::new();
     for category in &asset.categories {
         for word in &category.words {
+            if word.shared_surface_with.is_some() {
+                // Its surfaces are its partner's; the partner registers them once.
+                continue;
+            }
             let eligible = word.prompt || word.display || word.marker == Some(true);
             let mut derived_forms = Vec::new();
             if let Some(grammar) = &word.english_grammar {
@@ -863,6 +872,16 @@ fn validate_japanese_surfaces(asset: &SaijikiAsset) -> Result<(), SaijikiProject
             if !(word.prompt || word.display || word.marker == Some(true)) {
                 continue;
             }
+            if let Some(partner_key) = &word.shared_surface_with {
+                if shared_surface_partner(asset, partner_key, word).is_none() {
+                    return Err(SaijikiProjectionError::SharedSurfaceWithoutPartner {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                        partner_category_key: partner_key.clone(),
+                    });
+                }
+                continue;
+            }
             for surface in std::iter::once(word.surface_ja.as_str())
                 .chain(word.parser_surfaces_ja.iter().flatten().map(String::as_str))
             {
@@ -881,6 +900,30 @@ fn validate_japanese_surfaces(asset: &SaijikiAsset) -> Result<(), SaijikiProject
         }
     }
     Ok(())
+}
+
+/// The word of `partner_key` that writes the same surfaces in both languages as `word`, a
+/// word that shares its surface with that category (Saijiki v4: おもて and じ share
+/// メゾチント). Which of the two a mark reads is decided by where the word stands, not by
+/// the words around it (SPEC §3.3).
+pub(crate) fn shared_surface_partner<'a>(
+    asset: &'a SaijikiAsset,
+    partner_key: &str,
+    word: &SaijikiWordAsset,
+) -> Option<&'a SaijikiWordAsset> {
+    asset
+        .categories
+        .iter()
+        .find(|category| category.key == partner_key)?
+        .words
+        .iter()
+        .find(|partner| {
+            partner.shared_surface_with.is_none()
+                && partner.surface_ja == word.surface_ja
+                && partner.surface_en == word.surface_en
+                && partner.parser_surfaces_ja == word.parser_surfaces_ja
+                && partner.parser_surfaces_en == word.parser_surfaces_en
+        })
 }
 
 fn register_parser_surface(
@@ -916,6 +959,12 @@ fn register_parser_surface(
     }
     owners.insert(key, (category_key.to_owned(), surface_ja.to_owned()));
     Ok(())
+}
+
+/// The word's stable id (D1): the asset's `id`, or for an earlier edition the id derived
+/// from its Score value or English surface.
+pub(crate) fn word_id(word: &SaijikiWordAsset) -> Option<String> {
+    semantic_wire_id(word)
 }
 
 fn semantic_wire_id(word: &SaijikiWordAsset) -> Option<String> {
@@ -1033,6 +1082,11 @@ pub enum SaijikiProjectionError {
         category_key: String,
         identity: String,
     },
+    SharedSurfaceWithoutPartner {
+        category_key: String,
+        surface_ja: String,
+        partner_category_key: String,
+    },
 }
 
 impl SaijikiProjectionError {
@@ -1059,6 +1113,7 @@ impl SaijikiProjectionError {
             Self::SemanticAliasCategoryCrossing { .. } => "semantic_alias_category_crossing",
             Self::SemanticAliasCycle { .. } => "semantic_alias_cycle",
             Self::ConflictingSemanticAlias { .. } => "conflicting_semantic_alias",
+            Self::SharedSurfaceWithoutPartner { .. } => "shared_surface_without_partner",
         }
     }
 }
@@ -1218,6 +1273,15 @@ impl fmt::Display for SaijikiProjectionError {
             } => write!(
                 formatter,
                 "Saijiki semantic alias declaration is conflicting: {category_key}/{identity}"
+            ),
+            Self::SharedSurfaceWithoutPartner {
+                category_key,
+                surface_ja,
+                partner_category_key,
+            } => write!(
+                formatter,
+                "Saijiki word {category_key}/{surface_ja} shares its surface with \
+                 {partner_category_key}, which has no word of the same surfaces"
             ),
         }
     }

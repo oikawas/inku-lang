@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     MacroInvocation,
-    saijiki::{canonical_semantic_id, canonical_wire_id},
+    saijiki::canonical_semantic_id,
     saijiki_asset,
 };
 
@@ -75,10 +75,7 @@ pub fn project_macro_semantic_ref(
             };
             let mut words = BTreeMap::new();
             for word in &asset.words {
-                let lexical = word
-                    .score_value
-                    .clone()
-                    .or_else(|| word.surface_en.as_deref().map(canonical_wire_id));
+                let lexical = crate::saijiki::word_id(word);
                 let projection = lexical
                     .and_then(|id| {
                         canonical_semantic_id(asset_key, &id)

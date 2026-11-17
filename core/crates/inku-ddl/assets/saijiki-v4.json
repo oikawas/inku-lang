@@ -60,7 +60,7 @@
         {"id": "oil_paint", "surface_ja": "油彩", "surface_en": "oil paint", "physical_description": {"ja": "油で練った絵具を厚く塗り重ね、刷毛筋と盛り上がり、つやのある重なりが残る。", "en": "Oil-bound paint laid on thickly, with bristle ridges, raised impasto, and glossy overlapping strokes."}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": "oil_paint", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"id": "painting_knife", "surface_ja": "ペインティングナイフ", "surface_en": "painting knife", "physical_description": {"ja": "ナイフで盛って伸ばした絵具の平らな面に、稜と縁、かすれが残る。", "en": "Paint heaped and spread with a knife into flat planes, leaving ridges, edges, and dry streaks."}, "parser_surfaces_ja": null, "parser_surfaces_en": ["painting-knife"], "default": false, "prompt": true, "display": true, "marker": null, "score_value": "painting_knife", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"id": "etching", "surface_ja": "エッチング", "surface_en": "etching", "physical_description": {"ja": "酸で腐食させた太さのそろった線に、わずかな荒れと丸い端が残り、線の重ねで陰を作る。", "en": "Acid-bitten lines of even width with slightly rough edges and round ends; shading is built by layering lines."}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": "etching", "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"id": "computer", "surface_ja": "コンピュータ", "surface_en": "computer", "physical_description": {"ja": "同じ周期で正確に繰り返す線の揺れ。", "en": "Line sway that repeats exactly at the same period."}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": "computer", "marker_surfaces_ja": null, "marker_surfaces_en": null}
+        {"id": "computer", "surface_ja": "デジタル", "surface_en": "digital", "physical_description": {"ja": "方眼の升を並べた線と、升の点描に明るい走査線を重ねた塗り。", "en": "Lines built from grid cells, and fills of dithered cells under light scan lines."}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": "computer", "marker_surfaces_ja": null, "marker_surfaces_en": null}
       ],
       "marker_order_ja": null,
       "marker_order_en": null
@@ -95,7 +95,7 @@
         {"id": "stipple", "surface_ja": "点描", "surface_en": "stipple", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "stipple", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"id": "hatch", "surface_ja": "平行線", "surface_en": "hatch", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "hatch", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"id": "crosshatch", "surface_ja": "交差線", "surface_en": "crosshatch", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "crosshatch", "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"id": "aquatint", "surface_ja": "アクアチント", "surface_en": "aquatint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "aquatint", "marker_surfaces_ja": null, "marker_surfaces_en": null}
+        {"id": "aquatint", "surface_ja": "メゾチント", "surface_en": "mezzotint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "aquatint", "marker_surfaces_ja": null, "marker_surfaces_en": null, "shared_surface_with": "ji"}
       ],
       "marker_order_ja": null,
       "marker_order_en": null
@@ -108,7 +108,7 @@
       "marker_class": null,
       "words": [
         {"id": "dense", "surface_ja": "濃い", "surface_en": "dense", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "intensity"},
-        {"id": "temperate", "surface_ja": "程よい", "surface_en": "temperate", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "intensity"},
+        {"id": "temperate", "surface_ja": "程よい", "surface_en": "moderate", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "intensity"},
         {"id": "faint", "surface_ja": "薄い", "surface_en": "faint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "intensity"}
       ],
       "marker_order_ja": null,
@@ -186,7 +186,7 @@
       "bundle": "sway",
       "marker_class": "variation",
       "words": [
-        {"id": "narrowly", "surface_ja": "細かく", "surface_en": "narrowly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "amplitude"},
+        {"id": "narrowly", "surface_ja": "小さく", "surface_en": "narrowly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "amplitude"},
         {"id": "broadly", "surface_ja": "大きく", "surface_en": "broadly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "amplitude"},
         {"id": "loosely", "surface_ja": "ゆるやかに", "surface_en": "loosely", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "frequency"},
         {"id": "tightly", "surface_ja": "小刻みに", "surface_en": "tightly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "frequency"},

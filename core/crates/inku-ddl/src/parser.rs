@@ -413,6 +413,7 @@ pub(crate) fn parse_neutral_lexemes_in(
             }
         }
     }
+    read_shared_surfaces_by_place(edition, source, &mut tokens, &diagnostics);
 
     NeutralParseResult {
         tokens,
@@ -735,6 +736,92 @@ fn asset_relation_candidates(
     })
 }
 
+/// Read each word whose surface two categories share (Saijiki v4: じ and おもて メゾチント)
+/// by where it stands (SPEC §3.3): a sentence of the word alone, like `メゾチント。`, is the
+/// partner's word (the ground), and the word anywhere else, like `メゾチントの円`, is the
+/// sharing word (the surface). The lexer delivered the partner's word.
+fn read_shared_surfaces_by_place(
+    edition: SaijikiEdition,
+    source: &str,
+    tokens: &mut [NeutralToken],
+    diagnostics: &[NeutralDiagnostic],
+) {
+    let asset = edition.asset();
+    let sharing = asset
+        .categories
+        .iter()
+        .flat_map(|category| {
+            category.words.iter().filter_map(move |word| {
+                let partner_key = word.shared_surface_with.as_deref()?;
+                crate::saijiki::shared_surface_partner(asset, partner_key, word)?;
+                Some((partner_key, category.key.as_str(), word.surface_ja.as_str()))
+            })
+        })
+        .collect::<Vec<_>>();
+    if sharing.is_empty() {
+        return;
+    }
+    let sentence_of = |byte: usize| {
+        let start = source[..byte]
+            .char_indices()
+            .rev()
+            .find(|(index, character)| ends_sentence(source, *index, *character))
+            .map_or(0, |(index, character)| index + character.len_utf8());
+        let end = source[byte..]
+            .char_indices()
+            .find(|(offset, character)| ends_sentence(source, byte + offset, *character))
+            .map_or(source.len(), |(offset, _)| byte + offset);
+        (start, end)
+    };
+    let readings = tokens
+        .iter()
+        .enumerate()
+        .filter_map(|(index, token)| {
+            let NeutralTokenKind::SaijikiWord {
+                category_key,
+                canonical_surface_ja,
+                ..
+            } = &token.kind
+            else {
+                return None;
+            };
+            let (_, sharing_key, _) = sharing.iter().find(|(partner_key, _, surface_ja)| {
+                partner_key == category_key && surface_ja == canonical_surface_ja
+            })?;
+            let (start, end) = sentence_of(token.span.start_byte);
+            let inside = |span: SourceSpan| start <= span.start_byte && span.end_byte <= end;
+            let alone = tokens.iter().enumerate().all(|(other, candidate)| {
+                other == index
+                    || !inside(candidate.span)
+                    || matches!(candidate.kind, NeutralTokenKind::FunctionWord)
+            }) && !diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.recognized && inside(diagnostic.span));
+            (!alone).then_some((index, *sharing_key))
+        })
+        .collect::<Vec<_>>();
+    for (index, sharing_key) in readings {
+        if let NeutralTokenKind::SaijikiWord { category_key, .. } = &mut tokens[index].kind {
+            *category_key = sharing_key.to_owned();
+        }
+    }
+}
+
+/// Whether the character at `index` ends a sentence. A full stop between digits is a
+/// decimal point.
+fn ends_sentence(source: &str, index: usize, character: char) -> bool {
+    match character {
+        '。' | '！' | '!' | '？' | '?' | '\n' | '\r' => true,
+        '.' => {
+            let before = source[..index].chars().next_back();
+            let after = source[index + 1..].chars().next();
+            !(before.is_some_and(|c| c.is_ascii_digit())
+                && after.is_some_and(|c| c.is_ascii_digit()))
+        }
+        _ => false,
+    }
+}
+
 fn asset_word_candidates(
     edition: SaijikiEdition,
     language: ResolvedInstructionLanguage,
@@ -762,6 +849,10 @@ fn asset_word_candidates(
         let mut entries = Vec::new();
         for category in &edition.asset().categories {
             for word in &category.words {
+                if word.shared_surface_with.is_some() {
+                    // Delivered as its partner's word and read by place afterwards.
+                    continue;
+                }
                 let surfaces = parser_candidate_surfaces(word, language);
                 let mut add = |surface: String, suffix| {
                     entries.push(AssetWordCandidate {

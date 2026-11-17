@@ -18,8 +18,8 @@ import { SURFACE_BOX, FINENESS_PREVIEWS, UNDERLAYER_PREVIEWS } from './saijiki-s
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 /** The words the server's saijiki table puts in each category, not a copy. */
-const KIME = GENERATED_SAIJIKI.find((cat) => cat.key === 'kime')?.words ?? [];
-const SHITAJI = GENERATED_SAIJIKI.find((cat) => cat.key === 'shitaji')?.words ?? [];
+const KIME = (GENERATED_SAIJIKI.find((cat) => cat.key === 'kime')?.words ?? []).filter((word) => word !== '下塗り');
+const SHITAJI = (GENERATED_SAIJIKI.find((cat) => cat.key === 'kime')?.words ?? []).filter((word) => word === '下塗り');
 
 /** The sentence any word without an entry of its own gets instead. */
 const FALLBACK = '記述の解釈に影響する語彙です。';

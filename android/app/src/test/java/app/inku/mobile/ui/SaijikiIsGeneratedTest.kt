@@ -25,6 +25,26 @@ import org.junit.Test
  */
 class SaijikiIsGeneratedTest {
 
+    @Test fun bundlesFollowGeneratedOrderAndSelectedCategoryLeads() {
+        for (lang in UiLanguage.entries) {
+            val groups = saijikiGroups(lang)
+            val bundles = saijikiGroupBundles(groups, lang)
+            assertEquals(SaijikiGenerated.BUNDLES.map { it.key }, bundles.map { it.key })
+            for ((bundle, generated) in bundles.zip(SaijikiGenerated.BUNDLES)) {
+                assertEquals(if (lang.isEnglish) generated.nameEn else generated.nameJa, bundle.label)
+                assertEquals(SaijikiGenerated.CATEGORIES.filter { it.bundle == generated.key }.map { it.key }, bundle.groups.map { it.key })
+            }
+            val selected = groups.first { it.key == "basho" }
+            val prioritized = saijikiGroupBundles(groups, lang, selected.key)
+            assertEquals(selected.bundle, prioritized.first().key)
+            assertEquals(selected.key, prioritized.first().groups.first().key)
+            assertEquals(SaijikiGenerated.BUNDLES.filter { it.key != selected.bundle }.map { it.key }, prioritized.drop(1).map { it.key })
+            val filtered = saijikiGroupBundles(listOf(selected), lang)
+            assertEquals(SaijikiGenerated.BUNDLES.size, filtered.size)
+            assertTrue(filtered.filter { it.key != selected.bundle }.all { it.groups.isEmpty() })
+        }
+    }
+
     private fun source(relative: String): String {
         var file = File("src/$relative")
         if (!file.exists()) {

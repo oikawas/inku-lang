@@ -27,6 +27,7 @@ def test_all_saijiki_categories_match_the_core_v4_asset():
     assert asset["asset_id"] == "inku.saijiki.v4"
     from inku_server.saijiki_generated import BUNDLES
     assert BUNDLES == asset["bundles"]
+    assert next(c for c in saijiki.display_categories("ja") if c["key"] == "aida")["bundle"] == asset["relations_bundle"]
     assert len(asset["categories"]) == len(saijiki.SAIJIKI)
     fields = ("surface_ja", "surface_en", "score_value", "default", "prompt", "display", "marker",
               "parser_surfaces_ja", "parser_surfaces_en", "marker_surfaces_ja", "marker_surfaces_en", "id", "facet")

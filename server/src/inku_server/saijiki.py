@@ -26,7 +26,7 @@ schema からは削除しない。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from .saijiki_generated import BUNDLES, CATEGORIES
+from .saijiki_generated import BUNDLES, CATEGORIES, RELATIONS_BUNDLE
 
 __all__ = [
     "SaijikiWord",
@@ -420,7 +420,7 @@ def display_categories(lang: str) -> list[dict[str, object]]:
             "key": "aida",
             "name_ja": "あいだ",
             "name_en": "relations",
-            "bundle": "where",
+            "bundle": RELATIONS_BUNDLE,
             "words": tuple(aida_by_type[t].surface(lang) for t in _RELATION_DISPLAY_ORDER),
             "ids": _RELATION_DISPLAY_ORDER,
             "facets": (None,) * len(_RELATION_DISPLAY_ORDER),

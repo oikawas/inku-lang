@@ -24,6 +24,7 @@ object SaijikiGenerated {
 
     data class Category(
         val key: String,
+        val bundle: String,
         val nameJa: String,
         val nameEn: String,
         val wordsJa: List<String>,
@@ -33,6 +34,7 @@ object SaijikiGenerated {
     val CATEGORIES: List<Category> = listOf(
         Category(
             key = "katachi",
+            bundle = "what",
             nameJa = "かたち",
             nameEn = "forms",
             wordsJa = listOf("円", "楕円", "三角", "四角", "線", "弧", "自由線", "点", "雲形", "多角形", "半円", "三日月"),
@@ -40,6 +42,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "katamuki",
+            bundle = "where",
             nameJa = "かたむき",
             nameEn = "angles",
             wordsJa = listOf("水平", "垂直", "斜め", "右上がり", "右下がり", "左上がり", "左下がり", "回転"),
@@ -47,6 +50,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "tezawari",
+            bundle = "with",
             nameJa = "てざわり",
             nameEn = "touches",
             wordsJa = listOf("銀筆", "鉛筆", "ペン", "チョーク", "オイルパステル", "ガッシュ", "水彩", "油彩", "ペインティングナイフ", "エッチング", "デジタル"),
@@ -54,6 +58,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "tsuranari",
+            bundle = "with",
             nameJa = "つらなり",
             nameEn = "continuity",
             wordsJa = listOf("実線", "破線", "点線"),
@@ -61,6 +66,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "omote",
+            bundle = "face",
             nameJa = "おもて",
             nameEn = "surfaces",
             wordsJa = listOf("空", "塗り", "刷き", "刷毛目", "粒", "点描", "平行線", "交差線", "メゾチント"),
@@ -68,6 +74,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "sabaki",
+            bundle = "face",
             nameJa = "さばき",
             nameEn = "handling",
             wordsJa = listOf("濃い", "程よい", "薄い", "にじみ"),
@@ -75,6 +82,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "kime",
+            bundle = "face",
             nameJa = "きめ",
             nameEn = "fineness",
             wordsJa = listOf("細かい", "粗い", "密な", "疎な", "下塗り"),
@@ -82,6 +90,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "ji",
+            bundle = "ground",
             nameJa = "じ",
             nameEn = "grounds",
             wordsJa = listOf("紙", "和紙", "薄墨地", "木炭地", "カンバス", "画用紙", "メゾチント", "画面比"),
@@ -89,6 +98,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "iro",
+            bundle = "color",
             nameJa = "いろ",
             nameEn = "colors",
             wordsJa = listOf("白", "黒", "青", "赤", "緑", "灰", "黄", "橙", "紫"),
@@ -96,6 +106,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "yuragi",
+            bundle = "sway",
             nameJa = "ゆらぎ",
             nameEn = "movements",
             wordsJa = listOf("小さく", "大きく", "ゆるやかに", "小刻みに", "揺れる", "波打つ"),
@@ -103,6 +114,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "basho",
+            bundle = "where",
             nameJa = "ばしょ",
             nameEn = "places",
             wordsJa = listOf("上", "下", "中心", "左端", "右端", "上端", "下端", "隅"),
@@ -110,6 +122,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "ugoki",
+            bundle = "where",
             nameJa = "うごき",
             nameEn = "motions",
             wordsJa = listOf("置く", "並べる", "引く", "散らす", "埋める", "敷き詰める"),
@@ -117,6 +130,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "jun",
+            bundle = "where",
             nameJa = "じゅん",
             nameEn = "order",
             wordsJa = listOf("交互に", "順に"),
@@ -124,6 +138,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "wariai",
+            bundle = "what",
             nameJa = "わりあい",
             nameEn = "proportions",
             wordsJa = listOf("縦長", "横長", "全幅", "半幅"),
@@ -131,6 +146,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "futosa",
+            bundle = "with",
             nameJa = "ふとさ",
             nameEn = "widths",
             wordsJa = listOf("ごく細い", "細い", "太い", "ごく太い"),
@@ -138,6 +154,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "ookisa",
+            bundle = "what",
             nameJa = "おおきさ",
             nameEn = "sizes",
             wordsJa = listOf("ごく小さな", "小さな", "普通の大きさ", "大きな", "ごく大きな"),
@@ -145,6 +162,7 @@ object SaijikiGenerated {
         ),
         Category(
             key = "aida",
+            bundle = "where",
             nameJa = "あいだ",
             nameEn = "relations",
             wordsJa = listOf("沿う", "触れない", "切る", "間に", "触れる", "つながる", "載る", "中に", "重なる", "横切る", "鏡写し"),

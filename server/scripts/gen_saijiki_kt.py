@@ -71,6 +71,7 @@ def render_kt() -> str:
         "",
         "    data class Category(",
         "        val key: String,",
+        "        val bundle: String,",
         "        val nameJa: String,",
         "        val nameEn: String,",
         "        val wordsJa: List<String>,",
@@ -82,6 +83,7 @@ def render_kt() -> str:
     for cat_ja, cat_en in zip(ja, en):
         lines.append("        Category(")
         lines.append(f"            key = {_kt_string(str(cat_ja['key']))},")
+        lines.append(f"            bundle = {_kt_string(str(cat_ja['bundle']))},")
         lines.append(f"            nameJa = {_kt_string(str(cat_ja['name_ja']))},")
         lines.append(f"            nameEn = {_kt_string(str(cat_ja['name_en']))},")
         lines.append(f"            wordsJa = {_kt_list(cat_ja['words'])},")

@@ -4,6 +4,22 @@ import Testing
 @testable import InkuHost
 
 struct DDLPackageMigrationTests {
+    @Test func v3PackageMigratesCarriedDefinitionAndApproximatedSource() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let fixture = try ExactJSON(data: Data(contentsOf: root.appendingPathComponent("core/crates/inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json")))
+        let definition = try #require(fixture["entries"].array?.first?["definition"])
+        let input: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),
+            "language": .string("ja"), "ddl": .string("｛若葉｝。青い小さめの線を引く。"),
+            "plugins": .array([.object(["definition": definition, "note": .string("keep")])])])
+        let result = try DDLPackageImport.parse(input.data)
+        #expect(result.source.contains("小さな"))
+        #expect(!result.approximatedWords.isEmpty)
+        #expect(result.plugins.count == 1)
+        #expect(result.plugins[0].note == "keep")
+        #expect(try result.resolveCatalog(language: "ja")["entries"].array?.count == 1)
+    }
+
     @Test func importAdoptsRecoveredDefinitionsFromCoreAnswer() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -45,12 +61,16 @@ struct DDLPackageMigrationTests {
         #expect(try output.resolveCatalog(language: "ja")["entries"].array?.count == 1)
     }
 
-    @Test func legacyPackageMigratesButPlainTextAndV3DoNot() throws {
+    @Test func legacyAndV3PackagesMigrateButPlainTextAndV4DoNot() throws {
         let old = Data(#"{"schema":"inku.ddl-export.v2","language":"ja","ddl":"青い細筆の線を引く。","plugins":[]}"#.utf8)
         let migrated = try DDLPackageImport.parse(old)
         #expect(migrated.source.contains("ガッシュ"))
         #expect((migrated.migratedEdits ?? 0) > 0)
-        let current = Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v3","language":"ja","ddl":"青い水彩の線を引く。","plugins":[]}"#.utf8)
+        let v3 = Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v3","language":"ja","ddl":"青い小さめの線を引く。","plugins":[]}"#.utf8)
+        let migratedV3 = try DDLPackageImport.parse(v3)
+        #expect(migratedV3.source.contains("小さな"))
+        #expect(!migratedV3.approximatedWords.isEmpty)
+        let current = Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v4","language":"ja","ddl":"青い水彩の線を引く。","plugins":[]}"#.utf8)
         let unchanged = try DDLPackageImport.parse(current)
         #expect(unchanged.source == "青い水彩の線を引く。")
         #expect(unchanged.migratedEdits == nil)

@@ -73,7 +73,7 @@ struct PluginNamesMigrationTests {
         var v3Lock = lock
         v3Lock["digest"] = try #require(v3Entry["digest"] as? String)
         func compiled(_ ddl: String) throws -> [String: Any] {
-            let request = try json(["document": ["source": ddl, "language": "ja", "macro_locks": [v3Lock], "saijiki": "inku.saijiki.v3"], "definitions": [v3Definition], "compiler": compiler])
+            let request = try json(["document": ["source": ddl, "language": "ja", "macro_locks": [v3Lock], "saijiki": "inku.saijiki.v4"], "definitions": [v3Definition], "compiler": compiler])
             return try #require(try JSONSerialization.jsonObject(with: InkuCore.compile(request)) as? [String: Any])
         }
         let after = try compiled(try #require(goodWork?.ddl))

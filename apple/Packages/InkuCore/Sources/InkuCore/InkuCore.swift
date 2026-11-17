@@ -387,6 +387,10 @@ public enum InkuCore {
         InkuCoreBindings.migrateSaijikiV2(inputBytes: input)
     }
 
+    public static func migrateSaijikiV3(_ input: Data) -> Data {
+        InkuCoreBindings.migrateSaijikiV3(inputBytes: input)
+    }
+
     public static func rasterize(
         svg: String,
         targetWidth: UInt32? = nil,

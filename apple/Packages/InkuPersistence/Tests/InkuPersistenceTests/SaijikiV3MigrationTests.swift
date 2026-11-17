@@ -61,7 +61,7 @@ struct SaijikiV3MigrationTests {
         let configuration = try #require(performance["configuration"] as? [String: Any])
         let savedDefinitions = try #require(configuration["definitions"] as? [[String: Any]])
         #expect(savedDefinitions.count == 1)
-        #expect(migratedDocument["saijiki"] as? String == "inku.saijiki.v3")
+        #expect(migratedDocument["saijiki"] as? String == "inku.saijiki.v4")
         let registry = try #require(JSONSerialization.jsonObject(with: InkuCore.canvasRegistry) as? [String: Any])
         let registryDigest = try #require(registry["digest"] as? String)
         let seed = "42"
@@ -122,7 +122,7 @@ struct SaijikiV3MigrationTests {
         #expect(fields.0 == InkuDatabase.currentSchemaVersion)
         #expect(fields.1 == Data("historical".utf8))
         #expect(fields.2 == Data(SHA256.hash(data: Data("historical".utf8))))
-        #expect(fields.3 == "inku.saijiki.v3")
+        #expect(fields.3 == "inku.saijiki.v4")
         try reader.close()
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
         let reportURL = try #require(files.first { $0.lastPathComponent.hasPrefix(".inku-saijiki-v3-v7-") })

@@ -1,7 +1,8 @@
 {
-  "asset_id": "inku.saijiki.v3",
+  "asset_id": "inku.saijiki.v4",
   "categories": [
     {
+      "bundle": "what",
       "key": "katachi",
       "marker_class": "shape",
       "marker_order_en": [
@@ -14,7 +15,9 @@
         "arc",
         "free line",
         "point",
-        "cloudform"
+        "cloudform",
+        "semicircle",
+        "crescent"
       ],
       "marker_order_ja": [
         "線",
@@ -26,7 +29,9 @@
         "弧",
         "自由線",
         "点",
-        "雲形"
+        "雲形",
+        "半円",
+        "三日月"
       ],
       "name_en": "forms",
       "name_ja": "かたち",
@@ -34,6 +39,7 @@
         {
           "default": false,
           "display": true,
+          "id": "circle",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -45,6 +51,7 @@
         {
           "default": false,
           "display": true,
+          "id": "ellipse",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -56,6 +63,7 @@
         {
           "default": false,
           "display": true,
+          "id": "triangle",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -70,6 +78,7 @@
         {
           "default": false,
           "display": true,
+          "id": "square",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -88,6 +97,7 @@
         {
           "default": false,
           "display": true,
+          "id": "line",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -102,6 +112,7 @@
         {
           "default": false,
           "display": true,
+          "id": "arc",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -113,6 +124,7 @@
         {
           "default": false,
           "display": true,
+          "id": "free_line",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -124,6 +136,7 @@
         {
           "default": false,
           "display": true,
+          "id": "point",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -135,6 +148,7 @@
         {
           "default": false,
           "display": true,
+          "id": "cloudform",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -145,18 +159,48 @@
         },
         {
           "default": false,
-          "display": false,
+          "display": true,
+          "id": "polygon",
           "marker": true,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
-          "prompt": false,
+          "prompt": true,
           "score_value": null,
           "surface_en": "polygon",
           "surface_ja": "多角形"
+        },
+        {
+          "default": false,
+          "display": true,
+          "facet": "arc_form",
+          "id": "semicircle",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "semantic_category": "ratio",
+          "surface_en": "semicircle",
+          "surface_ja": "半円"
+        },
+        {
+          "default": false,
+          "display": true,
+          "facet": "arc_form",
+          "id": "crescent",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "semantic_category": "ratio",
+          "surface_en": "crescent",
+          "surface_ja": "三日月"
         }
       ]
     },
     {
+      "bundle": "where",
       "key": "katamuki",
       "marker_class": "angle",
       "marker_order_en": null,
@@ -175,6 +219,7 @@
               "adverb"
             ]
           },
+          "id": "horizontal",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -197,6 +242,7 @@
               "adverb"
             ]
           },
+          "id": "vertical",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -219,6 +265,7 @@
               "adverb"
             ]
           },
+          "id": "diagonal",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -230,6 +277,7 @@
         {
           "default": false,
           "display": true,
+          "id": "rising",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -241,6 +289,7 @@
         {
           "default": false,
           "display": true,
+          "id": "falling",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -251,22 +300,24 @@
         },
         {
           "default": false,
-          "display": false,
+          "display": true,
+          "id": "left_rising",
           "marker": true,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
-          "prompt": false,
+          "prompt": true,
           "score_value": null,
           "surface_en": "left-rising",
           "surface_ja": "左上がり"
         },
         {
           "default": false,
-          "display": false,
+          "display": true,
+          "id": "left_falling",
           "marker": true,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
-          "prompt": false,
+          "prompt": true,
           "score_value": null,
           "surface_en": "left-falling",
           "surface_ja": "左下がり"
@@ -274,6 +325,7 @@
         {
           "default": false,
           "display": true,
+          "id": "rotated",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -285,6 +337,7 @@
       ]
     },
     {
+      "bundle": "with",
       "key": "tezawari",
       "marker_class": "material",
       "marker_order_en": null,
@@ -295,6 +348,7 @@
         {
           "default": false,
           "display": true,
+          "id": "silverpoint",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -310,6 +364,7 @@
         {
           "default": false,
           "display": true,
+          "id": "pencil",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -325,6 +380,7 @@
         {
           "default": true,
           "display": true,
+          "id": "pen",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -340,6 +396,7 @@
         {
           "default": false,
           "display": true,
+          "id": "chalk",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -355,6 +412,7 @@
         {
           "default": false,
           "display": true,
+          "id": "oil_pastel",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -374,6 +432,7 @@
         {
           "default": false,
           "display": true,
+          "id": "gouache",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -389,6 +448,7 @@
         {
           "default": false,
           "display": true,
+          "id": "watercolor",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -408,6 +468,7 @@
         {
           "default": false,
           "display": true,
+          "id": "oil_paint",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -423,6 +484,7 @@
         {
           "default": false,
           "display": true,
+          "id": "painting_knife",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -442,6 +504,7 @@
         {
           "default": false,
           "display": true,
+          "id": "etching",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -457,21 +520,23 @@
         {
           "default": false,
           "display": true,
+          "id": "computer",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "physical_description": {
-            "en": "Line sway that repeats exactly at the same period.",
-            "ja": "同じ周期で正確に繰り返す線の揺れ。"
+            "en": "Lines built from grid cells, and fills of dithered cells under light scan lines.",
+            "ja": "方眼の升を並べた線と、升の点描に明るい走査線を重ねた塗り。"
           },
           "prompt": true,
           "score_value": "computer",
-          "surface_en": "computer",
-          "surface_ja": "コンピュータ"
+          "surface_en": "digital",
+          "surface_ja": "デジタル"
         }
       ]
     },
     {
+      "bundle": "with",
       "key": "tsuranari",
       "marker_class": null,
       "marker_order_en": null,
@@ -482,6 +547,7 @@
         {
           "default": true,
           "display": true,
+          "id": "solid",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -493,6 +559,7 @@
         {
           "default": false,
           "display": true,
+          "id": "dashed",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -504,6 +571,7 @@
         {
           "default": false,
           "display": true,
+          "id": "dotted",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -511,21 +579,11 @@
           "score_value": null,
           "surface_en": "dotted",
           "surface_ja": "点線"
-        },
-        {
-          "default": false,
-          "display": true,
-          "marker": null,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "prompt": true,
-          "score_value": null,
-          "surface_en": "dash-dot",
-          "surface_ja": "一点鎖線"
         }
       ]
     },
     {
+      "bundle": "face",
       "key": "omote",
       "marker_class": null,
       "marker_order_en": null,
@@ -536,6 +594,7 @@
         {
           "default": true,
           "display": true,
+          "id": "none",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -547,6 +606,7 @@
         {
           "default": false,
           "display": true,
+          "id": "solid",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -558,6 +618,7 @@
         {
           "default": false,
           "display": true,
+          "id": "sweep",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -569,6 +630,7 @@
         {
           "default": false,
           "display": true,
+          "id": "brushmarks",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -580,6 +642,7 @@
         {
           "default": false,
           "display": true,
+          "id": "grain",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -591,6 +654,7 @@
         {
           "default": false,
           "display": true,
+          "id": "stipple",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -602,6 +666,7 @@
         {
           "default": false,
           "display": true,
+          "id": "hatch",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -613,6 +678,7 @@
         {
           "default": false,
           "display": true,
+          "id": "crosshatch",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -624,17 +690,20 @@
         {
           "default": false,
           "display": true,
+          "id": "aquatint",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": "aquatint",
-          "surface_en": "aquatint",
-          "surface_ja": "アクアチント"
+          "shared_surface_with": "ji",
+          "surface_en": "mezzotint",
+          "surface_ja": "メゾチント"
         }
       ]
     },
     {
+      "bundle": "face",
       "key": "sabaki",
       "marker_class": null,
       "marker_order_en": null,
@@ -645,6 +714,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "intensity",
+          "id": "dense",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -656,17 +727,21 @@
         {
           "default": false,
           "display": true,
+          "facet": "intensity",
+          "id": "temperate",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
-          "surface_en": "temperate",
+          "surface_en": "moderate",
           "surface_ja": "程よい"
         },
         {
           "default": false,
           "display": true,
+          "facet": "intensity",
+          "id": "faint",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -674,10 +749,25 @@
           "score_value": null,
           "surface_en": "faint",
           "surface_ja": "薄い"
+        },
+        {
+          "default": false,
+          "display": true,
+          "facet": "spread",
+          "id": "bleeding",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "semantic_category": "variation",
+          "surface_en": "bleeding",
+          "surface_ja": "にじみ"
         }
       ]
     },
     {
+      "bundle": "face",
       "key": "kime",
       "marker_class": null,
       "marker_order_en": null,
@@ -688,6 +778,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "scale",
+          "id": "fine_grained",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -699,6 +791,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "scale",
+          "id": "coarse_grained",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -710,6 +804,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "density",
+          "id": "packed",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -721,6 +817,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "density",
+          "id": "sparse",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -728,31 +826,25 @@
           "score_value": null,
           "surface_en": "sparse",
           "surface_ja": "疎な"
-        }
-      ]
-    },
-    {
-      "key": "shitaji",
-      "marker_class": null,
-      "marker_order_en": null,
-      "marker_order_ja": null,
-      "name_en": "underlayer",
-      "name_ja": "したじ",
-      "words": [
+        },
         {
           "default": false,
           "display": true,
+          "facet": "underlayer",
+          "id": "underpainted",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
+          "semantic_category": "underlayer",
           "surface_en": "underpainted",
           "surface_ja": "下塗り"
         }
       ]
     },
     {
+      "bundle": "ground",
       "key": "ji",
       "marker_class": null,
       "marker_order_en": null,
@@ -763,6 +855,7 @@
         {
           "default": false,
           "display": true,
+          "id": "paper",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -774,6 +867,7 @@
         {
           "default": false,
           "display": true,
+          "id": "washi",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -785,6 +879,7 @@
         {
           "default": false,
           "display": true,
+          "id": "ink_wash",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -796,6 +891,7 @@
         {
           "default": false,
           "display": true,
+          "id": "charcoal_ground",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -807,6 +903,7 @@
         {
           "default": false,
           "display": true,
+          "id": "canvas",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -818,6 +915,7 @@
         {
           "default": false,
           "display": true,
+          "id": "drawing_paper",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -829,6 +927,7 @@
         {
           "default": false,
           "display": true,
+          "id": "mezzotint",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -840,6 +939,7 @@
       ]
     },
     {
+      "bundle": "color",
       "key": "iro",
       "marker_class": "color",
       "marker_order_en": null,
@@ -850,6 +950,7 @@
         {
           "default": false,
           "display": true,
+          "id": "white",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -861,6 +962,7 @@
         {
           "default": true,
           "display": true,
+          "id": "black",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -872,6 +974,7 @@
         {
           "default": false,
           "display": true,
+          "id": "blue",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -883,6 +986,7 @@
         {
           "default": false,
           "display": true,
+          "id": "red",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -894,6 +998,7 @@
         {
           "default": false,
           "display": true,
+          "id": "green",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -905,6 +1010,7 @@
         {
           "default": false,
           "display": true,
+          "id": "gray",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -916,6 +1022,7 @@
         {
           "default": false,
           "display": true,
+          "id": "yellow",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -927,6 +1034,7 @@
         {
           "default": false,
           "display": true,
+          "id": "orange",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -938,6 +1046,7 @@
         {
           "default": false,
           "display": true,
+          "id": "purple",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -949,6 +1058,7 @@
       ]
     },
     {
+      "bundle": "sway",
       "key": "yuragi",
       "marker_class": "variation",
       "marker_order_en": null,
@@ -959,17 +1069,21 @@
         {
           "default": false,
           "display": true,
+          "facet": "amplitude",
+          "id": "narrowly",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
           "surface_en": "narrowly",
-          "surface_ja": "細かく"
+          "surface_ja": "小さく"
         },
         {
           "default": false,
           "display": true,
+          "facet": "amplitude",
+          "id": "broadly",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -981,6 +1095,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "frequency",
+          "id": "loosely",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -992,6 +1108,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "frequency",
+          "id": "tightly",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1011,6 +1129,8 @@
               "third_person_singular"
             ]
           },
+          "facet": "quality",
+          "id": "swaying",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1030,6 +1150,8 @@
               "third_person_singular"
             ]
           },
+          "facet": "quality",
+          "id": "undulating",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1037,21 +1159,11 @@
           "score_value": null,
           "surface_en": "undulating",
           "surface_ja": "波打つ"
-        },
-        {
-          "default": false,
-          "display": true,
-          "marker": null,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "prompt": true,
-          "score_value": null,
-          "surface_en": "bleeding",
-          "surface_ja": "にじみ"
         }
       ]
     },
     {
+      "bundle": "where",
       "key": "basho",
       "marker_class": "place",
       "marker_order_en": null,
@@ -1062,6 +1174,7 @@
         {
           "default": false,
           "display": true,
+          "id": "top",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1073,6 +1186,7 @@
         {
           "default": false,
           "display": true,
+          "id": "bottom",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1084,6 +1198,7 @@
         {
           "default": false,
           "display": true,
+          "id": "center",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1095,6 +1210,7 @@
         {
           "default": false,
           "display": true,
+          "id": "left_edge",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1109,6 +1225,7 @@
         {
           "default": false,
           "display": true,
+          "id": "right_edge",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1123,6 +1240,7 @@
         {
           "default": false,
           "display": true,
+          "id": "top_edge",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1137,6 +1255,7 @@
         {
           "default": false,
           "display": true,
+          "id": "bottom_edge",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1151,39 +1270,7 @@
         {
           "default": false,
           "display": true,
-          "marker": null,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "prompt": true,
-          "score_value": null,
-          "surface_en": "start",
-          "surface_ja": "始点"
-        },
-        {
-          "default": false,
-          "display": true,
-          "marker": null,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "prompt": true,
-          "score_value": null,
-          "surface_en": "end",
-          "surface_ja": "終点"
-        },
-        {
-          "default": false,
-          "display": true,
-          "marker": null,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "prompt": true,
-          "score_value": null,
-          "surface_en": "partway",
-          "surface_ja": "途中"
-        },
-        {
-          "default": false,
-          "display": true,
+          "id": "corner",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1195,6 +1282,7 @@
       ]
     },
     {
+      "bundle": "where",
       "key": "ugoki",
       "marker_class": "operation",
       "marker_order_en": [
@@ -1211,7 +1299,6 @@
         "並べる",
         "散らす",
         "敷き詰める",
-        "描く",
         "埋める"
       ],
       "name_en": "motions",
@@ -1220,6 +1307,7 @@
         {
           "default": false,
           "display": true,
+          "id": "place",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1231,6 +1319,7 @@
         {
           "default": false,
           "display": true,
+          "id": "line_up",
           "marker": null,
           "marker_surfaces_en": [
             "arrange"
@@ -1248,6 +1337,7 @@
         {
           "default": false,
           "display": true,
+          "id": "draw",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1258,18 +1348,8 @@
         },
         {
           "default": false,
-          "display": false,
-          "marker": false,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "prompt": false,
-          "score_value": null,
-          "surface_en": null,
-          "surface_ja": "描く"
-        },
-        {
-          "default": false,
           "display": true,
+          "id": "scatter",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1281,6 +1361,7 @@
         {
           "default": false,
           "display": true,
+          "id": "fill",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1292,6 +1373,7 @@
         {
           "default": false,
           "display": true,
+          "id": "tile",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1303,6 +1385,7 @@
       ]
     },
     {
+      "bundle": "where",
       "key": "jun",
       "marker_class": null,
       "marker_order_en": null,
@@ -1313,6 +1396,7 @@
         {
           "default": false,
           "display": true,
+          "id": "alternating",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1324,6 +1408,7 @@
         {
           "default": false,
           "display": true,
+          "id": "in_order",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1335,6 +1420,7 @@
       ]
     },
     {
+      "bundle": "what",
       "key": "wariai",
       "marker_class": "ratio",
       "marker_order_en": null,
@@ -1345,6 +1431,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "aspect",
+          "id": "tall",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1360,6 +1448,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "aspect",
+          "id": "wide",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1374,6 +1464,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "width_extent",
+          "id": "full_width",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1385,6 +1477,8 @@
         {
           "default": false,
           "display": true,
+          "facet": "width_extent",
+          "id": "half_width",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
@@ -1392,50 +1486,159 @@
           "score_value": null,
           "surface_en": "half-width",
           "surface_ja": "半幅"
-        },
+        }
+      ]
+    },
+    {
+      "bundle": "with",
+      "core_modifier": "thinness",
+      "key": "futosa",
+      "marker_class": null,
+      "marker_order_en": null,
+      "marker_order_ja": null,
+      "name_en": "widths",
+      "name_ja": "ふとさ",
+      "words": [
         {
+          "core_modifier_value": "extra_fine",
           "default": false,
           "display": true,
+          "id": "extra_fine",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
-          "surface_en": "semicircle",
-          "surface_ja": "半円"
+          "surface_en": "very thin",
+          "surface_ja": "ごく細い"
         },
         {
+          "core_modifier_value": "fine",
           "default": false,
           "display": true,
+          "id": "fine",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
-          "surface_en": "waxing",
-          "surface_ja": "上弦"
+          "surface_en": "thin",
+          "surface_ja": "細い"
         },
         {
+          "core_modifier_value": "thick",
           "default": false,
           "display": true,
+          "id": "thick",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
-          "surface_en": "waning",
-          "surface_ja": "下弦"
+          "surface_en": "thick",
+          "surface_ja": "太い"
         },
         {
+          "core_modifier_value": "extra_thick",
           "default": false,
           "display": true,
+          "id": "extra_thick",
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
-          "surface_en": "crescent",
-          "surface_ja": "三日月"
+          "surface_en": "very thick",
+          "surface_ja": "ごく太い"
+        }
+      ]
+    },
+    {
+      "bundle": "what",
+      "core_modifier": "relative_scale",
+      "key": "ookisa",
+      "marker_class": null,
+      "marker_order_en": null,
+      "marker_order_ja": null,
+      "name_en": "sizes",
+      "name_ja": "おおきさ",
+      "words": [
+        {
+          "core_modifier_value": "very_small",
+          "default": false,
+          "display": true,
+          "id": "very_small",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "parser_surfaces_ja": [
+            "ごく小さい"
+          ],
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "very small",
+          "surface_ja": "ごく小さな"
+        },
+        {
+          "core_modifier_value": "small",
+          "default": false,
+          "display": true,
+          "id": "small",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "parser_surfaces_ja": [
+            "小さい"
+          ],
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "small",
+          "surface_ja": "小さな"
+        },
+        {
+          "core_modifier_value": "normal",
+          "default": false,
+          "display": true,
+          "id": "normal",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "normal-sized",
+          "surface_ja": "普通の大きさ"
+        },
+        {
+          "core_modifier_value": "large",
+          "default": false,
+          "display": true,
+          "id": "large",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "parser_surfaces_ja": [
+            "大きい"
+          ],
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "large",
+          "surface_ja": "大きな"
+        },
+        {
+          "core_modifier_value": "very_large",
+          "default": false,
+          "display": true,
+          "id": "very_large",
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "parser_surfaces_ja": [
+            "ごく大きい"
+          ],
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "very large",
+          "surface_ja": "ごく大きな"
         }
       ]
     }

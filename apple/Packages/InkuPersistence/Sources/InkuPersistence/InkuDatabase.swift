@@ -19,7 +19,7 @@ public enum LibraryAnnotationMark: Sendable {
 
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
-    public static let currentSchemaVersion = 9
+    public static let currentSchemaVersion = 10
     private static let vacuumMarker = "swift-v9-vacuum-complete"
     public nonisolated let url: URL
     public nonisolated let vacuumDeferred: Bool
@@ -93,6 +93,21 @@ public actor InkuDatabase {
                     throw error
                 }
             }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 10 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v10-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
             try inspection.close()
         } else {
             try FileManager.default.createDirectory(
@@ -110,11 +125,13 @@ public actor InkuDatabase {
         } else {
             let reportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-\(UUID().uuidString).json")
             let v7ReportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v3-v7-\(UUID().uuidString).json")
+            let v10ReportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v4-v10-\(UUID().uuidString).json")
             do { try queue.write { db in
-                try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL)
+                try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL, v10ReportURL: v10ReportURL)
             } } catch {
                 try? FileManager.default.removeItem(at: reportURL)
                 try? FileManager.default.removeItem(at: v7ReportURL)
+                try? FileManager.default.removeItem(at: v10ReportURL)
                 throw error
             }
         }
@@ -125,7 +142,7 @@ public actor InkuDatabase {
         }
     }
 
-    private static func migrate(_ db: Database, reportURL: URL, v7ReportURL: URL) throws {
+    private static func migrate(_ db: Database, reportURL: URL, v7ReportURL: URL, v10ReportURL: URL) throws {
         if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
             try Self.validateSchema(db)
             try db.execute(sql: Self.resourceSQL("migration-v2"))
@@ -176,6 +193,13 @@ public actor InkuDatabase {
                     """, arguments: [id, effect, revision, Data(SHA256.hash(data: snapshot)), ack, Data(SHA256.hash(data: payload))])
             }
             try db.execute(sql: Self.resourceSQL("migration-v9"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 9 {
+            try Self.validateSchema(db)
+            let report = try SaijikiV4Migration.run(db)
+            try report.write(to: v10ReportURL, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v10ReportURL.path)
+            try db.execute(sql: Self.resourceSQL("migration-v10"))
         }
     }
 
@@ -1109,10 +1133,11 @@ public actor InkuDatabase {
         try isolated.read { try Self.validateRestore($0) }
         let reportURL = url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-restore-\(UUID().uuidString).json")
         let v7ReportURL = url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v3-v7-restore-\(UUID().uuidString).json")
+        let v10ReportURL = url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v4-v10-restore-\(UUID().uuidString).json")
         var restored = false
-        defer { if !restored { try? FileManager.default.removeItem(at: reportURL); try? FileManager.default.removeItem(at: v7ReportURL) } }
+        defer { if !restored { try? FileManager.default.removeItem(at: reportURL); try? FileManager.default.removeItem(at: v7ReportURL); try? FileManager.default.removeItem(at: v10ReportURL) } }
         try isolated.write { db in
-            try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL)
+            try Self.migrate(db, reportURL: reportURL, v7ReportURL: v7ReportURL, v10ReportURL: v10ReportURL)
         }
         try isolated.read { try Self.validateRestore($0) }
         _ = try Self.compactV9(isolated, at: temporary)
@@ -1222,7 +1247,9 @@ public actor InkuDatabase {
         if version == 7 { return seventh }
         let eighth = seventh + "\n" + (try resourceSQL("migration-v8"))
         if version == 8 { return eighth }
-        return eighth + "\n" + (try resourceSQL("migration-v9-prepare")) + "\n" + (try resourceSQL("migration-v9"))
+        let ninth = eighth + "\n" + (try resourceSQL("migration-v9-prepare")) + "\n" + (try resourceSQL("migration-v9"))
+        if version == 9 { return ninth }
+        return ninth + "\n" + (try resourceSQL("migration-v10"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1259,10 +1286,11 @@ public actor InkuDatabase {
         if version >= 7 { identifiers.append("swift-v7-saijiki-v3") }
         if version >= 8 { identifiers.append("swift-v8-draw-options") }
         if version >= 9 { identifiers.append("swift-v9-effect-digests") }
+        if version >= 10 { identifiers.append("swift-v10-saijiki-v4") }
         guard try schemaObjects(in: db) == expectedObjects else { throw PersistenceError.unknownSchema }
         let actualIdentifiers = try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
         let completedIdentifiers = version >= 9 ? (identifiers + [vacuumMarker]).sorted() : identifiers
-        guard actualIdentifiers == identifiers || actualIdentifiers == completedIdentifiers else {
+        guard actualIdentifiers == identifiers.sorted() || actualIdentifiers == completedIdentifiers else {
             throw PersistenceError.unknownSchema
         }
     }

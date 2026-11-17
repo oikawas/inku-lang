@@ -59,7 +59,7 @@ struct EffectDigestMigrationTests {
             let row = try #require(try Row.fetchOne(reader, sql: "SELECT snapshot_sha256,save_payload_sha256 FROM effect_acknowledgements"))
             #expect((row["snapshot_sha256"] as Data) == Data(SHA256.hash(data: snapshot)))
             #expect((row["save_payload_sha256"] as Data) == Data(SHA256.hash(data: Data("{}".utf8))))
-            #expect(try Int.fetchOne(reader, sql: "PRAGMA user_version") == 9)
+            #expect(try Int.fetchOne(reader, sql: "PRAGMA user_version") == InkuDatabase.currentSchemaVersion)
             #expect(try Int.fetchOne(reader, sql: "SELECT count(*) FROM sqlite_master WHERE type='index' AND name='lineage_edges_parent_node_id'") == 1)
             #expect(try Int.fetchOne(reader, sql: "SELECT count(*) FROM schema_migrations WHERE identifier='swift-v9-vacuum-complete'") == 1)
         }

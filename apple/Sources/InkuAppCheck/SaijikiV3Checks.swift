@@ -15,12 +15,18 @@ func runSaijikiV3Checks() throws {
         "source": .string("青い細筆の線を引く。"), "language": .string("ja"),
         "macro_locks": .array([]), "saijiki": .string("inku.saijiki.v2")])])
     let answer = try ExactJSON(data: InkuCore.migrateSaijikiV2(request.data))
-    guard answer["document"]["document"]["saijiki"].string == "inku.saijiki.v3",
+    guard answer["document"]["document"]["saijiki"].string == "inku.saijiki.v4",
           answer["document"]["document"]["source"].string == migrated.source,
           answer["document"]["edits"].array?.count == migrated.migratedEdits else {
         throw CheckFailure.message("Import and core migration disagree")
     }
-    print("Saijiki v3 checks passed: old export and saved document agree; no provider calls.")
+    let v3: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),
+        "language": .string("ja"), "ddl": .string("青い小さめの線を引く。"), "plugins": .array([])])
+    let migratedV3 = try DDLPackageImport.parse(v3.data)
+    guard migratedV3.source.contains("小さな"), !migratedV3.approximatedWords.isEmpty else {
+        throw CheckFailure.message("V3 export and approximated words were not migrated")
+    }
+    print("Saijiki v4 checks passed: v2 and v3 exports migrate; no provider calls.")
 }
 
 /// Compile and draw each current touch offline, then apply the shared display support check.
@@ -35,7 +41,7 @@ func runSaijikiV3DisplayChecks(folder: URL) async throws {
     let tools: [(String, String)] = [("銀筆", "silverpoint"), ("鉛筆", "pencil"), ("ペン", "pen"),
         ("チョーク", "chalk"), ("オイルパステル", "oil_pastel"), ("ガッシュ", "gouache"),
         ("水彩", "watercolor"), ("油彩", "oil_paint"), ("ペインティングナイフ", "painting_knife"),
-        ("エッチング", "etching"), ("コンピュータ", "computer")]
+        ("エッチング", "etching"), ("デジタル", "computer")]
     for (word, weight) in tools {
         guard await app.drawNewDDL("青い\(word)の線を引く。"), let work = app.selectedWork else {
             throw CheckFailure.message("\(word): draw failed: \(app.errorText ?? app.status)")

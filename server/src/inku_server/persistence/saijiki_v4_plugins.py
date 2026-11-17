@@ -1,4 +1,4 @@
-"""Plan Saijiki v3 changes to copied installed plugin packages.
+"""Plan Saijiki v4 changes to copied installed plugin packages.
 
 This module only reads and produces proposed bytes; it never writes packages.
 """
@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from inku_server.ddl_export import migrate_v2_export
-from .saijiki_v3_migration import migrate_unit_v3
+from .saijiki_v4_migration import migrate_unit_v4
 
 _OLD_TOOL = re.compile(
-    r"細筆|太筆|ロットリング|クレヨン|ビュラン|ドライポイント|"
-    r"(?<![a-z])(?:fine-brush|thick-brush|rotring|crayon|burin|drypoint)(?![a-z])",
+    r"コンピュータ|アクアチント|細かく|一点鎖線|小さめ|大きめ|特大の|巨大な|上弦|下弦|"
+    r"(?<![a-z])(?:computer|aquatint|temperate|extra-fine|extra-thick|dash-dot|waxing|waning)(?![a-z])",
     re.IGNORECASE,
 )
 
@@ -29,7 +29,8 @@ def plan_packages(directory: Path, *, journal: Callable[[dict[str, Any]], None] 
     report: dict[str, Any] = {"packages": 0, "changed": 0, "unchanged": 0,
                               "refused_records": [], "notes_with_old_tools": [],
                               "unadjusted_thinness_records": [], "unassociated_tool_records": [],
-                              "unassociated_sweep_records": [], "edits": {}}
+                              "unassociated_sweep_records": [], "approximated_word_records": [],
+                              "approximated_ref_records": [], "edits": {}}
     proposed: dict[Path, bytes] = {}
     for child in sorted(root.iterdir()):
         if child.is_symlink():
@@ -52,7 +53,7 @@ def plan_packages(directory: Path, *, journal: Callable[[dict[str, Any]], None] 
             for index, word in enumerate(words):
                 definition = word["definition"]
                 unit = {"definitions": [definition]}
-                result = json.loads(migrate_unit_v3(json.dumps(unit, ensure_ascii=False).encode()))
+                result = json.loads(migrate_unit_v4(json.dumps(unit, ensure_ascii=False).encode()))
                 if journal:
                     journal({"package": child.name, "word": index, "kind": "definition", "input": unit, "answer": result})
                 answer = result["definitions"][0]
@@ -65,7 +66,7 @@ def plan_packages(directory: Path, *, journal: Callable[[dict[str, Any]], None] 
                     example = word.get(f"example_{language}")
                     if isinstance(example, str) and example:
                         moved = migrate_v2_export(
-                            example, language, [{"definition": definition, "note": ""}], include_details=True,
+                            example, language, [{"definition": definition, "note": ""}], saijiki="inku.saijiki.v3", include_details=True,
                             journal=(lambda entry: journal({"package": child.name, "word": index,
                                                             "language": language, **entry})) if journal else None)
                         word[f"example_{language}"] = moved["ddl"]
@@ -76,9 +77,15 @@ def plan_packages(directory: Path, *, journal: Callable[[dict[str, Any]], None] 
                             if moved[kind]:
                                 report["unassociated_tool_records" if kind == "unassociated_tools" else "unassociated_sweep_records"].append(
                                     {"package": child.name, "word": index, "language": language, kind: moved[kind]})
+                        if moved["approximated_words"]:
+                            report["approximated_word_records"].append({"package": child.name, "word": index,
+                                "language": language, "approximated_words": moved["approximated_words"]})
                 if answer.get("unadjusted_thinness"):
                     report["unadjusted_thinness_records"].append({"package": child.name, "word": index,
                                                                   "details": answer["unadjusted_thinness"]})
+                if answer.get("approximated_refs"):
+                    report["approximated_ref_records"].append({"package": child.name, "word": index,
+                        "approximated_refs": answer["approximated_refs"]})
                 word["definition"] = answer["definition"]
             encoded = (json.dumps(package, ensure_ascii=False, indent=2) + "\n").encode()
             # Do not mark formatting alone as a change.

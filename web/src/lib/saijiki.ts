@@ -46,15 +46,16 @@ export function saijikiWordsFor(categoryKey: string, isJapanese: boolean): strin
 	return source.find((cat) => cat.key === categoryKey)?.words ?? [];
 }
 
-const BUNDLE_ORDER = ['what', 'where', 'with', 'face', 'ground', 'color', 'sway'] as const;
+const BUNDLE_ORDER = ['what', 'with', 'face', 'sway', 'color', 'where', 'ground'] as const;
 export function saijikiGroups(categories: SaijikiCategory[]) {
 	return BUNDLE_ORDER.map((key) => ({ key, categories: categories.filter((category) => category.bundle === key) }));
 }
 
 export function bundleLabel(key: string, japanese: boolean): string {
 	const labels: Record<string, [string, string]> = {
-		what: ['かたち', 'What'], where: ['場所と動き', 'Where'], with: ['道具', 'With'],
-		face: ['面', 'Face'], ground: ['地', 'Ground'], color: ['色', 'Color'], sway: ['揺れ', 'Sway']
+		what: ['何を', 'What'], with: ['何で', 'With what'], face: ['どんな面で', 'What face'],
+		sway: ['どう揺れて', 'How it sways'], color: ['何色で', 'What color'],
+		where: ['どこに置くか', 'Where'], ground: ['何の上に', 'On what ground']
 	};
 	return labels[key]?.[japanese ? 0 : 1] ?? key;
 }

@@ -118,7 +118,7 @@ flowchart TD
 
 Stage 1のLLMは可視DDLの文字列を書かず、閉じた型の**下絵JSON**を返す（prompt `inku.typed-stage1-work-plan-prompt.v1`）。promptは歳時記から導出した有限語彙、解決済みcanvas・catalog identity、検証済みMacroのsignatureとlocalized summaryだけを持ち、Macro本文や展開後DDLを渡さない。
 
-- **正規化** — `normalize_work_plan`が各値を受理行列（`work-plan-capabilities-v2.json`、compilerへ一文ずつ問い合わせて生成したもの）と照合し、範囲外の値はfield単位で未指定に、形の無い層はその層だけを除く。層が1つも残らなければschema違反として予算内で再試行する。
+- **正規化** — `normalize_work_plan`が各値を受理行列（`work-plan-capabilities-v3.json`、compilerへ一文ずつ問い合わせて生成したもの）と照合し、範囲外の値はfield単位で未指定に、形の無い層はその層だけを除く。層が1つも残らなければschema違反として予算内で再試行する。
 - **印字** — `print_work_plan`が要求言語の可視DDLへ決定的に印字する。compilerへ渡るのはこの文字列だけで、下絵は一時物である。
 - **保存済み実行の再生** — `normalized_ddl`を持つ旧応答はそのまま読む。
 

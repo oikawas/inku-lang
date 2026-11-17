@@ -2,7 +2,7 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.354",
   "build": "1430",
-  "buildDate": "2026-11-17T01:06:00.037Z",
+  "buildDate": "2026-11-17T01:16:38.058Z",
   "versions": {
     "ddlSpec": "30",
     "ddlEngine": "78",
@@ -1901,19 +1901,19 @@
       "vocabulary": [
         {
           "term": "記述",
-          "meaning": "作者が書く詩歌的な入力。作品の最上層（inku 固有）"
+          "meaning": "ユーザーが書く短い文章、歌、詞。作品の元になる。"
         },
         {
           "term": "指示書（正規化DDL）",
-          "meaning": "記述をもとに作る、絵を描くための指示"
+          "meaning": "記述をもとにAIが生成する、絵を描くためのDDLによる指示書き。AIの個性が反映。"
         },
         {
           "term": "楽譜（JSON Score）",
-          "meaning": "指示書を構造化した中間表現。決定的に保存される"
+          "meaning": "指示書をTyped Compilerが処理して生成する、中間表現。決定的。"
         },
         {
           "term": "演奏（SVG）",
-          "meaning": "楽譜を描く一回性の結果"
+          "meaning": "楽譜からレンダリングした画像データ。描画エンジンが変わると描画も変わる。"
         }
       ],
       "limitLabels": {
@@ -3795,19 +3795,19 @@
       "vocabulary": [
         {
           "term": "Description",
-          "meaning": "Your poem-like input — the top, authored layer (inku's own)."
+          "meaning": "A short text, song, or lyrics written by the user. It is the source of the work."
         },
         {
           "term": "Instructions (normalized DDL)",
-          "meaning": "Directions for drawing a picture, made from the description."
+          "meaning": "Drawing instructions in DDL written by AI from the description. They reflect the AI’s individuality."
         },
         {
           "term": "Score (JSON Score)",
-          "meaning": "The structured, deterministically saved intermediate."
+          "meaning": "An intermediate representation produced when the Typed Compiler processes the instructions. Deterministic."
         },
         {
           "term": "Performance (SVG)",
-          "meaning": "The one-time drawing of a score."
+          "meaning": "Picture data drawn from the score. The drawing changes when the drawing engine changes."
         }
       ],
       "limitLabels": {
@@ -4548,7 +4548,7 @@
     }
   },
   "source": {
-    "commit": "3d5d75d72b7a9213b8f6041ee2d9e0fad1ad21d8",
+    "commit": "41b2a531cc651fcbe20251b1edeae27fef8b554a",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "001f310fbd4454ee8336877ec7b36e7dd85b3baf3e7a08727ee0c5e943820e8b",
@@ -4559,8 +4559,8 @@
       "web/BUILD_NUMBER": "e043c662bc456d809131f79ac8444973f9aed48a3287965dab7964a5f080c180",
       "server/src/inku_server/layer_versions.py": "07ac2c29547d1921adf33eb4f8536a2ad45dfdd12a29d1b975b38e2ba2a143a2",
       "core/crates/inku-render/src/lib.rs": "7005f745e98126fb17dd0496759a47ed7f51daca2ecefad4182339683ef0618f",
-      "web/src/lib/i18n/ja.ts": "4fa999be88af7b6a0ef6da82952ed6e216a0a136b1264954a433973e3f3c185f",
-      "web/src/lib/i18n/en.ts": "57a06d9fffea44d9fb6c4f7bb027aea2115606f12711f6dc306e544a2b5fd7df"
+      "web/src/lib/i18n/ja.ts": "9b20af6a8e42b6a3ef6b32430d3979242d5375ed330ee612195279180093c563",
+      "web/src/lib/i18n/en.ts": "5759bb781e6742fcab445b1c40dd9a5998ddf5c29a92ec6adb2771f58ca6b875"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

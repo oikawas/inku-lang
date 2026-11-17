@@ -15,6 +15,7 @@ def render_py() -> str:
     if asset["asset_id"] != "inku.saijiki.v4":
         raise ValueError("unexpected Saijiki asset")
     return ('"""Generated from saijiki-v4.json by gen_saijiki_py.py; do not edit."""\n\n'
+            + 'BUNDLES = ' + pformat(asset["bundles"], width=100, sort_dicts=False) + '\n\n'
             + 'CATEGORIES = ' + pformat(asset["categories"], width=100, sort_dicts=False) + '\n')
 
 

@@ -15,6 +15,7 @@ from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 from ...plugins import PLUGIN_PACKAGE_MANAGER
 from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
+from ...saijiki_generated import BUNDLES
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
 from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model
@@ -316,6 +317,7 @@ def api_saijiki(
     """Return the Saijiki vocabulary for display: the core categories and the
     words of enabled v2 plugin packages. Requires a signed-in user."""
     return {
+        "bundles": BUNDLES,
         "categories": display_categories(lang),
         "plugins": _enabled_plugin_entries(),
     }

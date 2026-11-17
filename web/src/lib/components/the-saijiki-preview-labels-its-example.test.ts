@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { SAIJIKI, SAIJIKI_BUNDLES, bundleLabel, hydrateSaijikiBundles, saijikiGroups } from '../saijiki.ts';
 
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8');
 
@@ -31,4 +32,17 @@ test('the example line opens with its label in both saijiki previews', () => {
 test('the label is written in both UI languages', () => {
 	assert.match(read('../i18n/ja.ts'), /\n\tsaijikiPreviewExampleLabel: '例文：',\n/);
 	assert.match(read('../i18n/en.ts'), /\n\tsaijikiPreviewExampleLabel: 'Example: ',\n/);
+});
+
+test('the bundle names and order follow the server snapshot and hydration', () => {
+	const saved = SAIJIKI_BUNDLES.map((bundle) => ({ ...bundle }));
+	try {
+		assert.deepEqual(saijikiGroups(SAIJIKI).map((group) => group.key), saved.map((bundle) => bundle.key));
+		assert.equal(bundleLabel('where', true), saved.find((bundle) => bundle.key === 'where')?.name_ja);
+		hydrateSaijikiBundles([{ key: 'where', name_ja: '場所', name_en: 'Place' }]);
+		assert.deepEqual(saijikiGroups(SAIJIKI).map((group) => group.key), ['where']);
+		assert.equal(bundleLabel('where', false), 'Place');
+	} finally {
+		hydrateSaijikiBundles(saved);
+	}
 });

@@ -1,4 +1,6 @@
-import { GENERATED_SAIJIKI, GENERATED_SAIJIKI_EN } from './saijiki.generated';
+import { GENERATED_SAIJIKI, GENERATED_SAIJIKI_EN, GENERATED_SAIJIKI_BUNDLES } from './saijiki.generated';
+
+export type SaijikiBundle = { key: string; name_ja: string; name_en: string };
 
 export type SaijikiCategory = {
 	key: string;
@@ -46,16 +48,17 @@ export function saijikiWordsFor(categoryKey: string, isJapanese: boolean): strin
 	return source.find((cat) => cat.key === categoryKey)?.words ?? [];
 }
 
-const BUNDLE_ORDER = ['what', 'with', 'face', 'sway', 'color', 'where', 'ground'] as const;
+export let SAIJIKI_BUNDLES: SaijikiBundle[] = GENERATED_SAIJIKI_BUNDLES.map((bundle) => ({ ...bundle }));
+
+export function hydrateSaijikiBundles(bundles: SaijikiBundle[]): void {
+	SAIJIKI_BUNDLES = bundles.map((bundle) => ({ ...bundle }));
+}
+
 export function saijikiGroups(categories: SaijikiCategory[]) {
-	return BUNDLE_ORDER.map((key) => ({ key, categories: categories.filter((category) => category.bundle === key) }));
+	return SAIJIKI_BUNDLES.map(({ key }) => ({ key, categories: categories.filter((category) => category.bundle === key) }));
 }
 
 export function bundleLabel(key: string, japanese: boolean): string {
-	const labels: Record<string, [string, string]> = {
-		what: ['何を', 'What'], with: ['何で', 'With what'], face: ['どんな面で', 'What face'],
-		sway: ['どう揺れて', 'How it sways'], color: ['何色で', 'What color'],
-		where: ['どこに置くか', 'Where'], ground: ['何の上に', 'On what ground']
-	};
-	return labels[key]?.[japanese ? 0 : 1] ?? key;
+	const bundle = SAIJIKI_BUNDLES.find((item) => item.key === key);
+	return (japanese ? bundle?.name_ja : bundle?.name_en) ?? key;
 }

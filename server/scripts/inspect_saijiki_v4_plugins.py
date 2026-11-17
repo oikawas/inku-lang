@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from count_saijiki_v1_migration import _resolve_guarded_database
-from inku_server.persistence.saijiki_v3_plugins import plan_packages
+from inku_server.persistence.saijiki_v4_plugins import plan_packages
 
 
 def main() -> int:

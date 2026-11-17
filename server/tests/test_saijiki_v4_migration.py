@@ -6,13 +6,84 @@ import json
 import pytest
 from sqlalchemy import create_engine
 
-from inku_server.persistence.saijiki_v3_migration import (
-    MigrationAlreadyWritten, _migrate_once_database, migrate_unit_v3,
+from inku_server.persistence.saijiki_v4_migration import (
+    MigrationAlreadyWritten, _migrate_once_database, migrate_unit_v4,
 )
-from inku_server.persistence.saijiki_v3_plugins import plan_packages
-from inku_server.persistence import saijiki_v3_cutover
+from inku_server.persistence.saijiki_v4_plugins import plan_packages
+from inku_server.persistence import saijiki_v4_cutover
 from inku_server.persistence.variation_authority import VariationAuthorityStore
-from tests.test_saijiki_v2_migrate_once import _saved_database
+from tests.test_saijiki_v2_migrate_once import _saved_database as _old_saved_database
+
+
+def _saved_database(path, *args):
+    """A v3-cutover-complete fixture, with matching saved document and link."""
+    _old_saved_database(path, *args)
+    engine = create_engine(f"sqlite:///{path}")
+    source = "黒い円を置く。"
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    with engine.begin() as connection:
+        context = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
+        context["ddl_digest"] = digest
+        raw = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        doc = {"source": source, "language": "ja", "macro_locks": [], "saijiki": "inku.saijiki.v3"}
+        connection.exec_driver_sql("UPDATE history SET ddl=? WHERE id='h'", (source,))
+        connection.exec_driver_sql("UPDATE variation_authority SET source=?,document_json=?,ddl_digest=?", (source, json.dumps(doc, ensure_ascii=False), digest))
+        connection.exec_driver_sql("UPDATE pipeline_history_links SET ddl_digest=?,fork_context_bytes=?,fork_context_digest=?", (digest, raw, hashlib.sha256(raw).hexdigest()))
+        connection.exec_driver_sql("INSERT INTO app_settings(key,value,at) VALUES ('saijiki_v3_saved_records',?,0)", (json.dumps({"refused_records": 0}),))
+    engine.dispose()
+
+
+@pytest.mark.parametrize(("marker", "reason"), [
+    (None, "saijiki_v3_cutover_missing"),
+    ({"refused_records": 1}, "saijiki_v3_refused_records_present"),
+])
+def test_v3_cutover_prerequisite_blocks_census_and_write(tmp_path, marker, reason):
+    from inku_server.persistence.saijiki_v4_migration import census, SaijikiV3PrerequisiteError
+    database = tmp_path / "saved.db"
+    _saved_database(database)
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        if marker is None:
+            connection.exec_driver_sql("DELETE FROM app_settings WHERE key='saijiki_v3_saved_records'")
+        else:
+            connection.exec_driver_sql("UPDATE app_settings SET value=? WHERE key='saijiki_v3_saved_records'", (json.dumps(marker),))
+    with engine.connect() as connection:
+        with pytest.raises(SaijikiV3PrerequisiteError, match=reason):
+            census(connection, migrate_unit_v4)
+    engine.dispose()
+    before = database.read_bytes()
+    with pytest.raises(SaijikiV3PrerequisiteError, match=reason):
+        _migrate_once_database(database, migrate_unit_v4)
+    assert database.read_bytes() == before
+
+
+def test_v3_document_and_history_report_approximation_and_v4_is_untouched(tmp_path):
+    database = tmp_path / "saved.db"
+    _saved_database(database)
+    source = "一点鎖線の線を引く。"
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        context = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
+        context["ddl_digest"] = digest
+        raw = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        doc = {"source": source, "language": "ja", "macro_locks": [], "saijiki": "inku.saijiki.v3"}
+        connection.exec_driver_sql("UPDATE history SET ddl=? WHERE id='h'", (source,))
+        connection.exec_driver_sql("UPDATE variation_authority SET source=?,document_json=?,ddl_digest=?", (source, json.dumps(doc, ensure_ascii=False), digest))
+        connection.exec_driver_sql("UPDATE pipeline_history_links SET ddl_digest=?,fork_context_bytes=?,fork_context_digest=?", (digest, raw, hashlib.sha256(raw).hexdigest()))
+        doc4 = {"source": "赤い円を置く。", "language": "ja", "macro_locks": [], "saijiki": "inku.saijiki.v4"}
+        connection.exec_driver_sql("INSERT INTO variation_authority SELECT owner_id, 'v4', protocol_version, revision, origin, authority, ?, ?, ?, authority_digest, updated_at FROM variation_authority WHERE variation_id='v'", (doc4["source"], json.dumps(doc4, ensure_ascii=False), hashlib.sha256(doc4["source"].encode()).hexdigest()))
+    engine.dispose()
+    report = _migrate_once_database(database, migrate_unit_v4)
+    assert {(x["kind"], x["id"]) for x in report["approximated_word_records"]} == {("history", "h:ddl"), ("variation_documents", "u/v")}
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT ddl FROM history WHERE id='h'").scalar_one() == "破線の線を引く。"
+        assert json.loads(connection.exec_driver_sql("SELECT document_json FROM variation_authority WHERE variation_id='v4'").scalar_one()) == doc4
+        assert connection.exec_driver_sql("SELECT COUNT(*) FROM app_settings WHERE key='saijiki_v3_saved_records'").scalar_one() == 1
+    engine.dispose()
+    with pytest.raises(MigrationAlreadyWritten):
+        _migrate_once_database(database, migrate_unit_v4)
 
 
 def test_missing_history_language_uses_saved_config_or_ddl(tmp_path):
@@ -20,8 +91,8 @@ def test_missing_history_language_uses_saved_config_or_ddl(tmp_path):
 
     database = tmp_path / "saved.db"
     _saved_database(database)
-    english = "Draw a blue fine-brush line."
-    japanese = "黒い太筆の線を引く。"
+    english = "Draw a blue dash-dot line."
+    japanese = "一点鎖線の線を引く。"
     engine = create_engine(f"sqlite:///{database}")
     with engine.begin() as connection:
         context = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
@@ -36,19 +107,19 @@ def test_missing_history_language_uses_saved_config_or_ddl(tmp_path):
                 id=ident, user_id="u", at=2, input="description", ddl=source, score="{}", svg="<svg/>", elapsed_ms=0))
     engine.dispose()
 
-    result = _migrate_once_database(database, migrate_unit_v3)
+    result = _migrate_once_database(database, migrate_unit_v4)
     assert result["refused_records"] == []
     engine = create_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
         values = dict(connection.exec_driver_sql("SELECT id,ddl FROM history").all())
     engine.dispose()
-    assert values == {"h": "Draw a blue gouache line.", "unlinked-en": "Draw a blue gouache line.",
-                      "unlinked-ja": "黒い太いガッシュの線を引く。"}
+    assert values == {"h": "Draw a blue dashed line.", "unlinked-en": "Draw a blue dashed line.",
+                      "unlinked-ja": "破線の線を引く。"}
 
 
 @pytest.mark.parametrize(("field", "config_language", "source", "expected"), [
-    ("en", "ja", "Draw a blue fine-brush line.", "Draw a blue gouache line."),
-    (None, "en", "黒い太筆の線を引く。", "黒い太筆の線を引く。"),
+    ("en", "ja", "Draw a blue dash-dot line.", "Draw a blue dashed line."),
+    (None, "en", "一点鎖線の線を引く。", "一点鎖線の線を引く。"),
 ])
 def test_history_language_precedence_also_applies_to_expanded_ddl(tmp_path, field, config_language, source, expected):
     from inku_server.persistence import legacy_v3_schema
@@ -64,19 +135,19 @@ def test_history_language_precedence_also_applies_to_expanded_ddl(tmp_path, fiel
         connection.exec_driver_sql("UPDATE pipeline_history_links SET ddl_digest=?,fork_context_bytes=?,fork_context_digest=?",
                                    (context["ddl_digest"], raw, hashlib.sha256(raw).hexdigest()))
         connection.exec_driver_sql("UPDATE history SET ddl=?, expanded_ddl=?, instruction_lang_resolved=? WHERE id='h'",
-                                   (source, "Draw a red fine-brush line.", field))
+                                   (source, "Draw a red dash-dot line.", field))
     engine.dispose()
-    result = _migrate_once_database(database, migrate_unit_v3)
+    result = _migrate_once_database(database, migrate_unit_v4)
     assert result["refused_records"] == []
     engine = create_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
         assert connection.exec_driver_sql("SELECT ddl,expanded_ddl FROM history WHERE id='h'").one() == (
-            expected, "Draw a red gouache line.")
+            expected, "Draw a red dashed line.")
     engine.dispose()
 
 
 def test_fork_catalog_locks_move_only_for_the_original_digest():
-    from inku_server.persistence.saijiki_v3_migration import _Link, _link_statement
+    from inku_server.persistence.saijiki_v4_migration import _Link, _link_statement
 
     matched = {"qualified_name": "Nature.下草", "version": "1.0.0", "digest": "a" * 64}
     unmatched = {**matched, "digest": "b" * 64}
@@ -95,12 +166,12 @@ def test_fork_catalog_locks_move_only_for_the_original_digest():
 
 def test_migration_reports_and_preserves_unmatched_fork_lock(tmp_path):
     from pathlib import Path
-    from inku_server.persistence.saijiki_v3_migration import _definition_unit
+    from inku_server.persistence.saijiki_v4_migration import _definition_unit
 
     fixture = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/tests/fixtures/nature-leaves-1.0-package.json"
     definition = next(item["definition"] for item in json.loads(fixture.read_text())["entries"]
                       if item["definition"]["heading"] == "下草")
-    answer = json.loads(migrate_unit_v3(_definition_unit(definition)))["definitions"][0]
+    answer = json.loads(migrate_unit_v4(_definition_unit(definition)))["definitions"][0]
     lock = {"qualified_name": answer["qualified_name"], "version": answer["version"],
             "digest": answer["old_digest"].removeprefix("sha256:")}
     other = {**lock, "digest": "0" * 64}
@@ -117,7 +188,7 @@ def test_migration_reports_and_preserves_unmatched_fork_lock(tmp_path):
         # An orphan link is migrated even without a history document to reject its mismatched lock.
         connection.exec_driver_sql("DELETE FROM history WHERE id='h'")
     engine.dispose()
-    report = _migrate_once_database(database, migrate_unit_v3)
+    report = _migrate_once_database(database, migrate_unit_v4)
     assert report["history_links"]["unmatched_locks"] == 1
     assert report["unmatched_lock_records"] == [{"id": "u/h", "lock": other}]
     engine = create_engine(f"sqlite:///{database}")
@@ -128,10 +199,10 @@ def test_migration_reports_and_preserves_unmatched_fork_lock(tmp_path):
         {**lock, "digest": answer["digest"].removeprefix("sha256:")}, other]
 
 
-def test_v2_work_and_authority_move_together_once(tmp_path):
+def test_v3_work_and_authority_move_together_once(tmp_path):
     path = tmp_path / "saved.db"
     _saved_database(path)
-    source = "黒い太筆の線を引く。"
+    source = "一点鎖線の線を引く。"
     digest = hashlib.sha256(source.encode()).hexdigest()
     engine = create_engine(f"sqlite:///{path}")
     with engine.begin() as connection:
@@ -139,7 +210,7 @@ def test_v2_work_and_authority_move_together_once(tmp_path):
         context["ddl_digest"] = digest
         encoded = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
         document = json.dumps({"source": source, "language": "ja", "macro_locks": [],
-                               "saijiki": "inku.saijiki.v2"}, ensure_ascii=False)
+                               "saijiki": "inku.saijiki.v3"}, ensure_ascii=False)
         connection.exec_driver_sql("UPDATE history SET ddl=? WHERE id='h'", (source,))
         connection.exec_driver_sql("UPDATE variation_authority SET source=?,document_json=?,ddl_digest=?",
                                    (source, document, digest))
@@ -147,19 +218,19 @@ def test_v2_work_and_authority_move_together_once(tmp_path):
                                    (digest, encoded, hashlib.sha256(encoded).hexdigest()))
     engine.dispose()
     journal = tmp_path / "journal.jsonl"
-    result = _migrate_once_database(path, migrate_unit_v3, journal=journal)
+    result = _migrate_once_database(path, migrate_unit_v4, journal=journal)
     assert result["refused_records"] == []
     assert result["executions"]["discarded"] == 1
     assert journal.stat().st_mode & 0o777 == 0o600
     engine = create_engine(f"sqlite:///{path}")
     linked = VariationAuthorityStore(engine).read_linked_history("u", "h")
-    assert linked is not None and linked.history.source == "黒い太いガッシュの線を引く。"
+    assert linked is not None and linked.history.source == "破線の線を引く。"
     with engine.connect() as connection:
         document = json.loads(connection.exec_driver_sql("SELECT document_json FROM variation_authority").scalar_one())
-    assert document["saijiki"] == "inku.saijiki.v3"
+    assert document["saijiki"] == "inku.saijiki.v4"
     engine.dispose()
     with pytest.raises(MigrationAlreadyWritten):
-        _migrate_once_database(path, migrate_unit_v3)
+        _migrate_once_database(path, migrate_unit_v4)
 
 
 def test_cutover_blanks_only_the_explicit_unlinked_text(tmp_path):
@@ -173,7 +244,7 @@ def test_cutover_blanks_only_the_explicit_unlinked_text(tmp_path):
     engine.dispose()
     packages=tmp_path/'plugins'
     packages.mkdir()
-    report=saijiki_v3_cutover.cutover(database,packages,tmp_path/'recovery',
+    report=saijiki_v4_cutover.cutover(database,packages,tmp_path/'recovery',
         journal=tmp_path/'journal.jsonl',blank=['bad:ddl'])
     assert report['blanked_records']==[{'id':'bad:ddl','chars':7}]
     engine=create_engine(f'sqlite:///{database}')
@@ -189,8 +260,8 @@ def test_package_plan_keeps_original_note_and_preview_and_moves_example(tmp_path
     package = json.loads(source.read_text())
     package["words"] = package["words"][:1]
     word = package["words"][0]
-    word["example_ja"] = "黒い太筆の線を引く。"
-    word["note_ja"] = "太筆という旧語を含む散文"
+    word["example_ja"] = "一点鎖線の線を引く。"
+    word["note_ja"] = "一点鎖線という旧語を含む散文"
     directory = tmp_path / "plugins" / "Nature.leaves-copy"
     directory.mkdir(parents=True)
     path = directory / "package.json"
@@ -202,7 +273,7 @@ def test_package_plan_keeps_original_note_and_preview_and_moves_example(tmp_path
     assert report["changed"] == 1 and not report["refused_records"]
     assert report["notes_with_old_tools"] == [{"package": directory.name, "word": 0, "language": "ja"}]
     moved = json.loads(proposed[path])["words"][0]
-    assert moved["example_ja"] == "黒い太いガッシュの線を引く。"
+    assert moved["example_ja"] == "破線の線を引く。"
     assert moved["note_ja"] == word["note_ja"] and moved["preview"] == word["preview"]
     assert any(entry["kind"] == "document" and entry["input"]["document"]["source"] == word["example_ja"]
                and entry["answer"]["document"]["document"]["source"] == moved["example_ja"] for entry in journal)
@@ -216,26 +287,26 @@ def test_cutover_rolls_back_database_and_package_on_package_write_failure(tmp_pa
     source = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/assets/nature-leaves-v2/package.json"
     package = json.loads(source.read_text())
     package["words"] = package["words"][:1]
-    package["words"][0]["example_ja"] = "黒い太筆の線を引く。"
+    package["words"][0]["example_ja"] = "一点鎖線の線を引く。"
     directory = tmp_path / "plugins" / "Nature.leaves-copy"
     directory.mkdir(parents=True)
     file = directory / "package.json"
     original = json.dumps(package, ensure_ascii=False).encode()
     file.write_bytes(original)
-    real_atomic = saijiki_v3_cutover._atomic
+    real_atomic = saijiki_v4_cutover._atomic
 
     def fail_package(path, data, mode):
         if path.name == "package.json":
             raise OSError("injected write failure")
         return real_atomic(path, data, mode)
 
-    monkeypatch.setattr(saijiki_v3_cutover, "_atomic", fail_package)
+    monkeypatch.setattr(saijiki_v4_cutover, "_atomic", fail_package)
     with pytest.raises(OSError, match="injected"):
-        saijiki_v3_cutover.cutover(database, directory.parent, tmp_path / "attempt", journal=tmp_path / "journal")
+        saijiki_v4_cutover.cutover(database, directory.parent, tmp_path / "attempt", journal=tmp_path / "journal")
     assert file.read_bytes() == original
     engine = create_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT COUNT(*) FROM app_settings WHERE key='saijiki_v3_saved_records'").scalar_one() == 0
+        assert connection.exec_driver_sql("SELECT COUNT(*) FROM app_settings WHERE key='saijiki_v4_saved_records'").scalar_one() == 0
         assert connection.exec_driver_sql("SELECT COUNT(*) FROM pipeline_candidate_executions").scalar_one() == 1
     engine.dispose()
 
@@ -248,18 +319,18 @@ def test_cutover_commits_database_and_packages_together(tmp_path):
     source = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/assets/nature-leaves-v2/package.json"
     package = json.loads(source.read_text())
     package["words"] = package["words"][:1]
-    package["words"][0]["example_ja"] = "黒い太筆の線を引く。"
+    package["words"][0]["example_ja"] = "一点鎖線の線を引く。"
     directory = tmp_path / "plugins" / "Nature.leaves-copy"
     directory.mkdir(parents=True)
     file = directory / "package.json"
     file.write_text(json.dumps(package, ensure_ascii=False))
     recovery = tmp_path / "attempt"
-    report = saijiki_v3_cutover.cutover(database, directory.parent, recovery, journal=tmp_path / "journal")
+    report = saijiki_v4_cutover.cutover(database, directory.parent, recovery, journal=tmp_path / "journal")
     assert report["packages"]["changed"] == 1
-    assert json.loads(file.read_text())["words"][0]["example_ja"] == "黒い太いガッシュの線を引く。"
-    assert saijiki_v3_cutover.recover(database, directory.parent, recovery) == "committed"
+    assert json.loads(file.read_text())["words"][0]["example_ja"] == "破線の線を引く。"
+    assert saijiki_v4_cutover.recover(database, directory.parent, recovery) == "committed"
     with pytest.raises(FileExistsError):
-        saijiki_v3_cutover.cutover(database, directory.parent, recovery, journal=tmp_path / "other-journal")
+        saijiki_v4_cutover.cutover(database, directory.parent, recovery, journal=tmp_path / "other-journal")
 
 
 def test_interrupted_uncommitted_package_is_restored_from_private_backup(tmp_path):
@@ -280,7 +351,7 @@ def test_interrupted_uncommitted_package_is_restored_from_private_backup(tmp_pat
             "before": hashlib.sha256(old).hexdigest(), "after": hashlib.sha256(new).hexdigest(),
         }],
     }))
-    assert saijiki_v3_cutover.recover(database, root, recovery) == "rolled_back"
+    assert saijiki_v4_cutover.recover(database, root, recovery) == "rolled_back"
     assert package.read_bytes() == old
 
 
@@ -298,13 +369,13 @@ def test_missing_builtin_definition_is_recovered_only_if_lock_digest_matches(tmp
         connection.exec_driver_sql("UPDATE variation_authority SET source=?, document_json=?",
                                    (document["source"], json.dumps(document, ensure_ascii=False)))
     engine.dispose()
-    result = _migrate_once_database(database, migrate_unit_v3)
+    result = _migrate_once_database(database, migrate_unit_v4)
     assert result["refused_records"] == []
     engine = create_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
         moved = json.loads(connection.exec_driver_sql("SELECT document_json FROM variation_authority").scalar_one())
     engine.dispose()
-    assert moved["saijiki"] == "inku.saijiki.v3"
+    assert moved["saijiki"] == "inku.saijiki.v4"
     assert moved["source"] == "黒い太いガッシュの線を引く。"
     assert moved["macro_locks"][0]["digest"] != lock["digest"]
 
@@ -320,7 +391,7 @@ def test_historical_builtin_fallback_never_ignores_a_wrong_digest(tmp_path):
         connection.exec_driver_sql("DELETE FROM pipeline_candidate_executions")
         connection.exec_driver_sql("UPDATE variation_authority SET document_json=?", (json.dumps(document, ensure_ascii=False),))
     engine.dispose()
-    result = _migrate_once_database(database, migrate_unit_v3)
+    result = _migrate_once_database(database, migrate_unit_v4)
     assert any(item["kind"] == "variation_documents" for item in result["refused_records"])
 
 
@@ -351,10 +422,10 @@ def test_saved_context_with_wrong_original_digest_is_refused(tmp_path):
             revision="1", origin="user_authored_ddl", authority="ddl_authoritative", source=source,
             document_json=document, ddl_digest=digest, authority_digest="0" * 64, updated_at=1))
     engine.dispose()
-    from inku_server.persistence.saijiki_v3_migration import census
+    from inku_server.persistence.saijiki_v4_migration import census
     engine = create_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
-        result = census(connection, migrate_unit_v3)
+        result = census(connection, migrate_unit_v4)
     engine.dispose()
     refused = [item for item in result["refused_records"] if item["id"].endswith("/orphan")]
     assert len(refused) == 1

@@ -162,6 +162,11 @@ fn a_v3_definition_moves_the_dash_dot_and_the_dropped_sizes_and_refuses_a_waxing
         migrated.definition["body"][0]["fields"]["continuity"]["id"],
         "dashed"
     );
+    // The host shows the author where a definition moved to a near word (SPEC §3.3).
+    assert_eq!(
+        migrated.approximated_refs,
+        vec!["$.body[0].fields.continuity".to_owned()]
+    );
     let error =
         inku_ddl::migrate_macro_definition_from_saijiki_v3(&definition(serde_json::json!({
             "proportion_arc_form": {"expr": "semantic_ref", "category": "ratio", "id": "waxing"},
@@ -174,4 +179,5 @@ fn a_v3_definition_moves_the_dash_dot_and_the_dropped_sizes_and_refuses_a_waxing
         })))
         .unwrap();
     assert!(!unchanged.changed);
+    assert!(unchanged.approximated_refs.is_empty());
 }

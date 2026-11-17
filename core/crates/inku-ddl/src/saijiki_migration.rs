@@ -67,6 +67,10 @@ pub struct SaijikiDefinitionMigration {
     /// its thinness following the new tool's widths, because the tool or the thinness is
     /// written through a parameter, a local or a cycle (Saijiki v3).
     pub unadjusted_thinness: Vec<String>,
+    /// The semantic references (JSON paths in the definition) Saijiki v4 moved to a near
+    /// word (一点鎖線 → 破線, 小さめ → 小さな, ...; SPEC §3.3), so the host can show the
+    /// author where the drawing may change, as `approximated_words` does for a document.
+    pub approximated_refs: Vec<String>,
 }
 
 /// Why a document or definition could not be migrated.
@@ -1295,7 +1299,23 @@ fn rewrite_emit_tools(statements: &mut [Value], path: &str, unadjusted: &mut Vec
     }
 }
 
-fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMigrationError> {
+/// Whether a context-free rename moves the word to a near word rather than respelling it.
+fn is_near_word_rename(category: &str, id: &str) -> bool {
+    matches!(
+        (category, id),
+        ("continuity", "dash_dot")
+            | (
+                "relative_scale",
+                "slightly_small" | "slightly_large" | "extra_large" | "huge"
+            )
+    )
+}
+
+fn rewrite_semantic_refs(
+    value: &mut Value,
+    path: &str,
+    approximated: &mut Vec<String>,
+) -> Result<(), SaijikiMigrationError> {
     match value {
         Value::Object(object) => {
             if object.get("expr").and_then(Value::as_str) == Some("semantic_ref") {
@@ -1309,7 +1329,11 @@ fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMig
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_owned();
-                if let Some((category, id)) = renamed_semantic_ref(&category, &id) {
+                if let Some((new_category, new_id)) = renamed_semantic_ref(&category, &id) {
+                    if is_near_word_rename(&category, &id) {
+                        approximated.push(path.to_owned());
+                    }
+                    let (category, id) = (new_category, new_id);
                     object.insert("category".to_owned(), Value::String(category.to_owned()));
                     object.insert("id".to_owned(), Value::String(id.to_owned()));
                 } else if matches!(
@@ -1329,12 +1353,12 @@ fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMig
                 return Ok(());
             }
             for (key, child) in object.iter_mut() {
-                rewrite_semantic_refs(child, &format!("{path}.{key}"))?;
+                rewrite_semantic_refs(child, &format!("{path}.{key}"), approximated)?;
             }
         }
         Value::Array(items) => {
             for (index, child) in items.iter_mut().enumerate() {
-                rewrite_semantic_refs(child, &format!("{path}[{index}]"))?;
+                rewrite_semantic_refs(child, &format!("{path}[{index}]"), approximated)?;
             }
         }
         _ => {}
@@ -1394,7 +1418,8 @@ fn migrate_macro_definition_to_current(
             rewrite_emit_tools(body, &format!("{scope}.body"), &mut unadjusted_thinness);
         }
     }
-    rewrite_semantic_refs(&mut migrated, "$")?;
+    let mut approximated_refs = Vec::new();
+    rewrite_semantic_refs(&mut migrated, "$", &mut approximated_refs)?;
 
     let typed = MacroDefinition::from_json(&migrated.to_string())
         .map_err(|_| SaijikiMigrationError::UnreadableDefinition)?;
@@ -1422,6 +1447,7 @@ fn migrate_macro_definition_to_current(
         definition: migrated,
         identity,
         unadjusted_thinness,
+        approximated_refs,
     })
 }
 

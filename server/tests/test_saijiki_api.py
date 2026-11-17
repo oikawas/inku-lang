@@ -25,6 +25,8 @@ _GENERATED_TS = _REPO_ROOT / "web" / "src" / "lib" / "saijiki.generated.ts"
 def test_all_saijiki_categories_match_the_core_v4_asset():
     asset = json.loads((_REPO_ROOT / "core/crates/inku-ddl/assets/saijiki-v4.json").read_text())
     assert asset["asset_id"] == "inku.saijiki.v4"
+    from inku_server.saijiki_generated import BUNDLES
+    assert BUNDLES == asset["bundles"]
     assert len(asset["categories"]) == len(saijiki.SAIJIKI)
     fields = ("surface_ja", "surface_en", "score_value", "default", "prompt", "display", "marker",
               "parser_surfaces_ja", "parser_surfaces_en", "marker_surfaces_ja", "marker_surfaces_en", "id", "facet")
@@ -79,6 +81,7 @@ def test_api_saijiki_matches_table():
             expected = json.loads(
                 json.dumps(
                     {
+                        "bundles": saijiki.BUNDLES,
                         "categories": saijiki.display_categories(lang),
                         "plugins": public_routes._enabled_plugin_entries(),
                     }

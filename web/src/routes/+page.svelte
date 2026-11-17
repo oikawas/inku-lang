@@ -16,7 +16,7 @@
 	import { ddlWorkKey } from '$lib/features/ddl-editor/work-key';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
-	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
+	import { hydrateSaijiki, hydrateSaijikiEn, hydrateSaijikiBundles, type SaijikiBundle } from '$lib/saijiki';
 	import { SURFACE_PREVIEWS, HANDLING_PREVIEWS, FINENESS_PREVIEWS, UNDERLAYER_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
 	import { instructionLangOf, resolveInstructionLang, type ResolvedInstructionLang } from '$lib/instructionLang';
 	import AppRail from '$lib/components/AppRail.svelte';
@@ -1231,6 +1231,7 @@
 
 	async function loadPluginVocabulary() {
 		type SaijikiPayload = {
+			bundles?: SaijikiBundle[];
 			categories: { key: string; name_ja: string; name_en: string; bundle: string; words: string[]; ids: string[]; facets: (string | null)[]; descriptions: (string | null)[] }[];
 			plugins: PluginEntry[];
 		};
@@ -1243,6 +1244,7 @@
 			// Both languages: highlighting matches the DDL's own language, which
 			// follows instruction_lang and need not agree with the UI language.
 			const [ja, en] = await Promise.all([fetchSaijiki('ja'), fetchSaijiki('en')]);
+			if (Array.isArray(ja.bundles)) hydrateSaijikiBundles(ja.bundles);
 			hydrateSaijiki(
 				ja.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, bundle: c.bundle, words: c.words, ids: c.ids, facets: c.facets, descriptions: c.descriptions }))
 			);

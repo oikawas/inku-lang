@@ -10,6 +10,18 @@ package app.inku.mobile.pipeline
  *     cd server && uv run python scripts/gen_saijiki_kt.py
  */
 object SaijikiGenerated {
+    data class Bundle(val key: String, val nameJa: String, val nameEn: String)
+
+    val BUNDLES: List<Bundle> = listOf(
+        Bundle("what", "何を", "What"),
+        Bundle("with", "何で", "With what"),
+        Bundle("face", "どんな面で", "What face"),
+        Bundle("sway", "どう揺れて", "How it sways"),
+        Bundle("color", "何色で", "What color"),
+        Bundle("where", "どこに置くか", "Where"),
+        Bundle("ground", "何の上に", "On what ground"),
+    )
+
     data class Category(
         val key: String,
         val nameJa: String,

@@ -26,7 +26,7 @@ schema からは削除しない。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from .saijiki_generated import CATEGORIES
+from .saijiki_generated import BUNDLES, CATEGORIES
 
 __all__ = [
     "SaijikiWord",

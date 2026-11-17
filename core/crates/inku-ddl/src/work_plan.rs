@@ -1529,7 +1529,16 @@ pub fn plan_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLa
         (WorkPlanSlot::Continuity, entity.continuity.as_ref()),
         (WorkPlanSlot::Angle, entity.angle.as_ref()),
         (WorkPlanSlot::Handling, entity.surface.intensity.as_ref()),
-        (WorkPlanSlot::Fineness, entity.surface.fineness.as_ref()),
+        // The plan has one fineness slot until the capabilities v3 (V1e) gives the packing its
+        // own; a packing word is carried there rather than lost.
+        (
+            WorkPlanSlot::Fineness,
+            entity
+                .surface
+                .fineness
+                .as_ref()
+                .or(entity.surface.density.as_ref()),
+        ),
         (WorkPlanSlot::Underlayer, entity.surface.underlayer.as_ref()),
         (
             WorkPlanSlot::MotionQuality,

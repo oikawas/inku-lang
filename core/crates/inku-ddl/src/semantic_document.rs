@@ -1126,8 +1126,11 @@ fn apply_continuation_occurrence(
                 ("handling", "dense" | "temperate" | "faint") => {
                     set_if_empty(&mut instruction.entity.surface.intensity, term)
                 }
-                ("fineness", "fine_grained" | "coarse_grained" | "packed" | "sparse") => {
+                ("fineness", "fine_grained" | "coarse_grained") => {
                     set_if_empty(&mut instruction.entity.surface.fineness, term)
+                }
+                ("fineness", "packed" | "sparse") => {
+                    set_if_empty(&mut instruction.entity.surface.density, term)
                 }
                 ("underlayer", "underpainted") => {
                     set_if_empty(&mut instruction.entity.surface.underlayer, term)
@@ -1398,6 +1401,7 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
         || entity.surface.quality.is_some()
         || entity.surface.intensity.is_some()
         || entity.surface.fineness.is_some()
+        || entity.surface.density.is_some()
         || entity.surface.underlayer.is_some()
         || entity.fluctuation.amplitude.is_some()
         || entity.fluctuation.frequency.is_some()
@@ -1477,6 +1481,7 @@ fn predicate_is_compatible(
         && option_is_mergeable(&left.surface.quality, &right.surface.quality)
         && option_is_mergeable(&left.surface.intensity, &right.surface.intensity)
         && option_is_mergeable(&left.surface.fineness, &right.surface.fineness)
+        && option_is_mergeable(&left.surface.density, &right.surface.density)
         && option_is_mergeable(&left.surface.underlayer, &right.surface.underlayer)
         && option_is_mergeable(&left.fluctuation.amplitude, &right.fluctuation.amplitude)
         && option_is_mergeable(&left.fluctuation.frequency, &right.fluctuation.frequency)
@@ -1559,6 +1564,10 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
     merge_option(
         &mut target.entity.surface.fineness,
         &continuation.entity.surface.fineness,
+    );
+    merge_option(
+        &mut target.entity.surface.density,
+        &continuation.entity.surface.density,
     );
     merge_option(
         &mut target.entity.surface.underlayer,

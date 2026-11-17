@@ -211,6 +211,7 @@ pub enum ScoreAppearanceField {
     SurfaceQuality,
     SurfaceIntensity,
     SurfaceFineness,
+    SurfaceDensity,
     SurfaceUnderlayer,
 }
 

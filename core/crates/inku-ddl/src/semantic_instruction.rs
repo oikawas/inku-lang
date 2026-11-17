@@ -1518,6 +1518,7 @@ fn semantic_entity_owned_spans(entity: &SemanticEntity) -> BTreeSet<(usize, usiz
         entity.surface.quality.as_ref(),
         entity.surface.intensity.as_ref(),
         entity.surface.fineness.as_ref(),
+        entity.surface.density.as_ref(),
         entity.surface.underlayer.as_ref(),
         entity.fluctuation.amplitude.as_ref(),
         entity.fluctuation.frequency.as_ref(),

@@ -445,6 +445,9 @@ pub struct SemanticSurface {
     pub quality: Option<SemanticTerm>,
     pub intensity: Option<SemanticTerm>,
     pub fineness: Option<SemanticTerm>,
+    /// Packing (密な・疎な): how many units a named texture lays, apart from
+    /// their size (`fineness`). The two are separate fields so both can hold.
+    pub density: Option<SemanticTerm>,
     pub underlayer: Option<SemanticTerm>,
 }
 
@@ -607,6 +610,7 @@ pub enum SemanticAssociationIssueKind {
     ConflictingSurfaceQualities,
     ConflictingSurfaceIntensities,
     ConflictingSurfaceFinenesses,
+    ConflictingSurfaceDensities,
     ConflictingSurfaceUnderlayers,
     UnknownSurfaceDimension,
     ConflictingFluctuationAmplitudes,
@@ -652,6 +656,7 @@ impl SemanticAssociationIssueKind {
             Self::ConflictingSurfaceQualities => "conflicting_surface_qualities",
             Self::ConflictingSurfaceIntensities => "conflicting_surface_intensities",
             Self::ConflictingSurfaceFinenesses => "conflicting_surface_finenesses",
+            Self::ConflictingSurfaceDensities => "conflicting_surface_densities",
             Self::ConflictingSurfaceUnderlayers => "conflicting_surface_underlayers",
             Self::UnknownSurfaceDimension => "unknown_surface_dimension",
             Self::ConflictingFluctuationAmplitudes => "conflicting_fluctuation_amplitudes",
@@ -1843,6 +1848,7 @@ struct AssociationRegion {
     surface_qualities: Vec<SemanticTerm>,
     surface_intensities: Vec<SemanticTerm>,
     surface_finenesses: Vec<SemanticTerm>,
+    surface_densities: Vec<SemanticTerm>,
     surface_underlayers: Vec<SemanticTerm>,
     unclassified_surfaces: Vec<SemanticTerm>,
     fluctuation_amplitudes: Vec<SemanticTerm>,
@@ -1883,6 +1889,7 @@ enum SurfaceDimension {
     Quality,
     Intensity,
     Fineness,
+    Density,
     Underlayer,
 }
 
@@ -1894,9 +1901,8 @@ fn classify_surface_dimension(category: &str, canonical_id: &str) -> Option<Surf
             | "crosshatch" | "bleed" | "aquatint",
         ) => Some(SurfaceDimension::Quality),
         ("handling", "dense" | "temperate" | "faint") => Some(SurfaceDimension::Intensity),
-        ("fineness", "fine_grained" | "coarse_grained" | "packed" | "sparse") => {
-            Some(SurfaceDimension::Fineness)
-        }
+        ("fineness", "fine_grained" | "coarse_grained") => Some(SurfaceDimension::Fineness),
+        ("fineness", "packed" | "sparse") => Some(SurfaceDimension::Density),
         ("underlayer", "underpainted") => Some(SurfaceDimension::Underlayer),
         _ => None,
     }
@@ -2531,6 +2537,7 @@ fn build_semantic_entities(
                         Some(SurfaceDimension::Quality) => region.surface_qualities.push(term),
                         Some(SurfaceDimension::Intensity) => region.surface_intensities.push(term),
                         Some(SurfaceDimension::Fineness) => region.surface_finenesses.push(term),
+                        Some(SurfaceDimension::Density) => region.surface_densities.push(term),
                         Some(SurfaceDimension::Underlayer) => region.surface_underlayers.push(term),
                         None => region.unclassified_surfaces.push(term),
                     }
@@ -3824,6 +3831,13 @@ fn associate_region(
         region_index,
         issues,
     );
+    let density = select_term(
+        owned_region.surface_densities,
+        OwnedSemanticOccurrence::Surface,
+        SemanticAssociationIssueKind::ConflictingSurfaceDensities,
+        region_index,
+        issues,
+    );
     let underlayer = select_term(
         owned_region.surface_underlayers,
         OwnedSemanticOccurrence::Surface,
@@ -3937,6 +3951,7 @@ fn associate_region(
             quality,
             intensity,
             fineness,
+            density,
             underlayer,
         },
         fluctuation: SemanticFluctuation {
@@ -4098,6 +4113,7 @@ fn take_pre_head_region(
         surface_qualities: take_owned_terms(&mut region.surface_qualities, &head, ownership),
         surface_intensities: take_owned_terms(&mut region.surface_intensities, &head, ownership),
         surface_finenesses: take_owned_terms(&mut region.surface_finenesses, &head, ownership),
+        surface_densities: take_owned_terms(&mut region.surface_densities, &head, ownership),
         surface_underlayers: take_owned_terms(&mut region.surface_underlayers, &head, ownership),
         unclassified_surfaces: take_owned_terms(
             &mut region.unclassified_surfaces,
@@ -4196,6 +4212,7 @@ fn take_surface_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSemantic
         .drain(..)
         .chain(region.surface_intensities.drain(..))
         .chain(region.surface_finenesses.drain(..))
+        .chain(region.surface_densities.drain(..))
         .chain(region.surface_underlayers.drain(..))
         .chain(region.unclassified_surfaces.drain(..))
         .map(OwnedSemanticOccurrence::Surface)
@@ -4504,6 +4521,7 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.surface.quality.is_some())
         + usize::from(entity.surface.intensity.is_some())
         + usize::from(entity.surface.fineness.is_some())
+        + usize::from(entity.surface.density.is_some())
         + usize::from(entity.surface.underlayer.is_some())
         + usize::from(entity.fluctuation.amplitude.is_some())
         + usize::from(entity.fluctuation.frequency.is_some())
@@ -5011,6 +5029,12 @@ fn semantic_surface_value(surface: &SemanticSurface) -> Value {
         record.insert(
             "fineness".to_owned(),
             semantic_identity_value(&fineness.identity),
+        );
+    }
+    if let Some(density) = &surface.density {
+        record.insert(
+            "density".to_owned(),
+            semantic_identity_value(&density.identity),
         );
     }
     if let Some(underlayer) = &surface.underlayer {

@@ -212,6 +212,25 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
                 ..texture(SurfaceTexture::Crosshatch)
             },
         ),
+        // Saijiki v4: the size and the packing are two slots of きめ, so both stand.
+        (
+            "中心に、赤のペンの細かい密な点描の円を1個置く。",
+            JA,
+            Expected {
+                scale: 0.05,
+                density: 0.85,
+                ..texture(SurfaceTexture::Stipple)
+            },
+        ),
+        (
+            "Place one red pen coarse-grained sparse stipple circle at the center.",
+            EN,
+            Expected {
+                scale: 0.90,
+                density: 0.05,
+                ..texture(SurfaceTexture::Stipple)
+            },
+        ),
     ];
     for (source, language, expected) in samples {
         let compiled = compile(source, language);
@@ -300,13 +319,17 @@ fn a_texture_word_without_a_named_texture_is_left_out_alone() {
     }
 }
 
-/// One mark takes one word of each class: two conflict, and both are left out
-/// as two handling words are.
+/// One mark takes one word of each slot: two conflict, and both are left out
+/// as two handling words are (the size and the packing of きめ are two slots).
 #[test]
 fn two_words_of_one_class_conflict_and_both_are_left_out() {
     for (source, without) in [
         (
-            "中心に、赤のペンの細かい密な点描の円を1個置く。",
+            "中心に、赤のペンの細かい粗い点描の円を1個置く。",
+            "中心に、赤のペンの点描の円を1個置く。",
+        ),
+        (
+            "中心に、赤のペンの密な疎な点描の円を1個置く。",
             "中心に、赤のペンの点描の円を1個置く。",
         ),
         (

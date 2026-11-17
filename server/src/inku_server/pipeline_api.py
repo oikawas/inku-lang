@@ -744,6 +744,10 @@ class PipelineService:
         with self._lock:
             run = self._runs.get(key)
             if run is None:
+                # A discard can commit while the saved snapshot is being
+                # restored outside the lock. Do not put it back into memory.
+                if self.store.read_execution(owner, execution_id) is None:
+                    raise HTTPException(404, "variation_not_found")
                 self._reserve_run()
                 run = candidate
                 self._runs[key] = run

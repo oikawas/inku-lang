@@ -868,6 +868,11 @@ def _execution_record(row: Mapping[str, Any]) -> PipelineExecutionRecord:
 
 @dataclass(frozen=True)
 class VariationAuthorityStore:
+    """Atomic owner-scoped storage for shared-core commit effects."""
+
+    engine: Engine
+    now_ms: Callable[[], int] = lambda: int(time.time() * 1000)
+
     def discard_unlinked_draft(self, owner_id: str, variation_id: str, *, revision: str | None = None,
                                before_ms: int | None = None, backup_path: str | None = None) -> dict:
         """Remove one unreachable authority and its records under the SQLite write lock."""
@@ -937,11 +942,6 @@ class VariationAuthorityStore:
                     connection.rollback()
                 if backup_path is not None:
                     connection.exec_driver_sql("DETACH DATABASE cleanup_backup")
-
-    """Atomic owner-scoped storage for shared-core commit effects."""
-
-    engine: Engine
-    now_ms: Callable[[], int] = lambda: int(time.time() * 1000)
 
     def install_schema(self) -> None:
         """Install only the candidate tables, primarily for isolated harnesses."""

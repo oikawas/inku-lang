@@ -5005,6 +5005,17 @@ fn semantic_macro_parameter_value(parameter: &SemanticMacroParameterBinding) -> 
     Value::Object(record.into_iter().collect())
 }
 
+/// The fineness and density terms as the canonical forms write them: a density alone takes
+/// the fineness slot it had in Saijiki v3.
+pub(crate) fn v3_compatible_texture_slots(
+    surface: &SemanticSurface,
+) -> (Option<&SemanticTerm>, Option<&SemanticTerm>) {
+    match (surface.fineness.as_ref(), surface.density.as_ref()) {
+        (None, Some(density)) => (Some(density), None),
+        slots => slots,
+    }
+}
+
 fn semantic_surface_value(surface: &SemanticSurface) -> Value {
     let mut record = BTreeMap::new();
     record.insert(
@@ -5024,14 +5035,18 @@ fn semantic_surface_value(surface: &SemanticSurface) -> Value {
             .unwrap_or(Value::Null),
     );
     // Written only when present (DDL 24), so a document without these words
-    // keeps its canonical bytes, as an ink spread does.
-    if let Some(fineness) = &surface.fineness {
+    // keeps its canonical bytes, as an ink spread does. Saijiki v3 kept 密な・疎な in the
+    // fineness field; a mark with only one of them still writes it there, so its meaning
+    // digest, and every Score selection seeded by it, stays as in v3 (the author's choice,
+    // 2026-11-17). Only a mark with both, which v3 could not write, has a density field.
+    let (fineness, density) = v3_compatible_texture_slots(surface);
+    if let Some(fineness) = fineness {
         record.insert(
             "fineness".to_owned(),
             semantic_identity_value(&fineness.identity),
         );
     }
-    if let Some(density) = &surface.density {
+    if let Some(density) = density {
         record.insert(
             "density".to_owned(),
             semantic_identity_value(&density.identity),

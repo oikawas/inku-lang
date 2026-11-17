@@ -72,7 +72,7 @@ def test_v3_document_and_history_report_approximation_and_v4_is_untouched(tmp_pa
         connection.exec_driver_sql("UPDATE variation_authority SET source=?,document_json=?,ddl_digest=?", (source, json.dumps(doc, ensure_ascii=False), digest))
         connection.exec_driver_sql("UPDATE pipeline_history_links SET ddl_digest=?,fork_context_bytes=?,fork_context_digest=?", (digest, raw, hashlib.sha256(raw).hexdigest()))
         doc4 = {"source": "赤い円を置く。", "language": "ja", "macro_locks": [], "saijiki": "inku.saijiki.v4"}
-        connection.exec_driver_sql("INSERT INTO variation_authority SELECT owner_id, 'v4', protocol_version, revision, origin, authority, ?, ?, ?, authority_digest, updated_at FROM variation_authority WHERE variation_id='v'", (doc4["source"], json.dumps(doc4, ensure_ascii=False), hashlib.sha256(doc4["source"].encode()).hexdigest()))
+        connection.exec_driver_sql("INSERT INTO variation_authority (owner_id,variation_id,protocol_version,revision,origin,authority,source,document_json,ddl_digest,authority_digest,updated_at) SELECT owner_id, 'v4', protocol_version, revision, origin, authority, ?, ?, ?, authority_digest, updated_at FROM variation_authority WHERE variation_id='v'", (doc4["source"], json.dumps(doc4, ensure_ascii=False), hashlib.sha256(doc4["source"].encode()).hexdigest()))
     engine.dispose()
     report = _migrate_once_database(database, migrate_unit_v4)
     assert {(x["kind"], x["id"]) for x in report["approximated_word_records"]} == {("history", "h:ddl"), ("variation_documents", "u/v")}
@@ -168,9 +168,8 @@ def test_migration_reports_and_preserves_unmatched_fork_lock(tmp_path):
     from pathlib import Path
     from inku_server.persistence.saijiki_v4_migration import _definition_unit
 
-    fixture = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/tests/fixtures/nature-leaves-1.0-package.json"
-    definition = next(item["definition"] for item in json.loads(fixture.read_text())["entries"]
-                      if item["definition"]["heading"] == "下草")
+    fixture = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/assets/nature-leaves-v2/package.json"
+    definition = json.loads(fixture.read_text())["words"][0]["definition"]
     answer = json.loads(migrate_unit_v4(_definition_unit(definition)))["definitions"][0]
     lock = {"qualified_name": answer["qualified_name"], "version": answer["version"],
             "digest": answer["old_digest"].removeprefix("sha256:")}

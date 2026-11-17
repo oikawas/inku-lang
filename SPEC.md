@@ -442,8 +442,10 @@ under these principles (author's ruling, 2026-09-29).
 
 The Web Saijiki previews follow the current categories too. The nine surface
 words each draw a distinct face inside the same contour; only empty leaves it
-unmarked. Sweep shows two passes, each one film of merged bands at 0.6 of the
-tool opacity (render engine 90), and brushmarks shows its bands laid one by one
+unmarked. Sweep shows two passes, one film of merged bands (render engine 90); the film's
+opacity is the surface opacity default 0.28 times the handling factor (1 for
+temperate, 1.35 for dense, 0.55 for faint), times 0.5 for the bands and 1.2 for
+the film, so 0.168 when temperate; the tool's opacity is not used, and brushmarks shows its bands laid one by one
 at 0.5, darker where they overlap (render engine 91). Bilingual
 handling previews compare the same pencil stipple: temperate on the left,
 dense, temperate or faint on the right, relative to that tool. Mark counts and
@@ -2785,7 +2787,7 @@ The six values Saijiki v3 (§3.3) retired remain only to replay saved Scores, an
 Reference §6 is the source of truth for the numeric characteristics (stroke
 width, opacity, dasharray, presence of a filter).
 
-A computer line, arc, free line, closed-shape contour or point draws no body: it is drawn by cells of the canvas's one lattice alone (the short side times 0.018, an 18px cell on 1000px; render engine 84 brings back engine 13–40's material, the remainder of sampling, and drops the body). Each point of the drawn path is rounded onto the lattice, and a cell in the mark's color is laid in the cell it is rounded into. The drawn path's points are the stroke's own points for a line or contour without variation or connection, and, for a varied or connected line, its centerline taken again along its length at the same number of points, both ends included. A cell's tone is in proportion to how far the rounding moved the point (0.45 at half a cell, the most), with a floor of 0.15; a point the rounding does not move, such as an end or a corner, is toned by its own distance from the cell it is rounded into, by the same rule. Where two consecutive cells leave a cell or more between them, the cells on the straight run between them are laid at the mean of the two tones, and a closed shape also joins its last cell to its first. The cells do not take the stroke's opacity, so neither intensity (`faint`, `dense`) nor an arrangement's fade reaches a computer line, arc or contour. Thinness only changes how far the mark sways, not the cell size. The thin line of a dotted, dashed or dash-dot style is drawn as before, and the computer's fill uses the same lattice (render engine 96). The values are in the reference's `weight_properties.computer_cells`.
+A digital line, arc, free line, closed-shape contour or point draws no body: it is drawn by cells of the canvas's one lattice alone (the short side times 0.018, an 18px cell on 1000px; render engine 84 brings back engine 13–40's material, the remainder of sampling, and drops the body). Each point of the drawn path is rounded onto the lattice, and a cell in the mark's color is laid in the cell it is rounded into. The drawn path's points are the stroke's own points for a line or contour without variation or connection, and, for a varied or connected line, its centerline taken again along its length at the same number of points, both ends included. A cell's tone is in proportion to how far the rounding moved the point (0.45 at half a cell, the most), with a floor of 0.15; a point the rounding does not move, such as an end or a corner, is toned by its own distance from the cell it is rounded into, by the same rule. Where two consecutive cells leave a cell or more between them, the cells on the straight run between them are laid at the mean of the two tones, and a closed shape also joins its last cell to its first. The cells do not take the stroke's opacity, so neither intensity (`faint`, `dense`) nor an arrangement's fade reaches a computer line, arc or contour. Thinness only changes how far the mark sways, not the cell size. The thin line of a dotted, dashed or dash-dot style is drawn as before, and the computer's fill uses the same lattice (render engine 96). The values are in the reference's `weight_properties.computer_cells`.
 
 #### Tool-specific fills and intensity
 

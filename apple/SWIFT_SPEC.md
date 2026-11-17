@@ -2,7 +2,7 @@
 
 ## 2026-11-17 Saijiki v4 and DB v10
 
-macOS and iOS use Saijiki v4. DB v10 first creates a verified backup, then migrates v3 saved works through the shared core and records refusals and approximated word locations. Score, SVG, historical executions, and effect digests remain unchanged. Import also migrates v3 DDL exports and retains the edit count and approximated locations. Presentation wording follows in V3b.
+macOS and iOS use Saijiki v4. DB v10 first creates a verified backup, then migrates v3 saved works through the shared core and records refusals, approximated word locations, and approximated reference paths in definitions. Score, SVG, historical executions, and effect digests remain unchanged. Import also migrates v3 DDL exports and retains the edit count, approximated word locations, and the number of approximated references in definitions. Approximations are not displayed.
 
 On macOS the history strip moves across pages with the arrow keys, and `#` on the canvas and in the library copies the work UUID. Generation information includes the comment and each stage's prompt digest, and diagnostics use the Web wording. Retained automatic backups can be deleted or restored after confirmation; restore first saves a copy of the current database. The work edit menu has the Web's three groups and ten items, without the AI refinement process or the juxtaposition (2026-11-13). All refinement children are saved in normal history; the database migration moves existing intermediate works to normal history after taking a SQLite backup.
 

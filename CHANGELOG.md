@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Swift (macOS and iOS): adopts Saijiki v4 and migrates saved works in DB v10. Imports of v3 DDL exports migrate as well and retain the locations of approximated words in the result.
+- Swift (macOS and iOS): adopts Saijiki v4 and migrates saved works in DB v10. Imports of v3 DDL exports migrate as well and retain approximated word locations and the count of approximated definition references. The DB migration report also retains the paths inside definitions.
 
 - Drawing (render engine 104): grain, stipple and aquatint now draw as strokes broken by paper tooth, round dots with a sloping tone, and a burnished mezzotint face. Reperformance changes works with these textures on closed shapes; saved SVGs do not.
 

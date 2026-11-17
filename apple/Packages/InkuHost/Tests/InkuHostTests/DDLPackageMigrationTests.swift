@@ -4,6 +4,18 @@ import Testing
 @testable import InkuHost
 
 struct DDLPackageMigrationTests {
+    @Test func v3ImportCountsApproximationsInsideDefinitions() throws {
+        let definition = try ExactJSON(data: Data(#"{"schema":"inku.macro-definition.v1","namespace":"Saved","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"continuity":{"expr":"semantic_ref","category":"continuity","id":"dash_dot"}}}]}"#.utf8))
+        let file: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),
+            "language": .string("ja"), "ddl": .string("青い線を引く。"),
+            "plugins": .array([.object(["definition": definition, "note": .string("")])])])
+        let migrated = try DDLPackageImport.parse(file.data)
+        #expect(migrated.approximatedDefinitionReferenceCount == 1)
+        #expect(migrated.approximatedWords.isEmpty)
+        let unchanged = try DDLPackageImport.parse(Data(#"{"schema":"inku.ddl-export.v2","saijiki":"inku.saijiki.v4","ddl":"青い線を引く。","plugins":[]}"#.utf8))
+        #expect(unchanged.approximatedDefinitionReferenceCount == 0)
+    }
+
     @Test func v3PackageMigratesCarriedDefinitionAndApproximatedSource() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -42,6 +54,19 @@ struct DDLPackageMigrationTests {
         #expect(result.plugins.count == 1)
         #expect(result.plugins.first?.definition == recovered?.first?["definition"])
         #expect(result.plugins.first?.note == "")
+        var answer = try #require(JSONSerialization.jsonObject(with: response) as? [String: Any])
+        var doc = try #require(answer["document"] as? [String: Any])
+        var recoveredRows = try #require(doc["recovered_definitions"] as? [[String: Any]])
+        recoveredRows[0]["approximated_refs"] = ["$.body[0].fields.continuity"]
+        doc["recovered_definitions"] = recoveredRows
+        answer["document"] = doc
+        let responseWithReference = try JSONSerialization.data(withJSONObject: answer)
+        var replayCall = 0
+        let replay = try DDLPackageImport.parse(file.data) { input in
+            replayCall += 1
+            return replayCall == 1 ? InkuCore.migrateSaijikiV2(input) : responseWithReference
+        }
+        #expect(replay.approximatedDefinitionReferenceCount == 1)
     }
 
     @Test func legacyPackageMigratesBundledDefinitionBeforeResolvingCatalog() throws {

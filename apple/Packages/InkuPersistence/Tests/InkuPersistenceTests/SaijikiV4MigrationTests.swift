@@ -58,8 +58,9 @@ struct SaijikiV4MigrationTests {
         let snapshotDigest = Data(SHA256.hash(data: snapshot))
         let payloadDigest = Data(SHA256.hash(data: Data("{}".utf8)))
         @Sendable func ack(_ id: String, _ edition: String, _ documentSource: String, _ locks: [[String: String]] = []) throws -> Data {
-            try JSONSerialization.data(withJSONObject: ["work_id": id, "performance": ["document": ["source": documentSource,
-                "language": "ja", "macro_locks": locks, "saijiki": edition], "configuration": ["definitions": []], "presentation": "keep"]], options: [.sortedKeys])
+            let definition = try JSONSerialization.jsonObject(with: Data(#"{"schema":"inku.macro-definition.v1","namespace":"Saved","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"continuity":{"expr":"semantic_ref","category":"continuity","id":"dash_dot"}}}]}"#.utf8))
+            return try JSONSerialization.data(withJSONObject: ["work_id": id, "performance": ["document": ["source": documentSource,
+                "language": "ja", "macro_locks": locks, "saijiki": edition], "configuration": ["definitions": id == "good" ? [definition] : []], "presentation": "keep"]], options: [.sortedKeys])
         }
         let goodAck = try ack("good", "inku.saijiki.v3", source)
         let old = try DatabaseQueue(path: url.path)
@@ -100,6 +101,11 @@ struct SaijikiV4MigrationTests {
         #expect(report["already"] as? Int == 1)
         #expect((report["refused"] as? [[String: String]])?.count == 3)
         #expect((report["approximated_words"] as? [[String: Any]])?.count == 1)
+        let refs = try #require((report["approximated_refs"] as? [[String: Any]])?.first)
+        #expect(refs["id"] as? String == "good")
+        #expect(refs["qualified_name"] as? String == "Saved.Mark")
+        #expect(refs["version"] as? String == "1.0.0")
+        #expect(refs["paths"] as? [String] == ["$.body[0].fields.continuity"])
         #expect(files.contains { $0.lastPathComponent.hasPrefix(".inku-before-v10-") })
     }
 }

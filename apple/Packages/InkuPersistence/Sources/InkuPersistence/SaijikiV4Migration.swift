@@ -18,7 +18,7 @@ enum SaijikiV4Migration {
         var refusals: [[String: String]] = []
         var replacements: [String: Int] = [:]
         var unassociatedTools: [[String: Any]] = [], unassociatedSweeps: [[String: Any]] = []
-        var unadjusted: [[String: Any]] = [], approximated: [[String: Any]] = []
+        var unadjusted: [[String: Any]] = [], approximated: [[String: Any]] = [], approximatedRefs: [[String: Any]] = []
         var workCount = 0
         let works = try Row.fetchCursor(db, sql: "SELECT id, ddl FROM history")
         while let row = try works.next() {
@@ -102,12 +102,16 @@ enum SaijikiV4Migration {
                 if let paths = entry["unadjusted_thinness"] as? [String], !paths.isEmpty {
                     unadjusted.append(["id": id, "qualified_name": entry["qualified_name"] ?? "", "version": entry["version"] ?? "", "paths": paths])
                 }
+                if let paths = entry["approximated_refs"] as? [String], !paths.isEmpty {
+                    approximatedRefs.append(["id": id, "qualified_name": entry["qualified_name"] ?? "", "version": entry["version"] ?? "", "paths": paths])
+                }
             }
         }
         let report: [String: Any] = ["schema": "inku.saijiki-v4-v10-report.v1", "works": workCount,
             "changed": changed, "ddl_changed": ddlChanged, "already": already, "refused": refusals,
             "replacements": replacements, "unassociated_tools": unassociatedTools,
             "unassociated_sweeps": unassociatedSweeps, "unadjusted_thinness": unadjusted, "approximated_words": approximated,
+            "approximated_refs": approximatedRefs,
             "seconds": Date().timeIntervalSince(started)]
         return try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
     }

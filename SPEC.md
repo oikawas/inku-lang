@@ -131,33 +131,38 @@ line behavior, color, weight, and negative space.
 
 ### 3.1 What Belongs in the Core
 
-The core vocabulary is the fifteen Saijiki categories plus **relations** (あいだ).
+The core vocabulary is the sixteen Saijiki categories plus **relations** (あいだ).
 The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
 
-The core vocabulary consists of fifteen Saijiki categories plus relations. Its source of truth is the shared Rust asset `core/crates/inku-ddl/assets/saijiki-v3.json`; the Server Saijiki table and Web / Android displays follow the same vocabulary. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) publishes the current values; the table below is an overview, and reference §1 decides additions and removals.
+The core vocabulary consists of sixteen Saijiki categories plus relations. The source of truth is `core/crates/inku-ddl/assets/saijiki-v4.json`; Server and host displays follow it. The machine-generated reference §1 publishes the current values.
 
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
-| forms | かたち | circle, ellipse, triangle, square, line, arc, free line, point, cloudform (free line from DDL 19; filling the plan chooses one only when the description names one or draws a line without a set shape, §14.10.5) |
-| touches | てざわり | silverpoint, pencil, pen, chalk, oil pastel, gouache, watercolor, oil paint, painting knife, etching, computer (Saijiki v3, DDL 29; the six retired words are in §3.3) |
-| continuity | つらなり | solid, dashed, dotted, dash-dot |
-| surfaces | おもて | empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint (brushmarks since DDL 25) |
-| handling | さばき | dense, temperate, faint |
-| fineness | きめ | fine-grained, coarse-grained, packed, sparse (DDL 24) |
-| underlayer | したじ | underpainted (DDL 24) |
+| forms | かたち | circle, ellipse, triangle, square, line, arc, free line, point, cloudform, polygon, semicircle, crescent |
+| touches | てざわり | silverpoint, pencil, pen, chalk, oil pastel, gouache, watercolor, oil paint, painting knife, etching, digital |
+| continuity | つらなり | solid, dashed, dotted |
+| surfaces | おもて | empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, mezzotint |
+| handling | さばき | dense, moderate, faint, bleeding |
+| fineness | きめ | fine-grained, coarse-grained, packed, sparse, underpainted |
+| widths | ふとさ | very thin, thin, thick, very thick |
+| sizes | おおきさ | very small, small, normal-sized, large, very large |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | order | じゅん | alternating, in order |
-| movements | ゆらぎ | narrowly, broadly, loosely, tightly, swaying, undulating, bleeding |
+| movements | ゆらぎ | narrowly, broadly, loosely, tightly, swaying, undulating |
 | relations | あいだ | along, not touching, cutting, between, touching, connected, resting on, inside, overlaps, crossing, mirrored — with fixed phrases such as `along the previous line` and `connected to the previous shape` |
-| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, partway, corner |
-| angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
-| proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
+| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, corner |
+| angles | かたむき | horizontal, vertical, diagonal, rising, falling, left-rising, left-falling, rotated |
+| proportions | わりあい | tall, wide, full-width, half-width |
 | colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
 
-`left-rising` / `左上がり` and `left-falling` / `左下がり` are hidden markers that retain distinct left/right meaning for typed direct DDL and Macro references. They are not yet exposed in the fill-the-plan prompt or Saijiki display, and the existing six displayed angle words remain unchanged.
+Polygon, left-rising and left-falling appear in the Saijiki display and reader vocabulary. Start, end and partway do not appear in the places or reader lists; they are read in relation phrases such as “connected to the start of the previous line”. Their reading when written alone remains the same as in v3.
+
+Saijiki v4 uses DDL 31, DDL engine 79 and `inku.work-plan-capabilities.v3`, with `density` for texture packing in the work plan. Score remains 0.24.0 and render engine 104. Macro semantic reference categories retain v3 names `ratio`, `variation` and `underlayer`; only the categories visible to authors and readers move.
+
+Stipple, hatch, crosshatch and mezzotint on a line, arc or free line are diagnosed and omitted from Score and the work plan matrix. Flat on lines and free lines, handling, surface and continuity on digital lines and outlines, and sway on points are also diagnosed and omitted while the mark remains. Dashed and dotted on arcs and closed shapes are omitted for all tools with `unsupported_continuity_without_line`; lines and free lines retain their behavior.
 
 English writes the edges with a hyphen (`left-edge`, `right-edge`, `top-edge`, `bottom-edge`), and the same position words are also read when written with a space (`left edge`, `right edge`, `top edge`, `bottom edge`; DDL 17). Like `line up` for `line-up`, the spaced spellings are parser aliases only: the fill-the-plan prompt and the Saijiki display keep the hyphenated words.
 
@@ -165,7 +170,7 @@ In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabul
 
 Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The shared path resolves omissions while lowering a lock-verified view to an actual Score for supported standalone shapes, repeated placements, groups, and Macro Emits. Omitted touch becomes pen, continuity becomes solid, and surface becomes filled for closed shapes and points but unfilled for lines, ordinary arcs, and free lines. Omitted count is one for place and draw and eight for a standalone line-up, scatter, or tile; groups and fills use their dedicated count rules below. An omitted place/draw position uses the center region shrunk to two thirds about its center; a distributed placement uses the whole canvas. Explicit numeric positions, named regions, numeric ranges, and numeric segments take precedence. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. On a support that covers the background (the charcoal ground and the mezzotint), it compares the OKLab L of what the support shows there (its body laid over the background) instead of the background (DDL engine 61). Each explicit value wins independently, and these resolutions are not written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
-Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, `very_large`, `extra_large`, and `huge`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, `very`, `extra-large` / `特大の`, and `huge` / `巨大な` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
+Shape size uses the five Saijiki words very small, small, normal-sized, large and very large (ごく小さな・小さな・普通の大きさ・大きな・ごく大きな), with their exact source spans. The nine internal `CoreModifierValue` classes remain for saved Macro definitions and compatibility; their legacy values do not add current Saijiki spellings. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
 
 Order specifies finite sequences of values of one attribute, such as color or material, or of shapes and groups. `Line up five circles, alternating red and gray.` produces red, gray, red, gray, red. `Line up eight, repeating a red circle, a blue line, and a gray arc in order.` produces circle, line, arc, circle, line, arc, circle, line. Alternating takes two entries; in order takes a nonempty list and preserves ordered duplicates. Colors in order may also shift once through a line-up or a tile instead of repeating (`shifting through yellow, orange, and red in order`, DDL 23, §18). Line-up, scatter, tile, and fill use the explicit count as the total number of placement units, regardless of list length. Multiple entries without an order operator do not imply a cycle. An invalid sequence produces a local diagnostic while independent drawing continues.
 
@@ -231,7 +236,7 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   included. A saved Score's `wash` (v1's pale ink
   wash) still draws as the pale band at three times the width and 0.35 of the
   opacity. The migration turns a pale ink wash into a faint sweep, which draws a
-  little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). Stipple, hatch, crosshatch, and aquatint are also accepted on their owning line, ordinary arc, or free line and retained in Score, but the current Renderer paints surfaces only on closed shapes, so these open marks receive no texture face. No texture is transferred to a preceding closed shape. On a closed
+  little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). Stipple, hatch, crosshatch and mezzotint on lines, ordinary arcs and free lines are omitted with `unsupported_surface_without_face`. No texture is transferred to a preceding closed shape. On a closed
   shape, an explicit sweep, brushmarks, grain, stipple, hatch, crosshatch, or
   aquatint is itself the area's performance and adds no flat base fill beneath it (DDL
   engine 46). A flat fill comes only from an explicit flat surface or the
@@ -302,25 +307,7 @@ saving or delivering an empty Score with its background as an omitted success.
   the response type, 2026-09-30): left optional, the reader skipped it on about
   half of the layers and dropped the faintness a description stated. Words for the movement of
   the brush, such as its speed, may join this category (§2 item 5)
-- **the fineness and underlayer categories name how a texture is laid** (DDL
-  24, the author's decision, 2026-10-22): fineness has four words (Japanese
-  細かい, 粗い, 密な, 疎な; English `fine-grained`, `coarse-grained`, `packed`,
-  `sparse`). Fine-grained and coarse-grained set the size of one dot or line of
-  the texture without changing the area it covers (the Score's `scale` 0.05 and
-  0.90); packed and sparse set how closely dots or lines of the same size lie
-  (`density` 0.85 and 0.05). Underlayer has one word, underpainted (下塗り),
-  which lays the tool's fill beneath the texture (`filled`). Both go only on a
-  named texture (sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint;
-  brushmarks since DDL 25) of a closed shape (circle, ellipse, triangle, square,
-  polygon, cloudform). On any other
-  mark (a line, an arc, a free line, a point) or on empty, flat, or a surface
-  with no texture, a diagnostic (`unsupported_surface_fineness`,
-  `unsupported_surface_underlayer`) leaves out that word alone, and the rest of
-  the sentence draws as it would without it. A mark takes one word of each
-  category; two words of one category conflict and both are left out (as two
-  handling words do). Marks a Macro emits do not take them. No words for the
-  direction of hatching are added, since no natural word avoids the angle words
-  (the author's decision, 2026-10-22)
+- **Fineness** holds fine-grained and coarse-grained (texture mark size), packed and sparse (packing), and underpainted (the tool's fill beneath). One word may be chosen from each of the three fields; two in one field conflict. They apply to named textures of the six closed shapes. Other uses omit only the word with `unsupported_surface_fineness` or `unsupported_surface_underlayer`. Macro-emitted marks do not take them.
 - **the grounds category holds the names of supports** (added 2026-08-15, render
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
   paper, mezzotint** -- the seven values of `canvas.ground.material`. **Where
@@ -483,14 +470,7 @@ explanatory drawings and do not change performances of saved Scores.
   characterless, neutral list**: a fully neutral vocabulary is artistically
   meaningless, and the choice of a limited vocabulary is itself what gives the
   works their world (§1.1).
-- **One word, one meaning**: each Saijiki word has exactly one meaning and is
-  never read differently by its place in a sentence or by the words around it.
-  This holds in Japanese and in English, and no word is shared with a grammar
-  modifier (thinness, size) in another sense. The values and field names of the
-  work plan response schema, which the reader (filling the plan) reads and writes, count
-  as words under the same principle. Ambiguity and wordplay belong to
-  the description (the poetic layer of §5.1); the reader resolves them into
-  single words of the visible DDL.
+- **One word, one meaning**: one Saijiki word (a category and spelling pair) has one meaning. The same spelling may stand in two categories only when its syntactic place determines the category (the ground sentence “Mezzotint.” and the shape modifier “mezzotint circle”), both name the same technique, and the author decides each word individually (mezzotint in Saijiki v4). Surrounding words do not determine its meaning.
 - **A word sits in the category of its nature, and its name says its
   meaning**: surfaces name techniques for a surface; movements name the shape
   of a mark's sway.
@@ -499,22 +479,9 @@ explanatory drawings and do not change performances of saved Scores.
   its projection into the work plan vocabulary, the capability matrix, and the
   response schema. Changing only the instruction text is not a change of the
   vocabulary.
-- **Raise the version and migrate**: a change to a word's form, meaning, or
-  category raises the Saijiki version (the asset id, currently
-  `inku.saijiki.v3`). A DDL document records the Saijiki version it was read
-  with: the pipeline's document and the saved work carry the asset id, and a
-  document without it was written with `inku.saijiki.v1`. The pipeline stops
-  such a document, and a definition that only the migration makes valid, with
-  `saijiki_migration_required`; the host migrates it and saves the result
-  (author's ruling, 2026-09-29). Saved documents are read under their old version and
-  overwritten once, meaning by meaning, with the new version's words, never by
-  string replacement. Saved macro definitions are rewritten the same way, and
-  the macro locks a work holds move to the new definitions (author's ruling,
-  2026-09-29). Saved Scores and SVGs are not rewritten. The old version's
-  reading is not kept, and compatibility is not kept by leaving old words as
-  hidden aliases or by reading a word by its place. The migration keeps every
-  meaning, so it makes no new variation, and it is a different operation from
-  the re-normalization of §12.8, which never rewrites an author's DDL.
+- **Raise the version and migrate**: changes to a word's form, meaning or category raise the Saijiki version; the current asset is `inku.saijiki.v4`. Read a saved document under its old edition and overwrite each word once with the new edition's word. When no word has the same meaning, use the near word chosen individually by the author and retain its position in the migration result (for example dash-dot → dashed, slightly small → small). Saved Scores and SVGs are not rewritten, so saved pictures do not change. This migration creates no new variation and is separate from §12.8 re-normalization. Saved Macro definitions are rewritten and their locks moved to the new definitions.
+
+V3 waxing and waning become a semicircle with a numeric rotation. Where the rotation cannot be written, they become a near semicircle and its position is recorded in `approximated_words`. Macro definition migration returns JSON paths of approximated semantic references in `approximated_refs`. Approximated words and waxing/waning rewrites can change the semantic document and thus other random choices in the same work. For a mark that writes packed or sparse alone, the semantic digest uses the v3 fineness slot and stays the same as v3; a mark that writes both size and packing uses separate slots.
 
 Saijiki v2 (2026-09-29) removed the exceptions of v1: English `large` for both
 an amplitude and a size, the surfaces `dense` and `faint` (adjectives) and
@@ -2767,13 +2734,13 @@ mark the tool makes on that scale, and `thick` is the geometric mean of the defa
 A Score with the thick side is Score version 0.16.0. Gouache is drawn as the fine brush, with only its thick side widened to the thick brush's default (8) and beyond (22). Etching has drypoint's widths (Saijiki v3, render engine 95).
 
 The finite visible DDL forms are Japanese `細い` / English `thin` for Fine,
-Japanese `ごく細い` / English `extra-fine` for ExtraFine, Japanese `太い` /
-English `thick` for Thick, and Japanese `ごく太い` / English `extra-thick` for
+Japanese `ごく細い` / English `very thin` for ExtraFine, Japanese `太い` /
+English `thick` for Thick, and Japanese `ごく太い` / English `very thick` for
 ExtraThick. The shared compiler keeps all four as typed identities independent of source spelling and carries them from supported direct
 instructions and flat Macro Emits through the common lowerer into the existing
 `Instruction.thinness`. Omission remains `None`; no open-ended degree synonym is inferred.
 
-Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). The sends that write the instructions read thinness words and write them into the normalized DDL, but they appear neither in the §3.1 vocabulary table nor in the Saijiki display.
+Saijiki v4 displays four width words in the widths category (author's ruling, 2026-11-17, replacing the 2026-07-29 ruling).
 
 #### Wild (engine 12; its reach in engine 14)
 
@@ -4048,10 +4015,7 @@ short edge for diameter, side, or width; ellipse and cloudform height is `3/5`
 of width. Normal line length and normal arc chord are also `6/25`, and a free
 line's normal length is `11/20` (0.55); arc sagitta
 is one quarter of its chord, and normal point diameter is `3/250` (0.012).
-Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
-standard, and strong small; `5/4`, `3/2`, and `7/4` for the corresponding large
-classes, with two further steps that mirror standard and strong small, `2`
-(`extra-large`, `特大の`) and `8/3` (`huge`, `巨大な`); and `1` for normal. One exact rational factor is applied once to the
+The current Saijiki size words very small, small, normal-sized, large and very large use factors `3/8`, `1/2`, `1`, `3/2` and `7/4`. The internal geometry policy also retains `3/4`, `5/4`, `2` and `8/3` for its nine `CoreModifierValue` classes and compatibility with saved Macro definitions; these are not extra current Saijiki words. One exact rational factor is applied once to the
 normal geometry: length for line, similar chord and sagitta for arc, and diameter
 for point. Existing `small` means standard-small, while an explicit
 "normal size" remains distinct from unspecified. A qualitative factor is not multiplied into explicit numeric geometry. When numeric geometry, qualitative size, or full/half width supply multiple candidates, each remains independent. `ConflictingSizeSpecifications` records the candidate and effective extents, and both legacy Stop and OmitAndContinue recover by scaling to the smallest reference extent while retaining the original specifications and explicit aspect. Free-form degree synonyms and hidden LLM completion are not added.
@@ -4224,7 +4188,7 @@ qualitative region, and an exact numeric coordinate are separate authorities.
 An exact coordinate is never silently moved, clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
 extent clips the canvas are separate matters.
 
-Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`, `一辺N`, `画面の横X、縦Yの位置`, numeric ranges, numeric segments, numeric angles and fades (§18), corresponding EN forms, and nine finite size classes in both languages. Decimal meaning retains exact signed base-10 coefficient and scale, with original spelling and source spans as provenance. The entrypoint takes a lock-verified intermediate filter v5 view and explicit host canvas/background; the matching resolved color-catalog context is required only when color is omitted. Supported standalone shapes, repeated placements, groups, and Macro Emits reach actual `Score` through the common geometry, omission, and resource-aware compact materialization rules of §18, without a count-one or center-only restriction. Omitted surfaces and `none` / `solid` retain their meanings; current `sweep`, `brushmarks`, `grain`, `stipple`, `hatch`, `crosshatch`, and `aquatint` reach the existing Renderer `SurfaceSpec`. `wash` and `bleed` are legacy saved-Score textures; the current bleeding word reaches independent `ink_spread`. Verified `paper`, `washi`, `ink_wash`, `charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach `CanvasGroundSpec` in a `Canvas::Spec` with the host-resolved aspect. Surface intensity reaches tool-relative normal/dense/faint appearance for lines, arcs, and faces. Recoverable unsupported combinations, including an explicit Point surface or brushmarks on an open mark, omit only the affected field or execution unit with its owner, spans, and diagnostics under either legacy error-policy input. The effect of textures retained on open marks follows §3.1. Ground alone is drawable content, and retaining it retains the original omission diagnostics. Integrity failure or omission of every target is stopped. The normal Server, Web, and Android runtimes use this Rust path.
+Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`, `一辺N`, `画面の横X、縦Yの位置`, numeric ranges, numeric segments, numeric angles and fades (§18), corresponding EN forms, and five Saijiki size classes in both languages. Decimal meaning retains exact signed base-10 coefficient and scale, with original spelling and source spans as provenance. The entrypoint takes a lock-verified intermediate filter v5 view and explicit host canvas/background; the matching resolved color-catalog context is required only when color is omitted. Supported standalone shapes, repeated placements, groups, and Macro Emits reach actual `Score` through the common geometry, omission, and resource-aware compact materialization rules of §18, without a count-one or center-only restriction. Omitted surfaces and `none` / `solid` retain their meanings; current `sweep`, `brushmarks`, `grain`, `stipple`, `hatch`, `crosshatch`, and `aquatint` reach the existing Renderer `SurfaceSpec`. `wash` and `bleed` are legacy saved-Score textures; the current bleeding word reaches independent `ink_spread`. Verified `paper`, `washi`, `ink_wash`, `charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach `CanvasGroundSpec` in a `Canvas::Spec` with the host-resolved aspect. Surface intensity reaches tool-relative normal/dense/faint appearance for lines, arcs, and faces. Recoverable unsupported combinations, including an explicit Point surface or brushmarks on an open mark, omit only the affected field or execution unit with its owner, spans, and diagnostics under either legacy error-policy input. The effect of textures accepted on open marks follows §3.1. Ground alone is drawable content, and retaining it retains the original omission diagnostics. Integrity failure or omission of every target is stopped. The normal Server, Web, and Android runtimes use this Rust path.
 
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation

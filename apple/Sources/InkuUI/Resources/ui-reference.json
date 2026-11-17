@@ -2,7 +2,7 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.355",
   "build": "1431",
-  "buildDate": "2026-11-17T07:22:39.698Z",
+  "buildDate": "2026-11-17T07:37:43.259Z",
   "versions": {
     "ddlSpec": "31",
     "ddlEngine": "79",
@@ -4600,10 +4600,10 @@
     }
   },
   "source": {
-    "commit": "e62ede6177f7907bee0416a9a06cfeceba45f432",
+    "commit": "20343243f8a63b3cf36c19ac6b60a27031fe6c27",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "bfeadaecbcbd2990efc429687c06ff442902f50bc41f5eaf4bccedeacb6dac97",
+      "web/src/routes/+page.svelte": "027f8df8ea83bb8e77fd9e83ec95c6bf5bf152d6ebbca7ee54ae318cde39f4a8",
       "web/src/lib/saijiki-surface.ts": "ba6640c75fa57284800b99127eecde2103f2f8d9035228ad945d8ea8d90e56bb",
       "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
       "web/src/lib/features/composition-record/figures.ts": "e15595d28b095c0d655bdad44e64fabb7766a2b7be9961d10f2526a3a40891d0",

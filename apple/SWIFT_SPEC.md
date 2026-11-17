@@ -2,7 +2,7 @@
 
 ## 2026-11-17 Saijiki v4 and DB v10
 
-The Saijiki window and description editor read bundle order, labels and category order from the shared asset and show categories under their bundles. Relations belong to `where`; aspect ratio is last in the `ground` category. A word's asset `description` takes precedence over the Web preview effect, which remains the fallback. Plugin words come last.
+The Saijiki window and description editor read bundle order, labels and category order from the shared asset and show categories under their bundles. The asset's `relations_bundle` places relations (currently `where`); an unknown bundle is refused. Aspect ratio is last in the `ground` category. A word's asset `description` takes precedence over the Web preview effect, which remains the fallback. Plugin words come last.
 
 macOS and iOS use Saijiki v4. DB v10 first creates a verified backup, then migrates v3 saved works through the shared core and records refusals, approximated word locations, and approximated reference paths in definitions. Score, SVG, historical executions, and effect digests remain unchanged. Import also migrates v3 DDL exports and retains the edit count, approximated word locations, and the number of approximated references in definitions. Approximations are not displayed.
 

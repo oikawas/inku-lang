@@ -112,6 +112,12 @@ struct Bootstrap: @unchecked Sendable {
     let productReference: ProductReference
     let drawingLimitDefinition: DrawingLimitDefinition
 
+    static func relationBundle(in vocabulary: [String: Any], bundles: [SaijikiBundle]) throws -> String {
+        guard let key = vocabulary["relations_bundle"] as? String,
+              bundles.contains(where: { $0.key == key }) else { throw HostError("bundled_vocabulary_invalid") }
+        return key
+    }
+
     init(pluginDataDirectory: URL? = nil) throws {
         func resource(_ name: String) throws -> Data {
             guard let url = Bundle.module.url(forResource: name, withExtension: "json") else {
@@ -145,6 +151,7 @@ struct Bootstrap: @unchecked Sendable {
             return SaijikiBundle(key: key, labelJa: ja, labelEn: en)
         }
         guard Set(bundles.map(\.key)).count == bundles.count else { throw HostError("bundled_vocabulary_invalid") }
+        let relationBundle = try Self.relationBundle(in: vocabulary, bundles: bundles)
         saijikiBundles = bundles
         var displayCategories = try categories.map { category in
             guard let id = category["key"] as? String, let name = category["name_ja"] as? String,
@@ -182,7 +189,7 @@ struct Bootstrap: @unchecked Sendable {
             }
             return SaijikiWord(id: "aida:" + ja, japanese: ja, english: en, detail: "", isDefault: false,
                 englishDetail: "", preview: reference.saijikiPreviews["aida:" + ja])
-        }, englishName: "relations", bundle: "where"))
+        }, englishName: "relations", bundle: relationBundle))
         let grouped = bundles.flatMap { $0.categories(in: displayCategories) }
         guard grouped.count == displayCategories.count, Set(grouped.map(\.id)).count == displayCategories.count else {
             throw HostError("bundled_vocabulary_invalid")

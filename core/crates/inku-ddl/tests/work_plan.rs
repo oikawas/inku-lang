@@ -1216,14 +1216,9 @@ fn texture_words_are_optional_fields_kept_on_a_named_texture() {
     for (field, words) in [
         (
             "fineness",
-            json!([
-                "unspecified",
-                "fine_grained",
-                "coarse_grained",
-                "packed",
-                "sparse"
-            ]),
+            json!(["unspecified", "fine_grained", "coarse_grained"]),
         ),
+        ("density", json!(["unspecified", "packed", "sparse"])),
         ("underlayer", json!(["unspecified", "underpainted"])),
     ] {
         assert_eq!(layer["properties"][field]["enum"], words, "{field}");
@@ -1233,9 +1228,9 @@ fn texture_words_are_optional_fields_kept_on_a_named_texture() {
         {"shape": "circle", "action": "place", "count": 1, "surface": "stipple",
          "fineness": "fine_grained", "underlayer": "underpainted"},
         {"shape": "circle", "action": "place", "count": 1, "surface": "flat",
-         "fineness": "packed", "underlayer": "underpainted"},
+         "density": "packed", "underlayer": "underpainted"},
         {"shape": "line", "action": "draw", "count": 1, "surface": "sweep",
-         "fineness": "sparse"},
+         "density": "sparse"},
     ]}));
     let attribute = |layer: usize, slot: WorkPlanSlot| {
         plan.layers[layer].attributes.get(&slot).map(String::as_str)
@@ -1243,9 +1238,9 @@ fn texture_words_are_optional_fields_kept_on_a_named_texture() {
     assert_eq!(attribute(0, WorkPlanSlot::Fineness), Some("fine_grained"));
     assert_eq!(attribute(0, WorkPlanSlot::Underlayer), Some("underpainted"));
     for (layer, slot) in [
-        (1, WorkPlanSlot::Fineness),
+        (1, WorkPlanSlot::Density),
         (1, WorkPlanSlot::Underlayer),
-        (2, WorkPlanSlot::Fineness),
+        (2, WorkPlanSlot::Density),
     ] {
         assert_eq!(attribute(layer, slot), None, "{layer} {slot:?}");
     }
@@ -1262,9 +1257,9 @@ fn texture_words_are_optional_fields_kept_on_a_named_texture() {
     assert_eq!(
         reasons,
         vec![
-            (Some(1), "fineness", "requires_texture"),
+            (Some(1), "density", "requires_texture"),
             (Some(1), "underlayer", "requires_texture"),
-            (Some(2), "fineness", "unsupported_for_form"),
+            (Some(2), "density", "unsupported_for_form"),
         ]
     );
 }
@@ -1280,7 +1275,7 @@ fn texture_words_print_and_compile_cleanly_on_every_closed_shape() {
         .iter()
         .map(|term| term.id.clone())
         .collect();
-    assert_eq!(fineness.len(), 4);
+    assert_eq!(fineness.len(), 2);
     let layer_of = |shape: &str, words: &[(WorkPlanSlot, &str)]| WorkPlanLayer {
         shape: shape.to_owned(),
         action: "place".to_owned(),
@@ -1296,8 +1291,22 @@ fn texture_words_print_and_compile_cleanly_on_every_closed_shape() {
         .collect(),
         ..WorkPlanLayer::default()
     };
+    // Saijiki v4: the packing is a slot of its own, and both stand together.
+    let density: Vec<String> = work_plan_vocabulary()
+        .terms(WorkPlanSlot::Density)
+        .iter()
+        .map(|term| term.id.clone())
+        .collect();
+    assert_eq!(density.len(), 2);
     let mut layers = Vec::new();
-    for shape in ["circle", "ellipse", "triangle", "square", "cloudform"] {
+    for shape in [
+        "circle",
+        "ellipse",
+        "triangle",
+        "square",
+        "polygon",
+        "cloudform",
+    ] {
         for texture in [
             "sweep",
             "brushmarks",
@@ -1310,14 +1319,34 @@ fn texture_words_print_and_compile_cleanly_on_every_closed_shape() {
             let surface = (WorkPlanSlot::Surface, texture);
             let under = (WorkPlanSlot::Underlayer, "underpainted");
             layers.push(layer_of(shape, &[surface, under]));
-            for word in &fineness {
-                let fine = (WorkPlanSlot::Fineness, word.as_str());
-                layers.push(layer_of(shape, &[surface, fine]));
-                layers.push(layer_of(shape, &[surface, fine, under]));
+            let singles = fineness
+                .iter()
+                .map(|word| (WorkPlanSlot::Fineness, word.as_str()))
+                .chain(
+                    density
+                        .iter()
+                        .map(|word| (WorkPlanSlot::Density, word.as_str())),
+                );
+            for single in singles {
+                layers.push(layer_of(shape, &[surface, single]));
+                layers.push(layer_of(shape, &[surface, single, under]));
+            }
+            for fine in &fineness {
+                for dense in &density {
+                    layers.push(layer_of(
+                        shape,
+                        &[
+                            surface,
+                            (WorkPlanSlot::Fineness, fine.as_str()),
+                            (WorkPlanSlot::Density, dense.as_str()),
+                            under,
+                        ],
+                    ));
+                }
             }
         }
     }
-    assert_eq!(layers.len(), 5 * 7 * 9);
+    assert_eq!(layers.len(), 6 * 7 * 13);
     common::par_map(&layers, |layer| {
         for language in [
             ResolvedInstructionLanguage::Ja,

@@ -19,11 +19,18 @@ public enum LibraryAnnotationMark: Sendable {
 
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
-    public static let currentSchemaVersion = 10
+    public static let currentSchemaVersion = 11
     private static let vacuumMarker = "swift-v9-vacuum-complete"
     public nonisolated let url: URL
     public nonisolated let vacuumDeferred: Bool
     let queue: DatabaseQueue
+    private var activeExecutionUsers: [String: Int] = [:]
+
+    public func beginExecutionUse(_ id: String) { activeExecutionUsers[id, default: 0] += 1 }
+    public func endExecutionUse(_ id: String) {
+        guard let count = activeExecutionUsers[id] else { return }
+        if count > 1 { activeExecutionUsers[id] = count - 1 } else { activeExecutionUsers.removeValue(forKey: id) }
+    }
 
     public init(url: URL) throws {
         guard url.isFileURL else { throw PersistenceError.invalidFileURL }
@@ -95,6 +102,21 @@ public actor InkuDatabase {
             }
             if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 10 {
                 let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v10-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 11 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v11-\(UUID().uuidString).sqlite")
                 let backup = try DatabaseQueue(path: backupURL.path)
                 do {
                     try inspection.backup(to: backup)
@@ -200,6 +222,10 @@ public actor InkuDatabase {
             try report.write(to: v10ReportURL, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v10ReportURL.path)
             try db.execute(sql: Self.resourceSQL("migration-v10"))
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 10 {
+            try Self.validateSchema(db)
+            try db.execute(sql: Self.resourceSQL("migration-v11"))
         }
     }
 
@@ -661,6 +687,7 @@ public actor InkuDatabase {
                                   deletedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) throws -> Int {
         try queue.write { db in
             var count = 0
+            var removedExecutions: [String: [String]] = [:]
             for id in Set(ids) {
                 guard let row = try Row.fetchOne(db, sql: "SELECT trashed, lineage_node_id FROM history WHERE id = ?", arguments: [id]),
                       !requireTrashed || row["trashed"] as Bool else { continue }
@@ -675,6 +702,24 @@ public actor InkuDatabase {
                 }
                 try db.execute(sql: "DELETE FROM history WHERE id = ?", arguments: [id])
                 count += db.changesCount
+                if let separator = id.lastIndex(of: "_") {
+                    let sequence = id[id.index(after: separator)...]
+                    if !sequence.isEmpty && sequence.allSatisfy({ $0.isASCII && $0.isNumber }) {
+                        removedExecutions[String(id[..<separator]), default: []].append("save-render:" + sequence)
+                    }
+                }
+            }
+            for (executionID, effects) in removedExecutions {
+                guard activeExecutionUsers[executionID] == nil else { continue }
+                guard let row = try Row.fetchOne(db, sql: "SELECT revision, snapshot FROM execution_snapshots WHERE id = ?", arguments: [executionID]),
+                      try !Self.executionHasSavedWork(id: executionID, snapshot: row["snapshot"], in: db) else { continue }
+                var savedRevisions: [Int64] = []
+                for effect in effects {
+                    if let revision = try Int64.fetchOne(db, sql: "SELECT revision FROM effect_acknowledgements WHERE execution_id = ? AND effect_id = ?", arguments: [executionID, effect]) { savedRevisions.append(revision) }
+                }
+                guard let lastSaved = savedRevisions.max(), lastSaved == (row["revision"] as Int64) else { continue }
+                try db.execute(sql: "DELETE FROM effect_acknowledgements WHERE execution_id = ?", arguments: [executionID])
+                try db.execute(sql: "DELETE FROM execution_snapshots WHERE id = ?", arguments: [executionID])
             }
             return count
         }
@@ -929,6 +974,66 @@ public actor InkuDatabase {
             try String.fetchAll(db, sql: "SELECT id FROM execution_snapshots ORDER BY rowid DESC LIMIT ?",
                                 arguments: [min(100, max(1, limit))])
         }
+    }
+
+    public enum KeepExecutionReason: Sendable, Equatable { case linked, busy, revisionMoved, tooRecent }
+    public enum DiscardExecutionResult: Sendable, Equatable { case discarded, absent, kept(KeepExecutionReason) }
+
+    /// The caller must separately prevent a live driver from acquiring this execution.
+    @discardableResult
+    public func discardUnsavedExecution(id: String, expectedRevision: Int64? = nil,
+                                        olderThan: Int64? = nil, backupURL: URL? = nil) throws -> DiscardExecutionResult {
+        guard activeExecutionUsers[id] == nil else { return .kept(.busy) }
+        if let backupURL {
+            guard backupURL.isFileURL, (try backupURL.resourceValues(forKeys: [.isRegularFileKey])).isRegularFile == true else {
+                throw PersistenceError.invalidFileURL
+            }
+        }
+        return try queue.writeWithoutTransaction { db in
+            if let backupURL { try db.execute(sql: "ATTACH DATABASE ? AS cleanup_backup", arguments: [backupURL.path]) }
+            defer { if backupURL != nil { try? db.execute(sql: "DETACH DATABASE cleanup_backup") } }
+            try db.execute(sql: "BEGIN IMMEDIATE")
+            do {
+                let result = try Self.discardUnsavedExecution(id: id, expectedRevision: expectedRevision, olderThan: olderThan, hasBackup: backupURL != nil, in: db)
+                try db.execute(sql: "COMMIT")
+                return result
+            } catch {
+                try? db.execute(sql: "ROLLBACK")
+                throw error
+            }
+        }
+    }
+
+    private static func discardUnsavedExecution(id: String, expectedRevision: Int64?, olderThan: Int64?, hasBackup: Bool, in db: Database) throws -> DiscardExecutionResult {
+            guard let row = try Row.fetchOne(db, sql: "SELECT revision, snapshot, updated_at FROM execution_snapshots WHERE id = ?", arguments: [id]) else { return .absent }
+            let revision: Int64 = row["revision"]
+            if try Self.executionHasSavedWork(id: id, snapshot: row["snapshot"], in: db) { return .kept(.linked) }
+            if let expectedRevision, revision != expectedRevision { return .kept(.revisionMoved) }
+            if let olderThan {
+                guard let updated: Int64 = row["updated_at"], updated < olderThan else { return .kept(.tooRecent) }
+            }
+            if hasBackup {
+                let differentSnapshot = try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT * FROM main.execution_snapshots WHERE id = ? EXCEPT SELECT * FROM cleanup_backup.execution_snapshots WHERE id = ?)", arguments: [id, id]) == true
+                let differentEffects = try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT * FROM main.effect_acknowledgements WHERE execution_id = ? EXCEPT SELECT * FROM cleanup_backup.effect_acknowledgements WHERE execution_id = ?)", arguments: [id, id]) == true
+                if differentSnapshot || differentEffects { return .kept(.tooRecent) }
+            }
+            try db.execute(sql: "DELETE FROM effect_acknowledgements WHERE execution_id = ?", arguments: [id])
+            try db.execute(sql: "DELETE FROM execution_snapshots WHERE id = ?", arguments: [id])
+            return .discarded
+    }
+
+    public func executionIDs(olderThan: Int64) throws -> [String] {
+        try queue.read { try String.fetchAll($0, sql: "SELECT id FROM execution_snapshots WHERE updated_at < ?", arguments: [olderThan]) }
+    }
+
+    private static func executionHasSavedWork(id: String, snapshot: Data, in db: Database) throws -> Bool {
+        let prefix = id + "_"
+        let ids = try String.fetchAll(db, sql: "SELECT id FROM history WHERE substr(id, 1, ?) = ?", arguments: [prefix.count, prefix])
+        if ids.contains(where: { let suffix = $0.dropFirst(prefix.count); return !suffix.isEmpty && suffix.allSatisfy { $0.isASCII && $0.isNumber } }) { return true }
+        if let object = try? JSONSerialization.jsonObject(with: snapshot) as? [String: Any],
+           let workID = object["savedWorkID"] as? String,
+           try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM history WHERE id = ?)", arguments: [workID]) == true { return true }
+        return false
     }
 
     /// nil expects absence and creates revision 0. Existing revisions advance by one.
@@ -1204,14 +1309,14 @@ public actor InkuDatabase {
             }
             next = expectedRevision + 1
             try db.execute(sql: """
-                UPDATE execution_snapshots SET revision = ?, snapshot = ? WHERE id = ? AND revision = ?
-                """, arguments: [next, snapshot, id, expectedRevision])
+                UPDATE execution_snapshots SET revision = ?, snapshot = ?, updated_at = MAX(COALESCE(updated_at, 0) + 1, ?) WHERE id = ? AND revision = ?
+                """, arguments: [next, snapshot, Int64(Date().timeIntervalSince1970 * 1000), id, expectedRevision])
             guard db.changesCount == 1 else { throw PersistenceError.revisionConflict }
         } else {
             guard try execution(id: id, in: db) == nil else { throw PersistenceError.revisionConflict }
             next = 0
-            try db.execute(sql: "INSERT INTO execution_snapshots (id, revision, snapshot) VALUES (?, ?, ?)",
-                           arguments: [id, next, snapshot])
+            try db.execute(sql: "INSERT INTO execution_snapshots (id, revision, snapshot, updated_at) VALUES (?, ?, ?, ?)",
+                           arguments: [id, next, snapshot, Int64(Date().timeIntervalSince1970 * 1000)])
         }
         return ExecutionSnapshot(id: id, revision: next, snapshot: snapshot)
     }
@@ -1249,7 +1354,9 @@ public actor InkuDatabase {
         if version == 8 { return eighth }
         let ninth = eighth + "\n" + (try resourceSQL("migration-v9-prepare")) + "\n" + (try resourceSQL("migration-v9"))
         if version == 9 { return ninth }
-        return ninth + "\n" + (try resourceSQL("migration-v10"))
+        let tenth = ninth + "\n" + (try resourceSQL("migration-v10"))
+        if version == 10 { return tenth }
+        return tenth + "\n" + (try resourceSQL("migration-v11"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1287,6 +1394,7 @@ public actor InkuDatabase {
         if version >= 8 { identifiers.append("swift-v8-draw-options") }
         if version >= 9 { identifiers.append("swift-v9-effect-digests") }
         if version >= 10 { identifiers.append("swift-v10-saijiki-v4") }
+        if version >= 11 { identifiers.append("swift-v11-execution-updated-at") }
         guard try schemaObjects(in: db) == expectedObjects else { throw PersistenceError.unknownSchema }
         let actualIdentifiers = try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
         let completedIdentifiers = version >= 9 ? (identifiers + [vacuumMarker]).sorted() : identifiers

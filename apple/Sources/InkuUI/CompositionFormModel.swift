@@ -36,6 +36,7 @@ public final class CompositionFormModel {
     public private(set) var status = ""
     public var errorText: String?
     @ObservationIgnored private var initialized = false
+    @ObservationIgnored private weak var cleanupApp: AppModel?
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var failureOrder: [Int: String] = [:]
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
@@ -50,6 +51,7 @@ public final class CompositionFormModel {
     public var canGenerate: Bool { contextAvailable && !sourceIsLocked && !running && !hasUnsaved }
 
     public func initialize(app: AppModel) async {
+        cleanupApp = app
         guard !initialized else { return }
         initialized = true
         modelReference = app.nextDrawingModelReference
@@ -80,6 +82,7 @@ public final class CompositionFormModel {
 
     public func discardCandidates() {
         guard !running else { return }
+        cleanupApp?.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
         candidates.removeAll { $0.savedWork == nil }
         previewID = nil; failures = []; errorText = nil
     }
@@ -108,6 +111,7 @@ public final class CompositionFormModel {
         let run = UUID()
         runID = run
         running = true; saving = false; stopping = false; app.runStops.track(self)
+        app.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
         errorText = nil; failures = []; failureOrder = [:]; candidates = []; previewID = nil
         laneLabels = labels
         laneStates = labels.map { _ in .waiting }
@@ -207,7 +211,10 @@ public final class CompositionFormModel {
             errorText = expired ? app.display.webCopy("compositionFormExpired", "候補が見つかりません。もう一度候補を作ってください。") : app.errorText
         }
         let committedAll = succeeded && !stopping && savedCount == selection.count
-        if committedAll { candidates.removeAll { $0.savedWork == nil } }
+        if committedAll {
+            app.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
+            candidates.removeAll { $0.savedWork == nil }
+        }
         finish()
         return committedAll
     }

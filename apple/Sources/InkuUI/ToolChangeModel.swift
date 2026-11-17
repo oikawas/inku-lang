@@ -29,6 +29,7 @@ public final class ToolChangeModel {
     public private(set) var previewID: String?
     public private(set) var committedWorks: [SavedWork] = []
     @ObservationIgnored private var runID: UUID?
+    @ObservationIgnored private weak var cleanupApp: AppModel?
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
 
     public init(work: SavedWork) { self.work = work }
@@ -36,6 +37,7 @@ public final class ToolChangeModel {
     public var selectedCount: Int { candidates.filter { $0.selected && $0.savedWork == nil }.count }
 
     public func generate(app: AppModel) async {
+        cleanupApp = app
         guard !running, !app.isBusy else { return }
         let fanoutLimit: Int
         do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
@@ -63,6 +65,7 @@ public final class ToolChangeModel {
             try await app.validateSavedAdjustmentParent(parent)
             guard self.runID == run, !self.stopping else { throw CancellationError() }
             self.saving = false
+            app.discardUnsavedExecutions(self.candidates.filter { $0.savedWork == nil }.map(\.id))
             self.candidates = []; self.lanes = []; self.failures = []; self.noChangeableSentences = false; self.previewID = nil
             self.noChangeableSentences = plans.isEmpty
             self.lanes = plans.map { _ in .waiting }
@@ -95,6 +98,7 @@ public final class ToolChangeModel {
 
     public func discardCandidates() {
         guard !running else { return }
+        cleanupApp?.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
         candidates.removeAll { $0.savedWork == nil }
         previewID = nil
     }

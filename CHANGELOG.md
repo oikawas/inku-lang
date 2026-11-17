@@ -10,6 +10,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Android: clean documents and execution records no longer linked to a work when discarding candidates, permanently deleting a work, and starting the app. Active documents, parent relationships, and restored executions are preserved.
 
+- Swift (macOS and iOS): cleans up discarded unsaved executions and records of permanently deleted works, and can clean older unlinked executions after a verified DB backup.
+
 - Swift (macOS and iOS): words inserted from Saijiki follow the displayed instructions' language. When the instructions are empty, they use the UI language.
 
 - Swift (macOS and iOS): Saijiki previews show the shared asset's Japanese and English descriptions for vocabulary and relation words.

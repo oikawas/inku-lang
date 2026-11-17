@@ -23,6 +23,8 @@ For everyday creative work, start with Creating Images. It covers drawing from d
 
 Administrators can choose whether verified manual and scheduled backups are followed by cleanup of documents not linked to a work. Cleanup is enabled by default, with a seven-day grace period after the last update; the period can be set from 1 to 365 days. Documents needed by works, children, or running executions remain. The safety backup taken before a restore does not run cleanup.
 
+In the macOS, iPhone, and iPad apps, DB backup settings also offer cleanup of unsaved executions after a verified backup. It is enabled by default with a seven-day grace period, adjustable from 1 to 365 days. Saved works and active executions remain, and the safety backup before restore does not run cleanup.
+
 ## Templates
 
 - [Environment variable template](./templates/inku-api.env.example)

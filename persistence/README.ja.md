@@ -14,7 +14,7 @@ Server registry v5の`image_provenance`と`image_ddl`はServerのhost拡張と�
 
 Androidの現行物理正本は生成済み[Room schema 14](../android/app/schemas/app.inku.mobile.data.db.InkuDatabase/14.json)。`history_items.normalized_ddl`と`ddl_source_origin`はともにNULL可のTEXTであり、旧`expanded_ddl`列を持たない。共通checkerはServer、Android、Swiftの現行schemaを契約v2へ照合する。
 
-Swiftの実装は[InkuPersistence](../apple/Packages/InkuPersistence/Package.swift)。GRDB 7.11.1を[SwiftPMの解決記録](../apple/Packages/InkuPersistence/Package.resolved)で固定する。[物理schema v1のSQL](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)に順次移行v2〜v10を適用した[現行schema export](reference/swift-schema-v10.json)が正本である。v10はannotation・奥書・未読語とprovider送信予算を含む10 tableで、v8は作品ごとの描画条件を、v9は効果のACKに要約値を持つ。v10は歳時記を移行する。版は論理契約v2、Room 14やServer registry v4とは独立している。[SavedWork／LineageNode／LineageEdge](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)は全共通項目を保持する。各Apple hostのDBはローカルのApplication Supportに置き、Server／AndroidのDBをSwift DBとして直接開いたり、macOS／iOSでlive DBファイルを共有したりしない。
+Swiftの実装は[InkuPersistence](../apple/Packages/InkuPersistence/Package.swift)。GRDB 7.11.1を[SwiftPMの解決記録](../apple/Packages/InkuPersistence/Package.resolved)で固定する。[物理schema v1のSQL](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)に順次移行v2〜v11を適用した[現行schema export](reference/swift-schema-v11.json)が正本である。v11はannotation・奥書・未読語とprovider送信予算を含む10 tableで、v8は作品ごとの描画条件を、v9は効果のACKに要約値を持つ。v10は歳時記を移行し、v11は実行の最終書込時刻を記録する。版は論理契約v2、Room 14やServer registry v4とは独立している。[SavedWork／LineageNode／LineageEdge](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)は全共通項目を保持する。各Apple hostのDBはローカルのApplication Supportに置き、Server／AndroidのDBをSwift DBとして直接開いたり、macOS／iOSでlive DBファイルを共有したりしない。
 
 `required_common`は宣言した全hostが保存または決定的に公開する事実、`optional_common`は共通の意味を予約しproducerのないhostによる省略を許す項目。認証・管理・端末固有のprovider/model/cacheはhost拡張である。
 
@@ -39,7 +39,7 @@ Androidの`render_seed`、`composition_seed`、`render_wild`は専用列が正�
 
 ## 現行runtimeと確認の順序
 
-Swift の現行物理 schema は [v10](reference/swift-schema-v10.json)。v10 は検証した控えを作って歳時記 v3 の作品を v4 へ移し、effect の二つの digest と過去の実行記録を保持する。以下の旧版への移行説明は当時の記録である。
+Swift の現行物理 schema は [v11](reference/swift-schema-v11.json)。v11 は実行記録の最終書込時刻を追加し、既存の行には移行時刻を入れる。v10 は検証した控えを作って歳時記 v3 の作品を v4 へ移し、effect の二つの digest と過去の実行記録を保持する。以下の旧版への移行説明は当時の記録である。
 
 ServerはSQLAlchemy/SQLite、AndroidはRoom/SQLiteの物理schemaを所有する。Serverの`db.init_db()`はcomposition façadeであり、新規DBを現行schemaで作り、旧二本文DBは明示的な手動DDL移行が必要として通常起動を拒否する。移行後の起動でもregistry/checksum、必要列、廃止列の不存在、FTSを確認する。凍結した旧schema/adapterは旧backupの隔離復元に使い、新規DBの定義で旧schemaを代用しない。
 

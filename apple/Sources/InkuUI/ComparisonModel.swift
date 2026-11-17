@@ -47,6 +47,7 @@ public final class ComparisonModel {
     public private(set) var status = ""
     public var errorText: String?
     @ObservationIgnored private var initialized = false
+    @ObservationIgnored private weak var cleanupApp: AppModel?
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var failureOrder: [Int: String] = [:]
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
@@ -71,6 +72,7 @@ public final class ComparisonModel {
     public var targetModelReference: String { original?.stage1Model ?? original?.stage2Model ?? "" }
 
     public func initialize(app: AppModel) async {
+        cleanupApp = app
         guard !initialized else { return }
         initialized = true
         guard !app.isPreview, let work = requestedWork ?? app.selectedWork else {
@@ -116,6 +118,7 @@ public final class ComparisonModel {
 
     public func discardCandidates() {
         guard !running else { return }
+        cleanupApp?.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
         candidates.removeAll { $0.savedWork == nil }
         previewID = nil
         failures = []; failedModelReferences = []
@@ -160,6 +163,7 @@ public final class ComparisonModel {
         let run = UUID()
         runID = run
         running = true; saving = false; stopping = false; app.runStops.track(self)
+        app.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
         errorText = nil; failures = []; failureOrder = [:]; failedModelReferences = []; candidates = []; previewID = nil
         laneLabels = labels.map(\.1)
         laneStates = labels.map { _ in .waiting }
@@ -232,7 +236,10 @@ public final class ComparisonModel {
         else if succeeded { status = "選択した\(savedCount)件を保存しました。" }
         else { status = "保存済み \(savedCount)件"; errorText = app.errorText }
         let committedAll = succeeded && !stopping && savedCount == selection.count
-        if committedAll { candidates.removeAll { $0.savedWork == nil } }
+        if committedAll {
+            app.discardUnsavedExecutions(candidates.filter { $0.savedWork == nil }.map(\.id))
+            candidates.removeAll { $0.savedWork == nil }
+        }
         finish()
         return committedAll
     }

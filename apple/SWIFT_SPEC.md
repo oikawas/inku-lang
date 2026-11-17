@@ -1311,6 +1311,8 @@ Selecting or reading a saved work uses its stored DDL, Score, and canonical SVG 
 
 ### Backup and restore
 
+DB v11 records the last execution write time. Discarding unsaved candidates and permanently deleting works clean execution records and ACKs while retaining saved, active, or subsequently advanced records. Cleanup after a verified backup is enabled by default with a seven-day grace period (1–365 days) and compares all rows against the backup. A safety backup before restore does not run cleanup.
+
 Manual backup uses the SQLite Backup API to capture a consistent snapshot including WAL contents. After schema, integrity, and stored-value validation, a standalone SQLite file is published at a new destination. Existing backups are not overwritten. Copying only the DB file is not treated as a backup.
 
 Restore cannot start from the UI during generation. It stops host executions, keeps the original backup read-only, validates an isolated snapshot, and replaces the active DB through the Backup API. After success, the app model resets execution, selection, and display state and reloads works. Content's restoration revision closes library preview, discards Demo/Batch observations and temporary Creation/presentation snapshots, and rereads library state, generations, and the selection position from the restored DB. DB backups include works, lineage, executions, snapshots, and ACKs; adjacent provider JSON and Keychain credentials are excluded.

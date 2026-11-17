@@ -229,7 +229,7 @@ public final class LocalMaintenance {
         do {
             let source = try await store.retainedURL(name: name)
             let safety = try await store.nextManualBackupURL(now: clock())
-            guard await app.backup(to: safety) else { return }
+            guard await app.backup(to: safety, cleanup: false) else { return }
             try await store.recordManual(url: safety)
             backupStatus = app.display.webCopy("settingsDbBackupRestoring", "リカバリしています…")
             let revision = app.restorationRevision

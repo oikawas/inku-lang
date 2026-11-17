@@ -249,6 +249,10 @@
 	let modelSelectionAllowVision = $state(true);
 	let modelSelectionVisionOnly = $state(false);
 	let modelSelectionForDrawing = false;
+	let modelSelectionOwner: string | undefined;
+	let modelSelectionReference: string | null = null;
+	let modelSelectionEdited = false;
+	let pendingModelSettings: { owner: string; values: UserModelSettings } | null = null;
 	let refinementModelSelection = $state(false);
 	let acceptRefinementModel: ((model: string) => void) | null = null;
 	// The Server config supplies the candidate-grid cap so it tracks render slots;
@@ -892,10 +896,15 @@
 		modelSelectionAllowVision = allowVision;
 		modelSelectionVisionOnly = visionOnly;
 		modelSelectionForDrawing = forDrawing;
+		modelSelectionOwner = session.currentUser?.id;
+		modelSelectionEdited = false;
+		modelSelectionReference = null;
+		pendingModelSettings = null;
 		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
 		if (forDrawing) {
 			const ref = visionOnly ? work.drawOptions.models.vision : work.drawOptions.models.stage1;
 			if (ref) {
+				modelSelectionReference = ref;
 				const selected = splitModelReference(ref, visionOnly ? availableVisionModelCatalog : availableModelCatalog);
 				if (visionOnly) { if (selected.provider) visionProvider = selected.provider; visionModel = selected.model; }
 				else { if (selected.provider) stage1Provider = stage2Provider = selected.provider; stage1Model = stage2Model = selected.model; }
@@ -909,6 +918,7 @@
 		acceptRefinementModel = accept;
 		refinementModelSelection = true;
 		openModelSelection(false, false, true);
+		modelSelectionReference = current;
 		if (selected.provider) stage1Provider = stage2Provider = selected.provider;
 		stage1Model = stage2Model = selected.model;
 	}
@@ -977,10 +987,13 @@
 			return;
 		}
 		if (modelSelectionForDrawing) {
-			work.invalidateWorkOptions();
-			if (modelSelectionVisionOnly) work.drawOptions.models.vision = qualifiedModelRef(visionProvider, visionModel);
-			else work.drawOptions.models.stage1 = work.drawOptions.models.stage2 = qualifiedModelRef(stage1Provider, stage1Model);
+			const selected = modelSelectionVisionOnly
+				? qualifiedModelRef(visionProvider, visionModel)
+				: qualifiedModelRef(stage1Provider, stage1Model);
 			restoreModelSelection();
+			work.invalidateWorkOptions();
+			if (modelSelectionVisionOnly) work.drawOptions.models.vision = selected;
+			else work.drawOptions.models.stage1 = work.drawOptions.models.stage2 = selected;
 			settings.finishModelSelection();
 			return;
 		}
@@ -990,7 +1003,7 @@
 	}
 
 	function restoreModelSelection() {
-		if (modelSelectionSnapshot) {
+		if (modelSelectionSnapshot && modelSelectionOwner === session.currentUser?.id) {
 			stage1Provider = modelSelectionSnapshot.stage1Provider;
 			stage1Model = modelSelectionSnapshot.stage1Model;
 			stage2Provider = modelSelectionSnapshot.stage2Provider;
@@ -999,8 +1012,18 @@
 			visionModel = modelSelectionSnapshot.visionModel;
 		}
 		modelSelectionSnapshot = null;
+		modelSelectionOwner = undefined;
+		modelSelectionReference = null;
+		modelSelectionEdited = false;
 		acceptRefinementModel = null;
 		refinementModelSelection = false;
+		const pending = pendingModelSettings;
+		pendingModelSettings = null;
+		if (pending && session.currentUser?.id === pending.owner) {
+			applyUserModelSettings({ ...session.currentUser, model_settings: {
+				...pending.values, ...session.currentUser.model_settings
+			} }, { excludeUserSettingIds: ['text-size'] });
+		}
 	}
 
 	function openCatalogModal() {
@@ -1149,6 +1172,22 @@
 			for (const group of groups) for (const model of group.models) model.qualified_id = qualifiedModelRef(group.id, model.id);
 			await loadModelReferences(groups.flatMap((group) => group.models.map((model): ReferenceQuery => ({action: 'split_ref', ref: model.qualified_id ?? ''}))));
 			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+			const pendingRef = modelSelectionReference;
+			if (settings.opened && settings.mode === 'model' && pendingRef && !modelSelectionEdited) {
+				await loadModelReferences([{ action: 'split_ref', ref: pendingRef }]);
+				if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+				if (settings.opened && settings.mode === 'model' && modelSelectionOwner === userId && modelSelectionReference === pendingRef && !modelSelectionEdited) {
+					const selected = splitModelReference(pendingRef);
+					if (selected.provider) {
+						await loadModelReferences([{ action: 'qualify_ref', provider: selected.provider, ref: selected.model }]);
+						if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+						if (settings.opened && settings.mode === 'model' && modelSelectionOwner === userId && modelSelectionReference === pendingRef && !modelSelectionEdited) {
+							if (modelSelectionVisionOnly) { visionProvider = selected.provider; visionModel = selected.model; }
+							else { stage1Provider = stage2Provider = selected.provider; stage1Model = stage2Model = selected.model; }
+						}
+					}
+				}
+			}
 			chatgptPlanAvailable = data.chatgpt_plan_available === true;
 			chatgptUsageUrl = data.sign_in_services?.find((service) => service.id === 'chatgpt')?.usage_url ?? null;
 			setModelLabelTable(data.model_labels);
@@ -1160,23 +1199,27 @@
 				.filter((group) => group.models.length > 0);
 			availableModelsLoaded = true;
 			modelCatalogStatus = 'ready';
-			if (!refinementModelSelection && Object.keys(userModels).length > 0) {
+			const modelSelectionOpen = settings.opened && settings.mode === 'model';
+			if (modelSelectionOpen && Object.keys(userModels).length > 0) {
+				pendingModelSettings = { owner: userId, values: userModels };
+			}
+			if (!modelSelectionOpen && !refinementModelSelection && Object.keys(userModels).length > 0) {
 				applyUserModelSettings(
 					{ ...session.currentUser, model_settings: userModels },
 					{ excludeUserSettingIds: ['text-size'] }
 				);
 			}
-			if (!refinementModelSelection && stage1Provider !== 'chatgpt' && !modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
+			if (!modelSelectionOpen && !refinementModelSelection && stage1Provider !== 'chatgpt' && !modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
 				const fallbackGroup = availableModelCatalog.find((group) => group.id !== 'chatgpt' && group.models.length > 0);
 				stage1Provider = fallbackGroup?.id ?? stage1Provider;
 				stage1Model = fallbackGroup?.models[0]?.id ?? stage1Model;
 			}
-			if (!refinementModelSelection && stage2Provider !== 'chatgpt' && !modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
+			if (!modelSelectionOpen && !refinementModelSelection && stage2Provider !== 'chatgpt' && !modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
 				const fallbackGroup = availableModelCatalog.find((group) => group.id !== 'chatgpt' && group.models.length > 0);
 				stage2Provider = fallbackGroup?.id ?? stage2Provider;
 				stage2Model = fallbackGroup?.models[0]?.id ?? stage2Model;
 			}
-			if (!refinementModelSelection && !visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
+			if (!modelSelectionOpen && !refinementModelSelection && !visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
 				const fallbackGroup = availableVisionModelCatalog.find((group) => group.models.length > 0);
 				visionProvider = fallbackGroup?.id ?? visionProvider;
 				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
@@ -1184,7 +1227,7 @@
 			const okugakiModelAvailable = availableVisionModelCatalog.some((group) =>
 				group.models.some((model) => qualifiedModelRef(group.id, model.id) === okugakiModel)
 			);
-			if (!refinementModelSelection && !okugakiModelAvailable) {
+			if (!modelSelectionOpen && !refinementModelSelection && !okugakiModelAvailable) {
 				okugakiModel = qualifiedModelRef(visionProvider, visionModel);
 			}
 			demo.reconcilePromptModel(demoPromptModelCatalog, availableModelsLoaded);
@@ -1337,6 +1380,8 @@
 	}
 
 	function resetAfterSignedOut(): void {
+		pendingModelSettings = null;
+		if (settings.opened && settings.mode === 'model') settings.close();
 		work.resetDrawDefaultsOwner();
 		work.clearImage();
 		compositionRanges = [];
@@ -2223,6 +2268,7 @@ $effect(() => {
 
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
+		if (settings.opened && settings.mode === 'model') modelSelectionEdited = true;
 		stage1Provider = v; stage1Model = modelsFor(v)[0]?.id ?? stage1Model;
 	}
 	function setStage1Model(v: string) {
@@ -2241,6 +2287,7 @@ $effect(() => {
 		setStage2Model(model);
 	}
 	function setVisionProvider(v: Provider) {
+		if (settings.opened && settings.mode === 'model') modelSelectionEdited = true;
 		visionProvider = v;
 		visionModel = visionModelsFor(v)[0]?.id ?? visionModel;
 	}

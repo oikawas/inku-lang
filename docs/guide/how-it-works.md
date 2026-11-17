@@ -103,7 +103,7 @@ A failed Sketch from life or color catalog selection never stops the drawing. Pa
 
 ## Surface and ground texture
 
-Scores may also carry surface and ground texture. The quality of a shape's surface (the Saijiki's "surfaces": flat, pale ink wash, stipple, hatch, crosshatch, aquatint, and more) goes into `instruction.surface`; a support such as washi, charcoal ground, canvas, or mezzotint (the Saijiki's "grounds") goes into `canvas.ground`. In the instructions, a surface quality is written as a modifier of the shape, as in "a pale-ink-wash circle," and a ground as a sentence of its own, such as "Washi." Those fields stay abstract. The renderer decides whether to perform them as SVG filters, clipped vector marks, or simplified compat output.
+Scores may also carry surface and ground texture. The quality of a shape's surface (the Saijiki's "surfaces": flat, sweep, stipple, hatch, crosshatch, mezzotint, and more) goes into `instruction.surface`; a support such as washi, charcoal ground, canvas, or mezzotint (the Saijiki's "grounds") goes into `canvas.ground`. In the instructions, a surface quality is written as a modifier of the shape, as in "a sweep circle," and a ground as a sentence of its own, such as "Washi." Those fields stay abstract. The renderer decides whether to perform them as SVG filters, clipped vector marks, or simplified compat output.
 
 ## Plugin vocabulary
 

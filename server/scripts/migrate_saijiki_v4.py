@@ -1,4 +1,4 @@
-"""One stopped-service Saijiki v3 cutover, with explicit operator approval."""
+"""One stopped-service Saijiki v4 cutover, with explicit operator approval."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ import os
 import sys
 from pathlib import Path
 
-from inku_server.persistence.saijiki_v3_cutover import cutover, recover
+from inku_server.persistence.saijiki_v4_cutover import cutover, recover
+from inku_server.persistence.saijiki_v4_migration import SaijikiV3PrerequisiteError
 
 
 def main() -> int:
@@ -36,8 +37,12 @@ def main() -> int:
         blank = [line.strip() for line in args.blank.read_text(encoding="utf-8").splitlines() if line.strip()]
         if len(blank) != len(set(blank)):
             raise ValueError("duplicate_blank_id")
-    report = cutover(args.database, args.packages, args.recovery,
-                     journal=args.recovery / "journal.jsonl", blank=blank)
+    try:
+        report = cutover(args.database, args.packages, args.recovery,
+                         journal=args.recovery / "journal.jsonl", blank=blank)
+    except SaijikiV3PrerequisiteError as error:
+        print(json.dumps({"status": "refused", "reason": str(error)}))
+        return 1
     result = args.recovery / "report.json"
     with result.open("x", encoding="utf-8") as output:
         json.dump(report, output, ensure_ascii=False, sort_keys=True)

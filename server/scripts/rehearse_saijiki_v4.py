@@ -1,4 +1,4 @@
-"""Count or rehearse Saijiki v3 only inside a marked isolated run directory."""
+"""Count or rehearse Saijiki v4 only inside a marked isolated run directory."""
 
 from __future__ import annotations
 
@@ -9,8 +9,10 @@ import sqlite3
 from pathlib import Path
 
 from count_saijiki_v1_migration import _resolve_guarded_database
-from inku_server.persistence.saijiki_v3_migration import census, migrate_once, migrate_unit_v3
-from inku_server.persistence.saijiki_v3_plugins import plan_packages
+from inku_server.persistence.saijiki_v4_migration import (
+    SaijikiV3PrerequisiteError, census, migrate_once, migrate_unit_v4, require_v3_cutover,
+)
+from inku_server.persistence.saijiki_v4_plugins import plan_packages
 
 
 def _inside(root: Path, name: Path, *, directory: bool = False) -> Path:
@@ -45,10 +47,19 @@ def main() -> int:
     journal_path = output / "journal.jsonl"
     if report_path.exists() or journal_path.exists():
         raise ValueError("output_already_exists")
+    try:
+        with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as connection:
+            require_v3_cutover(connection)
+    except SaijikiV3PrerequisiteError as error:
+        result = {"status": "refused", "reason": str(error), "mode": args.mode}
+        with report_path.open("x", encoding="utf-8") as destination:
+            json.dump(result, destination, ensure_ascii=False, sort_keys=True, indent=2)
+        print(json.dumps({**result, "report": str(report_path)}))
+        return 1
     package_report, proposed = plan_packages(packages)
     if args.mode == "census":
         with sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True) as connection:
-            report = census(connection, migrate_unit_v3, workers=args.workers, timeout=args.timeout,
+            report = census(connection, migrate_unit_v4, workers=args.workers, timeout=args.timeout,
                             journal=journal_path)
     else:
         if package_report["refused_records"]:

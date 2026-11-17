@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: Saijiki v4 vocabulary is generated from the shared asset and displayed in seven bundles. Migration of older exports and saved records, diagnostics, and rehearsal tools are updated. Production data has not been migrated.
+
 - Drawing (render engine 104): grain, stipple and aquatint now draw as strokes broken by paper tooth, round dots with a sloping tone, and a burnished mezzotint face. Reperformance changes works with these textures on closed shapes; saved SVGs do not.
 
 - Swift: the About vocabulary table now has updated descriptions of the description, instructions, score, and performance.

@@ -75,7 +75,7 @@ lint が一字一句を強制する事実と、次の 2 つの規則は本書が
 「偶然に委ねる」／`By chance` も作者が2026-10-05に確定した固定値として lint が強制する。
 既定は「原理に沿う」。この配置の選びは推敲の要素を増やさない。2026-11-13 から、言葉で描いた作品で指示書に物のまとまりがあれば「配置を変える」は物の置き場の画面（「動かす物」「置き場」）を開き、この 2 つの選びは、まとまりの無い作品（型で描いた作品など）の選びとして残る。2026-10-14 の作者指定「配色を変える」は、同じ色カタログ内の割当を変える独立した作品編集メニューとして扱い、既存の4要素と自律推敲の選択は変えない。同じ日の「支持体を変える」も、使っていない支持体へ地だけを差し替える独立した作品編集メニューとして同じ扱いとする。「てざわりを変える」（Change the touches）も同じで、その中の「すべての文を同じ筆記具にする」／`Same tool for every sentence`（既定）と「文ごとに違う筆記具にする」／`A different tool for each sentence` は配置の選びと同じく推敲の要素を増やさない。
 
-> **`Moderate` は古い作品の変奏の強度の表示に予約されている。** 速度の表示に使わない（コストは
+> **`Moderate` は古い作品の変奏の強度と、歳時記 v4 のさばき「程よい」に使う。** 速度の表示に使わない（コストは
 > `Very fast (no LLM)` / `Medium (Stage 2 LLM and API)` / `Slow (LLM and API)`）。
 
 tooltip の型: 一文目に「何が起きるか」、二文目に「何が保たれるか」。一〜二文で止める。
@@ -115,7 +115,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `image` | **Vision が実際に画像を見る**文脈、またはInfoの作者指定文で心にある像を指す用法 | `appInfoConceptBody` / `modelSelectionVisionHint` / 画像タブの `imageTab`・`imageTabHint`・`imageChooseFile`・`imageUploading`・`imageThumbnailAlt`・`imageVisionRequired`・`imageCanvasAspect`・`imageCatalogAuto`・`imageCatalogAutoHint`・`imageWritingDdl`・`imageReviewingDdl`・`imageSelectingCatalog`・`imageMissing`・`imageInvalid`・`imageTooLarge`・`imageDdlFailed` |
 | `render*` | **サーバー側の技術設定・DB フィールド名・置換トークン** | `canvasSeedSummary`(`{render}`) / `settingsRenderConcurrency*`(5 件) / `historyReplayMissingSeed`(`render_seed`) / `replayComparisonTitle`(Renderer) |
 | `kotobagaki` | **例外なし**（v2.9.15 で語彙ダイアログの詞書の行が消え、英語表示に残る用例は 0 件） | — |
-| `Moderate` | **古い作品の変奏の強度・中** | `retiredVariationMedium` |
+| `Moderate` | **古い作品の変奏の強度・中、歳時記 v4 の程よい** | `retiredVariationMedium`、歳時記のさばきの見本と該当する診断文 |
 
 **新しく例外を足すときは、`i18n-lint.mjs` の該当リストとこの表を同じ commit で更新する。**
 例外に足す前に、まず訳語を変えられないかを考えること。

@@ -43,6 +43,7 @@ public struct DrawingAdjustmentPlan: Sendable {
 @MainActor
 @Observable
 public final class AppModel {
+    public let maintenance = LocalMaintenance()
     public private(set) var canvasFitQuestion: CanvasFitQuestion?
     @ObservationIgnored public var canvasFitChoiceHandler: (@MainActor (CanvasFitQuestion) async -> CanvasFitChoice)?
     @ObservationIgnored private var canvasFitContinuation: CheckedContinuation<CanvasFitChoice, Never>?
@@ -519,6 +520,10 @@ public final class AppModel {
             var startupCatalogError: Error?
             do { _ = try bootstrap.macroCatalog(language: instructionLanguage(for: currentInputText), settings: settings) }
             catch { startupCatalogError = error }
+            maintenance.connect(app: self)
+            library.onPermanentlyDeleted = { [weak maintenance] ids in
+                await maintenance?.removeDeletedWorkLogs(ids: ids, database: database)
+            }
             library.onMutation = { [weak self] in await self?.refreshWorks() }
             // Web `inku-history-display-mode` and the thumbnail/list tab come back with the library.
             if let layout = display.libraryLayout.flatMap(LibraryLayout.init(rawValue:)) {
@@ -2385,6 +2390,7 @@ public final class AppModel {
         var preferences = display.preferences
         preferences.cleanupLastAt = Date(); preferences.cleanupLastBackup = url.lastPathComponent
         preferences.cleanupLastDeleted = 0; preferences.cleanupLastKept = 0
+        preferences.cleanupLastLogsDeleted = 0
         preferences.cleanupLastSkipped = false; preferences.cleanupLastError = nil
         guard !isBusy, let database, let host else {
             preferences.cleanupLastSkipped = true; display.preferences = preferences; return
@@ -2401,12 +2407,23 @@ public final class AppModel {
                 if result == .discarded { preferences.cleanupLastDeleted! += 1 }
                 else { preferences.cleanupLastKept! += 1 }
             }
-        } catch { preferences.cleanupLastError = error.localizedDescription }
+            if !preferences.cleanupLastSkipped! && !isBusy {
+                isBusy = true
+                do {
+                    preferences.cleanupLastLogsDeleted = try await maintenance.removeOldLogs(olderThan: Date(timeIntervalSince1970: Double(cutoff) / 1000))
+                    isBusy = false
+                } catch { isBusy = false; throw error }
+            } else { preferences.cleanupLastSkipped = true }
+        } catch {
+            if let partial = error as? LogCleanupError { preferences.cleanupLastLogsDeleted = partial.deleted }
+            preferences.cleanupLastError = error.localizedDescription
+        }
         // Merge only cleanup fields so changes made while the task awaited are retained.
         display.preferences.cleanupLastAt = preferences.cleanupLastAt
         display.preferences.cleanupLastBackup = preferences.cleanupLastBackup
         display.preferences.cleanupLastDeleted = preferences.cleanupLastDeleted
         display.preferences.cleanupLastKept = preferences.cleanupLastKept
+        display.preferences.cleanupLastLogsDeleted = preferences.cleanupLastLogsDeleted
         display.preferences.cleanupLastSkipped = preferences.cleanupLastSkipped
         display.preferences.cleanupLastError = preferences.cleanupLastError
     }

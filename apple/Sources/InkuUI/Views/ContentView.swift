@@ -91,7 +91,7 @@ public struct ContentView: View {
     @State private var workspaceWork: SavedWork?
     @State private var batchWorkspace = BatchWorkspaceSelection()
     @State private var confirmNewBatch = false
-    @State private var maintenance = LocalMaintenance()
+    private var maintenance: LocalMaintenance { model.maintenance }
     @State private var dialog: WorkDialog?
     @State private var presentation = false
     @State private var presentationWork: SavedWork?

@@ -25,6 +25,12 @@ private struct BackupSnapshot: Sendable {
     let totalBytes: Int64
 }
 
+struct LogCleanupError: LocalizedError {
+    let deleted: Int
+    let underlying: Error
+    var errorDescription: String? { underlying.localizedDescription }
+}
+
 private actor LocalMaintenanceStore {
     private let directory: URL
     init(directory: URL) { self.directory = directory }
@@ -151,6 +157,47 @@ private actor LocalMaintenanceStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(execution).write(to: file, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+    }
+
+    private func logFolder(_ name: String) throws -> URL? {
+        let folder = directory.appendingPathComponent(name, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: folder.path) else { return nil }
+        let values = try folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isDirectory == true, values.isSymbolicLink != true else { return nil }
+        return folder
+    }
+
+    private func removeLog(at url: URL, olderThan cutoff: Date? = nil) throws -> Bool {
+        let name = url.lastPathComponent
+        guard name.hasSuffix(".json") else { return false }
+        let stem = name.dropLast(5)
+        guard stem.utf8.count == 64, stem.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }) else { return false }
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .contentModificationDateKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true else { return false }
+        if let cutoff { guard let modified = values.contentModificationDate, modified < cutoff else { return false } }
+        try FileManager.default.removeItem(at: url)
+        return true
+    }
+
+    func removeLog(folder name: String, id: String) throws {
+        guard let folder = try logFolder(name) else { return }
+        let hash = SHA256.hash(data: Data(id.utf8)).map { String(format: "%02x", $0) }.joined()
+        let file = folder.appendingPathComponent(hash + ".json")
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        _ = try removeLog(at: file)
+    }
+
+    func removeLogs(olderThan cutoff: Date) throws -> Int {
+        var count = 0
+        do {
+            for name in ["result-logs", "drawing-logs"] {
+                guard let folder = try logFolder(name) else { continue }
+                for file in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .contentModificationDateKey]) {
+                    if try removeLog(at: file, olderThan: cutoff) { count += 1 }
+                }
+            }
+        } catch { throw LogCleanupError(deleted: count, underlying: error) }
+        return count
     }
 }
 
@@ -289,5 +336,25 @@ public final class LocalMaintenance {
         guard let store, enabled else { return }
         do { try await store.log(execution: execution); logStatus = "" }
         catch { logStatus = "描画ログのファイルを保存できませんでした。" }
+    }
+
+    func removeDeletedWorkLogs(ids: [String], database: InkuDatabase) async {
+        guard let store else { return }
+        do {
+            for id in ids {
+                guard try await database.work(id: id) == nil else { continue }
+                try await store.removeLog(folder: "result-logs", id: id)
+                if let location = try? WorkIdentity.location(id),
+                   try await !database.hasSavedWorks(executionID: location.executionID) {
+                    try await store.removeLog(folder: "drawing-logs", id: location.executionID)
+                }
+            }
+        } catch { logStatus = "ログのファイルを片付けられませんでした: \(error.localizedDescription)" }
+    }
+
+    func removeOldLogs(olderThan cutoff: Date) async throws -> Int {
+        guard let store else { throw HostError("log_directory_unavailable") }
+        do { return try await store.removeLogs(olderThan: cutoff) }
+        catch { logStatus = "ログのファイルを片付けられませんでした: \(error.localizedDescription)"; throw error }
     }
 }

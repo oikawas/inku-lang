@@ -1004,7 +1004,7 @@ toolbarの「描画ログ」で直近100件のpipeline実行を新しい順に�
 
 通常APIの失敗metricへ後方互換optionalの診断を付ける。OS通信errorのdomain／codeと固定した説明、既知host error、HTTP拒否のcode／type／param／statusと240文字以内のmessageを保存する。接続先はscheme／host／portだけとし、path／query／userinfo／headersを含めない。実credentialと秘密らしい文字列を切取り前にmaskする。HTTP応答を得られない通信では、要求を送れたと推測しない。古い実行には新しい詳細を補作せず、記録されなかった理由を明示する。共通Rustの失敗分類・再試行・fallbackは変更しない。
 
-既存の「生成結果のログを保存」を有効にすると、成功作品の従来logに加えて、DBと同じdirectoryの `drawing-logs/` へ実行ごとの累積JSONを原子的に保存する。成功・失敗・停止までのcore経過と通常metricを含み、古いcallbackで新しいrevisionを上書きしない。file logは既定で無効、SQLiteの実行記録は従来どおり保存される。file logの自動rotation／日数purgeはまだ設けない。詳細本文は従来の開発者専用・明示opt-inへ分離する。
+既存の「生成結果のログを保存」を有効にすると、成功作品の従来logに加えて、DBと同じdirectoryの `drawing-logs/` へ実行ごとの累積JSONを原子的に保存する。成功・失敗・停止までのcore経過と通常metricを含み、古いcallbackで新しいrevisionを上書きしない。file logは既定で無効、SQLiteの実行記録は従来どおり保存される。作品の完全削除時はその結果ログを消し、同じ実行の作品が残らない場合は描画ログも消す。検証済みDB backup後の片付けが有効な場合は同じ猶予より古いログファイルも消す。ログはDB backupに含まれない。詳細本文は従来の開発者専用・明示opt-inへ分離する。
 
 限定確認は `InkuAppCheck --drawing-failure-log-only` の1失敗実行でSQLite・再起動後の読出し・terminal file logと再送信なしを確認する。hostの `ProviderObservationTransportChecks.testSafeFailureDiagnosticsWithoutRawCapture` は接続拒否1件とHTTP拒否1件、秘密除去と旧metricの読出しを確認する。実providerの再描画成功・native操作・OS実機の確認はそれぞれ分ける。
 

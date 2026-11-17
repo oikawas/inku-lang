@@ -181,3 +181,34 @@ fn a_v3_definition_moves_the_dash_dot_and_the_dropped_sizes_and_refuses_a_waxing
     assert!(!unchanged.changed);
     assert!(unchanged.approximated_refs.is_empty());
 }
+
+// Concrete failure (V1f, 19 of the author's works): 始点・終点・途中 written outside a
+// relation phrase stopped being words in v4, so 終点 split into an unknown 終 and the shape
+// 点, and the migration refused the document for its new diagnostic. v4 keeps them as
+// marker-only words, read as in v3.
+#[test]
+fn a_v3_place_word_outside_a_relation_phrase_migrates_and_reads_as_before() {
+    for (source, language) in [
+        ("中心に黒い線を引き、終点に黒い小さな円を1個置く。", JA),
+        ("右端の線の途中から、垂直な黒い線を1本引く。", JA),
+        (
+            "Place one small white ellipse near the upper right end of the previous line.",
+            EN,
+        ),
+    ] {
+        let migrated = migrate(source, language).unwrap();
+        assert_eq!(migrated.source, source);
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let unknown = inku_ddl::parse_neutral_lexemes(&document)
+            .diagnostics
+            .into_iter()
+            .map(|diagnostic| diagnostic.surface)
+            .collect::<Vec<_>>();
+        for retired in ["終", "途", "end"] {
+            assert!(
+                !unknown.iter().any(|surface| surface == retired),
+                "{source}"
+            );
+        }
+    }
+}

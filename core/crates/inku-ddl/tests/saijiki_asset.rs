@@ -78,7 +78,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        103
+        // ばしょ keeps 始点・終点・途中 as marker-only rows, read as in v3.
+        106
     );
     assert_eq!(asset.relations.len(), 11);
     assert_eq!(

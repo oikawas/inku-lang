@@ -492,10 +492,11 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
         }
     }
 
-    // v4 offers every remaining word to the list and the reader, keeps no
-    // marker-only or disabled row, and moves the two core-modifier categories
-    // (futosa, ookisa) out of the Saijiki word count.
-    assert_eq!((active, marker_only, disabled), (94, 0, 0));
+    // v4 offers every remaining word to the list and the reader except ばしょ's
+    // 始点・終点・途中 (start, end, partway): they are read as in v3 but shown only inside
+    // the relation phrases, so they stay marker-only. No row is disabled, and the two
+    // core-modifier categories (futosa, ookisa) are out of the Saijiki word count.
+    assert_eq!((active, marker_only, disabled), (97, 3, 0));
 }
 
 #[test]

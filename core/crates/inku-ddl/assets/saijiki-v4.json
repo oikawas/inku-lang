@@ -201,6 +201,9 @@
         {"id": "right_edge", "surface_ja": "右端", "surface_en": "right-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_en": ["right edge"]},
         {"id": "top_edge", "surface_ja": "上端", "surface_en": "top-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_en": ["top edge"]},
         {"id": "bottom_edge", "surface_ja": "下端", "surface_en": "bottom-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_en": ["bottom edge"]},
+        {"id": "start", "surface_ja": "始点", "surface_en": "start", "default": false, "prompt": false, "display": false, "marker": true, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"id": "end", "surface_ja": "終点", "surface_en": "end", "default": false, "prompt": false, "display": false, "marker": true, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"id": "partway", "surface_ja": "途中", "surface_en": "partway", "default": false, "prompt": false, "display": false, "marker": true, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"id": "corner", "surface_ja": "隅", "surface_en": "corner", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
       ],
       "marker_order_ja": null,

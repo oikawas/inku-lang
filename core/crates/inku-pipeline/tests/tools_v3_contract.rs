@@ -18,6 +18,22 @@ const CURRENT: [&str; 11] = [
     "etching",
     "computer",
 ];
+/// The ids of the tools the work plan offers: its values are made from the
+/// English of the word, which Saijiki v4 gives as `digital` for the Score's
+/// `computer`.
+const PLAN_TOOLS: [&str; 11] = [
+    "silverpoint",
+    "pencil",
+    "pen",
+    "chalk",
+    "oil_pastel",
+    "gouache",
+    "watercolor",
+    "oil_paint",
+    "painting_knife",
+    "etching",
+    "digital",
+];
 const OLD: [&str; 6] = [
     "rotring",
     "crayon",
@@ -79,18 +95,21 @@ fn saved_variants_raise_only_new_weights_and_do_not_rename_old_drawn_tools() {
 }
 
 #[test]
-fn stage1_offers_every_tool_with_bilingual_description_for_all_39_forms() {
+fn stage1_offers_every_tool_with_bilingual_description_for_all_40_forms() {
     let vocab = work_plan_vocabulary();
     let ids = vocab
         .terms(WorkPlanSlot::Tool)
         .iter()
         .map(|x| x.id.as_str())
         .collect::<Vec<_>>();
-    assert_eq!(ids, CURRENT);
+    assert_eq!(ids, PLAN_TOOLS);
     let table = work_plan_capabilities();
-    assert_eq!(table.forms.len(), 39);
+    // Saijiki v4: the 39 forms of v3 less `arc/waxing` and `arc/waning` (the
+    // half-moon arcs are now a rotated semicircle) and plus `polygon` with its
+    // two proportions.
+    assert_eq!(table.forms.len(), 40);
     for form in table.forms.keys() {
-        for id in CURRENT {
+        for id in PLAN_TOOLS {
             assert!(table.accepts(form, WorkPlanSlot::Tool, id), "{form}/{id}");
         }
     }

@@ -247,13 +247,13 @@ fn a_work_the_instructions_cannot_recompose_stays_as_it_is() {
     };
     // A place written as a word is a place the description states: nothing moves.
     assert_eq!(
-        unchanged("上に、細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。"),
+        unchanged("上に、小さくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。"),
         Recomposition::Unchanged {
             reason: "nothing_to_move"
         }
     );
     let composed =
-        "左上（横0〜1/3、縦0〜1/3）に、細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。";
+        "左上（横0〜1/3、縦0〜1/3）に、小さくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。";
     // A sentence a plan does not write: a relation to the previous shape.
     assert_eq!(
         unchanged(&format!(
@@ -265,7 +265,7 @@ fn a_work_the_instructions_cannot_recompose_stays_as_it_is() {
     );
 }
 
-const CIRCLE: &str = "細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。";
+const CIRCLE: &str = "小さくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。";
 
 fn by_chance(source: &str, seed: u64) -> Recomposition {
     recompose(
@@ -372,8 +372,8 @@ fn a_range_joined_with_a_hyphen_moves() {
 fn a_work_with_a_joint_recomposes_and_the_joined_sentence_stays() {
     let source = "紙。\n背景を白で埋める。\n\
         右上の四半分（横1/2〜1、縦0〜1/2）に、灰の鉛筆の薄い空の横長の大きな四角を1個置く。\n\
-        左中央（横0〜1/3、縦1/3〜2/3）に、細かく小刻みに揺れる黒の細いガッシュの実線の濃い粒の垂直の普通の大きさの線を1個引く、前の形に重なる。\n\
-        左（横0〜1/3、縦0〜1）に、緑のペンの程よいとても小さな点を5個散らす。";
+        左中央（横0〜1/3、縦1/3〜2/3）に、小さく小刻みに揺れる黒の細いガッシュの実線の濃い粒の垂直の普通の大きさの線を1個引く、前の形に重なる。\n\
+        左（横0〜1/3、縦0〜1）に、緑のペンの程よいごく小さな点を5個散らす。";
     let joined = source.lines().nth(3).expect("the joined sentence");
     assert!(joined.ends_with("、前の形に重なる。"), "{joined}");
     for mode in [RecomposeMode::Principled, RecomposeMode::Chance] {

@@ -5,7 +5,8 @@
 //! The fixture holds the normalized plans of the run and the prototype's message for
 //! each, with a placeholder for the description (the message holds the description
 //! verbatim at its head). It holds no description text. The expected messages
-//! write the size 特大の with one の (I-709); the measured requests had 特大のの.
+//! are written in the Saijiki v4 words (the size 特大の of the measured requests,
+//! which had 特大のの before I-709, is ごく大きな).
 
 use std::collections::BTreeMap;
 

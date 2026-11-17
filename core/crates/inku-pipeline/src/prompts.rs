@@ -2730,7 +2730,7 @@ mod tests {
                 .is_err()
         );
 
-        let source = "青で背景を塗りつぶす\n様々な色の四角30個をチョークとコンピュータで塗りつぶす。\n中心に赤い円を1個置く。";
+        let source = "青で背景を塗りつぶす\n様々な色の四角30個をチョークとデジタルで塗りつぶす。\n中心に赤い円を1個置く。";
         let compilation = inku_ddl::compile_typed_ddl(
             inku_ddl::NormalizedDdlDocument::new(
                 source,
@@ -2783,7 +2783,7 @@ mod tests {
         );
         assert_eq!(
             message["source_regions"][1]["source"],
-            "様々な色の四角30個をチョークとコンピュータで塗りつぶす"
+            "様々な色の四角30個をチョークとデジタルで塗りつぶす"
         );
         let facts = message["source_regions"]
             .as_array()
@@ -2801,7 +2801,7 @@ mod tests {
         assert!(facts.contains(&("entity_head", "katachi:四角")));
         assert!(facts.contains(&("quantity", "30")));
         assert!(facts.contains(&("touch", "tezawari:チョーク")));
-        assert!(facts.contains(&("touch", "tezawari:コンピュータ")));
+        assert!(facts.contains(&("touch", "tezawari:デジタル")));
         // Completion normalizes wording without inventing alternation or count
         // splits. Since v4 (A1, 2026-10-06) it may write a place in numbers
         // after the author's words.

@@ -157,10 +157,8 @@ val PresentationStarInk = Color(0xFFFFD45C)
 val PresentationControlLabel = Color(0xFFFFFDF8)
 
 // --- Saijiki vocabulary groups ----------------------------------------------
-// One hue per group, in the order the server's table declares them. The pill
-// under a recognised word takes the colour of the group the word belongs to.
-// The count has to match: the lookup is `[index % size]`, so a list one short
-// would give the last group the first group's colour instead of failing.
+// One hue per group. The pill under a recognised word takes the colour of the
+// group it belongs to; the key-to-colour mapping is in InkuApp.kt.
 
 val SaijikiGroupSand = Color(0xFFEAD7A3)
 val SaijikiGroupSky = Color(0xFF9CC6E8)
@@ -178,6 +176,7 @@ val SaijikiGroupShell = Color(0xFFD8C4B6)
 val SaijikiGroupMist = Color(0xFF9FD3D8)
 val SaijikiGroupLemon = Color(0xFFE6E08F)
 val SaijikiGroupPeach = Color(0xFFF4C7A8)
+val SaijikiGroupSage = Color(0xFF82BAA7)
 
 // --- Status -----------------------------------------------------------------
 

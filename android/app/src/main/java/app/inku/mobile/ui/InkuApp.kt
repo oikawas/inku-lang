@@ -422,25 +422,24 @@ internal fun saijikiDetectionWords(lang: UiLanguage): List<Pair<String, SaijikiG
     }
 }
 
-private val saijikiGroupColors = listOf(
-    SaijikiGroupSand,
-    SaijikiGroupSky,
-    SaijikiGroupLeaf,
-    SaijikiGroupClay,
-    SaijikiGroupIris,
-    SaijikiGroupMint,
-    // きめ / fineness and したじ / underlayer follow さばき in the generated table.
-    // Inserting their colours here preserves every existing category's colour.
-    SaijikiGroupLilac,
-    SaijikiGroupFlax,
-    SaijikiGroupAmber,
-    SaijikiGroupSlate,
-    SaijikiGroupBlossom,
-    SaijikiGroupMoss,
-    SaijikiGroupShell,
-    SaijikiGroupMist,
-    SaijikiGroupLemon,
-    SaijikiGroupPeach,
+private val saijikiGroupColors = mapOf(
+    "katachi" to SaijikiGroupSand,
+    "katamuki" to SaijikiGroupSky,
+    "tezawari" to SaijikiGroupLeaf,
+    "tsuranari" to SaijikiGroupClay,
+    "omote" to SaijikiGroupIris,
+    "sabaki" to SaijikiGroupMint,
+    "kime" to SaijikiGroupLilac,
+    "futosa" to SaijikiGroupFlax,
+    "ji" to SaijikiGroupAmber,
+    "iro" to SaijikiGroupSlate,
+    "yuragi" to SaijikiGroupBlossom,
+    "basho" to SaijikiGroupMoss,
+    "ugoki" to SaijikiGroupShell,
+    "jun" to SaijikiGroupMist,
+    "wariai" to SaijikiGroupLemon,
+    "aida" to SaijikiGroupPeach,
+    "ookisa" to SaijikiGroupSage,
 )
 
 /**
@@ -468,8 +467,8 @@ internal fun derivationKindLabel(kind: String?): String {
 private val S: InkuStrings
     @Composable @ReadOnlyComposable get() = LocalStrings.current
 
-/** The pill colour for the category declared at [index]. */
-internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index % saijikiGroupColors.size]
+/** The pill colour follows the category key, independently of its position. */
+internal fun saijikiGroupColor(key: String): Color = saijikiGroupColors.getValue(key)
 
 @Composable
 fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
@@ -1088,9 +1087,9 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
 @Composable
 internal fun rememberDdlVocabularyTokens(lang: UiLanguage): List<DdlVocabularyToken> {
     return remember(lang) {
-        val colorForKey = SaijikiGenerated.CATEGORIES.mapIndexed { index, category ->
-            category.key to saijikiGroupColorAt(index)
-        }.toMap()
+        val colorForKey = SaijikiGenerated.CATEGORIES.associate { category ->
+            category.key to saijikiGroupColor(category.key)
+        }
         saijikiDetectionWords(lang).map { (word, group) ->
             DdlVocabularyToken(word = word, group = group, color = colorForKey.getValue(group.key))
         }.distinctBy { it.word }.sortedByDescending { it.word.length }

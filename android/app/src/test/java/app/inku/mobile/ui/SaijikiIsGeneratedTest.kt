@@ -37,23 +37,15 @@ class SaijikiIsGeneratedTest {
     /**
      * T1: what the screen builds, in either language, is the server's table.
      *
-     * The numbers are the table's as `gen_saijiki_kt.py` bakes it today
-     * (fourteen categories and 98 words since Saijiki v2 added さばき and took
-     * 濃い and 薄い out of おもて, 102 since DDL 18 added 載る, 中に, 重なる and
-     * 横切る to あいだ on 2026-10-12, and 103 since 自由線 joined かたち on
-     * 2026-10-15; sixteen categories and 108 words since DDL 24 added
-     * きめ / fineness and したじ / underlayer on 2026-10-22; 109 words since
-     * DDL 25 added 刷毛目 / brushmarks to おもて on 2026-10-23; sixteen
-     * categories and 110 words with DDL 26's aspect ratio at the end of grounds);
-     * they move when the server's table does, and the generator is the check
-     * that the Kotlin copy followed.
+     * The v4 table has 17 groups including relations and 115 displayed words.
+     * These move when the server's table does; the generator checks the copy.
      */
     @Test
-    fun testScreenShowsSixteenCategoriesAndOneHundredTenWordsInBothLanguages() {
+    fun testScreenShowsV4CategoriesAndWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
-            assertEquals("$lang: display categories", 16, groups.size)
-            assertEquals("$lang: display words", 109, groups.sumOf { it.words.size })
+            assertEquals("$lang: display categories", 17, groups.size)
+            assertEquals("$lang: display words", 115, groups.sumOf { it.words.size })
             val grounds = groups.first { it.key == "ji" }.words
             assertEquals("$lang: grounds words", 8, grounds.size)
             assertEquals(if (lang == UiLanguage.Ja) "画面比" else "aspect ratio", grounds.last())
@@ -98,12 +90,12 @@ class SaijikiIsGeneratedTest {
     fun testTouchWordsMatchTheServerOrderIncludingTheSilverpoint() {
         val touch = saijikiGroups(UiLanguage.Ja).first { it.key == "tezawari" }
         assertEquals(
-            listOf("銀筆", "鉛筆", "ペン", "チョーク", "オイルパステル", "ガッシュ", "水彩", "油彩", "ペインティングナイフ", "エッチング", "コンピュータ"),
+            listOf("銀筆", "鉛筆", "ペン", "チョーク", "オイルパステル", "ガッシュ", "水彩", "油彩", "ペインティングナイフ", "エッチング", "デジタル"),
             touch.words,
         )
         val touchEn = saijikiGroups(UiLanguage.En).first { it.key == "tezawari" }
         assertEquals(
-            listOf("silverpoint", "pencil", "pen", "chalk", "oil pastel", "gouache", "watercolor", "oil paint", "painting knife", "etching", "computer"),
+            listOf("silverpoint", "pencil", "pen", "chalk", "oil pastel", "gouache", "watercolor", "oil paint", "painting knife", "etching", "digital"),
             touchEn.words,
         )
     }
@@ -158,31 +150,32 @@ class SaijikiIsGeneratedTest {
             assertTrue("$lang: does not recognise brushmarks", "brushmarks" in words)
             assertTrue("$lang: does not recognise 画面比", "画面比" in words)
             assertTrue("$lang: does not recognise aspect ratio", "aspect ratio" in words)
-            assertEquals("$lang: detection surfaces", 218, words.size)
+            assertEquals("$lang: detection surfaces", 228, words.size)
         }
     }
 
     /**
      * T6: every category has a colour of its own.
      *
-     * The pill colour is looked up as `[index % size]`, so a list one short does
-     * not fail -- the tenth category quietly takes the first one's colour. The
-     * hand-copy had nine categories and nine colours, and adding the tenth is
-     * the kind of change that leaves the list behind.
+     * The lookup uses category keys, so reordering cannot change existing colours.
      */
     @Test
     fun testEveryCategoryHasItsOwnColour() {
-        val colors = SaijikiGenerated.CATEGORIES.indices.map { saijikiGroupColorAt(it) }
+        val colors = SaijikiGenerated.CATEGORIES.map { saijikiGroupColor(it.key) }
         assertEquals("one colour per category", SaijikiGenerated.CATEGORIES.size, colors.toSet().size)
-        val previousColoursAfterHandling = mapOf(
+        val previousColours = mapOf(
+            "katachi" to SaijikiGroupSand, "katamuki" to SaijikiGroupSky,
+            "tezawari" to SaijikiGroupLeaf, "tsuranari" to SaijikiGroupClay,
+            "omote" to SaijikiGroupIris, "sabaki" to SaijikiGroupMint,
+            "kime" to SaijikiGroupLilac, "futosa" to SaijikiGroupFlax,
             "ji" to SaijikiGroupAmber, "iro" to SaijikiGroupSlate,
             "yuragi" to SaijikiGroupBlossom, "basho" to SaijikiGroupMoss,
             "ugoki" to SaijikiGroupShell, "jun" to SaijikiGroupMist,
             "wariai" to SaijikiGroupLemon, "aida" to SaijikiGroupPeach,
         )
-        for ((key, color) in previousColoursAfterHandling) {
-            val index = SaijikiGenerated.CATEGORIES.indexOfFirst { it.key == key }
-            assertEquals("$key keeps its previous colour", color, saijikiGroupColorAt(index))
+        for ((key, color) in previousColours) {
+            assertTrue("$key exists", SaijikiGenerated.CATEGORIES.any { it.key == key })
+            assertEquals("$key keeps its colour", color, saijikiGroupColor(key))
         }
     }
 }

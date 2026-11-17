@@ -46,7 +46,7 @@ class ParityPreviewsTest {
         val textureWords = listOf("細かい" to "fine-grained", "粗い" to "coarse-grained", "密な" to "packed",
             "疎な" to "sparse", "下塗り" to "underpainted")
         val diagrams = textureWords.map { (word, english) ->
-            val key = if (word == "下塗り") "shitaji" else "kime"
+            val key = "kime"
             val ja = saijikiPreview(key, word, english, UiLanguage.Ja, "en")
             val en = saijikiPreview(key, word, word, UiLanguage.En, "ja")
             assertTrue(ja.effect.contains("質感"))

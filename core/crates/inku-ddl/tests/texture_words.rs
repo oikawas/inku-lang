@@ -434,3 +434,68 @@ fn an_amplitude_word_with_a_sway_word_sways_as_before() {
         assert_eq!(variation.quality, quality, "{source}");
     }
 }
+
+/// Saijiki v4 (I-741 and the author's 2026-11-17 choice): a word a mark cannot show is
+/// left out with its reason, and the mark is drawn as it is without the word.
+// Concrete failure: the word stays in the Score and is not drawn (a face word on a line),
+// is dropped without a word (a flat on a line, a handling word on a digital line), or
+// takes the whole sentence with it (a sway word on a point).
+#[test]
+fn a_word_the_mark_cannot_show_is_left_out_with_its_reason() {
+    let gap = |kind: fn(String, String) -> ScoreFieldGap, category: &str, id: &str| {
+        kind(category.into(), id.into())
+    };
+    let without_face = |category: String, id: String| {
+        ScoreFieldGap::UnsupportedSurfaceWithoutFace { category, id }
+    };
+    let on_point = |category: String, id: String| ScoreFieldGap::UnsupportedFluctuationOnPoint {
+        category,
+        id,
+    };
+    let digital = |category: String, id: String| {
+        ScoreFieldGap::UnsupportedSurfaceIntensityForDigital { category, id }
+    };
+    for (source, without, expected) in [
+        (
+            "中心に、黒のペンの点描の線を1本引く。",
+            "中心に、黒のペンの線を1本引く。",
+            gap(without_face, "surface", "stipple"),
+        ),
+        (
+            "中心に、黒のペンのメゾチントの弧を1本引く。",
+            "中心に、黒のペンの弧を1本引く。",
+            gap(without_face, "surface", "aquatint"),
+        ),
+        (
+            "中心に、黒のペンの塗りの自由線を1本引く。",
+            "中心に、黒のペンの自由線を1本引く。",
+            gap(without_face, "surface", "solid"),
+        ),
+        (
+            "中心に、黒のペンの大きく波打つ点を1個置く。",
+            "中心に、黒のペンの点を1個置く。",
+            gap(on_point, "variation", "undulating"),
+        ),
+        (
+            "中心に、黒のデジタルの薄い線を1本引く。",
+            "中心に、黒のデジタルの線を1本引く。",
+            gap(digital, "handling", "faint"),
+        ),
+    ] {
+        let compiled = compile(source, JA);
+        let reference = compile(without, JA);
+        assert_eq!(compiled.gaps, vec![expected], "{source}");
+        assert_eq!(compiled.upstream, 0, "{source}");
+        assert_eq!(
+            compiled.score.instructions, reference.score.instructions,
+            "{source}"
+        );
+    }
+    // The handling word still lays a digital fill and a textured face.
+    for source in [
+        "中心に、黒のデジタルの濃い円を1個置く。",
+        "中心に、黒のデジタルの薄い点描の円を1個置く。",
+    ] {
+        assert!(compile(source, JA).gaps.is_empty(), "{source}");
+    }
+}

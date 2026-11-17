@@ -4969,19 +4969,9 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
 #[test]
 fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
-    let point = stage15(
-        "place one red swaying point at left-edge. place one blue circle at left-edge.",
-        ResolvedInstructionLanguage::En,
-    );
-    let point_emit = stage15_locked(
-        "place one blue circle at left-edge. ｛Pair｝",
-        ResolvedInstructionLanguage::En,
-        &[fluctuation_definition(
-            &[("quality", "swaying")],
-            false,
-            "point",
-        )],
-    );
+    // A sway word on a point, written or emitted by a Macro, leaves out only the sway
+    // words and the point is drawn (Saijiki v4; texture_words
+    // `a_word_the_mark_cannot_show_is_left_out_with_its_reason`).
     let unbound = stage15_locked(
         "place one blue circle at left-edge. swaying ｛Pair｝",
         ResolvedInstructionLanguage::En,
@@ -5005,8 +4995,6 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         &[malformed],
     );
     for (result, unit, survivors) in [
-        (&point, "instruction", 1),
-        (&point_emit, "emit", 1),
         (&unbound, "caller_field", 2),
         (&malformed, "emit", 1),
     ] {

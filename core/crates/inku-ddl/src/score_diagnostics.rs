@@ -95,6 +95,28 @@ pub enum ScoreFieldGap {
         category: String,
         id: String,
     },
+    /// A surface word that lays a face (点描・平行線・交差線・メゾチント, and 塗り) on a
+    /// line, an open arc or a free line, which has no face (Saijiki v4, I-741). Only the
+    /// word is left out and the mark is drawn as written; before v4 the textures were kept
+    /// in the Score and not drawn, and the flat on a line was dropped without a word.
+    UnsupportedSurfaceWithoutFace {
+        category: String,
+        id: String,
+    },
+    /// A sway word (揺れる・波打つ, and the amplitude and spacing words with it) on a point,
+    /// which does not sway (Saijiki v4). Only the sway words are left out and the point is
+    /// drawn; before v4 the whole sentence was left undrawn.
+    UnsupportedFluctuationOnPoint {
+        category: String,
+        id: String,
+    },
+    /// A handling word (濃い・程よい・薄い) on a mark of the digital tool with neither a fill
+    /// nor a textured face (Saijiki v4): its lines and outlines are grid cells whose tone
+    /// does not follow the handling. Only the word is left out.
+    UnsupportedSurfaceIntensityForDigital {
+        category: String,
+        id: String,
+    },
     /// An amplitude word (細かく・大きく) without a sway word (揺れる・波打つ)
     /// to say what sways (DDL 24). It was read as a sway of its own before.
     FluctuationAmplitudeWithoutQuality {
@@ -221,6 +243,8 @@ pub enum ScoreAppearanceField {
 pub enum ScoreInstructionField {
     LayoutDirection,
     FluctuationAmplitude,
+    /// Every sway word of the mark (振れ幅・波の間隔・揺れの質).
+    Fluctuation,
 }
 
 /// One outer macro-invocation field whose meaning is not bound into the exact body.

@@ -8,6 +8,32 @@ import app.inku.mobile.data.lineage.DescriptionLock
 
 @Dao
 interface SharedPipelineDao {
+    @Query("SELECT * FROM variation_authority WHERE owner_id = :ownerId")
+    suspend fun authorities(ownerId: String): List<VariationAuthorityEntity>
+
+    @Query("SELECT COUNT(*) FROM variation_authority WHERE owner_id = :ownerId AND parent_variation_id = :variationId")
+    suspend fun countChildren(ownerId: String, variationId: String): Int
+
+    @Query("SELECT COUNT(*) FROM pipeline_history_links WHERE owner_id = :ownerId AND variation_id = :variationId AND (:excludedHistoryId IS NULL OR history_id != :excludedHistoryId)")
+    suspend fun countLinksExcept(ownerId: String, variationId: String, excludedHistoryId: String?): Int
+
+    @Query("SELECT COUNT(*) FROM pipeline_history_links l INNER JOIN history_items h ON h.id = l.history_id WHERE l.owner_id = :ownerId AND l.variation_id = :variationId AND l.history_id != :excludedHistoryId")
+    suspend fun countLiveLinksExcept(ownerId: String, variationId: String, excludedHistoryId: String): Int
+
+    @Query("SELECT COUNT(*) FROM pipeline_candidate_executions WHERE owner_id = :ownerId AND variation_id = :variationId AND updated_at >= :before")
+    suspend fun countExecutionsAtOrAfter(ownerId: String, variationId: String, before: Long): Int
+
+    @Query("SELECT COUNT(*) FROM pipeline_candidate_executions WHERE owner_id = :ownerId AND variation_id = :variationId AND execution_id = :executionId")
+    suspend fun countExecution(ownerId: String, variationId: String, executionId: String): Int
+
+    @Query("DELETE FROM variation_authority WHERE owner_id = :ownerId AND variation_id = :variationId")
+    suspend fun deleteAuthority(ownerId: String, variationId: String): Int
+
+    @Query("DELETE FROM variation_authority_actions WHERE owner_id = :ownerId AND variation_id = :variationId")
+    suspend fun deleteActionsForVariation(ownerId: String, variationId: String)
+
+    @Query("DELETE FROM pipeline_candidate_executions WHERE owner_id = :ownerId AND variation_id = :variationId")
+    suspend fun deleteExecutionsForVariation(ownerId: String, variationId: String)
     @Query("SELECT * FROM variation_authority WHERE owner_id = :ownerId AND variation_id = :variationId")
     suspend fun getAuthority(ownerId: String, variationId: String): VariationAuthorityEntity?
 

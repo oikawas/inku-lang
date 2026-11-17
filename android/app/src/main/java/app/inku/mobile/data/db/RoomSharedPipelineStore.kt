@@ -13,6 +13,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class SharedPipelinePersistenceException(message: String) : IllegalArgumentException(message)
+class VariationNotFoundException : IllegalStateException("variation_not_found")
+
+sealed interface DraftDiscardResult {
+    data object Discarded : DraftDiscardResult
+    data object Absent : DraftDiscardResult
+    data class Kept(val reason: String) : DraftDiscardResult
+}
 
 data class ManagedHistoryLinkInput(
     val ownerId: String,
@@ -73,6 +80,28 @@ class RoomSharedPipelineStore(
 ) : PipelineCommitStore, PipelineExecutionStore {
     private val dao: SharedPipelineDao
         get() = database.sharedPipelineDao()
+
+    /** The caller holds the host's idle gate; all reachability checks are made in the write transaction. */
+    suspend fun discardUnlinkedDraft(
+        ownerId: String,
+        variationId: String,
+        revision: String? = null,
+        before: Long? = null,
+        restoredExecutionId: String? = null,
+        excludedHistoryId: String? = null,
+    ): DraftDiscardResult = database.withTransaction {
+        discardUnlinkedDraftInTransaction(ownerId, variationId, revision, before, restoredExecutionId, excludedHistoryId)
+    }
+
+    internal suspend fun discardUnlinkedDraftInTransaction(
+        ownerId: String,
+        variationId: String,
+        revision: String? = null,
+        before: Long? = null,
+        restoredExecutionId: String? = null,
+        excludedHistoryId: String? = null,
+    ): DraftDiscardResult = discardDraftInTransaction(database.openHelper.writableDatabase, ownerId, variationId,
+        revision, before, restoredExecutionId, excludedHistoryId)
 
     /**
      * Applies the core's commit action. An action id seen before answers with
@@ -227,13 +256,7 @@ class RoomSharedPipelineStore(
         require(history.normalizedDdl.orEmpty().sha256() == input.ddlDigest) {
             "history source does not match its committed revision"
         }
-        val acknowledged = dao.findCommittedAction(
-            input.ownerId,
-            input.variationId,
-            input.revision,
-            input.ddlDigest,
-        )
-        requireNotNull(acknowledged) { "history link requires committed source" }
+        requireCommittedVariation(database.openHelper.writableDatabase, input.ownerId, input.variationId, input.revision, input.ddlDigest)
         val bytes = encodeForkContext(input)
         return PipelineHistoryLinkEntity(
             ownerId = input.ownerId,
@@ -251,8 +274,8 @@ class RoomSharedPipelineStore(
         lineage: LineageWrite,
         input: ManagedHistoryLinkInput,
     ) {
-        val link = buildHistoryLink(history, input)
         database.withTransaction {
+            val link = buildHistoryLink(history, input)
             database.historyDao().insert(history)
             database.lineageDao().insertNode(lineage.node)
             lineage.edge?.let { database.lineageDao().insertEdge(it) }
@@ -278,6 +301,7 @@ class RoomSharedPipelineStore(
                 ?: throw SharedPipelinePersistenceException("replay source history was not found")
             val sourceLink = dao.getHistoryLink(input.ownerId, input.sourceHistoryId)
                 ?: throw SharedPipelinePersistenceException("replay source is not managed history")
+            if (dao.getAuthority(input.ownerId, sourceLink.variationId) == null) throw VariationNotFoundException()
             val sourceContext = decodeForkContextObject(sourceHistory, sourceLink)
             require(history.normalizedDdl == sourceHistory.normalizedDdl) {
                 "replay source DDL changed"
@@ -397,7 +421,7 @@ class RoomSharedPipelineStore(
             val frozen = JSONObject().put("protocol_version", AUTHORITY_PROTOCOL).put("revision", revision)
                 .put("origin", "user_authored_ddl").put("authority", "ddl_authoritative")
             val parentAuthority = dao.getAuthority(replay.ownerId, parentLink.variationId)
-                ?: throw SharedPipelinePersistenceException("tool parent's authority was not found")
+                ?: throw VariationNotFoundException()
             val document = JSONObject(parentAuthority.documentJson).put("source", source)
                 .put("language", context.objectField("config").stringField("language"))
                 .put("macro_locks", context.objectField("macro_catalog").getJSONArray("definition_locks"))
@@ -464,7 +488,7 @@ class RoomSharedPipelineStore(
             val frozen = JSONObject().put("protocol_version", AUTHORITY_PROTOCOL).put("revision", revision)
                 .put("origin", "user_authored_ddl").put("authority", "ddl_authoritative")
             val parentAuthority = dao.getAuthority(replay.ownerId, parentLink.variationId)
-                ?: throw SharedPipelinePersistenceException("ground parent's authority was not found")
+                ?: throw VariationNotFoundException()
             val document = JSONObject(parentAuthority.documentJson).put("source", expectedDdl)
                 .put("language", context.objectField("config").stringField("language"))
                 .put("macro_locks", context.objectField("macro_catalog").getJSONArray("definition_locks"))

@@ -467,6 +467,9 @@ data class RefinementCandidate(
     val selected: Boolean = false,
 )
 
+internal fun unsavedCandidateDrafts(candidates: List<RefinementCandidate>): List<PipelineView> =
+    candidates.filter { it.saveState == RefinementSaveState.Unsaved }.mapNotNull { it.pipelineResult?.pipelineView }
+
 enum class AppTab {
     Compose,
     History,
@@ -544,6 +547,7 @@ class InkuViewModel @JvmOverloads constructor(
     private val exportTemplates = repository.exportTemplates()
     private var modelDownloadJob: Job? = null
     private var drawingJob: Job? = null
+    private var stoppedDraft: Pair<PipelineView, Job?>? = null
     private var lineageJob: Job? = null
     private var refinementJob: Job? = null
     private var canvasSearchJob: Job? = null
@@ -626,7 +630,7 @@ class InkuViewModel @JvmOverloads constructor(
             repository.ensureDefaultModelAssets()
             repository.ensureDefaultExportTemplates()
             restorePersistedSettings()
-            runCatching { withContext(Dispatchers.IO) { repository.restoreActivePipeline() } }
+            val restored = runCatching { withContext(Dispatchers.IO) { repository.restoreActivePipeline() } }
                 .onSuccess { view ->
                     // The latest execution is read after the settings above,
                     // and by then the reader can have started one of their
@@ -642,8 +646,11 @@ class InkuViewModel @JvmOverloads constructor(
                 }
                 .onFailure { error -> localState.value = localState.value.copy(message = messageFor(error, strings(), strings().restoreDrawingFailed)) }
             // After the restore, which reads the newest execution.
-            runCatching { withContext(Dispatchers.IO) { repository.pruneSettledExecutions() } }
-                .onFailure { error -> android.util.Log.w("InkuViewModel", "pruning ended executions failed", error) }
+            if (restored.isSuccess) {
+                runCatching { withContext(Dispatchers.IO) { repository.pruneSettledExecutions(restored.getOrNull()?.executionId) } }
+                    .onSuccess { count -> android.util.Log.i("InkuViewModel", "startup cleanup removed $count drafts and executions") }
+                    .onFailure { error -> android.util.Log.w("InkuViewModel", "startup cleanup failed", error) }
+            }
             withContext(Dispatchers.IO) {
                 var offset = 0
                 var refreshedInPass = 0
@@ -697,12 +704,15 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun startDescriptionVariation() {
         if (localState.value.isDrawing || localState.value.historyAuthorityLoading) return
+        val abandoned = localState.value.pipelineView
+        val oldJob = drawingJob
         localState.value = localState.value.copy(
             pipelineView = null,
             descriptionForkRequested = true,
             selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(localState.value.selectedCanvasAspect),
             message = strings().pipelineNewDescriptionNotice,
         )
+        discardDraftsLater(listOfNotNull(abandoned), oldJob)
     }
 
     private fun presentPipelineView(view: PipelineView) {
@@ -1483,13 +1493,12 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun clearPrompt() {
         if (state.value.isDrawing) return
+        val abandoned = localState.value.pipelineView
+        val oldJob = drawingJob
         if (localState.value.workContextId != null) closeWorkContext()
         // Starting a new work leaves a drawing that was waiting on the author --
         // restored at start or presented after a stop -- for good, as the stop
         // itself does; left open, it was restored again at every start.
-        localState.value.pipelineView?.takeIf { !it.terminal }?.let { view ->
-            guardedScope.launch { runCatching { withContext(Dispatchers.IO) { repository.cancelPipeline(view.executionId) } } }
-        }
         discardStagedCameraPhoto()
         cameraRetryInput = null
         promptEditedByUser = true
@@ -1517,6 +1526,8 @@ class InkuViewModel @JvmOverloads constructor(
             selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(localState.value.selectedCanvasAspect),
             message = null,
         )
+        discardDraftsLater(listOfNotNull(abandoned), oldJob, cancel = true)
+        discardStoppedDraft()
     }
 
     fun setDdl(value: String) {
@@ -2427,6 +2438,7 @@ class InkuViewModel @JvmOverloads constructor(
      */
     private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab, asParent: Boolean = true) {
         if (localState.value.isDrawing) stopDrawing()
+        discardStoppedDraft()
         discardStagedCameraPhoto()
         cameraRetryInput = null
         promptEditedByUser = false
@@ -2464,6 +2476,8 @@ class InkuViewModel @JvmOverloads constructor(
         isCurrent: () -> Boolean = { true },
         update: (InkuUiState) -> InkuUiState,
     ) {
+        val abandoned = localState.value.pipelineView
+        val oldJob = drawingJob
         localState.value = update(localState.value).copy(
             selectedHistory = item,
             pendingDescriptionParent = null,
@@ -2473,6 +2487,7 @@ class InkuViewModel @JvmOverloads constructor(
             historyDescriptionLocked = null,
             historyAuthorityLoading = true,
         )
+        discardDraftsLater(listOfNotNull(abandoned), oldJob)
         guardedScope.launch {
             val managed = runCatching {
                 withContext(Dispatchers.IO) { repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id) }
@@ -2724,6 +2739,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun beginDrawingRun(keepDescriptionParent: Boolean = false): Long {
+        discardStoppedDraft()
         drawingRunSerial += 1
         drawingJob?.cancel()
         localState.value = localState.value.copy(
@@ -3367,10 +3383,15 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun stopDrawing() {
         drawingRunSerial += 1
-        drawingJob?.cancel()
+        val oldJob = drawingJob
+        oldJob?.cancel()
         drawingJob = null
         val cancelled = localState.value.pipelineView?.takeIf { !it.terminal }?.also { view ->
-            guardedScope.launch { runCatching { withContext(Dispatchers.IO) { repository.cancelPipeline(view.executionId) } } }
+            val cancelJob = guardedScope.launch {
+                oldJob?.join()
+                runCatching { withContext(Dispatchers.IO) { repository.cancelPipeline(view.executionId) } }
+            }
+            stoppedDraft = view to cancelJob
         }
         localState.value = localState.value.copy(
             isDrawing = false, demoWaitingSeconds = null, batchCanRetry = false, message = strings().statusStopped,
@@ -3402,7 +3423,9 @@ class InkuViewModel @JvmOverloads constructor(
         // 「対象作品変更時は結果を破棄し、進行中の要求を中断する」(SPEC :616, :686,
         // :2143). The running job is cancelled first: a candidate that lands
         // after the target changed belongs to a work that is no longer here.
-        refinementJob?.cancel()
+        val oldJob = refinementJob
+        val discarded = unsavedCandidateDrafts(localState.value.refinementCandidates)
+        oldJob?.cancel()
         refinementJob = null
         val previous = localState.value.refinementParent
         localState.value = localState.value.copy(
@@ -3426,6 +3449,7 @@ class InkuViewModel @JvmOverloads constructor(
             groundCurrentLabel = null,
             tab = AppTab.Lineage,
         )
+        discardDraftsLater(discarded, oldJob)
         // The tab is set here rather than through `setTab`, which is what reads
         // the lineage; closing the refinement would otherwise show an empty
         // lineage, or the one of a work opened before.
@@ -3484,6 +3508,32 @@ class InkuViewModel @JvmOverloads constructor(
     private fun unsavedCandidateCount(): Int = localState.value.takeIf { it.refinementOpen }
         ?.refinementCandidates?.count { it.saveState == RefinementSaveState.Unsaved } ?: 0
 
+    private fun discardDraftsLater(views: List<PipelineView>, after: Job? = null, cancel: Boolean = false) {
+        if (views.isEmpty()) return
+        guardedScope.launch {
+            after?.join()
+            for (view in views.distinctBy { it.variationId }) {
+                val current = localState.value
+                if (current.pipelineView?.variationId == view.variationId ||
+                    authoringReturnState?.pipelineView?.variationId == view.variationId ||
+                    current.refinementCandidates.any { it.pipelineResult?.pipelineView?.variationId == view.variationId }) continue
+                try {
+                    withContext(Dispatchers.IO) {
+                        if (cancel && !view.terminal) repository.cancelPipeline(view.executionId)
+                        repository.discardUnlinkedDraft(view)
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { android.util.Log.w("InkuViewModel", "discarding draft failed", error) }
+            }
+        }
+    }
+
+    private fun discardStoppedDraft() {
+        val stopped = stoppedDraft ?: return
+        stoppedDraft = null
+        discardDraftsLater(listOf(stopped.first), stopped.second)
+    }
+
     /**
      * Asks before [action] drops unsaved refinement candidates; true when it
      * asked, and [action] then runs on 破棄. One rule for every refinement
@@ -3502,6 +3552,8 @@ class InkuViewModel @JvmOverloads constructor(
         val action = afterDiscardConfirmed
         afterDiscardConfirmed = null
         val current = localState.value
+        val discarded = if (current.discardConfirm is DiscardConfirm.Candidates) unsavedCandidateDrafts(current.refinementCandidates) else emptyList()
+        val oldJob = refinementJob
         localState.value = current.copy(
             discardConfirm = null,
             // Dropped here, so the action that asked does not ask again.
@@ -3509,6 +3561,7 @@ class InkuViewModel @JvmOverloads constructor(
                 current.refinementCandidates.filterNot { it.saveState == RefinementSaveState.Unsaved }
             } else current.refinementCandidates,
         )
+        discardDraftsLater(discarded, oldJob)
         action?.invoke()
     }
 
@@ -3525,7 +3578,9 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun closeRefinement() {
         if (refinementSaving || localState.value.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
-        refinementJob?.cancel()
+        val oldJob = refinementJob
+        val discarded = unsavedCandidateDrafts(localState.value.refinementCandidates)
+        oldJob?.cancel()
         refinementJob = null
         localState.value = localState.value.copy(
             refinementOpen = false,
@@ -3537,6 +3592,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementCanAbort = false,
             refinementStatus = null,
         )
+        discardDraftsLater(discarded, oldJob)
         // A child saved one by one is not in the graph read when the refinement opened.
         if (localState.value.tab == AppTab.Lineage) refreshLineage()
     }
@@ -3796,12 +3852,14 @@ class InkuViewModel @JvmOverloads constructor(
                 val jobs = candidateJobs(current, parent)
                 val append = current.refinementSubview == RefinementSubview.Model ||
                     current.refinementSubview == RefinementSubview.ColorArrangement
+                val discarded = if (append) emptyList() else unsavedCandidateDrafts(localState.value.refinementCandidates)
                 localState.value = localState.value.copy(
                     refinementCandidates = if (append) localState.value.refinementCandidates else emptyList(),
                     refinementPreviewId = if (append) localState.value.refinementPreviewId else null,
                     refinementPlannedCount = jobs.size,
                     refinementRoundStartCount = if (append) localState.value.refinementCandidates.size else 0,
                 )
+                discardDraftsLater(discarded)
                 jobs.forEach { job ->
                     try {
                         if (current.refinementSubview == RefinementSubview.Model) {

@@ -359,30 +359,44 @@ class InkuRepository(
         return view.takeIf { !it.terminal }
     }
 
-    /**
-     * Drops stored executions that have ended (completed, failed or cancelled),
-     * keeping the newest one, which [restoreActivePipeline] reads. Nothing
-     * else removed them, so the table grew with every drawing. A run still
-     * going or waiting on the author (needs_user_edit among them) is kept. A
-     * saved work keeps its DDL, prompts and fork context in its own rows; only
-     * the status of its finished run is no longer shown (as for every work
-     * before the Saijiki v3 migration). Run once at start, after the restore.
-     * Only executions written before this process started are considered, so
-     * a refinement begun during start-up keeps the candidates it just finished.
-     */
-    suspend fun pruneSettledExecutions(): Int {
+    /** Removes unreachable pre-process drafts leaf-first after restore, then old settled linked runs except the newest. */
+    suspend fun pruneSettledExecutions(restoredExecutionId: String? = null): Int {
         val dao = database.sharedPipelineDao()
+        var removed = 0
+        do {
+            var pass = 0
+            for (authority in dao.authorities(AndroidWorkPipeline.OWNER_ID)) {
+                val result = pipeline.withIdleVariation(authority.variationId, { app.inku.mobile.data.db.DraftDiscardResult.Kept(it) }) {
+                    sharedPipelineStore.discardUnlinkedDraft(authority.ownerId, authority.variationId,
+                        before = processStartedAt, restoredExecutionId = restoredExecutionId)
+                }
+                if (result == app.inku.mobile.data.db.DraftDiscardResult.Discarded) { pass++; removed++ }
+            }
+        } while (pass > 0)
         val ids = dao.executionsNewestFirst(AndroidWorkPipeline.OWNER_ID, processStartedAt)
             .drop(1).filter { it.writtenBefore }.map { it.executionId }
-        var removed = 0
         for (id in ids) {
-            val state = runCatching { sharedPipelineStore.load(AndroidWorkPipeline.OWNER_ID, id) }.getOrNull() ?: continue
-            if (SharedPipelineHost.storedPhaseTag(state) !in SETTLED_EXECUTION_PHASES) continue
-            dao.deleteExecution(AndroidWorkPipeline.OWNER_ID, id)
-            removed++
+            val execution = dao.getExecution(AndroidWorkPipeline.OWNER_ID, id) ?: continue
+            if (id == restoredExecutionId) continue
+            val deleted = pipeline.withIdleVariation(execution.variationId, { false }) {
+                if (dao.countLinksExcept(execution.ownerId, execution.variationId, null) == 0) return@withIdleVariation false
+                val state = runCatching { sharedPipelineStore.load(execution.ownerId, id) }.getOrNull() ?: return@withIdleVariation false
+                if (SharedPipelineHost.storedPhaseTag(state) !in SETTLED_EXECUTION_PHASES) return@withIdleVariation false
+                database.withTransaction {
+                    val current = dao.getExecution(execution.ownerId, id)
+                    if (current == null || current.updatedAt >= processStartedAt || current.sequence != execution.sequence) false
+                    else { dao.deleteExecution(execution.ownerId, id); true }
+                }
+            }
+            if (deleted) removed++
         }
         return removed
     }
+
+    suspend fun discardUnlinkedDraft(view: PipelineView): app.inku.mobile.data.db.DraftDiscardResult =
+        pipeline.withIdleVariation(view.variationId, { app.inku.mobile.data.db.DraftDiscardResult.Kept(it) }) {
+            sharedPipelineStore.discardUnlinkedDraft(AndroidWorkPipeline.OWNER_ID, view.variationId, revision = view.revision)
+        }
 
     // Named after the execution's step, so saving the same completed run again
     // (a restore after the process ended) finds the row saved first.
@@ -1619,8 +1633,10 @@ class InkuRepository(
      * another row drawn to the same render hash still shows it.
      */
     suspend fun deleteHistoryPermanently(id: String) {
-        val thumbnail = database.withTransaction {
+        val link = database.sharedPipelineDao().getAnyHistoryLink(id)
+        suspend fun remove(allowDraftCleanup: Boolean): String? = database.withTransaction {
             val history = database.historyDao()
+            val existed = history.getById(id) != null
             val nodeId = history.lineageNodeIdOf(id)
             val thumbnailPath = history.thumbnailPathOf(id)
             if (nodeId != null) {
@@ -1628,7 +1644,17 @@ class InkuRepository(
                 database.lineageDao().clearEdgeMetadataTouching(nodeId)
             }
             history.deletePermanently(id)
+            if (existed && allowDraftCleanup && link != null) {
+                sharedPipelineStore.discardUnlinkedDraftInTransaction(link.ownerId, link.variationId,
+                    revision = link.revision, excludedHistoryId = id)
+            }
             thumbnailPath?.takeIf { history.countWithThumbnail(it) == 0 }
+        }
+        val thumbnail = if (link == null) remove(false) else {
+            val result = pipeline.withIdleVariation(link.variationId, { null as Pair<Boolean, String?>? }, link.ownerId) {
+                true to remove(true)
+            }
+            if (result == null) remove(false) else result.second
         }
         originalPhotos.deleteSaved(id)
         thumbnail?.let { path ->

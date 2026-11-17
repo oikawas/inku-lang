@@ -47,6 +47,11 @@ class SharedPipelineHost(
     }
 
     suspend fun start(request: PipelineStartRequest): PipelineView {
+        val session = sessionsMutex.withLock { startSession(request) }
+        return useSession(session) { driveWithCancellation(it) }
+    }
+
+    private suspend fun startSession(request: PipelineStartRequest): Session {
         require(request.ownerId.isNotBlank()) { "owner id required" }
         val config = JSONObject(request.configJson)
         val limits = limitsFrom(config)
@@ -134,13 +139,25 @@ class SharedPipelineHost(
             stateBytes = persistedState(session),
         )
         val key = key(request.ownerId, snapshot.requiredString("execution_id"))
-        sessionsMutex.withLock {
-            if (sessions.putIfAbsent(key, session) != null) {
-                throw PipelineHostException("execution_already_started")
-            }
-            session.users = 1
+        if (sessions.putIfAbsent(key, session) != null) {
+            throw PipelineHostException("execution_already_started")
         }
-        return useSession(session) { driveWithCancellation(it) }
+        session.users = 1
+        return session
+    }
+
+    /** Serializes the idle check and deletion against session acquisition and starts. */
+    suspend fun <T> withIdleVariation(ownerId: String, variationId: String, busy: (String) -> T, block: suspend () -> T): T {
+        // A start owns this mutex from before creating its execution until its session is registered.
+        if (!sessionsMutex.tryLock()) return busy("busy")
+        try {
+            val active = sessions.values.filter { it.ownerId == ownerId && it.users > 0 }
+            if (active.any { it.snapshot().requiredString("variation_id") == variationId }) return busy("busy")
+            if (active.any { it.context.parentVariationId == variationId }) return busy("parent_of_running")
+            return block()
+        } finally {
+            sessionsMutex.unlock()
+        }
     }
 
     suspend fun command(

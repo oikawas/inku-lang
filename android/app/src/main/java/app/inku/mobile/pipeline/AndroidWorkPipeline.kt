@@ -99,6 +99,9 @@ class AndroidWorkPipeline(
     )
     private val authoring = SharedAuthoringPipeline(host, configBuilder)
 
+    internal suspend fun <T> withIdleVariation(variationId: String, busy: (String) -> T, ownerId: String = OWNER_ID, block: suspend () -> T): T =
+        host.withIdleVariation(ownerId, variationId, busy, block)
+
     /** The edited work's own configuration and opaque record go to the shared core. */
     suspend fun completionRangeStates(source: String, executionId: String?, historyId: String?): List<CompletionRangeState> {
         if (executionId != null) {

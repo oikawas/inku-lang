@@ -36,6 +36,39 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SharedPipelineHostTest {
+    @Test fun cleanupKeepsStartingAndRunningChildAndItsParent() = runBlocking {
+        val starting = CompletableDeferred<Unit>()
+        val register = CompletableDeferred<Unit>()
+        val driving = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        val memory = MemoryExecutionStore()
+        val executions = object : PipelineExecutionStore by memory {
+            override suspend fun create(ownerId: String, executionId: String, variationId: String, sequence: String, stateBytes: ByteArray) {
+                starting.complete(Unit)
+                register.await()
+                memory.create(ownerId, executionId, variationId, sequence, stateBytes)
+            }
+        }
+        val provider = object : PipelineProviderEffect {
+            override suspend fun perform(actionJson: String, models: PipelineModelSelection): String {
+                driving.complete(Unit)
+                finish.await()
+                error("test provider stopped")
+            }
+        }
+        val host = host(ScriptedBinding(), provider, RecordingCommitStore(), executions)
+        val job = async { runCatching { host.start(startRequest(PipelineAuthoring.Description("mist", false)).copy(
+            context = AuthoringContext("mist", parentVariationId = "parent"))) } }
+        starting.await()
+        assertEquals("busy", host.withIdleVariation(OWNER, "parent", { it }) { "removed" })
+        register.complete(Unit)
+        driving.await()
+        assertEquals("parent_of_running", host.withIdleVariation(OWNER, "parent", { it }) { "removed" })
+        assertEquals("busy", host.withIdleVariation(OWNER, "variation", { it }) { "removed" })
+        finish.complete(Unit)
+        job.await()
+        Unit
+    }
     @Test
     fun approvalProposalProjectsUnreadWordsInOrderAndDefaultsToEmpty() = runBlocking {
         suspend fun proposal(unread: JSONArray?): PipelinePatchProposal {

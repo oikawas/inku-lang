@@ -45,6 +45,7 @@ fun inkuError(text: (InkuStrings) -> String): Nothing = throw InkuFailure(text)
  */
 fun messageFor(error: Throwable, strings: InkuStrings, fallback: String): String =
     when (error) {
+        is app.inku.mobile.data.db.VariationNotFoundException -> strings.candidateNotFound
         is InkuFailure -> DisplaySanitizer.redact(error.text(strings))
         is app.inku.mobile.llm.ProviderBudgetRejectedException -> when (error.reason) {
             "provider daily request budget exhausted" -> strings.errorProviderDailyBudget

@@ -3428,10 +3428,12 @@ fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
         );
     }
     // Written only when present (DDL 24), so a document without these words
-    // keeps its lock bytes.
+    // keeps its lock bytes; a density alone keeps its v3 fineness slot.
+    let (fineness, density) =
+        crate::semantic_association::v3_compatible_texture_slots(&entity.surface);
     for (field, term) in [
-        ("surface_fineness", entity.surface.fineness.as_ref()),
-        ("surface_density", entity.surface.density.as_ref()),
+        ("surface_fineness", fineness),
+        ("surface_density", density),
         ("surface_underlayer", entity.surface.underlayer.as_ref()),
     ] {
         if let Some(term) = term {

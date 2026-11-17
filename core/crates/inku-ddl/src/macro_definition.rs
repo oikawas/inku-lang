@@ -78,6 +78,8 @@ pub fn project_macro_semantic_ref(
                             .expect("embedded Saijiki semantic aliases must validate")
                     })
                     .map(|canonical_id| {
+                        // A word Saijiki v4 moved keeps its Macro semantic category.
+                        let category = word.semantic_category.as_deref().unwrap_or(category);
                         debug_assert!(known_semantic_id(category, &canonical_id));
                         MacroSemanticRefProjection {
                             category: category.to_owned(),
@@ -2278,9 +2280,28 @@ pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<Stri
             crate::CoreModifierValue::from_semantic_ref(category, id)
                 .map(|value| value.as_str().to_owned())
         }
-        SemanticCategoryAuthority::Asset(asset_key) => canonical_semantic_id(asset_key, id)
-            .expect("embedded Saijiki semantic aliases must validate"),
+        // Saijiki v4 has no したじ category; its word is moved (`moved_word_semantic_id`).
+        SemanticCategoryAuthority::Asset(asset_key) => match canonical_semantic_id(asset_key, id) {
+            Ok(id) => id,
+            Err(crate::SaijikiProjectionError::MissingCategory { .. }) => None,
+            Err(error) => panic!("embedded Saijiki semantic aliases must validate: {error}"),
+        }
+        .or_else(|| moved_word_semantic_id(category, id)),
     }
+}
+
+/// A word Saijiki v4 moved to another category keeps its Macro semantic category
+/// (`semantic_category`): its id under that category, wherever the asset now holds it.
+fn moved_word_semantic_id(category: &str, id: &str) -> Option<String> {
+    saijiki_asset()
+        .categories
+        .iter()
+        .flat_map(|asset_category| &asset_category.words)
+        .find(|word| {
+            word.semantic_category.as_deref() == Some(category)
+                && crate::saijiki::word_id(word).as_deref() == Some(id)
+        })
+        .and_then(crate::saijiki::word_id)
 }
 
 fn is_ascii_identifier(value: &str) -> bool {

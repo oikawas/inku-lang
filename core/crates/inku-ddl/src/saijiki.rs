@@ -161,6 +161,12 @@ pub struct SaijikiWordAsset {
     /// semantic reference names it (`extra_fine`, `very_small`, ...).
     #[serde(default)]
     pub core_modifier_value: Option<String>,
+    /// The Macro semantic category of a word Saijiki v4 moved to another category
+    /// (半円・三日月 `ratio`, にじみ `variation`, 下塗り `underlayer`). The author and the
+    /// reader see the new category; Macro definitions and the compiler keep the name they
+    /// have always used, so no saved definition changes.
+    #[serde(default)]
+    pub semantic_category: Option<String>,
 }
 
 /// Bilingual physical trace description attached to one Saijiki word.
@@ -977,6 +983,20 @@ fn register_parser_surface(
     }
     owners.insert(key, (category_key.to_owned(), surface_ja.to_owned()));
     Ok(())
+}
+
+/// The slot of its category a current-edition word fills (`arc_form`, `spread`, `scale`,
+/// `density`, `underlayer`, ...), or `None` for a word of a one-slot category.
+pub(crate) fn word_facet(category_key: &str, canonical_surface_ja: &str) -> Option<&'static str> {
+    saijiki_asset()
+        .categories
+        .iter()
+        .find(|category| category.key == category_key)?
+        .words
+        .iter()
+        .find(|word| word.surface_ja == canonical_surface_ja)?
+        .facet
+        .as_deref()
 }
 
 /// The word's stable id (D1): the asset's `id`, or for an earlier edition the id derived

@@ -214,7 +214,7 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
 - **the surfaces category holds state nouns for the techniques of surfaces and
   marks**: use a noun such as "flat", not the act of painting. Its words name the
   quality only (empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch,
-  aquatint); density belongs to handling. Paper grain belongs to the support (the grounds
+  mezzotint); density belongs to handling. Paper grain belongs to the support (the grounds
   category). Grain and sweep remain applicable to lines and arcs: grain raises
   support tooth, while sweep changes no sheet properties and
   produces a band at three times the width (a thick or extra-thick line's or
@@ -238,7 +238,7 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   opacity. The migration turns a pale ink wash into a faint sweep, which draws a
   little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). Stipple, hatch, crosshatch and mezzotint on lines, ordinary arcs and free lines are omitted with `unsupported_surface_without_face`. No texture is transferred to a preceding closed shape. On a closed
   shape, an explicit sweep, brushmarks, grain, stipple, hatch, crosshatch, or
-  aquatint is itself the area's performance and adds no flat base fill beneath it (DDL
+  mezzotint is itself the area's performance and adds no flat base fill beneath it (DDL
   engine 46). A flat fill comes only from an explicit flat surface or the
   omitted-surface default of a closed shape, except that a texture with the
   underlayer word underpainted lays the tool's fill beneath it (DDL 24). Current
@@ -1886,7 +1886,7 @@ classifier, and the Score intensity values. A value is its word's English as
 written (spaces and hyphens become `_`), and field names say their meaning
 (`position`, `handling`, `motion_spacing`, and so on; the underdrawing type
 `inku.work-plan.v2`, Saijiki v2). A layer with a named texture (sweep,
-brushmarks, grain, stipple, hatch, crosshatch, aquatint) may carry the optional
+brushmarks, grain, stipple, hatch, crosshatch, mezzotint) may carry the optional
 fields `fineness` (`fine_grained`, `coarse_grained`, `packed`, `sparse`) and
 `underlayer` (`underpainted`) (DDL 24). In the capability matrix only the
 closed-shape rows take their values, and validation removes both fields from a
@@ -2812,7 +2812,7 @@ Each brush defines one seamless band tile per document (320 for the fine brush a
 
 The drawing hand no longer draws one shape as one even face and one band (render engine 88; the four parts the author chose on the prototype sheets).
 - **Brush fills in light and dark**: a gouache, thick or fine brush fill (outside Compat) keeps its 0.92 floor and lays darker bands of the same colour over it. They use the same tile, turned 35° from the light bands and offset by their own seed, with no floor, at opacity 0.6. The darkening follows the colour's relative luminance Y: 0.72 at 0.45 or below, 0.94 at 0.95 or above, and a straight line between, so a white face stays white and still shows its bands. Overlapping fills no longer melt into one flat mass; each shape shows its own brush direction.
-- **A thin wash under a texture**: a closed shape with a texture word (sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint and the like) and no fill lays a thin wash of its own colour under its texture marks (0.12 normal, 0.18 dense, 0.072 faint).
+- **A thin wash under a texture**: a closed shape with a texture word (sweep, brushmarks, grain, stipple, hatch, crosshatch, mezzotint and the like) and no fill lays a thin wash of its own colour under its texture marks (0.12 normal, 0.18 dense, 0.072 faint).
 
 **Grain, stipple and aquatint (render engine 104).** Grain is directional strokes broken by paper tooth: SVG feTurbulence is cut at a quantile for the coverage, at 0.6 of the tool's line opacity. Editable and Compat use a flat tone without a filter. The face named aquatint draws a mezzotint: fine light specks of paper in a deep tone, with light burnished toward the upper left. Stipple thins a jittered grid of equal round dots, 0.8 mm in diameter on a 30 cm sheet (half for fine, twice for coarse). Coverage slopes from 0.35 times the mean at upper left to 1.65 at lower right; the mean is 0.22 times the square root of the packing factor. Display and Editable lay tiles from the canvas origin, 6 cm times the fineness size factor on each side, shared by faces of the same colour, fineness and packing. Eight layers divided by dot rank make eight tone steps. Faces with fewer direct dots than a quarter of a tile and Compat use direct dots; above 24,000 per face the dots grow to preserve coverage. Noise periods have a 0.33 mm minimum because renderers calculate noise in canvas units. This paragraph supersedes the historical descriptions of these three faces under engines 89 and 90 below.
 - **Irregularities follow length**: stroke events (catch, fade, correction) and paper responses (bleed swell, tooth skip) arrive at their rate per 40 samples (about 0.8 of the short side), not per stroke. Their caps are 1/12 (at least 2) and 1/8 (at least 3) of the sample count, so a long line has more of them and a short one fewer. A stroke keeps at most 257 samples (129 before).
@@ -3691,7 +3691,7 @@ depends on the performance seed, and the same seed reproduces the same contour.
 
 The edge quality of the contour is carried by the stroke engine, the tool
 grammar — a pencil cloudform and a rotring cloudform are different things.  The
-interior is filled by surface (wash, stipple, hatch, aquatint, and so on).
+interior is filled by surface (wash, stipple, hatch, mezzotint, and so on).
 Combined with `mode: carve` it can cut an irregular light out of a dark ground.
 Output passes through Bezier fitting and obeys the point budget.
 

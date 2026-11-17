@@ -19,7 +19,7 @@ fn embedded_asset_has_stable_identity_and_exact_digest() {
 
     assert_eq!(asset.schema_version, 1);
     assert_eq!(asset.asset_id, SAIJIKI_ASSET_ID);
-    assert_eq!(SAIJIKI_ASSET_ID, "inku.saijiki.v3");
+    assert_eq!(SAIJIKI_ASSET_ID, "inku.saijiki.v4");
     assert_eq!(
         saijiki_asset_sha256_hex(),
         Sha256::digest(SAIJIKI_ASSET_BYTES)
@@ -241,7 +241,8 @@ fn invalid_semantic_aliases_fail_closed_with_distinct_stable_kinds() {
         }),
         ("conflicting_semantic_alias", |asset: &mut SaijikiAsset| {
             place_word_mut(asset, "中心").semantic_alias = Some("center".to_owned());
-            place_word_mut(asset, "上").surface_en = Some("center".to_owned());
+            // The id is the word's own field (Saijiki v4, D1), not derived from its English.
+            place_word_mut(asset, "上").id = Some("center".to_owned());
         }),
     ];
 

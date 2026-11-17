@@ -25,9 +25,11 @@ use std::sync::OnceLock;
 use inku_ddl::{
     InvalidDocumentStage, MacroDefinition, MacroLock, NormalizedDdlDocument, SAIJIKI_ASSET_ID,
     SAIJIKI_V1_MIGRATION_SCHEMA_ID, SAIJIKI_V2_ASSET_ID, SAIJIKI_V2_MIGRATION_SCHEMA_ID,
-    SaijikiDefinitionMigration, SaijikiDocumentMigration, SaijikiMigrationError,
-    migrate_document_from_saijiki_v1, migrate_document_from_saijiki_v2,
+    SAIJIKI_V3_ASSET_ID, SAIJIKI_V3_MIGRATION_SCHEMA_ID, SaijikiDefinitionMigration,
+    SaijikiDocumentMigration, SaijikiMigrationError, migrate_document_from_saijiki_v1,
+    migrate_document_from_saijiki_v2, migrate_document_from_saijiki_v3,
     migrate_macro_definition_from_saijiki_v1, migrate_macro_definition_from_saijiki_v2,
+    migrate_macro_definition_from_saijiki_v3,
 };
 use inku_pipeline::machine::{LockedDefinition, VisibleDocument};
 use serde::Deserialize;
@@ -61,6 +63,7 @@ struct SavedDocument {
 enum Retired {
     V1,
     V2,
+    V3,
 }
 
 impl Retired {
@@ -68,6 +71,7 @@ impl Retired {
         match self {
             Self::V1 => SAIJIKI_V1_MIGRATION_SCHEMA_ID,
             Self::V2 => SAIJIKI_V2_MIGRATION_SCHEMA_ID,
+            Self::V3 => SAIJIKI_V3_MIGRATION_SCHEMA_ID,
         }
     }
 
@@ -75,6 +79,7 @@ impl Retired {
         match self {
             Self::V1 => inku_ddl::SAIJIKI_V1_ASSET_ID,
             Self::V2 => SAIJIKI_V2_ASSET_ID,
+            Self::V3 => SAIJIKI_V3_ASSET_ID,
         }
     }
 
@@ -83,6 +88,7 @@ impl Retired {
         match self {
             Self::V1 => saijiki.is_none_or(|edition| edition == inku_ddl::SAIJIKI_V1_ASSET_ID),
             Self::V2 => saijiki == Some(SAIJIKI_V2_ASSET_ID),
+            Self::V3 => saijiki == Some(SAIJIKI_V3_ASSET_ID),
         }
     }
 
@@ -93,6 +99,7 @@ impl Retired {
         match self {
             Self::V1 => migrate_document_from_saijiki_v1(document),
             Self::V2 => migrate_document_from_saijiki_v2(document),
+            Self::V3 => migrate_document_from_saijiki_v3(document),
         }
     }
 
@@ -103,6 +110,7 @@ impl Retired {
         match self {
             Self::V1 => migrate_macro_definition_from_saijiki_v1(definition),
             Self::V2 => migrate_macro_definition_from_saijiki_v2(definition),
+            Self::V3 => migrate_macro_definition_from_saijiki_v3(definition),
         }
     }
 }
@@ -141,9 +149,11 @@ const HISTORICAL_DEFINITIONS: &str = include_str!("../assets/nature-historical-d
 fn historical(retired: Retired) -> &'static [Supplied] {
     static V1: OnceLock<Vec<Supplied>> = OnceLock::new();
     static V2: OnceLock<Vec<Supplied>> = OnceLock::new();
+    static V3: OnceLock<Vec<Supplied>> = OnceLock::new();
     let cell = match retired {
         Retired::V1 => &V1,
         Retired::V2 => &V2,
+        Retired::V3 => &V3,
     };
     cell.get_or_init(|| {
         let table: Value = serde_json::from_str(HISTORICAL_DEFINITIONS).unwrap_or(Value::Null);
@@ -331,6 +341,13 @@ pub fn migrate_saijiki_v1(input_bytes: Vec<u8>) -> Vec<u8> {
 #[uniffi::export]
 pub fn migrate_saijiki_v2(input_bytes: Vec<u8>) -> Vec<u8> {
     migrate_bytes(Retired::V2, &input_bytes)
+}
+
+/// Migrate one saved Saijiki v3 unit (a document and its definitions) to the current edition
+/// (Saijiki v4, 2026-11-17). The output has the v2 entry's shape.
+#[uniffi::export]
+pub fn migrate_saijiki_v3(input_bytes: Vec<u8>) -> Vec<u8> {
+    migrate_bytes(Retired::V3, &input_bytes)
 }
 
 #[cfg(test)]

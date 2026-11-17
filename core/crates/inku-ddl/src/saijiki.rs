@@ -13,10 +13,10 @@ use sha2::{Digest, Sha256};
 use crate::ResolvedInstructionLanguage;
 
 /// Stable identity for the Saijiki asset semantics.
-pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v3";
+pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v4";
 
 /// The exact embedded UTF-8 source bytes for this asset edition.
-pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v3.json");
+pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v4.json");
 
 /// Identity of the retired first edition. Its asset is embedded only so that saved documents
 /// and Macro definitions written with it can be migrated once to the current edition (SPEC
@@ -32,6 +32,12 @@ pub const SAIJIKI_V2_ASSET_ID: &str = "inku.saijiki.v2";
 
 const SAIJIKI_V2_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v2.json");
 
+/// Identity of the retired third edition (2026-10-31 to Saijiki v4). Like the others, it is
+/// embedded only for the one-time migration of saved documents and Macro definitions.
+pub const SAIJIKI_V3_ASSET_ID: &str = "inku.saijiki.v3";
+
+const SAIJIKI_V3_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v3.json");
+
 /// The Saijiki edition a reader recognizes words from.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SaijikiEdition {
@@ -39,12 +45,14 @@ pub(crate) enum SaijikiEdition {
     V1,
     /// The retired second edition, read only by the migration.
     V2,
+    /// The retired third edition, read only by the migration.
     V3,
+    V4,
 }
 
 impl SaijikiEdition {
     /// The edition every compilation reads.
-    pub(crate) const CURRENT: Self = Self::V3;
+    pub(crate) const CURRENT: Self = Self::V4;
 
     pub(crate) fn asset(self) -> &'static SaijikiAsset {
         match self {
@@ -53,7 +61,11 @@ impl SaijikiEdition {
                     .expect("embedded inku.saijiki.v1 asset must remain valid JSON")
             }),
             Self::V2 => saijiki_v2_asset(),
-            Self::V3 => saijiki_asset(),
+            Self::V3 => SAIJIKI_V3_ASSET.get_or_init(|| {
+                serde_json::from_slice(SAIJIKI_V3_ASSET_BYTES)
+                    .expect("embedded inku.saijiki.v3 asset must remain valid JSON")
+            }),
+            Self::V4 => saijiki_asset(),
         }
     }
 
@@ -61,7 +73,8 @@ impl SaijikiEdition {
         match self {
             Self::V1 => SAIJIKI_V1_ASSET_ID,
             Self::V2 => SAIJIKI_V2_ASSET_ID,
-            Self::V3 => SAIJIKI_ASSET_ID,
+            Self::V3 => SAIJIKI_V3_ASSET_ID,
+            Self::V4 => SAIJIKI_ASSET_ID,
         }
     }
 }
@@ -94,6 +107,10 @@ pub struct SaijikiCategoryAsset {
     pub key: String,
     pub name_ja: String,
     pub name_en: String,
+    /// The group of categories a sentence is composed in (Saijiki v4; earlier editions have
+    /// none): `what`, `with`, `face`, `sway`, `color`, `where`, `ground`.
+    #[serde(default)]
+    pub bundle: Option<String>,
     pub marker_class: Option<String>,
     pub words: Vec<SaijikiWordAsset>,
     pub marker_order_ja: Option<Vec<String>>,
@@ -103,6 +120,10 @@ pub struct SaijikiCategoryAsset {
 /// One bilingual Saijiki word, including all source flags and marker overrides.
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 pub struct SaijikiWordAsset {
+    /// The word's stable id (Saijiki v4, D1). Earlier editions have none; their id is derived
+    /// from the Score value or the English surface, which is the id v4 keeps.
+    #[serde(default)]
+    pub id: Option<String>,
     pub surface_ja: String,
     pub surface_en: Option<String>,
     #[serde(default)]
@@ -119,6 +140,13 @@ pub struct SaijikiWordAsset {
     pub semantic_alias: Option<String>,
     pub marker_surfaces_ja: Option<Vec<String>>,
     pub marker_surfaces_en: Option<Vec<String>>,
+    /// The slot of its category the word fills, where a category has several (Saijiki v4):
+    /// one word per slot may stand on a mark.
+    #[serde(default)]
+    pub facet: Option<String>,
+    /// What the word does, in both languages (Saijiki v4; written in V2).
+    #[serde(default)]
+    pub description: Option<SaijikiPhysicalDescriptionAsset>,
 }
 
 /// Bilingual physical trace description attached to one Saijiki word.
@@ -472,6 +500,7 @@ static SAIJIKI_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 static SAIJIKI_ASSET_SHA256_HEX: OnceLock<String> = OnceLock::new();
 static SAIJIKI_V1_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 static SAIJIKI_V2_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
+static SAIJIKI_V3_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 
 /// Return the parsed embedded asset, parsing it exactly once per process.
 ///
@@ -480,7 +509,7 @@ static SAIJIKI_V2_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 pub fn saijiki_asset() -> &'static SaijikiAsset {
     SAIJIKI_ASSET.get_or_init(|| {
         serde_json::from_slice(SAIJIKI_ASSET_BYTES)
-            .expect("embedded inku.saijiki.v3 asset must remain valid JSON")
+            .expect("embedded inku.saijiki.v4 asset must remain valid JSON")
     })
 }
 
@@ -606,10 +635,12 @@ pub(crate) fn canonical_semantic_id_in(
     static V1: OnceLock<Ids> = OnceLock::new();
     static V2: OnceLock<Ids> = OnceLock::new();
     static V3: OnceLock<Ids> = OnceLock::new();
+    static V4: OnceLock<Ids> = OnceLock::new();
     let cache = match edition {
         SaijikiEdition::V1 => &V1,
         SaijikiEdition::V2 => &V2,
         SaijikiEdition::V3 => &V3,
+        SaijikiEdition::V4 => &V4,
     };
     let asset = edition.asset();
     let categories = cache.get_or_init(|| {
@@ -888,8 +919,9 @@ fn register_parser_surface(
 }
 
 fn semantic_wire_id(word: &SaijikiWordAsset) -> Option<String> {
-    word.score_value
+    word.id
         .clone()
+        .or_else(|| word.score_value.clone())
         .or_else(|| word.surface_en.as_deref().map(canonical_wire_id))
 }
 

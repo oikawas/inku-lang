@@ -686,6 +686,8 @@ fn asset_relation_candidates(
     static V2_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
     static V3_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
     static V3_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V4_JA: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
+    static V4_EN: OnceLock<Vec<AssetRelationCandidate>> = OnceLock::new();
     let cache = match (edition, language) {
         (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
         (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
@@ -693,6 +695,8 @@ fn asset_relation_candidates(
         (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::Ja) => &V4_JA,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::En) => &V4_EN,
     };
     cache.get_or_init(|| {
         let mut entries = Vec::new();
@@ -742,6 +746,8 @@ fn asset_word_candidates(
     static V2_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
     static V3_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
     static V3_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V4_JA: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
+    static V4_EN: OnceLock<Vec<AssetWordCandidate>> = OnceLock::new();
     let cache = match (edition, language) {
         (SaijikiEdition::V1, ResolvedInstructionLanguage::Ja) => &V1_JA,
         (SaijikiEdition::V1, ResolvedInstructionLanguage::En) => &V1_EN,
@@ -749,6 +755,8 @@ fn asset_word_candidates(
         (SaijikiEdition::V2, ResolvedInstructionLanguage::En) => &V2_EN,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::Ja) => &V3_JA,
         (SaijikiEdition::V3, ResolvedInstructionLanguage::En) => &V3_EN,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::Ja) => &V4_JA,
+        (SaijikiEdition::V4, ResolvedInstructionLanguage::En) => &V4_EN,
     };
     cache.get_or_init(|| {
         let mut entries = Vec::new();

@@ -25,6 +25,9 @@ pub const SAIJIKI_V1_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v1-migration.v1";
 /// Stable identity of the v2 migration contract (Saijiki v3, 2026-10-31).
 pub const SAIJIKI_V2_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v2-migration.v1";
 
+/// Stable identity of the v3 migration contract (Saijiki v4, 2026-11-17).
+pub const SAIJIKI_V3_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v3-migration.v1";
+
 /// One v1 word and the current word written in its place.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct SaijikiMigrationEdit {
@@ -452,6 +455,15 @@ pub fn migrate_document_from_saijiki_v2(
     document: &NormalizedDdlDocument,
 ) -> Result<SaijikiDocumentMigration, SaijikiMigrationError> {
     migrate_document_to_current(document, SaijikiEdition::V2)
+}
+
+/// Rewrite one saved v3 document to the current edition, word by word at its positions.
+/// The result is read again with the current edition and refused if it reads with more
+/// diagnostics than the v3 source did.
+pub fn migrate_document_from_saijiki_v3(
+    document: &NormalizedDdlDocument,
+) -> Result<SaijikiDocumentMigration, SaijikiMigrationError> {
+    migrate_document_to_current(document, SaijikiEdition::V3)
 }
 
 fn migrate_document_to_current(
@@ -1109,6 +1121,14 @@ pub fn migrate_macro_definition_from_saijiki_v1(
 /// definition with no retired tool is returned unchanged. The v1 rewrites find nothing in
 /// a v2 definition, so the two editions share one rewrite.
 pub fn migrate_macro_definition_from_saijiki_v2(
+    definition: &Value,
+) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
+    migrate_macro_definition_to_current(definition)
+}
+
+/// Rewrite one saved v3 Macro definition to the current edition. The version is kept; a
+/// definition with no word v4 rewrites is returned unchanged.
+pub fn migrate_macro_definition_from_saijiki_v3(
     definition: &Value,
 ) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
     migrate_macro_definition_to_current(definition)

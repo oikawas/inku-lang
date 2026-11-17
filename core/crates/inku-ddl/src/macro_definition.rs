@@ -1174,8 +1174,9 @@ impl MacroDefinition {
     }
 
     /// The identity a saved definition was locked by under a retired Saijiki edition
-    /// (`inku.saijiki.v1` or `inku.saijiki.v2`): its canonical form with each semantic word
-    /// spelled through that edition's asset, as the cores of that edition computed it. It is
+    /// (`inku.saijiki.v1`, `inku.saijiki.v2` or `inku.saijiki.v3`): its canonical form with
+    /// each semantic word spelled through that edition's asset, as the cores of that edition
+    /// computed it. It is
     /// not validated against the current vocabulary, whose retired words it may hold; a
     /// migration compares it with a saved lock before moving the lock (SPEC §3.3). `None`
     /// for another edition, or when a word is not in that edition or a value does not read.
@@ -1183,6 +1184,7 @@ impl MacroDefinition {
         let edition = match edition {
             crate::saijiki::SAIJIKI_V1_ASSET_ID => crate::saijiki::SaijikiEdition::V1,
             crate::saijiki::SAIJIKI_V2_ASSET_ID => crate::saijiki::SaijikiEdition::V2,
+            crate::saijiki::SAIJIKI_V3_ASSET_ID => crate::saijiki::SaijikiEdition::V3,
             _ => return None,
         };
         self.qualified_name()?;

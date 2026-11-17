@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: model selection shows catalog loading and keeps the choice in the dialog when settings are refreshed.
+
 - Server: ChatGPT model list and refresh responses now include the service, group, and connection state, fixing the model settings refresh error.
 
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.

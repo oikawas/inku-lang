@@ -140,7 +140,8 @@ impl WorkPlanVocabulary {
 }
 
 /// Each prompt word of one category with its canonical semantic ID, which
-/// decides the slot of a word whose category spans several slots.
+/// decides the slot of a word whose category spans several slots. A word Saijiki v4
+/// moved to the category keeps the slot it had (`moved_terms`).
 fn saijiki_terms(category_key: &str) -> Vec<(String, WorkPlanTerm)> {
     let Some(category) = saijiki_asset()
         .categories
@@ -152,19 +153,44 @@ fn saijiki_terms(category_key: &str) -> Vec<(String, WorkPlanTerm)> {
     category
         .words
         .iter()
-        .filter(|word| word.prompt)
-        .filter_map(|word| {
-            let canonical =
-                project_macro_semantic_ref(category_key, &word.surface_ja)?.canonical_id;
-            let en = word.surface_en.clone()?;
-            Some((
-                canonical,
-                WorkPlanTerm {
-                    id: canonical_wire_id(&en),
-                    ja: word.surface_ja.clone(),
-                    en,
-                },
-            ))
+        .filter(|word| word.prompt && word.semantic_category.is_none())
+        .filter_map(|word| plan_term(category_key, word))
+        .collect()
+}
+
+fn plan_term(category_key: &str, word: &crate::SaijikiWordAsset) -> Option<(String, WorkPlanTerm)> {
+    let canonical = project_macro_semantic_ref(category_key, &word.surface_ja)?.canonical_id;
+    let en = word.surface_en.clone()?;
+    Some((
+        canonical,
+        WorkPlanTerm {
+            id: canonical_wire_id(&en),
+            ja: word.surface_ja.clone(),
+            en,
+        },
+    ))
+}
+
+/// The words Saijiki v4 moved to another category (半円・三日月 to かたち, にじみ to
+/// さばき, 下塗り to きめ), in the plan slot they had: the plan keeps its slots.
+fn moved_terms() -> Vec<(WorkPlanSlot, String, WorkPlanTerm)> {
+    saijiki_asset()
+        .categories
+        .iter()
+        .flat_map(|category| {
+            category.words.iter().filter_map(move |word| {
+                let slot = match word.semantic_category.as_deref()? {
+                    "ratio" => WorkPlanSlot::Proportion,
+                    "variation" => WorkPlanSlot::Bleeding,
+                    "underlayer" => WorkPlanSlot::Underlayer,
+                    _ => return None,
+                };
+                if !word.prompt {
+                    return None;
+                }
+                let (canonical, term) = plan_term(&category.key, word)?;
+                Some((slot, canonical, term))
+            })
         })
         .collect()
 }
@@ -239,11 +265,14 @@ pub fn work_plan_vocabulary() -> &'static WorkPlanVocabulary {
             (WorkPlanSlot::Surface, "omote"),
             (WorkPlanSlot::Handling, "sabaki"),
             (WorkPlanSlot::Fineness, "kime"),
-            (WorkPlanSlot::Underlayer, "shitaji"),
         ] {
             for (_, term) in saijiki_terms(key) {
                 vocabulary.push(slot, term);
             }
+        }
+        // Each moved word was the last of its v3 slot, so the slot keeps its order.
+        for (slot, _, term) in moved_terms() {
+            vocabulary.push(slot, term);
         }
         for (canonical, term) in saijiki_terms("yuragi") {
             let slot = match classify_fluctuation_dimension(&canonical) {
@@ -1447,13 +1476,15 @@ fn plan_ids_by_semantic_id() -> &'static BTreeMap<WorkPlanSlot, BTreeMap<String,
             (WorkPlanSlot::Angle, "katamuki"),
             (WorkPlanSlot::Handling, "sabaki"),
             (WorkPlanSlot::Fineness, "kime"),
-            (WorkPlanSlot::Underlayer, "shitaji"),
             (WorkPlanSlot::Ground, "ji"),
         ] {
             let table = tables.entry(slot).or_default();
             for (canonical, term) in saijiki_terms(key) {
                 table.insert(canonical, term.id);
             }
+        }
+        for (slot, canonical, term) in moved_terms() {
+            tables.entry(slot).or_default().insert(canonical, term.id);
         }
         for (canonical, term) in saijiki_terms("yuragi") {
             let slot = match classify_fluctuation_dimension(&canonical) {

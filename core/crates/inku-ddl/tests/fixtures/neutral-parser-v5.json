@@ -5,36 +5,36 @@
     {
       "id": "ja-longest-source-and-hole",
       "language": "ja",
-      "source": " 画用紙に一点鎖線を八つ、薄墨地で少し。\r\n",
+      "source": " 画用紙に破線を八つ、薄墨地で少し。\r\n",
       "expected_tokens": [
         {"kind": "saijiki_word", "surface": "画用紙", "start_byte": 1, "end_byte": 10, "asset_id": "inku.saijiki.v4", "category_key": "ji", "canonical_surface_ja": "画用紙"},
         {"kind": "function_word", "surface": "に", "start_byte": 10, "end_byte": 13},
-        {"kind": "saijiki_word", "surface": "一点鎖線", "start_byte": 13, "end_byte": 25, "asset_id": "inku.saijiki.v4", "category_key": "tsuranari", "canonical_surface_ja": "一点鎖線"},
-        {"kind": "function_word", "surface": "を", "start_byte": 25, "end_byte": 28},
-        {"kind": "exact_number", "surface": "八つ", "start_byte": 28, "end_byte": 34, "value": 8},
-        {"kind": "saijiki_word", "surface": "薄墨地", "start_byte": 37, "end_byte": 46, "asset_id": "inku.saijiki.v4", "category_key": "ji", "canonical_surface_ja": "薄墨地"},
-        {"kind": "function_word", "surface": "で", "start_byte": 46, "end_byte": 49}
+        {"kind": "saijiki_word", "surface": "破線", "start_byte": 13, "end_byte": 19, "asset_id": "inku.saijiki.v4", "category_key": "tsuranari", "canonical_surface_ja": "破線"},
+        {"kind": "function_word", "surface": "を", "start_byte": 19, "end_byte": 22},
+        {"kind": "exact_number", "surface": "八つ", "start_byte": 22, "end_byte": 28, "value": 8},
+        {"kind": "saijiki_word", "surface": "薄墨地", "start_byte": 31, "end_byte": 40, "asset_id": "inku.saijiki.v4", "category_key": "ji", "canonical_surface_ja": "薄墨地"},
+        {"kind": "function_word", "surface": "で", "start_byte": 40, "end_byte": 43}
       ],
       "expected_diagnostics": [
-        {"kind": "hole", "surface": "少し", "start_byte": 49, "end_byte": 55, "recognized": true}
+        {"kind": "hole", "surface": "少し", "start_byte": 43, "end_byte": 49, "recognized": true}
       ],
       "recognized_delivery_count": 8
     },
     {
       "id": "en-case-longest-source-and-hole",
       "language": "en",
-      "source": "\r\nDrawing Paper with DASH-DOT and twelve, in ink wash ground; a few. ",
+      "source": "\r\nDrawing Paper with DASHED and twelve, in ink wash ground; a few. ",
       "expected_tokens": [
         {"kind": "saijiki_word", "surface": "Drawing Paper", "start_byte": 2, "end_byte": 15, "asset_id": "inku.saijiki.v4", "category_key": "ji", "canonical_surface_ja": "画用紙"},
         {"kind": "function_word", "surface": "with", "start_byte": 16, "end_byte": 20},
-        {"kind": "saijiki_word", "surface": "DASH-DOT", "start_byte": 21, "end_byte": 29, "asset_id": "inku.saijiki.v4", "category_key": "tsuranari", "canonical_surface_ja": "一点鎖線"},
-        {"kind": "function_word", "surface": "and", "start_byte": 30, "end_byte": 33},
-        {"kind": "exact_number", "surface": "twelve", "start_byte": 34, "end_byte": 40, "value": 12},
-        {"kind": "function_word", "surface": "in", "start_byte": 42, "end_byte": 44},
-        {"kind": "saijiki_word", "surface": "ink wash ground", "start_byte": 45, "end_byte": 60, "asset_id": "inku.saijiki.v4", "category_key": "ji", "canonical_surface_ja": "薄墨地"}
+        {"kind": "saijiki_word", "surface": "DASHED", "start_byte": 21, "end_byte": 27, "asset_id": "inku.saijiki.v4", "category_key": "tsuranari", "canonical_surface_ja": "破線"},
+        {"kind": "function_word", "surface": "and", "start_byte": 28, "end_byte": 31},
+        {"kind": "exact_number", "surface": "twelve", "start_byte": 32, "end_byte": 38, "value": 12},
+        {"kind": "function_word", "surface": "in", "start_byte": 40, "end_byte": 42},
+        {"kind": "saijiki_word", "surface": "ink wash ground", "start_byte": 43, "end_byte": 58, "asset_id": "inku.saijiki.v4", "category_key": "ji", "canonical_surface_ja": "薄墨地"}
       ],
       "expected_diagnostics": [
-        {"kind": "hole", "surface": "a few", "start_byte": 62, "end_byte": 67, "recognized": true}
+        {"kind": "hole", "surface": "a few", "start_byte": 60, "end_byte": 65, "recognized": true}
       ],
       "recognized_delivery_count": 8
     },

@@ -996,12 +996,6 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
     );
     for (source, language, expected_surface, expected_key) in [
         (
-            "slightly small circle",
-            ResolvedInstructionLanguage::En,
-            "slightly small",
-            "slightly_small",
-        ),
-        (
             "small circle",
             ResolvedInstructionLanguage::En,
             "small",
@@ -1020,12 +1014,6 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
             "normal",
         ),
         (
-            "slightly large circle",
-            ResolvedInstructionLanguage::En,
-            "slightly large",
-            "slightly_large",
-        ),
-        (
             "large circle",
             ResolvedInstructionLanguage::En,
             "large",
@@ -1038,10 +1026,16 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
             "very_large",
         ),
         (
-            "とても大きな円",
+            "ごく大きな円",
             ResolvedInstructionLanguage::Ja,
-            "とても大きな",
+            "ごく大きな",
             "very_large",
+        ),
+        (
+            "ごく小さな円",
+            ResolvedInstructionLanguage::Ja,
+            "ごく小さな",
+            "very_small",
         ),
     ] {
         let sized = compile(source, language, &[], None, LIMITS);
@@ -2917,13 +2911,18 @@ fn incomplete_structured_document_retains_binding_and_does_not_seed_or_expand() 
 
 #[test]
 fn disabled_saijiki_row_uses_source_preserving_unknown_blocking_path() {
-    let disabled = saijiki_asset()
-        .categories
-        .iter()
-        .flat_map(|category| &category.words)
-        .find(|word| !word.prompt && !word.display && word.marker != Some(true))
-        .expect("accepted asset has one disabled tombstone");
-    let source = disabled.surface_ja.clone();
+    // v4 keeps no disabled tombstone rows; a word retired in v4 is simply not
+    // in the asset and takes the same source-preserving unknown blocking path.
+    let retired = "上弦";
+    assert!(
+        saijiki_asset()
+            .categories
+            .iter()
+            .flat_map(|category| &category.words)
+            .all(|word| word.surface_ja != retired),
+        "{retired} is retired in v4"
+    );
+    let source = retired.to_string();
     let source_digest = sha256(source.as_bytes());
 
     let result = compile(&source, ResolvedInstructionLanguage::Ja, &[], None, LIMITS);

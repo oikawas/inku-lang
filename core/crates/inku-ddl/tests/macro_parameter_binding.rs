@@ -492,7 +492,7 @@ fn declared_core_binding_requires_a_unique_complete_assignment() {
             MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
         ),
         (
-            "thin extra-fine small ｛Mark｝",
+            "thin very thin small ｛Mark｝",
             MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment,
         ),
         (

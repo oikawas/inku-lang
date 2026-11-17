@@ -1656,8 +1656,8 @@ fn declared_core_values_keep_exact_non_asset_owner_and_ordinary_modifiers() {
         }),
     );
     for source in [
-        "thin small ｛Core｝! extra-fine large circle.",
-        "small ｛Core｝ thin. extra-fine large circle.",
+        "thin small ｛Core｝! very thin large circle.",
+        "small ｛Core｝ thin. very thin large circle.",
     ] {
         let document = document_macro_document(source, std::slice::from_ref(&definition));
         let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();

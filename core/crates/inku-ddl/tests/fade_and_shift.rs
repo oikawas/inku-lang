@@ -236,7 +236,7 @@ fn a_fade_outward_takes_a_row_or_a_scatter() {
         recipe(&instruction(&row(HORIZONTAL, "")))
     );
     let scatter = instruction(
-        "画面全体（横0〜1、縦0〜1）に、中心から外へ薄れさせて、赤いとても小さな点を30個散らす。",
+        "画面全体（横0〜1、縦0〜1）に、中心から外へ薄れさせて、赤いごく小さな点を30個散らす。",
     );
     assert_eq!(fade(&scatter), Fade::Outward);
     assert_eq!(
@@ -277,7 +277,7 @@ fn marks_that_cannot_fade_so_are_left_out_with_a_reason() {
             ScoreFieldGap::UnsupportedFade,
         ),
         (
-            "画面全体（横0〜1、縦0〜1）に、左から右へ薄れさせて、赤いとても小さな点を30個散らす。",
+            "画面全体（横0〜1、縦0〜1）に、左から右へ薄れさせて、赤いごく小さな点を30個散らす。",
             ScoreFieldGap::UnsupportedFade,
         ),
         (
@@ -372,7 +372,7 @@ fn colors_in_order_shift_once_through_a_row() {
 #[test]
 fn colors_that_shift_need_a_row_or_a_tile_and_enough_marks() {
     let scatter = compile(
-        "画面全体（横0〜1、縦0〜1）に、黄・橙・赤の順に段々に移して、とても小さな点を30個散らす。",
+        "画面全体（横0〜1、縦0〜1）に、黄・橙・赤の順に段々に移して、ごく小さな点を30個散らす。",
     );
     assert_eq!(scatter.gaps, vec![ScoreFieldGap::UnsupportedColorShift]);
     let short = compile(&format!(

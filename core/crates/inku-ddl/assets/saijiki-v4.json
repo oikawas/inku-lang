@@ -23,8 +23,8 @@
         {"id": "semicircle", "surface_ja": "半円", "surface_en": "semicircle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "arc_form", "semantic_category": "ratio"},
         {"id": "crescent", "surface_ja": "三日月", "surface_en": "crescent", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "facet": "arc_form", "semantic_category": "ratio"}
       ],
-      "marker_order_ja": ["線", "円", "楕円", "三角", "四角", "多角形", "弧", "自由線", "点", "雲形"],
-      "marker_order_en": ["line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "free line", "point", "cloudform"]
+      "marker_order_ja": ["線", "円", "楕円", "三角", "四角", "多角形", "弧", "自由線", "点", "雲形", "半円", "三日月"],
+      "marker_order_en": ["line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "free line", "point", "cloudform", "semicircle", "crescent"]
     },
     {
       "key": "katamuki",

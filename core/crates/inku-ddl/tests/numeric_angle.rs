@@ -196,7 +196,8 @@ fn every_mark_of_a_row_a_tile_and_a_scatter_turns() {
 }
 
 #[test]
-fn an_arc_turns_and_waxing_adds_its_quarter_turn() {
+fn an_arc_turns_and_a_semicircle_arc_takes_the_same_numeric_angle() {
+    // v4 retired the waxing word; its quarter turn is now written as the angle itself.
     assert_eq!(
         only(&score(
             "画面の横0.5、縦0.5の位置に、回転30度の青い弧を1個置く。",
@@ -207,7 +208,7 @@ fn an_arc_turns_and_waxing_adds_its_quarter_turn() {
     );
     assert_eq!(
         only(&score(
-            "画面の横0.5、縦0.5の位置に、回転30度の上弦の青い弧を1個置く。",
+            "画面の横0.5、縦0.5の位置に、回転120度の半円の青い弧を1個置く。",
             "square"
         ))
         .rotation,

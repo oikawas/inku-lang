@@ -258,8 +258,14 @@ fn width_extent_measures_each_primitive_reference_contour() {
 
 #[test]
 fn moon_forms_preserve_semicircle_direction_and_filled_reference_crescent() {
-    for (form, rotation) in [("semicircle", 0.0), ("waxing", 90.0), ("waning", 270.0)] {
-        let source = format!("place one red half-width {form} arc at center.");
+    // v4 retired the waxing and waning words; the same Score is written as a
+    // semicircle arc with its rotation in degrees.
+    for (turn, rotation) in [
+        ("", 0.0),
+        (" rotated 90 degrees", 90.0),
+        (" rotated 270 degrees", 270.0),
+    ] {
+        let source = format!("place one red half-width semicircle arc{turn} at center.");
         let transformed = stage15(&source, ResolvedInstructionLanguage::En);
         let lowered = lower_verified_stage15_score(
             transformed.verified_effective_view(),
@@ -1384,7 +1390,7 @@ fn direct_fine_reaches_actual_score_thinness() {
             Thinness::Fine,
         ),
         (
-            "place one extra-fine red circle at center.",
+            "place one very thin red circle at center.",
             ResolvedInstructionLanguage::En,
             Thinness::ExtraFine,
         ),
@@ -2369,13 +2375,13 @@ fn normal_geometry_uses_short_edge_aspect_and_center_for_the_closed_subset() {
 }
 
 #[test]
-fn seven_size_classes_apply_table_b_once_and_explicit_normal_remains_source_fact() {
+fn five_size_classes_apply_table_b_once_and_explicit_normal_remains_source_fact() {
+    // Saijiki v4 reads five size steps; slightly small and slightly large are
+    // no longer words (their Table B factors stay with the Score value only).
     for (surface, value, factor) in [
-        ("slightly small", CoreModifierValue::SlightlySmall, 0.75),
         ("small", CoreModifierValue::Small, 0.50),
         ("very small", CoreModifierValue::VerySmall, 0.375),
         ("normal-sized", CoreModifierValue::Normal, 1.0),
-        ("slightly large", CoreModifierValue::SlightlyLarge, 1.25),
         ("large", CoreModifierValue::Large, 1.50),
         ("very large", CoreModifierValue::VeryLarge, 1.75),
     ] {
@@ -2435,7 +2441,7 @@ fn seven_size_classes_apply_table_b_once_and_explicit_normal_remains_source_fact
 #[test]
 fn japanese_size_with_intervening_drawing_modifiers_reaches_the_same_score() {
     let ja = stage15(
-        "画面の横0.5、縦0.5の位置に、とても小さな赤いペンの実線の空の円をひとつ置く。",
+        "画面の横0.5、縦0.5の位置に、ごく小さな赤いペンの実線の空の円をひとつ置く。",
         ResolvedInstructionLanguage::Ja,
     );
     let en = stage15(
@@ -2926,7 +2932,7 @@ fn flat_macro_thinness_uses_literal_and_component_parameter_through_the_shared_l
     ));
 
     let caller = stage15_locked(
-        "place one green circle at center. extra-fine ｛ThinnessPair｝",
+        "place one green circle at center. very thin ｛ThinnessPair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3473,7 +3479,7 @@ fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
     )));
 
     let still_unbound = stage15_locked(
-        "extra-fine ｛Pair｝",
+        "very thin ｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3869,8 +3875,8 @@ fn declared_core_fields_and_literals_share_ordinary_effective_score() {
         ),
         (
             ResolvedInstructionLanguage::En,
-            "very large ｛Fields｝ extra-fine",
-            "place one extra-fine very large red circle at center.",
+            "very large ｛Fields｝ very thin",
+            "place one very thin very large red circle at center.",
             "extra_fine",
             "very_large",
         ),
@@ -3883,8 +3889,8 @@ fn declared_core_fields_and_literals_share_ordinary_effective_score() {
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "ごく細いとても大きい｛Fields｝",
-            "ごく細いとても大きい赤い円を中心に置く。",
+            "ごく細いごく大きい｛Fields｝",
+            "ごく細いごく大きい赤い円を中心に置く。",
             "extra_fine",
             "very_large",
         ),

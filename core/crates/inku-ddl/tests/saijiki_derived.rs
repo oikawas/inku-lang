@@ -59,7 +59,9 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "弧",
             "自由線",
             "点",
-            "雲形"
+            "雲形",
+            "半円",
+            "三日月"
         ]
     );
     assert_eq!(
@@ -75,6 +77,8 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "free line",
             "point",
             "cloudform",
+            "semicircle",
+            "crescent",
             "place",
             "draw",
             "arrange",
@@ -154,16 +158,17 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
 
     let ja = saijiki_derived_projection(ResolvedInstructionLanguage::Ja).unwrap();
     let en = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();
-    assert!(!en.prompt_block.contains("left-rising"));
-    assert!(!en.prompt_block.contains("left-falling"));
+    // Saijiki v4 (D9 B): the four direction words are shown and handed to the reader.
+    assert!(en.prompt_block.contains("left-rising"));
+    assert!(en.prompt_block.contains("left-falling"));
     let angle_display = en
         .display_categories
         .iter()
         .find(|category| category.key == "katamuki")
         .unwrap();
-    assert!(!angle_display.words.iter().any(|word| word == "left-rising"));
+    assert!(angle_display.words.iter().any(|word| word == "left-rising"));
     assert!(
-        !angle_display
+        angle_display
             .words
             .iter()
             .any(|word| word == "left-falling")
@@ -174,8 +179,9 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             .iter()
             .any(|word| word == "描く")
     );
+    // Saijiki v4 (D10 A): the polygon is shown.
     assert!(
-        !en.display_categories[0]
+        en.display_categories[0]
             .words
             .iter()
             .any(|word| word == "polygon")
@@ -208,7 +214,8 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             .find(|category| category.key == "ji")
             .unwrap();
         assert_eq!(ground.words.last().map(String::as_str), Some(head));
-        assert_eq!(projection.display_categories.len(), 16);
+        // Saijiki v4: 16 categories (ふとさ・おおきさ added, したじ gone) and あいだ.
+        assert_eq!(projection.display_categories.len(), 17);
         assert!(!projection.prompt_block.contains(head));
     }
 }

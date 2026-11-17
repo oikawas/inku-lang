@@ -4814,7 +4814,8 @@ fn appearance_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField>
     match gap {
         ScoreFieldGap::UnsupportedColorIdentity { .. } => Some(ScoreAppearanceField::Color),
         ScoreFieldGap::UnsupportedTouchIdentity { .. } => Some(ScoreAppearanceField::Touch),
-        ScoreFieldGap::UnsupportedContinuityIdentity { .. } => {
+        ScoreFieldGap::UnsupportedContinuityIdentity { .. }
+        | ScoreFieldGap::UnsupportedContinuityWithoutLine { .. } => {
             Some(ScoreAppearanceField::Continuity)
         }
         ScoreFieldGap::UnsupportedSurfaceIdentity { .. }
@@ -5247,9 +5248,9 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedTouchIdentity { .. } | ScoreFieldGap::MissingTouch => {
             Some("touch".to_owned())
         }
-        ScoreFieldGap::UnsupportedContinuityIdentity { .. } | ScoreFieldGap::MissingContinuity => {
-            Some("continuity".to_owned())
-        }
+        ScoreFieldGap::UnsupportedContinuityIdentity { .. }
+        | ScoreFieldGap::UnsupportedContinuityWithoutLine { .. }
+        | ScoreFieldGap::MissingContinuity => Some("continuity".to_owned()),
         ScoreFieldGap::UnsupportedSurfaceIdentity { .. }
         | ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. }
         | ScoreFieldGap::UnsupportedSurfaceWithoutFace { .. }
@@ -6721,6 +6722,19 @@ fn resolve_complete_object<'a>(
         Some(_) => map_score_enum::<LineStyle>(input.continuity, "continuity", &mut gaps),
         None => Some(LineStyle::Solid),
     };
+    // Every tool of Saijiki v4 draws an arc and an outline as one hand contour, which has
+    // no dashes (inku-render marks.rs `hand_contour`); only a line and a free line lay a
+    // dashed line over their stroke. A dashed or dotted arc or closed shape leaves out
+    // only the word (the author's choice, 2026-11-17).
+    if let Some(identity) = input.continuity
+        && style.is_some_and(|style| style != LineStyle::Solid)
+        && !matches!(primitive, Primitive::Line | Primitive::FreeLine)
+    {
+        gaps.push(ScoreFieldGap::UnsupportedContinuityWithoutLine {
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
     let arc_form = match input.proportion_arc_form {
         Some(identity)
             if primitive != Primitive::Arc

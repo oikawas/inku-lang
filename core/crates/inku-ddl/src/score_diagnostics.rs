@@ -117,6 +117,13 @@ pub enum ScoreFieldGap {
         category: String,
         id: String,
     },
+    /// A dashed or dotted word (破線・点線) on an arc or a closed shape (Saijiki v4): every
+    /// tool draws them as one hand contour without dashes, and only a line and a free line
+    /// lay a dashed line. Only the word is left out.
+    UnsupportedContinuityWithoutLine {
+        category: String,
+        id: String,
+    },
     /// An amplitude word (細かく・大きく) without a sway word (揺れる・波打つ)
     /// to say what sways (DDL 24). It was read as a sway of its own before.
     FluctuationAmplitudeWithoutQuality {

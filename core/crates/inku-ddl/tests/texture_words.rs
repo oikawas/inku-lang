@@ -455,7 +455,20 @@ fn a_word_the_mark_cannot_show_is_left_out_with_its_reason() {
     let digital = |category: String, id: String| {
         ScoreFieldGap::UnsupportedSurfaceIntensityForDigital { category, id }
     };
+    let without_line = |category: String, id: String| {
+        ScoreFieldGap::UnsupportedContinuityWithoutLine { category, id }
+    };
     for (source, without, expected) in [
+        (
+            "中心に、黒のペンの破線の弧を1本引く。",
+            "中心に、黒のペンの弧を1本引く。",
+            gap(without_line, "continuity", "dashed"),
+        ),
+        (
+            "中心に、黒の鉛筆の点線の円を1個置く。",
+            "中心に、黒の鉛筆の円を1個置く。",
+            gap(without_line, "continuity", "dotted"),
+        ),
         (
             "中心に、黒のペンの点描の線を1本引く。",
             "中心に、黒のペンの線を1本引く。",

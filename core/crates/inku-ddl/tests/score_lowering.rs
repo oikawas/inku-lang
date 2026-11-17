@@ -2052,7 +2052,8 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             LineStyle::Solid,
         ),
         (
-            "place one blue pencil dashed empty ellipse with width 0.4, height 0.2 at horizontal 0.5, vertical 0.5.",
+            // A dashed closed shape leaves out the word (Saijiki v4); the geometry is the point.
+            "place one blue pencil solid empty ellipse with width 0.4, height 0.2 at horizontal 0.5, vertical 0.5.",
             "a4",
             Primitive::Ellipse,
             Some(Point::new(0.5, 0.5)),
@@ -2061,7 +2062,7 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             Some(Point::new(0.4, 0.2)),
             Color::Blue,
             Weight::Pencil,
-            LineStyle::Dashed,
+            LineStyle::Solid,
         ),
         (
             "place one gray chalk dotted empty cloudform with width 0.3, height 0.2 at horizontal 0.5, vertical 0.5.",
@@ -4994,10 +4995,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         ResolvedInstructionLanguage::En,
         &[malformed],
     );
-    for (result, unit, survivors) in [
-        (&unbound, "caller_field", 2),
-        (&malformed, "emit", 1),
-    ] {
+    for (result, unit, survivors) in [(&unbound, "caller_field", 2), (&malformed, "emit", 1)] {
         let stopped = lower_verified_stage15_score_with_policy(
             result.verified_effective_view(),
             context,

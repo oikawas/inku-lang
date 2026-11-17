@@ -2065,7 +2065,7 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             LineStyle::Solid,
         ),
         (
-            "place one gray chalk dotted empty cloudform with width 0.3, height 0.2 at horizontal 0.5, vertical 0.5.",
+            "place one gray chalk solid empty cloudform with width 0.3, height 0.2 at horizontal 0.5, vertical 0.5.",
             "vertical",
             Primitive::Cloudform,
             Some(Point::new(0.5, 0.5)),
@@ -2074,7 +2074,7 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             Some(Point::new(0.3, 0.2)),
             Color::Gray,
             Weight::Chalk,
-            LineStyle::Dotted,
+            LineStyle::Solid,
         ),
         (
             "place one black thin pen solid empty square with side length 0.2 at horizontal 0.5, vertical 0.5.",

@@ -801,7 +801,7 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 ## 4. Saijiki: complete vocabulary and accepted spellings
 
-Japanese is canonical. Spellings follow `inku.saijiki.v4` in `core/crates/inku-ddl/assets/saijiki-v4.json`: 103 words in 16 categories and 11 separate relation words.
+Japanese is canonical. Spellings follow `inku.saijiki.v4` in `core/crates/inku-ddl/assets/saijiki-v4.json`: 106 rows in 16 categories (103 displayed and three marker-only) and 11 separate relation words.
 
 ### Reading and writing the words
 
@@ -829,7 +829,7 @@ The `default=true` flags on pen, solid, empty, and black annotate the reference 
 | `ji` | じ | grounds | 7 | Public |
 | `iro` | いろ | colors | 9 | Public |
 | `yuragi` | ゆらぎ | movements | 6 | Public |
-| `basho` | ばしょ | places | 8 | Public |
+| `basho` | ばしょ | places | 11 | Eight public; start, end and partway are marker-only |
 | `ugoki` | うごき | motions | 6 | Public |
 | `jun` | じゅん | order | 2 | Public |
 | `wariai` | わりあい | proportions | 4 | Public |
@@ -1025,7 +1025,7 @@ English `sways` and `undulates` are permitted grammatical forms of their rows. `
 
 ### 4.12. Places — ばしょ
 
-A place can name a region, rather than a fixed point. Coordinates below run from the canvas's top left at (0,0) to its bottom right at (1,1). Place and draw select an anchor after shrinking the region to two thirds about its center. Line-up, scatter, and tile distribute marks using the region. Start, end, and partway are not independent canvas placement regions.
+A place can name a region, rather than a fixed point. Coordinates below run from the canvas's top left at (0,0) to its bottom right at (1,1). Place and draw select an anchor after shrinking the region to two thirds about its center. Line-up, scatter, and tile distribute marks using the region. Start, end and partway are marker-only words omitted from the displayed list; they are read in relation phrases, and their reading alone remains as in v3. They are not independent canvas placement regions.
 
 | Japanese | English | Meaning and acceptance | Short usage |
 |---|---|---|---|
@@ -1040,7 +1040,7 @@ A place can name a region, rather than a fixed point. Coordinates below run from
 
 English `left edge`, `right edge`, `top edge`, and `bottom edge` are parser spellings of the same rows. A named place conflicts with a numeric position, range, or pair of endpoints on the same mark. With no place, place and draw use the center region; line-up, scatter, tile, and fill use the whole canvas.
 
-The table's start, end, and partway examples require a target drawn by the preceding sentence. Precede the start and partway examples with `赤い線を引く。` / `Draw a red line.`, and the end example with `赤い弧を引く。` / `Draw a red arc.` Pasting a relation phrase alone into empty instructions reports a missing preceding target.
+Start, end and partway in relation phrases require a preceding target. For example, write `Draw a red line.` before `Draw an arc connected to the start of the previous line.` A relation phrase alone reports a missing preceding target.
 
 ### 4.13. Motions — うごき
 

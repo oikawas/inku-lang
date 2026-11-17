@@ -121,7 +121,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 | **わりあい** | 縦長、横長、全幅、半幅 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる、つながる、載る、中に、重なる、横切る、鏡写し |
 
-多角形・左上がり・左下がりは歳時記の画面と読み手の一覧に出す。
+多角形・左上がり・左下がりは歳時記の画面と読み手の一覧に出す。始点・終点・途中はばしょの一覧と読み手の一覧には出さず、「前の線の始点につながる」などの関係句で読む。単独で書いた場合も v3 と同じように読む。
 
 英語の端の語はハイフンで書く（`left-edge`・`right-edge`・`top-edge`・`bottom-edge`）。空白で書いた`left edge`・`right edge`・`top edge`・`bottom edge`も同じ位置の語として読む（DDL 17）。`line-up`に対する`line up`と同じく、空白の書き方はparserだけが読む別の書き方で、型を埋める工程のpromptと歳時記の表示はハイフンの語のままである。
 
@@ -190,6 +190,8 @@ Webの歳時記previewも現行カテゴリに合わせる。おもて9語は同
 - **語はその性質のカテゴリに置き、名は意味を言う**：おもては面の技法を、ゆらぎは痕の揺れの形を言う。
 - **構造で伝える**：語は持ち主（歳時記の共有assetと構文の修飾語の表）で変え、下絵の語の一覧・受理行列・応答の型へ投影して読み手に届ける。指示文の説明だけを変えて済ませない。
 - **版を上げて移行する**：語の形・意味・カテゴリを変えるときは歳時記の版を上げる。現行は `inku.saijiki.v4`。保存済みの文書は旧い版の文法で読む。語ごとに新しい版の語へ一度だけ上書きで書き換える。新しい版に同じ意味の語が無い語は、作者が1語ずつ決めた近い語へ寄せ、寄せた位置を移行の結果に残す（例: 一点鎖線→破線、小さめ→小さな）。保存済みのScoreとSVGは書き換えないので、保存した絵は変わらない。この移行は新しいvariationを作らず、§12.8の再正規化とは別の操作である。保存済みのMacro定義も書き換え、作品のlockを新しい定義へ移す。
+
+v3 の上弦・下弦は回転の数を添えた半円に書き換える。回転を書けない所は半円に寄せ、文書の `approximated_words` に位置を残す。Macro 定義も近い語に寄せた意味参照の JSON path を `approximated_refs` に返す。寄せた語や上弦・下弦の書き換えは意味の文書を変えるので、同じ作品のほかの無作為の選びも変わりうる。密な・疎なだけを書いた痕は、意味の digest を作るとき v3 と同じ fineness の欄に置き、v3 と同じ digest を保つ。大きさと詰まり方を両方書いた痕は別々の欄を使う。
 
 歳時記 v2（2026-09-29）で、v1 の例外は改めた：英語の`large`の二義、おもての`濃い`・`薄い`（形容詞）と`薄墨`（素材の名）、ゆらぎの`ゆっくり`・`速く`（波の数）、下絵の応答の型の値`fine`・`large`・`solid`と欄の名`place`。今は例外を持たない。
 
@@ -2450,7 +2452,7 @@ JSON Score は共有lowererが検証済みmeaningから作る機械可読の楽�
 
 **記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へsilent rewriteせず、単独primitiveは予算内のsource順prefixを描画して要求数と実行数を診断する。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行の単独図形・反復配置で、個数と独立にcircle / square / ellipse / cloudform / triangle / polygonについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Lineのnormal lengthとArcのnormal chordも`6/25`、free_lineのnormal lengthは`11/20`（0.55）で、Arcのsagittaはchordの`1/4`、Pointのnormal diameterは`3/250`（0.012）である。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`で、その上にstandard・strong smallを反転した`2`（`特大の` / `extra-large`）と`8/3`（`巨大な` / `huge`）がある。normalは`1`で、通常geometryへexact rationalとして一度だけ掛ける。Lineはlength、Arcはchordとsagittaを相似に、Pointはdiameterを拡縮する。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryへqualitative sizeの倍率を掛けない。数値寸法・qualitative size・全幅／半幅を複数指定した場合は、それぞれを独立候補として保持し、`ConflictingSizeSpecifications`に候補と有効値を記録して代表寸法の最小値へ相似に回復する。元の指定と明示した縦横比を保ち、旧Stop / OmitAndContinueの両入力に同じ回復を適用する。自由なdegree同義語やhidden LLMで補わない。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行の単独図形・反復配置で、個数と独立にcircle / square / ellipse / cloudform / triangle / polygonについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Lineのnormal lengthとArcのnormal chordも`6/25`、free_lineのnormal lengthは`11/20`（0.55）で、Arcのsagittaはchordの`1/4`、Pointのnormal diameterは`3/250`（0.012）である。現行の歳時記のおおきさ5語、ごく小さな・小さな・普通の大きさ・大きな・ごく大きなは、それぞれ倍率 `3/8`・`1/2`・`1`・`3/2`・`7/4` を使う。内部の `CoreModifierValue` の9値と幾何方針は保存済み Macro 定義などとの互換のため `3/4`・`5/4`・`2`・`8/3` も保持するが、これらは現行の歳時記語を増やさない。通常geometryへexact rationalとして一度だけ掛ける。Lineはlength、Arcはchordとsagittaを相似に、Pointはdiameterを拡縮する。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryへqualitative sizeの倍率を掛けない。数値寸法・qualitative size・全幅／半幅を複数指定した場合は、それぞれを独立候補として保持し、`ConflictingSizeSpecifications`に候補と有効値を記録して代表寸法の最小値へ相似に回復する。元の指定と明示した縦横比を保ち、旧Stop / OmitAndContinueの両入力に同じ回復を適用する。自由なdegree同義語やhidden LLMで補わない。
 
 Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去のcircle `0.038` / ellipse `0.06×0.032`という固定寸法 calibration は現役candidateではなく、context前のcandidateはsymbolic size intentを保持する。値と経緯は CHANGELOG に置く。
 

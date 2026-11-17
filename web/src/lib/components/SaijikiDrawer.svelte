@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
+	import { SAIJIKI, SAIJIKI_EN, saijikiWordsFor, saijikiGroups, bundleLabel } from '$lib/saijiki';
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { instructionLangOf, type ResolvedInstructionLang } from '$lib/instructionLang';
@@ -46,6 +46,12 @@
 	// The reference keeps the reader's language even when its clicked word is
 	// inserted into the instructions box. The editor's own panel follows DDL.
 	const wordLang = $derived(ddlLang ?? instructionLangOf(getLang()));
+	function preview(categoryKey: string, canonical: string, word: string): SaijikiPreview {
+		const result = previewForWord(categoryKey, canonical, word, wordLang);
+		const category = (getLang() === 'ja' ? SAIJIKI : SAIJIKI_EN).find((item) => item.key === categoryKey);
+		const index = SAIJIKI.find((item) => item.key === categoryKey)?.words.indexOf(canonical) ?? -1;
+		return { ...result, effect: category?.descriptions[index] || result.effect };
+	}
 
 	function selectWord(word: string, preview: SaijikiPreview): void {
 		onInsertWord?.(word);
@@ -106,9 +112,11 @@
 					<div class="saijiki-preview-placeholder">{t().saijikiPreviewPlaceholder}</div>
 				{/if}
 			</div>
-			{#each SAIJIKI as cat, ci (cat.key)}
+			{#each saijikiGroups(SAIJIKI) as group (group.key)}
+				<div class="saijiki-cat-head">{bundleLabel(group.key, getLang() === 'ja')}</div>
+				{#each group.categories as cat (cat.key)}
 				{@const words = saijikiWordsFor(cat.key, wordLang === 'ja')}
-				<div class="saijiki-cat" style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
+				<div class="saijiki-cat">
 					<div class="saijiki-cat-head">
 						<span class="saijiki-cat-ja">{cat.label}</span>
 						<span class="saijiki-cat-en">{cat.en}</span>
@@ -119,13 +127,14 @@
 							<button
 								class="saijiki-chip"
 								onpointerdown={(e) => e.preventDefault()}
-								onclick={() => selectWord(word, previewForWord(cat.key, canonicalWord, word, wordLang))}
-								onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
-								onfocus={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
+								onclick={() => selectWord(word, preview(cat.key, canonicalWord, word))}
+								onpointerenter={() => (activePreview = preview(cat.key, canonicalWord, word))}
+								onfocus={() => (activePreview = preview(cat.key, canonicalWord, word))}
 							>{word}</button>
 						{/each}
 					</div>
 				</div>
+				{/each}
 			{/each}
 			{#if pluginEntries.length > 0}
 				<div class="saijiki-cat plugin-cat">

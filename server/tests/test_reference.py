@@ -82,8 +82,7 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
     # lists "free line", the Score writes free_line (I-715 B2).
     forms_en = {form.replace(" ", "_") for form in saijiki["core_categories_en"]["forms"]}
     primitives = set(get_args(schema.Primitive))
-    assert forms_en <= primitives
-    assert primitives - forms_en <= {"polygon"}
+    assert forms_en - {"semicircle", "crescent"} == primitives
     assert set(saijiki["core_categories_ja"]) == {
         "かたち",
         "かたむき",
@@ -96,7 +95,6 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
         # DDL 24 (2026-10-22): the size or the spacing of a named texture's
         # units, and the paint under it.
         "きめ",
-        "したじ",
         # ddl-engine 19: the support a work is made on. It stands beside おもて
         # for the reason おもて stands beside つらなり -- one says how the inside
         # of a shape is, the other how the sheet under it is.
@@ -108,6 +106,8 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
         # The finite sequences a work may cycle through (交互に, 順に); SPEC §3.1.
         "じゅん",
         "わりあい",
+        "ふとさ",
+        "おおきさ",
     }
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import json
 
 _SERVER_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SERVER_SRC) not in sys.path:
@@ -34,7 +35,10 @@ def _render_array(name: str, lang: str) -> list[str]:
         lines.append(f"\t\tkey: {_ts_string(str(category['key']))},")
         lines.append(f"\t\tlabel: {_ts_string(str(category['name_ja']))},")
         lines.append(f"\t\ten: {_ts_string(str(category['name_en']))},")
-        lines.append(f"\t\twords: [{words}]")
+        lines.append(f"\t\tbundle: {_ts_string(str(category['bundle']))},")
+        lines.append(f"\t\twords: [{words}],")
+        for field in ("ids", "facets", "descriptions"):
+            lines.append(f"\t\t{field}: {json.dumps(category[field], ensure_ascii=False)},")
         lines.append("\t},")
     lines.append("];")
     return lines

@@ -189,11 +189,11 @@ export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 		exampleEn: 'Place a crosshatch square',
 		svg: surfaceSvg(surfaceHatch([45, 115], 9, 2, 0.5))
 	},
-	アクアチント: {
+	メゾチント: {
 		effect: '粒の濃さを段に分ける。既定は三段。',
-		example: 'アクアチントの四角を置く',
+		example: 'メゾチントの四角を置く',
 		effectEn: 'Divides the grain into discrete tone steps, three by default.',
-		exampleEn: 'Place an aquatint square',
+		exampleEn: 'Place a mezzotint square',
 		svg: surfaceSvg(
 			surfaceDabs(26, 1.5, 0.28, 2.3, 51, 76) +
 				surfaceDabs(26, 1.5, 0.56, 6.1, 77, 103) +
@@ -208,22 +208,22 @@ export const HANDLING_PREVIEWS: Record<string, PreviewEntry> = {
 		effect: '道具の本来の濃さより濃く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が濃い点描。',
 		example: '鉛筆の濃い点描の四角を置く',
 		effectEn:
-			'Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: dense stipple.',
+			'Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: dense stipple.',
 		exampleEn: 'Place a dense stipple pencil square',
 		svg: surfaceSvg(handlingRelative(0.66 * 1.35))
 	},
 	程よい: {
 		effect: '道具の本来の濃さで置く。さばきを省略した痕と同じ。図は左右とも程よい鉛筆の点描。',
 		example: '鉛筆の程よい点描の四角を置く',
-		effectEn: 'Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show temperate pencil stipple.',
-		exampleEn: 'Place a temperate stipple pencil square',
+		effectEn: 'Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show moderate pencil stipple.',
+		exampleEn: 'Place a moderate stipple pencil square',
 		svg: surfaceSvg(handlingRelative(0.66))
 	},
 	薄い: {
 		effect: '道具の本来の濃さより淡く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が薄い点描。',
 		example: '鉛筆の薄い点描の四角を置く',
 		effectEn:
-			'Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: faint stipple.',
+			'Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: moderate pencil stipple; right: faint stipple.',
 		exampleEn: 'Place a faint stipple pencil square',
 		svg: surfaceSvg(handlingRelative(0.66 * 0.55))
 	}

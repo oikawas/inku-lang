@@ -4,7 +4,11 @@ export type SaijikiCategory = {
 	key: string;
 	label: string;
 	en: string;
+	bundle: string;
 	words: string[];
+	ids: string[];
+	facets: (string | null)[];
+	descriptions: (string | null)[];
 };
 
 // Module-level mutable vocabulary store (v1.92 Phase 3). The single source is
@@ -40,4 +44,17 @@ export function hydrateSaijikiEn(categories: SaijikiCategory[]): void {
 export function saijikiWordsFor(categoryKey: string, isJapanese: boolean): string[] {
 	const source = isJapanese ? SAIJIKI : SAIJIKI_EN;
 	return source.find((cat) => cat.key === categoryKey)?.words ?? [];
+}
+
+const BUNDLE_ORDER = ['what', 'where', 'with', 'face', 'ground', 'color', 'sway'] as const;
+export function saijikiGroups(categories: SaijikiCategory[]) {
+	return BUNDLE_ORDER.map((key) => ({ key, categories: categories.filter((category) => category.bundle === key) }));
+}
+
+export function bundleLabel(key: string, japanese: boolean): string {
+	const labels: Record<string, [string, string]> = {
+		what: ['かたち', 'What'], where: ['場所と動き', 'Where'], with: ['道具', 'With'],
+		face: ['面', 'Face'], ground: ['地', 'Ground'], color: ['色', 'Color'], sway: ['揺れ', 'Sway']
+	};
+	return labels[key]?.[japanese ? 0 : 1] ?? key;
 }

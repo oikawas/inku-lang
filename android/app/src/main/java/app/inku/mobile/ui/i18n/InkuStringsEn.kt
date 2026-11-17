@@ -666,6 +666,7 @@ object InkuStringsEn : InkuStrings {
     override val tapWordToSelect = "Tap a word in the text to select it"
     override val search = "Search"
     override val saijiki = "Saijiki"
+    override val saijikiDescriptionFallback = "A vocabulary word that shapes how the description is read."
     override val svgGeneric = "Generic SVG"
     override val confirm = "OK"
     override val producedInstructions = "Instructions (normalized DDL)"

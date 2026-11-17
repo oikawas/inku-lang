@@ -521,6 +521,7 @@ interface InkuStrings {
     val tapWordToSelect: String
     val search: String
     val saijiki: String
+    val saijikiDescriptionFallback: String
     val svgGeneric: String
     val confirm: String
     val producedInstructions: String

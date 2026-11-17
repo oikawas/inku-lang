@@ -640,6 +640,7 @@ object InkuStringsJa : InkuStrings {
     override val tapWordToSelect = "本文の語をタップで選択"
     override val search = "検索"
     override val saijiki = "歳時記"
+    override val saijikiDescriptionFallback = "記述の解釈に影響する語彙です。"
     override val svgGeneric = "汎用SVG"
     override val confirm = "決定"
     override val producedInstructions = "生成された指示文"

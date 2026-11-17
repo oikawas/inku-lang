@@ -57,11 +57,6 @@ const SURFACE_BLEED_RINGS: usize = 3;
 const SURFACE_DEFAULT_DENSITY: f64 = 0.35;
 const SURFACE_DEFAULT_SCALE: f64 = 0.35;
 
-/// Prototype parameters for distinct point surfaces (render engine 104).
-const STIPPLE_RADIUS_FACTOR: f64 = 2.4;
-const STIPPLE_COUNT_FACTOR: f64 = 1.5;
-const STIPPLE_MAX: usize = 2400;
-const STIPPLE_OPACITY_MIN: f64 = 0.8;
 /// The share of the tool's opacity a 粒 face deposits (render engine 104).
 const GRAIN_DEPOSIT: f64 = 0.6;
 /// The finest noise period a face draws, in mm at a 30 cm sheet (render engine 104).
@@ -729,7 +724,7 @@ fn sweep_parts(
 /// Met's open-access mezzotints and chalk drawings): their texture is 0.1 to
 /// 0.3 mm fine, far below a point per element, so the faces are laid by an SVG
 /// noise filter, cut to a cover, inside the contour. 点描 lays its own dots
-/// ([`stipple_face`]): at the noise's period it could not be told from the
+/// (directly or in tiles): at the noise's period it could not be told from the
 /// mezzotint (the author's sheet 08, 2026-11-17).
 #[derive(Clone, Copy)]
 enum NoiseKind {
@@ -1511,27 +1506,10 @@ fn render_vectors(
     let area_factor = ((width * height) / (context.canvas.unit().powi(2) * 0.18))
         .clamp(0.2, SURFACE_AREA_FACTOR_MAX);
     match surface.texture {
-        SurfaceTexture::Stipple | SurfaceTexture::PaperGrain => {
-            let stipple = surface.texture == SurfaceTexture::Stipple;
-            let count_factor = if stipple { STIPPLE_COUNT_FACTOR } else { 1.0 };
-            let maximum = if stipple {
-                STIPPLE_MAX
-            } else {
-                SURFACE_MARK_MAX
-            };
-            let count = ((maximum as f64 * cover * count_ratio) as usize).min(
-                ((22.0 + density * 120.0) * area_factor * cover * count_ratio * count_factor)
-                    as usize,
-            );
-            let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45)
-                * size
-                * if stipple { STIPPLE_RADIUS_FACTOR } else { 1.0 };
-            let opacity = if stipple {
-                (mark_style(instruction, context).stroke_opacity * underpaint_boost(instruction))
-                    .min(1.0)
-            } else {
-                opacity
-            };
+        SurfaceTexture::PaperGrain => {
+            let count = ((SURFACE_MARK_MAX as f64 * cover * count_ratio) as usize)
+                .min(((22.0 + density * 120.0) * area_factor * cover * count_ratio) as usize);
+            let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45) * size;
             for (index, point) in scatter(contour, count, seed).into_iter().enumerate() {
                 // A dab is at most 1.65 `radius` round, and its stroke runs at
                 // most 1.75 of that from its point.
@@ -1545,14 +1523,7 @@ fn render_vectors(
                     DabSpec {
                         radius: radius * (0.55 + hash01(index as i64, seed, "surface-r") * 1.1),
                         color: &color,
-                        opacity: opacity
-                            * if stipple {
-                                STIPPLE_OPACITY_MIN
-                                    + hash01(index as i64, seed, "surface-o")
-                                        * (1.0 - STIPPLE_OPACITY_MIN)
-                            } else {
-                                0.45 + hash01(index as i64, seed, "surface-o") * 0.55
-                            },
+                        opacity: opacity * (0.45 + hash01(index as i64, seed, "surface-o") * 0.55),
                         seed,
                         index: index as i64,
                         class_name: "surface-stroke-v1",
@@ -1776,7 +1747,10 @@ fn render_vectors(
                 }
             }
         }
-        SurfaceTexture::None | SurfaceTexture::Solid | SurfaceTexture::Grain => {}
+        SurfaceTexture::None
+        | SurfaceTexture::Solid
+        | SurfaceTexture::Grain
+        | SurfaceTexture::Stipple => {}
     }
 }
 

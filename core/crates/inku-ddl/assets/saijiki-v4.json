@@ -268,6 +268,39 @@
       ],
       "marker_order_ja": null,
       "marker_order_en": null
+    },
+    {
+      "key": "futosa",
+      "name_ja": "ふとさ",
+      "name_en": "widths",
+      "bundle": "with",
+      "core_modifier": "thinness",
+      "marker_class": null,
+      "words": [
+        {"id": "extra_fine", "surface_ja": "ごく細い", "surface_en": "very thin", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "core_modifier_value": "extra_fine"},
+        {"id": "fine", "surface_ja": "細い", "surface_en": "thin", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "core_modifier_value": "fine"},
+        {"id": "thick", "surface_ja": "太い", "surface_en": "thick", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "core_modifier_value": "thick"},
+        {"id": "extra_thick", "surface_ja": "ごく太い", "surface_en": "very thick", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "core_modifier_value": "extra_thick"}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "ookisa",
+      "name_ja": "おおきさ",
+      "name_en": "sizes",
+      "bundle": "what",
+      "core_modifier": "relative_scale",
+      "marker_class": null,
+      "words": [
+        {"id": "very_small", "surface_ja": "ごく小さな", "surface_en": "very small", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["ごく小さい"], "core_modifier_value": "very_small"},
+        {"id": "small", "surface_ja": "小さな", "surface_en": "small", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["小さい"], "core_modifier_value": "small"},
+        {"id": "normal", "surface_ja": "普通の大きさ", "surface_en": "normal-sized", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "core_modifier_value": "normal"},
+        {"id": "large", "surface_ja": "大きな", "surface_en": "large", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["大きい"], "core_modifier_value": "large"},
+        {"id": "very_large", "surface_ja": "ごく大きな", "surface_en": "very large", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["ごく大きい"], "core_modifier_value": "very_large"}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
     }
   ],
   "relations": [

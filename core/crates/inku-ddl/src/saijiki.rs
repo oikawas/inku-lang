@@ -111,6 +111,11 @@ pub struct SaijikiCategoryAsset {
     /// none): `what`, `with`, `face`, `sway`, `color`, `where`, `ground`.
     #[serde(default)]
     pub bundle: Option<String>,
+    /// The syntactic modifier dimension the category's words are read as (Saijiki v4: ふとさ
+    /// `thinness` and おおきさ `relative_scale`). Such words are carried as core modifiers,
+    /// not as Saijiki words; the parser builds its modifier forms from them.
+    #[serde(default)]
+    pub core_modifier: Option<String>,
     pub marker_class: Option<String>,
     pub words: Vec<SaijikiWordAsset>,
     pub marker_order_ja: Option<Vec<String>>,
@@ -152,6 +157,10 @@ pub struct SaijikiWordAsset {
     /// a sentence of the word alone is the partner's, and any other place is this word's.
     #[serde(default)]
     pub shared_surface_with: Option<String>,
+    /// The core modifier value of a word of a `core_modifier` category, named as a Macro
+    /// semantic reference names it (`extra_fine`, `very_small`, ...).
+    #[serde(default)]
+    pub core_modifier_value: Option<String>,
 }
 
 /// Bilingual physical trace description attached to one Saijiki word.
@@ -761,7 +770,11 @@ fn validate_semantic_aliases(asset: &SaijikiAsset) -> Result<(), SaijikiProjecti
 
 fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
     let mut owners = HashMap::<String, (String, String)>::new();
-    for category in &asset.categories {
+    for category in asset
+        .categories
+        .iter()
+        .filter(|category| category.core_modifier.is_none())
+    {
         for word in &category.words {
             if word.shared_surface_with.is_some() {
                 // Its surfaces are its partner's; the partner registers them once.
@@ -867,7 +880,12 @@ fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectio
 /// row a reader can recognize are distinct across the asset, so no word is read by position.
 fn validate_japanese_surfaces(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
     let mut owners = HashMap::<&str, (&str, &str)>::new();
-    for category in &asset.categories {
+    // Core modifier words are read by the parser's modifier grammar, not as Saijiki words.
+    for category in asset
+        .categories
+        .iter()
+        .filter(|category| category.core_modifier.is_none())
+    {
         for word in &category.words {
             if !(word.prompt || word.display || word.marker == Some(true)) {
                 continue;

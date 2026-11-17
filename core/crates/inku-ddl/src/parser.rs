@@ -281,23 +281,89 @@ pub struct CoreModifierSurfaceForms {
     pub relative_scale: &'static [(&'static str, CoreModifierValue)],
 }
 
+/// The modifier forms the current edition reads.
 pub fn core_modifier_surface_forms(
     language: ResolvedInstructionLanguage,
 ) -> CoreModifierSurfaceForms {
-    match language {
-        ResolvedInstructionLanguage::Ja => CoreModifierSurfaceForms {
-            regular: "正形",
-            sides_prefix: "辺数",
-            thinness: THINNESS_SURFACES_JA,
-            relative_scale: RELATIVE_SCALE_SURFACES_JA,
-        },
-        ResolvedInstructionLanguage::En => CoreModifierSurfaceForms {
-            regular: "regular",
-            sides_prefix: "sides ",
-            thinness: THINNESS_SURFACES_EN,
-            relative_scale: RELATIVE_SCALE_SURFACES_EN,
-        },
+    core_modifier_surface_forms_in(SaijikiEdition::CURRENT, language)
+}
+
+/// The modifier forms one edition reads. Saijiki v4 owns its thinness and relative-scale
+/// words (ふとさ・おおきさ) and the forms are built from them; the retired editions read the
+/// fixed tables the migration needs to recognize their documents.
+pub(crate) fn core_modifier_surface_forms_in(
+    edition: SaijikiEdition,
+    language: ResolvedInstructionLanguage,
+) -> CoreModifierSurfaceForms {
+    let (regular, sides_prefix) = match language {
+        ResolvedInstructionLanguage::Ja => ("正形", "辺数"),
+        ResolvedInstructionLanguage::En => ("regular", "sides "),
+    };
+    let (thinness, relative_scale) = match (edition, language) {
+        (SaijikiEdition::V4, _) => (
+            asset_core_modifier_forms(language, "thinness"),
+            asset_core_modifier_forms(language, "relative_scale"),
+        ),
+        (_, ResolvedInstructionLanguage::Ja) => (THINNESS_SURFACES_JA, RELATIVE_SCALE_SURFACES_JA),
+        (_, ResolvedInstructionLanguage::En) => (THINNESS_SURFACES_EN, RELATIVE_SCALE_SURFACES_EN),
+    };
+    CoreModifierSurfaceForms {
+        regular,
+        sides_prefix,
+        thinness,
+        relative_scale,
     }
+}
+
+/// The surfaces of the current asset's words of one core modifier dimension, longest first
+/// so a longer form is tried before a shorter one it contains (`very small` before `small`).
+/// The canonical surface of a word comes before its other forms.
+fn asset_core_modifier_forms(
+    language: ResolvedInstructionLanguage,
+    dimension: &str,
+) -> &'static [(&'static str, CoreModifierValue)] {
+    use std::sync::OnceLock;
+    static FORMS: OnceLock<[Vec<(&'static str, CoreModifierValue)>; 4]> = OnceLock::new();
+    let forms = FORMS.get_or_init(|| {
+        let build = |language: ResolvedInstructionLanguage, dimension: &str| {
+            let mut forms = crate::saijiki::saijiki_asset()
+                .categories
+                .iter()
+                .filter(|category| category.core_modifier.as_deref() == Some(dimension))
+                .flat_map(|category| &category.words)
+                .flat_map(|word| {
+                    let value = word
+                        .core_modifier_value
+                        .as_deref()
+                        .and_then(|id| CoreModifierValue::from_semantic_ref(dimension, id))
+                        .expect("embedded core modifier words must name a modifier value");
+                    parser_candidate_surfaces(word, language)
+                        .into_iter()
+                        .map(move |surface| match surface {
+                            std::borrow::Cow::Borrowed(surface) => (surface, value),
+                            std::borrow::Cow::Owned(_) => {
+                                unreachable!("core modifier words have no derived English forms")
+                            }
+                        })
+                })
+                .collect::<Vec<_>>();
+            forms.sort_by_key(|(surface, _)| std::cmp::Reverse(surface.chars().count()));
+            forms
+        };
+        [
+            build(ResolvedInstructionLanguage::Ja, "thinness"),
+            build(ResolvedInstructionLanguage::Ja, "relative_scale"),
+            build(ResolvedInstructionLanguage::En, "thinness"),
+            build(ResolvedInstructionLanguage::En, "relative_scale"),
+        ]
+    });
+    let index = match (language, dimension) {
+        (ResolvedInstructionLanguage::Ja, "thinness") => 0,
+        (ResolvedInstructionLanguage::Ja, _) => 1,
+        (ResolvedInstructionLanguage::En, "thinness") => 2,
+        (ResolvedInstructionLanguage::En, _) => 3,
+    };
+    &forms[index]
 }
 
 const PRIORITY_FUNCTION: u8 = 1;
@@ -847,7 +913,13 @@ fn asset_word_candidates(
     };
     cache.get_or_init(|| {
         let mut entries = Vec::new();
-        for category in &edition.asset().categories {
+        // Core modifier words (ふとさ・おおきさ) are read by the modifier grammar.
+        for category in edition
+            .asset()
+            .categories
+            .iter()
+            .filter(|category| category.core_modifier.is_none())
+        {
             for word in &category.words {
                 if word.shared_surface_with.is_some() {
                     // Delivered as its partner's word and read by place afterwards.
@@ -1164,7 +1236,7 @@ fn candidates_at_uncached(
         ResolvedInstructionLanguage::Ja => crate::shape_constraint::SHAPE_HEADS_JA,
         ResolvedInstructionLanguage::En => crate::shape_constraint::SHAPE_HEADS_EN,
     };
-    let modifier_forms = core_modifier_surface_forms(language);
+    let modifier_forms = core_modifier_surface_forms_in(edition, language);
     push_surface_candidate(
         edition,
         &mut candidates,

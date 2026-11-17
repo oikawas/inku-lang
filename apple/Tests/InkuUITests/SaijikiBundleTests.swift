@@ -16,6 +16,8 @@ final class SaijikiBundleTests: XCTestCase {
         XCTAssertEqual(ground.bundle, "ground")
         XCTAssertEqual(ground.words.last?.id, "ji:画面比")
         XCTAssertEqual(bootstrap.saijiki.first { $0.id == "aida" }?.bundle, "where")
+        let places = try XCTUnwrap(bootstrap.saijiki.first { $0.id == "basho" })
+        XCTAssertTrue(Set(places.words.map(\.japanese)).isDisjoint(with: ["始点", "終点", "途中"]))
         XCTAssertEqual(bootstrap.saijiki.flatMap(\.words).filter { !$0.referenceOnly && !$0.id.hasPrefix("aida:") }.count,
                        bootstrap.productReference.saijikiPreviews.count)
     }

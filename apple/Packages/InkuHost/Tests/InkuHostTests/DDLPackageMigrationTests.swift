@@ -4,6 +4,14 @@ import Testing
 @testable import InkuHost
 
 struct DDLPackageMigrationTests {
+    @Test func v3ImportReportsApproximationOfRotatedWaxingArc() throws {
+        let file: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),
+            "language": .string("ja"), "ddl": .string("中心に、黒のペンの右上がりの上弦の弧を1本引く。"), "plugins": .array([])])
+        let result = try DDLPackageImport.parse(file.data)
+        #expect(result.source == "中心に、黒のペンの右上がりの半円の弧を1本引く。")
+        #expect(result.approximatedWords.count == 1)
+    }
+
     @Test func v3ImportCountsApproximationsInsideDefinitions() throws {
         let definition = try ExactJSON(data: Data(#"{"schema":"inku.macro-definition.v1","namespace":"Saved","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"continuity":{"expr":"semantic_ref","category":"continuity","id":"dash_dot"}}}]}"#.utf8))
         let file: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"),

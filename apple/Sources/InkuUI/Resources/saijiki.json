@@ -1269,6 +1269,42 @@
         },
         {
           "default": false,
+          "display": false,
+          "id": "start",
+          "marker": true,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": false,
+          "score_value": null,
+          "surface_en": "start",
+          "surface_ja": "始点"
+        },
+        {
+          "default": false,
+          "display": false,
+          "id": "end",
+          "marker": true,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": false,
+          "score_value": null,
+          "surface_en": "end",
+          "surface_ja": "終点"
+        },
+        {
+          "default": false,
+          "display": false,
+          "id": "partway",
+          "marker": true,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": false,
+          "score_value": null,
+          "surface_en": "partway",
+          "surface_ja": "途中"
+        },
+        {
+          "default": false,
           "display": true,
           "id": "corner",
           "marker": null,

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Swift (macOS and iOS): when migrating Saijiki v3, waxing and waning arcs whose direction cannot be expressed are approximated as semicircles and their locations are retained in the migration result. “Start”, “end”, and “partway” remain recognized without appearing in the vocabulary display.
+
 - Swift (macOS and iOS): the Saijiki window and the description editor group vocabulary categories under the same bundle headings as the Web. A word's asset description takes precedence, falling back to the preview text when absent.
 
 - Swift (macOS and iOS): adopts Saijiki v4 and migrates saved works in DB v10. Imports of v3 DDL exports migrate as well and retain approximated word locations and the count of approximated definition references. The DB migration report also retains the paths inside definitions.

@@ -947,11 +947,11 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 塗り | `flat` | 面を一様に塗る。 | `塗りの四角を置く。` / `Place a flat square.` |
 | 刷き | `sweep` | 面を少し角度を変えて二度掃き、各掃きの帯を一枚の膜にする。開いた痕では幅広い帯になる。 | `刷きの四角を置く。` / `Place a sweep square.` |
 | 刷毛目 | `brushmarks` | 帯を一本ずつ重ね、重なった所が濃い筋になる。閉じた形の面だけに使う。 | `刷毛目の四角を置く。` / `Place a brushmarks square.` |
-| 粒 | `grain` | 細かな粒と擦れた粗さを作る。開いた痕では支持体の歯を強める。 | `粒の四角を置く。` / `Place a grain square.` |
-| 点描 | `stipple` | 面に点を撒いて濃淡を作る。形の点とは別の語。 | `点描の円を置く。` / `Place a stipple circle.` |
+| 粒 | `grain` | 紙の歯で途切れる方向のある筆致を作る。開いた痕では支持体の歯を強める。 | `粒の四角を置く。` / `Place a grain square.` |
+| 点描 | `stipple` | 同じ大きさの丸い点で左上から右下へ濃くなる調子を作る。形の点とは別の語。 | `点描の円を置く。` / `Place a stipple circle.` |
 | 平行線 | `hatch` | 平行な線で面を埋める。線の名詞を複数置く指定とは別。 | `平行線の四角を置く。` / `Place a hatch square.` |
 | 交差線 | `crosshatch` | 平行線にもう一組を交差させる。 | `交差線の四角を置く。` / `Place a crosshatch square.` |
-| アクアチント | `aquatint` | 粒の濃さを段に分ける。通常は三段。 | `アクアチントの四角を置く。` / `Place an aquatint square.` |
+| アクアチント | `aquatint` | 深い調子に細かい明るい点がのぞき、左上へ明るくなるメゾチントの面を作る。 | `アクアチントの四角を置く。` / `Place an aquatint square.` |
 
 | 対象 | 受理と演奏の制限 |
 |---|---|

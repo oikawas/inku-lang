@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Drawing (render engine 104): grain, stipple and aquatint now draw as strokes broken by paper tooth, round dots with a sloping tone, and a burnished mezzotint face. Reperformance changes works with these textures on closed shapes; saved SVGs do not.
+
 - Swift: the About vocabulary table now has updated descriptions of the description, instructions, score, and performance.
 
 - Swift: the About concept is shorter, and the “Vocabulary and layers” heading is now “Vocabulary” in both Japanese and English.

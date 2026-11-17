@@ -182,6 +182,22 @@ impl Document {
         }
     }
 
+    /// Add a definition unless one with the same id is already there (the
+    /// grain tiles that every face of one instruction shares, render engine 104).
+    #[cfg(feature = "geometry-export")]
+    pub(crate) fn push_definition_once(&mut self, definition: Element) {
+        if let (Some(id), Some(Node::Element(defs))) =
+            (definition.attribute("id"), self.root.children.first())
+            && defs.name == "defs"
+            && defs.children.iter().any(
+                |node| matches!(node, Node::Element(existing) if existing.attribute("id") == Some(id)),
+            )
+        {
+            return;
+        }
+        self.push_definition(definition);
+    }
+
     #[must_use]
     pub fn serialize(&self) -> String {
         let mut output = String::with_capacity(self.root.unescaped_len().max(4096));

@@ -10,7 +10,9 @@ use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element,
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
 use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
-use crate::marks::{MarkContext, intensity_factor, mark_width, reaches_canvas, sweep_band_width};
+use crate::marks::{
+    MarkContext, intensity_factor, mark_style, mark_width, reaches_canvas, sweep_band_width,
+};
 use crate::materials::{texture_filter_id, with_texture_filter};
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
@@ -48,15 +50,26 @@ const SURFACE_SWEEP_OPACITY: f64 = 0.5;
 /// 1.2 of one band's opacity, which keeps a face's mean tone (calibrated on the
 /// author's batch of Build 1309).
 const SURFACE_SWEEP_PASS_FACTOR: f64 = 1.2;
-/// The dab shapes one grain face places, its sizes split evenly over 0.55 to
-/// 1.65 of the grain radius (render engine 90).
-const SURFACE_GRAIN_SHAPES: usize = 12;
 const SURFACE_BLEED_RINGS: usize = 3;
 /// A surface's default density and scale (the Score's `SurfaceSpec`). The
 /// fineness words (DDL 24) move a named texture away from them, and the units'
 /// own formulas read these (render engine 89).
 const SURFACE_DEFAULT_DENSITY: f64 = 0.35;
 const SURFACE_DEFAULT_SCALE: f64 = 0.35;
+
+/// The share of the tool's opacity a 粒 face deposits (render engine 104).
+const GRAIN_DEPOSIT: f64 = 0.6;
+/// The finest noise period a face draws, in mm at a 30 cm sheet (render engine 104).
+const NOISE_PERIOD_MIN_MM: f64 = 0.33;
+const AQUATINT_DARKEN_FRACTION: f64 = -0.30;
+const AQUATINT_DARKEN_LIMIT: f64 = 0.15;
+const AQUATINT_LIGHT_OPACITY: f64 = 0.18;
+const AQUATINT_DARK_OPACITY: f64 = 0.97;
+const AQUATINT_RADIUS_BASE: f64 = 0.95;
+const AQUATINT_RADIUS_DENSITY: f64 = 0.55;
+const AQUATINT_STOPS_PER_STEP: usize = 4;
+const AQUATINT_MIN_LIGHTNESS: f64 = 0.15;
+const AQUATINT_LIFT_LIGHTNESS: f64 = 0.16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SurfaceRender {
@@ -308,29 +321,6 @@ fn sweep_bleed_filter(instruction: &Instruction, context: MarkContext<'_>) -> El
         format_number(sweep_bleed(instruction.weight) * context.canvas.unit() / 1000.0),
     ));
     filter
-}
-
-/// Hundredths are enough for a placed grain point.
-fn hundredths(value: f64) -> String {
-    format_number((value * 100.0).round() / 100.0)
-}
-
-/// Whether a point lies inside the contour or within `reach` of it.
-fn near_inside(point: Point, reach: f64, contour: &[Point]) -> bool {
-    let diagonal = reach * std::f64::consts::FRAC_1_SQRT_2;
-    point_in_polygon(point, contour)
-        || [
-            (reach, 0.0),
-            (-reach, 0.0),
-            (0.0, reach),
-            (0.0, -reach),
-            (diagonal, diagonal),
-            (-diagonal, diagonal),
-            (diagonal, -diagonal),
-            (-diagonal, -diagonal),
-        ]
-        .iter()
-        .any(|(dx, dy)| point_in_polygon(Point::new(point.x + dx, point.y + dy), contour))
 }
 
 fn surface_color(instruction: &Instruction, context: MarkContext<'_>) -> String {
@@ -729,121 +719,744 @@ fn sweep_parts(
     Some((vec![body.into()], Vec::new()))
 }
 
-/// The grain of one face: one tile as large as the face, not repeated, its
-/// points laid at random at the density the 0.08-unit tile once repeated
-/// (render engine 90; the repeating tile showed as a lattice). A finer grain
-/// sets more, smaller points at the same cover, and the density multiplies
-/// them (render engine 89). The face places `SURFACE_GRAIN_SHAPES` dab shapes,
-/// turned, by `use`.
-fn grain_pattern(
+/// The faces drawn from noise (render engine 104). Prints and drawings were
+/// measured at a sheet 30 cm across the canvas's short side (2026-11-17, the
+/// Met's open-access mezzotints and chalk drawings): their texture is 0.1 to
+/// 0.3 mm fine, far below a point per element, so the faces are laid by an SVG
+/// noise filter, cut to a cover, inside the contour. 点描 lays its own dots
+/// (directly or in tiles): at the noise's period it could not be told from the
+/// mezzotint (the author's sheet 08, 2026-11-17).
+#[derive(Clone, Copy)]
+enum NoiseKind {
+    /// 粒: the tool's strokes caught by the paper's tooth, along one direction.
+    Grain,
+    /// The fine rocked ground of a mezzotint (the face 「アクアチント」 draws).
+    Rocker,
+}
+
+/// Millimetres per canvas unit at a 30 cm short side.
+fn mm(context: MarkContext<'_>) -> f64 {
+    context.canvas.unit() / 300.0
+}
+
+/// The standard normal quantile at `1 - cover`, read off a table: the noise is
+/// near-normal around 0.5 (measured in resvg, 2026-11-17).
+fn cover_quantile(cover: f64) -> f64 {
+    const TABLE: [(f64, f64); 13] = [
+        (0.05, 1.645),
+        (0.10, 1.2816),
+        (0.15, 1.0364),
+        (0.20, 0.8416),
+        (0.25, 0.6745),
+        (0.30, 0.5244),
+        (0.35, 0.3853),
+        (0.40, 0.2533),
+        (0.45, 0.1257),
+        (0.50, 0.0),
+        (0.55, -0.1257),
+        (0.60, -0.2533),
+        (0.70, -0.5244),
+    ];
+    let cover = cover.clamp(TABLE[0].0, TABLE[TABLE.len() - 1].0);
+    for pair in TABLE.windows(2) {
+        let ((c0, z0), (c1, z1)) = (pair[0], pair[1]);
+        if cover <= c1 {
+            return z0 + (z1 - z0) * (cover - c0) / (c1 - c0);
+        }
+    }
+    TABLE[TABLE.len() - 1].1
+}
+
+struct NoiseSpec {
+    /// Periods along the face's x and y, in mm.
+    period: (f64, f64),
+    octaves: u32,
+    /// The paper's tooth mixed in (period in mm), for 粒.
+    tooth: Option<f64>,
+    cover: f64,
+    /// The width of the cut in noise value: small is a crisp edge.
+    edge: f64,
+    /// A blur before the cut (mm), rounding the noise's peaks into round dots.
+    smooth: f64,
+}
+
+fn noise_spec(kind: NoiseKind, scale: f64, density: f64) -> NoiseSpec {
+    let size = texture_size_factor(scale.max(0.04));
+    let packing = texture_count_ratio(density.max(0.02)).dpowf(0.5);
+    match kind {
+        // A soft grey deposit along the strokes, broken by the paper's tooth.
+        NoiseKind::Grain => NoiseSpec {
+            period: (0.35 * size, 1.5 * size),
+            octaves: 2,
+            tooth: Some(0.4 * size),
+            cover: (0.35 * packing).clamp(0.08, 0.7),
+            edge: 0.25,
+            smooth: 0.0,
+        },
+        // The ink the tone keeps: the rest is paper showing as light specks.
+        NoiseKind::Rocker => NoiseSpec {
+            period: (0.45 * size, 0.6 * size),
+            octaves: 3,
+            tooth: None,
+            cover: (0.92 * packing.dpowf(0.1)).clamp(0.75, 0.97),
+            edge: 0.2,
+            smooth: 0.0,
+        },
+    }
+}
+
+/// The filter that keeps the face's colour only where the noise rises above
+/// the cut. Its id names its content, so the faces of one instruction share it.
+fn noise_filter(spec: &NoiseSpec, context: MarkContext<'_>, seed: i64) -> Element {
+    let unit = mm(context);
+    let spread = if spec.tooth.is_some() { 0.083 } else { 0.118 };
+    let cut = 0.5 + spread * cover_quantile(spec.cover);
+    let slope = 1.0 / spec.edge;
+    // A renderer computes the noise at the canvas's own unit (0.33 mm at a 30 cm
+    // sheet), so a finer period draws no texture at all: the fine words keep
+    // the finest the canvas shows.
+    let period = |mm_long: f64| mm_long.max(NOISE_PERIOD_MIN_MM) * unit;
+    let frequency = format!(
+        "{} {}",
+        format_number(1.0 / period(spec.period.0)),
+        format_number(1.0 / period(spec.period.1))
+    );
+    let payload = format!(
+        "{frequency}|{}|{:?}|{:.4}|{:.4}|{:.4}|{seed}",
+        spec.octaves, spec.tooth, spec.cover, spec.edge, spec.smooth
+    );
+    let digest = Sha256::digest(payload.as_bytes());
+    let id = format!(
+        "surface_noise_{}",
+        digest[..6]
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    let mut filter = Element::new("filter")
+        .attr("id", id)
+        .attr("x", "-5%")
+        .attr("y", "-5%")
+        .attr("width", "110%")
+        .attr("height", "110%")
+        .attr("color-interpolation-filters", "sRGB");
+    filter.push(
+        Element::new("feTurbulence")
+            .attr("type", "fractalNoise")
+            .attr("baseFrequency", frequency)
+            .attr("numOctaves", spec.octaves.to_string())
+            .attr("seed", seed.to_string())
+            .attr("result", "noise"),
+    );
+    if let Some(tooth) = spec.tooth {
+        filter.push(
+            Element::new("feTurbulence")
+                .attr("type", "fractalNoise")
+                .attr("baseFrequency", format_number(1.0 / (tooth * unit)))
+                .attr("numOctaves", "1")
+                .attr("seed", (seed + 1).to_string())
+                .attr("result", "tooth"),
+        );
+        filter.push(
+            Element::new("feComposite")
+                .attr("in", "noise")
+                .attr("in2", "tooth")
+                .attr("operator", "arithmetic")
+                .attr("k1", "0")
+                .attr("k2", "0.6")
+                .attr("k3", "0.4")
+                .attr("k4", "0")
+                .attr("result", "noise"),
+        );
+    }
+    if spec.smooth > 0.0 {
+        filter.push(
+            Element::new("feGaussianBlur")
+                .attr("in", "noise")
+                .attr("stdDeviation", format_number(spec.smooth * unit))
+                .attr("result", "noise"),
+        );
+    }
+    filter.push(
+        Element::new("feColorMatrix")
+            .attr("in", "noise")
+            .attr("type", "matrix")
+            .attr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0")
+            .attr("result", "level"),
+    );
+    let mut transfer = Element::new("feComponentTransfer")
+        .attr("in", "level")
+        .attr("result", "cut");
+    transfer.push(
+        Element::new("feFuncA")
+            .attr("type", "linear")
+            .attr("slope", format_number(slope))
+            .attr("intercept", format_number(-slope * (cut - spec.edge / 2.0))),
+    );
+    filter.push(transfer);
+    filter.push(
+        Element::new("feComposite")
+            .attr("in", "SourceGraphic")
+            .attr("in2", "cut")
+            .attr("operator", "in"),
+    );
+    filter
+}
+
+/// 点描's dots (render engine 104, remade after the author's sheet 08,
+/// 2026-11-17): round dots of one size, each one countable, 0.8 mm across at a
+/// 30 cm sheet (×0.5 fine, ×2 coarse). A stipple engraving builds its tone by
+/// how many dots it lays, so the face is not even: the light comes from the
+/// upper left, as on the mezzotint, and the dots lie sparse there and close
+/// toward the lower right.
+const STIPPLE_DOT_RADIUS_MM: f64 = 0.4;
+/// The face's mean cover at the default density (packing moves it by its
+/// square root, as on the noise faces).
+const STIPPLE_COVER: f64 = 0.22;
+/// The cover at a position `t` (0 upper left, 1 lower right) is the mean times
+/// `STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN * t`, whose mean over `t` is one.
+const STIPPLE_TONE_LIGHT: f64 = 0.35;
+const STIPPLE_TONE_SPAN: f64 = 1.3;
+/// The dots sit on a grid shaken by this share of a cell, so they neither
+/// clump nor read as a grid.
+const STIPPLE_JITTER: f64 = 0.7;
+/// A face laying its own dots (Compat, and a face under a quarter of the tile)
+/// lays at most this many; a larger face draws larger dots at the same cover.
+/// A dot is a tenth-long move with a round cap, about 11 bytes. 12,000 made
+/// a large face's dots visibly coarser (the author's sheet 10, 2026-11-17).
+const STIPPLE_DOT_LIMIT: f64 = 24_000.0;
+
+/// The side of 点描's tile, in mm at a 30 cm sheet, at the default size: the
+/// tile scales with the dots, so it holds about the same count (about 2,600
+/// at the default density).
+const STIPPLE_TILE_MM: f64 = 60.0;
+/// The tone's steps: the tile's dots are ranked and split into this many
+/// layers, each laid from where its dots begin to show.
+const STIPPLE_LAYERS: usize = 8;
+
+/// The dots of one 点描 tile as stroked moves in tenths of a unit, starting at
+/// the tile's corner. A dot near an edge is written again past the opposite
+/// edge, so the tiles meet without a seam.
+fn stipple_tile_path(dots: &[Point], side: f64, radius: f64) -> String {
+    let mut d = String::new();
+    let mut last: Option<(i64, i64)> = None;
+    for dot in dots {
+        for oy in [-side, 0.0, side] {
+            for ox in [-side, 0.0, side] {
+                let (x, y) = (dot.x + ox, dot.y + oy);
+                if x < -radius || y < -radius || x > side + radius || y > side + radius {
+                    continue;
+                }
+                let x = (x * 10.0).round() as i64;
+                let y = (y * 10.0).round() as i64;
+                let (dx, dy) = match last {
+                    None => {
+                        d.push('M');
+                        (x, y)
+                    }
+                    Some((last_x, last_y)) => {
+                        d.push('m');
+                        (x - last_x, y - last_y)
+                    }
+                };
+                write_tenths(&mut d, dx);
+                d.push(' ');
+                write_tenths(&mut d, dy);
+                d.push_str("h.1");
+                last = Some((x + 1, y));
+            }
+        }
+    }
+    d
+}
+
+/// The part of `contour` on the lower-right side of the line where the tone
+/// position (0 upper left, 1 lower right, across the bounds) reaches `start`.
+fn tone_part(contour: &[Point], bounds: (f64, f64, f64, f64), start: f64) -> Vec<Point> {
+    let (min_x, min_y, width, height) = bounds;
+    let side = |p: Point| ((p.x - min_x) / width + (p.y - min_y) / height) / 2.0 - start;
+    let mut part = Vec::new();
+    for (index, &point) in contour.iter().enumerate() {
+        let next = contour[(index + 1) % contour.len()];
+        let (a, b) = (side(point), side(next));
+        if a >= 0.0 {
+            part.push(point);
+        }
+        if (a >= 0.0) != (b >= 0.0) {
+            let share = a / (a - b);
+            part.push(Point::new(
+                point.x + (next.x - point.x) * share,
+                point.y + (next.y - point.y) * share,
+            ));
+        }
+    }
+    part
+}
+
+/// 点描 on Display and Editable (render engine 104, for the size, 2026-11-17):
+/// the dots of sheet 09 laid from one tile that every face of the same colour,
+/// fineness and density shares, from the canvas's origin. The tile's dots are
+/// ranked into `STIPPLE_LAYERS` patterns; a layer is laid over the part of the
+/// face past the tone position its dots begin at, so the tone steps where the
+/// direct dots slope. A face smaller than the tile returns `None` and lays
+/// its own dots ([`stipple_face`]), which are then fewer.
+fn stipple_tiled_faces(
     instruction: &Instruction,
     context: MarkContext<'_>,
-    seed: Seed,
+    contour: &[Point],
     color: &str,
     opacity: f64,
-    pattern_id: &str,
+) -> Option<(Vec<Element>, Vec<Element>)> {
+    let Some(surface) = instruction.surface.as_ref() else {
+        return Some((Vec::new(), Vec::new()));
+    };
+    let size = texture_size_factor(surface.scale.max(0.04));
+    let packing = texture_count_ratio(surface.density.max(0.02)).dpowf(0.5);
+    let mean = (STIPPLE_COVER * packing).clamp(0.05, 0.5);
+    let peak = mean * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN);
+    let (mut min_x, mut min_y) = (f64::INFINITY, f64::INFINITY);
+    let (mut max_x, mut max_y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for point in contour {
+        min_x = min_x.min(point.x);
+        min_y = min_y.min(point.y);
+        max_x = max_x.max(point.x);
+        max_y = max_y.max(point.y);
+    }
+    let (width, height) = (max_x - min_x, max_y - min_y);
+    if !(width > 0.0 && height > 0.0) {
+        return Some((Vec::new(), Vec::new()));
+    }
+    let radius = STIPPLE_DOT_RADIUS_MM * size * mm(context);
+    let side = STIPPLE_TILE_MM * size * mm(context);
+    let cells = ((side / (radius * (std::f64::consts::PI / peak).sqrt())).round() as i64).max(1);
+    let cell = side / cells as f64;
+    // A face that would lay fewer than a quarter of the tile's dots lays them
+    // itself. A larger one shares the tile: the other faces of the work in its
+    // colour (an arrangement's copies reach here as faces of their own) pay
+    // nothing more for it.
+    let direct = width * height * mean / (std::f64::consts::PI * radius * radius);
+    if direct < (cells * cells) as f64 / 4.0 {
+        return None;
+    }
+    let digest = Sha256::digest(
+        format!(
+            "surface-stipple-tile:{:.6}:{:.6}:{}",
+            size,
+            packing,
+            seed_debug_text(context.render_seed)
+        )
+        .as_bytes(),
+    );
+    let seed = Seed::from(i64::from_le_bytes(
+        digest[..8].try_into().expect("eight bytes"),
+    ));
+    let mut layers = vec![Vec::new(); STIPPLE_LAYERS];
+    for row in 0..cells {
+        for column in 0..cells {
+            let index = row * cells + column;
+            let rank = hash01(index, seed, "stipple-keep");
+            let layer = ((rank * STIPPLE_LAYERS as f64) as usize).min(STIPPLE_LAYERS - 1);
+            layers[layer].push(Point::new(
+                cell * (column as f64
+                    + 0.5
+                    + STIPPLE_JITTER * (hash01(index, seed, "stipple-x") - 0.5)),
+                cell * (row as f64
+                    + 0.5
+                    + STIPPLE_JITTER * (hash01(index, seed, "stipple-y") - 0.5)),
+            ));
+        }
+    }
+    let (mut layer_faces, mut tiles) = (Vec::new(), Vec::new());
+    let bounds = [
+        Point::new(min_x, min_y),
+        Point::new(max_x, min_y),
+        Point::new(max_x, max_y),
+        Point::new(min_x, max_y),
+    ];
+    for (layer, dots) in layers.iter().enumerate() {
+        // A dot of rank r shows where the cover's share of the peak passes r.
+        let rank = (layer as f64 + 0.5) / STIPPLE_LAYERS as f64;
+        let start = ((rank * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN) - STIPPLE_TONE_LIGHT)
+            / STIPPLE_TONE_SPAN)
+            .max(0.0);
+        if dots.is_empty() || start >= 1.0 {
+            continue;
+        }
+        // The layer covers the bounds past its start; the clip keeps it inside
+        // the contour.
+        let part = tone_part(&bounds, (min_x, min_y, width, height), start);
+        if part.len() < 3 {
+            continue;
+        }
+        // The tile holds the dots and their colour only: a face's opacity (a
+        // fade along an arrangement varies it per mark) stays on the face.
+        let d = stipple_tile_path(dots, side, radius);
+        let payload = format!(
+            "{d}|{color}|{}|{}",
+            format_number(2.0 * radius),
+            format_number(side)
+        );
+        let id = format!(
+            "surface_stipple_{}",
+            Sha256::digest(payload.as_bytes())[..6]
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        );
+        let mut tile = Element::new("pattern")
+            .attr("id", &id)
+            .attr("patternUnits", "userSpaceOnUse")
+            .attr("x", "0")
+            .attr("y", "0")
+            .attr("width", format_number(side))
+            .attr("height", format_number(side));
+        tile.push(
+            Element::new("path")
+                .attr("d", d)
+                .attr("fill", "none")
+                .attr("stroke", color)
+                .attr("stroke-width", format_number(2.0 * radius))
+                .attr("stroke-linecap", "round"),
+        );
+        tiles.push(tile);
+        layer_faces.push(
+            Element::new("path")
+                .attr("d", closed_path(&part))
+                .attr("fill", format!("url(#{id})"))
+                .attr("fill-opacity", format_number(opacity))
+                .attr("stroke", "none")
+                .attr("class", "surface-stipple-dots-v1"),
+        );
+    }
+    if layer_faces.is_empty() {
+        return Some((Vec::new(), tiles));
+    }
+    // The contour is written once, as the clip of the layers' plain parts.
+    let outline = closed_path(contour);
+    let clip_id = format!(
+        "surface_stipple_clip_{}",
+        Sha256::digest(outline.as_bytes())[..6]
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    let mut clip = Element::new("clipPath").attr("id", &clip_id);
+    clip.push(Element::new("path").attr("d", outline));
+    tiles.push(clip);
+    let mut group = Element::new("g").attr("clip-path", format!("url(#{clip_id})"));
+    for face in layer_faces {
+        group.push(face);
+    }
+    Some((vec![group], tiles))
+}
+
+/// One 点描 face: its dots as one stroked path in `color` at `opacity`, each a
+/// round cap (Compat too, since it needs no filter). One stroke paints its
+/// overlaps once, so two touching dots do not darken.
+fn stipple_face(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
     contour: &[Point],
-) -> Vec<Element> {
+    color: &str,
+    opacity: f64,
+    seed: Seed,
+) -> Option<Element> {
+    let surface = instruction.surface.as_ref()?;
+    let size = texture_size_factor(surface.scale.max(0.04));
+    let packing = texture_count_ratio(surface.density.max(0.02)).dpowf(0.5);
+    let mean = (STIPPLE_COVER * packing).clamp(0.05, 0.5);
+    let peak = mean * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN);
+    let (mut min_x, mut min_y) = (f64::INFINITY, f64::INFINITY);
+    let (mut max_x, mut max_y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for point in contour {
+        min_x = min_x.min(point.x);
+        min_y = min_y.min(point.y);
+        max_x = max_x.max(point.x);
+        max_y = max_y.max(point.y);
+    }
+    let (width, height) = (max_x - min_x, max_y - min_y);
+    if !(width > 0.0 && height > 0.0) {
+        return None;
+    }
+    let mut radius = STIPPLE_DOT_RADIUS_MM * size * mm(context);
+    let dots = width * height * mean / (std::f64::consts::PI * radius * radius);
+    if dots > STIPPLE_DOT_LIMIT {
+        radius *= (dots / STIPPLE_DOT_LIMIT).sqrt();
+    }
+    // A full cell holds one dot at the peak cover.
+    let cell = radius * (std::f64::consts::PI / peak).sqrt();
+    let columns = (width / cell).ceil() as i64 + 1;
+    let rows = (height / cell).ceil() as i64 + 1;
+    let mut d = String::new();
+    let mut last: Option<(i64, i64)> = None;
+    for row in 0..rows {
+        for column in 0..columns {
+            let index = row * columns + column;
+            let point = Point::new(
+                min_x
+                    + cell
+                        * (column as f64
+                            + STIPPLE_JITTER * (hash01(index, seed, "stipple-x") - 0.5)),
+                min_y
+                    + cell
+                        * (row as f64 + STIPPLE_JITTER * (hash01(index, seed, "stipple-y") - 0.5)),
+            );
+            if !point_in_polygon(point, contour) {
+                continue;
+            }
+            let t =
+                (((point.x - min_x) / width + (point.y - min_y) / height) / 2.0).clamp(0.0, 1.0);
+            let cover = mean * (STIPPLE_TONE_LIGHT + STIPPLE_TONE_SPAN * t);
+            if hash01(index, seed, "stipple-keep") >= cover / peak {
+                continue;
+            }
+            // In tenths of a unit (0.03 mm at a 30 cm sheet), each dot moved to
+            // from the last one.
+            let x = (point.x * 10.0).round() as i64;
+            let y = (point.y * 10.0).round() as i64;
+            let (dx, dy) = match last {
+                None => {
+                    d.push('M');
+                    (x, y)
+                }
+                Some((last_x, last_y)) => {
+                    d.push('m');
+                    (x - last_x, y - last_y)
+                }
+            };
+            write_tenths(&mut d, dx);
+            d.push(' ');
+            write_tenths(&mut d, dy);
+            d.push_str("h.1");
+            last = Some((x + 1, y));
+        }
+    }
+    last?;
+    Some(
+        Element::new("path")
+            .attr("d", d)
+            .attr("fill", "none")
+            .attr("stroke", color)
+            .attr("stroke-opacity", format_number(opacity))
+            .attr("stroke-width", format_number(2.0 * radius))
+            .attr("stroke-linecap", "round")
+            .attr("class", "surface-stipple-dots-v1"),
+    )
+}
+
+/// A whole count of tenths as a short decimal (`-1.5`, `.7`, `12`).
+fn write_tenths(output: &mut String, value: i64) {
+    if value < 0 {
+        output.push('-');
+    }
+    let magnitude = value.unsigned_abs();
+    let (whole, tenth) = (magnitude / 10, magnitude % 10);
+    if whole > 0 || tenth == 0 {
+        output.push_str(&whole.to_string());
+    }
+    if tenth > 0 {
+        output.push('.');
+        output.push_str(&tenth.to_string());
+    }
+}
+
+/// One noise face: the contour filled with `color` at `opacity`, kept where the
+/// noise rises. 粒 turns its noise along the strokes' direction; the face
+/// stays in place. Compat (no filter) lays the cover as a flat tone instead.
+fn noise_face(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    contour: &[Point],
+    kind: NoiseKind,
+    color: &str,
+    opacity: f64,
+    class_name: &str,
+) -> (Element, Option<Element>) {
     let surface = instruction
         .surface
         .as_ref()
         .expect("surface checked by caller");
-    let tile = context.canvas.unit() * 0.08;
-    let size = texture_size_factor(surface.scale.max(0.04));
-    let radius = (context.canvas.unit() * (0.002 + SURFACE_DEFAULT_SCALE * 0.004)).max(0.45) * size;
-    let tile_area = tile * tile;
-    let reference_area = context.canvas.unit().powi(2) * 0.18;
-    let cover = 1.0 / (size * size);
-    let per_tile = (((22.0 + SURFACE_DEFAULT_DENSITY * 120.0) * tile_area / reference_area
-        * cover
-        * texture_count_ratio(surface.density.max(0.02)))
-    .ceil() as usize)
-        .max(1);
-    let density = per_tile as f64 / tile_area;
-    let reach = (radius * 1.65 * 2.0).max(mark_width(instruction, context.canvas) * 0.75);
-    let min_x = contour
+    let spec = noise_spec(kind, surface.scale, surface.density);
+    if context.profile == SvgProfile::Compat || !context.use_filters {
+        return (
+            Element::new("path")
+                .attr("d", closed_path(contour))
+                .attr("fill", color)
+                .attr("fill-opacity", format_number(opacity * spec.cover))
+                .attr("stroke", "none")
+                .attr("class", class_name),
+            None,
+        );
+    }
+    // The noise seeds from what every face of the instruction shares, so its
+    // copies draw from one filter; each face's own seed is unchanged.
+    let digest = Sha256::digest(
+        format!(
+            "surface-noise:{}:{:?}:{}:{}",
+            context.instruction_index,
+            instruction.weight,
+            surface.texture.as_str(),
+            seed_debug_text(context.render_seed)
+        )
+        .as_bytes(),
+    );
+    let seed = i64::from(u16::from_le_bytes([digest[0], digest[1]]));
+    let filter = noise_filter(&spec, context, seed);
+    let id = filter.attribute("id").expect("filter id").to_owned();
+    let angle = match kind {
+        NoiseKind::Grain => 20.0 + 50.0 * f64::from(digest[2]) / 255.0,
+        // The tone's light comes from the upper left; turning the face would turn it.
+        NoiseKind::Rocker => 0.0,
+    };
+    let center = points_center(contour);
+    let (sin, cos) = ((-angle).to_radians().dsin(), (-angle).to_radians().dcos());
+    let turned = contour
         .iter()
-        .map(|point| point.x)
-        .fold(f64::INFINITY, f64::min)
-        - reach;
-    let max_x = contour
-        .iter()
-        .map(|point| point.x)
-        .fold(f64::NEG_INFINITY, f64::max)
-        + reach;
-    let min_y = contour
-        .iter()
-        .map(|point| point.y)
-        .fold(f64::INFINITY, f64::min)
-        - reach;
-    let max_y = contour
-        .iter()
-        .map(|point| point.y)
-        .fold(f64::NEG_INFINITY, f64::max)
-        + reach;
-    let (width, height) = (max_x - min_x, max_y - min_y);
-    let candidates = (density * width * height).round() as usize;
-    let mut definitions = Vec::new();
-    for shape in 0..SURFACE_GRAIN_SHAPES {
-        let factor = 0.55 + 1.1 * (shape as f64 + 0.5) / SURFACE_GRAIN_SHAPES as f64;
-        definitions.push(
-            dab(
-                instruction,
-                context,
-                Point::new(0.0, 0.0),
-                DabSpec {
-                    radius: radius * factor,
-                    color,
-                    opacity,
-                    seed,
-                    index: shape as i64,
-                    class_name: "surface-grain-dab",
-                    use_filters: false,
-                },
+        .map(|point| {
+            let (dx, dy) = (point.x - center.x, point.y - center.y);
+            Point::new(
+                center.x + dx * cos - dy * sin,
+                center.y + dx * sin + dy * cos,
             )
-            .attr("id", format!("{pattern_id}_dab_{shape}")),
-        );
-    }
-    let mut pattern = Element::new("pattern")
-        .attr("id", pattern_id)
-        .attr("patternUnits", "userSpaceOnUse")
-        .attr("x", format_number(min_x))
-        .attr("y", format_number(min_y))
-        .attr("width", format_number(width))
-        .attr("height", format_number(height));
-    if context.profile != SvgProfile::Compat {
-        pattern.set_attr("class", "surface-grain-pattern-v2");
-    }
-    for index in 0..candidates {
-        let index = index as i64;
-        let point = Point::new(
-            min_x + hash01(index, seed, "surface-grain-x") * width,
-            min_y + hash01(index, seed, "surface-grain-y") * height,
-        );
-        if !near_inside(point, reach, contour) {
-            continue;
+        })
+        .collect::<Vec<_>>();
+    let face = Element::new("path")
+        .attr("d", closed_path(&turned))
+        .attr("fill", color)
+        .attr("fill-opacity", format_number(opacity))
+        .attr("stroke", "none")
+        .attr("filter", format!("url(#{id})"))
+        .attr("class", class_name);
+    let mut group = Element::new("g").attr(
+        "transform",
+        format!(
+            "rotate({} {} {})",
+            format_number(angle),
+            format_number(center.x),
+            format_number(center.y)
+        ),
+    );
+    group.push(face);
+    (group, Some(filter))
+}
+
+/// Add a face's definitions to the document's, leaving out any whose id the
+/// document already carries: the grain tiles of one instruction's faces are
+/// one set, named by their content (render engine 104).
+pub(crate) fn extend_definitions(target: &mut Vec<Element>, definitions: Vec<Element>) {
+    for definition in definitions {
+        let known = definition.attribute("id").is_some_and(|id| {
+            target
+                .iter()
+                .any(|existing| existing.attribute("id") == Some(id))
+        });
+        if !known {
+            target.push(definition);
         }
-        let shape = ((hash01(index, seed, "surface-r") * SURFACE_GRAIN_SHAPES as f64) as usize)
-            .min(SURFACE_GRAIN_SHAPES - 1);
-        let turn = hash01(index, seed, "surface-grain-turn") * 360.0;
-        let mark_opacity = 0.45 + hash01(index, seed, "surface-o") * 0.55;
-        pattern.push(
-            Element::new("use")
-                .attr("href", format!("#{pattern_id}_dab_{shape}"))
-                .attr(
-                    "transform",
-                    format!(
-                        "translate({} {}) rotate({})",
-                        hundredths(point.x - min_x),
-                        hundredths(point.y - min_y),
-                        format_number((turn * 10.0).round() / 10.0)
-                    ),
-                )
-                .attr("opacity", hundredths(mark_opacity)),
+    }
+}
+
+/// A colored mezzotint holds one pigment, letting the paper show in the light.
+fn aquatint_pigment(color: &str) -> String {
+    let Some(rgb) = hex_rgb(color) else {
+        return color.to_owned();
+    };
+    if rgb == [0, 0, 0] || rgb == [17, 17, 17] {
+        return color.to_owned();
+    }
+    let [lightness, a, b] = inku_score::oklab_from_srgb(rgb.map(|v| f64::from(v) / 255.0));
+    if lightness < AQUATINT_MIN_LIGHTNESS {
+        let lifted =
+            crate::materials::adjust_pigment(color, |_, c, h| (AQUATINT_LIFT_LIGHTNESS, c, h));
+        let center = hex_rgb(&lifted).expect("pigment is hexadecimal");
+        let chroma = a.dhypot(b);
+        let mut best = None;
+        for dr in -4_i16..=4 {
+            for dg in -4_i16..=4 {
+                for db in -4_i16..=4 {
+                    let candidate: [u8; 3] = std::array::from_fn(|i| {
+                        (i16::from(center[i]) + [dr, dg, db][i]).clamp(0, 255) as u8
+                    });
+                    let [l, ca, cb] =
+                        inku_score::oklab_from_srgb(candidate.map(|v| f64::from(v) / 255.0));
+                    let candidate_chroma = ca.dhypot(cb);
+                    if l < AQUATINT_MIN_LIGHTNESS
+                        || (chroma > 1e-5
+                            && ca * a + cb * b
+                                < candidate_chroma * chroma * 2_f64.to_radians().dcos())
+                    {
+                        continue;
+                    }
+                    let error = (l - AQUATINT_LIFT_LIGHTNESS).abs() + (ca - a).dhypot(cb - b);
+                    if best.as_ref().is_none_or(|(old, _)| error < *old) {
+                        best = Some((error, candidate));
+                    }
+                }
+            }
+        }
+        let selected = best.map_or(center, |(_, rgb)| rgb);
+        return format!("#{:02x}{:02x}{:02x}", selected[0], selected[1], selected[2]);
+    }
+    let fraction = AQUATINT_DARKEN_FRACTION.max(AQUATINT_MIN_LIGHTNESS / lightness - 1.0);
+    crate::materials::layered_pigment(color, fraction, AQUATINT_DARKEN_LIMIT)
+}
+
+/// Lay a smooth light from the upper left, then faint ink-texture over it.
+fn aquatint_surface(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    contour: &[Point],
+    group: &mut Element,
+    definitions: &mut Vec<Element>,
+) {
+    let surface = instruction
+        .surface
+        .as_ref()
+        .expect("surface checked by caller");
+    let pigment = aquatint_pigment(&texture_color(instruction, context));
+    let id = format!(
+        "surface_aquatint_{:03}_{:03}",
+        context.instruction_index, context.mark_index
+    );
+    let radius =
+        (AQUATINT_RADIUS_BASE - AQUATINT_RADIUS_DENSITY * surface.density).clamp(0.35, 0.94);
+    let count = usize::from(surface.tone_steps.clamp(1, 16)) * AQUATINT_STOPS_PER_STEP;
+    let strength = intensity_factor(instruction.surface_intensity);
+    let mut gradient = Element::new("radialGradient")
+        .attr("id", &id)
+        .attr("cx", "25%")
+        .attr("cy", "25%")
+        .attr("r", format!("{}%", format_number(radius * 100.0)));
+    for i in 0..=count {
+        let t = i as f64 / count as f64;
+        let smooth = t * t * (3.0 - 2.0 * t);
+        let opacity = ((AQUATINT_LIGHT_OPACITY
+            + (AQUATINT_DARK_OPACITY - AQUATINT_LIGHT_OPACITY) * smooth)
+            * strength)
+            .clamp(0.0, 1.0);
+        gradient.push(
+            Element::new("stop")
+                .attr("offset", format_number(t))
+                .attr("stop-color", &pigment)
+                .attr("stop-opacity", format_number(opacity)),
         );
     }
-    definitions.push(pattern);
-    definitions
+    definitions.push(gradient);
+    // The tone itself holds the rocked ground: where the burr held no ink the
+    // paper shows through as fine light specks, so the deep tone sparkles and
+    // the lights are grained (the measured mezzotints, 2026-11-17). No white is
+    // laid; the specks are the paper.
+    let (tone, filter) = noise_face(
+        instruction,
+        context,
+        contour,
+        NoiseKind::Rocker,
+        &format!("url(#{id})"),
+        1.0,
+        "surface-aquatint-tone-v2",
+    );
+    definitions.extend(filter);
+    group.push(tone);
 }
 
 fn line_angle(direction: SurfaceDirection) -> f64 {
@@ -893,7 +1506,7 @@ fn render_vectors(
     let area_factor = ((width * height) / (context.canvas.unit().powi(2) * 0.18))
         .clamp(0.2, SURFACE_AREA_FACTOR_MAX);
     match surface.texture {
-        SurfaceTexture::Stipple | SurfaceTexture::PaperGrain => {
+        SurfaceTexture::PaperGrain => {
             let count = ((SURFACE_MARK_MAX as f64 * cover * count_ratio) as usize)
                 .min(((22.0 + density * 120.0) * area_factor * cover * count_ratio) as usize);
             let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45) * size;
@@ -1078,45 +1691,7 @@ fn render_vectors(
                 }
             }
         }
-        SurfaceTexture::Aquatint => {
-            let steps = usize::from(surface.tone_steps.max(1));
-            let band = width / steps as f64;
-            let radius = (context.canvas.unit() * (0.0015 + scale * 0.0025)).max(0.45) * size;
-            let count = ((SURFACE_MARK_MAX as f64 * cover * count_ratio) as usize).min(
-                (((18.0 + density * 90.0) * area_factor * cover * count_ratio) as usize).max(5),
-            );
-            for (index, point) in scatter(contour, count, seed).into_iter().enumerate() {
-                let step = if band > 0.0 {
-                    (((point.x - x) / band) as isize).clamp(0, steps as isize - 1) as usize
-                } else {
-                    0
-                };
-                let jitter = (hash01(step as i64, seed, "aquatint-boundary") - 0.5) * band * 0.08;
-                let shifted = Point::new(point.x + jitter, point.y);
-                let target = if point_in_polygon(shifted, contour) {
-                    shifted
-                } else {
-                    point
-                };
-                if !reaches_canvas(instruction, context, target, target, radius * 2.0) {
-                    continue;
-                }
-                group.push(dab(
-                    instruction,
-                    context,
-                    target,
-                    DabSpec {
-                        radius,
-                        color: &color,
-                        opacity: opacity * (0.35 + 0.65 * (step + 1) as f64 / steps as f64),
-                        seed,
-                        index: index as i64,
-                        class_name: &format!("surface-stroke-v1 aquatint-step-{}", step + 1),
-                        use_filters: context.use_filters,
-                    },
-                ));
-            }
-        }
+        SurfaceTexture::Aquatint => {}
         SurfaceTexture::Bleed => {
             let blur = (context.canvas.unit() * (0.010 + surface.bleed * 0.030)).max(1.0);
             let normals = centerline_normals(contour, true);
@@ -1172,7 +1747,10 @@ fn render_vectors(
                 }
             }
         }
-        SurfaceTexture::None | SurfaceTexture::Solid | SurfaceTexture::Grain => {}
+        SurfaceTexture::None
+        | SurfaceTexture::Solid
+        | SurfaceTexture::Grain
+        | SurfaceTexture::Stipple => {}
     }
 }
 
@@ -1227,31 +1805,49 @@ pub(crate) fn render_surface(
         );
     }
     let mut definitions = Vec::new();
-    if surface.texture == SurfaceTexture::Grain {
-        let pattern_id = format!(
-            "surface_pattern_{:03}_{:03}_grain",
-            context.instruction_index, context.mark_index
-        );
+    if matches!(
+        surface.texture,
+        SurfaceTexture::Grain | SurfaceTexture::Stipple
+    ) {
         let color = texture_color(instruction, context);
-        definitions.extend(grain_pattern(
-            instruction,
-            context,
-            seed,
-            &color,
-            (surface.opacity
-                * intensity_factor(instruction.surface_intensity)
-                * underpaint_boost(instruction))
-            .min(0.75),
-            &pattern_id,
-            &contour,
-        ));
-        group.push(
-            Element::new("path")
-                .attr("d", closed_path(&contour))
-                .attr("fill", format!("url(#{pattern_id})"))
-                .attr("stroke", "none")
-                .attr("class", "surface-grain-carrier-v1"),
-        );
+        // Chalk leaves a grey deposit, not the tool's full line; a stipple dot
+        // is the full ink of the point.
+        let deposit = if surface.texture == SurfaceTexture::Grain {
+            GRAIN_DEPOSIT
+        } else {
+            1.0
+        };
+        let opacity = (mark_style(instruction, context).stroke_opacity
+            * deposit
+            * underpaint_boost(instruction))
+        .min(1.0);
+        if surface.texture == SurfaceTexture::Grain {
+            let (face, filter) = noise_face(
+                instruction,
+                context,
+                &contour,
+                NoiseKind::Grain,
+                &color,
+                opacity,
+                "surface-grain-noise-v1",
+            );
+            definitions.extend(filter);
+            group.push(face);
+        } else if let Some((faces, tiles)) = (context.profile != SvgProfile::Compat)
+            .then(|| stipple_tiled_faces(instruction, context, &contour, &color, opacity))
+            .flatten()
+        {
+            definitions.extend(tiles);
+            for face in faces {
+                group.push(face);
+            }
+        } else if let Some(face) =
+            stipple_face(instruction, context, &contour, &color, opacity, seed)
+        {
+            group.push(face);
+        }
+    } else if surface.texture == SurfaceTexture::Aquatint {
+        aquatint_surface(instruction, context, &contour, &mut group, &mut definitions);
     } else if matches!(
         surface.texture,
         SurfaceTexture::Sweep | SurfaceTexture::Brushmarks
@@ -1320,6 +1916,7 @@ mod tests {
 
     use super::*;
     use crate::support::DEFAULT_SUPPORT;
+    use crate::surface_geometry::point_in_polygon;
     use crate::types::{CanvasSize, Score};
 
     fn context<'a>(colors: &'a BTreeMap<String, String>) -> MarkContext<'a> {
@@ -1377,6 +1974,82 @@ mod tests {
         );
         assert_eq!(seed_debug_text(Some(-7)), "Some(-7)");
         assert_eq!(seed_debug_text(None), "None");
+    }
+
+    #[test]
+    fn point_surfaces_and_their_fineness_and_underpainting_differ() {
+        let colors = BTreeMap::new();
+        let draw = |texture: &str, scale: f64, density: f64, filled: bool| {
+            let instruction: Instruction = serde_json::from_value(serde_json::json!({
+                "primitive":"circle", "center":[0.5,0.5], "radius":0.2,
+                "weight":"pen", "filled":filled,
+                "surface":{"texture":texture, "scale":scale, "density":density}
+            }))
+            .unwrap();
+            // 粒 and the mezzotint are noise filters on Display (render engine 104).
+            let display = MarkContext {
+                profile: SvgProfile::Display,
+                use_filters: true,
+                ..context(&colors)
+            };
+            let rendered = render_surface(
+                &instruction,
+                MarkGeometry::of(&instruction).unwrap(),
+                display,
+            )
+            .unwrap();
+            let mut svg = crate::svg::Document::new(context(&colors).canvas);
+            for definition in rendered.definitions {
+                svg.push_definition(definition);
+            }
+            svg.push(rendered.group);
+            svg.serialize()
+        };
+        let textures = ["stipple", "grain", "aquatint"];
+        let defaults: Vec<_> = textures
+            .iter()
+            .map(|t| draw(t, 0.35, 0.35, false))
+            .collect();
+        assert_ne!(defaults[0], defaults[1]);
+        assert_ne!(defaults[0], defaults[2]);
+        assert_ne!(defaults[1], defaults[2]);
+        for (texture, default) in textures.iter().zip(defaults) {
+            for (scale, density, filled) in [
+                (0.05, 0.35, false),
+                (0.90, 0.35, false),
+                (0.35, 0.85, false),
+                (0.35, 0.05, false),
+                (0.35, 0.35, true),
+            ] {
+                assert_ne!(
+                    default,
+                    draw(texture, scale, density, filled),
+                    "{texture} {scale} {density} {filled}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn aquatint_dark_pigment_preserves_hue_and_avoids_black_mixing() {
+        for color in [
+            "#2c3e91", "#a2342a", "#2f6b3a", "#010000", "#020104", "#000010",
+        ] {
+            let lab = |c: &str| {
+                inku_score::oklab_from_srgb(hex_rgb(c).unwrap().map(|v| f64::from(v) / 255.0))
+            };
+            let original = lab(color);
+            let dark = aquatint_pigment(color);
+            let result = lab(&dark);
+            let hue = |x: [f64; 3]| x[2].datan2(x[1]).to_degrees();
+            let delta = (hue(original) - hue(result)).abs().rem_euclid(360.0);
+            assert!(delta.min(360.0 - delta) <= 2.0, "{color} {dark}");
+            assert!(
+                result[0] >= 0.15 && (original[0] < 0.15 || result[0] <= original[0]),
+                "{color} {dark}"
+            );
+        }
+        assert_eq!(aquatint_pigment("#000000"), "#000000");
     }
 
     #[test]
@@ -1602,34 +2275,211 @@ mod tests {
     }
 
     #[test]
-    fn grain_lays_one_unrepeated_tile_through_a_portable_carrier() {
+    fn stipple_tiles_share_ranked_layers_across_faces() {
+        let colors = BTreeMap::new();
         let score: Score = serde_json::from_str(
-            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{"texture":"grain"}}]}"#,
+            r#"{"instructions":[{"primitive":"circle","center":[0.3,0.5],"radius":0.2,"surface":{"texture":"stipple"}},{"primitive":"circle","center":[0.75,0.5],"radius":0.15,"surface":{"texture":"stipple"}}]}"#,
         )
         .unwrap();
+        let display = MarkContext {
+            profile: SvgProfile::Display,
+            use_filters: true,
+            ..context(&colors)
+        };
+        let mut ids = Vec::new();
+        for instruction in &score.instructions {
+            let rendered =
+                render_surface(instruction, MarkGeometry::of(instruction).unwrap(), display)
+                    .unwrap();
+            let (tiles, clips): (Vec<_>, Vec<_>) = rendered
+                .definitions
+                .iter()
+                .partition(|definition| definition.name() == "pattern");
+            assert_eq!(tiles.len(), STIPPLE_LAYERS);
+            assert_eq!(clips.len(), 1);
+            assert_eq!(clips[0].name(), "clipPath");
+            for tile in &tiles {
+                let text = format!("{tile:?}");
+                assert!(text.contains("\"round\""));
+                // A face's opacity stays on the face.
+                assert!(!text.contains("opacity"));
+            }
+            let mut faces = Vec::new();
+            with_class(&rendered.group, "surface-stipple-dots-v1", &mut faces);
+            assert_eq!(faces.len(), STIPPLE_LAYERS);
+            assert!(
+                faces
+                    .iter()
+                    .all(|face| face.attribute("fill-opacity").is_some())
+            );
+            ids.push(
+                tiles
+                    .iter()
+                    .map(|tile| tile.attribute("id").unwrap().to_owned())
+                    .collect::<Vec<_>>(),
+            );
+        }
+        // The same colour, fineness and density lay one tile on both faces.
+        assert_eq!(ids[0], ids[1]);
+        let mut unique = ids[0].clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), ids[0].len());
+    }
+
+    #[test]
+    fn compat_stipple_lays_round_dots_denser_toward_the_lower_right() {
         let colors = BTreeMap::new();
+        let score: Score = serde_json::from_str(
+            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{"texture":"stipple"}}]}"#,
+        )
+        .unwrap();
         let instruction = &score.instructions[0];
         let geometry = MarkGeometry::of(instruction).unwrap();
-        let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
-        // Twelve dab shapes, and the tile that places them.
-        assert_eq!(rendered.definitions.len(), SURFACE_GRAIN_SHAPES + 1);
-        let pattern = rendered.definitions.last().unwrap();
-        assert_eq!(pattern.name(), "pattern");
-        // The tile covers the whole face (400 px across), so nothing repeats.
-        for side in ["width", "height"] {
-            let length: f64 = pattern.attribute(side).unwrap().parse().unwrap();
-            assert!(length >= 400.0);
+        let rendered = render_surface(
+            instruction,
+            geometry,
+            MarkContext {
+                profile: SvgProfile::Compat,
+                use_filters: false,
+                ..context(&colors)
+            },
+        )
+        .unwrap();
+        assert!(rendered.definitions.is_empty());
+        let mut dots = Vec::new();
+        with_class(&rendered.group, "surface-stipple-dots-v1", &mut dots);
+        assert_eq!(dots.len(), 1);
+        assert_eq!(dots[0].attribute("stroke-linecap"), Some("round"));
+        let face = dots[0].attribute("d").unwrap().to_owned();
+        // Walk the moves back to the dots' centres and count each half.
+        let numbers = face
+            .split(['M', 'm', 'h'])
+            .filter(|part| !part.is_empty() && *part != ".1")
+            .map(|part| {
+                let mut pair = part.split(' ').map(|n| n.parse::<f64>().unwrap());
+                (pair.next().unwrap(), pair.next().unwrap())
+            })
+            .collect::<Vec<_>>();
+        let (mut x, mut y) = (0.0, 0.0);
+        let (mut light, mut dark) = (0, 0);
+        let center = context(&colors).canvas.width / 2.0;
+        let middle = context(&colors).canvas.height / 2.0;
+        for (index, (dx, dy)) in numbers.iter().enumerate() {
+            if index == 0 {
+                (x, y) = (*dx, *dy);
+            } else {
+                (x, y) = (x + 0.1 + dx, y + dy);
+            }
+            if (x - center) + (y - middle) < 0.0 {
+                light += 1;
+            } else {
+                dark += 1;
+            }
         }
-        // About 3 points per 80 px square, as the repeating tile held.
-        let placed = pattern
-            .children()
-            .iter()
-            .filter(|node| matches!(node, Node::Element(element) if element.name() == "use"))
-            .count();
-        assert!((40..=120).contains(&placed));
-        let group = format!("{:?}", rendered.group);
-        assert!(group.contains("surface-grain-carrier-v1"));
-        assert!(!group.contains("clipPath"));
-        assert!(!group.contains("filter"));
+        assert!(light > 100, "{light}");
+        // A circle cuts the corners, where the tone runs furthest: its halves
+        // differ by about 1.5.
+        assert!(dark * 10 > light * 13, "{light} {dark}");
+    }
+
+    #[test]
+    fn write_tenths_is_short_and_exact() {
+        for (value, text) in [(0, "0"), (7, ".7"), (-15, "-1.5"), (120, "12"), (-1, "-.1")] {
+            let mut output = String::new();
+            write_tenths(&mut output, value);
+            assert_eq!(output, text);
+        }
+    }
+
+    #[test]
+    fn point_faces_lay_one_noise_filter_and_compat_lays_a_flat_tone() {
+        let colors = BTreeMap::new();
+        for texture in ["grain", "aquatint"] {
+            let score: Score = serde_json::from_str(&format!(
+                r#"{{"instructions":[{{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{{"texture":"{texture}"}}}}]}}"#
+            ))
+            .unwrap();
+            let instruction = &score.instructions[0];
+            let geometry = MarkGeometry::of(instruction).unwrap();
+            let display = MarkContext {
+                profile: SvgProfile::Display,
+                use_filters: true,
+                ..context(&colors)
+            };
+            let rendered = render_surface(instruction, geometry, display).unwrap();
+            let filters = rendered
+                .definitions
+                .iter()
+                .filter(|element| element.name() == "filter")
+                .collect::<Vec<_>>();
+            assert_eq!(filters.len(), 1, "{texture}");
+            let filter = format!("{:?}", filters[0]);
+            assert!(filter.contains("feTurbulence"), "{texture}");
+            assert!(!filter.contains("tableValues"), "{texture}");
+            let id = filters[0].attribute("id").unwrap();
+            assert!(id.starts_with("surface_noise_"), "{texture}");
+            let group = format!("{:?}", rendered.group);
+            assert!(group.contains(&format!("url(#{id})")), "{texture}");
+            // No point is written as its own element any more.
+            assert!(!group.contains("\"use\""), "{texture}");
+            assert!(!group.contains("clipPath"), "{texture}");
+
+            let compat = MarkContext {
+                profile: SvgProfile::Compat,
+                use_filters: false,
+                ..context(&colors)
+            };
+            let flat = render_surface(instruction, geometry, compat).unwrap();
+            assert!(
+                flat.definitions
+                    .iter()
+                    .all(|element| element.name() != "filter"),
+                "{texture}"
+            );
+            assert!(!format!("{:?}", flat.group).contains("filter"), "{texture}");
+        }
+    }
+
+    #[test]
+    fn a_noise_filter_does_not_grow_with_the_face_and_is_shared_by_its_copies() {
+        let colors = BTreeMap::new();
+        let defs = |radius: f64, center: [f64; 2]| {
+            let score: Score = serde_json::from_str(&format!(
+                r#"{{"instructions":[{{"primitive":"circle","center":[{},{}],"radius":{radius},"surface":{{"texture":"grain"}}}}]}}"#,
+                center[0], center[1]
+            ))
+            .unwrap();
+            let instruction = &score.instructions[0];
+            let geometry = MarkGeometry::of(instruction).unwrap();
+            let display = MarkContext {
+                profile: SvgProfile::Display,
+                use_filters: true,
+                ..context(&colors)
+            };
+            render_surface(instruction, geometry, display)
+                .unwrap()
+                .definitions
+        };
+        let small = defs(0.06, [0.5, 0.5]);
+        assert!(small.iter().any(|element| element.name() == "filter"));
+        let large = defs(0.45, [0.5, 0.5]);
+        // The same filter, whatever the size of the face.
+        assert_eq!(format!("{small:?}"), format!("{large:?}"));
+        // A copy elsewhere names the same filter, so the document keeps one.
+        let moved = defs(0.06, [0.2, 0.7]);
+        let mut document = small.clone();
+        extend_definitions(&mut document, moved);
+        assert_eq!(document.len(), small.len());
+    }
+
+    #[test]
+    fn the_cover_quantile_reads_the_normal_table() {
+        assert!((cover_quantile(0.25) - 0.6745).abs() < 1e-9);
+        assert!((cover_quantile(0.5)).abs() < 1e-9);
+        assert!(cover_quantile(0.3) < cover_quantile(0.2));
+        // Outside the table it holds the end values.
+        assert!((cover_quantile(0.01) - 1.645).abs() < 1e-9);
+        assert!((cover_quantile(0.99) + 0.5244).abs() < 1e-9);
     }
 }

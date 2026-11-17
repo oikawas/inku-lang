@@ -934,11 +934,11 @@ Surfaces are state nouns describing a closed face or a trace. Handling describes
 | 塗り | `flat` | Fills the face evenly. | `塗りの四角を置く。` / `Place a flat square.` |
 | 刷き | `sweep` | Sweeps the face twice at slightly different angles, merging each pass's bands into one film. On an open mark, makes a broad band. | `刷きの四角を置く。` / `Place a sweep square.` |
 | 刷毛目 | `brushmarks` | Lays bands one by one, leaving darker ridges where they overlap. Only on a closed form's face. | `刷毛目の四角を置く。` / `Place a brushmarks square.` |
-| 粒 | `grain` | Fine grain and a scuffed roughness. On an open mark, increases the ground's tooth. | `粒の四角を置く。` / `Place a grain square.` |
-| 点描 | `stipple` | Dots scattered across a face to build tone. Separate from the point form. | `点描の円を置く。` / `Place a stipple circle.` |
+| 粒 | `grain` | Directional strokes broken by paper tooth. On an open mark, increases the ground's tooth. | `粒の四角を置く。` / `Place a grain square.` |
+| 点描 | `stipple` | Equal round dots build a tone that darkens from upper left to lower right. Separate from the point form. | `点描の円を置く。` / `Place a stipple circle.` |
 | 平行線 | `hatch` | Parallel lines filling a face; not a request for several line primitives. | `平行線の四角を置く。` / `Place a hatch square.` |
 | 交差線 | `crosshatch` | A second set of lines crossing the first. | `交差線の四角を置く。` / `Place a crosshatch square.` |
-| アクアチント | `aquatint` | Grain divided into tone steps, normally three. | `アクアチントの四角を置く。` / `Place an aquatint square.` |
+| アクアチント | `aquatint` | A mezzotint face with fine light specks in a deep tone, brightening toward the upper left. | `アクアチントの四角を置く。` / `Place an aquatint square.` |
 
 | Target | Acceptance and performance restrictions |
 |---|---|

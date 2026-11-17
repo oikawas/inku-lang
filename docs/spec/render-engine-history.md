@@ -13,6 +13,10 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 
 [SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated. Record a new version's values, reasons, and results in [CHANGELOG.md](../../CHANGELOG.md).
 
+## engine 104 — Grain, stipple and aquatint
+
+Grain, stipple and aquatint were hard to distinguish and too faint. Following the author's decisions on sheets 06, 08, 09 and 10, grain becomes strokes broken by paper tooth, aquatint a burnished mezzotint tone, and stipple round dots with tone sloping from upper left to lower right. Redraws of works with these textures on closed shapes change; saved SVGs do not. See [SPEC.md](../../SPEC.md).
+
 ## engine 103 — sway (I-743)
 
 79% of instructions with sway moved no more than lines without those words. Following the author's selection, the hand's sway remains, frequency and amplitude are half-coupled, and arcs, closed shapes and free lines use the same length-based rule as straight lines. Connected targets receive wild too. Reperformance of works with sway changes; saved SVGs do not. See [SPEC.md §13.9](../../SPEC.md#139-the-variation-schema-in-the-json-score).

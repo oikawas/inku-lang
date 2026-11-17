@@ -459,8 +459,9 @@ fn engine_renders_every_surface_without_profile_only_geometry() {
             "missing surface {texture}"
         );
     }
-    assert!(first.svg.contains("<pattern"));
-    assert!(first.svg.contains("surface-grain-carrier-v1"));
+    // Compat lays 粒 as a flat tone of its cover (render engine 104: the grain is
+    // a noise filter elsewhere).
+    assert!(first.svg.contains("surface-grain-noise-v1"));
     assert_eq!(first.metadata.render_surface_textures.len(), 8);
     assert!(!first.svg.contains("<filter"));
     assert!(!first.svg.contains("<clipPath"));
@@ -647,10 +648,11 @@ fn display_grain_tile_is_reusable_and_not_filtered_per_dab() {
         },
     };
     let output = render(request).unwrap();
-    let pattern_start = output.svg.find("<pattern id=\"surface_pattern_").unwrap();
-    let pattern_end = pattern_start + output.svg[pattern_start..].find("</pattern>").unwrap();
-    assert!(!output.svg[pattern_start..pattern_end].contains("filter=\""));
-    assert!(output.svg.contains("surface-grain-carrier-v1"));
+    // The grain is one noise filter on the face (render engine 104): no point
+    // is its own element, so none carries a filter of its own.
+    assert_eq!(output.svg.matches("<filter id=\"surface_noise_").count(), 1);
+    assert!(!output.svg.contains("<pattern id=\"surface_grain_"));
+    assert!(output.svg.contains("surface-grain-noise-v1"));
 }
 
 #[test]
@@ -749,7 +751,8 @@ fn compat_grain_omits_the_nonportable_pattern_class() {
         },
     };
     let output = render(request).unwrap();
-    assert!(output.svg.contains("<pattern"));
+    // Compat lays 粒 as one flat tone of its cover (render engine 104).
+    assert!(output.svg.contains("class=\"surface-grain-noise-v1\""));
     assert!(!output.svg.contains("class=\"surface-grain-pattern-v1\""));
     assert!(!output.svg.contains("<filter"));
 }

@@ -225,7 +225,10 @@ fn linear_from_oklab([lightness, a, b]: [f64; 3]) -> [f64; 3] {
 
 /// The pigment moved in OKLCH. Lightness and hue are kept exactly; chroma gives
 /// way until sRGB can hold the colour, so no channel is ever clipped.
-fn adjust_pigment(color: &str, change: impl Fn(f64, f64, f64) -> (f64, f64, f64)) -> String {
+pub(crate) fn adjust_pigment(
+    color: &str,
+    change: impl Fn(f64, f64, f64) -> (f64, f64, f64),
+) -> String {
     let Some(rgb) = parse_pigment(color) else {
         return color.to_owned();
     };

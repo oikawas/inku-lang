@@ -206,6 +206,14 @@ fn the_current_core_draws_the_public_ddl_inside_the_table() {
         "the saved burin dot writes no alpha mask"
     );
     *written.entry("alpha mask").or_default() += 1;
+    // Render engine 104 laid 粒 from a noise filter, and its points were the
+    // last `use` a public DDL wrote; the saved burin's engraved cuts still place
+    // theirs by `use`, so the saved dot keeps the href case reached.
+    assert!(
+        dot.contains("<use href="),
+        "the saved burin dot writes no use href"
+    );
+    *written.entry("use href").or_default() += 1;
     let display = display_svg(&dot).unwrap_or_else(|error| panic!("saved burin dot: {error}"));
     totals.href += display.rewrites.href;
     totals.ellipse += display.rewrites.ellipse;

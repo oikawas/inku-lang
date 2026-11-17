@@ -177,7 +177,7 @@ fn mark_appearance(
         group.push(surface.group);
         mark = group;
         for definition in surface.definitions {
-            document.push_definition(definition);
+            document.push_definition_once(definition);
         }
     }
     if !overridden {

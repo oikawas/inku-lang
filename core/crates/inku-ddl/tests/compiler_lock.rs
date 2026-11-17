@@ -19,7 +19,7 @@ const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v12.jso
 
 #[test]
 fn unresolved_drawing_clauses_are_bounded_known_holes() {
-    let source = "青で背景を塗りつぶす\n様々な色の四角30個をチョークとコンピュータで塗りつぶす。";
+    let source = "青で背景を塗りつぶす\n様々な色の四角30個をチョークとデジタルで塗りつぶす。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -52,14 +52,14 @@ fn unresolved_drawing_clauses_are_bounded_known_holes() {
             .collect::<Vec<_>>(),
         [
             "青で背景を塗りつぶす",
-            "様々な色の四角30個をチョークとコンピュータで塗りつぶす"
+            "様々な色の四角30個をチョークとデジタルで塗りつぶす"
         ]
     );
 }
 
 #[test]
 fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
-    let source = "背景を灰で埋める。赤いチョークの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く。細かく揺れる。";
+    let source = "背景を灰で埋める。赤いチョークの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く。小さく揺れる。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -121,7 +121,7 @@ fn recoverable_fragments_do_not_block_an_anchored_clause_hole() {
 
 #[test]
 fn unresolved_continuation_clause_preserves_drawable_predecessor() {
-    let source = "背景を灰で埋める。赤いチョークの太い折れ線を右上がりから右下がりへ交互に組み合わせて右下へ引く。線が細かく波打つ。";
+    let source = "背景を灰で埋める。赤いチョークの太い折れ線を右上がりから右下がりへ交互に組み合わせて右下へ引く。線が小さく波打つ。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -633,7 +633,7 @@ fn multi_head_continuation_claims_project_one_conflict_per_predicate_occurrence(
     for (language, source, expected_claims, expected_owners) in [
         (
             ResolvedInstructionLanguage::Ja,
-            "線 円。線は 円は 細かく 揺れる。",
+            "線 円。線は 円は 小さく 揺れる。",
             2,
             &["owner=fluctuation_amplitude", "owner=fluctuation_quality"][..],
         ),
@@ -1430,7 +1430,7 @@ fn spec_ja_and_en_clause_topology_reaches_one_compiler_meaning() {
 #[test]
 fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
     let ja = compile(
-        "中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。",
+        "中心に鉛筆の細い線をひとつ置く。線は小さく揺れる。",
         ResolvedInstructionLanguage::Ja,
         &[],
         None,
@@ -1648,7 +1648,7 @@ fn failed_continuation_projection_preserves_owners_and_unique_occurrences() {
     for (language, source) in [
         (
             ResolvedInstructionLanguage::Ja,
-            "三角 四角。円は 弧は 細かく 揺れる。",
+            "三角 四角。円は 弧は 小さく 揺れる。",
         ),
         (
             ResolvedInstructionLanguage::En,
@@ -1763,7 +1763,7 @@ fn failed_continuation_preserves_preexisting_explicit_fingerprints() {
         (
             ResolvedInstructionLanguage::Ja,
             "中心に赤い鉛筆の細い線をひとつ置く。円は。",
-            "中心に赤い鉛筆の細い線をひとつ置く。円は細かく揺れる。",
+            "中心に赤い鉛筆の細い線をひとつ置く。円は小さく揺れる。",
         ),
         (
             ResolvedInstructionLanguage::En,

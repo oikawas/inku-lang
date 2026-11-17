@@ -12,11 +12,7 @@ use serde::{
 };
 use sha2::{Digest, Sha256};
 
-use crate::{
-    MacroInvocation,
-    saijiki::canonical_semantic_id,
-    saijiki_asset,
-};
+use crate::{MacroInvocation, saijiki::canonical_semantic_id, saijiki_asset};
 
 /// Exact schema and digest domain for this semantic definition edition.
 pub const MACRO_DEFINITION_SCHEMA_ID: &str = "inku.macro-definition.v1";

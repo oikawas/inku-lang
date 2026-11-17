@@ -5,7 +5,7 @@
     {
       "id": "ja-mixed-six",
       "language": "ja",
-      "source": "円 青、水平\r\n破線 細かく 上 置く 縦長 を 八つ 8 沿う たくさん",
+      "source": "円 青、水平\r\n破線 小さく 上 置く 縦長 を 八つ 8 沿う たくさん",
       "expected_core_roles": [
         {"role": "primitive", "asset_id": "inku.saijiki.v4", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 3},
         {"role": "color", "asset_id": "inku.saijiki.v4", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 4, "end_byte": 7}
@@ -13,7 +13,7 @@
       "expected_remaining_roles": [
         {"role": "angle", "asset_id": "inku.saijiki.v4", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 10, "end_byte": 16},
         {"role": "continuity", "asset_id": "inku.saijiki.v4", "category_key": "tsuranari", "canonical_surface_ja": "破線", "start_byte": 18, "end_byte": 24},
-        {"role": "fluctuation", "asset_id": "inku.saijiki.v4", "category_key": "yuragi", "canonical_surface_ja": "細かく", "start_byte": 25, "end_byte": 34},
+        {"role": "fluctuation", "asset_id": "inku.saijiki.v4", "category_key": "yuragi", "canonical_surface_ja": "小さく", "start_byte": 25, "end_byte": 34},
         {"role": "place", "asset_id": "inku.saijiki.v4", "category_key": "basho", "canonical_surface_ja": "上", "start_byte": 35, "end_byte": 38},
         {"role": "motion", "asset_id": "inku.saijiki.v4", "category_key": "ugoki", "canonical_surface_ja": "置く", "start_byte": 39, "end_byte": 45},
         {"role": "proportion", "asset_id": "inku.saijiki.v4", "category_key": "wariai", "canonical_surface_ja": "縦長", "start_byte": 46, "end_byte": 52}
@@ -42,7 +42,7 @@
       "expected_remaining_roles": [
         {"role": "angle", "asset_id": "inku.saijiki.v4", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 13, "end_byte": 23},
         {"role": "continuity", "asset_id": "inku.saijiki.v4", "category_key": "tsuranari", "canonical_surface_ja": "破線", "start_byte": 25, "end_byte": 31},
-        {"role": "fluctuation", "asset_id": "inku.saijiki.v4", "category_key": "yuragi", "canonical_surface_ja": "細かく", "start_byte": 32, "end_byte": 40},
+        {"role": "fluctuation", "asset_id": "inku.saijiki.v4", "category_key": "yuragi", "canonical_surface_ja": "小さく", "start_byte": 32, "end_byte": 40},
         {"role": "place", "asset_id": "inku.saijiki.v4", "category_key": "basho", "canonical_surface_ja": "上", "start_byte": 41, "end_byte": 44},
         {"role": "motion", "asset_id": "inku.saijiki.v4", "category_key": "ugoki", "canonical_surface_ja": "置く", "start_byte": 45, "end_byte": 50},
         {"role": "proportion", "asset_id": "inku.saijiki.v4", "category_key": "wariai", "canonical_surface_ja": "縦長", "start_byte": 51, "end_byte": 55}

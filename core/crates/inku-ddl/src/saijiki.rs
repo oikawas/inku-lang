@@ -1855,7 +1855,7 @@ mod tests {
             "油彩",
             "ペインティングナイフ",
             "エッチング",
-            "コンピュータ",
+            "デジタル",
         ];
         let expected_en = [
             "silverpoint",
@@ -1868,7 +1868,7 @@ mod tests {
             "oil paint",
             "painting knife",
             "etching",
-            "computer",
+            "digital",
         ];
         let ja_lines = ja.lines().collect::<Vec<_>>();
         let en_lines = en.lines().collect::<Vec<_>>();
@@ -1897,7 +1897,7 @@ mod tests {
         tools
             .words
             .iter_mut()
-            .find(|word| word.surface_ja == "コンピュータ")
+            .find(|word| word.surface_ja == "デジタル")
             .unwrap()
             .prompt = false;
 
@@ -1908,7 +1908,7 @@ mod tests {
 
         assert_eq!(filtered_ja.lines().count(), expected_ja.len() - 1);
         assert_eq!(filtered_en.lines().count(), expected_en.len() - 1);
-        assert!(!filtered_ja.contains("コンピュータ"));
-        assert!(!filtered_en.contains("computer"));
+        assert!(!filtered_ja.contains("デジタル"));
+        assert!(!filtered_en.contains("digital"));
     }
 }

@@ -53,7 +53,7 @@
       "expected_deferred": [
         {"kind": "saijiki_word", "surface": "horizontal", "start_byte": 0, "end_byte": 10, "asset_id": "inku.saijiki.v4", "category_key": "katamuki", "canonical_surface_ja": "水平"},
         {"kind": "saijiki_word", "surface": "solid", "start_byte": 11, "end_byte": 16, "asset_id": "inku.saijiki.v4", "category_key": "tsuranari", "canonical_surface_ja": "実線"},
-        {"kind": "saijiki_word", "surface": "narrowly", "start_byte": 17, "end_byte": 25, "asset_id": "inku.saijiki.v4", "category_key": "yuragi", "canonical_surface_ja": "細かく"},
+        {"kind": "saijiki_word", "surface": "narrowly", "start_byte": 17, "end_byte": 25, "asset_id": "inku.saijiki.v4", "category_key": "yuragi", "canonical_surface_ja": "小さく"},
         {"kind": "saijiki_word", "surface": "top", "start_byte": 26, "end_byte": 29, "asset_id": "inku.saijiki.v4", "category_key": "basho", "canonical_surface_ja": "上"},
         {"kind": "saijiki_word", "surface": "place", "start_byte": 30, "end_byte": 35, "asset_id": "inku.saijiki.v4", "category_key": "ugoki", "canonical_surface_ja": "置く"},
         {"kind": "saijiki_word", "surface": "tall", "start_byte": 36, "end_byte": 40, "asset_id": "inku.saijiki.v4", "category_key": "wariai", "canonical_surface_ja": "縦長"},

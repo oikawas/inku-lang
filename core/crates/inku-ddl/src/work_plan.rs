@@ -20,7 +20,7 @@ use crate::fluctuation::{FluctuationDimension, classify_fluctuation_dimension};
 use crate::grammar_markers::MarkerId;
 use crate::macro_definition::project_macro_semantic_ref;
 use crate::parser::{CoreModifierValue, core_modifier_surface_forms};
-use crate::saijiki::{canonical_wire_id, saijiki_asset, word_id};
+use crate::saijiki::{canonical_wire_id, saijiki_asset};
 
 pub const WORK_PLAN_SCHEMA_ID: &str = "inku.work-plan.v2";
 pub const WORK_PLAN_CAPABILITIES_ASSET_ID: &str = "inku.work-plan-capabilities.v2";
@@ -160,8 +160,7 @@ fn saijiki_terms(category_key: &str) -> Vec<(String, WorkPlanTerm)> {
             Some((
                 canonical,
                 WorkPlanTerm {
-                    // The word's own id (D1), so a plan value outlives an English rename.
-                    id: word_id(word)?,
+                    id: canonical_wire_id(&en),
                     ja: word.surface_ja.clone(),
                     en,
                 },
@@ -434,7 +433,7 @@ pub fn work_plan_ground_material(value: &str) -> Option<inku_score::GroundMateri
         .words
         .iter()
         .filter(|word| word.prompt)
-        .find(|word| word_id(word).as_deref() == Some(value))?
+        .find(|word| word.surface_en.as_deref().map(canonical_wire_id).as_deref() == Some(value))?
         .score_value
         .as_deref()
         .and_then(|score| serde_json::from_value(Value::String(score.to_owned())).ok())
@@ -457,7 +456,7 @@ fn texture_surfaces() -> &'static [String] {
                     .as_deref()
                     .is_some_and(|value| !matches!(value, "none" | "solid"))
             })
-            .filter_map(word_id)
+            .filter_map(|word| word.surface_en.as_deref().map(canonical_wire_id))
             .collect()
     })
 }

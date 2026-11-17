@@ -456,7 +456,7 @@
     {
       "id": "fluctuation-conflict-preserves-action-position",
       "language": "ja",
-      "source": "中心に、細かく 大きく 円を置く。",
+      "source": "中心に、小さく 大きく 円を置く。",
       "instruction_actions": [
         "place"
       ],

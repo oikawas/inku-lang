@@ -279,7 +279,7 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
                 (
                     expected_surfaces[1],
                     "yuragi",
-                    "細かく",
+                    "小さく",
                     expected_surfaces[1]
                 ),
             ],

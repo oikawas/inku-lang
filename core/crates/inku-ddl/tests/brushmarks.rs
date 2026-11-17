@@ -321,7 +321,7 @@ fn the_plan_offers_brushmarks_on_closed_shapes_only() {
             "stipple",
             "hatch",
             "crosshatch",
-            "aquatint"
+            "mezzotint"
         ])
     );
     let capabilities = work_plan_capabilities();

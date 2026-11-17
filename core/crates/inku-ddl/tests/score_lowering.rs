@@ -2666,7 +2666,7 @@ fn named_surface_texture_is_the_area_performance_without_a_hidden_flat_base() {
         ("stipple", false, Some(SurfaceTexture::Stipple)),
         ("hatch", false, Some(SurfaceTexture::Hatch)),
         ("crosshatch", false, Some(SurfaceTexture::Crosshatch)),
-        ("aquatint", false, Some(SurfaceTexture::Aquatint)),
+        ("mezzotint", false, Some(SurfaceTexture::Aquatint)),
         ("flat", true, None),
         ("empty", false, None),
     ] {
@@ -2729,10 +2729,14 @@ fn ordinary_non_solid_surface_intensity_reaches_the_score_and_keeps_quality() {
 #[test]
 fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
-    for (level, expected) in [
-        ("dense", inku_score::SurfaceIntensity::Dense),
-        ("temperate", inku_score::SurfaceIntensity::Normal),
-        ("faint", inku_score::SurfaceIntensity::Faint),
+    for (level, written, expected) in [
+        ("dense", "dense", inku_score::SurfaceIntensity::Dense),
+        (
+            "temperate",
+            "moderate",
+            inku_score::SurfaceIntensity::Normal,
+        ),
+        ("faint", "faint", inku_score::SurfaceIntensity::Faint),
     ] {
         let definition = MacroDefinition::from_json(&serde_json::json!({
             "schema":"inku.macro-definition.v1", "namespace":"Draw", "heading":"Intensity", "version":"1.0.0",
@@ -2746,7 +2750,7 @@ fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
             }}]
         }).to_string()).unwrap();
         let transformed = stage15_locked(
-            &format!("place one red flat {level} circle at center. ｛Intensity｝"),
+            &format!("place one red flat {written} circle at center. ｛Intensity｝"),
             ResolvedInstructionLanguage::En,
             &[definition],
         );
@@ -4895,8 +4899,8 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "左端に、赤い円をひとつ置く。円は細かくゆるやかに波打つ。",
-            "｛Pair｝ 細かくゆるやかに波打つ",
+            "左端に、赤い円をひとつ置く。円は小さくゆるやかに波打つ。",
+            "｛Pair｝ 小さくゆるやかに波打つ",
             vec![
                 ("amplitude", "narrowly"),
                 ("frequency", "loosely"),

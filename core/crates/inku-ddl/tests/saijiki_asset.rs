@@ -260,7 +260,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
     let asset_value: Value = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
     // The amplitude words are adverbs only (narrowly, broadly) and carry no
     // grammar of their own; an adjective form would read as a shape's width or size.
-    for surface_ja in ["細かく", "大きく", "ゆるやかに", "小刻みに"] {
+    for surface_ja in ["小さく", "大きく", "ゆるやかに", "小刻みに"] {
         assert_eq!(
             word_value(&asset_value, "yuragi", surface_ja).get("english_grammar"),
             None
@@ -367,7 +367,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
         );
     }
     for (surface_ja, canonical_id) in [
-        ("細かく", "narrowly"),
+        ("小さく", "narrowly"),
         ("大きく", "broadly"),
         ("ゆるやかに", "loosely"),
         ("小刻みに", "tightly"),
@@ -474,11 +474,17 @@ fn alias_free_rows_keep_their_existing_lexical_semantic_identity() {
             if word.semantic_alias.is_some() {
                 continue;
             }
-            let expected = word.score_value.clone().or_else(|| {
-                word.surface_en
-                    .as_deref()
-                    .map(|surface| surface.replace(['-', ' '], "_"))
-            });
+            // The word's own id (Saijiki v4, D1): the identity v3 derived from the Score
+            // value or the English surface, kept when the English surface was renamed.
+            let expected = word
+                .id
+                .clone()
+                .or_else(|| word.score_value.clone())
+                .or_else(|| {
+                    word.surface_en
+                        .as_deref()
+                        .map(|surface| surface.replace(['-', ' '], "_"))
+                });
             assert_eq!(
                 project_macro_semantic_ref(&category.key, &word.surface_ja)
                     .map(|projection| projection.canonical_id),

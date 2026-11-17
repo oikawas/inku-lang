@@ -3,7 +3,7 @@
 //! underlayer word (したじ: 下塗り) lays the tool's paint under it. On any other
 //! mark the word says nothing: only that word is left out, with its own
 //! reason, and the rest of the sentence lowers as it does without it. An
-//! amplitude word (細かく・大きく) without a sway word (揺れる・波打つ) makes no
+//! amplitude word (小さく・大きく) without a sway word (揺れる・波打つ) makes no
 //! sway, and is left out the same way.
 
 use inku_ddl::{
@@ -161,7 +161,7 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
             },
         ),
         (
-            "中心に、赤のペンの疎なアクアチントの雲形を1個置く。",
+            "中心に、赤のペンの疎なメゾチントの雲形を1個置く。",
             JA,
             Expected {
                 density: 0.05,
@@ -169,7 +169,7 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
             },
         ),
         (
-            "Place one red pen sparse aquatint cloudform at the center.",
+            "Place one red pen sparse mezzotint cloudform at the center.",
             EN,
             Expected {
                 density: 0.05,
@@ -334,7 +334,7 @@ fn two_words_of_one_class_conflict_and_both_are_left_out() {
 fn an_amplitude_word_without_a_sway_word_makes_no_sway() {
     for (source, without, language, id) in [
         (
-            "中心に、赤のペンの細かく点描の円を1個置く。",
+            "中心に、赤のペンの小さく点描の円を1個置く。",
             "中心に、赤のペンの点描の円を1個置く。",
             JA,
             "narrowly",
@@ -382,7 +382,7 @@ fn an_amplitude_word_without_a_sway_word_makes_no_sway() {
 fn an_amplitude_word_with_a_sway_word_sways_as_before() {
     for (source, language, amplitude, quality) in [
         (
-            "中心に、赤のペンの細かく揺れる点描の円を1個置く。",
+            "中心に、赤のペンの小さく揺れる点描の円を1個置く。",
             JA,
             Amplitude::Fine,
             Quality::Perlin,

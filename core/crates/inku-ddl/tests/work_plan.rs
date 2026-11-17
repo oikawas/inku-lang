@@ -1305,7 +1305,7 @@ fn texture_words_print_and_compile_cleanly_on_every_closed_shape() {
             "stipple",
             "hatch",
             "crosshatch",
-            "aquatint",
+            "mezzotint",
         ] {
             let surface = (WorkPlanSlot::Surface, texture);
             let under = (WorkPlanSlot::Underlayer, "underpainted");

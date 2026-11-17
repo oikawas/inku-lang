@@ -2289,7 +2289,8 @@ fn lightness(color: Option<&str>, default: f64) -> f64 {
 fn surface_weight(surface: Option<&str>) -> f64 {
     match surface {
         Some("solid" | "flat") => 1.5,
-        Some("aquatint") => 1.1,
+        // The Score keeps `aquatint`; the plan writes the v4 English, `mezzotint`.
+        Some("aquatint" | "mezzotint") => 1.1,
         Some("grain" | "sweep" | "brushmarks" | "hatch") => 0.9,
         Some("stipple") => 0.8,
         Some("wash") => 0.7,

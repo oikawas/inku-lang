@@ -11,13 +11,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The one-time move of saved Saijiki v1/v2 records to v3.
+ * The one-time move of saved Saijiki v1/v2/v3 records to v4.
  *
  * Saijiki names its edition on every visible document; a saved
  * document without the field was written with v1, and the core refuses it, and
  * a saved Macro definition that only a migration makes valid, with
  * `saijiki_migration_required` (SPEC §3.3). The core owns the migration itself
- * (`migrate_saijiki_v1` / `migrate_saijiki_v2`): given one saved unit -- a document and the
+ * (`migrate_saijiki_v1` / `migrate_saijiki_v2` / `migrate_saijiki_v3`): given one saved unit -- a document and the
  * definitions its locks name, or definitions alone -- it returns the unit in
  * the current edition.
  *
@@ -40,10 +40,11 @@ import org.json.JSONObject
  * with the setting [DONE_SETTING], so a failure writes nothing and the next
  * start tries again, and a second run after success does nothing.
  */
-internal class SaijikiV3Migration(
+internal class SaijikiMigration(
     private val migrate: (ByteArray) -> ByteArray,
     private val migrateV2: (ByteArray) -> ByteArray = app.inku.mobile.pipeline.NativePipelineBridge::migrateSaijikiV2,
     private val discardExecutions: Boolean,
+    private val migrateV3: (ByteArray) -> ByteArray = app.inku.mobile.pipeline.NativePipelineBridge::migrateSaijikiV3,
     private val now: () -> Long = System::currentTimeMillis,
     private val elapsedMillis: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
@@ -51,10 +52,11 @@ internal class SaijikiV3Migration(
     // and must die with their unit rather than accumulate for the whole database.
     private val definitionsByDigest = linkedMapOf<String, Any>()
     private val definitionDigests = IdentityHashMap<Any, String>()
-    private val definitionAnswers = HashMap<String, JSONObject>()
+    private val definitionAnswers = HashMap<Pair<String, String?>, JSONObject>()
     private var coreCalls = 0
     private var coreMillis = 0L
     private var coreMaxMillis = 0L
+    private var definitionsEdition: String? = null
 
     /** Writes the migration once; null when it was already written. */
     fun runOnce(db: SupportSQLiteDatabase): JSONObject? {
@@ -123,9 +125,17 @@ internal class SaijikiV3Migration(
         val sweeps = JSONArray()
         val tools = JSONArray()
         val thinness = JSONArray()
-        val historyEdition = db.query("SELECT 1 FROM app_settings WHERE key = 'saijiki_v2_saved_records'").use {
-            if (it.moveToFirst()) "inku.saijiki.v2" else null
+        val approximated = JSONArray()
+        val historyEdition = db.query("SELECT key FROM app_settings WHERE key IN ('saijiki_v2_saved_records', 'saijiki_v3_saved_records')").use {
+            val editions = mutableSetOf<String>()
+            while (it.moveToNext()) editions.add(it.getString(0))
+            when {
+                "saijiki_v3_saved_records" in editions -> "inku.saijiki.v3"
+                "saijiki_v2_saved_records" in editions -> "inku.saijiki.v2"
+                else -> null
+            }
         }
+        definitionsEdition = historyEdition
 
         // The frozen catalogs of the performances, and the definitions each variation saved.
         val links = linkedMapOf<String, Link>()
@@ -215,6 +225,10 @@ internal class SaijikiV3Migration(
                 return null
             }
             val documentEdits = migrated.optJSONArray("edits") ?: JSONArray()
+            val approximatedWords = migrated.optJSONArray("approximated_words") ?: JSONArray()
+            if (approximatedWords.length() > 0) {
+                approximated.put(JSONObject().put("kind", kind).put("id", recordId).put("approximated_words", approximatedWords))
+            }
             val unassociatedTools = migrated.optJSONArray("unassociated_tools") ?: JSONArray()
             if (unassociatedTools.length() > 0) {
                 count(kind, "with_unassociated_tools")
@@ -249,18 +263,18 @@ internal class SaijikiV3Migration(
                     refused.put(refusal("variation_documents", "$ownerId/$variationId", JSONObject().put("code", "unreadable_document")))
                     continue
                 }
-                if (document.optString("saijiki") == "inku.saijiki.v3") {
+                if (document.optString("saijiki") == "inku.saijiki.v4") {
                     count("variation_documents", "current")
                     continue
                 }
                 val edition = if (document.has("saijiki")) document.optString("saijiki") else null
-                if (edition != null && edition != "inku.saijiki.v2") {
+                if (edition != null && edition != "inku.saijiki.v2" && edition != "inku.saijiki.v3") {
                     count("variation_documents", "refused")
                     refused.put(refusal("variation_documents", "$ownerId/$variationId", JSONObject().put("code", "other_edition"))
                         .put("source", document.optString("source")).put("locks", document.optJSONArray("macro_locks")?.length() ?: 0))
                     continue
                 }
-                count("variation_documents", if (edition == null) "v1" else "v2")
+                count("variation_documents", when (edition) { null -> "v1"; "inku.saijiki.v2" -> "v2"; else -> "v3" })
                 val locks = documentLocks(document.optJSONArray("macro_locks"))
                 val definitions = distinct(locks.objects().mapNotNull { lock ->
                     val key = listOf(lock.optString("qualified_name"), lock.optString("version"), lock.optString("digest"))
@@ -398,6 +412,7 @@ internal class SaijikiV3Migration(
             executions = executions,
             report = report
                 .put("edits", JSONObject(edits as Map<*, *>))
+                .put("approximated_word_records", approximated)
                 .put("refused_records", refused)
                 .put("unassociated_sweep_records", sweeps)
                 .put("unassociated_tool_records", tools)
@@ -450,7 +465,12 @@ internal class SaijikiV3Migration(
     private fun ask(unit: String): JSONObject {
         val started = elapsedMillis()
         val document = JSONObject(unit).optJSONObject("document")
-        val call = if (document != null && !document.has("saijiki")) migrate else migrateV2
+        val edition = if (document == null) definitionsEdition else document.optString("saijiki").ifEmpty { null }
+        val call = when (edition) {
+            "inku.saijiki.v3" -> migrateV3
+            "inku.saijiki.v2" -> migrateV2
+            else -> migrate
+        }
         val output = call(unit.toByteArray(Charsets.UTF_8))
         coreCalls += 1
         val duration = elapsedMillis() - started
@@ -466,7 +486,7 @@ internal class SaijikiV3Migration(
     }
 
     private fun definitionAnswer(definition: Any): JSONObject {
-        return definitionAnswers.getOrPut(definitionDigest(definition)) {
+        return definitionAnswers.getOrPut(definitionDigest(definition) to definitionsEdition) {
             val answer = ask(LineagePlanner.canonicalJson(JSONObject().put("definitions", JSONArray().put(definition))))
             answer.optJSONArray("definitions")?.optJSONObject(0)
                 ?: JSONObject().put("error", answer.optJSONObject("error") ?: JSONObject().put("code", "unknown"))
@@ -500,7 +520,7 @@ internal class SaijikiV3Migration(
         const val DISCARDED_TABLE = "pipeline_candidate_executions"
 
         /** The app setting that records the migration was written; the Server's name. */
-        const val DONE_SETTING = "saijiki_v3_saved_records"
+        const val DONE_SETTING = "saijiki_v4_saved_records"
 
         private val LOCK_FIELDS = listOf("qualified_name", "version", "digest", "aliases")
 

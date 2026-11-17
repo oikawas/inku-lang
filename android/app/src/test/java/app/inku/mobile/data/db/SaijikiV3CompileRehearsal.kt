@@ -25,7 +25,7 @@ internal fun compileMigratedRecords(host: HostSqlite, folder: File) = runBlockin
         while (c.moveToNext()) {
             val context = JSONObject(c.getBlob(2).decodeToString())
             val config = context.getJSONObject("config")
-            historyLocks[c.getString(0)] = SaijikiV3Migration.documentLocks(context.optJSONObject("macro_catalog")?.optJSONArray("definition_locks"))
+            historyLocks[c.getString(0)] = SaijikiMigration.documentLocks(context.optJSONObject("macro_catalog")?.optJSONArray("definition_locks"))
             configs[c.getString(0)] = config
             variationConfigs.putIfAbsent(c.getString(1), config)
         }
@@ -51,7 +51,7 @@ internal fun compileMigratedRecords(host: HostSqlite, folder: File) = runBlockin
             val configObject = JSONObject(config)
             val editorInput = JSONObject().put("source", source).put("language", language)
                 .put("definitions", configObject.optJSONArray("definitions") ?: JSONArray())
-                .put("locks", locks ?: SaijikiV3Migration.documentLocks(JSONArray(prepared?.macroLocksJson ?: "[]")))
+                .put("locks", locks ?: SaijikiMigration.documentLocks(JSONArray(prepared?.macroLocksJson ?: "[]")))
                 .put("compiler", configObject.getJSONObject("compiler"))
             val editor = JSONObject(binding.pluginCalls(editorInput.toString().toByteArray()).decodeToString())
             record.put("editor_resolution", editor)

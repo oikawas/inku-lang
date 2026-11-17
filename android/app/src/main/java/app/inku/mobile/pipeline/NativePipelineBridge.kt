@@ -54,6 +54,7 @@ object NativePipelineBridge : SharedPipelineBinding {
     external fun migrateSaijikiV1(inputBytes: ByteArray): ByteArray
     /** One saved Saijiki v2 unit in, the same unit in the current edition out (SPEC §3.3). */
     external fun migrateSaijikiV2(inputBytes: ByteArray): ByteArray
+    external fun migrateSaijikiV3(inputBytes: ByteArray): ByteArray
     external fun migratePluginNames(inputBytes: ByteArray): ByteArray
     external fun pluginPackage(inputBytes: ByteArray): ByteArray
     external fun pluginCalls(inputBytes: ByteArray): ByteArray

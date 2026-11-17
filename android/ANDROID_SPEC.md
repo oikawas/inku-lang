@@ -99,6 +99,10 @@ A work's `score_json`, `display_svg` and `render_metadata_json` move to `history
 
 Automatic selection from a description receives the drawing seed and records the reading and choice prompts separately. Work information shows the selection method, color reading, and items dropped because they were absent from the description. Fixed catalogs and image selection do not retain a description catalog seed, and a child does not inherit the reading record. The Room version is unchanged.
 
+## 2026-11-18 Cleaning documents without works
+
+When candidates are discarded, a work is permanently deleted, or the app starts, it cleans documents without a linked work together with their acknowledgments and execution records. Documents with children, active documents and their parents, restored executions, and records written after process start are kept; startup removes eligible leaves first. Permanent deletion checks other works and the revision, retaining the history link as a restoration marker. Cleanup is transactional and failures are logged.
+
 ## 2026-11-01 Saijiki v3 / render engine 95
 
 History migration prefers its saved instruction_lang_resolved, then the work's saved config language, then the app's shared DDL language detection. Missing language metadata must not leave retired English tools unmigrated by treating the text as Japanese.

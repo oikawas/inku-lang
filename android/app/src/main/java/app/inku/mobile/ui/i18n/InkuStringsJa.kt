@@ -158,6 +158,7 @@ object InkuStringsJa : InkuStrings {
     override val pipelineDeclineFailed = "DDLの変更案を断れませんでした。"
     override val drawingContextUnreadable = "描画の状態を読めませんでした。"
     override val drawingContextMissing = "描画の状態が見つかりません。"
+    override val candidateNotFound = "案が見つかりません。"
     override val demoFailed = "デモの描画に失敗しました。"
     override val licenseUpdateFailed = "ライセンスへの同意を保存できませんでした。"
     override val pipelineProposal = "DDLの変更案を確認してください。"

@@ -182,6 +182,7 @@ interface InkuStrings {
     val pipelineDeclineFailed: String
     val drawingContextUnreadable: String
     val drawingContextMissing: String
+    val candidateNotFound: String
     val demoFailed: String
     val licenseUpdateFailed: String
     val pipelineProposal: String

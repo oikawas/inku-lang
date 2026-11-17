@@ -677,3 +677,26 @@ fn every_category_belongs_to_one_listed_bundle_in_the_screen_order() {
         );
     }
 }
+
+// Every word and relation the Saijiki screen shows has the author's approved description in
+// both languages (I-742, 2026-11-17), so no host falls back to a generic sentence.
+#[test]
+fn every_shown_word_and_relation_has_a_description_in_both_languages() {
+    let asset = saijiki_asset();
+    for category in &asset.categories {
+        for word in category.words.iter().filter(|word| word.display) {
+            let description = word
+                .description
+                .as_ref()
+                .unwrap_or_else(|| panic!("{} {}", category.key, word.surface_ja));
+            assert!(!description.ja.is_empty() && !description.en.is_empty());
+        }
+    }
+    for relation in &asset.relations {
+        let description = relation
+            .description
+            .as_ref()
+            .unwrap_or_else(|| panic!("{}", relation.relation_type));
+        assert!(!description.ja.is_empty() && !description.en.is_empty());
+    }
+}

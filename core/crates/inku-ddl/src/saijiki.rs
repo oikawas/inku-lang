@@ -253,6 +253,10 @@ pub struct RelationAsset {
     pub literals_en: Vec<String>,
     #[serde(default)]
     pub literal_targets: HashMap<String, TouchingLiteralTarget>,
+    /// What the relation does to the drawing, as the Saijiki screen shows it (Saijiki v4,
+    /// I-742; earlier editions have none).
+    #[serde(default)]
+    pub description: Option<SaijikiPhysicalDescriptionAsset>,
 }
 
 /// The primitive explicitly named by an existing full Touching literal.

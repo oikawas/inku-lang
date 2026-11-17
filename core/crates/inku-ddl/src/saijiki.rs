@@ -103,6 +103,9 @@ pub struct SaijikiAsset {
     /// (Saijiki v4; earlier editions have none). Every category's `bundle` is one of them.
     #[serde(default)]
     pub bundles: Vec<SaijikiBundleAsset>,
+    /// The bundle the relation words (あいだ) are shown in (Saijiki v4: `where`).
+    #[serde(default)]
+    pub relations_bundle: Option<String>,
 }
 
 /// One bundle of categories (Saijiki v4, RECUT-PLAN §3): its key and its heading.

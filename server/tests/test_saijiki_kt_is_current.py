@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 
 import pytest
 
@@ -59,6 +60,20 @@ def test_bundle_names_and_order_match_core_asset() -> None:
     declarations = [f'Bundle("{item["key"]}", "{item["name_ja"]}", "{item["name_en"]}")' for item in bundles]
     positions = [text.index(declaration) for declaration in declarations]
     assert positions == sorted(positions)
+
+
+@android_only
+def test_category_bundles_match_web_snapshot() -> None:
+    kotlin = _load_generator()._OUTPUT.read_text(encoding="utf-8")
+    web = (ROOT / "web/src/lib/saijiki.generated.ts").read_text(encoding="utf-8").split(
+        "export const GENERATED_SAIJIKI_EN:", 1
+    )[0]
+    kt_pairs = re.findall(r'Category\(\s*key = "([^"]+)",\s*bundle = "([^"]+)",', kotlin)
+    web_pairs = re.findall(r"\{\s*key: '([^']+)',\s*label: '[^']*',\s*en: '[^']*',\s*bundle: '([^']+)',", web)
+    assert len(kt_pairs) == len(web_pairs) == 17
+    assert kt_pairs == web_pairs
+    from inku_server.saijiki_generated import RELATIONS_BUNDLE
+    assert dict(kt_pairs)["aida"] == RELATIONS_BUNDLE
 
 
 @android_only

@@ -665,6 +665,8 @@ fn every_category_belongs_to_one_listed_bundle_in_the_screen_order() {
             .unwrap_or_else(|| panic!("{}", category.key));
         assert!(keys.contains(&bundle), "{} {bundle}", category.key);
     }
+    // あいだ (the relation words) is shown under どこに置くか (RECUT-PLAN §3).
+    assert_eq!(asset.relations_bundle.as_deref(), Some("where"));
     for bundle in &keys {
         assert!(
             asset

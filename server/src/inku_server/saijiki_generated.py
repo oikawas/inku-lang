@@ -8,6 +8,8 @@ BUNDLES = [{'key': 'what', 'name_ja': '何を', 'name_en': 'What'},
  {'key': 'where', 'name_ja': 'どこに置くか', 'name_en': 'Where'},
  {'key': 'ground', 'name_ja': '何の上に', 'name_en': 'On what ground'}]
 
+RELATIONS_BUNDLE = 'where'
+
 CATEGORIES = [{'key': 'katachi',
   'name_ja': 'かたち',
   'name_en': 'forms',

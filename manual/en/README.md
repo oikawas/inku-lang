@@ -25,6 +25,12 @@ Administrators can choose whether verified manual and scheduled backups are foll
 
 In the macOS, iPhone, and iPad apps, DB backup settings also offer cleanup of unsaved executions after a verified backup. It is enabled by default with a seven-day grace period, adjustable from 1 to 365 days. Saved works and active executions remain, and the safety backup before restore does not run cleanup.
 
+When this option is enabled, result and drawing log files older than the same grace period are also deleted after backup. Log files are not included in the DB backup.
+
+## App result logs
+
+Enabling result logging saves files for committed works and drawing progress. Permanently deleting a work removes its result log and, if no other work from that execution remains, its drawing log. When cleanup after a DB backup is enabled, logs older than the grace period are also deleted.
+
 ## Templates
 
 - [Environment variable template](./templates/inku-api.env.example)

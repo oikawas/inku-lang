@@ -629,6 +629,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     .disabled(model.isBusy || automation.isOccupied)
                 Text(model.display.localized("成功・失敗・停止の経過を描画ログへ保存します。ファイル保存を切っても端末の実行記録は確認できます。"))
                     .inkuFont(12).foregroundStyle(.secondary)
+                Text(model.display.localized("DB バックアップ後の片付けが有効な場合、猶予より古いログファイルも削除します。"))
+                    .inkuFont(12).foregroundStyle(.secondary)
                 Text(model.display.localized("指示書・Score・生成情報を端末内へ記録します。APIキーは記録しません。"))
                     .inkuFont(13).foregroundStyle(.secondary)
             }
@@ -670,6 +672,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(display.label("最終片付け", "Last cleanup") + ": " + date.formatted(date: .numeric, time: .shortened))
                     Text(display.label("バックアップ", "Backup") + ": " + (display.preferences.cleanupLastBackup ?? ""))
                     Text(display.label("削除: \(display.preferences.cleanupLastDeleted ?? 0)、保持: \(display.preferences.cleanupLastKept ?? 0)", "Deleted: \(display.preferences.cleanupLastDeleted ?? 0), kept: \(display.preferences.cleanupLastKept ?? 0)"))
+                    Text(display.label("ログ削除: \(display.preferences.cleanupLastLogsDeleted ?? 0)", "Logs deleted: \(display.preferences.cleanupLastLogsDeleted ?? 0)"))
                     if display.preferences.cleanupLastSkipped == true { Text(display.label("処理中のため一部を飛ばしました。", "Cleanup was skipped while the app was busy.")) }
                     if let error = display.preferences.cleanupLastError { Text(error).foregroundStyle(.red) }
                 }

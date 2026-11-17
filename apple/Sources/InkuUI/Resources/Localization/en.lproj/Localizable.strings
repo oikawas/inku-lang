@@ -1124,6 +1124,8 @@
 "描画ログ" = "Drawing log";
 "成功・失敗・停止した描画の記録を確認します。" = "Review completed, failed and stopped performances.";
 "成功・失敗・停止の経過を描画ログへ保存します。ファイル保存を切っても端末の実行記録は確認できます。" = "Save progress through completion, failure or cancellation to drawing log files. Local execution records remain available when file logging is off.";
+"DB バックアップ後の片付けが有効な場合、猶予より古いログファイルも削除します。" = "When cleanup after a database backup is enabled, log files older than the grace period are also deleted.";
+"ログのファイルを片付けられませんでした: %@" = "Could not clean up log files: %@";
 "描画ログを読み込めませんでした。" = "Could not read the drawing log.";
 "描画ログのファイルを保存できませんでした。" = "Could not save the drawing log file.";
 "描画の実行記録はまだありません。" = "No performances have been recorded yet.";

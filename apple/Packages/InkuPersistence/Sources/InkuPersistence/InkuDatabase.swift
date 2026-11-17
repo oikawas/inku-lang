@@ -685,8 +685,13 @@ public actor InkuDatabase {
     @discardableResult
     public func permanentlyDelete(ids: [String], requireTrashed: Bool = true,
                                   deletedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) throws -> Int {
+        try permanentlyDeleteReturningIDs(ids: ids, requireTrashed: requireTrashed, deletedAt: deletedAt).count
+    }
+
+    public func permanentlyDeleteReturningIDs(ids: [String], requireTrashed: Bool = true,
+                                             deletedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) throws -> [String] {
         try queue.write { db in
-            var count = 0
+            var deleted: [String] = []
             var removedExecutions: [String: [String]] = [:]
             for id in Set(ids) {
                 guard let row = try Row.fetchOne(db, sql: "SELECT trashed, lineage_node_id FROM history WHERE id = ?", arguments: [id]),
@@ -701,7 +706,7 @@ public actor InkuDatabase {
                         """, arguments: [nodeID, nodeID])
                 }
                 try db.execute(sql: "DELETE FROM history WHERE id = ?", arguments: [id])
-                count += db.changesCount
+                if db.changesCount == 1 { deleted.append(id) }
                 if let separator = id.lastIndex(of: "_") {
                     let sequence = id[id.index(after: separator)...]
                     if !sequence.isEmpty && sequence.allSatisfy({ $0.isASCII && $0.isNumber }) {
@@ -721,14 +726,29 @@ public actor InkuDatabase {
                 try db.execute(sql: "DELETE FROM effect_acknowledgements WHERE execution_id = ?", arguments: [executionID])
                 try db.execute(sql: "DELETE FROM execution_snapshots WHERE id = ?", arguments: [executionID])
             }
-            return count
+            return deleted
         }
     }
 
     @discardableResult
     public func emptyTrash() throws -> Int {
+        try emptyTrashReturningIDs().count
+    }
+
+    public func emptyTrashReturningIDs() throws -> [String] {
         let ids = try queue.read { try String.fetchAll($0, sql: "SELECT id FROM history WHERE trashed = 1") }
-        return try permanentlyDelete(ids: ids)
+        return try permanentlyDeleteReturningIDs(ids: ids)
+    }
+
+    public func hasSavedWorks(executionID: String) throws -> Bool {
+        let prefix = executionID + "_"
+        return try queue.read { db in
+            let ids = try String.fetchAll(db, sql: "SELECT id FROM history WHERE substr(id, 1, ?) = ?", arguments: [prefix.count, prefix])
+            return ids.contains { id in
+                let suffix = id.dropFirst(prefix.count)
+                return !suffix.isEmpty && suffix.utf8.allSatisfy { (48...57).contains($0) }
+            }
+        }
     }
 
     /// Both the original reader response and the user's adopted wording travel in backups.

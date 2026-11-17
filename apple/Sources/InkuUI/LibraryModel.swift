@@ -185,6 +185,7 @@ public final class LibraryModel {
         return overview.merging(normal)
     }
     @ObservationIgnored public var onMutation: (@MainActor () async -> Void)?
+    @ObservationIgnored public var onPermanentlyDeleted: (@MainActor ([String]) async -> Void)?
     @ObservationIgnored private var database: InkuDatabase?
     @ObservationIgnored private let includeListSVG: Bool
     /// Told when works are deleted for good, to drop their thumbnails.
@@ -786,14 +787,18 @@ public final class LibraryModel {
 
     public func permanentlyDelete(ids: [String]? = nil) async {
         let ids = ids ?? selectedIDs.sorted()
-        if await mutate(ids: ids, { let count = try await $0.permanentlyDelete(ids: ids); return "\(count) 件を完全に削除しました" }) {
+        var deleted: [String] = []
+        if await mutate(ids: ids, { deleted = try await $0.permanentlyDeleteReturningIDs(ids: ids); return "\(deleted.count) 件を完全に削除しました" }) {
+            await onPermanentlyDeleted?(deleted)
             selectedIDs.subtract(ids)
             await thumbnails?.pruneOrphans()
         }
     }
 
     public func emptyTrash() async {
-        if await mutate({ let count = try await $0.emptyTrash(); return "\(count) 件を完全に削除しました" }) {
+        var deleted: [String] = []
+        if await mutate({ deleted = try await $0.emptyTrashReturningIDs(); return "\(deleted.count) 件を完全に削除しました" }) {
+            await onPermanentlyDeleted?(deleted)
             selectedIDs.removeAll()
             await thumbnails?.pruneOrphans()
         }

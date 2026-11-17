@@ -44,6 +44,7 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var cleanupLastBackup: String?
     public var cleanupLastDeleted: Int?
     public var cleanupLastKept: Int?
+    public var cleanupLastLogsDeleted: Int?
     public var cleanupLastSkipped: Bool?
     public var cleanupLastError: String?
     public var backupIntervalHours = 24

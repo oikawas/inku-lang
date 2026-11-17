@@ -16,7 +16,7 @@ public enum WorkIdentity {
         return hash
     }
     static func savedID(executionID: String, sequence: String) -> String { executionID + "_" + sequence }
-    static func location(_ workID: String) throws -> (executionID: String, effectID: String) {
+    public static func location(_ workID: String) throws -> (executionID: String, effectID: String) {
         guard let separator = workID.lastIndex(of: "_") else { throw HostError("saved_performance_context_unavailable") }
         let id = String(workID[..<separator]); let sequence = String(workID[workID.index(after: separator)...])
         guard !id.isEmpty, !sequence.isEmpty, sequence.utf8.allSatisfy({ (48...57).contains($0) }) else { throw HostError("saved_performance_context_unavailable") }

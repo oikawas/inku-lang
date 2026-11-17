@@ -41,3 +41,14 @@ test('an older export is migrated before the DDL is accepted', async () => {
 	await assert.rejects(importDdl(text, 'ja', async () => new Response('', { status: 422 })));
 	await assert.rejects(importDdl(JSON.stringify({ schema: 'inku.ddl-export.v2', saijiki: null, ddl: 'x' }), 'ja', async () => Response.json({})));
 });
+
+test('a v3 export is sent for migration and a v4 export is accepted directly', async () => {
+	const file = { schema: 'inku.ddl-export.v2', saijiki: 'inku.saijiki.v3', ddl: '一点鎖線の線を引く。', plugins: [] };
+	const result = await importDdl(JSON.stringify(file), 'ja', async (_path, init) => {
+		assert.equal(JSON.parse(String(init?.body)).saijiki, 'inku.saijiki.v3');
+		return Response.json({ ddl: '破線の線を引く。', plugins: [], edits: 1, approximated_words: [{ start: 0, end: 2 }] });
+	});
+	assert.equal(result.ddl, '破線の線を引く。');
+	const current = await importDdl(JSON.stringify({ ...file, saijiki: 'inku.saijiki.v4' }), 'ja');
+	assert.equal(current.edits, null);
+});

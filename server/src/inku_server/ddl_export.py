@@ -10,17 +10,22 @@ DDL_EXPORT_SCHEMA = "inku.ddl-export.v2"
 
 
 def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]], *,
+                      saijiki: str = "inku.saijiki.v2",
                       include_details: bool = False,
                       journal: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
     """Migrate one portable export with locks derived from its own definitions."""
     import inku_render
 
+    if saijiki not in ("inku.saijiki.v2", "inku.saijiki.v3"):
+        raise ValueError("invalid_saijiki_edition")
+    migrate = (inku_render.pipeline_migrate_saijiki_v3 if saijiki == "inku.saijiki.v3"
+               else inku_render.pipeline_migrate_saijiki_v2)
     definitions = [item["definition"] for item in plugins]
     # A v2 definition may contain old touch IDs that the v3 catalog quite
     # correctly refuses. Migrate definitions first, then bind the document to
     # their new identities; otherwise old exported packages cannot be read.
     first_input = {"definitions": definitions}
-    first = json.loads(inku_render.pipeline_migrate_saijiki_v2(json.dumps(first_input, ensure_ascii=False).encode()))
+    first = json.loads(migrate(json.dumps(first_input, ensure_ascii=False).encode()))
     if journal:
         journal({"kind": "definitions", "input": first_input, "answer": first})
     entries = first.get("definitions", [])
@@ -32,9 +37,9 @@ def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]],
     locks = [{"qualified_name": entry["qualified_name"], "version": entry["version"],
               "digest": entry["old_digest"]} for entry in entries]
     request = {"document": {"source": source, "language": language, "macro_locks": locks,
-                             "saijiki": "inku.saijiki.v2"},
+                             "saijiki": saijiki},
                "definitions": definitions}
-    result = json.loads(inku_render.pipeline_migrate_saijiki_v2(
+    result = json.loads(migrate(
         json.dumps(request, ensure_ascii=False).encode()))
     if journal:
         journal({"kind": "document", "input": request, "answer": result})
@@ -47,7 +52,8 @@ def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]],
     response = {"ddl": document["document"]["source"],
                 "plugins": [{"definition": item["definition"], "note": plugin.get("note", "")}
                             for item, plugin in zip(migrated, plugins, strict=True)],
-                "edits": len(document.get("edits", []))}
+                "edits": len(document.get("edits", [])),
+                "approximated_words": document.get("approximated_words", [])}
     if include_details:
         response["edit_details"] = document.get("edits", [])
         response["unassociated_tools"] = document.get("unassociated_tools", [])
@@ -83,6 +89,6 @@ def build_ddl_export(
         note = summaries[index] if index < len(summaries) and isinstance(summaries[index], str) else ""
         plugins.append({"definition": dict(definition), "note": note})
     return {
-        "schema": DDL_EXPORT_SCHEMA, "saijiki": "inku.saijiki.v3", "language": language, "ddl": source,
+        "schema": DDL_EXPORT_SCHEMA, "saijiki": "inku.saijiki.v4", "language": language, "ddl": source,
         "plugins": plugins, "exported_from": dict(exported_from or {}),
     }

@@ -52,6 +52,7 @@ router = APIRouter(dependencies=[Depends(_current_user)])
 class DdlExportMigrationRequest(BaseModel):
     ddl: str = Field(max_length=100_000)
     language: Literal["ja", "en"]
+    saijiki: Literal["inku.saijiki.v2", "inku.saijiki.v3"] = "inku.saijiki.v2"
     plugins: list[dict] = Field(default_factory=list, max_length=64)
 
 
@@ -65,7 +66,7 @@ def migrate_ddl_export(request: DdlExportMigrationRequest) -> dict:
     if len(json.dumps(request.plugins, ensure_ascii=False).encode("utf-8")) > 2_000_000:
         raise HTTPException(status_code=422, detail="invalid_export_definitions")
     try:
-        return migrate_v2_export(request.ddl, request.language, request.plugins)
+        return migrate_v2_export(request.ddl, request.language, request.plugins, saijiki=request.saijiki)
     except (ValueError, KeyError, TypeError) as exc:
         raise HTTPException(status_code=422, detail="saijiki_export_migration_refused") from exc
 

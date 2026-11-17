@@ -12,9 +12,15 @@ from inku_server.ddl_export import build_ddl_export, migrate_v2_export
 
 
 def test_export_records_its_saijiki_and_old_export_moves_its_text():
-    assert build_ddl_export("黒い円。", "ja")["saijiki"] == "inku.saijiki.v3"
+    assert build_ddl_export("黒い円。", "ja")["saijiki"] == "inku.saijiki.v4"
     result = migrate_v2_export("黒い太筆の線を引く。", "ja", [])
-    assert result == {"ddl": "黒い太いガッシュの線を引く。", "plugins": [], "edits": 1}
+    assert result == {"ddl": "黒い太いガッシュの線を引く。", "plugins": [], "edits": 1, "approximated_words": []}
+
+
+def test_v3_export_reports_approximated_words():
+    result = migrate_v2_export("一点鎖線の線を引く。", "ja", [], saijiki="inku.saijiki.v3")
+    assert "破線" in result["ddl"]
+    assert result["approximated_words"]
 
 
 def test_export_migration_keeps_plugin_note_and_definition():
@@ -54,7 +60,7 @@ def test_authenticated_migration_route_returns_new_text():
             headers={"Authorization": f"Bearer {token}"},
             json={"ddl": "黒い太筆の線を引く。", "language": "ja", "plugins": []})
         assert response.status_code == 200
-        assert response.json() == {"ddl": "黒い太いガッシュの線を引く。", "plugins": [], "edits": 1}
+        assert response.json() == {"ddl": "黒い太いガッシュの線を引く。", "plugins": [], "edits": 1, "approximated_words": []}
     finally:
         db.delete_session(token)
         db.delete_user(user["id"])

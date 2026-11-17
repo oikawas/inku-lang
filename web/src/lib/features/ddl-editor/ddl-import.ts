@@ -62,11 +62,11 @@ export async function importDdl(text: string, language: 'ja' | 'en', apiFetch?: 
 	let file: Record<string, unknown> | null = null;
 	try { file = record(JSON.parse(text)); } catch { /* Plain DDL needs no migration. */ }
 	if (file?.schema !== DDL_EXPORT_SCHEMA) return { ...parsed, edits: null };
-	if (file.saijiki === 'inku.saijiki.v3') return { ...parsed, edits: null };
-	if ((Object.hasOwn(file, 'saijiki') && file.saijiki !== 'inku.saijiki.v2') || !apiFetch) throw new Error('ddl_export_invalid');
+	if (file.saijiki === 'inku.saijiki.v4') return { ...parsed, edits: null };
+	if ((Object.hasOwn(file, 'saijiki') && file.saijiki !== 'inku.saijiki.v2' && file.saijiki !== 'inku.saijiki.v3') || !apiFetch) throw new Error('ddl_export_invalid');
 	const response = await apiFetch('/api/ddl-export/migrate-v2', {
 		method: 'POST', headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ ddl: parsed.ddl, language: file.language === 'en' ? 'en' : 'ja', plugins: parsed.plugins })
+		body: JSON.stringify({ ddl: parsed.ddl, language: file.language === 'en' ? 'en' : 'ja', plugins: parsed.plugins, saijiki: file.saijiki ?? 'inku.saijiki.v2' })
 	});
 	if (!response.ok) throw new Error('ddl_export_invalid');
 	const migrated = await response.json();

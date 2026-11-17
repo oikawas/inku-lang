@@ -11,7 +11,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /** Opt-in migration of a separate device backup copy under a hard JVM heap cap. */
-class SaijikiV3HeapTest {
+class SaijikiMigrationHeapTest {
     @Test fun deviceCopyFitsLimitedHeap() {
         val path = System.getenv("INKU_SAIJIKI_HEAP_DB") ?: return
         require(path.contains("/local/evidence/android/saijiki-v4-v3-20261117/"))

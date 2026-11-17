@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web and Swift: the About vocabulary table now has updated descriptions of the description, instructions, score, and performance.
+
 - Web and Swift: the About concept is shorter, and the “Vocabulary and layers” heading is now “Vocabulary” in both Japanese and English.
 
 - Swift: the About vocabulary table no longer lists “Interpret” and describes the instructions as directions for drawing a picture. Both Japanese and English are updated.

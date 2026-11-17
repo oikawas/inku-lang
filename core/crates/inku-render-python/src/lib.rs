@@ -406,6 +406,22 @@ fn pipeline_migrate_saijiki_v2<'py>(
     })
 }
 
+/// Migrate one saved Saijiki v3 unit (a document and its definitions) for a one-time host
+/// migration (Saijiki v4, 2026-11-17).
+#[pyfunction]
+fn pipeline_migrate_saijiki_v3<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        Ok({
+            let input = input_bytes.as_bytes().to_vec();
+            let output = py.detach(|| inku_pipeline_uniffi::migrate_saijiki_v3(input));
+            PyBytes::new(py, &output)
+        })
+    })
+}
+
 /// Another composition read from a work's visible instructions (draw-system05).
 #[pyfunction]
 fn pipeline_recompose<'py>(
@@ -973,6 +989,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v1, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v2, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v3, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_recompose, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_retouch, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_ranges, module)?)?;

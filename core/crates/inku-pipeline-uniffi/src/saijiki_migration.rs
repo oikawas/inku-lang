@@ -193,6 +193,7 @@ fn definition_value(old_digest: Option<&str>, migration: &SaijikiDefinitionMigra
         "digest": format!("sha256:{}", migration.identity.full_digest_hex()),
         "changed": migration.changed,
         "unadjusted_thinness": migration.unadjusted_thinness,
+        "approximated_refs": migration.approximated_refs,
     })
 }
 

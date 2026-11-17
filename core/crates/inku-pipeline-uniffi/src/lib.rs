@@ -39,7 +39,7 @@ pub use raster::{
     RasterFailure, RasterFonts, RasterFrame, RasterScene, prepare_raster_fonts,
     prepare_raster_scene, raster_api_version, rasterize_svg,
 };
-pub use saijiki_migration::{migrate_saijiki_v1, migrate_saijiki_v2};
+pub use saijiki_migration::{migrate_saijiki_v1, migrate_saijiki_v2, migrate_saijiki_v3};
 pub use standalone::{
     compile_and_render_svg_limited, compile_document, line_animation, line_animation_bytes,
     render_compiled_svg_limited,

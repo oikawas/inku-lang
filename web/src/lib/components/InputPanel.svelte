@@ -395,7 +395,7 @@
 			{#if nextDrawParentNodeId !== null}<p class="description-parent-note">{t().nextDrawChildNotice}</p>{/if}
 			{#if modelReadiness}
 				<div role="status">
-					<p>{modelReadiness.kind === 'chatgpt_unavailable' ? t().chatgptModelUnavailable : modelReadiness.kind === 'no_models_admin' ? t().drawingNoModelsAdmin : modelReadiness.kind === 'no_models_user' ? t().drawingNoModelsUser : modelReadiness.kind === 'unavailable' ? t().drawingModelUnavailable : modelReadiness.kind === 'missing_key_admin' ? t().drawingKeyMissingAdmin : t().drawingKeyMissingUser}</p>
+					<p>{modelReadiness.kind === 'chatgpt_unavailable' ? t().chatgptModelUnavailable : modelReadiness.kind === 'chatgpt_unpublished' ? t().chatgptModelUnpublished : modelReadiness.kind === 'no_models_admin' ? t().drawingNoModelsAdmin : modelReadiness.kind === 'no_models_user' ? t().drawingNoModelsUser : modelReadiness.kind === 'unavailable' ? t().drawingModelUnavailable : modelReadiness.kind === 'missing_key_admin' ? t().drawingKeyMissingAdmin : t().drawingKeyMissingUser}</p>
 					{#if modelReadiness.action === 'choose'}<button class="ghost-btn" type="button" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>{/if}
 					{#if modelReadiness.action === 'settings'}<button class="ghost-btn" type="button" onclick={() => onOpenConnectionSettings(modelReadiness?.provider)}>{t().drawingOpenConnection}</button>{/if}
 				</div>

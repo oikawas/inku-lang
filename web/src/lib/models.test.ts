@@ -98,6 +98,10 @@ test('drawing readiness distinguishes unpublished models, missing keys, sign-in 
  assert.deepEqual(modelReadiness('ready', groups, 'openai:example', false, false), {kind:'missing_key_user',action:'choose',provider:'openai'});
  assert.equal(modelReadiness('loading', groups, 'openai:example', true, false), null);
  assert.deepEqual(modelReadiness('ready', groups, 'chatgpt:example', true, false), {kind:'chatgpt_unavailable',action:null});
+ assert.deepEqual(modelReadiness('ready', groups, 'chatgpt:example', true, true), {kind:'chatgpt_unpublished',action:'choose'});
+ assert.deepEqual(modelReadiness('ready', [], 'chatgpt:example', true, false), {kind:'chatgpt_unavailable',action:null});
+ assert.deepEqual(modelReadiness('ready', [], 'chatgpt:example', true, true), {kind:'chatgpt_unpublished',action:'choose'});
+ assert.equal(modelReadiness('ready', [...groups, {id:'chatgpt', label:'ChatGPT', models:[{id:'example', label:'example', qualified_id:'chatgpt:example'}]}] as ProviderGroup[], 'chatgpt:example', true, true), null);
  assert.deepEqual(modelReadiness('ready', groups, 'missing:example', true, false), {kind:'unavailable',action:'choose'});
  assert.deepEqual(modelReadiness('ready', [], '', false, false), {kind:'no_models_user',action:null});
 });

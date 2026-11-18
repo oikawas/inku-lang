@@ -106,6 +106,7 @@ export const en: LangPack = {
 	chatgptPersonalModels: 'These models belong to your connection. Use Select models to fetch the list, choose LLM or Vision uses and models to publish, then save. They are not published to other users.',
 	chatgptUsingPlan: 'Using ChatGPT plan',
 	chatgptModelUnavailable: 'The selected ChatGPT model is unavailable. Check the connection or choose a model explicitly.',
+	chatgptModelUnpublished: 'The selected model is not published from ChatGPT. Choose another model or publish it in the ChatGPT public model selection.',
 	drawingNoModelsAdmin: "Add a connection in Model settings to draw.",
 	drawingNoModelsUser: "You can draw when an administrator publishes a model.",
 	drawingModelUnavailable: "The selected drawing model is unavailable. Choose an available model.",

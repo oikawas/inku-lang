@@ -106,6 +106,7 @@ export const ja: LangPack = {
 	chatgptPersonalModels: 'この接続の本人用モデルです。「公開モデルを選択」で一覧を取得し、LLM／Visionの用途と公開するモデルを選んで保存してください。他の利用者には公開されません。',
 	chatgptUsingPlan: 'ChatGPTプランを使用中',
 	chatgptModelUnavailable: '選択したChatGPTモデルは利用できません。ChatGPT でサインインの接続を確かめるか、モデルを明示的に選び直してください。',
+	chatgptModelUnpublished: '選択したモデルは ChatGPT で公開していません。モデルを選び直すか、ChatGPT の公開モデル選択で公開してください。',
 	drawingNoModelsAdmin: "モデル設定で接続先を追加してください。",
 	drawingNoModelsUser: "管理者がモデルを公開すると描けます。",
 	drawingModelUnavailable: "選択した描画モデルは利用できません。使えるモデルを選んでください。",

@@ -107,6 +107,7 @@ export interface LangPack {
 	chatgptPersonalModels: string;
 	chatgptUsingPlan: string;
 	chatgptModelUnavailable: string;
+	chatgptModelUnpublished: string;
 	drawingNoModelsAdmin: string;
 	drawingNoModelsUser: string;
 	drawingModelUnavailable: string;

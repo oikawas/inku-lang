@@ -156,7 +156,7 @@ struct ChatGPTModelsSheet: View {
             Toggle(isOn: Binding(get: { isSelected(item.id) }, set: { draft?.toggleModel(item.id, selected: $0) })) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.id).inkuFont(14, weight: .semibold)
-                    Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
+                        .textSelection(.enabled)
                     ModelLabelsView(labels: item.resolvedLabels, display: display, endOfLifeDate: item.eolDate)
                 }
             }

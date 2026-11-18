@@ -361,7 +361,6 @@ struct ProviderModelsSheet: View {
                 enabledToggle(item)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.id).inkuFont(14, weight: .semibold)
-                    Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                         .textSelection(.enabled)
                     ModelLabelsView(labels: item.resolvedLabels, display: model.display, endOfLifeDate: item.eolDate)
                 }.frame(maxWidth: .infinity, alignment: .leading)

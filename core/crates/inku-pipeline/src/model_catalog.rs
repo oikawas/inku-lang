@@ -94,19 +94,6 @@ fn labels(model: &Value, source: &Value) -> Vec<String> {
         names.insert("no_response");
     }
     let table = array(source.get("labels"));
-    let publishable = table
-        .iter()
-        .filter_map(|l| {
-            l.get("id")
-                .and_then(Value::as_str)
-                .map(|id| (id, l["publishable"] == true))
-        })
-        .collect::<std::collections::HashMap<_, _>>();
-    if !MEASUREMENTS.iter().any(|key| model.get(*key).is_some())
-        && names.iter().all(|id| publishable.get(id) == Some(&true))
-    {
-        names.insert("unmeasured");
-    }
     table
         .iter()
         .filter_map(|l| l.get("id").and_then(Value::as_str))

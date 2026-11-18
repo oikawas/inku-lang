@@ -1095,12 +1095,10 @@
       }
     },
     "never measured": {
-      "fold": "unmeasured",
+      "fold": null,
       "id": "x",
       "label": "x",
-      "labels": [
-        "unmeasured"
-      ],
+      "labels": [],
       "purposes": [
         "llm"
       ],
@@ -1153,12 +1151,10 @@
       }
     },
     "never measured, purposes absent": {
-      "fold": "unmeasured",
+      "fold": null,
       "id": "x",
       "label": "x",
-      "labels": [
-        "unmeasured"
-      ],
+      "labels": [],
       "selection": {
         "levels": {
           "llm": {
@@ -1326,7 +1322,6 @@
       "id": "x",
       "label": "x",
       "labels": [
-        "unmeasured",
         "legacy"
       ],
       "legacy": true,

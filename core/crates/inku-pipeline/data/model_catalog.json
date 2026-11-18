@@ -1,14 +1,8 @@
 {
  "schema": "inku.model-catalog.v2",
- "version": "3.0.0",
- "updated": "2026-10-15T23:00:00+09:00",
+ "version": "3.1.0",
+ "updated": "2026-11-18T16:12:00+09:00",
  "labels": [
-  {
-   "id": "unmeasured",
-   "ja": "未計測",
-   "en": "Not measured",
-   "publishable": true
-  },
   {
    "id": "legacy",
    "ja": "旧モデル",

@@ -34,13 +34,13 @@ class ModelCatalogDeviceTest {
             catalog.classify(JSONObject().put("id", "silent").put("purposes", JSONArray()).put("recommendation_llm", 0)),
         )
         val scheme = lightColorScheme()
-        val expectedByLabel = mapOf("legacy" to scheme.onSurfaceVariant, "eol" to scheme.error, "unmeasured" to scheme.onSurfaceVariant,
+        val expectedByLabel = mapOf("legacy" to scheme.onSurfaceVariant, "eol" to scheme.error,
             "no_response" to scheme.error)
         rule.setContent { MaterialTheme(colorScheme = scheme) { Column {
             models.forEach { ModelCatalogDetails(it, InkuStringsJa) }
         } } }
         assertEquals(listOf("legacy", "eol"), models[0].labels.map { it.id })
-        assertEquals(listOf("unmeasured", "legacy"), models[1].labels.map { it.id })
+        assertEquals(listOf("legacy"), models[1].labels.map { it.id })
         models.forEach { model ->
             model.labels.forEach { label ->
                 val results = mutableListOf<TextLayoutResult>()
@@ -51,11 +51,11 @@ class ModelCatalogDeviceTest {
         }
     }
 
-    @Test fun sixClosedFoldsShowCanonicalLabelsAndBlockUnpublishableModels() {
+    @Test fun fiveClosedFoldsShowCanonicalLabelsAndBlockUnpublishableModels() {
         val catalog = ModelCatalog.load(rule.activity)
         val models = catalog.labels.map { label ->
             val record = JSONObject().put("id", label.id)
-            if (label.id != "unmeasured") record.put("labels", JSONArray().put(label.id)).put("comment_ja", "確認用コメント")
+            record.put("labels", JSONArray().put(label.id)).put("comment_ja", "確認用コメント")
             if (label.id == "no_response") record.put("purposes", JSONArray())
             if (label.id == "legacy") record.put("recommendation_llm", 4).put("speed_llm_seconds", 2.8).put("cost_usd_llm", 0.00007)
             if (label.id == "eol") record.put("labels", JSONArray(listOf("legacy", "not_supported", "eol")))
@@ -97,6 +97,6 @@ class ModelCatalogDeviceTest {
             rule.onNodeWithTag("CatalogFold:${label.id}").performClick()
         }
         // No response when measured can be published since 2026-10-26.
-        assertEquals(setOf("unmeasured", "legacy", "no_response"), selected)
+        assertEquals(setOf("legacy", "no_response"), selected)
     }
 }

@@ -61,7 +61,7 @@ def _kept_by_the_server(model: dict) -> dict:
 def test_the_catalog_file_is_well_formed():
     assert catalog_problems() == []
     assert [label["id"] for label in MODEL_LABELS] == [
-        "unmeasured", "legacy", "subscription", "no_response", "not_supported", "eol"]
+        "legacy", "subscription", "no_response", "not_supported", "eol"]
     assert set(MODEL_CATALOG["providers"]) == {
         "openai", "anthropic", "gemini", "nvidia", "ollama", "ollama-cloud", "local-mlx", "chatgpt"}
 

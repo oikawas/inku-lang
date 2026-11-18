@@ -365,11 +365,11 @@ commits no duplicate evaluations, candidates, initial published models or label 
 Startup preserves existing publication choices. ChatGPT-plan evaluations also come from
 `providers.chatgpt`; personal offerings and publication choices remain within their registration.
 
-Model management shows six folds in label-table order, with counts, initially closed. Every
+Model management shows five folds in label-table order, with counts, initially closed. Every
 label appears in rows and descriptions: blocking labels use the warning color and publishable
 labels use subdued color. The last label determines the fold; core `selection` decides whether a model can be published or selected. Core sort keys order names with the same collation as Web. No remaining purpose adds `no_response`
 (publishable from 2026-10-26, still in the warning color);
-no measurement and only publishable other labels adds `unmeasured`. Management and drawing
+models without measurements carry no such label and stay in the ordinary list. Management and drawing
 model selection show the available recommendations (LLM, Stage 1, Stage 2, Vision), average
 seconds, estimated USD costs and comments from the source. Missing values are not invented.
 

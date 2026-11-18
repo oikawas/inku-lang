@@ -41,7 +41,7 @@ test('a model chosen for a purpose it did not answer is listed after those that 
 });
 
 test('the labels the Server worked out decide the fold and the publication, as the shared cases say', () => {
-	assert.deepEqual(modelFolds(), ['unmeasured', 'legacy', 'subscription', 'no_response', 'not_supported', 'eol']);
+	assert.deepEqual(modelFolds(), ['legacy', 'subscription', 'no_response', 'not_supported', 'eol']);
 	for (const entry of cases.cases) {
 		const model = fixtures.cases[entry.name];
 		assert.deepEqual([modelFold(model), !isModelUnselectable(model)], [entry.fold, entry.publishable], entry.name);
@@ -54,7 +54,6 @@ test('a model shows every label it carries, and a fold is titled from the table'
 	assert.equal(modelStatusLabel(retired, true), '旧モデル · 提供終了 (2026-10-13)');
 	assert.equal(modelStatusLabel(retired, false), 'Older model · End of life (2026-10-13)');
 	assert.equal(modelStatusLabel({ id: 'x', label: 'x', labels: [], fold: null }, true), null);
-	assert.equal(modelFoldTitle('unmeasured', 5, true), '未計測（5）');
 	assert.equal(modelFoldTitle('legacy', 46, false), 'Older model (46)');
 });
 
@@ -63,9 +62,6 @@ test('each label keeps its own colour: only one that keeps the model from public
 	assert.deepEqual(modelStatusParts(retired, true), [
 		{ text: '旧モデル', blocking: false },
 		{ text: '提供終了 (2026-10-13)', blocking: true }
-	]);
-	assert.deepEqual(modelStatusParts({ id: 'x', label: 'x', labels: ['unmeasured'], fold: 'unmeasured' }, false), [
-		{ text: 'Not measured', blocking: false }
 	]);
 	assert.deepEqual(modelStatusParts({ id: 'x', label: 'x', labels: [], fold: null }, true), []);
 });

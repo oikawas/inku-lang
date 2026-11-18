@@ -38,7 +38,7 @@ The vocabulary used in the UI is as follows.
 2. Enter your user name and password.
 3. Press `Sign in`.
 
-The left app rail provides settings, profile, theme, UI display language, the tooltip toggle, and sign-out controls. The rail can be expanded or collapsed.
+The left app rail provides settings, profile, theme, UI display language, the tooltip toggle, and sign-out controls. The rail can be expanded or collapsed. Its logo remains visible in Simple UI and opens About inku.
 
 The UI language and the description language are separate. Ordinary painting detects the description language from the entered text, including English text in the Japanese UI and Japanese text in the English UI. Only text with no usable language signal falls back to the UI language. Ordinary Web input always uses automatic detection and has no language selector; explicit API language settings are separate.
 
@@ -512,7 +512,7 @@ Each lineage initially shows 200 works. `Show more` adds 200 at a time.
 - The `#` buttons copy the work's UUID (so does the `#` at the bottom right of the canvas). The `ID` row of the preview shows the UUID's first eight characters. To name a work to an AI or to inku-cli, pass this UUID rather than a hash: a hash can coincide with another work of the same drawing, and it is rewritten when the hash scheme changes
 - The `Starred`, `Revision`, and `Shared` filters. Used together, only works matching every one of them remain
 - Switching between ordinary history and trash
-- Thumbnail view and list view. The list compares image, description, created time, model, color catalog, SVG size, ID (the `#` button copies the UUID), and actions (revision mark, share settings, move to trash). Elapsed seconds appear in the reading preview
+- Thumbnail view and list view. Thumbnail cards retain their inline delete control; open share settings from the preview. The list compares image, description, created time, model, color catalog, SVG size, ID (the `#` button copies the UUID), and actions (revision mark, share settings, move to trash). Elapsed seconds appear in the reading preview
 - Move to trash, restore, and permanent delete, singly or by multiple selection
 - `Select all` toggles selection of works on the current page; the adjacent `Clear selection` clears selections across all pages
 - Expanding and selecting a whole lineage at once

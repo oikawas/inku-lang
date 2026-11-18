@@ -1409,7 +1409,6 @@
 									{/each}
 								</div>
 							</div>
-							{#if historyManagerView === 'active' && onShareItem && !it.shared}<button class="ghost-btn share-settings-btn" type="button" onclick={() => onShareItem?.(it)}>{isJapanese ? '共有設定' : 'Share settings'}</button>{/if}
 						</div>
 					</div>
 				{/each}
@@ -1516,7 +1515,6 @@
 		font-size: 0.75em;
 		line-height: 1.35;
 	}
-	.share-settings-btn { align-self: flex-start; font-size: var(--btn-sm-font-size); }
 
 	.lineage-history-list { min-height: 0; overflow: auto; padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 	.lineage-history-message, .history-empty-message { margin: auto; padding: 30px; color: var(--fg3); text-align: center; }

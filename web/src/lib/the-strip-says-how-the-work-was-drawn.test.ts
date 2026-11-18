@@ -64,11 +64,10 @@ test('the strip shares the tabs\' row, and only the tabs look pressable (2026-11
 });
 
 test('the strip traces the input panel\'s conditions top to bottom, left to right (2026-11-05)', () => {
-	assert.deepEqual([...INPUT_PANEL_ORDER], ['models', 'catalog', 'route', 'sketch', 'composition', 'wild', 'canvas_aspect']);
-	// The input panel itself, top to bottom: model, catalog, the route and its
-	// two stages, the stroke limit, the canvas.
+	assert.deepEqual([...INPUT_PANEL_ORDER], ['canvas_aspect', 'models', 'catalog', 'route', 'sketch', 'composition', 'wild']);
+	// The canvas heads the conditions, followed by the model, catalog and route.
 	const conditions = INPUT.slice(INPUT.indexOf('{#snippet inputConditionRows()}'), INPUT.indexOf('{#snippet inputSettings()}'));
-	const at = ['t().modelButton', 't().colorCatalogButton', '<DrawConditions', 't().wildButton', '<CanvasAspectPlugin']
+	const at = ['<CanvasAspectPlugin', 't().modelButton', 't().colorCatalogButton', '<DrawConditions']
 		.map((token) => conditions.indexOf(token));
 	assert.ok(at.every((index) => index >= 0), 'an input condition is missing from the panel');
 	for (let i = 1; i < at.length; i += 1) assert.ok(at[i - 1] < at[i], `input condition ${i} moved`);
@@ -79,7 +78,7 @@ test('the strip traces the input panel\'s conditions top to bottom, left to righ
 	const keys = drawOptionRows(null, ja, { order: INPUT_PANEL_ORDER }).map((row) => row.key);
 	assert.deepEqual(keys, [...INPUT_PANEL_ORDER]);
 	assert.deepEqual(drawOptionRows(null, ja, { image: true, order: INPUT_PANEL_ORDER }).map((row) => row.key),
-		['models', 'catalog', 'wild', 'canvas_aspect']);
+		['canvas_aspect', 'models', 'catalog', 'wild']);
 });
 
 test('the work\'s actions stand over the canvas\'s top right, on the Work tab (2026-11-05)', () => {

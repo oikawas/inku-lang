@@ -16,6 +16,7 @@
 		savedDdl?: string | null;
 		onConfirmDiscard?: (run: () => void, cancel: () => void) => void;
 		label: string;
+		newAction?: import('svelte').Snippet;
 		onEdit?: (() => void) | null;
 		editDisabled?: boolean;
 		/** Perform the shown DDL again through Stage 2. Omitted = no button. */
@@ -40,7 +41,7 @@
 		onLineHover?: ((line: number | null) => void) | null;
 	};
 
-	let { ddl, savedDdl = null, onConfirmDiscard, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], completionWork = null, apiFetch, workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin, activeLines = [], onLineHover = null }: Props = $props();
+	let { ddl, savedDdl = null, onConfirmDiscard, label, newAction, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], completionWork = null, apiFetch, workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin, activeLines = [], onLineHover = null }: Props = $props();
 	let editor = $state<DdlEditor | null>(null);
 	let rangeStatus = $state<RangeEditorStatus>({ preview: null, invalid: false, composing: false });
 
@@ -82,6 +83,7 @@
 				<span class="ddl-viewer-label">{primaryLabel}</span>
 			{/if}
 		</span>
+		{#if newAction}<span class="ddl-new-action">{@render newAction()}</span>{/if}
 		{#if onEdit}
 			<Tooltip placement="left" text={t().tooltipDdlEdit}>
 				<button class="ghost-btn" type="button" disabled={editDisabled} onclick={() => onEdit?.()}>{t().ddlEditButton}</button>
@@ -133,6 +135,7 @@
 		min-width: 0;
 	}
 	.ddl-viewer-head {
+		position: sticky; top: 0; z-index: 3; background: var(--bg);
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -160,6 +163,7 @@
 		overflow-x: auto;
 	}
 	.ddl-viewer-actions {
+		position: sticky; bottom: 0; z-index: 3; background: var(--bg);
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;

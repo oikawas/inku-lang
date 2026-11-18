@@ -50,8 +50,8 @@ function camera(facts: ExifFacts): string | undefined {
 }
 
 /**
- * The source note the image tab fills in for a chosen image: one `label: value`
- * line per fact, the file name first. Empty when nothing is chosen or known.
+ * File name and capture time share the first line; camera and exposure share
+ * the second. Empty when nothing is chosen or known.
  */
 export function imageProvenanceText(
 	fileName: string,
@@ -59,20 +59,20 @@ export function imageProvenanceText(
 	options: ImageProvenanceOptions,
 	labels: ImageProvenanceLabels,
 ): string {
-	const lines: string[] = [];
-	if (options.includeFileName && fileName.trim()) lines.push(`${labels.fileName}: ${fileName.trim()}`);
+	const first: string[] = [];
+	const second: string[] = [];
+	if (options.includeFileName && fileName.trim()) first.push(`${labels.fileName}: ${fileName.trim()}`);
 	if (options.includeExif && facts) {
-		if (facts.takenAt) lines.push(`${labels.takenAt}: ${facts.takenAt}`);
+		if (facts.takenAt) first.push(facts.takenAt);
 		const body = camera(facts);
-		if (body) lines.push(`${labels.camera}: ${body}`);
-		if (facts.lens) lines.push(`${labels.lens}: ${facts.lens}`);
+		if (body) second.push(body);
 		const exposure = [
 			facts.fNumber ? `f/${trimNumber(facts.fNumber, 1)}` : null,
 			facts.exposureTime ? exposureTime(facts.exposureTime) : null,
 			facts.iso ? `ISO ${Math.round(facts.iso)}` : null,
 			facts.focalLength ? `${trimNumber(facts.focalLength, 1)} mm` : null,
 		].filter((part): part is string => part !== null);
-		if (exposure.length > 0) lines.push(`${labels.exposure}: ${exposure.join(' · ')}`);
+		second.push(...exposure);
 	}
-	return lines.join('\n');
+	return [first.join(' · '), second.join(' · ')].filter(Boolean).join('\n');
 }

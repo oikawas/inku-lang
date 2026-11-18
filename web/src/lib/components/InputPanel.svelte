@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import { placeIn } from '$lib/place-in';
 	import type { ModelReadiness } from '$lib/model-readiness';
 	import LabelHighlight from './LabelHighlight.svelte';
 	import Tooltip from './Tooltip.svelte';
@@ -8,7 +9,6 @@
 	import type { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DrawConditions from './DrawConditions.svelte';
-	import SwitchChip from './SwitchChip.svelte';
 	import { type SketchMode } from '$lib/sketch';
 	import { type CompositionMode, type DrawRoute } from '$lib/draw-route';
 	import PaintButton from './PaintButton.svelte';
@@ -30,6 +30,8 @@
 	};
 	type Props = {
 		drawActionTarget?: HTMLElement | null;
+		tabsTarget?: HTMLElement | null;
+		visionCatalogReady?: boolean;
 		nextDrawParentNodeId?: string | null;
 		chatgptPlanSelected?: boolean;
 		chatgptUsageUrl?: string | null;
@@ -133,7 +135,7 @@
 	};
 
 	let {
-		drawActionTarget = null, nextDrawParentNodeId = null,
+		drawActionTarget = null, tabsTarget = null, visionCatalogReady = false, nextDrawParentNodeId = null,
 		chatgptPlanSelected = false,
 		chatgptUsageUrl = null,
 		modelReadiness = null, onOpenConnectionSettings,
@@ -218,21 +220,7 @@
 	}: Props = $props();
 
 	const isJapanese = $derived(t().code === 'ja');
-	// Keep the existing action and its tooltips in this component while the
-	// page places the action between the two scroll regions.
-	function placeDrawAction(node: HTMLElement, target: HTMLElement | null) {
-		const marker = document.createComment('draw-action');
-		node.before(marker);
-		function place(next: HTMLElement | null) {
-			if (next) next.appendChild(node);
-			else if (marker.parentNode) marker.after(node);
-		}
-		place(target);
-		return {
-			update: place,
-			destroy() { node.remove(); marker.remove(); }
-		};
-	}
+	let imageInputEl = $state<HTMLInputElement | null>(null);
 
 	// Progress sits on the tab only while the batch is running, so the tab returns
 	// to its plain label the moment the run stops. batchCurrent is 0 outside a run.
@@ -270,7 +258,7 @@
 
 </script>
 
-<div class="panel-tabs">
+<div class="tabs-placeholder"><div class="panel-tabs" use:placeIn={tabsTarget}>
 	{#each tabItems as item (item.mode)}
 		<Tooltip
 			placement={item.mode === 'single' ? 'bottom-right' : 'bottom-left'}
@@ -289,15 +277,24 @@
 			</button>
 		</Tooltip>
 	{/each}
-</div>
+</div></div>
 
 <section class="panel-section">
 	<!-- The description is written before its conditions, immediately before painting. -->
 	{#snippet inputConditionRows()}
+		<div class="conditions-head">
+			<h3 class="conditions-heading">{inputMode === 'batch' ? t().batchNextConditionsLabel : t().nextWorkConditions}</h3>
+			<Tooltip text={t().tooltipInputCanvas}>
+				<CanvasAspectPlugin row selected={pictureConditions ? imageCanvasAspectId : canvasAspectId}
+					options={pictureConditions ? [{ id: 'image', label: t().imageCanvasAspect, category: 'Vision', ratio: '', ratioW: 1, ratioH: 1, intentJa: t().imageCanvasAspect, intentEn: t().imageCanvasAspect }, ...canvasAspectOptions] : canvasAspectOptions}
+					open={canvasAspectMenuOpen} onToggle={onToggleCanvasAspectMenu} onSelect={pictureConditions ? onSelectImageCanvasAspect : onSelectCanvasAspect} />
+			</Tooltip>
+		</div>
 		<div class="condition-rows" aria-label={t().nextWorkConditions}>
 			<div class="condition-selection">
 				<span class="condition-inline-label">{t().modelButton}</span>
-				<span class="condition-value" title={conditionModelName}>{conditionModelName}</span>
+				<span class="condition-value" class:invalid-vision={pictureConditions && visionCatalogReady && !visionModelAvailable} title={conditionModelName}>{conditionModelName}</span>
+				{#if pictureConditions && visionCatalogReady && !visionModelAvailable}<span class="invalid-vision-note">{t().imageVisionUnavailableShort}</span>{/if}
 				{#if chatgptPlanSelected && inputMode === 'single' && chatgptUsageUrl}
 					<a class="chatgpt-plan-label" href={chatgptUsageUrl} target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
 				{/if}
@@ -315,44 +312,14 @@
 			<div class="condition-compact-rows">
 				{#if !pictureConditions}
 				<div class="condition-draw">
-					<DrawConditions route={drawRoute} {sketchMode} {compositionMode} {isJapanese}
+					<DrawConditions route={drawRoute} {sketchMode} {compositionMode} {isJapanese} {wild}
 						onSelectRoute={onSelectDrawRoute} {onSelectSketchMode} {onSelectCompositionMode} />
 				</div>
-				<div class="condition-compact-row wild-row">
-					<!-- The line's label (the author, 2026-10-27): it heads the canvas
-					     after it too, so it names no one switch. -->
-					<span class="condition-inline-label">{isJapanese ? 'オプション' : 'Options'}</span>
-					<Tooltip text={t().tooltipInputWild} placement="top-right">
-						<SwitchChip label={t().wildButton} on={wild} onToggle={() => onSelectWild(!wild)} />
-					</Tooltip>
-				</div>
 				{/if}
-				<div class="condition-compact-row">
-					<Tooltip text={t().tooltipInputCanvas}>
-						{#if pictureConditions}
-						<CanvasAspectPlugin
-							selected={imageCanvasAspectId}
-							options={[{ id: 'image', label: t().imageCanvasAspect, category: 'Vision', ratio: '', ratioW: 1, ratioH: 1, intentJa: t().imageCanvasAspect, intentEn: t().imageCanvasAspect }, ...canvasAspectOptions]}
-							open={canvasAspectMenuOpen} showValue
-							onToggle={onToggleCanvasAspectMenu} onSelect={onSelectImageCanvasAspect}
-						/>
-						{:else}
-						<CanvasAspectPlugin
-							selected={canvasAspectId}
-							options={canvasAspectOptions}
-							open={canvasAspectMenuOpen}
-							showValue
-							onToggle={onToggleCanvasAspectMenu}
-							onSelect={onSelectCanvasAspect}
-					/>
-						{/if}
-					</Tooltip>
-				</div>
 			</div>
 		</div>
 	{/snippet}
 	{#snippet inputSettings()}
-		<h3 class="conditions-heading">{t().nextWorkConditions}</h3>
 		{@render inputConditionRows()}
 	{/snippet}
 
@@ -395,6 +362,7 @@
 
 		{@render inputSettings()}
 
+		<div class="description-action-placeholder"><div class="description-action" use:placeIn={drawActionTarget}>
 		{#if singleRunning && !hideRunStatus}
 			<div class="gen-status-wrap">
 			<RunStatus
@@ -409,9 +377,7 @@
 				onStop={onStop}
 			/>
 			</div>
-		{/if}
-		<div class="description-action-placeholder"><div class="description-action" use:placeDrawAction={drawActionTarget}>
-		{#if !(singleRunning && !hideRunStatus)}
+		{:else}
 			{#if descriptionLocked}
 				<!-- Drawing a held work from its description is the fork, named as such,
 				     never a plain "draw" that throws the edited DDL away. -->
@@ -435,26 +401,24 @@
 		{#if error}<p class="error-text">{error}</p>{/if}
 		</div></div>
 	{:else if inputMode === 'image'}
-		<button class="ghost-btn" onclick={onClearInput} disabled={singleRunning || generationDisabled}>{t().clearInputBtn}</button>
+		<div class="image-pick-row">
+			<input bind:this={imageInputEl} class="image-input" type="file" accept=".jpeg,.jpg,.png,.gif,.tiff,.tif,image/jpeg,image/png,image/gif,image/tiff" disabled={imageUploading || singleRunning || generationDisabled} onchange={(event) => { const file = event.currentTarget.files?.[0]; if (file) void onSelectImage(file); event.currentTarget.value = ''; }} />
+			{#if uploadedImage}<img src={uploadedImage.thumbnail} alt={t().imageThumbnailAlt} /><span class="image-pick-name">{imageFileName}<small>{uploadedImage.original_width} × {uploadedImage.original_height}</small></span>{/if}
+			{#if imageUploading}<span role="status">{t().imageUploading}</span>{/if}
+			<button type="button" class="ghost-btn image-pick-button" class:full={!uploadedImage} disabled={imageUploading || singleRunning || generationDisabled} onclick={() => imageInputEl?.click()}>{t().imageChooseButton}</button>
+		</div>
+		{#if error && !uploadedImage}<p class="error-text">{error}</p>{/if}
 		<label class="input-heading" for="image-provenance">{t().imageProvenanceLabel}</label>
-		<textarea id="image-provenance" class="input-ta" rows="4" bind:value={imageProvenance} oninput={() => onImageProvenanceInput?.()} placeholder={t().imageProvenanceHint}></textarea>
-		<p class="input-description">{t().imageProvenanceHint}</p>
-		<label class="image-file-label">
-			<span>{t().imageChooseFile}</span>
-			<input type="file" accept=".jpeg,.jpg,.png,.gif,.tiff,.tif,image/jpeg,image/png,image/gif,image/tiff" disabled={imageUploading || singleRunning || generationDisabled} onchange={(event) => { const file = event.currentTarget.files?.[0]; if (file) void onSelectImage(file); event.currentTarget.value = ''; }} />
-		</label>
-		{#if imageUploading}<p role="status">{t().imageUploading}</p>{/if}
-		{#if uploadedImage}
-			<figure class="image-preview"><img src={uploadedImage.thumbnail} alt={t().imageThumbnailAlt} /><figcaption>{imageFileName} · {uploadedImage.original_width} × {uploadedImage.original_height}</figcaption></figure>
-		{/if}
+		<textarea id="image-provenance" class="input-ta image-provenance" rows="3" bind:value={imageProvenance} oninput={() => onImageProvenanceInput?.()} placeholder={t().imageProvenanceHint}></textarea>
 		{@render inputSettings()}
+		<div><div class="description-action" use:placeIn={drawActionTarget}>
 		{#if singleRunning && !hideRunStatus}
 			<RunStatus label={stageLabel || t().imageWritingDdl} stage1Model={visionModelName} elapsedMs={liveMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onStop={onStop} />
 		{:else}
 			<PaintButton onclick={onSubmitImage} disabled={!uploadedImage || imageUploading || !visionModelAvailable || generationDisabled || singleRunning}>{t().submitBtn}</PaintButton>
-			{#if !visionModelAvailable}<p role="status">{t().imageVisionRequired}</p>{/if}
 		{/if}
-		{#if error}<p class="error-text">{error}</p>{/if}
+		{#if error && uploadedImage}<p class="error-text">{error}</p>{/if}
+		</div></div>
 	{:else if inputMode === 'batch'}
 		<!-- Descriptions or pictures; locked while either side runs. Each panel puts
 		     it at the right end of its own heading line. -->
@@ -474,8 +438,8 @@
 			</span>
 		{/snippet}
 		{#if imageFolder.source === 'image'}
-			<button class="ghost-btn" onclick={onClearInput} disabled={folderRunning || generationDisabled}>{t().clearInputBtn}</button>
 			<ImageFolderBatchPanel
+				actionTarget={drawActionTarget}
 				sourceSwitch={batchSourceSwitch}
 				folder={imageFolder}
 				busy={singleRunning || generationDisabled || batchRunning}
@@ -494,6 +458,7 @@
 			/>
 		{:else}
 		<BatchPanel
+			actionTarget={drawActionTarget}
 			sourceSwitch={batchSourceSwitch}
 			settings={inputConditionRows}
 			{runTokensIn}
@@ -563,11 +528,14 @@
 		border-radius: 50%; background: var(--fg2); transition: transform 0.15s;
 	}
 	.batch-source-switch[aria-checked='true'] .batch-source-knob { transform: translateX(16px); background: var(--fg); }
-	.image-file-label { display: grid; gap: 6px; color: var(--fg2); font-size: var(--ui-font-size-12); }
-	.image-file-label input { min-width: 0; width: 100%; font: inherit; }
-	.image-preview { margin: 4px 0; display: grid; gap: 4px; }
-	.image-preview img { max-width: 100%; max-height: 180px; object-fit: contain; align-self: start; }
-	.image-preview figcaption { color: var(--fg3); font-size: var(--ui-font-size-12); overflow-wrap: anywhere; }
+	.image-input { display: none; }
+	.image-pick-row { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+	.image-pick-row img { width: 40px; height: 40px; object-fit: cover; }
+	.image-pick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-font-size-12); }
+	.image-pick-name small { display: block; color: var(--fg3); }
+	.image-pick-button.full { width: 100%; }
+	.image-provenance { resize: none; }
+	label.input-heading { font-size: var(--ui-font-size-12); font-weight: 400; }
 	.panel-tabs { display: flex; border-bottom: 1px solid var(--border); }
 	.panel-tabs :global(.tooltip-wrap) { flex: 1; }
 	.panel-section > :global(.tooltip-wrap) { width: 100%; }
@@ -620,6 +588,9 @@
 	.description-action :global(.tooltip-wrap) { width: 100%; }
 	.description-parent-note { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-11); line-height: 1.5; }
 	.conditions-heading { margin: 8px 0 2px; font-size: var(--ui-font-size-12); font-weight: 500; color: var(--fg2); }
+	.conditions-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+	.invalid-vision, .invalid-vision-note { color: var(--danger); }
+	.invalid-vision-note { font-size: var(--ui-font-size-10); white-space: nowrap; }
 	.condition-rows {
 		display: grid;
 		gap: 6px;
@@ -654,22 +625,7 @@
 		flex-wrap: wrap;
 		gap: 6px;
 	}
-	.condition-compact-row {
-		display: flex;
-		align-items: center;
-		min-width: 0;
-	}
-	.condition-compact-row :global(.tooltip-wrap) { flex: none; max-width: 100%; position: static; }
-	/* Anchor menus to the whole conditions row so a wrapped trigger never
-	   pushes its menu outside the narrow input panel. */
-	.condition-compact-row :global(.sketch-plugin),
-	.condition-compact-row :global(.canvas-aspect-plugin) { position: static; max-width: 100%; }
-	.condition-compact-row :global(.sketch-menu),
-	.condition-compact-row :global(.aspect-menu) { width: min(310px, 100%); }
-	.condition-compact-row :global(.ghost-btn) { white-space: normal; text-align: left; border-radius: 13px; }
 	/* Its bubble anchors to the chip, not to the whole row of chips. */
-	.condition-compact-row.wild-row { gap: 8px; }
-	.condition-compact-row.wild-row :global(.tooltip-wrap) { position: relative; }
 	.condition-inline-label {
 		color: var(--fg3);
 		font-size: var(--ui-font-size-11);
@@ -682,7 +638,6 @@
 		min-width: 0;
 		padding-bottom: 8px;
 		margin-bottom: 2px;
-		border-bottom: 1px solid var(--border);
 	}
 	.input-label {
 		display: flex;
@@ -734,9 +689,6 @@
 	}
 	.gen-status-wrap { margin-top: 4px; }
 	.error-text { color: var(--danger); font-size: var(--ui-font-size-12); white-space: pre-line; }
-	@media (max-width: 430px) {
-		.condition-compact-row { max-width: 100%; }
-	}
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }

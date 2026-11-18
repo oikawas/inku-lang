@@ -313,7 +313,7 @@
 		background: transparent;
 	}
 	.compact .ddl-editor-frame :global(.cm-editor) { height: auto; }
-	.compact .ddl-editor-frame :global(.cm-scroller) { max-height: 50vh; scrollbar-gutter: auto; }
+	.compact .ddl-editor-frame :global(.cm-scroller) { max-height: none; overflow: visible; scrollbar-gutter: auto; }
 	.compact .ddl-editor-frame :global(.cm-content) { padding: 2px 0; }
 	.compact .ddl-editor-frame.readonly { opacity: 1; }
 	.ddl-editor-support {

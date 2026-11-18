@@ -20,12 +20,13 @@
 		sketchMode: SketchMode;
 		compositionMode: CompositionMode;
 		isJapanese: boolean;
+		wild?: boolean;
 		onSelectRoute: (route: DrawRoute) => void;
 		onSelectSketchMode: (mode: SketchMode) => void;
 		onSelectCompositionMode: (mode: CompositionMode) => void;
 	};
 
-	let { route, sketchMode, compositionMode, isJapanese, onSelectRoute, onSelectSketchMode, onSelectCompositionMode }: Props = $props();
+	let { route, sketchMode, compositionMode, isJapanese, wild = false, onSelectRoute, onSelectSketchMode, onSelectCompositionMode }: Props = $props();
 
 	const sketchOn = $derived(sketchMode === 'on');
 	const compositionOn = $derived(compositionPassed(route, compositionMode));
@@ -65,10 +66,12 @@
 		{#each flow as step, index (index)}
 			<li class="flow-{step.kind}">{step.label}</li>
 		{/each}
+		{#if wild}<li class="wild-indicator">{t().wildButton}</li>{/if}
 	</ol>
 </div>
 
 <style>
+	.wild-indicator { margin-left: auto; color: var(--fg2); font-size: var(--ui-font-size-10); }
 	.draw-conditions {
 		position: relative;
 		display: grid;
@@ -142,6 +145,7 @@
 		margin-right: 4px;
 		color: var(--fg3);
 	}
+	.draw-flow li.wild-indicator::before { content: none; }
 	.flow-end { color: var(--fg3); }
 	.flow-fixed { color: var(--fg); }
 	.flow-switch { color: var(--accent); }

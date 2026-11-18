@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { placeIn } from '$lib/place-in';
 	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import PaintButton from './PaintButton.svelte';
@@ -8,6 +9,7 @@
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type Props = {
+		actionTarget?: HTMLElement | null;
 		folder: ImageFolderBatch;
 		/** Another run (one work, the description batch, a demo) holds the Server. */
 		busy: boolean;
@@ -29,7 +31,7 @@
 	};
 
 	let {
-		folder, busy, visionModelName, visionModelAvailable, stageLabel, liveMs,
+		folder, busy, visionModelName, visionModelAvailable, stageLabel, liveMs, actionTarget = null,
 		runTokensIn, runTokensOut, runAttempt = null, runProgress = null, error, onRun, onStop, settings, sourceSwitch,
 	}: Props = $props();
 
@@ -56,7 +58,7 @@
 </script>
 
 <div class="batch-label">
-	<span class="batch-label-text"><strong>{t().imageFolderLabel}</strong><span class="batch-label-hint">{t().imageFolderHint}</span></span>
+	<span class="batch-label-text"><strong>{t().imageFolderLabel}</strong></span>
 	<span class="batch-label-end">
 		{#if folder.interrupted && !folder.running}
 			<span class="batch-interrupted-mark">{t().batchInterruptedLabel}</span>
@@ -81,19 +83,21 @@
 			event.currentTarget.value = '';
 		}}
 	/>
-	<button type="button" class="ghost-btn" onclick={chooseFolder} disabled={folder.running}>{t().imageFolderChoose}</button>
 	{#if folder.folderName}
 		<span class="folder-summary">{t().imageFolderSummary(folder.folderName, folder.pictures.length, done)}</span>
+		<button type="button" class="ghost-btn" onclick={chooseFolder} disabled={folder.running}>{t().imageFolderChoose}</button>
+	{:else}
+		<button type="button" class="ghost-btn" onclick={chooseFolder} disabled={folder.running}>{t().imageFolderChoose}</button>
+		<span class="folder-summary">{t().imageFolderHint}</span>
 	{/if}
 </div>
 {#if folder.folderName && folder.pictures.length === 0}<p class="batch-info">{t().imageFolderEmpty}</p>{/if}
-{#if folder.resumeBlocked}<p class="batch-info">{t().batchResumeScanning}</p>{/if}
 
 <section class="batch-next-conditions" aria-label={t().batchNextConditionsLabel}>
-	<div class="batch-next-conditions-head"><span>{t().batchNextConditionsLabel}</span></div>
 	{@render settings?.()}
 </section>
 
+<div><div class="folder-fixed-action" use:placeIn={actionTarget}>
 {#if folder.running}
 	<div class="batch-progress-wrap">
 		<BatchRunSummary current={folder.summaryCurrent} total={folder.summaryTotal} startedAt={folder.startedAt} averageWorkMs={folder.averageWorkMs} />
@@ -111,8 +115,8 @@
 {:else if folder.pictures.length > 0}
 	<div class="batch-actions">
 		{#if pending === 0}
+			<PaintButton onclick={() => onRun(true)} {disabled}>{t().imageFolderRestart}</PaintButton>
 			<p class="batch-info">{t().imageFolderAllDone}</p>
-			<button type="button" class="ghost-btn" onclick={() => onRun(true)} {disabled}>{t().imageFolderRestart}</button>
 		{:else if done > 0 || folder.failures.length > 0}
 			<PaintButton onclick={() => onRun(false)} {disabled}>{t().imageFolderResume(pending)}</PaintButton>
 			<button type="button" class="ghost-btn" onclick={() => onRun(true)} {disabled}>{t().imageFolderRestart}</button>
@@ -120,15 +124,18 @@
 			<PaintButton onclick={() => onRun(true)} {disabled}>{t().imageFolderRun(pending)}</PaintButton>
 		{/if}
 	</div>
-	{#if !visionModelAvailable}<p role="status">{t().imageVisionRequired}</p>{/if}
+{:else}
+	<PaintButton onclick={() => onRun(true)} disabled>{t().imageFolderRun(0)}</PaintButton>
 {/if}
 
+{#if folder.resumeBlocked}<p class="batch-info">{t().batchResumeScanning}</p>{/if}
 {#if !folder.running && folder.stopReason}
 	<p class="error-text">{t().imageFolderServerLost(folder.stopReason)}</p>
 {:else if !folder.running && folder.interrupted}
 	<p class="batch-info">{t().imageFolderInterrupted}</p>
 {/if}
 {#if error}<p class="error-text">{error}</p>{/if}
+</div></div>
 
 {#if !folder.running && folder.failures.length > 0}
 	<details class="folder-failures">
@@ -170,9 +177,9 @@
 	.batch-label-end { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; margin-left: auto; }
 	.batch-interrupted-mark { flex: 0 0 auto; color: var(--danger); font-size: var(--ui-font-size-12); font-weight: 500; }
 	.error-text { color: var(--danger); font-size: var(--ui-font-size-12); white-space: pre-line; }
-	.folder-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 4px; }
+	.folder-pick { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; }
 	.folder-input { display: none; }
-	.folder-summary { min-width: 0; color: var(--fg2); font-size: var(--ui-font-size-12); overflow-wrap: anywhere; }
+	.folder-summary { flex: 1; min-width: 0; color: var(--fg2); font-size: var(--ui-font-size-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.batch-info { margin: 4px 0; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.batch-next-conditions { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 	.batch-next-conditions-head {

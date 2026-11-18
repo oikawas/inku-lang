@@ -296,8 +296,8 @@
 				<span class="condition-inline-label">{t().modelButton}</span>
 				<span class="condition-value" class:invalid-vision={pictureConditions && visionCatalogReady && !visionModelAvailable} title={conditionModelName}>{conditionModelName}</span>
 				{#if pictureConditions && visionCatalogReady && !visionModelAvailable}
-					<span class="invalid-vision-note">{inputMode !== 'image' || visionUnavailableReason === 'not_vision' ? t().imageVisionUnavailableShort : visionUnavailableReason === 'unpublished' ? t().imageVisionNotPublished : visionUnavailableReason === 'disconnected' ? t().imageVisionNotConnected : t().imageVisionNotListed}</span>
-					{#if inputMode === 'image' && visionUnavailableReason !== 'not_vision'}<button type="button" class="vision-settings" onclick={() => onOpenConnectionSettings(visionUnavailableReason === 'unpublished' || visionUnavailableReason === 'disconnected' ? 'chatgpt' : undefined)}>{t().settingsTabModels}</button>{/if}
+					<span class="invalid-vision-note">{visionUnavailableReason === 'not_vision' ? t().imageVisionUnavailableShort : visionUnavailableReason === 'unpublished' ? t().imageVisionNotPublished : visionUnavailableReason === 'disconnected' ? t().imageVisionNotConnected : t().imageVisionNotListed}</span>
+					{#if visionUnavailableReason !== 'not_vision'}<button type="button" class="vision-settings" onclick={() => onOpenConnectionSettings(visionUnavailableReason === 'unpublished' || visionUnavailableReason === 'disconnected' ? 'chatgpt' : undefined)}>{t().settingsTabModels}</button>{/if}
 				{/if}
 				{#if chatgptPlanSelected && inputMode === 'single' && chatgptUsageUrl}
 					<a class="chatgpt-plan-label" href={chatgptUsageUrl} target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>

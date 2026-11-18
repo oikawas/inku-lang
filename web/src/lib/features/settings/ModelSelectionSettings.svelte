@@ -43,9 +43,7 @@
 	const modelSelectionTab = $derived<ModelSelectionTab>(visionOnlySelection ? 'vision' : allowVisionSelection ? selectedTab : 'shared');
 	const recommendationPurpose = $derived<ModelPurpose>(modelSelectionTab === 'vision' ? 'vision' : 'llm');
 	const recommendationStage = $derived<ModelStage | undefined>(modelSelectionTab === 'vision' ? undefined : 'both');
-	const selectedName = $derived(modelSelectionTab === 'vision'
-		? visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel
-		: providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model);
+	const selectedName = $derived(modelSelectionTab === 'vision' ? visionModel : stage1Model);
 	function modelSelected(provider: Provider, model: string): boolean {
 		if (modelSelectionTab === 'vision') return visionProvider === provider && visionModel === model;
 		return stage1Provider === provider && stage1Model === model;
@@ -97,7 +95,7 @@
 									onclick={() => selectGenerationModel(provider.id, model.id)}
 								>
 									<div class="model-button-heading">
-										<strong>{model.label}</strong>
+										<strong>{model.id}</strong>
 										<span class="model-recommendation" aria-label={`${t().settingsModelRecommendationFields[recommendationPurpose === 'vision' ? 'recommendation_vision' : 'recommendation_llm']} ${modelRecommendation(model, recommendationPurpose, recommendationStage)}`}>{modelRecommendationStars(model, recommendationPurpose, recommendationStage)}</span>
 									</div>
 									{#if purposeUnsupported(model, recommendationPurpose)}<span class="not-recommended-note">{t().modelNotRecommended}</span>{/if}

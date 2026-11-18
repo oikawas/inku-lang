@@ -54,6 +54,7 @@
 	import {
 		modelDisplayName,
 		modelShortName,
+		modelCardName,
 		modelStripName,
 		qualifiedModelRef,
 		splitModelReference,
@@ -3748,7 +3749,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{formatHistoryDate}
 			{catalogName}
 			{historyPreviewText}
-			shortModel={modelDisplayName}
+			shortModel={modelCardName}
 			{apiFetch}
 			currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
 			currentLineageRootId={work.displayedHistoryItem?.lineage_root_node_id ?? null}

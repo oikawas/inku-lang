@@ -997,7 +997,7 @@ their suffixes. Tooltips retain the full provider and model names.
 screen is too many for someone opening inku for the first time and too few for
 someone building a work up, so the visible surface is one of three **UI modes**,
 stored per logged-in user in the server database. **Simple UI** shows what
-is required and the history — the user menu, the way into settings, the single
+is required and the history — the rail logo, the user menu, the way into settings, the single
 description input, `New`, the drawing controls, the canvas and the history. When
 work tools are hidden, the left panel hides `Change the composition and laws`
 and `Change the layout` while retaining the composition and laws record. **History
@@ -1289,6 +1289,9 @@ full roster is not opened)
 - Settings modal: Display and operation, Making, Export, Connections and
   administration, Extensions and details; contents follow permissions and the
   Standard/Detailed selection
+
+The Library's thumbnail cards keep their inline delete control but do not show
+Share settings. It remains available in the work preview and list view.
 
 The work-conditions header shows the displayed work's models, color catalog,
 and canvas. Work actions, including star and sharing marks and export, appear

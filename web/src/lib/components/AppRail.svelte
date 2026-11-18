@@ -94,13 +94,13 @@
 				</button>
 			</Tooltip>
 		</div>
-		{#if showAuxiliary}<div class="rail-logo-row">
+		<div class="rail-logo-row">
 			<Tooltip placement="right" text={t().tooltipAppRailLogo}>
 				<button class="rail-logo" type="button" onclick={onOpenAppInfo} aria-label={t().appInfoOpenLabel}>
 					<span class="rail-logo-core">inku</span>{#if expanded}<span class="rail-logo-suffix">-lang</span>{/if}
 				</button>
 			</Tooltip>
-		</div>{/if}
+		</div>
 		{#if showAuxiliary && expanded}<div class="rail-sub">{t().subtitle}</div>{/if}
 	</div>
 

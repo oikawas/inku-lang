@@ -10,6 +10,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Web: The description input and displayed work's record now scroll separately, with Draw between them and a note when the next drawing will be a child.
 
+- Web: The rail logo opens About inku in Simple UI too. Share settings is removed from Library thumbnail cards and remains in the preview and list.
+
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.
 
 - Android: clean documents and execution records no longer linked to a work when discarding candidates, permanently deleting a work, and starting the app. Active documents, parent relationships, and restored executions are preserved.

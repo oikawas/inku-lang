@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- The read-and-draw and image-writing prompts now explain and illustrate how fineness affects sweep and brushmarks band width and spacing. In a 20-description trial, works using fineness rose from 0 to 5, mainly on brushmarks; the author chose the trial more often in a blinded comparison.
+
 - The read-and-draw and image-writing prompts now include Saijiki word explanations and a fineness combination example. They broaden the choice of surface and movement words; in the author's comparison the drawings were as good as or better than before.
 
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.

@@ -250,6 +250,8 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
 ):
     from inku_server import db
 
+    monkeypatch.setattr(db, "require_background_write", lambda: None)
+
     effects = object.__new__(ProductPipelineEffects)
     effects.binding = SimpleNamespace(canvas_registry={
         "registry": {"formats": [{"id": "square", "width_units": 1, "height_units": 1}]}
@@ -480,6 +482,38 @@ def test_description_fork_uses_inherited_route_and_composition(tmp_path, monkeyp
     assert context["host_options"]["route"] == "read_and_draw"
     assert context["host_options"]["composition"] == "on"
     assert context["sketch_request"]["mode"] == "on"
+    engine.dispose()
+
+
+def test_description_fork_accepts_a_parent_without_a_result(tmp_path, monkeypatch):
+    from inku_server import db
+    from inku_server.api_core import common
+    from inku_server.pipeline_api import PipelineService, pipeline_router
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'no-result.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    service = PipelineService.__new__(PipelineService)
+    service.store = SimpleNamespace(read=lambda *_args: {"authority": "present"})
+    service.get = lambda *_args: {"execution_id": "old", "variation_id": "parent", "result": None,
+        "authority": {"revision": "1", "authority": "description_authoritative"}, "description": "A line"}
+    service.execution = lambda *_args: SimpleNamespace(config=default_manifest(binding)["pipeline"], context={})
+    def start(owner, kind, text, **kwargs):
+        _, context = effects.prepare(owner, kind, text,
+            {"instruction_lang": "en", "stage1_model": "fixture:one"}, kwargs["source_work"])
+        assert context["host_options"].get("lineage_parent_node_id") is None
+        return {"execution_id": "new"}
+    service.start = start
+    app = FastAPI()
+    app.include_router(pipeline_router(service, lambda: {"id": "author"}))
+    response = TestClient(app).post("/api/pipeline/variations/parent/fork-description",
+        json={"expected_revision": "1", "description": "A line"})
+    assert response.status_code == 200 and response.json()["execution_id"] == "new"
     engine.dispose()
 
 

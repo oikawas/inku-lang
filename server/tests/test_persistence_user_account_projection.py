@@ -115,7 +115,7 @@ def test_projector_preserves_response_defaults_filtering_and_labels() -> None:
         "tooltips_enabled": True,
         "download_folder_enabled": True,
         "download_folder_name": "Art",
-        "settings_tab": "db",
+        "settings_tab": "models",
         "model_settings": {"normalized": True},
         "image_generation_count": 0,
         "at": 123,

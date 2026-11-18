@@ -454,7 +454,7 @@ class UserAccountProjector:
             "tooltips_enabled": row.tooltips_enabled is not False,
             "download_folder_enabled": row.download_folder_enabled is True,
             "download_folder_name": row.download_folder_name,
-            "settings_tab": row.settings_tab if row.settings_tab in self.settings_tabs else "db",
+            "settings_tab": row.settings_tab if row.settings_tab in self.settings_tabs else "models",
             "model_settings": self.normalize_user_model_settings_fn(model_settings),
             "image_generation_count": row.image_generation_count or 0,
             "at": row.at,

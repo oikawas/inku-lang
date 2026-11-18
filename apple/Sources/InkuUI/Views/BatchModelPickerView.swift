@@ -137,7 +137,7 @@ struct BatchModelPickerView: View {
 
     /// ModelSelectionSettings.svelte `selectedName`: the chosen model's label, else its id as stored.
     private var selectedSummaryText: String {
-        let name = entry(for: draftReference, purpose: purpose).map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
+        let name = entry(for: draftReference, purpose: purpose).map { $0.model.id }
             ?? (draftReference.isEmpty ? model.display.localized("未設定") : draftReference)
         return model.display.webCopyFormat("modelSelectionSelected", "選択中 %@", name)
     }
@@ -178,7 +178,7 @@ struct BatchModelPickerView: View {
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: 8) {
-                    Text(entry.label.isEmpty ? entry.id : entry.label)
+                    Text(entry.id)
                         .inkuFont(13, weight: .medium).strikethrough(entry.modelFold == "eol")
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)

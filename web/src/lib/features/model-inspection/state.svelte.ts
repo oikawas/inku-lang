@@ -66,7 +66,7 @@ function modelInspectionModelChoices(): ModelInspectionChoice[] {
 			const id = qualifiedModelRef(group.id as Provider, model.id);
 			if (seen.has(id)) continue;
 			seen.add(id);
-			choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id), model });
+			choices.push({ id, label: model.id, providerLabel: group.label || String(group.id), model });
 		}
 	}
 	return choices;

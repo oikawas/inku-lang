@@ -235,7 +235,7 @@ struct ModelSettingsView: View {
                         .inkuFont(12).frame(width: 68, alignment: .leading).padding(.top, 5)
                         ModelSettingsChipLayout(spacing: 6) {
                             ForEach(models) { item in
-                                Text(item.label).inkuFont(12)
+                                Text(item.id).inkuFont(12)
                                     .padding(.horizontal, 9).padding(.vertical, 5)
                                     .background(Color.primary.opacity(0.04), in: Capsule())
                                     .overlay { Capsule().stroke(Color.primary.opacity(0.15)) }

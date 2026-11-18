@@ -10,8 +10,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - The read-and-draw and image-writing prompts now explain and illustrate how fineness affects sweep and brushmarks band width and spacing. In a 20-description trial, works using fineness rose from 0 to 5, mainly on brushmarks; the author chose the trial more often in a blinded comparison.
 
-- The read-and-draw and image-writing prompts now include Saijiki word explanations and a fineness combination example. They broaden the choice of surface and movement words; in the author's comparison the drawings were as good as or better than before.
-
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.
 
 - Android: clean documents and execution records no longer linked to a work when discarding candidates, permanently deleting a work, and starting the app. Active documents, parent relationships, and restored executions are preserved.
@@ -753,6 +751,14 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.359 (2026-11-18 / Build 1435)
+
+- The read-and-draw and image-writing prompts now include Saijiki word explanations and a fineness combination example. They broaden the choice of surface and movement words; in the author's comparison the drawings were as good as or better than before.
+
+- Web: show model names as API IDs, use SIWC for the ChatGPT provider, and read history strip abbreviations from core.
+
+- Web: display selected model and color catalog values at 12px in the description, image, and batch tabs.
 
 ## v2.15.358 (2026-11-18 / Build 1434)
 

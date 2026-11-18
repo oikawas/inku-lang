@@ -1,46 +1,36 @@
+import Foundation
 import InkuUI
 import InkuHost
 
-/// Failure: old three-letter family/version labels discarded the distinguishing model variant and size.
+/// Check the shared core fixture through the same action as the UI.
 func runHistoryModelNameChecks() throws {
-    // Outputs obtained from Web historyStripFields.ts under node, 2026-10-15 (Build1225).
-    let cases = [
-        ("ChatGPT plan", "GPT-6-Luna", "Ch GPT6Lu"),
-        ("OpenAI API Platform", "GPT-5.1 mini", "Op GPT5.1Mi"),
-        ("Claude API", "Claude Opus 4.7", "Cl Op4.7"),
-        ("Gemini API", "Gemini 2.5 Flash Lite", "Ge 2.5FlL"),
-        ("Ollama", "qwen3.5:4b-q4_K_M (3.4GB)", "Ol Qw3.5·4BQ4KM"),
-        ("Ollama Cloud (ollama.com)", "deepseek-v4-flash", "Oc DS4Fl"),
-        ("NVIDIA NIM", "Google Gemma 4 31B Instruct", "NV Gm4·31BI"),
-        ("NVIDIA NIM", "meta/llama-3.3-70b-instruct", "NV Ll3.3·70BI"),
-        ("Ollama", "gemma4:e4b-it-q4_K_M (9.6GB)", "Ol Gm4E4BIQ4KM"),
-        ("Acme", "vendor/unknown-reasoning-2-31b-preview", "Ac unknownR2·31BPv"),
-        ("", "", ""),
-        (" Claude API ", "anthropic Claude Sonnet 4.6", "Cl ClSo4.6"),
-        ("Gemini API", "Gemma 4 31B", "Ge Gm4·31B"),
-        ("Ollama Cloud", "qwen3-coder-480b-a35b-instruct", "Oc Qw3Cdr480BA35BI")
-    ]
-    for (owner, name, expected) in cases {
-        let actual = ModelNaming.abbreviateStripModel(owner: owner, name: name)
-        guard actual == expected else { throw CheckFailure.message("History model \(owner)/\(name): \(actual) != Web \(expected)") }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let file = root.appendingPathComponent("core/crates/inku-pipeline/data/model-display-cases.json")
+    let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
+    guard let cases = fixture?["cases"] as? [[String: Any]], cases.count == 21 else {
+        throw CheckFailure.message("Shared model display cases unavailable")
     }
-    // Core resolves only providers passed by the host. Without the ChatGPT connection,
-    // its explicit reference uses its stored provider/model IDs instead of the old global snapshot.
+    for row in cases {
+        guard let owner = row["owner"] as? String, let name = row["name"] as? String,
+              let expected = row["strip_label"] as? String else { throw CheckFailure.message("Malformed model display case") }
+        let actual = ModelNaming.stripLabel(owner: owner, name: name, abbreviation: row["owner_abbreviation"] as? String)
+        guard actual == expected else { throw CheckFailure.message("History model \(owner)/\(name): \(actual) != \(expected)") }
+    }
     guard ModelNaming().resolve("chatgpt:gpt-6-luna").provider == "chatgpt" else {
         throw CheckFailure.message("A saved ChatGPT reference lost its explicit provider")
     }
     var plan = ProviderSettings.personalPlan
     plan.models = [.init(id: "gpt-6.1-sol", label: "GPT-6.1-Sol")]
     let naming = ModelNaming(providers: [plan])
-    // Sign in with ChatGPT step 1: core names the connection in the display language and gives its abbreviation.
     let japanese = ModelNaming(providers: [plan], language: "ja")
-    guard naming.displayName("chatgpt:gpt-6.1-sol") == "Sign in with ChatGPT / GPT-6.1-Sol",
-          japanese.displayName("chatgpt:gpt-6.1-sol") == "ChatGPT でサインイン / GPT-6.1-Sol",
+    guard naming.displayName("chatgpt:gpt-6.1-sol") == "SIWC / gpt-6.1-sol",
+          japanese.displayName("chatgpt:gpt-6.1-sol") == "SIWC / gpt-6.1-sol",
           naming.stripModel("chatgpt:gpt-6.1-sol") == "SIWC GPT6.1So",
           japanese.stripModel("chatgpt:gpt-6.1-sol") == "SIWC GPT6.1So",
-          naming.modelShortName("chatgpt:gpt-6.1-sol") == "GPT-6.1-Sol",
+          naming.modelShortName("chatgpt:gpt-6.1-sol") == "gpt-6.1-sol",
           ProviderModelReference.resolve("gpt-6.1-sol", providers: [plan]).providerID == "nvidia" else {
-        throw CheckFailure.message("Published ChatGPT plan model lost its display name or changed bare-reference routing")
+        throw CheckFailure.message("Published ChatGPT model naming or bare-reference routing changed")
     }
-    print("History model names passed: \(cases.count) current Web outputs, Sign in with ChatGPT named by core (ja/en, SIWC), variants/sizes/quantization retained, Ollama Cloud distinguished. No provider calls.")
+    print("History model names passed: \(cases.count) shared core cases; SIWC and bare-reference routing. No provider calls.")
 }

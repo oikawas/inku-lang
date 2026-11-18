@@ -1,10 +1,7 @@
 import Foundation
 import InkuHost
 
-/// How a saved model reference is named on screen, ported from the Build1162 Web functions:
-/// `shortModelName`/`shortModel` (routes/+page.svelte), `abbreviateStripModel` (lib/historyStripFields.ts),
-/// and `providerLabel`/`modelDisplayName`/`modelShortName`/`resolveModelRefForDisplay` (lib/models.ts).
-/// The configured services and published personal-plan models supply the names resolved by the shared core.
+/// Model display names and history-strip labels come from the shared core.
 public struct ModelNaming: Sendable {
     /// Web `DEFAULT_PROVIDER`, the stage default of rule 3.
     public static let defaultProvider = "nvidia"
@@ -44,126 +41,45 @@ public struct ModelNaming: Sendable {
         return displayResolution(provider + ":_", defaultProvider: provider)["provider_label"] as? String ?? provider
     }
 
-    /// Core `provider_abbreviation`, given for a sign-in connection only ("SIWC").
-    private func providerAbbreviation(_ provider: String) -> String? {
-        guard !provider.isEmpty else { return nil }
-        return displayResolution(provider + ":_", defaultProvider: provider)["provider_abbreviation"] as? String
-    }
-
-    private func modelLabel(provider: String, model: String) -> String? {
-        guard connections.contains(where: { $0.id == provider && $0.kind != .chatGPTPlan })
-                || ProviderModelReference.retiredProviderIDs.contains(provider) || provider == "chatgpt" else { return model }
-        return displayResolution(provider + ":" + model, defaultProvider: provider)["model_label"] as? String
-    }
-
     /// Web `resolveModelRefForDisplay`: explicit qualification, sole ownership, retired ownership, then the stage default.
     public func resolve(_ reference: String, stageProvider: String = ModelNaming.defaultProvider) -> (provider: String, model: String) {
         let answer = displayResolution(reference, defaultProvider: stageProvider == Self.defaultProvider ? stageDefault : stageProvider)
         return (answer["provider"] as? String ?? stageProvider, answer["model"] as? String ?? reference)
     }
 
-    /// Web `modelDisplayName`: "<provider> / <model label>".
+    /// Core's display name, retaining the provider and API model ID.
     public func displayName(_ reference: String?) -> String {
         let ref = (reference ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !ref.isEmpty else { return "" }
+        let answer = displayResolution(ref)
+        if let name = answer["display_name"] as? String { return name }
         let (provider, model) = resolve(ref)
-        let name = modelLabel(provider: provider, model: model) ?? model
-        let owner = providerLabel(provider)
-        return owner.isEmpty ? name : "\(owner) / \(name)"
+        let owner = answer["provider_label"] as? String ?? provider
+        return owner.isEmpty ? model : "\(owner) / \(model)"
     }
 
-    /// Web `modelShortName`: the label without its provider and without a vendor prefix before the first slash.
+    /// The model ID, including any vendor prefix.
     public func modelShortName(_ reference: String?) -> String {
         let ref = (reference ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !ref.isEmpty else { return "" }
-        let (provider, model) = resolve(ref)
-        let name = modelLabel(provider: provider, model: model) ?? model
-        guard let slash = name.firstIndex(of: "/") else { return name }
-        return String(name[name.index(after: slash)...])
+        return resolve(ref).model
     }
 
-    // MARK: +page.svelte
-
-    /// Web `shortModelName`: a known family word, otherwise the first 8 characters after the last slash.
-    public static func shortModelName(_ model: String) -> String {
-        for family in ["opus", "haiku", "sonnet", "qwen3", "qwen", "gemma"] where model.contains(family) { return family }
-        return String((model.components(separatedBy: "/").last ?? model).prefix(8))
-    }
-
-    /// Web `shortModel`, the library card form: "<provider label>/<short name>".
+    /// Library cards use the same core display name.
     public func shortModel(_ reference: String?) -> String {
-        guard let reference, !reference.isEmpty else { return "" }
-        let (provider, model) = resolve(reference)
-        let owner = providerLabel(provider)
-        let short = Self.shortModelName(model)
-        return owner.isEmpty ? short : "\(owner)/\(short)"
+        displayName(reference)
     }
 
     /// Web `historyModelStage1Short`, the history strip form.
     public func stripModel(_ reference: String?) -> String {
-        guard let reference, !reference.isEmpty else { return "-" }
-        let (provider, model) = resolve(reference)
-        let label = modelLabel(provider: provider, model: model) ?? model
-        let name = label.firstIndex(of: "/").map { String(label[label.index(after: $0)...]) } ?? label
-        return Self.abbreviateStripModel(owner: providerLabel(provider), name: name, abbreviation: providerAbbreviation(provider))
+        guard let reference, !reference.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "-" }
+        return displayResolution(reference)["strip_label"] as? String ?? reference
     }
 
-    // MARK: historyStripFields.ts
-
-    /// Web historyStripFields.ts: compact recognizable words while retaining versions, sizes and variants.
-    /// A sign-in connection's own abbreviation from core ("SIWC") replaces the first two letters of its name.
-    public static func abbreviateStripModel(owner: String, name: String, abbreviation: String? = nil) -> String {
-        func replace(_ text: String, _ pattern: String, _ replacement: String) -> String {
-            text.replacingOccurrences(of: pattern, with: replacement, options: [.regularExpression, .caseInsensitive])
-        }
-        let provider = abbreviation.flatMap { $0.isEmpty ? nil : $0 }
-            ?? (owner.range(of: "ollama.*cloud", options: [.regularExpression, .caseInsensitive]) != nil
-                ? "Oc" : String(owner.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2)))
-        var model = replace(name.trimmingCharacters(in: .whitespacesAndNewlines), "^.*/", "")
-        model = replace(model, "^(?:anthropic|google|meta|mistral\\s+ai)\\s+", "")
-        model = replace(model, "\\s*\\([\\d.]+\\s*[GM]B\\)\\s*$", "")
-        model = replace(model, "\\bdeepseek[-\\s]+v(?=\\d)", "deepseek-")
-        model = replacingMatches(model, pattern: "(?i)\\bq(\\d+)[_-]k[_-]([a-z])\\b") { match, text in
-            let bits = Range(match.range(at: 1), in: text).map { String(text[$0]) } ?? ""
-            let suffix = Range(match.range(at: 2), in: text).map { String(text[$0]).uppercased() } ?? ""
-            return "Q" + bits + "K" + suffix
-        }
-        if owner.range(of: "^claude\\b", options: [.regularExpression, .caseInsensitive]) != nil { model = replace(model, "^claude[\\s-]+", "") }
-        if owner.range(of: "^gemini\\b", options: [.regularExpression, .caseInsensitive]) != nil { model = replace(model, "^gemini[\\s-]+", "") }
-        let tokens = model.components(separatedBy: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":_-")))
-            .filter { !$0.isEmpty }.map { token in
-                replacingMatches(token, pattern: "(?i)[a-z]+") { match, text in
-                    let word = Range(match.range, in: text).map { String(text[$0]) } ?? ""
-                    return stripWords[word.lowercased()] ?? word
-                }
-            }
-        var compact = ""
-        for (index, token) in tokens.enumerated() {
-            if index > 0, tokens[index - 1].last.map({ $0.isASCII && $0.isNumber }) == true,
-               token.first.map({ $0.isASCII && $0.isNumber }) == true { compact += "·" }
-            compact += token
-        }
-        return [provider, compact].filter { !$0.isEmpty }.joined(separator: " ")
-    }
-
-    private static let stripWords = [
-        "gpt": "GPT", "oss": "oss", "sol": "So", "luna": "Lu", "astra": "As", "terra": "Te",
-        "claude": "Cl", "sonnet": "So", "opus": "Op", "haiku": "Ha", "fable": "Fa",
-        "gemini": "Ge", "gemma": "Gm", "flash": "Fl", "lite": "L", "pro": "Pr", "mini": "Mi", "nano": "Na", "turbo": "T",
-        "llama": "Ll", "qwen": "Qw", "deepseek": "DS", "minimax": "MM", "kimi": "Ki",
-        "mistral": "Mi", "ministral": "Min", "mixtral": "Mx", "nemotron": "Nem", "granite": "Gr",
-        "large": "Lg", "medium": "Md", "small": "Sm", "super": "Su", "ultra": "Ul",
-        "instruct": "I", "it": "I", "vision": "V", "reasoning": "R", "thinking": "Th",
-        "preview": "Pv", "latest": "Lt", "code": "Cd", "coder": "Cdr", "a": "A", "b": "B", "e": "E"
-    ]
-
-    private static func replacingMatches(_ text: String, pattern: String, replacement: (NSTextCheckingResult, String) -> String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
-        var result = text
-        for match in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
-            if let range = Range(match.range, in: result) { result.replaceSubrange(range, with: replacement(match, text)) }
-        }
-        return result
+    /// Shared core action used for fixture checks of history-strip labels.
+    public static func stripLabel(owner: String, name: String, abbreviation: String? = nil) -> String {
+        let answer = try? ProviderCoreSettings.call("strip_label", ["owner": owner, "name": name, "owner_abbreviation": abbreviation as Any? ?? NSNull()])
+        return answer?["strip_label"] as? String ?? name
     }
 
     // MARK: HistoryManager.svelte

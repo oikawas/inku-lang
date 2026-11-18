@@ -133,7 +133,7 @@ public struct ComparisonView: View {
         let full = !selected && comparison.modelReferences.count >= 4
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 4) {
-                Toggle(entry.label.isEmpty ? entry.id : entry.label, isOn: Binding(
+                Toggle(entry.id, isOn: Binding(
                     get: { selected }, set: {
                         comparison.selectModel(reference, selected: $0)
                         model.display.preferences.comparisonModels = Array(comparison.modelReferences.prefix(4))

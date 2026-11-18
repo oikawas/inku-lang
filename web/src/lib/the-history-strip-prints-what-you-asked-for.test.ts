@@ -14,7 +14,6 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
-	abbreviateStripModel,
 	canAddHistoryStripField,
 	DEFAULT_HISTORY_STRIP_FIELDS,
 	formatHistoryStripEngineVersion,
@@ -140,36 +139,17 @@ test('T-163  the file size is read from the server, not counted from what arrive
 	assert.match(HISTORY_OWNER, /include_svg: 'false'/);
 });
 
-test('the strip keeps model versions, families, sizes and variants distinct', () => {
-	const pairs = [
-		['ChatGPT plan', 'GPT 6 sol', 'GPT 6.1 sol'],
-		['ChatGPT plan', 'GPT 6.1 sol', 'GPT 6.1 luna'],
-		['Claude API (Cloud)', 'Claude Sonnet 5', 'Claude Opus 5'],
-		['Gemini API (Cloud)', 'Gemini 3.5 Flash-Lite', 'Gemini 3.5 Pro'],
-		['Gemini API (Cloud)', 'Gemma 4 31B Instruct', 'Gemma 4 12B Instruct'],
-		['OpenAI API Platform', 'GPT-5.1 mini', 'GPT-5.1 nano'],
-		['NVIDIA NIM (Cloud)', 'meta/llama-3.3-70b-instruct', 'meta/llama-3.3-70b-instruct-v2'],
-		['Ollama Cloud (ollama.com)', 'gemma4:31b', 'gemma4:12b']
-	];
-	for (const [owner, first, second] of pairs) {
-		const a = abbreviateStripModel(owner, first);
-		const b = abbreviateStripModel(owner, second);
-		assert.notEqual(a, b, `${first} and ${second} must be readable as different models`);
-	}
-	// Sign in with ChatGPT is abbreviated as the shared core names it (2026-11-14).
-	const signIn = (JSON.parse(readFileSync(new URL('../../../core/crates/inku-pipeline/data/sign-in-cases.json', import.meta.url), 'utf8')) as {
-		cases: { name: string; answer: { provider_label?: string; provider_abbreviation?: string } }[];
-	}).cases.find((row) => row.name === 'display English label without language')!.answer;
-	assert.equal(abbreviateStripModel(signIn.provider_label!, 'GPT-6.1-Sol', signIn.provider_abbreviation), 'SIWC GPT6.1So');
-	assert.equal(abbreviateStripModel(signIn.provider_label!, 'GPT-6-Luna', signIn.provider_abbreviation), 'SIWC GPT6Lu');
-	assert.equal(abbreviateStripModel('Claude API (Cloud)', 'Anthropic Claude Sonnet 5.5'), 'Cl So5.5');
-	assert.equal(abbreviateStripModel('Claude API (Cloud)', 'Claude Opus 4.7'), 'Cl Op4.7');
-	assert.equal(abbreviateStripModel('Gemini API (Cloud)', 'Gemini 3.5 Flash-Lite'), 'Ge 3.5FlL');
-	assert.equal(abbreviateStripModel('NVIDIA NIM', 'Google Gemma 4 31B Instruct'), 'NV Gm4·31BI');
-	assert.equal(abbreviateStripModel('NVIDIA NIM', 'meta/llama-3.3-70b-instruct'), 'NV Ll3.3·70BI');
-	assert.equal(abbreviateStripModel('Ollama', 'qwen3.5:4b-q4_K_M (3.4GB)'), 'Ol Qw3.5·4BQ4KM');
-	assert.equal(abbreviateStripModel('Ollama Cloud (ollama.com)', 'deepseek-v4.1-flash'), 'Oc DS4.1Fl');
-	assert.notEqual(abbreviateStripModel('Ollama', 'gemma4:31b'), abbreviateStripModel('Ollama Cloud', 'gemma4:31b'));
-	assert.notEqual(abbreviateStripModel('Ollama', 'qwen3.5:4b-q4_K_M'), abbreviateStripModel('Ollama', 'qwen3.5:4b-q8_0'));
-	assert.equal(abbreviateStripModel('', 'unknown-model-v2'), 'unknownmodelv2');
+test('the history strip uses the shared core fixture labels', async () => {
+	const { configureModelReferences, loadModelReferences, clearModelReferences } = await import('./modelReferences.ts');
+	const { modelStripName } = await import('./models.ts');
+	const fixture = JSON.parse(readFileSync(new URL('../../../core/crates/inku-pipeline/data/model-display-cases.json', import.meta.url), 'utf8')) as {
+		cases: { owner: string; owner_abbreviation: string | null; name: string; strip_label: string }[];
+	};
+	const cases = fixture.cases.filter((item) => item.name);
+	const queries = cases.map((item, index) => ({action:'resolve_display' as const, ref:`fixture${index}:${item.name}`}));
+	clearModelReferences();
+	configureModelReferences(async () => Response.json({results:cases.map((item) => ({outcome:'ok', strip_label:item.strip_label}))}));
+	await loadModelReferences(queries);
+	for (let i = 0; i < cases.length; i++) assert.equal(modelStripName(queries[i].ref), cases[i].strip_label);
+	assert.equal(modelStripName(''), '');
 });

@@ -2784,7 +2784,7 @@ private fun DrawConditionChoice(heading: String, value: String, change: String, 
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onChange) { Text(change) }
         }
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -5371,7 +5371,7 @@ private fun ProviderConnectionCard(
                 } else if (provider.isDefaultLocal) {
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         publishedModelIds.forEach { modelId ->
-                            PublishedModelChip(modelDisplayName(modelId))
+                            PublishedModelChip(modelDisplayName(modelId, provider.providerId))
                         }
                     }
                 } else {
@@ -5382,7 +5382,7 @@ private fun ProviderConnectionCard(
                             modifier = Modifier.testTag("PublishedPurpose:${provider.providerId}:$purpose")) {
                             Text("$label ${models.size}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-                                models.forEach { modelId -> PublishedModelChip(modelDisplayName(modelId)) }
+                                models.forEach { modelId -> PublishedModelChip(modelDisplayName(modelId, provider.providerId)) }
                             }
                         }
                     }
@@ -6204,7 +6204,7 @@ private fun buildModelChoices(state: InkuUiState, includeChatGpt: Boolean): List
         .forEach { provider ->
             groups += provider.providerId to availablePublishedModels(provider, state).map { modelId ->
                 val qualified = qualifyModelId(provider.providerId, modelId, state)
-                val label = if (provider.providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == modelId }?.label ?: catalogModelFor(state, provider.providerId, modelId).name else catalogModelFor(state, provider.providerId, modelId).name
+                val label = modelDisplayName(modelId, provider.providerId)
                 ModelChoice(qualified, label, providerGroupLabel(provider, state.uiLanguage))
             }
         }
@@ -6270,7 +6270,7 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
         ModelOptionChoice(
             rawId = id,
             qualifiedId = qualifyModelId(provider.providerId, id, state),
-            label = if (providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == id }?.label ?: catalogModelFor(state, providerId, id).name else catalogModelFor(state, providerId, id).name,
+            label = modelDisplayName(id, providerId),
             notes = id,
             notRecommended = (if (state.modelSelectionForCamera) listOf("llm", "vision") else listOf("llm"))
                 .any { purposeUnsupported(catalogModelFor(state, providerId, id), it) },
@@ -6345,14 +6345,7 @@ private fun ModelLabelWithSupportMark(label: String, supported: Boolean) {
     }
 }
 
-private fun modelDisplayName(modelId: String): String {
-    return when (modelId.removePrefix("nvidia:")) {
-        "google/gemma-4-31b-it" -> "Gemma 4 31B Instruct"
-        "meta/llama-3.3-70b-instruct" -> "Llama 3.3 70B Instruct"
-        "mistralai/mistral-large-2-instruct" -> "Mistral Large 2 Instruct"
-        else -> modelId.substringAfterLast(":")
-    }
-}
+internal fun modelDisplayName(modelId: String, providerId: String): String = modelId.removePrefix("$providerId:")
 
 internal fun formatDuration(ms: Long): String {
     return "${"%.1f".format(ms / 1000.0)}s"
@@ -6456,10 +6449,14 @@ private fun SwatchStrip(colors: List<String>) {
 
 private fun selectedModelLabel(state: InkuUiState): String = modelLabelFor(state, state.selectedModelId)
 
-private fun modelLabelFor(state: InkuUiState, modelId: String): String {
-    modelChoicesFor(state).firstOrNull { it.id == modelId }?.let { return it.label }
-    return state.modelAssets.firstOrNull { it.modelId == modelId }?.displayName
-        ?: modelId.substringAfterLast(":")
+internal fun modelLabelFor(state: InkuUiState, modelId: String): String {
+    val answer = app.inku.mobile.data.catalogRequest("resolve_display", JSONObject()
+        .put("providers", providerReferenceRows(state)).put("ref", modelId)
+        .put("default_provider", "local-litert-lm").put("language", state.uiLanguage.code))
+    return answer.optString("display_name").takeIf { it.isNotBlank() }
+        ?: modelChoicesFor(state).firstOrNull { it.id == modelId }?.label
+        ?: state.modelAssets.firstOrNull { it.modelId == modelId }?.displayName
+        ?: modelId
 }
 
 @Composable
@@ -6469,7 +6466,7 @@ private fun shortCatalogLabel(state: InkuUiState): String {
 }
 
 private fun shortModelLabel(state: InkuUiState): String {
-    return selectedModelLabel(state).compactLabel(14)
+    return selectedModelLabel(state)
 }
 
 private val CompactLabelSpaces = Regex("\\s+")

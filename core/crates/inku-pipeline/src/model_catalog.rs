@@ -11,6 +11,7 @@ pub(crate) mod sign_in;
 mod sign_in_flow;
 mod sign_in_transfer;
 mod sign_in_view;
+mod strip_label;
 
 const SOURCE: &str = include_str!("../data/model_catalog.json");
 const PROVIDERS: &str = include_str!("../data/provider-definitions.json");
@@ -966,6 +967,8 @@ fn provider_catalog(
             if include_disabled || enabled {
                 let mut row = model.clone();
                 row["enabled"] = json!(enabled);
+                // Shown by the name its provider's API takes (the author, 2026-11-18).
+                row["label"] = json!(model_id);
                 let mut shown = labelled(&row, catalog());
                 if hide_speed {
                     for key in [
@@ -1448,20 +1451,29 @@ pub(crate) fn model_catalog_inside(request: &Value, input: &[u8]) -> Vec<u8> {
                 .and_then(|p| p["label"].as_str())
                 .filter(|s| !s.is_empty())
                 .unwrap_or(provider);
-            let model_label = selected
-                .and_then(|p| array(p.get("models")).iter().find(|m| m["id"] == model))
-                .and_then(|m| m["label"].as_str())
-                .filter(|s| !s.is_empty())
-                .unwrap_or(model);
+            // A model is named by the name its provider's API takes (the author, 2026-11-18);
+            // a catalog or sign-in label is no longer shown.
+            let model_label = model;
             match sign_in::service(provider) {
-                Some(service) => json!({"provider":provider,"model":model,
-                    "provider_label":sign_in::label(service, language),
-                    "provider_abbreviation":service["abbreviation"],"model_label":model_label}),
-                None => {
-                    json!({"provider":provider,"model":model,"provider_label":provider_label,"model_label":model_label})
+                Some(service) => {
+                    let abbreviation = service["abbreviation"].as_str().unwrap_or("");
+                    let provider_label = sign_in::label(service, language);
+                    // Sign in with ChatGPT is too long beside a model: SIWC / gpt-6.1-sol.
+                    json!({"provider":provider,"model":model,"provider_label":provider_label,
+                        "provider_abbreviation":abbreviation,"model_label":model_label,
+                        "display_name":format!("{abbreviation} / {model_label}"),
+                        "strip_label":strip_label::strip_label(provider_label.as_str().unwrap_or(""), Some(abbreviation), model)})
                 }
+                None => json!({"provider":provider,"model":model,"provider_label":provider_label,
+                    "model_label":model_label,"display_name":format!("{provider_label} / {model_label}"),
+                    "strip_label":strip_label::strip_label(provider_label, None, model)}),
             }
         }
+        Some("strip_label") => json!({"strip_label": strip_label::strip_label(
+            request["owner"].as_str().unwrap_or(""),
+            request["owner_abbreviation"].as_str(),
+            request["name"].as_str().unwrap_or(""),
+        )}),
         Some("internal") => json!({"model": internal(&request["model"])}),
         Some("label") => json!({"model": labelled(&request["model"], source)}),
         Some("problems") => {
@@ -1796,6 +1808,21 @@ mod tests {
             assert_eq!(json!(problems(&row["catalog"], &order)), row["problems"]);
         }
         assert!(problems(source, &[]).is_empty());
+    }
+
+    #[test]
+    fn shared_model_display_cases_give_each_history_strip_name() {
+        let cases: Value =
+            serde_json::from_str(include_str!("../data/model-display-cases.json")).unwrap();
+        assert_eq!(array(cases.get("cases")).len(), 21);
+        for row in array(cases.get("cases")) {
+            let request = json!({"schema":"inku.model-catalog-request.v1","action":"strip_label",
+                "owner":row["owner"],"owner_abbreviation":row["owner_abbreviation"],"name":row["name"]});
+            let actual: Value =
+                serde_json::from_slice(&model_catalog_json(&serde_json::to_vec(&request).unwrap()))
+                    .unwrap();
+            assert_eq!(actual["strip_label"], row["strip_label"], "{row}");
+        }
     }
 
     #[test]

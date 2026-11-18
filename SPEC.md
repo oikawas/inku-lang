@@ -1006,7 +1006,7 @@ is drawn, looked at and lost, and because both doors that take a work out as one
 sheet (the share card) belong to the history group** (v2.13.9). **The canvas
 toolbar stays in every mode**; under Simple UI the share card is the only control
 left on it. **Full UI** shows everything, as
-before. **Custom UI** adds any of seven groups (batch drawing, drawing settings,
+before. **Custom UI** adds any of seven groups (Picture and batch input tabs, drawing settings,
 instruction tools, detailed status, work tools, history, auxiliary controls) to
 that required set. **A newly created account starts in Simple UI.** A mode
 changes the display layer and nothing else: the feature paths, the history and

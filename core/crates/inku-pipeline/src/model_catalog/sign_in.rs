@@ -86,6 +86,16 @@ fn provider_groups(request: &Value, language: &str) -> Value {
             .filter(|group| group["id"].as_str().is_none_or(|id| !seen.contains(&id)))
             .cloned(),
     );
+    // Each model by the name its provider's API takes (the author, 2026-11-18).
+    for group in &mut result {
+        if let Some(models) = group["models"].as_array_mut() {
+            for model in models {
+                if let Some(id) = model["id"].as_str().map(str::to_owned) {
+                    model["label"] = json!(id);
+                }
+            }
+        }
+    }
     json!({"groups":result})
 }
 

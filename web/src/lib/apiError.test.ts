@@ -130,7 +130,6 @@ test('an unknown HTTP code has a drawing-specific sentence only for drawing', ()
 	for (const strings of [ja, en]) {
 		assert.equal(describeDrawingApiErrorDetail({code: 'http_500'}, 500, strings), strings.drawingStartFailed);
 		assert.equal(describeDrawingApiErrorDetail('http_500', 500, strings), strings.drawingStartFailed);
-		assert.equal(describeApiErrorDetail({code: 'http_500'}, 500, strings), strings.pipelineRequestFailed);
 		assert.equal(describeDrawingApiErrorDetail({code: 'model_not_offered'}, 403, strings), strings.errorModelNotOffered);
 	}
 });

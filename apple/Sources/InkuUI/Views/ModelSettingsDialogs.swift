@@ -360,7 +360,7 @@ struct ProviderModelsSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 enabledToggle(item)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.label).inkuFont(14, weight: .semibold)
+                    Text(item.id).inkuFont(14, weight: .semibold)
                     Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                         .textSelection(.enabled)
                     ModelLabelsView(labels: item.resolvedLabels, display: model.display, endOfLifeDate: item.eolDate)
@@ -379,7 +379,7 @@ struct ProviderModelsSheet: View {
 
     @ViewBuilder
     private func enabledToggle(_ item: ProviderModelSettings) -> some View {
-        let toggle = Toggle(model.display.webCopy("settingsModelPublishedModels", "ユーザーに公開するモデル") + ": " + item.label, isOn: Binding(
+        let toggle = Toggle(model.display.webCopy("settingsModelPublishedModels", "ユーザーに公開するモデル") + ": " + item.id, isOn: Binding(
             get: { draft.isEnabled(modelID: item.id) },
             set: { draft.setEnabled(modelID: item.id, enabled: $0) }))
             .labelsHidden().disabled(!item.isPublishable)
@@ -403,7 +403,7 @@ struct ProviderModelsSheet: View {
             .overlay(Capsule().stroke(unrecommended ? Color.red : selected ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2),
                                       lineWidth: unrecommended ? 2 : 1))
             // No tooltip (author 2026-11-12, Web `noResponseTitle` removed); the red frame stays, VoiceOver reads why.
-            .accessibilityLabel(item.label + " " + label)
+            .accessibilityLabel(item.id + " " + label)
             .accessibilityValue(model.display.localized(selected ? "選択中" : "未選択"))
             .accessibilityHint(unrecommended ? note : "")
             .disabled(!ProviderModelsDraft.canEditPurposes(item))

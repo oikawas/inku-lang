@@ -155,7 +155,7 @@ struct ChatGPTModelsSheet: View {
         HStack(alignment: .top, spacing: 12) {
             Toggle(isOn: Binding(get: { isSelected(item.id) }, set: { draft?.toggleModel(item.id, selected: $0) })) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.label).inkuFont(14, weight: .semibold)
+                    Text(item.id).inkuFont(14, weight: .semibold)
                     Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
                     ModelLabelsView(labels: item.resolvedLabels, display: display, endOfLifeDate: item.eolDate)
                 }
@@ -200,7 +200,7 @@ struct ChatGPTModelsSheet: View {
             .foregroundStyle(on ? Color.accentColor : Color.secondary)
             .background(on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
             .overlay(Capsule().stroke(on ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2)))
-            .accessibilityLabel(item.label + " " + label)
+            .accessibilityLabel(item.id + " " + label)
             .accessibilityValue(display.localized(on ? "選択中" : "未選択"))
             .accessibilityHint(locked ? note : "")
     }

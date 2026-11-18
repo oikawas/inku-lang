@@ -145,7 +145,7 @@ public final class ComparisonModel {
                 let entry = modelProviders.lazy.flatMap { provider in
                     SettingsModel.batchModels(for: provider).filter { provider.id + ":" + $0.id == reference }
                 }.first
-                return (reference, entry.map { $0.label.isEmpty ? $0.id : $0.label } ?? reference)
+                return (reference, entry?.id ?? reference)
             }
         guard !labels.isEmpty, labels.count == requestedCount else {
             errorText = "比較する候補を指定してください。"

@@ -297,7 +297,6 @@
 				<span class="condition-value" class:invalid-vision={pictureConditions && visionCatalogReady && !visionModelAvailable} title={conditionModelName}>{conditionModelName}</span>
 				{#if pictureConditions && visionCatalogReady && !visionModelAvailable}
 					<span class="invalid-vision-note">{visionUnavailableReason === 'not_vision' ? t().imageVisionUnavailableShort : visionUnavailableReason === 'unpublished' ? t().imageVisionNotPublished : visionUnavailableReason === 'disconnected' ? t().imageVisionNotConnected : t().imageVisionNotListed}</span>
-					{#if visionUnavailableReason !== 'not_vision'}<button type="button" class="vision-settings" onclick={() => onOpenConnectionSettings(visionUnavailableReason === 'unpublished' || visionUnavailableReason === 'disconnected' ? 'chatgpt' : undefined)}>{t().settingsTabModels}</button>{/if}
 				{/if}
 				{#if chatgptPlanSelected && inputMode === 'single' && chatgptUsageUrl}
 					<a class="chatgpt-plan-label" href={chatgptUsageUrl} target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
@@ -595,7 +594,6 @@
 	.conditions-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
 	.invalid-vision, .invalid-vision-note { color: var(--danger); }
 	.invalid-vision-note { font-size: var(--ui-font-size-10); white-space: nowrap; }
-	.vision-settings { flex: none; border: 0; padding: 0; background: none; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; font-size: var(--ui-font-size-10); white-space: nowrap; }
 	.condition-rows {
 		display: grid;
 		gap: 6px;

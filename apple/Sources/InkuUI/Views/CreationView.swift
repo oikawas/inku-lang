@@ -5,11 +5,14 @@ import ImageIO
 import UniformTypeIdentifiers
 
 enum CreationPanelSizing {
-    static func upperHeight(content: CGFloat, available: CGFloat, action: CGFloat, footer: CGFloat) -> CGFloat {
+    static func heights(content: CGFloat, available: CGFloat, action: CGFloat, footer: CGFloat) -> (upper: CGFloat, lower: CGFloat) {
         let space = max(0, available - max(0, action) - max(0, footer))
         let lowerReserve = min(140, max(0, space - 120))
         let upperLimit = max(0, space - lowerReserve)
-        return min(upperLimit, max(min(120, space), content.isFinite ? content : upperLimit))
+        let upperMinimum = min(120, space)
+        let desired = content.isFinite ? max(upperMinimum, content) : .infinity
+        let upper = desired <= upperLimit ? desired : min(upperLimit, max(upperMinimum, space / 2))
+        return (upper, max(0, space - upper))
     }
 }
 
@@ -26,12 +29,13 @@ struct CreationPanelLayout: Layout {
         let content = subviews[0].sizeThatFits(intrinsic).height
         let action = subviews[1].sizeThatFits(intrinsic).height
         let footer = subviews[3].sizeThatFits(intrinsic).height
-        let upper = CreationPanelSizing.upperHeight(content: content, available: bounds.height, action: action, footer: footer)
-        let lower = max(0, bounds.height - action - footer - upper)
+        let sizes = CreationPanelSizing.heights(content: content, available: bounds.height, action: action, footer: footer)
         var y = bounds.minY
-        for (index, height) in [upper, action, lower, footer].enumerated() {
+        for (index, height) in [sizes.upper, action, sizes.lower, footer].enumerated() {
+            let exactProposal = ProposedViewSize(width: width, height: height)
+            _ = subviews[index].sizeThatFits(exactProposal)
             subviews[index].place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading,
-                                  proposal: ProposedViewSize(width: width, height: height))
+                                  proposal: exactProposal)
             y += height
         }
     }
@@ -690,6 +694,7 @@ struct CreationView: View {
                             }
                         }
                     }.frame(maxWidth: .infinity, maxHeight: hasLowerScroll ? .infinity : nil, alignment: .topLeading)
+                        .clipped()
                     VStack(alignment: .leading, spacing: 0) {
                         if !isBatch { statusFooter }
                     }.frame(maxWidth: .infinity, alignment: .leading)

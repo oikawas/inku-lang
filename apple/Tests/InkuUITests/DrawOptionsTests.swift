@@ -9,13 +9,18 @@ import XCTest
 
 @MainActor final class DrawOptionsTests: XCTestCase {
     func testUpperPanelUsesContentHeightAndReservesTheWorkRecord() {
-        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 320, available: 900, action: 60, footer: 20), 320)
-        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 900, available: 500, action: 60, footer: 20), 280)
-        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 0, available: 900, action: 60, footer: 20), 120)
-        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 900, available: 0, action: 60, footer: 20), 0)
-        XCTAssertEqual(CreationPanelSizing.upperHeight(content: .infinity, available: 500, action: 60, footer: 20), 280)
-        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 900, available: 240, action: 60, footer: 20), 120)
-        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 900, available: 180, action: 60, footer: 20), 100)
+        let roomy = CreationPanelSizing.heights(content: 320, available: 900, action: 60, footer: 20)
+        XCTAssertEqual(roomy.upper, 320)
+        XCTAssertTrue(roomy.lower.isFinite)
+        XCTAssertEqual(roomy.lower, 900 - 60 - 20 - roomy.upper)
+        let constrained = CreationPanelSizing.heights(content: 900, available: 500, action: 60, footer: 20)
+        XCTAssertEqual(constrained.upper, 210)
+        XCTAssertEqual(constrained.lower, 210)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 0, available: 900, action: 60, footer: 20).upper, 120)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 900, available: 0, action: 60, footer: 20).upper, 0)
+        XCTAssertEqual(CreationPanelSizing.heights(content: .infinity, available: 500, action: 60, footer: 20).upper, 210)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 900, available: 240, action: 60, footer: 20).upper, 120)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 900, available: 180, action: 60, footer: 20).upper, 100)
     }
 
     func testImageFolderSummaryFormatsCountsInBothLanguages() {

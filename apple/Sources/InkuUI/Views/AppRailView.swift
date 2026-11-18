@@ -85,23 +85,23 @@ struct AppRailView: View {
             }
             // macOS opens About inku only from the app menu; the rail logo stays on iOS.
             #if !os(macOS)
-            if showAuxiliary {
-                Button(action: onOpenAbout) {
-                    HStack(spacing: 0) {
-                        Text("inku").lineLimit(1).minimumScaleFactor(0.6).frame(width: 30)
-                        if expanded { Text("-lang").padding(.trailing, 9) }
-                    }
-                    .inkuFont(15, weight: .light)
-                    .lineLimit(1)
-                    .frame(height: 30)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(InkuColor.panel))
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
-                    .contentShape(Rectangle())
+            Button(action: onOpenAbout) {
+                HStack(spacing: 0) {
+                    Text("inku").lineLimit(1).minimumScaleFactor(0.6).frame(width: 30)
+                    if expanded { Text("-lang").padding(.trailing, 9) }
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
-                .accessibilityLabel(display.localized("inkuについて"))
-                .inkuTooltip(display.tooltip("inku-lang について", serverKey: "tooltipAppRailLogo"), placement: .right)
+                .inkuFont(15, weight: .light)
+                .lineLimit(1)
+                .frame(height: 30)
+                .background(RoundedRectangle(cornerRadius: 4).fill(InkuColor.panel))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+            .accessibilityLabel(display.localized("inkuについて"))
+            .inkuTooltip(display.tooltip("inku-lang について", serverKey: "tooltipAppRailLogo"), placement: .right)
+            if showAuxiliary {
                 if expanded {
                     Text(display.webCopy("subtitle", "視覚的な短歌を書く")).inkuFont(10).foregroundStyle(.secondary)
                         .lineLimit(1).padding(.top, 4)

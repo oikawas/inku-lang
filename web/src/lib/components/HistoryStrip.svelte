@@ -625,8 +625,7 @@
 		flex-direction: column;
 		gap: 1px;
 	}
-	/* Compact model tokens leave the 82px picture its space. Unknown names
-	   can still wrap so a distinguishing suffix is never silently clipped. */
+	/* Keep long model labels inside the narrow thumbnail. */
 	.thumb-meta-first { font-size: var(--ui-font-size-10); line-height: 1.3; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-meta-rest { font-size: var(--ui-font-size-10); line-height: 1.3; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-meta-model {
@@ -635,10 +634,9 @@
 		font-weight: 500;
 		letter-spacing: -0.02em;
 		color: var(--fg);
-		white-space: normal;
-		overflow: visible;
-		overflow-wrap: anywhere;
-		text-overflow: clip;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.thumb-held-badge {
 		position: absolute;

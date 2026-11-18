@@ -50,12 +50,12 @@
 	import { pipelineAttentionReason } from '$lib/features/pipeline/attention';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import { abbreviateStripModel, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
+	import { toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
 	import {
 		modelDisplayName,
 		modelShortName,
+		modelStripName,
 		qualifiedModelRef,
-		displayModelReference,
 		splitModelReference,
 		type Provider,
 		type ProviderGroup,
@@ -2472,25 +2472,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		displayLatestBatchRender();
 	}
 
-	function shortModelName(m: string): string {
-		if (m.includes('opus')) return 'opus';
-		if (m.includes('haiku')) return 'haiku';
-		if (m.includes('sonnet')) return 'sonnet';
-		if (m.includes('qwen3')) return 'qwen3';
-		if (m.includes('qwen')) return 'qwen';
-		if (m.includes('gemma')) return 'gemma';
-		return (m.split('/').pop() ?? m).slice(0, 8);
-	}
-
-	// The narrow history columns keep the shortened model name, but they still
-	// say which provider ran it: the same id can be served by two of them.
-	function shortModel(m: string | null | undefined): string {
-		if (!m) return '';
-		const { providerLabel: owner, model } = displayModelReference(m);
-		const short = shortModelName(model);
-		return owner ? `${owner}/${short}` : short;
-	}
-
 	function statusModelName(m: string | null | undefined): string {
 		return modelDisplayName(m);
 	}
@@ -2615,8 +2596,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function historyModelStage1Short(it: Iteration): string {
 		if (!it.stage1_model) return '-';
-		const { providerLabel: owner, providerAbbreviation } = displayModelReference(it.stage1_model);
-		return abbreviateStripModel(owner, modelShortName(it.stage1_model), providerAbbreviation);
+		return modelStripName(it.stage1_model);
 	}
 
 	function historyModelStage1Full(it: Iteration): string {
@@ -3768,7 +3748,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{formatHistoryDate}
 			{catalogName}
 			{historyPreviewText}
-			{shortModel}
+			shortModel={modelDisplayName}
 			{apiFetch}
 			currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
 			currentLineageRootId={work.displayedHistoryItem?.lineage_root_node_id ?? null}

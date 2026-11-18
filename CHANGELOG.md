@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: show model names as API IDs, use SIWC for the ChatGPT provider, and read history strip abbreviations from core.
+
 - Web: display selected model and color catalog values at 12px in the description, image, and batch tabs.
 
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.

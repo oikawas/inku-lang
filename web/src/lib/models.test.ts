@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { modelDisplayName, modelShortName, pickerSelection, splitModelReference, type ProviderGroup } from './models.ts';
+import { modelDisplayName, modelShortName, modelStripName, pickerSelection, splitModelReference, type ProviderGroup } from './models.ts';
 
 const GROUPS: ProviderGroup[] = [
 	{
@@ -20,20 +20,25 @@ test('a disconnected ChatGPT reference stays qualified even with an empty explic
 	assert.equal(pickerSelection(GROUPS, 'chatgpt:plain-model').selected, null);
 });
 
-test('the short name drops the provider the long name carries', () => {
+test('the display name comes from core and the short name is the API id', () => {
 	const long = modelDisplayName('nim:plain-model', GROUPS);
 	const short = modelShortName('nim:plain-model', GROUPS);
-	assert.equal(long, 'NVIDIA NIM (Cloud) / Plain Model');
-	assert.equal(short, 'Plain Model');
+	assert.equal(long, 'NVIDIA NIM (Cloud) / plain-model');
+	assert.equal(short, 'plain-model');
 });
 
-test('the vendor prefix of a served id is dropped', () => {
-	assert.equal(modelShortName('nim:google/gemma-4-31b-it', GROUPS), 'gemma-4-31b-it');
+test('Sign in with ChatGPT uses the core display and history labels', () => {
+	assert.equal(modelDisplayName('chatgpt:model'), 'SIWC / model');
+	assert.equal(modelShortName('chatgpt:model'), 'model');
+	assert.equal(modelStripName('chatgpt:model'), 'SIWC model');
 });
 
-test('only the first slash is a vendor prefix', () => {
-	// A label with more than one slash keeps everything after the first.
-	assert.equal(modelShortName('nim:a/b/c', GROUPS), 'b/c');
+test('the vendor prefix of a served id is retained', () => {
+	assert.equal(modelShortName('nim:google/gemma-4-31b-it', GROUPS), 'google/gemma-4-31b-it');
+});
+
+test('all slashes in a served id are retained', () => {
+	assert.equal(modelShortName('nim:a/b/c', GROUPS), 'a/b/c');
 });
 
 test('nothing in, nothing out', () => {
@@ -50,7 +55,7 @@ test('the name is never truncated', () => {
 	const a = modelShortName('nim:google/gemma-4-31b-it', GROUPS);
 	const b = modelShortName('nim:google/gemma-4-31b-it-v2', GROUPS);
 	assert.notEqual(a, b);
-	assert.equal(b, 'gemma-4-31b-it-v2');
+	assert.equal(b, 'google/gemma-4-31b-it-v2');
 });
 
 test('I-297: the picker knows when it has nothing to offer, and when the stored id is not offered', () => {

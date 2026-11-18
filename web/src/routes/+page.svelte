@@ -4166,6 +4166,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex: 0 1 auto;
 		min-height: 0;
 		overflow-y: auto;
+		overflow-x: hidden;
 		padding: 14px 16px;
 		display: flex;
 		flex-direction: column;

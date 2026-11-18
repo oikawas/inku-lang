@@ -135,7 +135,7 @@
 		min-width: 0;
 	}
 	.ddl-viewer-head {
-		position: sticky; top: 0; z-index: 3; background: var(--bg);
+		position: sticky; top: -14px; z-index: 3; background: var(--bg);
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -163,7 +163,7 @@
 		overflow-x: auto;
 	}
 	.ddl-viewer-actions {
-		position: sticky; bottom: 0; z-index: 3; background: var(--bg);
+		position: sticky; bottom: -14px; z-index: 3; background: var(--bg);
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;

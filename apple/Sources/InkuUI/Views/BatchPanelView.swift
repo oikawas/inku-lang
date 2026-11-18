@@ -316,11 +316,21 @@ struct BatchPanelView: View {
                 }
             } else if automation.running {
                 // BatchPanel.svelte:319-321: while the batch runs, its tiles stand above the drawing indicator.
-                if !automation.rows.isEmpty { BatchRunSummaryView(summary: automation.batchSummary, display: model.display) }
-                RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
-                              stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
-                              onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
-                              journalActive: automation.batchRowStartedAt != nil) { runProgress }
+                if phone {
+                    if !automation.rows.isEmpty { BatchRunSummaryView(summary: automation.batchSummary, display: model.display) }
+                    RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
+                                  stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
+                                  onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
+                                  journalActive: automation.batchRowStartedAt != nil) { runProgress }
+                } else {
+                    CompactRunStatusView(model: model, label: runningLabel, stopping: automation.stopping, startedAt: automation.batchSummary.startedAt,
+                                         onStop: { Task { await automation.stop(app: model) } }) {
+                        if !automation.rows.isEmpty { BatchRunSummaryView(summary: automation.batchSummary, display: model.display) }
+                        if automation.batchRowStartedAt != nil, let journal = model.runJournal {
+                            RunJournalView(model: model, journal: journal, label: runningLabel)
+                        } else { runProgress }
+                    }
+                }
             } else {
                 newBatchButton
                 if !model.hasAvailableBatchDrawingModel {

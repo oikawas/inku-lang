@@ -84,7 +84,7 @@ struct BatchConditionsView: View {
 
     private func tip(_ key: String) -> String {
         let serverKeys = ["次のバッチで使う描画モデルを選びます。": "tooltipInputModel", "次のバッチで使う配色を選びます。": "tooltipInputCatalog",
-                          "次の作品で写生を使うかを選びます。": "tooltipInputSketch", "次の作品の筆致を規則から外します。": "tooltipInputWild",
+                          "次の作品で写生を使うかを選びます。": "tooltipInputSketch",
                           "用紙の形と意図を見て、次の作品の用紙を選びます。": "tooltipInputCanvas"]
         return model.display.tooltip(key, serverKey: serverKeys[key])
     }

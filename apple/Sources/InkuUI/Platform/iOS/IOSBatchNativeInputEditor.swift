@@ -31,6 +31,7 @@ struct BatchNativeInputEditor: UIViewRepresentable {
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
     var completions: DdlCompletions? = nil
     var onCharacterHover: ((Int?) -> Void)? = nil
+    var growsToFit = false
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
     func makeUIView(context: Context) -> BatchIOSTextView {
@@ -44,6 +45,7 @@ struct BatchNativeInputEditor: UIViewRepresentable {
         storage.addLayoutManager(layout)
         layout.addTextContainer(container)
         let editor = BatchIOSTextView(frame: .zero, textContainer: container)
+        editor.isScrollEnabled = !growsToFit
         editor.style = style
         editor.autocorrectionType = .no
         editor.autocapitalizationType = .none
@@ -67,6 +69,11 @@ struct BatchNativeInputEditor: UIViewRepresentable {
         return editor
     }
     func updateUIView(_ view: BatchIOSTextView, context: Context) { context.coordinator.update(from: self) }
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: BatchIOSTextView, context: Context) -> CGSize? {
+        guard growsToFit, let width = proposal.width else { return nil }
+        let size = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: max(100, ceil(size.height)))
+    }
     static func dismantleUIView(_ view: BatchIOSTextView, coordinator: Coordinator) { coordinator.detach() }
 
     @MainActor

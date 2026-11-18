@@ -20,6 +20,7 @@ struct BatchNativeInputEditor: NSViewRepresentable {
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
     var completions: DdlCompletions? = nil
     var onCharacterHover: ((Int?) -> Void)? = nil
+    var growsToFit = false
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
@@ -60,7 +61,7 @@ struct BatchNativeInputEditor: NSViewRepresentable {
         scroll.backgroundColor = .textBackgroundColor
         scroll.drawsBackground = style.drawsBackground
         scroll.wraps = style.wraps
-        scroll.hasVerticalScroller = true
+        scroll.hasVerticalScroller = !growsToFit
         scroll.hasHorizontalScroller = !style.wraps
         scroll.autohidesScrollers = true
         // AppKit no longer clips ordinary views to their bounds by default.
@@ -89,6 +90,14 @@ struct BatchNativeInputEditor: NSViewRepresentable {
 
     func updateNSView(_ view: BatchEditorScrollView, context: Context) {
         context.coordinator.update(from: self)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: BatchEditorScrollView, context: Context) -> CGSize? {
+        guard growsToFit, let width = proposal.width, let editor = nsView.documentView as? NSTextView,
+              let container = editor.textContainer, let layout = editor.layoutManager else { return nil }
+        container.containerSize = NSSize(width: max(1, width - editor.textContainerInset.width * 2), height: .greatestFiniteMagnitude)
+        layout.ensureLayout(for: container)
+        return CGSize(width: width, height: max(100, ceil(layout.usedRect(for: container).height + editor.textContainerInset.height * 2 + 20)))
     }
 
     static func dismantleNSView(_ view: BatchEditorScrollView, coordinator: Coordinator) {

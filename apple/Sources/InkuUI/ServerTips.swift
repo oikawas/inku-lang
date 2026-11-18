@@ -33,7 +33,6 @@ public enum ServerTips {
         "次の作品の配色を選びます。": "tooltipInputCatalog",
         "次のバッチで使う配色を選びます。": "tooltipInputCatalog",
         "次の作品の指示書に使う言語を選びます。": "tooltipDdlLang",
-        "次の作品の筆致を規則から外します。": "tooltipInputWild",
         "用紙の形と意図を見て、次の作品の用紙を選びます。": "tooltipInputCanvas",
         "歳時記の語と説明を参照します。": "tooltipSaijikiToggle",
         "次の作品で写生を使うかを選びます。": "tooltipInputSketch",

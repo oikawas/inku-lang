@@ -50,6 +50,14 @@ import XCTest
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         app.setImageInput(try ImageInput.prepare(png as Data), fileName: "test.png")
         XCTAssertEqual(app.drawSelections["image"], imageChoice)
+        let shown = SavedWork(id: "shown", at: 1, input: "test", score: "{}", svg: "<svg>shown</svg>")
+        await app.selectWork(shown, adoptDrawOptions: false)
+        app.setImageProvenanceFromUser("手書きの来歴")
+        app.setImageInput(try ImageInput.prepare(png as Data), fileName: "other.png", automaticProvenance: "自動の来歴")
+        XCTAssertEqual(app.selectedWorkID, shown.id)
+        XCTAssertEqual(app.currentSVG, shown.svg)
+        XCTAssertEqual(app.imageProvenance, "手書きの来歴")
+        XCTAssertEqual(app.drawSelections["image"], imageChoice)
         app.newWork()
         XCTAssertEqual(app.drawSelections["image"], app.drawDefaults["image"])
     }
@@ -104,7 +112,7 @@ import XCTest
         XCTAssertEqual(legacySelection.route, DrawOptionsCore.release["describe"]?.route)
         XCTAssertEqual(legacySelection.sketch, "off")
         XCTAssertEqual(legacySelection.composition, "off")
-        XCTAssertEqual(legacySelection.wild, "on")
+        XCTAssertEqual(legacySelection.wild, DrawOptionsCore.release["describe"]?.wild)
         let app = AppModel()
         for tab in app.drawDefaults.keys {
             app.activeDrawTab = tab; app.drawRoute = "stages"; app.sketchMode = "off"

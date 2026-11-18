@@ -631,18 +631,24 @@ struct CreationView: View {
                     else { generationAction }
                 }.padding(.vertical, 8)
                 if !isBatch {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 14) {
-                            PipelineCompletionView(model: model)
-                            PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords)
-                            if let work = workspaceWork {
-                                CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
-                                                         disabled: controlsDisabled, onWorkAction: onWorkAction)
-                            }
-                            if display.visible("detail_status"), let work = workspaceWork { CreationResultLog(model: model, work: work) }
-                            statusFooter
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }.frame(maxHeight: .infinity)
+                    if let work = workspaceWork {
+                        CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
+                                                 disabled: controlsDisabled, onWorkAction: onWorkAction, pinned: true,
+                                                 onNewDDL: isImage ? nil : { showNewDDL = true },
+                                                 beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
+                            .frame(maxHeight: .infinity)
+                    } else if model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 14) {
+                                PipelineCompletionView(model: model)
+                                PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords)
+                                if !isImage && display.visible("ddl_tools") { newDDLHeading }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }.frame(maxHeight: .infinity)
+                    } else if !isImage && display.visible("ddl_tools") {
+                        newDDLHeading
+                    }
+                    statusFooter
                 }
             }
         }
@@ -659,7 +665,11 @@ struct CreationView: View {
                 if !isBatch { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords) }
                 if !isBatch, let work = workspaceWork {
                     CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
-                                             disabled: controlsDisabled, onWorkAction: onWorkAction)
+                                             disabled: controlsDisabled, onWorkAction: onWorkAction,
+                                             onNewDDL: isImage ? nil : { showNewDDL = true },
+                                             beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
+                } else if !isBatch && !isImage && display.visible("ddl_tools") {
+                    newDDLHeading
                 }
                 if !isBatch, display.visible("detail_status"), let work = workspaceWork {
                     CreationResultLog(model: model, work: work)
@@ -667,6 +677,16 @@ struct CreationView: View {
                 statusFooter
             }
             .frame(width: width, alignment: .leading)
+    }
+
+    private var newDDLHeading: some View {
+        HStack {
+            Text(display.localized("指示書")).inkuFont(12, weight: .semibold)
+            Spacer()
+            Button(display.webCopy("ddlNewButton", "指示書を新規作成")) { showNewDDL = true }
+                .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
+                .inkuTooltip(display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
+        }
     }
 
     /// InputPanel.svelte:180-198: two equal underline tabs; a running tab carries a dot and `(n/N ↻r)`.
@@ -751,11 +771,11 @@ struct CreationView: View {
                 if imageBatch.folder.isEmpty {
                     Text(display.webCopy("imageFolderHint", "中の画像を名前の順に1枚ずつ描きます")).inkuFont(12).foregroundStyle(.secondary)
                 } else {
-                    Text("\(URL(fileURLWithPath: imageBatch.folder).lastPathComponent)：\(imageBatch.total) / \(imageBatch.completed)")
+                    Text(display.webCopyFormat("imageFolderSummary", "%@：%@ 枚（描き終えた %@ 枚）", URL(fileURLWithPath: imageBatch.folder).lastPathComponent, imageBatch.total, imageBatch.completed))
                         .inkuFont(12).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength: 0)
-                Button(display.localized("フォルダを選ぶ")) {
+                Button(display.webCopy("imageFolderChoose", "フォルダを選ぶ")) {
                     Task {
                         guard let url = await fileDialogs?.choose(.folder()) else { return }
                         do { try await imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
@@ -786,9 +806,16 @@ struct CreationView: View {
         VStack(alignment: .leading, spacing: 6) {
             if imageBatch.hasJournal {
                 if imageBatch.running {
-                    BatchRunSummaryView(summary: imageBatch.summary, display: display)
-                    RunStatusView(display: display, label: imageBatch.status, onStop: { Task { await imageBatch.stop(app: model) } }, journalModel: model,
-                                  journalActive: imageBatch.drawing) { EmptyView() }
+                    if phoneLayout {
+                        BatchRunSummaryView(summary: imageBatch.summary, display: display)
+                        RunStatusView(display: display, label: imageBatch.status, onStop: { Task { await imageBatch.stop(app: model) } }, journalModel: model,
+                                      journalActive: imageBatch.drawing) { EmptyView() }
+                    } else {
+                        CompactRunStatusView(model: model, label: imageBatch.status, startedAt: imageBatch.summary.startedAt, onStop: { Task { await imageBatch.stop(app: model) } }) {
+                            BatchRunSummaryView(summary: imageBatch.summary, display: display)
+                            if imageBatch.drawing, let journal = model.runJournal { RunJournalView(model: model, journal: journal, label: imageBatch.status) }
+                        }
+                    }
                 } else {
                     HStack {
                         Button(display.localized("続きから描く")) { startImageBatch(restart: false) }
@@ -808,10 +835,6 @@ struct CreationView: View {
 
     private var imageInputPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(12)
-            editor(text: Binding(get: { model.imageProvenance }, set: { model.setImageProvenanceFromUser($0) }),
-                   readOnly: model.savedImageDDL != nil && model.imageInput == nil, rows: 3,
-                   placeholder: display.webCopy("imageProvenancePlaceholder", "画像の来歴"))
             HStack {
                 if let input = model.imageInput, let preview = imagePreview {
                     Image(decorative: preview, scale: 1).resizable().scaledToFill().frame(width: 40, height: 40).clipped()
@@ -834,24 +857,15 @@ struct CreationView: View {
                 Button(display.webCopy("imageChooseButton", "画像を選ぶ")) { chooseImage() }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }
-            if let record = savedImageRecord {
-                if let ddl = model.selectedWork?.ddl {
-                    Text(display.localized("指示書")).inkuFont(14, weight: .semibold)
-                    Text(ddl).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if let before = record["before_review"].string, !before.isEmpty {
-                    DisclosureGroup(display.localized("見比べる前の指示書")) {
-                        Text(before).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                        if let work = model.selectedWork {
-                            Button(display.localized("この指示書で子を描く")) {
-                                Task { _ = await model.drawEditedDDL(work: work, source: before, forceEdit: true) }
-                            }.disabled(controlsDisabled)
-                        }
-                    }
-                }
+            .frame(minHeight: 40)
+            if let imageLoadError { Text(imageLoadError).foregroundStyle(.red).inkuFont(12) }
+            Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(12)
+            editor(text: Binding(get: { model.imageProvenance }, set: { model.setImageProvenanceFromUser($0) }),
+                   readOnly: model.savedImageDDL != nil && model.imageInput == nil, rows: 3,
+                   placeholder: display.webCopy("imageProvenanceHint", "画像の出典や覚え書き。作品と一緒に記録し、描画には使いません。"))
+            if savedImageRecord != nil {
                 Text(display.localized("描き直すには画像を選び直してください。")).foregroundStyle(.secondary).inkuFont(12)
             }
-            if let imageLoadError { Text(imageLoadError).foregroundStyle(.red).inkuFont(12) }
             DrawingConditionsHeading(model: model, batch: false, canvasID: model.imageCanvasID, imageSelection: true,
                                      showPaperPicker: $showPaperPicker, showDetails: $showConditionDetails, hasDetails: false)
             imageVisionRow
@@ -887,20 +901,10 @@ struct CreationView: View {
     private var imageVisionRow: some View {
         let reference = model.imageVisionModel
         let unavailable = visionSettings.map { !SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: $0) } ?? false
-        return DrawingConditionRow(display: display, label: "Vision",
+        return DrawingConditionRow(display: display, label: display.webCopy("modelButton", "モデル"),
                                    value: model.modelDisplayName(reference, empty: display.localized("選択してください")),
                                    help: "Vision", unavailable: unavailable) { showImageModelPicker = true }
             .disabled(controlsDisabled)
-    }
-
-    private var imagePaperCondition: some View {
-        let value = model.imageCanvasID == "image" ? display.localized("画像の縦横比を使う") :
-            (model.canvases.first { $0.id == model.imageCanvasID }?.label ?? model.imageCanvasID)
-        return conditionRow(display.localized("画面比"), value: value, help: "") { showPaperPicker = true }
-            .disabled(controlsDisabled)
-            .popover(isPresented: $showPaperPicker) {
-                CreationPaperPicker(model: model, imageSelection: true) { showPaperPicker = false }.environment(display).inkuPopoverContent()
-            }
     }
 
     private func chooseImage() {
@@ -1083,9 +1087,16 @@ struct CreationView: View {
     }
 
     /// Web RunStatus.svelte: mascot, the stage and its provider facts, and the stop button, in one bordered box.
-    private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
-        RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
-                      stopsWithEscape: !workspaceCovered, onStop: onStop, journalModel: model) { ProviderProgressView(model: model, embedded: true) }
+    @ViewBuilder private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
+        if phoneLayout {
+            RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
+                          stopsWithEscape: !workspaceCovered, onStop: onStop, journalModel: model) { ProviderProgressView(model: model, embedded: true) }
+        } else {
+            CompactRunStatusView(model: model, label: label, stopping: stopping, stopsWithEscape: !workspaceCovered, onStop: onStop) {
+                if let journal = model.runJournal { RunJournalView(model: model, journal: journal, label: label) }
+                else { ProviderProgressView(model: model, embedded: true) }
+            }
+        }
     }
 
     /// The native status line and the backup and result-log reports, which the Web has no place for.
@@ -1506,7 +1517,7 @@ struct CreationView: View {
 
     private func tip(_ key: String) -> String {
         let serverKeys = ["次の作品の描画モデルを選びます。": "tooltipInputModel", "次の作品の配色を選びます。": "tooltipInputCatalog",
-                          "次の作品の指示書に使う言語を選びます。": "tooltipInputLang", "次の作品の筆致を規則から外します。": "tooltipInputWild",
+                          "次の作品の指示書に使う言語を選びます。": "tooltipInputLang",
                           "用紙の形と意図を見て、次の作品の用紙を選びます。": "tooltipInputCanvas", "入力と次の生成条件から作品を描きます。": "tooltipSubmit",
                           "歳時記の語と説明を参照します。": "tooltipSaijikiToggle"]
         return display.tooltip(key, serverKey: serverKeys[key])

@@ -12,24 +12,19 @@ struct DrawingConditionRow: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                Text(label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button(display.webCopy("editButton", "変更"), action: action)
-                    .buttonStyle(InkuGhostButtonStyle()).inkuTooltip(help)
+        HStack(spacing: 8) {
+            Text(label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+            Text(value).inkuFont(14).lineLimit(1).truncationMode(.middle).foregroundStyle(unavailable ? Color.red : Color.primary)
+                .inkuTooltip(display.tooltipValue(value))
+            Spacer(minLength: 0)
+            if unavailable { Text(display.webCopy("imageVisionUnavailableShort", "画像に使えません")).inkuFont(11).foregroundStyle(.red) }
+            if showsPlan {
+                Link(display.webCopy("chatgptManageUsage", "利用枠を管理"), destination: display.signInUsageURL() ?? URL(string: "https://chatgpt.com/settings/usage")!)
+                    .inkuFont(11).inkuTooltip(display.tooltip("ChatGPTプランの使用状況を開きます。", serverKey: "chatgptManageUsage"))
             }
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle).foregroundStyle(unavailable ? Color.red : Color.primary)
-                    .inkuTooltip(display.tooltipValue(value))
-                if unavailable { Text(display.webCopy("imageVisionUnavailableShort", "画像に使えません")).inkuFont(11).foregroundStyle(.red) }
-                if showsPlan {
-                    Link(display.webCopy("chatgptManageUsage", "利用枠を管理"), destination: display.signInUsageURL() ?? URL(string: "https://chatgpt.com/settings/usage")!)
-                        .inkuFont(11).inkuTooltip(display.tooltip("ChatGPTプランの使用状況を開きます。", serverKey: "chatgptManageUsage"))
-                }
-                Spacer(minLength: 0)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-        }.padding(.vertical, 7)
+            Button(display.webCopy("editButton", "変更"), action: action)
+                .buttonStyle(InkuGhostButtonStyle()).inkuTooltip(help)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 7)
     }
 }
 

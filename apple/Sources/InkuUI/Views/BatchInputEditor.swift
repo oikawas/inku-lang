@@ -132,6 +132,7 @@ struct InkuTextEditor: View {
     /// Web `ddlCompletions`: saijiki words and macro names offered while typing; nil offers nothing.
     var completions: DdlCompletions? = nil
     var onCharacterHover: ((Int?) -> Void)? = nil
+    var growsToFit = false
     @Environment(DisplaySettings.self) private var display
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.inkuTooltipsCovered) private var covered
@@ -142,7 +143,8 @@ struct InkuTextEditor: View {
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme,
                                style: style, marks: marks, marksKey: marksKey, covered: covered, insertion: insertion, reveal: reveal,
-                               rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions, onCharacterHover: onCharacterHover)
+                               rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions, onCharacterHover: onCharacterHover,
+                               growsToFit: growsToFit)
             .clipped()
     }
 }

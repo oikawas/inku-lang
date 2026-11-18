@@ -3,6 +3,13 @@ import InkuHost
 @testable import InkuUI
 
 @MainActor final class ReadDrawPresentationTests: XCTestCase {
+    func testModelDisplayNamesUseCoreAndKeepEmptyPlaceholder() {
+        let app = AppModel()
+        XCTAssertEqual(app.modelDisplayName("chatgpt:gpt-6.1-sol"), "SIWC / gpt-6.1-sol")
+        XCTAssertEqual(app.modelDisplayName("anthropic:claude-opus-4-7"), "Claude API / claude-opus-4-7")
+        XCTAssertEqual(app.modelDisplayName("", empty: "選択してください"), "選択してください")
+        XCTAssertEqual(app.modelDisplayName(nil), "")
+    }
     func testJournalUsesCurrentActionAndNotAnEarlierAttempt() throws {
         let display = DisplaySettings()
         display.preferences.language = "ja"

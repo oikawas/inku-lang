@@ -774,6 +774,13 @@ public final class AppModel {
 
     public func localDataDirectory() -> URL? { database?.url.deletingLastPathComponent() }
     public var stageDefaultProviderID: String { cachedStageDefaultProviderID }
+    /// Resolve display text from the current provider settings without changing the stored reference.
+    public func modelDisplayName(_ reference: String?, empty: String = "") -> String {
+        _ = providerSettingsRevision
+        guard let reference, !reference.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return empty }
+        return ModelNaming(providers: settings.providers, stageProvider: stageDefaultProviderID,
+                           language: display.preferences.language).displayName(reference)
+    }
     private func updateStageDefaultProviderID() {
         cachedStageDefaultProviderID = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID
             ?? ProviderModelReference.stageDefaultProviderID

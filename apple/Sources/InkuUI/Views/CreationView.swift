@@ -913,7 +913,7 @@ struct CreationView: View {
                     .popover(isPresented: $showConditionDetails) { conditionDetails.inkuPopoverContent() }
             }.padding(.top, 8).padding(.bottom, 2)
             conditionRow(display.webCopy("modelButton", "モデル"),
-                         value: DrawPresentation.modelReference(model.nextBatchDrawingModelReference, empty: display.localized("選択してください")),
+                         value: model.modelDisplayName(model.nextBatchDrawingModelReference, empty: display.localized("選択してください")),
                          help: display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
                          showsPlan: model.nextBatchDrawingModelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
                 .disabled(controlsDisabled)

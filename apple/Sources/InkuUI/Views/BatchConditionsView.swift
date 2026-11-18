@@ -71,11 +71,11 @@ struct BatchConditionsView: View {
     private var modelSummary: String {
         let empty = model.display.localized("選択してください")
         if let frozen {
-            let first = DrawPresentation.modelReference(frozen.stage1Model, empty: empty)
+            let first = model.modelDisplayName(frozen.stage1Model, empty: empty)
             return frozen.stage1Model == frozen.stage2Model ? first
-                : first + " / " + DrawPresentation.modelReference(frozen.stage2Model, empty: empty)
+                : first + " / " + model.modelDisplayName(frozen.stage2Model, empty: empty)
         }
-        return DrawPresentation.modelReference(model.nextBatchDrawingModelReference, empty: empty)
+        return model.modelDisplayName(model.nextBatchDrawingModelReference, empty: empty)
     }
 
     private var details: some View {

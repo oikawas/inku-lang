@@ -123,15 +123,6 @@ export function modelShortName(ref: string | null | undefined, _groups?: Provide
     return answer?.model_label ?? ref;
 }
 
-/** The library card's provider and complete API model ID. */
-export function modelCardName(ref: string | null | undefined): string {
-	ref = ref?.trim();
-	if (!ref) return '';
-	const { providerLabel, providerAbbreviation, model } = displayModelReference(ref);
-	const owner = providerAbbreviation || providerLabel;
-	return owner ? `${owner}/${model}` : model;
-}
-
 /** The shared core names a model for the history strip. */
 export function modelStripName(ref: string | null | undefined): string {
 	ref = ref?.trim();

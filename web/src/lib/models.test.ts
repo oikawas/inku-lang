@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { modelCardName, modelDisplayName, modelShortName, modelStripName, pickerSelection, splitModelReference, type ProviderGroup } from './models.ts';
+import { modelDisplayName, modelShortName, modelStripName, pickerSelection, splitModelReference, type ProviderGroup } from './models.ts';
 
 const GROUPS: ProviderGroup[] = [
 	{
@@ -32,19 +32,6 @@ test('Sign in with ChatGPT uses the core display and history labels', () => {
 	assert.equal(modelDisplayName('chatgpt:model'), 'SIWC / model');
 	assert.equal(modelShortName('chatgpt:model'), 'model');
 	assert.equal(modelStripName('chatgpt:model'), 'SIWC model');
-});
-
-test('library cards show the provider and complete API id without spaces', async () => {
-	assert.equal(modelCardName('chatgpt:model'), 'SIWC/model');
-	assert.equal(modelCardName('nim:google/gemma-4-31b-it'), 'NVIDIA NIM (Cloud)/google/gemma-4-31b-it');
-	const { configureModelReferences, loadModelReferences } = await import('./modelReferences.ts');
-	configureModelReferences(async () => Response.json({results:[
-		{outcome:'ok', provider:'anthropic', model:'claude-opus-4-7', provider_label:'Claude API'},
-		{outcome:'ok', provider:'chatgpt', model:'gpt-6.1-sol', provider_label:'Sign in with ChatGPT', provider_abbreviation:'SIWC'},
-	]}));
-	await loadModelReferences([{action:'resolve_display',ref:'anthropic:claude-opus-4-7'}, {action:'resolve_display',ref:'chatgpt:gpt-6.1-sol'}]);
-	assert.equal(modelCardName('anthropic:claude-opus-4-7'), 'Claude API/claude-opus-4-7');
-	assert.equal(modelCardName('chatgpt:gpt-6.1-sol'), 'SIWC/gpt-6.1-sol');
 });
 
 test('model selection and administration show ids instead of saved labels', () => {

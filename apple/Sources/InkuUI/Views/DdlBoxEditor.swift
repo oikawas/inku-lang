@@ -9,6 +9,7 @@ struct DdlBoxEditor: View {
     @Bindable var model: AppModel
     let work: SavedWork
     let editable: Bool
+    var growsToFit = false
     @State private var pluginCalls: [PluginCall] = []
     @State private var pluginCallsRevision = 0
     @State private var pluginSource = ""
@@ -21,10 +22,11 @@ struct DdlBoxEditor: View {
     /// Web `invalidSource`: an invalid range in the editor, or any unreadable numeric range in the text.
     private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
 
-    init(model: AppModel, work: SavedWork, editable: Bool) {
+    init(model: AppModel, work: SavedWork, editable: Bool, growsToFit: Bool = false) {
         self.model = model
         self.work = work
         self.editable = editable
+        self.growsToFit = growsToFit
     }
 
     private var text: String { model.ddlBoxText(for: work) }
@@ -65,8 +67,8 @@ struct DdlBoxEditor: View {
                                }
                                let line = BatchEditorLineIndex(text).line(containing: index)
                                model.activeCompositionThing = CompositionThings.thing(model.compositionUnits, atLine: line)
-                           })
-                .frame(minHeight: 100, maxHeight: 220)
+                           }, growsToFit: growsToFit)
+                .frame(minHeight: 100, maxHeight: growsToFit ? nil : 220)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
                 .overlay(alignment: .topTrailing) {
                     if !tooltipsCovered, model.display.preferences.showTooltips, pluginSource == text,

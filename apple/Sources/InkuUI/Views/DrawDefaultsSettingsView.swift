@@ -140,7 +140,7 @@ import InkuHost
     private var phoneSaveSection: some View {
         Section {
             saveButton
-            if saved { Text(copy("drawDefaultsSaved", "保存しました。左の欄には、次に「新規作成」を押したときに出ます。")) }
+            if saved { Text(copy("drawDefaultsSaved", "保存しました。記述と記述のバッチは次に「新規作成」を押すと反映されます。")) }
             if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
         }
     }
@@ -223,7 +223,7 @@ import InkuHost
                 do { try model.saveDrawDefaults(draft); saved = true; failed = false }
                 catch { failed = true; saved = false }
             }
-            if saved { Text(copy("drawDefaultsSaved", "保存しました。左の欄には、次に「新規作成」を押したときに出ます。")) }
+            if saved { Text(copy("drawDefaultsSaved", "保存しました。記述と記述のバッチは次に「新規作成」を押すと反映されます。")) }
             if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
         }
     }

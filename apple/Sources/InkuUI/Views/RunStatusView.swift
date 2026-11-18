@@ -5,6 +5,50 @@ import SwiftUI
 /// sits at the end of an existing button row (dialog footers) without a frame of its own.
 enum RunStatusVariant { case bar, inline }
 
+/// The fixed action row stays small; the complete journal and batch summary open in a bounded popover.
+@MainActor
+struct CompactRunStatusView<Details: View>: View {
+    let model: AppModel
+    let label: String
+    var stopping = false
+    var startedAt: Date? = nil
+    var stopsWithEscape = false
+    let onStop: () -> Void
+    @ViewBuilder var details: () -> Details
+    @State private var showingDetails = false
+    @State private var appearedAt = Date()
+
+    var body: some View {
+        let display = model.display
+        TimelineView(.periodic(from: model.runJournal?.beganAt ?? startedAt ?? appearedAt, by: 1)) { context in
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 1) {
+                    let current = model.runJournal?.report["current"]
+                    Text(current.map { RunJournalView.currentLabel($0, label: label, attempt: nil, display: display) } ?? display.message(label))
+                        .inkuFont(12, weight: .medium).lineLimit(1)
+                    let began = model.runJournal?.beganAt ?? startedAt ?? appearedAt
+                    Text(display.webCopyFormat("runStatusElapsed", "経過 %@秒", String(format: "%.1f", max(0, context.date.timeIntervalSince(began)))))
+                        .inkuFont(11).foregroundStyle(.secondary).lineLimit(1)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                Button(display.label("詳細", "Details")) { showingDetails.toggle() }
+                    .buttonStyle(InkuGhostButtonStyle())
+                    .popover(isPresented: $showingDetails) {
+                        ScrollView { details().frame(maxWidth: .infinity, alignment: .leading).padding(12) }
+                            .frame(width: 320, height: 240)
+                    }
+                if stopsWithEscape {
+                    stopButton.keyboardShortcut(.escape, modifiers: [])
+                } else { stopButton }
+            }
+        }
+    }
+
+    private var stopButton: some View {
+        Button(model.display.localized(stopping ? "停止中" : "停止"), action: onStop)
+            .buttonStyle(InkuStopButtonStyle()).disabled(stopping)
+    }
+}
+
 @MainActor
 struct RunStatusView<Info: View>: View {
     typealias Variant = RunStatusVariant

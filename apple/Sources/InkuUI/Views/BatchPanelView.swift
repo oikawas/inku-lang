@@ -15,6 +15,7 @@ struct BatchPanelView: View {
     @State private var clearResume = false
     /// The creation panel keeps these on WorkspaceUIState, so switching 記述／バッチ does not reset them.
     var ui: WorkspaceUIState? = nil
+    var actionFooter: AnyView? = nil
     @State private var localResultsExpanded = false
     @State private var localIssuesExpanded = false
     @State private var selectedHistoryPrompt = ""
@@ -70,6 +71,22 @@ struct BatchPanelView: View {
     }
 
     private var inputContent: some View {
+        Group {
+            if phone {
+                batchContent(includeActions: true)
+            } else {
+                ScrollView { batchContent(includeActions: false) }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            actions
+                            actionFooter
+                        }.padding(.vertical, 8).background(InkuColor.bg)
+                    }
+            }
+        }
+    }
+
+    private func batchContent(includeActions: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             input
             if automation.canResume && !automation.running { resumeCard }
@@ -77,7 +94,7 @@ struct BatchPanelView: View {
             if model.display.visible("drawing_settings") {
                 BatchConditionsView(model: model, automation: automation)
             }
-            actions
+            if includeActions { actions }
             if automation.running { BatchObservationCards(model: model, automation: automation) }
             if !automation.running, automation.failedCount > 0 { failureReport }
             if automation.uncertainCount > 0 { issueResults }
@@ -122,11 +139,6 @@ struct BatchPanelView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
                     .overlay(alignment: .bottomTrailing) { resizeHandle }
-                // BatchPanel.svelte:200: 「N 件」 while there is something to draw and no run.
-                if paintableCount > 0 && !automation.running {
-                    Text(model.display.preferences.language == "en" ? "\(paintableCount) items" : "\(paintableCount) 件")
-                        .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
-                }
                 HStack(spacing: 8) {
                     if !automation.running {
                         Button(model.display.webCopy("clearInputBtn", "新規作成")) {
@@ -137,6 +149,11 @@ struct BatchPanelView: View {
                             .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
                     }
                     if !automation.batchPromptHistory.isEmpty { inputHistory }
+                    Spacer(minLength: 0)
+                    if paintableCount > 0 && !automation.running {
+                        Text(model.display.preferences.language == "en" ? "\(paintableCount) items" : "\(paintableCount) 件")
+                            .inkuFont(12).foregroundStyle(.secondary).monospacedDigit().fixedSize()
+                    }
                 }
             }
             if let error = automation.historyErrorText {
@@ -303,11 +320,21 @@ struct BatchPanelView: View {
                 }
             } else if automation.running {
                 // BatchPanel.svelte:319-321: while the batch runs, its tiles stand above the drawing indicator.
-                if !automation.rows.isEmpty { BatchRunSummaryView(summary: automation.batchSummary, display: model.display) }
-                RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
-                              stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
-                              onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
-                              journalActive: automation.batchRowStartedAt != nil) { runProgress }
+                if phone {
+                    if !automation.rows.isEmpty { BatchRunSummaryView(summary: automation.batchSummary, display: model.display) }
+                    RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
+                                  stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
+                                  onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
+                                  journalActive: automation.batchRowStartedAt != nil) { runProgress }
+                } else {
+                    CompactRunStatusView(model: model, label: runningLabel, stopping: automation.stopping, startedAt: automation.batchSummary.startedAt,
+                                         onStop: { Task { await automation.stop(app: model) } }) {
+                        if !automation.rows.isEmpty { BatchRunSummaryView(summary: automation.batchSummary, display: model.display) }
+                        if automation.batchRowStartedAt != nil, let journal = model.runJournal {
+                            RunJournalView(model: model, journal: journal, label: runningLabel)
+                        } else { runProgress }
+                    }
+                }
             } else {
                 newBatchButton
                 if !model.hasAvailableBatchDrawingModel {

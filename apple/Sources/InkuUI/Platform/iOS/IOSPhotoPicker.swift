@@ -11,8 +11,9 @@ struct InkuPhotoPickerButton: View {
     @State private var item: PhotosPickerItem?
 
     var body: some View {
-        PhotosPicker(selection: $item, matching: .images, preferredItemEncoding: .compatible) { Text(title) }
+        PhotosPicker(selection: $item, matching: .images, preferredItemEncoding: .compatible) { Image(systemName: "photo") }
             .buttonStyle(InkuGhostButtonStyle())
+            .accessibilityLabel(title)
             .disabled(disabled)
             .onChange(of: item) { _, picked in
                 guard let picked else { return }

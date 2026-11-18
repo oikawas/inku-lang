@@ -16,11 +16,21 @@ final class IOSFilesStep2Tests: XCTestCase {
         let fromFile = ImageProvenance.text(url: url, includeFileName: true, includeExif: true, language: "ja")
         let fromBytes = ImageProvenance.text(data: data, fileName: url.lastPathComponent, includeFileName: true, includeExif: true, language: "ja")
         XCTAssertEqual(fromBytes, fromFile)
-        XCTAssertTrue(fromFile.contains("カメラ: Inku Test"), fromFile)
+        XCTAssertEqual(fromFile, "ファイル名: \(url.lastPathComponent) · 2026:10:20 14:32:05\nApple iPhone 15 Pro · f/1.8 · 1/120 s · ISO 64 · 6.9 mm")
 
         // A photo has no file name: only the camera fields remain.
         let photo = ImageProvenance.text(data: data, fileName: nil, includeFileName: true, includeExif: true, language: "ja")
-        XCTAssertEqual(photo, fromFile.split(separator: "\n").dropFirst().joined(separator: "\n"))
+        XCTAssertEqual(photo, "2026:10:20 14:32:05\nApple iPhone 15 Pro · f/1.8 · 1/120 s · ISO 64 · 6.9 mm")
+        XCTAssertEqual(ImageProvenance.text(data: data, fileName: "x.jpg", includeFileName: true, includeExif: false, language: "ja"), "ファイル名: x.jpg")
+        XCTAssertEqual(ImageProvenance.text(data: data, fileName: "x.jpg", includeFileName: false, includeExif: false, language: "ja"), "")
+        let other = try Self.jpegWithExif(properties: [
+            kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFMake: "Canon", kCGImagePropertyTIFFModel: "Canon EOS R5",
+                                            kCGImagePropertyTIFFDateTime: "2026:10:20 14:32:05"],
+            kCGImagePropertyExifDictionary: [kCGImagePropertyExifFNumber: 4.0, kCGImagePropertyExifExposureTime: 2.0,
+                                            kCGImagePropertyExifFocalLength: 24.0, kCGImagePropertyExifLensModel: "hidden lens"]
+        ])
+        XCTAssertEqual(ImageProvenance.text(data: other, fileName: "x.jpg", includeFileName: true, includeExif: true, language: "en"),
+                       "File name: x.jpg · 2026:10:20 14:32:05\nCanon EOS R5 · f/4 · 2 s · 24 mm")
     }
 
     func testBackupGenerationDefaultOnThisPlatform() {
@@ -32,7 +42,7 @@ final class IOSFilesStep2Tests: XCTestCase {
         XCTAssertFalse(DisplayPreferences().automaticBackup)
     }
 
-    private static func jpegWithExif() throws -> Data {
+    private static func jpegWithExif(properties: [CFString: Any]? = nil) throws -> Data {
         let context = try XCTUnwrap(CGContext(data: nil, width: 4, height: 3, bitsPerComponent: 8, bytesPerRow: 0,
                                               space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
         context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
@@ -40,11 +50,13 @@ final class IOSFilesStep2Tests: XCTestCase {
         let image = try XCTUnwrap(context.makeImage())
         let data = NSMutableData()
         let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil))
-        let properties: [CFString: Any] = [
-            kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFMake: "Inku", kCGImagePropertyTIFFModel: "Test"],
-            kCGImagePropertyExifDictionary: [kCGImagePropertyExifDateTimeOriginal: "2026:11:08 18:30:00", kCGImagePropertyExifFNumber: 2.8],
+        let defaults: [CFString: Any] = [
+            kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFMake: "Apple", kCGImagePropertyTIFFModel: "iPhone 15 Pro"],
+            kCGImagePropertyExifDictionary: [kCGImagePropertyExifDateTimeOriginal: "2026:10:20 14:32:05", kCGImagePropertyExifFNumber: 1.78,
+                                            kCGImagePropertyExifExposureTime: 1.0 / 120.0, kCGImagePropertyExifISOSpeedRatings: [64],
+                                            kCGImagePropertyExifFocalLength: 6.86],
         ]
-        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+        CGImageDestinationAddImage(destination, image, (properties ?? defaults) as CFDictionary)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         return data as Data
     }

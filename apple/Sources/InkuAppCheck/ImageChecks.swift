@@ -70,7 +70,7 @@ func runImageChecks(realOpus: Bool = false) async throws {
         throw CheckFailure.message("fixed image paper")
     }
     app.imageCanvasID = "image"
-    guard app.imageProvenance.contains("撮影日時: 2026:10:27 12:34:56"),
+    guard app.imageProvenance.contains("2026:10:27 12:34:56"),
           app.imageProvenance.contains("ファイル名: example.jpg"), !app.imageProvenance.contains("35.1234"),
           !app.imageProvenance.contains("139.1234") else { throw CheckFailure.message("image Exif provenance") }
     if realOpus { await app.generate() }
@@ -133,7 +133,9 @@ func runImageChecks(realOpus: Bool = false) async throws {
         await app.selectWork(work)
         guard app.imageProvenance == provenance, !app.imageProvenanceTyped else { throw CheckFailure.message("saved image provenance") }
         app.setImageInput(prepared, fileName: "new.jpg", automaticProvenance: "new image")
-        guard app.imageProvenance == "new image", app.selectedWork == nil else { throw CheckFailure.message("old image provenance remained") }
+        guard app.imageProvenance == "new image", app.selectedWork?.id == work.id, app.currentSVG == work.svg else {
+            throw CheckFailure.message("image replacement lost the displayed work or kept old provenance")
+        }
         app.setImageProvenanceFromUser("author note")
         app.setImageInput(prepared, fileName: "another.jpg", automaticProvenance: "another image")
         guard app.imageProvenance == "author note" else { throw CheckFailure.message("typed image provenance lost") }

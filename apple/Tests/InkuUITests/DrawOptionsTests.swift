@@ -4,10 +4,57 @@ import ImageIO
 import InkuHost
 import InkuPersistence
 import UniformTypeIdentifiers
+import SwiftUI
 import XCTest
 @testable import InkuUI
 
 @MainActor final class DrawOptionsTests: XCTestCase {
+    func testUpperPanelUsesContentHeightAndReservesTheWorkRecord() {
+        let roomy = CreationPanelSizing.heights(content: 320, available: 900, action: 60, footer: 20)
+        XCTAssertEqual(roomy.upper, 320)
+        XCTAssertTrue(roomy.lower.isFinite)
+        XCTAssertEqual(roomy.lower, 900 - 60 - 20 - roomy.upper)
+        let constrained = CreationPanelSizing.heights(content: 900, available: 500, action: 60, footer: 20)
+        XCTAssertEqual(constrained.upper, 210)
+        XCTAssertEqual(constrained.lower, 210)
+        let upperViewport = CreationPanelSizing.viewportSize(proposal: ProposedViewSize(width: 420, height: constrained.upper),
+                                                            natural: CGSize(width: 420, height: 900))
+        XCTAssertTrue(upperViewport.height.isFinite)
+        XCTAssertLessThan(upperViewport.height, 900)
+        XCTAssertEqual(upperViewport.height, constrained.upper)
+        let unbounded = CreationPanelSizing.viewportSize(proposal: ProposedViewSize(width: 420, height: .infinity),
+                                                        natural: CGSize(width: 420, height: 900))
+        XCTAssertEqual(unbounded.height, 900)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 0, available: 900, action: 60, footer: 20).upper, 120)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 900, available: 0, action: 60, footer: 20).upper, 0)
+        XCTAssertEqual(CreationPanelSizing.heights(content: .infinity, available: 500, action: 60, footer: 20).upper, 210)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 900, available: 240, action: 60, footer: 20).upper, 120)
+        XCTAssertEqual(CreationPanelSizing.heights(content: 900, available: 180, action: 60, footer: 20).upper, 100)
+    }
+
+    func testImageFolderSummaryFormatsCountsInBothLanguages() {
+        let display = DisplaySettings()
+        display.preferences.language = "ja"
+        XCTAssertEqual(CreationView.imageFolderSummary(display: display, folder: "/tmp/photos", total: 12, completed: 3),
+                       "photos：12 枚（描き終えた 3 枚）")
+        display.preferences.language = "en"
+        XCTAssertEqual(CreationView.imageFolderSummary(display: display, folder: "/tmp/photos", total: 12, completed: 3),
+                       "photos: 12 pictures (3 painted)")
+    }
+
+    func testEmptyVisionReferenceIsNotReportedUnavailable() {
+        let settings = HostSettings()
+        XCTAssertFalse(CreationView.imageVisionUnavailable(reference: "", settings: settings))
+        XCTAssertFalse(CreationView.imageVisionUnavailable(reference: "missing:model", settings: nil))
+        XCTAssertTrue(CreationView.imageVisionUnavailable(reference: "missing:model", settings: settings))
+    }
+
+    func testRecordedWildKeepsDefault() throws {
+        var defaults = DrawOptionsCore.release
+        defaults["describe"]?.wild = "off"
+        let options = try DrawOptionsCore.forRecorded(["wild": true], tab: "describe", defaults: defaults)
+        XCTAssertEqual(options.wild, "off")
+    }
     func testImplicitClearsPreserveChoicesAndExplicitNewResets() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("inku-clear-choice-\(UUID())")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -43,6 +90,14 @@ import XCTest
         CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         app.setImageInput(try ImageInput.prepare(png as Data), fileName: "test.png")
+        XCTAssertEqual(app.drawSelections["image"], imageChoice)
+        let shown = SavedWork(id: "shown", at: 1, input: "test", score: "{}", svg: "<svg>shown</svg>")
+        await app.selectWork(shown, adoptDrawOptions: false)
+        app.setImageProvenanceFromUser("手書きの来歴")
+        app.setImageInput(try ImageInput.prepare(png as Data), fileName: "other.png", automaticProvenance: "自動の来歴")
+        XCTAssertEqual(app.selectedWorkID, shown.id)
+        XCTAssertEqual(app.currentSVG, shown.svg)
+        XCTAssertEqual(app.imageProvenance, "手書きの来歴")
         XCTAssertEqual(app.drawSelections["image"], imageChoice)
         app.newWork()
         XCTAssertEqual(app.drawSelections["image"], app.drawDefaults["image"])
@@ -98,7 +153,7 @@ import XCTest
         XCTAssertEqual(legacySelection.route, DrawOptionsCore.release["describe"]?.route)
         XCTAssertEqual(legacySelection.sketch, "off")
         XCTAssertEqual(legacySelection.composition, "off")
-        XCTAssertEqual(legacySelection.wild, "on")
+        XCTAssertEqual(legacySelection.wild, DrawOptionsCore.release["describe"]?.wild)
         let app = AppModel()
         for tab in app.drawDefaults.keys {
             app.activeDrawTab = tab; app.drawRoute = "stages"; app.sketchMode = "off"
@@ -124,12 +179,10 @@ import XCTest
         let input = try XCTUnwrap(creation.components(separatedBy: "private var nextConditions: some View {").dropFirst().first?.components(separatedBy: "private var catalogSummary:").first)
         XCTAssertLessThan(try XCTUnwrap(input.range(of: "modelButton")?.lowerBound), try XCTUnwrap(input.range(of: "colorCatalogButton")?.lowerBound))
         XCTAssertLessThan(try XCTUnwrap(input.range(of: "colorCatalogButton")?.lowerBound), try XCTUnwrap(input.range(of: "DrawConditionsView")?.lowerBound))
-        XCTAssertLessThan(try XCTUnwrap(input.range(of: "DrawConditionsView")?.lowerBound), try XCTUnwrap(input.range(of: "DrawingCompactConditions")?.lowerBound))
+        XCTAssertLessThan(try XCTUnwrap(input.range(of: "DrawingConditionsHeading")?.lowerBound), try XCTUnwrap(input.range(of: "modelButton")?.lowerBound))
         let steps = try String(contentsOf: root.appendingPathComponent("apple/Sources/InkuUI/Views/DrawConditionsView.swift"), encoding: .utf8)
         XCTAssertLessThan(try XCTUnwrap(steps.range(of: "routeButton(")?.lowerBound), try XCTUnwrap(steps.range(of: "DrawSwitchChip(title:")?.lowerBound))
-        let compact = try String(contentsOf: root.appendingPathComponent("apple/Sources/InkuUI/Views/DrawingConditionRows.swift"), encoding: .utf8)
-        let compactBody = try XCTUnwrap(compact.components(separatedBy: "struct DrawingCompactConditions:").last)
-        XCTAssertLessThan(try XCTUnwrap(compactBody.range(of: "wildButton")?.lowerBound), try XCTUnwrap(compactBody.range(of: "canvasAspectButton")?.lowerBound))
+        XCTAssertTrue(steps.contains("wild == true"))
     }
     func testCustomProvidersSurviveSavingAndReading() throws {
         let providers = ["custom-a", "custom-b", "custom-c"].map { id in

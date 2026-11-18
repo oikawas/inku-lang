@@ -4,6 +4,66 @@ import SwiftUI
 import ImageIO
 import UniformTypeIdentifiers
 
+enum CreationPanelSizing {
+    static func viewportSize(proposal: ProposedViewSize, natural: CGSize) -> CGSize {
+        func resolved(_ proposed: CGFloat?, _ fallback: CGFloat) -> CGFloat {
+            if let proposed, proposed.isFinite { return max(0, proposed) }
+            return fallback.isFinite ? max(0, fallback) : 0
+        }
+        return CGSize(width: resolved(proposal.width, natural.width), height: resolved(proposal.height, natural.height))
+    }
+
+    static func heights(content: CGFloat, available: CGFloat, action: CGFloat, footer: CGFloat) -> (upper: CGFloat, lower: CGFloat) {
+        let space = max(0, available - max(0, action) - max(0, footer))
+        let lowerReserve = min(140, max(0, space - 120))
+        let upperLimit = max(0, space - lowerReserve)
+        let upperMinimum = min(120, space)
+        let desired = content.isFinite ? max(upperMinimum, content) : .infinity
+        let upper = desired <= upperLimit ? desired : min(upperLimit, max(upperMinimum, space / 2))
+        return (upper, max(0, space - upper))
+    }
+}
+
+/// A scroll viewport must accept the panel's allocated size, even if its content reports a larger ideal size.
+struct CreationPanelViewport: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let natural = subviews.first?.sizeThatFits(proposal) ?? .zero
+        return CreationPanelSizing.viewportSize(proposal: proposal, natural: natural)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let child = subviews.first else { return }
+        let exact = ProposedViewSize(width: bounds.width, height: bounds.height)
+        _ = child.sizeThatFits(exact)
+        child.place(at: bounds.origin, anchor: .topLeading, proposal: exact)
+    }
+}
+
+/// Measures the fixed rows and places the two scrolls without a preference/state feedback loop.
+struct CreationPanelLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 4 else { return }
+        let width = bounds.width
+        let intrinsic = ProposedViewSize(width: width, height: nil)
+        let content = subviews[0].sizeThatFits(intrinsic).height
+        let action = subviews[1].sizeThatFits(intrinsic).height
+        let footer = subviews[3].sizeThatFits(intrinsic).height
+        let sizes = CreationPanelSizing.heights(content: content, available: bounds.height, action: action, footer: footer)
+        var y = bounds.minY
+        for (index, height) in [sizes.upper, action, sizes.lower, footer].enumerated() {
+            let exactProposal = ProposedViewSize(width: width, height: height)
+            _ = subviews[index].sizeThatFits(exactProposal)
+            subviews[index].place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading,
+                                  proposal: exactProposal)
+            y += height
+        }
+    }
+}
+
 struct BatchWorkspaceSelection {
     private enum Display { case history, latest, row(SavedWork, String) }
     private var display = Display.history
@@ -222,6 +282,7 @@ struct CreationView: View {
     @State private var rightPanelHeight: CGFloat = 0
     @State private var refinementMenuButtonHeight: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
+    @State private var visionSettings: HostSettings?
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
     /// iPhone: a refinement chosen in the 作品編集 sheet, opened once the sheet has gone (one sheet at a time).
     @State private var pendingPhoneAction: (SavedWork, String)?
@@ -321,7 +382,13 @@ struct CreationView: View {
         .onDisappear { batchWorkspace.invalidateReads() }
         .onChange(of: model.imageInput?.jpeg, initial: true) { _, data in imagePreview = data.flatMap(PlatformImage.load(data:)) }
         .onChange(of: model.savedImageDDL, initial: true) { _, data in savedImageRecord = data.flatMap { try? ExactJSON(data: $0) } }
-        .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
+        .task(id: model.providerSettingsRevision) {
+            visionSettings = nil
+            let settings = await model.hostSettings()
+            guard !Task.isCancelled else { return }
+            savedProviders = settings.providers
+            visionSettings = settings
+        }
         .task(id: workspaceWork?.lineageNodeID) {
             workspaceGeneration = nil
             guard let nodeID = workspaceWork?.lineageNodeID else { return }
@@ -600,10 +667,72 @@ struct CreationView: View {
 
     /// Web `.left-panel` / `.panel-scroll`: padding 14×16 (12 at 1180 or narrower), 14 between sections.
     private var leftPanel: some View {
-        ScrollView {
-            leftPanelContent(width: max(0, leftPanelWidth - (compactWindow ? 24 : 32)))
-                .padding(.vertical, 14).padding(.horizontal, compactWindow ? 12 : 16)
+        VStack(alignment: .leading, spacing: 0) {
+            if automation.running && automation.mode == "demo" { demoBanner }
+            if display.visible("input_modes") { inputTabs }
+            if isBatch && batchKind != "image" {
+                batchKindPicker.padding(.vertical, 8)
+                batchTextPanel
+            } else {
+                let hasLowerScroll = !isBatch && (workspaceWork != nil || model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty)
+                let layout = hasLowerScroll ? AnyLayout(CreationPanelLayout()) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                layout {
+                    CreationPanelViewport {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 14) {
+                                if isBatch { batchKindPicker; imageFolderPanel }
+                                else if isImage { imageInputPanel }
+                                else {
+                                    input
+                                    if display.visible("drawing_settings") { nextConditions }
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
+                        }
+                        .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
+                    }
+                    .frame(maxHeight: hasLowerScroll ? nil : .infinity)
+                    .clipped()
+                    .contentShape(Rectangle())
+                    VStack(alignment: .leading, spacing: 0) {
+                        Group {
+                            if isBatch { imageFolderActions }
+                            else if isImage { imageActions }
+                            else { generationAction }
+                        }.padding(.vertical, 8)
+                        if isBatch { statusFooter }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    CreationPanelViewport {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if !isBatch {
+                                if let work = workspaceWork {
+                                    CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
+                                                             disabled: controlsDisabled, onWorkAction: onWorkAction, pinned: true,
+                                                             onNewDDL: isImage ? nil : { showNewDDL = true },
+                                                             beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
+                                        .frame(maxHeight: .infinity)
+                                } else if model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty {
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 14) {
+                                            PipelineCompletionView(model: model)
+                                            PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords)
+                                            if !isImage && display.visible("ddl_tools") { newDDLHeading }
+                                        }.frame(maxWidth: .infinity, alignment: .leading)
+                                    }.frame(maxHeight: .infinity)
+                                } else if !isImage && display.visible("ddl_tools") {
+                                    newDDLHeading
+                                }
+                            }
+                        }.frame(maxWidth: .infinity, maxHeight: hasLowerScroll ? .infinity : nil, alignment: .topLeading)
+                    }
+                    .clipped()
+                    .contentShape(Rectangle())
+                    VStack(alignment: .leading, spacing: 0) {
+                        if !isBatch { statusFooter }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
         }
+        .padding(.horizontal, compactWindow ? 12 : 16)
         .background(InkuColor.bg)
     }
 
@@ -612,20 +741,15 @@ struct CreationView: View {
                 if automation.running && automation.mode == "demo" { demoBanner }
                 if display.visible("input_modes") { inputTabs }
                 inputContents
-                if !isBatch && display.visible("ddl_tools") {
-                    HStack {
-                        Spacer(minLength: 0)
-                        Button(display.webCopy("ddlNewButton", "指示書の新規作成")) { showNewDDL = true }
-                            .buttonStyle(InkuGhostButtonStyle())
-                            .disabled(controlsDisabled)
-                            .inkuTooltip(display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
-                    }.padding(.top, -6)
-                }
                 if !isBatch { PipelineCompletionView(model: model) }
                 if !isBatch { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords) }
                 if !isBatch, let work = workspaceWork {
                     CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
-                                             disabled: controlsDisabled, onWorkAction: onWorkAction)
+                                             disabled: controlsDisabled, onWorkAction: onWorkAction,
+                                             onNewDDL: isImage ? nil : { showNewDDL = true },
+                                             beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
+                } else if !isBatch && !isImage && display.visible("ddl_tools") {
+                    newDDLHeading
                 }
                 if !isBatch, display.visible("detail_status"), let work = workspaceWork {
                     CreationResultLog(model: model, work: work)
@@ -633,6 +757,16 @@ struct CreationView: View {
                 statusFooter
             }
             .frame(width: width, alignment: .leading)
+    }
+
+    private var newDDLHeading: some View {
+        HStack {
+            Text(display.localized("指示書")).inkuFont(12, weight: .semibold)
+            Spacer()
+            Button(display.webCopy("ddlNewButton", "指示書を新規作成")) { showNewDDL = true }
+                .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
+                .inkuTooltip(display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
+        }
     }
 
     /// InputPanel.svelte:180-198: two equal underline tabs; a running tab carries a dot and `(n/N ↻r)`.
@@ -681,17 +815,10 @@ struct CreationView: View {
     private var inputContents: some View {
         VStack(alignment: .leading, spacing: 6) {
             if isBatch {
-                Picker(display.localized("入力"), selection: $batchKind) {
-                    Text(display.webCopy("modeSingle", "記述")).tag("description")
-                    Text(display.webCopy("imageTab", "画像")).tag("image")
-                }.pickerStyle(.segmented).disabled(controlsDisabled)
+                batchKindPicker
                 if batchKind == "image" { imageFolderPanel }
                 else {
-                    BatchPanelView(model: model, automation: automation,
-                                   onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
-                                   followsLatestWork: batchWorkspace.followsLatest,
-                                   selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
-                                   onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
+                    batchTextPanel
                 }
             } else {
                 if isImage { imageInputPanel } else {
@@ -703,24 +830,44 @@ struct CreationView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var batchKindPicker: some View {
+        Picker(display.localized("入力"), selection: $batchKind) {
+            Text(display.webCopy("modeSingle", "記述")).tag("description")
+            Text(display.webCopy("imageTab", "画像")).tag("image")
+        }.pickerStyle(.segmented).disabled(controlsDisabled)
+    }
+
+    private var batchTextPanel: some View {
+        BatchPanelView(model: model, automation: automation,
+                       onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
+                       followsLatestWork: batchWorkspace.followsLatest,
+                       selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
+                       onNewBatch: { batchWorkspace.showHistory() }, ui: ui, actionFooter: AnyView(statusFooter))
+    }
+
     private var imageFolderPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Button(display.webCopy("clearInputBtn", "新規作成")) {
-                imageBatch.newWork(app: model); batchWorkspace.showHistory()
-            }.disabled(controlsDisabled || imageBatch.selecting)
-            Button(display.localized("画像フォルダを選ぶ")) {
-                Task {
-                    guard let url = await fileDialogs?.choose(.folder()) else { return }
-                    do { try await imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
+            HStack {
+                if imageBatch.folder.isEmpty {
+                    Text(display.webCopy("imageFolderHint", "中の画像を名前の順に1枚ずつ描きます")).inkuFont(12).foregroundStyle(.secondary)
+                } else {
+                    Text(Self.imageFolderSummary(display: display, folder: imageBatch.folder, total: imageBatch.total, completed: imageBatch.completed))
+                        .inkuFont(12).lineLimit(1).truncationMode(.middle)
                 }
-            }.disabled(controlsDisabled || imageBatch.selecting)
-            if !imageBatch.folder.isEmpty { Text(imageBatch.folder).textSelection(.enabled).inkuFont(12) }
-            conditionRow("Vision", value: model.imageVisionModel.isEmpty ? display.localized("選択してください") : model.imageVisionModel,
-                         help: "Vision") { showImageModelPicker = true }.disabled(controlsDisabled)
+                Spacer(minLength: 0)
+                Button(display.webCopy("imageFolderChoose", "フォルダを選ぶ")) {
+                    Task {
+                        guard let url = await fileDialogs?.choose(.folder()) else { return }
+                        do { try await imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
+                    }
+                }.disabled(controlsDisabled || imageBatch.selecting)
+            }
+            DrawingConditionsHeading(model: model, batch: true, canvasID: model.imageCanvasID, imageSelection: true,
+                                     showPaperPicker: $showPaperPicker, showDetails: $showConditionDetails, hasDetails: false)
+            imageVisionRow
             conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
                 showColorCatalogs = true
             }.disabled(controlsDisabled || model.catalogs.isEmpty)
-            imagePaperCondition
             if imageBatch.hasJournal {
                 Text("\(imageBatch.completed) / \(imageBatch.total) · \(display.localized("失敗")) \(imageBatch.failed)")
                 ForEach(imageBatch.failures, id: \.self) { failure in
@@ -730,15 +877,31 @@ struct CreationView: View {
                     Text(display.localized("前回の処理結果を確認できない画像があります。履歴を確認してください。"))
                         .foregroundStyle(.orange)
                 }
+            }
+            if phoneLayout { imageFolderActions }
+        }
+    }
+
+    private var imageFolderActions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if imageBatch.hasJournal {
                 if imageBatch.running {
-                    // ImageFolderBatchPanel.svelte:97-99: the folder's tiles above the drawing indicator.
-                    BatchRunSummaryView(summary: imageBatch.summary, display: display)
-                    RunStatusView(display: display, label: imageBatch.status, onStop: { Task { await imageBatch.stop(app: model) } }, journalModel: model,
-                                  journalActive: imageBatch.drawing) { EmptyView() }
+                    if phoneLayout {
+                        BatchRunSummaryView(summary: imageBatch.summary, display: display)
+                        RunStatusView(display: display, label: imageBatch.status, onStop: { Task { await imageBatch.stop(app: model) } }, journalModel: model,
+                                      journalActive: imageBatch.drawing) { EmptyView() }
+                    } else {
+                        CompactRunStatusView(model: model, label: imageBatch.status, startedAt: imageBatch.summary.startedAt, onStop: { Task { await imageBatch.stop(app: model) } }) {
+                            BatchRunSummaryView(summary: imageBatch.summary, display: display)
+                            if imageBatch.drawing, let journal = model.runJournal { RunJournalView(model: model, journal: journal, label: imageBatch.status) }
+                        }
+                    }
                 } else {
                     HStack {
                         Button(display.localized("続きから描く")) { startImageBatch(restart: false) }
+                            .buttonStyle(InkuPaintButtonStyle())
                         Button(display.localized("最初から描く")) { startImageBatch(restart: true) }
+                            .buttonStyle(InkuGhostButtonStyle())
                     }.disabled(model.isBusy || automation.isOccupied || imageBatch.total == 0 || model.imageVisionModel.isEmpty)
                 }
             }
@@ -754,14 +917,16 @@ struct CreationView: View {
 
     private var imageInputPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Button(display.webCopy("clearInputBtn", "新規作成")) { model.newWork(); batchWorkspace.showHistory() }
-                .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
-            Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(14, weight: .semibold)
-            editor(text: Binding(get: { model.imageProvenance }, set: { model.setImageProvenanceFromUser($0) }),
-                   readOnly: model.savedImageDDL != nil && model.imageInput == nil)
             HStack {
-                Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
-                Spacer()
+                if let input = model.imageInput, let preview = imagePreview {
+                    Image(decorative: preview, scale: 1).resizable().scaledToFill().frame(width: 40, height: 40).clipped()
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(model.imageFileName.isEmpty ? display.localized("写真") : model.imageFileName)
+                            .inkuFont(12).lineLimit(1).truncationMode(.middle)
+                        Text("\(input.originalWidth) × \(input.originalHeight)").inkuFont(11).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 0)
                 // The iPhone takes photos from the camera in the tab bar (author 2026-11-13); the iPad, which has no
                 // tab bar, keeps this button.
                 if !phoneLayout {
@@ -772,37 +937,34 @@ struct CreationView: View {
                 InkuPhotoPickerButton(title: display.localized("写真から選ぶ"), disabled: controlsDisabled) { data in
                     loadImage(data: data, fileName: nil)
                 }
-                Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
+                Button(display.webCopy("imageChooseButton", "画像を選ぶ")) { chooseImage() }
                     .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
             }
-            if model.imageInput != nil, let preview = imagePreview {
-                Image(decorative: preview, scale: 1).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 220)
-                Text(model.imageFileName).inkuFont(12).foregroundStyle(.secondary)
-            }
-            if let record = savedImageRecord {
-                if let ddl = model.selectedWork?.ddl {
-                    Text(display.localized("指示書")).inkuFont(14, weight: .semibold)
-                    Text(ddl).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if let before = record["before_review"].string, !before.isEmpty {
-                    DisclosureGroup(display.localized("見比べる前の指示書")) {
-                        Text(before).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                        if let work = model.selectedWork {
-                            Button(display.localized("この指示書で子を描く")) {
-                                Task { _ = await model.drawEditedDDL(work: work, source: before, forceEdit: true) }
-                            }.disabled(controlsDisabled)
-                        }
-                    }
-                }
+            .frame(minHeight: 40)
+            if let imageLoadError { Text(imageLoadError).foregroundStyle(.red).inkuFont(12) }
+            Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(12)
+            editor(text: Binding(get: { model.imageProvenance }, set: { model.setImageProvenanceFromUser($0) }),
+                   readOnly: model.savedImageDDL != nil && model.imageInput == nil, rows: 3,
+                   placeholder: display.webCopy("imageProvenanceHint", "画像の出典や覚え書き。作品と一緒に記録し、描画には使いません。"))
+            if savedImageRecord != nil {
                 Text(display.localized("描き直すには画像を選び直してください。")).foregroundStyle(.secondary).inkuFont(12)
             }
-            if let imageLoadError { Text(imageLoadError).foregroundStyle(.red).inkuFont(12) }
-            conditionRow("Vision", value: model.imageVisionModel.isEmpty ? display.localized("選択してください") : model.imageVisionModel,
-                         help: "Vision") { showImageModelPicker = true }.disabled(controlsDisabled)
+            DrawingConditionsHeading(model: model, batch: false, canvasID: model.imageCanvasID, imageSelection: true,
+                                     showPaperPicker: $showPaperPicker, showDetails: $showConditionDetails, hasDetails: false)
+            imageVisionRow
             conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
                 showColorCatalogs = true
             }.disabled(controlsDisabled || model.catalogs.isEmpty)
-            imagePaperCondition
+            if phoneLayout { imageActions }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard !controlsDisabled, let url = urls.first, url.isFileURL else { return false }
+            loadImage(url)
+            return true
+        }
+    }
+
+    @ViewBuilder private var imageActions: some View {
             if model.singleRunStatusVisible(in: "image") {
                 let label = model.status == display.localized("見比べる画を描いています…") ? model.status :
                     model.providerProgress.flatMap { $0.outcome == .running ? display.localized($0.stageTitleKey) : nil }
@@ -813,26 +975,29 @@ struct CreationView: View {
                 Button(display.webCopy("generateButton", "描画する")) {
                     if model.imageWarningAcknowledged { Task { await model.generate() } }
                     else { showImageNotice = true }
-                }.buttonStyle(.borderedProminent).disabled(!model.canGenerate || controlsDisabled)
+                }.buttonStyle(InkuPaintButtonStyle()).disabled(!model.canGenerate || controlsDisabled)
             }
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard !controlsDisabled, let url = urls.first, url.isFileURL else { return false }
-            loadImage(url)
-            return true
-        }
     }
 
     static let imageRunStatusID = "image-run-status"
 
-    private var imagePaperCondition: some View {
-        let value = model.imageCanvasID == "image" ? display.localized("画像の縦横比を使う") :
-            (model.canvases.first { $0.id == model.imageCanvasID }?.label ?? model.imageCanvasID)
-        return conditionRow(display.localized("画面比"), value: value, help: "") { showPaperPicker = true }
+    private var imageVisionRow: some View {
+        let reference = model.imageVisionModel
+        let unavailable = Self.imageVisionUnavailable(reference: reference, settings: visionSettings)
+        return DrawingConditionRow(display: display, label: display.webCopy("modelButton", "モデル"),
+                                   value: model.modelDisplayName(reference, empty: display.localized("選択してください")),
+                                   help: "Vision", unavailable: unavailable) { showImageModelPicker = true }
             .disabled(controlsDisabled)
-            .popover(isPresented: $showPaperPicker) {
-                CreationPaperPicker(model: model, imageSelection: true) { showPaperPicker = false }.environment(display).inkuPopoverContent()
-            }
+    }
+
+    static func imageFolderSummary(display: DisplaySettings, folder: String, total: Int, completed: Int) -> String {
+        display.webCopyFormat("imageFolderSummary", "%@：%@ 枚（描き終えた %@ 枚）",
+                              URL(fileURLWithPath: folder).lastPathComponent, String(total), String(completed))
+    }
+
+    static func imageVisionUnavailable(reference: String, settings: HostSettings?) -> Bool {
+        guard !reference.isEmpty, let settings else { return false }
+        return !SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: settings)
     }
 
     private func chooseImage() {
@@ -904,14 +1069,10 @@ struct CreationView: View {
     /// InputPanel.svelte:201-262,445-503: "次に描く条件", two rows with a 変更 button, then the compact row.
     private var nextConditions: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(display.webCopy("nextWorkConditions", "次の生成条件")).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button { showConditionDetails = true } label: { Image(systemName: "ellipsis") }
-                    .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
-                    .accessibilityLabel(display.localized("生成条件の詳細"))
-                    .popover(isPresented: $showConditionDetails) { conditionDetails.inkuPopoverContent() }
-            }.padding(.top, 8).padding(.bottom, 2)
+            DrawingConditionsHeading(model: model, batch: false, canvasID: model.canvasID,
+                                     showPaperPicker: $showPaperPicker, showDetails: $showConditionDetails)
+                .popover(isPresented: $showConditionDetails) { conditionDetails.inkuPopoverContent() }
+                .padding(.top, 8).padding(.bottom, 2)
             conditionRow(display.webCopy("modelButton", "モデル"),
                          value: model.modelDisplayName(model.nextBatchDrawingModelReference, empty: display.localized("選択してください")),
                          help: display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
@@ -925,13 +1086,10 @@ struct CreationView: View {
                 .accessibilityValue(catalogSummary)
             Rectangle().fill(InkuColor.border).frame(height: 1)
             if model.inputMode == "description" {
-                DrawConditionsView(model: model, sketch: model.sketchMode, onSketch: { model.sketchMode = $0 })
+                DrawConditionsView(model: model, sketch: model.sketchMode, onSketch: { model.sketchMode = $0 }, wild: model.wild)
                     .disabled(controlsDisabled)
                     .padding(.bottom, 8)
-                Rectangle().fill(InkuColor.border).frame(height: 1)
             }
-            DrawingCompactConditions(model: model, wild: model.wild, canvasID: model.canvasID, showPaperPicker: $showPaperPicker)
-                .disabled(controlsDisabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1022,9 +1180,16 @@ struct CreationView: View {
     }
 
     /// Web RunStatus.svelte: mascot, the stage and its provider facts, and the stop button, in one bordered box.
-    private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
-        RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
-                      stopsWithEscape: !workspaceCovered, onStop: onStop, journalModel: model) { ProviderProgressView(model: model, embedded: true) }
+    @ViewBuilder private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
+        if phoneLayout {
+            RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
+                          stopsWithEscape: !workspaceCovered, onStop: onStop, journalModel: model) { ProviderProgressView(model: model, embedded: true) }
+        } else {
+            CompactRunStatusView(model: model, label: label, stopping: stopping, stopsWithEscape: !workspaceCovered, onStop: onStop) {
+                if let journal = model.runJournal { RunJournalView(model: model, journal: journal, label: label) }
+                else { ProviderProgressView(model: model, embedded: true) }
+            }
+        }
     }
 
     /// The native status line and the backup and result-log reports, which the Web has no place for.
@@ -1043,18 +1208,18 @@ struct CreationView: View {
     }
 
     /// InputPanel.svelte:292-304: the textarea over LabelHighlight, which paints the numbers and comments grey.
-    private func editor(text: Binding<String>, readOnly: Bool = false) -> some View {
+    private func editor(text: Binding<String>, readOnly: Bool = false, rows: CGFloat = 5, placeholder: String? = nil) -> some View {
         let scale = display.preferences.textScale
         return ZStack(alignment: .topLeading) {
             InkuTextEditor(text: text, isEditable: !readOnly, accessibilityLabel: display.localized("記述"), style: .description)
                 .disabled(controlsDisabled)
             if text.wrappedValue.isEmpty {
-                Text(display.webCopy("inputPlaceholder", "山の向こうに月が昇る")).inkuFont(14).foregroundStyle(.tertiary)
+                Text(placeholder ?? display.webCopy("inputPlaceholder", "山の向こうに月が昇る")).inkuFont(14).foregroundStyle(.tertiary)
                     .padding(.vertical, 9).padding(.horizontal, 10).allowsHitTesting(false)
             }
         }
         // Five rows at 14px with line height 1.65, as `rows="5"`.
-        .frame(height: (5 * 14 * 1.65 + 18) * scale)
+        .frame(height: (rows * 14 * 1.65 + 18) * scale)
         .background(readOnly ? InkuColor.bg2 : InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2, style: StrokeStyle(lineWidth: 1, dash: readOnly ? [4, 3] : [])))
     }
@@ -1445,7 +1610,7 @@ struct CreationView: View {
 
     private func tip(_ key: String) -> String {
         let serverKeys = ["次の作品の描画モデルを選びます。": "tooltipInputModel", "次の作品の配色を選びます。": "tooltipInputCatalog",
-                          "次の作品の指示書に使う言語を選びます。": "tooltipInputLang", "次の作品の筆致を規則から外します。": "tooltipInputWild",
+                          "次の作品の指示書に使う言語を選びます。": "tooltipInputLang",
                           "用紙の形と意図を見て、次の作品の用紙を選びます。": "tooltipInputCanvas", "入力と次の生成条件から作品を描きます。": "tooltipSubmit",
                           "歳時記の語と説明を参照します。": "tooltipSaijikiToggle"]
         return display.tooltip(key, serverKey: serverKeys[key])

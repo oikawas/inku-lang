@@ -15,8 +15,9 @@ struct InkuCameraButton: View {
 
     var body: some View {
         if UIImagePickerController.isSourceTypeAvailable(.camera) {
-            Button(title) { capturing = true }
+            Button { capturing = true } label: { Image(systemName: "camera") }
                 .buttonStyle(InkuGhostButtonStyle())
+                .accessibilityLabel(title)
                 .disabled(disabled)
                 .fullScreenCover(isPresented: $capturing) {
                     InkuCameraPicker { data in

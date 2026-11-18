@@ -1274,7 +1274,7 @@ public final class AppModel {
     public func setImageInput(_ image: PreparedImageInput, fileName: String, automaticProvenance: String = "") {
         let typed = imageProvenanceTyped && !imageProvenance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? imageProvenance : nil
-        if selectedWork != nil { clearWorkOutput(); inputMode = "image" }
+        if selectedWork != nil { inputMode = "image" }
         imageProvenance = typed ?? automaticProvenance
         imageProvenanceTyped = typed != nil
         imageInput = image; imageFileName = fileName

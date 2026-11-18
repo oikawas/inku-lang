@@ -366,6 +366,9 @@ struct CreationDisplayedProcess: View {
     let saved: Bool
     let disabled: Bool
     let onWorkAction: (SavedWork, String) -> Void
+    var pinned = false
+    var onNewDDL: (() -> Void)? = nil
+    var beforeReview: String? = nil
 
     private var sketch: String? { work.sketchText.flatMap { $0.isEmpty ? nil : $0 } }
     private var ddl: String { work.ddl ?? "" }
@@ -385,7 +388,55 @@ struct CreationDisplayedProcess: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Group {
+            if pinned {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12, pinnedViews: [.sectionHeaders]) {
+                        processIntro
+                        if model.display.visible("ddl_tools") && (work.ddl != nil || onNewDDL != nil) {
+                            Section {
+                                if work.ddl != nil { DdlBoxEditor(model: model, work: work, editable: boxEditable, growsToFit: true) }
+                                beforeReviewContent
+                            } header: { ddlHeader.padding(.vertical, 6).background(InkuColor.bg) }
+                        }
+                        if model.display.visible("detail_status") { CreationResultLog(model: model, work: work) }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if model.display.visible("ddl_tools"), work.ddl != nil { ddlActions.padding(.vertical, 6).background(InkuColor.bg) }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    processIntro
+                    if model.display.visible("ddl_tools") && (work.ddl != nil || onNewDDL != nil) {
+                        ddlHeader
+                        if work.ddl != nil {
+                            DdlBoxEditor(model: model, work: work, editable: boxEditable)
+                            beforeReviewContent
+                            ddlActions
+                        }
+                    }
+                }
+            }
+        }
+        .task(id: work.id) {
+            displayedContext = nil
+            composition = nil
+            guard saved else { return }
+            let context = try? await model.savedConfiguration(workID: work.id)
+            let record = try? await model.compositionRecord(work: work)
+            guard !Task.isCancelled else { return }
+            displayedContext = context
+            composition = record
+        }
+    }
+
+    private var processIntro: some View {
+        Group {
+            if pinned {
+                PipelineCompletionView(model: model)
+                PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: model.display, pluginWords: model.pluginWords)
+            }
             // `+page.svelte` `.displayed-work-heading`: 12px semibold under a rule, 16pt above.
             Text(model.display.webCopy("displayedWorkProcessWithComposition", "表示中作品の写生・構図・指示書")).inkuFont(12, weight: .semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -412,17 +463,40 @@ struct CreationDisplayedProcess: View {
             }
             CompositionSection(model: model, work: work, snapshot: composition, saved: saved, disabled: !saved || disabled,
                                onAction: onWorkAction)
-            if model.display.visible("ddl_tools"), work.ddl != nil {
+        }
+    }
+
+    private var ddlHeader: some View {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(model.display.localized(ddlHeading)).inkuFont(12, weight: .semibold)
+                    Text(work.ddl == nil ? model.display.localized("指示書") : model.display.localized(ddlHeading)).inkuFont(12, weight: .semibold)
                         .inkuTooltip(model.display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
                     Spacer(minLength: 4)
+                    if let onNewDDL {
+                        Button(model.display.webCopy("ddlNewButton", "指示書を新規作成"), action: onNewDDL)
+                            .buttonStyle(InkuGhostButtonStyle()).disabled(disabled)
+                            .inkuTooltip(model.display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
+                    }
+                    if work.ddl != nil {
                     Button(model.display.localized("指示書エディタ")) { onWorkAction(work, "ddl") }
                         .buttonStyle(InkuGhostButtonStyle())
                         .disabled(!saved || !hasDDL || disabled)
                         .inkuTooltip(model.display.tooltip("表示中の作品の指示書を編集して、その子として描き直します", serverKey: "tooltipDdlEdit"))
+                    }
                 }
-                DdlBoxEditor(model: model, work: work, editable: boxEditable)
+    }
+
+    @ViewBuilder private var beforeReviewContent: some View {
+        if let beforeReview, !beforeReview.isEmpty {
+            DisclosureGroup(model.display.localized("見比べる前の指示書")) {
+                Text(beforeReview).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                Button(model.display.localized("この指示書で子を描く")) {
+                    Task { _ = await model.drawEditedDDL(work: work, source: beforeReview, forceEdit: true) }
+                }.disabled(disabled)
+            }
+        }
+    }
+
+    private var ddlActions: some View {
                 HStack {
                     Spacer(minLength: 0)
                     if saved {
@@ -444,18 +518,6 @@ struct CreationDisplayedProcess: View {
                         .disabled(!saved || !DDLSource.hasBody(boxText) || disabled || model.ddlBoxRangeBlocked)
                         .inkuTooltip(model.display.tooltip(model.display.label("表示中の指示書（正規化DDL）を必要に応じて補完して描き直します。記述から指示書を書き直さないので、読みは変わりません。", "Completes the shown instructions (normalized DDL) if needed and redraws them. It does not rewrite them from the description, so the reading stays unchanged."), serverKey: "tooltipDdlPaint"))
                 }
-            }
-        }
-        .task(id: work.id) {
-            displayedContext = nil
-            composition = nil
-            guard saved else { return }
-            let context = try? await model.savedConfiguration(workID: work.id)
-            let record = try? await model.compositionRecord(work: work)
-            guard !Task.isCancelled else { return }
-            displayedContext = context
-            composition = record
-        }
     }
 
     private var sketchNote: String {

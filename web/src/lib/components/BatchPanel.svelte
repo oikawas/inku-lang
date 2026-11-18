@@ -409,7 +409,7 @@
 		font-weight: 400;
 	}
 	.batch-label-text { display: flex; min-width: 0; gap: 2px; }
-	.batch-label strong { font-weight: 600; color: var(--fg); }
+	.batch-label strong { flex: none; white-space: nowrap; font-weight: 600; color: var(--fg); }
 	.batch-label-hint { color: var(--fg2); }
 	.batch-label-end { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; margin-left: auto; }
 	.batch-interrupted-mark {

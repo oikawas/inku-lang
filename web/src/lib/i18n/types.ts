@@ -124,6 +124,7 @@ export interface LangPack {
 	pipelinePerform: string;
 	pipelineWorking: string;
 	pipelineRequestFailed: string;
+	drawingStartFailed: string;
 	pipelinePatchTitle: string;
 	pipelinePatchHint: string;
 	pipelineUnreadNotKeptTitle: string;

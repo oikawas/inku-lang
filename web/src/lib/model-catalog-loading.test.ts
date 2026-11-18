@@ -40,17 +40,17 @@ const moduleSource = `export function create(fetcher) {
 const compiled = ts.transpileModule(moduleSource, {compilerOptions:{target:ts.ScriptTarget.ESNext,module:ts.ModuleKind.ESNext}}).outputText;
 const {create} = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
-test('model list shows loading, then a failure, and can be loaded again', async () => {
+test('a refresh keeps the previous list ready, including after a failure', async () => {
   let finish!: (response: Response) => void;
   let attempts = 0;
   const harness = create(() => ++attempts === 1 ? new Promise<Response>((resolve) => {finish = resolve;}) : Promise.resolve(Response.json({
     catalog:[{id:'openai',label:'OpenAI',models:[{id:'x',label:'X'}]}], settings:{}
   })));
   const first = harness.load();
-  assert.deepEqual(harness.state(), {status:'loading',loaded:false,groups:[{id:'stale',models:[]}]});
+  assert.deepEqual(harness.state(), {status:'ready',loaded:true,groups:[{id:'stale',models:[]}]});
   finish(new Response('', {status:503}));
   await first;
-  assert.deepEqual(harness.state(), {status:'error',loaded:false,groups:[{id:'stale',models:[]}]});
+  assert.deepEqual(harness.state(), {status:'ready',loaded:true,groups:[{id:'stale',models:[]}]});
   await harness.load();
   assert.equal(harness.state().status, 'ready');
   assert.equal(harness.state().loaded, true);
@@ -142,6 +142,7 @@ test('refreshing the catalog does not replace a refinement model in progress', a
   harness.switchUser();
   const pending = harness.load();
   assert.deepEqual(harness.state().groups, []);
+  assert.equal(harness.state().status, 'loading');
   finish(Response.json({catalog:[], settings:{}}));
   await pending;
  });

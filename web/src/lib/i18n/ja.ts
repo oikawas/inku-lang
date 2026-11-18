@@ -157,6 +157,7 @@ export const ja: LangPack = {
 	pipelinePerform: '演奏する',
 	pipelineWorking: '作品を準備しています…',
 	pipelineRequestFailed: '作品を更新できませんでした。',
+	drawingStartFailed: '描画を開始できませんでした。時間をおいて、もう一度描いてください。',
 	pipelinePatchTitle: 'DDLの補完候補',
 	pipelinePatchHint: '候補を採用すると、表示されたDDLを保存します。',
 	pipelineUnreadNotKeptTitle: '案にそのまま残らない語',

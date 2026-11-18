@@ -83,7 +83,7 @@ struct DrawingLogView: View {
                                         }
                                         Text(record.description.isEmpty ? model.display.localized("DDLからの描画") : record.description)
                                             .lineLimit(3).inkuFont(12)
-                                        Text(record.stage1Model).inkuFont(11).foregroundStyle(.secondary).lineLimit(1)
+                                        Text(model.modelDisplayName(record.stage1Model)).inkuFont(11).foregroundStyle(.secondary).lineLimit(1)
                                     }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
                                         .background(selectedID == record.id ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.04),
                                                     in: RoundedRectangle(cornerRadius: 8))
@@ -97,8 +97,8 @@ struct DrawingLogView: View {
             Text(model.display.localized(phase(record.phase))).inkuFont(16, weight: .semibold)
             Text(record.startedAt.formatted(date: .complete, time: .standard)).foregroundStyle(.secondary)
             if !record.description.isEmpty { Text(record.description).textSelection(.enabled) }
-            Text(model.display.localizedFormat("解釈モデル: %@", record.stage1Model))
-            Text(model.display.localizedFormat("補完モデル: %@", record.stage2Model))
+            Text(model.display.localizedFormat("解釈モデル: %@", model.modelDisplayName(record.stage1Model)))
+            Text(model.display.localizedFormat("補完モデル: %@", model.modelDisplayName(record.stage2Model)))
             if let reason = record.failureReason {
                 VStack(alignment: .leading, spacing: 5) {
                     if reason == "svg_too_large", let limit = record.failureSVGLimitMiB {

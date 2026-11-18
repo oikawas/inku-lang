@@ -54,11 +54,6 @@ enum DrawPresentation {
         return japanese ? pair.0 : pair.1
     }
 
-    static func modelReference(_ reference: String, empty: String) -> String {
-        guard !reference.isEmpty else { return empty }
-        return reference.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).joined(separator: " / ")
-    }
-
     static func catalogSummary(mode: String, id: String?, catalogs: [ColorCatalogOption], auto: String, random: String, missing: String) -> String {
         if mode == "auto" { return auto }
         if mode == "random" { return random }

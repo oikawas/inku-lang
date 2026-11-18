@@ -78,7 +78,7 @@ public struct AuxiliaryView: View {
         @Bindable var auxiliary = auxiliary
         return VStack(alignment: .leading, spacing: 10) {
             Button { showModels = true } label: {
-                Label(auxiliary.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : auxiliary.modelReference, systemImage: "eye")
+                Label(model.modelDisplayName(auxiliary.modelReference, empty: model.display.localized("Visionモデルを選択")), systemImage: "eye")
             }.inkuTooltip(model.display.tooltip("画像を扱える登録モデルから選択します。", serverKey: "modelSelectionVisionHint"))
             HStack(spacing: 8) {
                 Text(model.display.localized("応答の言語")).inkuFont(12).foregroundStyle(.secondary)

@@ -156,7 +156,7 @@ struct CreationWorkInfoView: View {
                     }
                 }
                 group(copy("provenanceSectionInterpretation", "解釈")) {
-                    row(copy("historyModelInterpretation", "指示書のモデル"), work.stage1Model, hint: "provenanceHintStage1Model")
+                    row(copy("historyModelInterpretation", "指示書のモデル"), work.stage1Model.map { model.modelDisplayName($0) }, hint: "provenanceHintStage1Model")
                     row(model.display.label("指示書の言語", "Instructions language"), languageName(work.instructionLangResolved), hint: "provenanceHintStage1Lang")
                     row(copy("provenanceLabelLangRequested", "要求した言語"), languageName(work.instructionLangRequested), hint: "provenanceHintLangRequested")
                     if let reason = work.interpretFallback, !reason.isEmpty {
@@ -165,7 +165,7 @@ struct CreationWorkInfoView: View {
                     row(copy("provenanceLabelComposeFallback", "作曲フォールバック"), composeFallback(work), hint: "provenanceHintComposeFallback")
                 }
                 group(copy("provenanceSectionPerformance", "演奏")) {
-                    row(copy("historyModelCompletion", "補完のモデル"), work.stage2Model, hint: "provenanceHintStage2Model")
+                    row(copy("historyModelCompletion", "補完のモデル"), work.stage2Model.map { model.modelDisplayName($0) }, hint: "provenanceHintStage2Model")
                     row(model.display.label("補完の言語", "Completion language"), languageName(work.instructionLangResolved), hint: "provenanceHintStage2Lang")
                     if let amplitude = work.variationAmplitude { row(copy("provenanceLabelVariation", "変奏"), amplitude, hint: "provenanceHintVariation") }
                     if let seed = work.variationSeed { row(copy("provenanceLabelVariationSeed", "変奏 seed"), seed, hint: "provenanceHintVariationSeed") }

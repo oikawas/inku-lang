@@ -121,7 +121,7 @@ public struct WorkEditView: View {
 
     private var modelRow: some View {
         DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"),
-            value: DrawPresentation.modelReference(editor.modelReference, empty: model.display.localized("選択してください")),
+            value: model.modelDisplayName(editor.modelReference, empty: model.display.localized("選択してください")),
             help: model.display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
             showsPlan: editor.modelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
             .disabled(editor.running || model.isBusy)

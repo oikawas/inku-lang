@@ -776,6 +776,8 @@ export const en: LangPack = {
 	tooltipSketchToggle: 'Show the prose the sketch-from-life layer wrote. Whether it is open is remembered for your account.',
 	tooltipStatsToggle: "Show the elapsed time and token counts for writing the instructions and completion.",
 	tooltipInputClear: 'Clear text input',
+	tooltipDescriptionNew: 'Clear the description and conditions, detach from the displayed work, and start a new work.',
+	nextDrawChildNotice: 'Draw as a child of the displayed work. Choose “New” to start a new work.',
 	tooltipSubmit: 'Reads your description, chooses composition and touch, and paints one work.',
 	tooltipDdlPaint: "Completes the shown instructions (normalized DDL) if needed and redraws them. It does not rewrite them from the description, so the reading stays unchanged.",
 	tooltipInputTabSingle: 'Write a description in natural language and paint a single work',

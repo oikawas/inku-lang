@@ -748,14 +748,17 @@ export function createWorkState(deps: WorkStateDeps) {
 		};
 	}
 
+	function nextDrawParentNodeId(): string | null {
+		return pendingCanvasAspectDerivation?.parentNodeId
+			?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+	}
+
 	/** Whether the next drawing from the input panel would hang under a parent.
 	 *  Detached, or with nothing on the canvas, it is a new work rather than a
 	 *  refinement, and nothing is being carried forward to ask about. Mirrors
 	 *  the parent expression submit() and replay() compute for themselves. */
 	function submitWouldRefine(): boolean {
-		const parentNodeId = pendingCanvasAspectDerivation?.parentNodeId
-			?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
-		return parentNodeId !== null;
+		return nextDrawParentNodeId() !== null;
 	}
 
 	/** Ask before refining from a work drawn by a fallback, and wait for the
@@ -960,7 +963,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		submitAbortController = abortController;
 		submitStopRequested = false;
 		const canvasAspectDerivation = pendingCanvasAspectDerivation;
-		const submitParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+		const submitParentNodeId = nextDrawParentNodeId();
 		const submitSource = displayedHistoryItem?.source_text ?? displayedHistoryItem?.input ?? input;
 		const submitTextChanged = input.trim() !== submitSource.trim();
 		// Sketching (Stage 0.5). The grain edge fires only when the grain differs from
@@ -1369,6 +1372,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				&& displayedHistoryItem?.data_warnings?.includes('pipeline_diagnostics_invalid') === true;
 		},
 		get canSubmit() { return canSubmit; },
+		get nextDrawParentNodeId() { return nextDrawParentNodeId(); },
 		get currentInstructionText() {
 			if (displayedHistoryItem?.image_ddl || result?.image_ddl || pipelineView?.image_ddl) return '';
 			if (displayedHistoryItem?.input) return displayedHistoryItem.input;

@@ -53,6 +53,13 @@ const uploaded = (id: string) => ({ image_id: id, thumbnail: 'data:image/jpeg;ba
 
 const beforeReview = '画面比2:1。\n背景を黄で埋める。';
 const afterReview = '画面比2:1。\n背景を赤で埋める。';
+test('the next drawing names the displayed parent unless detached', () => {
+	const work = imageWork(async () => { throw new Error('no request expected'); });
+	work.displayedHistoryItem = { ...recordedImage(), lineage_node_id: 'parent-node' };
+	assert.equal(work.nextDrawParentNodeId, 'parent-node');
+	work.lineageDetached = true;
+	assert.equal(work.nextDrawParentNodeId, null);
+});
 function recordedImage(ddl = afterReview) {
 	return { id: 'image-work', input: '', source_text: '', ddl, at: 1, svg: '<svg/>', score: { instructions: [] },
 		lineage_node_id: 'image-node', image_provenance: 'source note', image_ddl: { before_review: beforeReview } };

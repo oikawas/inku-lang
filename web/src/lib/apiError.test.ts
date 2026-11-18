@@ -125,3 +125,7 @@ test('a work saved before the Saijiki migration says so in the page language', (
 		ja.errorSaijikiMigrationRequired
 	);
 });
+
+test('an unknown HTTP code is a sentence in both languages', () => {
+ for (const strings of [ja, en]) assert.equal(describeApiErrorDetail({code: 'http_500'}, 500, strings), strings.pipelineRequestFailed);
+});

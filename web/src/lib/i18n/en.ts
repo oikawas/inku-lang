@@ -101,6 +101,12 @@ export const en: LangPack = {
 	chatgptPersonalModels: 'These models belong to your connection. Use Select models to fetch the list, choose LLM or Vision uses and models to publish, then save. They are not published to other users.',
 	chatgptUsingPlan: 'Using ChatGPT plan',
 	chatgptModelUnavailable: 'The selected ChatGPT model is unavailable. Check the connection or choose a model explicitly.',
+	drawingNoModelsAdmin: "Add a connection in Model settings to draw.",
+	drawingNoModelsUser: "You can draw when an administrator publishes a model.",
+	drawingModelUnavailable: "The selected drawing model is unavailable. Choose an available model.",
+	drawingKeyMissingAdmin: "The drawing model's connection has no API key. Enter one in Model settings to draw.",
+	drawingKeyMissingUser: "The drawing model's connection has no API key. You can draw when an administrator connects it.",
+	drawingOpenConnection: "Open connection settings",
 	chatgptStatus: (code) => ({
 		chatgpt_models_loading: 'Loading models…',
 		chatgpt_connected: 'Connected', chatgpt_signed_out: 'Not connected', chatgpt_exported: 'The receiving host renews this account.',

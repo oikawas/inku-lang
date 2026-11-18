@@ -17,10 +17,10 @@ const moduleSource = `export function create(fetcher) {
   let acceptRefinementModel = null;
   const settings = {opened:false,mode:'settings'};
   let availableModelCatalog = [{id:'stale',models:[]}], availableVisionModelCatalog = [], demoPromptModelCatalog = [];
-  let chatgptPlanAvailable = false, chatgptUsageUrl = null, modelCatalogOwner, stage1Provider = 'openai', stage1Model = 'x', stage2Provider = 'openai', stage2Model = 'x', visionProvider = 'openai', visionModel = 'x', okugakiModel = 'openai:x';
+  let chatgptPlanAvailable = false, chatgptUsageUrl = null, modelCatalogOwner = 'actor', stage1Provider = 'openai', stage1Model = 'x', stage2Provider = 'openai', stage2Model = 'x', visionProvider = 'openai', visionModel = 'x', okugakiModel = 'openai:x';
   const session = {currentUser:{id:'actor'}}, apiFetch = fetcher;
   const console = {warn() {}};
-  const clearModelReferences = () => {}, configureModelReferences = () => {}, loadModelReferences = async () => {}, setModelLabelTable = () => {};
+  const clearModelReferences = () => {}, configureModelReferences = () => {}, loadModelReferences = async () => {}, refreshModelReferences = async () => {}, setModelLabelTable = () => {};
   const getLang = () => 'en';
   const qualifiedModelRef = (provider, model) => provider + ':' + model, demoInstructionModelGroups = groups => groups;
   const splitModelReference = ref => { const index = ref.indexOf(':'); return index < 0 ? {provider:null, model:ref} : {provider:ref.slice(0,index),model:ref.slice(index+1)}; };
@@ -47,10 +47,10 @@ test('model list shows loading, then a failure, and can be loaded again', async 
     catalog:[{id:'openai',label:'OpenAI',models:[{id:'x',label:'X'}]}], settings:{}
   })));
   const first = harness.load();
-  assert.deepEqual(harness.state(), {status:'loading',loaded:false,groups:[]});
+  assert.deepEqual(harness.state(), {status:'loading',loaded:false,groups:[{id:'stale',models:[]}]});
   finish(new Response('', {status:503}));
   await first;
-  assert.deepEqual(harness.state(), {status:'error',loaded:false,groups:[]});
+  assert.deepEqual(harness.state(), {status:'error',loaded:false,groups:[{id:'stale',models:[]}]});
   await harness.load();
   assert.equal(harness.state().status, 'ready');
   assert.equal(harness.state().loaded, true);
@@ -135,3 +135,13 @@ test('refreshing the catalog does not replace a refinement model in progress', a
   assert.equal(harness.state().status, 'ready');
   assert.deepEqual(harness.models(), ['chosen', 'chosen']);
 });
+
+ test('changing accounts clears the previous catalog while the new one loads', async () => {
+  let finish!: (response: Response) => void;
+  const harness = create(() => new Promise<Response>(resolve => { finish = resolve; }));
+  harness.switchUser();
+  const pending = harness.load();
+  assert.deepEqual(harness.state().groups, []);
+  finish(Response.json({catalog:[], settings:{}}));
+  await pending;
+ });

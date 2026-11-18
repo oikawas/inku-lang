@@ -88,9 +88,11 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 	if (typeof detail === 'string' && detail.startsWith(SCORE_NOT_RENDERABLE)) {
 		return strings.errorScoreNotRenderable(detail.slice(SCORE_NOT_RENDERABLE.length));
 	}
+	if (typeof detail === 'string' && /^http_\d+$/.test(detail)) return strings.pipelineRequestFailed;
 	if (typeof detail === 'string' && detail) return detail;
 
 	const structured = object(detail);
+	if (typeof structured?.code === 'string' && /^http_\d+$/.test(structured.code)) return strings.pipelineRequestFailed;
 	if (structured?.code === 'generated_svg_too_large' && typeof structured.limit_mib === 'number' && Number.isFinite(structured.limit_mib)) {
 		return strings.errorGeneratedSvgTooLarge(structured.limit_mib);
 	}

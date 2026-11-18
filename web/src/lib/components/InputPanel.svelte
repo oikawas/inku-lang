@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import type { ModelReadiness } from '$lib/model-readiness';
 	import LabelHighlight from './LabelHighlight.svelte';
 	import Tooltip from './Tooltip.svelte';
 	import BatchPanel from './BatchPanel.svelte';
@@ -30,7 +31,8 @@
 	type Props = {
 		chatgptPlanSelected?: boolean;
 		chatgptUsageUrl?: string | null;
-		chatgptModelAvailable?: boolean;
+		modelReadiness?: ModelReadiness;
+		onOpenConnectionSettings: (provider?: string) => void;
 		inputMode: 'single' | 'image' | 'batch';
 		imageProvenance: string;
 		uploadedImage: UploadedPipelineImage | null;
@@ -131,7 +133,7 @@
 	let {
 		chatgptPlanSelected = false,
 		chatgptUsageUrl = null,
-		chatgptModelAvailable = false,
+		modelReadiness = null, onOpenConnectionSettings,
 		inputMode = $bindable('single'),
 		imageProvenance = $bindable(''), uploadedImage, imageFileName, imageUploading, imageRunning,
 		imageCanvasAspectId, visionModelName, visionModelAvailable,
@@ -401,9 +403,13 @@
 					<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
 				</Tooltip>
 			{/if}
-			{#if chatgptPlanSelected && !chatgptModelAvailable}
-				<p role="status">{t().chatgptModelUnavailable}</p>
-			{/if}
+			{#if modelReadiness}
+                <div role="status">
+                    <p>{modelReadiness.kind === 'chatgpt_unavailable' ? t().chatgptModelUnavailable : modelReadiness.kind === 'no_models_admin' ? t().drawingNoModelsAdmin : modelReadiness.kind === 'no_models_user' ? t().drawingNoModelsUser : modelReadiness.kind === 'unavailable' ? t().drawingModelUnavailable : modelReadiness.kind === 'missing_key_admin' ? t().drawingKeyMissingAdmin : t().drawingKeyMissingUser}</p>
+                    {#if modelReadiness.action === 'choose'}<button class="ghost-btn" type="button" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>{/if}
+                    {#if modelReadiness.action === 'settings'}<button class="ghost-btn" type="button" onclick={() => onOpenConnectionSettings(modelReadiness?.provider)}>{t().drawingOpenConnection}</button>{/if}
+                </div>
+            {/if}
 		{/if}
 
 		{#if error}<p class="error-text">{error}</p>{/if}

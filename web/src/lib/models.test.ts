@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
+import { modelReadiness, missingApiKey } from './model-readiness.ts';
 import { modelDisplayName, modelShortName, modelStripName, pickerSelection, splitModelReference, type ProviderGroup } from './models.ts';
 
 const GROUPS: ProviderGroup[] = [
@@ -87,4 +88,16 @@ test('I-297: the picker knows when it has nothing to offer, and when the stored 
 	assert.equal(gone.selected, null);
 	assert.equal(gone.notInList, true);
 	assert.equal(gone.groups.length, GROUPS.filter((group) => group.models.length > 0).length);
+});
+
+test('drawing readiness distinguishes unpublished models, missing keys, sign-in and loading', () => {
+ const groups = [{id:'openai', label:'OpenAI', requires_api_key:true, api_key_set:false, models:[{id:'example', label:'example', qualified_id:'openai:example'}]}, {id:'local', label:'Local', requires_api_key:false, api_key_set:false, models:[{id:'local', label:'local', qualified_id:'local:local'}]}] as ProviderGroup[];
+ assert.equal(missingApiKey(groups[0]), true);
+ assert.equal(missingApiKey(groups[1]), false);
+ assert.deepEqual(modelReadiness('ready', groups, 'openai:example', true, false), {kind:'missing_key_admin',action:'settings',provider:'openai'});
+ assert.deepEqual(modelReadiness('ready', groups, 'openai:example', false, false), {kind:'missing_key_user',action:'choose',provider:'openai'});
+ assert.equal(modelReadiness('loading', groups, 'openai:example', true, false), null);
+ assert.deepEqual(modelReadiness('ready', groups, 'chatgpt:example', true, false), {kind:'chatgpt_unavailable',action:null});
+ assert.deepEqual(modelReadiness('ready', groups, 'missing:example', true, false), {kind:'unavailable',action:'choose'});
+ assert.deepEqual(modelReadiness('ready', [], '', false, false), {kind:'no_models_user',action:null});
 });

@@ -976,6 +976,8 @@ revision** — is a premise of the design.
 
 ### 7.2 Screen Composition (in concept)
 
+Simple UI also shows `New`. When work tools are hidden, the left panel hides `Change the composition and laws` and `Change the layout` while retaining the composition and laws record.
+
 The current reference UI places description input and interpretation results,
 the drawing canvas, the history strip, and refinement on the making screen.
 Saved works are managed in a separate Library screen. Moving between the two

@@ -72,6 +72,7 @@ export type ProviderGroup = {
 	kind?: string;
 	builtin?: boolean;
 	requires_api_key?: boolean;
+	api_key_set?: boolean;
 	memo?: string;
 	// A sign-in service's group ("Sign in with ChatGPT") carries its core labels in both
 	// languages and its abbreviation; the Server puts it first.

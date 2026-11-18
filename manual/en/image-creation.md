@@ -56,6 +56,10 @@ The user menu, settings, one description and Paint action, and the canvas are al
 
 This manual assumes Full UI. Under Simple UI some of the operations described here are not on screen.
 
+`New` remains available on the Describe tab in Simple UI. It clears the displayed work and description and restores the drawing defaults. The composition and laws record remains visible; `Change the composition and laws` and `Change the layout` are hidden.
+
+Before drawing, a notice appears if the chosen model is unavailable or its connection lacks an API key. Choose another model, or an administrator can open connection settings and enter the key. The Draw button remains available.
+
 ### Changing your own password
 
 1. Press your user name in the left app rail and choose `Profile`.

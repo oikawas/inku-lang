@@ -942,7 +942,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		try {
 			await ensureVisibleLineageParentId();
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
+			error = cause instanceof PipelineApiError ? describeApiError(cause.detail, cause.status) : cause instanceof Error ? cause.message : String(cause);
 			return;
 		}
 
@@ -1003,7 +1003,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			}
 		} catch (cause) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
-				error = cause instanceof Error ? cause.message : String(cause);
+				error = cause instanceof PipelineApiError ? describeApiError(cause.detail, cause.status) : cause instanceof Error ? cause.message : String(cause);
 				// The work the author opened meanwhile keeps its picture.
 				if (pipelineController.lastRunWasShown) result = null;
 			}
@@ -1076,7 +1076,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			});
 		} catch (cause) {
 			if (!batch.interrupted) {
-				error = cause instanceof Error ? cause.message : String(cause);
+				error = cause instanceof PipelineApiError ? describeApiError(cause.detail, cause.status) : cause instanceof Error ? cause.message : String(cause);
 				result = null;
 			}
 		} finally {

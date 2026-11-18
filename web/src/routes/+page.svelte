@@ -63,12 +63,13 @@
 		type ModelOption
 	} from '$lib/models';
 	import { setModelLabelTable } from '$lib/modelMeta';
-	import { clearChatGPTReferences, clearModelReferences, configureModelReferences, disableModelReferences, loadModelReferences, type ReferenceQuery } from '$lib/modelReferences';
+	import { clearChatGPTReferences, clearModelReferences, configureModelReferences, disableModelReferences, loadModelReferences, refreshModelReferences, type ReferenceQuery } from '$lib/modelReferences';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { describeApiErrorDetail } from '$lib/apiError';
+	import { modelReadiness } from '$lib/model-readiness';
 	import { createApiFetch } from '$lib/transport/api-fetch';
 	import { createSessionState, type UserItem, type UserModelSettings } from '$lib/features/session/state.svelte';
 	import { createWorkState } from '$lib/features/work/state.svelte';
@@ -514,6 +515,8 @@
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	let modelCatalogStatus = $state<'loading' | 'ready' | 'error'>('loading');
+	let modelSettingsTarget = $state<string | null>(null);
+	setContext('model-settings-target', { get: () => modelSettingsTarget, clear: () => { modelSettingsTarget = null; } });
 	setContext('model-catalog-load', { status: () => modelCatalogStatus, retry: () => loadAvailableModels() });
 
 	/**
@@ -1148,10 +1151,12 @@
 		configureModelReferences(apiFetch, getLang);
 		modelCatalogStatus = 'loading';
 		availableModelsLoaded = false;
-		clearModelReferences();
-		availableModelCatalog = [];
-		availableVisionModelCatalog = [];
-		demoPromptModelCatalog = [];
+		if (modelCatalogOwner !== userId) {
+            clearModelReferences();
+            availableModelCatalog = [];
+            availableVisionModelCatalog = [];
+            demoPromptModelCatalog = [];
+        }
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1167,7 +1172,7 @@
 				const model = userModels?.[`${stage}_model`];
 				if (provider && model) queries.push({ action: 'qualify_ref', provider, ref: model }, { action: 'split_ref', ref: model });
 			}
-			await loadModelReferences(queries);
+			await refreshModelReferences(queries, () => session.currentUser?.id === userId && request === modelCatalogRequest);
 			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
 			for (const group of groups) for (const model of group.models) model.qualified_id = qualifiedModelRef(group.id, model.id);
 			await loadModelReferences(groups.flatMap((group) => group.models.map((model): ReferenceQuery => ({action: 'split_ref', ref: model.qualified_id ?? ''}))));
@@ -2918,7 +2923,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<InputPanel
 						chatgptPlanSelected={(work.drawOptions.models.stage1 ?? '').startsWith('chatgpt:')}
 						{chatgptUsageUrl}
-						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.qualified_id === work.drawOptions.models.stage1))}
+						modelReadiness={modelReadiness(modelCatalogOwner === session.currentUser?.id ? modelCatalogStatus : 'loading', availableModelCatalog, work.drawOptions.models.stage1 ?? '', session.isAdmin, chatgptPlanAvailable)}
+						onOpenConnectionSettings={(provider) => { modelSettingsTarget = provider ?? null; settings.openSettings('models'); }}
 						sketchMode={work.sketchMode}
 						wild={work.drawOptions.wild === 'on'}
 						onSelectWild={(value) => { if ((work.drawOptions.wild === 'on') !== value) work.invalidateWorkOptions(); work.drawOptions.wild = value ? 'on' : 'off'; }}
@@ -3977,7 +3983,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-drawing-settings :global(.current-selection),
 	.ui-hide-drawing-settings :global(.conditions-heading),
 	.ui-hide-drawing-settings :global(.condition-rows),
-	.ui-hide-drawing-settings :global(.input-label .tooltip-wrap),
 	.ui-hide-ddl-tools .ddl-new-action,
 	.ui-hide-ddl-tools :global(.ddl-viewer),
 	.ui-hide-detail-status .thinking-details,
@@ -3988,6 +3993,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-work-tools :global(.right-tabs),
 	/* The work's action menu left the tabs' row for the canvas's top right. */
 	.ui-hide-work-tools :global(.canvas-work-actions),
+	.ui-hide-work-tools :global(.comp-actions),
 	/* The canvas corner rows are named button by button rather than as whole
 	   rows. Two of the controls now standing there answer to detail_status and
 	   not to work_tools, and a rule on the row would take them with it in any

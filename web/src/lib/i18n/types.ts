@@ -102,6 +102,12 @@ export interface LangPack {
 	chatgptPersonalModels: string;
 	chatgptUsingPlan: string;
 	chatgptModelUnavailable: string;
+	drawingNoModelsAdmin: string;
+	drawingNoModelsUser: string;
+	drawingModelUnavailable: string;
+	drawingKeyMissingAdmin: string;
+	drawingKeyMissingUser: string;
+	drawingOpenConnection: string;
 	chatgptStatus: (code: string) => string;
 	pipelineDescriptionLabel: string;
 	pipelineLegacyForkHint: string;

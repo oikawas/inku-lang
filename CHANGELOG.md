@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- When a work opens, Lift the stroke limit comes from the tab default instead of the work's record, or is off if the default has no value. The recorded value remains in the work's conditions strip. Sketch, composition, and the other choices keep their existing rules.
+
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.
 
 - Android: clean documents and execution records no longer linked to a work when discarding candidates, permanently deleting a work, and starting the app. Active documents, parent relationships, and restored executions are preserved.

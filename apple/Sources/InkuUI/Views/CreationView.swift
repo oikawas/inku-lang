@@ -4,6 +4,25 @@ import SwiftUI
 import ImageIO
 import UniformTypeIdentifiers
 
+private struct CreationUpperHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+private struct CreationActionHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+private struct CreationFooterHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+enum CreationPanelSizing {
+    static func upperHeight(content: CGFloat, available: CGFloat, action: CGFloat, footer: CGFloat) -> CGFloat {
+        min(max(0, content), max(0, available - action - footer - 140))
+    }
+}
+
 struct BatchWorkspaceSelection {
     private enum Display { case history, latest, row(SavedWork, String) }
     private var display = Display.history
@@ -211,6 +230,9 @@ struct CreationView: View {
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
     @State private var imagePreview: CGImage?
+    @State private var upperContentHeight: CGFloat = .greatestFiniteMagnitude
+    @State private var actionRowHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
     @State private var savedImageRecord: ExactJSON?
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
     @State private var batchKind = "description"
@@ -614,6 +636,9 @@ struct CreationView: View {
                 batchKindPicker.padding(.vertical, 8)
                 batchTextPanel
             } else {
+              GeometryReader { geometry in
+               let hasLowerScroll = !isBatch && (workspaceWork != nil || model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty)
+               VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         if isBatch { batchKindPicker; imageFolderPanel }
@@ -623,13 +648,23 @@ struct CreationView: View {
                             if display.visible("drawing_settings") { nextConditions }
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
+                        .background(GeometryReader { proxy in
+                            Color.clear.preference(key: CreationUpperHeightKey.self, value: proxy.size.height)
+                        })
                 }
-                .frame(maxHeight: .infinity)
+                .frame(height: hasLowerScroll ? CreationPanelSizing.upperHeight(content: upperContentHeight, available: geometry.size.height,
+                                                                                action: actionRowHeight, footer: footerHeight) : nil)
+                .frame(maxHeight: hasLowerScroll ? nil : .infinity)
+                .onPreferenceChange(CreationUpperHeightKey.self) { upperContentHeight = $0 }
                 Group {
                     if isBatch { imageFolderActions }
                     else if isImage { imageActions }
                     else { generationAction }
                 }.padding(.vertical, 8)
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: CreationActionHeightKey.self, value: proxy.size.height)
+                    })
+                    .onPreferenceChange(CreationActionHeightKey.self) { actionRowHeight = $0 }
                 if isBatch { statusFooter }
                 if !isBatch {
                     if let work = workspaceWork {
@@ -650,7 +685,13 @@ struct CreationView: View {
                         newDDLHeading
                     }
                     statusFooter
+                        .background(GeometryReader { proxy in
+                            Color.clear.preference(key: CreationFooterHeightKey.self, value: proxy.size.height)
+                        })
+                        .onPreferenceChange(CreationFooterHeightKey.self) { footerHeight = $0 }
                 }
+               }
+              }
             }
         }
         .padding(.horizontal, compactWindow ? 12 : 16)
@@ -820,7 +861,9 @@ struct CreationView: View {
                 } else {
                     HStack {
                         Button(display.localized("続きから描く")) { startImageBatch(restart: false) }
+                            .buttonStyle(InkuPaintButtonStyle())
                         Button(display.localized("最初から描く")) { startImageBatch(restart: true) }
+                            .buttonStyle(InkuGhostButtonStyle())
                     }.disabled(model.isBusy || automation.isOccupied || imageBatch.total == 0 || model.imageVisionModel.isEmpty)
                 }
             }
@@ -894,7 +937,7 @@ struct CreationView: View {
                 Button(display.webCopy("generateButton", "描画する")) {
                     if model.imageWarningAcknowledged { Task { await model.generate() } }
                     else { showImageNotice = true }
-                }.buttonStyle(.borderedProminent).disabled(!model.canGenerate || controlsDisabled)
+                }.buttonStyle(InkuPaintButtonStyle()).disabled(!model.canGenerate || controlsDisabled)
             }
     }
 

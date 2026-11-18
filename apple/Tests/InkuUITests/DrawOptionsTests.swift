@@ -8,6 +8,12 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class DrawOptionsTests: XCTestCase {
+    func testUpperPanelUsesContentHeightAndReservesTheWorkRecord() {
+        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 320, available: 900, action: 60, footer: 20), 320)
+        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 900, available: 500, action: 60, footer: 20), 280)
+        XCTAssertEqual(CreationPanelSizing.upperHeight(content: 900, available: 180, action: 60, footer: 20), 0)
+    }
+
     func testImageFolderSummaryFormatsCountsInBothLanguages() {
         let display = DisplaySettings()
         display.preferences.language = "ja"

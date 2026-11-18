@@ -5,6 +5,7 @@ import SwiftUI
     @Bindable var model: AppModel
     let sketch: String
     let onSketch: (String) -> Void
+    var wild: Bool? = nil
     var frozenRoute: String? = nil
     var frozenComposition: Bool? = nil
     private var display: DisplaySettings { model.display }
@@ -33,7 +34,11 @@ import SwiftUI
             }
             GridRow {
                 drawLabel(display.label("流れ", "Flow"))
-                drawingFlow
+                HStack {
+                    drawingFlow
+                    Spacer(minLength: 0)
+                    if wild == true { Text(display.webCopy("wildButton", "筆致制限を外す")).inkuFont(11).foregroundStyle(.secondary) }
+                }
             }
         }
     }

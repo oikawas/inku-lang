@@ -20,15 +20,10 @@ struct BatchConditionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(model.display.webCopy("batchNextConditionsLabel", "次のバッチの描画条件"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button { showDetails = true } label: { Image(systemName: "ellipsis") }
-                    .buttonStyle(InkuGhostButtonStyle())
-                    .accessibilityLabel(model.display.localized("生成条件の詳細"))
-                    .popover(isPresented: $showDetails) { details.inkuPopoverContent() }
-            }.padding(.bottom, 2)
+            DrawingConditionsHeading(model: model, batch: true, canvasID: shownCanvasID,
+                                     showPaperPicker: $showPaperPicker, showDetails: $showDetails)
+                .popover(isPresented: $showDetails) { details.inkuPopoverContent() }
+                .padding(.bottom, 2)
             DrawingConditionRow(display: model.display, label: model.display.webCopy("modelButton", "モデル"), value: modelSummary,
                                 help: tip("次のバッチで使う描画モデルを選びます。")) { showModelPicker = true }
             Rectangle().fill(InkuColor.border).frame(height: 1)
@@ -36,12 +31,10 @@ struct BatchConditionsView: View {
                                 help: tip("次のバッチで使う配色を選びます。")) { showColorCatalogs = true }
             .disabled(model.catalogs.isEmpty)
             Rectangle().fill(InkuColor.border).frame(height: 1)
-            DrawConditionsView(model: model, sketch: shownSketchMode, onSketch: { model.sketchMode = $0 },
+            DrawConditionsView(model: model, sketch: shownSketchMode, onSketch: { model.sketchMode = $0 }, wild: shownWild,
                                frozenRoute: frozen == nil ? nil : (frozenRequest?.drawRoute ?? "stages"),
                                frozenComposition: frozen == nil ? nil : (frozenRequest?.descriptionComposition ?? false))
                 .padding(.bottom, 8)
-            Rectangle().fill(InkuColor.border).frame(height: 1)
-            DrawingCompactConditions(model: model, wild: shownWild, canvasID: shownCanvasID, showPaperPicker: $showPaperPicker)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(disabled)

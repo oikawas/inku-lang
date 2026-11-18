@@ -33,7 +33,7 @@ public struct DrawOptions: Codable, Equatable, Sendable {
 
 /// Web INPUT_PANEL_ORDER, shared by the canvas strip and its ordering check.
 enum DrawOptionPresentation {
-    static let inputOrder = ["models", "catalog", "route", "sketch", "composition", "wild", "canvas_aspect"]
+    static let inputOrder = ["canvas_aspect", "models", "catalog", "route", "sketch", "composition", "wild"]
     static func keys(isImage: Bool) -> [String] {
         inputOrder.filter { !isImage || !["route", "sketch", "composition"].contains($0) }
     }

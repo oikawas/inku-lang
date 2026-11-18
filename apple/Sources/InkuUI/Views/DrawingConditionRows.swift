@@ -8,6 +8,7 @@ struct DrawingConditionRow: View {
     let value: String
     let help: String
     var showsPlan = false
+    var unavailable = false
     let action: () -> Void
 
     var body: some View {
@@ -19,8 +20,9 @@ struct DrawingConditionRow: View {
                     .buttonStyle(InkuGhostButtonStyle()).inkuTooltip(help)
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle)
+                Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle).foregroundStyle(unavailable ? Color.red : Color.primary)
                     .inkuTooltip(display.tooltipValue(value))
+                if unavailable { Text(display.webCopy("imageVisionUnavailableShort", "画像に使えません")).inkuFont(11).foregroundStyle(.red) }
                 if showsPlan {
                     Link(display.webCopy("chatgptManageUsage", "利用枠を管理"), destination: display.signInUsageURL() ?? URL(string: "https://chatgpt.com/settings/usage")!)
                         .inkuFont(11).inkuTooltip(display.tooltip("ChatGPTプランの使用状況を開きます。", serverKey: "chatgptManageUsage"))
@@ -32,34 +34,39 @@ struct DrawingConditionRow: View {
 }
 
 @MainActor
-struct DrawingCompactConditions: View {
+struct DrawingConditionsHeading: View {
     @Bindable var model: AppModel
-    let wild: Bool?
+    let batch: Bool
     let canvasID: String?
+    var imageSelection = false
     @Binding var showPaperPicker: Bool
+    @Binding var showDetails: Bool
+    var hasDetails = true
     private var display: DisplaySettings { model.display }
     private var canvas: String {
         guard let canvasID else { return display.localized("未記録") }
+        if imageSelection && canvasID == "image" { return display.localized("画像の縦横比を使う") }
         return model.canvases.first { $0.id == canvasID }?.label ?? canvasID
     }
     var body: some View {
-        WrappingHStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Text(display.label("オプション", "Options")).inkuFont(11).foregroundStyle(.tertiary)
-                DrawSwitchChip(title: display.webCopy("wildButton", "筆致制限を外す"), on: wild == true) { model.wild.toggle() }
-                    .accessibilityValue(display.localized(wild.map { $0 ? "オン" : "オフ" } ?? "未記録"))
-                    .inkuTooltip(display.tooltip("次の作品の筆致を規則から外します。", serverKey: "tooltipInputWild"))
-                if wild == nil { Text(display.localized("未記録")).inkuFont(11).foregroundStyle(.secondary) }
-            }
-            Button { showPaperPicker = true } label: {
-                Text(display.webCopy("canvasAspectButton", "キャンバス") + (display.preferences.language == "ja" ? "：" : ": ") + canvas)
-            }
+        HStack(spacing: 6) {
+            Text(batch ? display.webCopy("batchNextConditionsLabel", "次のバッチの描画条件") : display.webCopy("nextWorkConditions", "次に描く条件"))
+                .inkuFont(12).foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            Text(display.webCopy("canvasAspectButton", "キャンバス")).inkuFont(11).foregroundStyle(.secondary)
+            Text(canvas).inkuFont(12).lineLimit(1).truncationMode(.middle)
+            Button(display.webCopy("editButton", "変更")) { showPaperPicker = true }
             .buttonStyle(InkuGhostButtonStyle())
             .inkuTooltip(display.tooltip("用紙の形と意図を見て、次の作品の用紙を選びます。", serverKey: "tooltipInputCanvas"))
             .popover(isPresented: $showPaperPicker) {
-                CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display).inkuPopoverContent()
+                CreationPaperPicker(model: model, imageSelection: imageSelection) { showPaperPicker = false }.environment(display).inkuPopoverContent()
             }
             .accessibilityValue(canvas)
-        }.padding(.top, 2)
+            if hasDetails {
+                Button { showDetails = true } label: { Image(systemName: "ellipsis") }
+                    .buttonStyle(InkuGhostButtonStyle())
+                    .accessibilityLabel(display.localized("生成条件の詳細"))
+            }
+        }
     }
 }

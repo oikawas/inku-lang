@@ -8,6 +8,12 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class DrawOptionsTests: XCTestCase {
+    func testRecordedWildKeepsDefault() throws {
+        var defaults = DrawOptionsCore.release
+        defaults["describe"]?.wild = "off"
+        let options = try DrawOptionsCore.forRecorded(["wild": true], tab: "describe", defaults: defaults)
+        XCTAssertEqual(options.wild, "off")
+    }
     func testImplicitClearsPreserveChoicesAndExplicitNewResets() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("inku-clear-choice-\(UUID())")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -124,12 +130,10 @@ import XCTest
         let input = try XCTUnwrap(creation.components(separatedBy: "private var nextConditions: some View {").dropFirst().first?.components(separatedBy: "private var catalogSummary:").first)
         XCTAssertLessThan(try XCTUnwrap(input.range(of: "modelButton")?.lowerBound), try XCTUnwrap(input.range(of: "colorCatalogButton")?.lowerBound))
         XCTAssertLessThan(try XCTUnwrap(input.range(of: "colorCatalogButton")?.lowerBound), try XCTUnwrap(input.range(of: "DrawConditionsView")?.lowerBound))
-        XCTAssertLessThan(try XCTUnwrap(input.range(of: "DrawConditionsView")?.lowerBound), try XCTUnwrap(input.range(of: "DrawingCompactConditions")?.lowerBound))
+        XCTAssertLessThan(try XCTUnwrap(input.range(of: "DrawingConditionsHeading")?.lowerBound), try XCTUnwrap(input.range(of: "modelButton")?.lowerBound))
         let steps = try String(contentsOf: root.appendingPathComponent("apple/Sources/InkuUI/Views/DrawConditionsView.swift"), encoding: .utf8)
         XCTAssertLessThan(try XCTUnwrap(steps.range(of: "routeButton(")?.lowerBound), try XCTUnwrap(steps.range(of: "DrawSwitchChip(title:")?.lowerBound))
-        let compact = try String(contentsOf: root.appendingPathComponent("apple/Sources/InkuUI/Views/DrawingConditionRows.swift"), encoding: .utf8)
-        let compactBody = try XCTUnwrap(compact.components(separatedBy: "struct DrawingCompactConditions:").last)
-        XCTAssertLessThan(try XCTUnwrap(compactBody.range(of: "wildButton")?.lowerBound), try XCTUnwrap(compactBody.range(of: "canvasAspectButton")?.lowerBound))
+        XCTAssertTrue(steps.contains("wild == true"))
     }
     func testCustomProvidersSurviveSavingAndReading() throws {
         let providers = ["custom-a", "custom-b", "custom-c"].map { id in

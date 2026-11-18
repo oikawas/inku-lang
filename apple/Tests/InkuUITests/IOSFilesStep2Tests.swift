@@ -16,11 +16,13 @@ final class IOSFilesStep2Tests: XCTestCase {
         let fromFile = ImageProvenance.text(url: url, includeFileName: true, includeExif: true, language: "ja")
         let fromBytes = ImageProvenance.text(data: data, fileName: url.lastPathComponent, includeFileName: true, includeExif: true, language: "ja")
         XCTAssertEqual(fromBytes, fromFile)
-        XCTAssertTrue(fromFile.contains("カメラ: Inku Test"), fromFile)
+        XCTAssertEqual(fromFile, "ファイル名: \(url.lastPathComponent) · 2026:10:20 14:32:05\nApple iPhone 15 Pro · f/1.8 · 1/120 s · ISO 64 · 6.9 mm")
 
         // A photo has no file name: only the camera fields remain.
         let photo = ImageProvenance.text(data: data, fileName: nil, includeFileName: true, includeExif: true, language: "ja")
-        XCTAssertEqual(photo, fromFile.split(separator: "\n").dropFirst().joined(separator: "\n"))
+        XCTAssertEqual(photo, "2026:10:20 14:32:05\nApple iPhone 15 Pro · f/1.8 · 1/120 s · ISO 64 · 6.9 mm")
+        XCTAssertEqual(ImageProvenance.text(data: data, fileName: "x.jpg", includeFileName: true, includeExif: false, language: "ja"), "ファイル名: x.jpg")
+        XCTAssertEqual(ImageProvenance.text(data: data, fileName: "x.jpg", includeFileName: false, includeExif: false, language: "ja"), "")
     }
 
     func testBackupGenerationDefaultOnThisPlatform() {
@@ -41,8 +43,10 @@ final class IOSFilesStep2Tests: XCTestCase {
         let data = NSMutableData()
         let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil))
         let properties: [CFString: Any] = [
-            kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFMake: "Inku", kCGImagePropertyTIFFModel: "Test"],
-            kCGImagePropertyExifDictionary: [kCGImagePropertyExifDateTimeOriginal: "2026:11:08 18:30:00", kCGImagePropertyExifFNumber: 2.8],
+            kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFMake: "Apple", kCGImagePropertyTIFFModel: "iPhone 15 Pro"],
+            kCGImagePropertyExifDictionary: [kCGImagePropertyExifDateTimeOriginal: "2026:10:20 14:32:05", kCGImagePropertyExifFNumber: 1.78,
+                                            kCGImagePropertyExifExposureTime: 1.0 / 120.0, kCGImagePropertyExifISOSpeedRatings: [64],
+                                            kCGImagePropertyExifFocalLength: 6.86],
         ]
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         XCTAssertTrue(CGImageDestinationFinalize(destination))

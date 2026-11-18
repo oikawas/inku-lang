@@ -70,6 +70,19 @@ struct BatchPanelView: View {
     }
 
     private var inputContent: some View {
+        Group {
+            if phone {
+                batchContent(includeActions: true)
+            } else {
+                ScrollView { batchContent(includeActions: false) }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        actions.padding(.vertical, 8).background(InkuColor.bg)
+                    }
+            }
+        }
+    }
+
+    private func batchContent(includeActions: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             input
             if automation.canResume && !automation.running { resumeCard }
@@ -77,7 +90,7 @@ struct BatchPanelView: View {
             if model.display.visible("drawing_settings") {
                 BatchConditionsView(model: model, automation: automation)
             }
-            actions
+            if includeActions { actions }
             if automation.running { BatchObservationCards(model: model, automation: automation) }
             if !automation.running, automation.failedCount > 0 { failureReport }
             if automation.uncertainCount > 0 { issueResults }
@@ -122,11 +135,6 @@ struct BatchPanelView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
                     .overlay(alignment: .bottomTrailing) { resizeHandle }
-                // BatchPanel.svelte:200: 「N 件」 while there is something to draw and no run.
-                if paintableCount > 0 && !automation.running {
-                    Text(model.display.preferences.language == "en" ? "\(paintableCount) items" : "\(paintableCount) 件")
-                        .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
-                }
                 HStack(spacing: 8) {
                     if !automation.running {
                         Button(model.display.webCopy("clearInputBtn", "新規作成")) {
@@ -137,6 +145,11 @@ struct BatchPanelView: View {
                             .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
                     }
                     if !automation.batchPromptHistory.isEmpty { inputHistory }
+                    Spacer(minLength: 0)
+                    if paintableCount > 0 && !automation.running {
+                        Text(model.display.preferences.language == "en" ? "\(paintableCount) items" : "\(paintableCount) 件")
+                            .inkuFont(12).foregroundStyle(.secondary).monospacedDigit().fixedSize()
+                    }
                 }
             }
             if let error = automation.historyErrorText {

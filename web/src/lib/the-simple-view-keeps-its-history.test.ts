@@ -109,6 +109,7 @@ test('T-2: full mode shows all seven groups', () => {
 });
 
 test('T-3: a custom mode is built on the simple defaults', () => {
+	assert.equal(resolveUiVisibility('custom', {}).history, true);
 	// What the custom mode adds is added to the simple UI, so the history the
 	// simple UI now has is there too unless the user turned it off by name.
 	assert.deepEqual(resolveUiVisibility('custom', { work_tools: true }), {

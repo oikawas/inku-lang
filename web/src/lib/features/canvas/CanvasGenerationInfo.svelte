@@ -340,7 +340,7 @@
 >
 	<header class="generation-info-head">
 		<strong>{isJapanese ? '生成情報' : 'Provenance'}</strong>
-		<button type="button" class="generation-info-close" onclick={onClose} aria-label="Close">&times;</button>
+		<button type="button" class="generation-info-close" onclick={onClose} aria-label={t().closeLabel}>&times;</button>
 	</header>
 	<div class="generation-info-tabs" role="tablist">
 		<button type="button" role="tab" aria-selected={tab === 'details'} class:active={tab === 'details'} onclick={() => (tab = 'details')}>{isJapanese ? '詳細' : 'Details'}</button>

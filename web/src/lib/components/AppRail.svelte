@@ -116,6 +116,7 @@
 					type="button"
 					aria-haspopup="menu"
 					aria-expanded={userMenuOpen}
+					aria-label={`${singleUserMode ? t().profileButton : t().tooltipAppRailUser} (${currentUser.email || currentUser.username})`}
 					onclick={onToggleUserMenu}
 				>
 					<span class="rail-icon user-icon" aria-hidden="true"></span>
@@ -134,7 +135,7 @@
 
 		<div class="rail-menu-wrap" bind:this={uiModeWrapEl}>
 			<Tooltip placement="right" text={t().uiModeLabel} disabled={uiModeOpen}>
-				<button class="rail-action" class:active={uiModeOpen} type="button" aria-haspopup="menu" aria-expanded={uiModeOpen} onclick={() => (uiModeOpen = !uiModeOpen)}>
+				<button class="rail-action" class:active={uiModeOpen} type="button" aria-haspopup="menu" aria-expanded={uiModeOpen} aria-label={t().uiModeLabel} onclick={() => (uiModeOpen = !uiModeOpen)}>
 					<!-- Three bars, not ::before/::after: the icon needs three of them,
 					     and which are solid is what says which mode is on. -->
 					<span class="rail-icon ui-mode-icon ui-mode-{uiMode}" aria-hidden="true">
@@ -173,7 +174,7 @@
 		</Tooltip>
 
 		<Tooltip placement="right" text={t().tooltipAppRailSettings}>
-			<button class="rail-action" class:active={settingsOpen} onclick={onOpenSettings}>
+			<button class="rail-action" class:active={settingsOpen} aria-label={t().tooltipAppRailSettings} onclick={onOpenSettings}>
 				<span class="rail-icon gear-icon" aria-hidden="true"></span>
 				{#if expanded}<span class="rail-label">{t().settingsButton}</span>{/if}
 			</button>
@@ -181,7 +182,7 @@
 
 		{#if showAuxiliary}
 		<Tooltip placement="right" text={t().tooltipAppRailTheme}>
-			<button class="rail-action" onclick={onToggleTheme} disabled={themeSaving}>
+			<button class="rail-action" aria-label={t().tooltipAppRailTheme} onclick={onToggleTheme} disabled={themeSaving}>
 				<span class="rail-icon theme-icon" class:dark={darkMode} aria-hidden="true"></span>
 				{#if expanded}<span class="rail-label">{darkMode ? t().themeLight : t().themeDark}</span>{/if}
 			</button>

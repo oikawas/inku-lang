@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: Aligned Custom UI visibility with its controls and refined Saijiki and settings text, the lineage heading, canvas controls, and rail accessibility labels.
+
 - Web: Drawing guidance now reports model availability and missing connection keys. Simple UI shows New and hides refinement actions. Model names remain visible during refresh, and retry and error reporting are corrected.
 
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.

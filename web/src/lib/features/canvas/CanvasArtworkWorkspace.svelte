@@ -547,11 +547,13 @@
 		   button row above the caption so its bubbles do not pass behind it. */
 		z-index: 13;
 		display: flex;
+		flex-wrap: wrap;
+		max-width: max(34px, calc(50% - 96px));
 		align-items: center;
 		gap: 6px;
 	}
 	.canvas-corner-left { left: 18px; }
-	.canvas-corner-right { right: 18px; }
+	.canvas-corner-right { right: 18px; justify-content: flex-end; }
 	.canvas-icon-btn {
 		width: 34px;
 		height: 34px;

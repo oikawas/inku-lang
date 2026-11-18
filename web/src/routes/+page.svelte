@@ -544,6 +544,7 @@
 			if (!visibility.work_tools) outputTab = 'canvas';
 		}
 	});
+	setContext('ddl-tools-visible', () => session.uiVisibility.ddl_tools);
 	const batch = new BatchState<BatchPaintResult, Iteration>({
 		apiFetch,
 		signedIn: () => session.currentUser !== null,
@@ -2057,7 +2058,7 @@ const dialogCompletionWork: CompletionRangeWork | null = $derived.by(() => {
 const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(work.displayedHistoryItem?.ddl ?? work.ddl));
 	const rangeEditingLocked = $derived(demoRunning || work.loading || work.reloading || refinementSession.gridBusy);
 	function insertDdlWordFromDrawer(word: string): void {
-		if (ddlDialogOpen || !canEditCurrentDdl || rangeEditingLocked) return;
+		if (!session.uiVisibility.ddl_tools || ddlDialogOpen || !canEditCurrentDdl || rangeEditingLocked) return;
 		ddlViewer?.insertWord(word);
 	}
 	$effect(() => {

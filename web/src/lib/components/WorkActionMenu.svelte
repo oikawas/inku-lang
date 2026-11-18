@@ -11,7 +11,7 @@
 </script>
 
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { getContext, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 
@@ -28,6 +28,7 @@
 	};
 
 	let { node, isJapanese, variant, open, available = undefined, unavailableReason, onRequestOpen, onOpenChange, onAction }: Props = $props();
+	const ddlToolsVisible = getContext<(() => boolean) | undefined>('ddl-tools-visible');
 	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models', 'composition-form']);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
@@ -136,7 +137,7 @@
 			<div class="work-action-group" role="group" aria-label={t().workActionGroupForm}>
 				<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupForm}</div>
 				<button type="button" role="menuitem" onclick={(event) => select('layout', event)}>{t().canvasVaryComposition}</button>
-				<button type="button" role="menuitem" onclick={(event) => select('instructions', event)}>{t().workActionInstructions}</button>
+				{#if ddlToolsVisible?.() !== false}<button type="button" role="menuitem" onclick={(event) => select('instructions', event)}>{t().workActionInstructions}</button>{/if}
 			</div>
 			{#if !ddlOrigin}
 				<div class="work-action-group" role="group" aria-label={t().workActionGroupDescription}>

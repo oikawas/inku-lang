@@ -773,7 +773,7 @@ $effect(() => {
 					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
 					onValidateSnapshot={onValidateSavedWorkExport}
 				/>
-				<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
+				<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をごみ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をごみ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
 					<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
 				</button>
 			</div>
@@ -890,7 +890,7 @@ $effect(() => {
 										{#if node.history}<HistoryThumbnail item={node.history} size="manager" />{:else}<span>{withheldLabel(node) ?? (isJapanese ? '削除済み' : 'Deleted')}</span>{/if}
 									</div>
 									{#if node.history?.display_label}<div class="display-label">{node.history.display_label}</div>{/if}
-									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}
+									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ごみ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}
 									<div class="meta" title={node.history ? workText(node) : (node.description_hash ?? '')}>{workText(node)}</div>
 								</button>
 								{#if childCount > 0 && !browsingState.overviewOpen}
@@ -1002,6 +1002,7 @@ $effect(() => {
 	.lineage-panel { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; padding: 22px 22px 64px; overflow: hidden; display: flex; flex-direction: column; color: var(--fg); background: var(--bg); }
 	.lineage-panel.overview { position: fixed; inset: 14px; z-index: 1300; width: auto; height: auto; border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 18px 70px #000a; }
 	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+	.lineage-panel > header > div:first-child { flex-shrink: 0; }
 	h2 { margin: 0 0 4px; font-size: 1.05rem; }
 	p { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.lineage-actions, .toolbar-group, .overview-zoom, .orientation-toggle { display: flex; align-items: center; gap: 8px; }

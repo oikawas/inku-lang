@@ -976,8 +976,6 @@ revision** — is a premise of the design.
 
 ### 7.2 Screen Composition (in concept)
 
-Simple UI also shows `New`. When work tools are hidden, the left panel hides `Change the composition and laws` and `Change the layout` while retaining the composition and laws record.
-
 The current reference UI places description input and interpretation results,
 the drawing canvas, the history strip, and refinement on the making screen.
 Saved works are managed in a separate Library screen. Moving between the two
@@ -1000,7 +998,9 @@ screen is too many for someone opening inku for the first time and too few for
 someone building a work up, so the visible surface is one of three **UI modes**,
 stored per logged-in user in the server database. **Simple UI** shows what
 is required and the history — the user menu, the way into settings, the single
-description input, the drawing controls, the canvas and the history. **History
+description input, `New`, the drawing controls, the canvas and the history. When
+work tools are hidden, the left panel hides `Change the composition and laws`
+and `Change the layout` while retaining the composition and laws record. **History
 is one of the required things so that the simple screen is not one where a work
 is drawn, looked at and lost, and because both doors that take a work out as one
 sheet (the share card) belong to the history group** (v2.13.9). **The canvas

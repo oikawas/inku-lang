@@ -1150,14 +1150,17 @@
 			return;
 		}
 		configureModelReferences(apiFetch, getLang);
-		modelCatalogStatus = 'loading';
-		availableModelsLoaded = false;
-		if (modelCatalogOwner !== userId) {
-            clearModelReferences();
-            availableModelCatalog = [];
-            availableVisionModelCatalog = [];
-            demoPromptModelCatalog = [];
-        }
+		const refreshing = modelCatalogOwner === userId && availableModelsLoaded;
+		if (!refreshing) {
+			modelCatalogStatus = 'loading';
+			availableModelsLoaded = false;
+			if (modelCatalogOwner !== userId) {
+				clearModelReferences();
+				availableModelCatalog = [];
+				availableVisionModelCatalog = [];
+				demoPromptModelCatalog = [];
+			}
+		}
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1238,7 +1241,7 @@
 			}
 			demo.reconcilePromptModel(demoPromptModelCatalog, availableModelsLoaded);
 		} catch (e) {
-			if (session.currentUser?.id === userId && request === modelCatalogRequest) modelCatalogStatus = 'error';
+			if (session.currentUser?.id === userId && request === modelCatalogRequest && !refreshing) modelCatalogStatus = 'error';
 			console.warn('failed to load model catalog', e);
 		}
 	}

@@ -157,6 +157,7 @@ export const en: LangPack = {
 	pipelinePerform: 'Perform',
 	pipelineWorking: 'Preparing the work…',
 	pipelineRequestFailed: 'The work could not be updated.',
+	drawingStartFailed: 'Could not start drawing. Wait a little and try drawing again.',
 	pipelinePatchTitle: 'Proposed DDL completion',
 	pipelinePatchHint: 'Accepting this proposal saves the DDL shown here.',
 	pipelineUnreadNotKeptTitle: 'Words not kept as written',

@@ -4,22 +4,36 @@ import SwiftUI
 import ImageIO
 import UniformTypeIdentifiers
 
-private struct CreationUpperHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-private struct CreationActionHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-private struct CreationFooterHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
 enum CreationPanelSizing {
     static func upperHeight(content: CGFloat, available: CGFloat, action: CGFloat, footer: CGFloat) -> CGFloat {
-        min(max(0, content), max(0, available - action - footer - 140))
+        let space = max(0, available - max(0, action) - max(0, footer))
+        let lowerReserve = min(140, max(0, space - 120))
+        let upperLimit = max(0, space - lowerReserve)
+        return min(upperLimit, max(min(120, space), content.isFinite ? content : upperLimit))
+    }
+}
+
+/// Measures the fixed rows and places the two scrolls without a preference/state feedback loop.
+struct CreationPanelLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 4 else { return }
+        let width = bounds.width
+        let intrinsic = ProposedViewSize(width: width, height: nil)
+        let content = subviews[0].sizeThatFits(intrinsic).height
+        let action = subviews[1].sizeThatFits(intrinsic).height
+        let footer = subviews[3].sizeThatFits(intrinsic).height
+        let upper = CreationPanelSizing.upperHeight(content: content, available: bounds.height, action: action, footer: footer)
+        let lower = max(0, bounds.height - action - footer - upper)
+        var y = bounds.minY
+        for (index, height) in [upper, action, lower, footer].enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading,
+                                  proposal: ProposedViewSize(width: width, height: height))
+            y += height
+        }
     }
 }
 
@@ -230,9 +244,6 @@ struct CreationView: View {
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
     @State private var imagePreview: CGImage?
-    @State private var upperContentHeight: CGFloat = .greatestFiniteMagnitude
-    @State private var actionRowHeight: CGFloat = 0
-    @State private var footerHeight: CGFloat = 0
     @State private var savedImageRecord: ExactJSON?
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
     @State private var batchKind = "description"
@@ -636,62 +647,53 @@ struct CreationView: View {
                 batchKindPicker.padding(.vertical, 8)
                 batchTextPanel
             } else {
-              GeometryReader { geometry in
-               let hasLowerScroll = !isBatch && (workspaceWork != nil || model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty)
-               VStack(alignment: .leading, spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if isBatch { batchKindPicker; imageFolderPanel }
-                        else if isImage { imageInputPanel }
-                        else {
-                            input
-                            if display.visible("drawing_settings") { nextConditions }
-                        }
-                    }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
-                        .background(GeometryReader { proxy in
-                            Color.clear.preference(key: CreationUpperHeightKey.self, value: proxy.size.height)
-                        })
-                }
-                .frame(height: hasLowerScroll ? CreationPanelSizing.upperHeight(content: upperContentHeight, available: geometry.size.height,
-                                                                                action: actionRowHeight, footer: footerHeight) : nil)
-                .frame(maxHeight: hasLowerScroll ? nil : .infinity)
-                .onPreferenceChange(CreationUpperHeightKey.self) { upperContentHeight = $0 }
-                Group {
-                    if isBatch { imageFolderActions }
-                    else if isImage { imageActions }
-                    else { generationAction }
-                }.padding(.vertical, 8)
-                    .background(GeometryReader { proxy in
-                        Color.clear.preference(key: CreationActionHeightKey.self, value: proxy.size.height)
-                    })
-                    .onPreferenceChange(CreationActionHeightKey.self) { actionRowHeight = $0 }
-                if isBatch { statusFooter }
-                if !isBatch {
-                    if let work = workspaceWork {
-                        CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
-                                                 disabled: controlsDisabled, onWorkAction: onWorkAction, pinned: true,
-                                                 onNewDDL: isImage ? nil : { showNewDDL = true },
-                                                 beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
-                            .frame(maxHeight: .infinity)
-                    } else if model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 14) {
-                                PipelineCompletionView(model: model)
-                                PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords)
-                                if !isImage && display.visible("ddl_tools") { newDDLHeading }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                        }.frame(maxHeight: .infinity)
-                    } else if !isImage && display.visible("ddl_tools") {
-                        newDDLHeading
+                let hasLowerScroll = !isBatch && (workspaceWork != nil || model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty)
+                let layout = hasLowerScroll ? AnyLayout(CreationPanelLayout()) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                layout {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 14) {
+                            if isBatch { batchKindPicker; imageFolderPanel }
+                            else if isImage { imageInputPanel }
+                            else {
+                                input
+                                if display.visible("drawing_settings") { nextConditions }
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
                     }
-                    statusFooter
-                        .background(GeometryReader { proxy in
-                            Color.clear.preference(key: CreationFooterHeightKey.self, value: proxy.size.height)
-                        })
-                        .onPreferenceChange(CreationFooterHeightKey.self) { footerHeight = $0 }
+                    .frame(maxHeight: hasLowerScroll ? nil : .infinity)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Group {
+                            if isBatch { imageFolderActions }
+                            else if isImage { imageActions }
+                            else { generationAction }
+                        }.padding(.vertical, 8)
+                        if isBatch { statusFooter }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 0) {
+                        if !isBatch {
+                            if let work = workspaceWork {
+                                CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
+                                                         disabled: controlsDisabled, onWorkAction: onWorkAction, pinned: true,
+                                                         onNewDDL: isImage ? nil : { showNewDDL = true },
+                                                         beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
+                                    .frame(maxHeight: .infinity)
+                            } else if model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 14) {
+                                        PipelineCompletionView(model: model)
+                                        PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords)
+                                        if !isImage && display.visible("ddl_tools") { newDDLHeading }
+                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                }.frame(maxHeight: .infinity)
+                            } else if !isImage && display.visible("ddl_tools") {
+                                newDDLHeading
+                            }
+                        }
+                    }.frame(maxWidth: .infinity, maxHeight: hasLowerScroll ? .infinity : nil, alignment: .topLeading)
+                    VStack(alignment: .leading, spacing: 0) {
+                        if !isBatch { statusFooter }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
                 }
-               }
-              }
             }
         }
         .padding(.horizontal, compactWindow ? 12 : 16)

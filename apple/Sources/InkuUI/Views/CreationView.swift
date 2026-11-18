@@ -5,6 +5,14 @@ import ImageIO
 import UniformTypeIdentifiers
 
 enum CreationPanelSizing {
+    static func viewportSize(proposal: ProposedViewSize, natural: CGSize) -> CGSize {
+        func resolved(_ proposed: CGFloat?, _ fallback: CGFloat) -> CGFloat {
+            if let proposed, proposed.isFinite { return max(0, proposed) }
+            return fallback.isFinite ? max(0, fallback) : 0
+        }
+        return CGSize(width: resolved(proposal.width, natural.width), height: resolved(proposal.height, natural.height))
+    }
+
     static func heights(content: CGFloat, available: CGFloat, action: CGFloat, footer: CGFloat) -> (upper: CGFloat, lower: CGFloat) {
         let space = max(0, available - max(0, action) - max(0, footer))
         let lowerReserve = min(140, max(0, space - 120))
@@ -13,6 +21,21 @@ enum CreationPanelSizing {
         let desired = content.isFinite ? max(upperMinimum, content) : .infinity
         let upper = desired <= upperLimit ? desired : min(upperLimit, max(upperMinimum, space / 2))
         return (upper, max(0, space - upper))
+    }
+}
+
+/// A scroll viewport must accept the panel's allocated size, even if its content reports a larger ideal size.
+struct CreationPanelViewport: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let natural = subviews.first?.sizeThatFits(proposal) ?? .zero
+        return CreationPanelSizing.viewportSize(proposal: proposal, natural: natural)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let child = subviews.first else { return }
+        let exact = ProposedViewSize(width: bounds.width, height: bounds.height)
+        _ = child.sizeThatFits(exact)
+        child.place(at: bounds.origin, anchor: .topLeading, proposal: exact)
     }
 }
 
@@ -654,17 +677,22 @@ struct CreationView: View {
                 let hasLowerScroll = !isBatch && (workspaceWork != nil || model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty)
                 let layout = hasLowerScroll ? AnyLayout(CreationPanelLayout()) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
                 layout {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 14) {
-                            if isBatch { batchKindPicker; imageFolderPanel }
-                            else if isImage { imageInputPanel }
-                            else {
-                                input
-                                if display.visible("drawing_settings") { nextConditions }
-                            }
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
+                    CreationPanelViewport {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 14) {
+                                if isBatch { batchKindPicker; imageFolderPanel }
+                                else if isImage { imageInputPanel }
+                                else {
+                                    input
+                                    if display.visible("drawing_settings") { nextConditions }
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
+                        }
+                        .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
                     }
                     .frame(maxHeight: hasLowerScroll ? nil : .infinity)
+                    .clipped()
+                    .contentShape(Rectangle())
                     VStack(alignment: .leading, spacing: 0) {
                         Group {
                             if isBatch { imageFolderActions }
@@ -673,28 +701,31 @@ struct CreationView: View {
                         }.padding(.vertical, 8)
                         if isBatch { statusFooter }
                     }.frame(maxWidth: .infinity, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 0) {
-                        if !isBatch {
-                            if let work = workspaceWork {
-                                CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
-                                                         disabled: controlsDisabled, onWorkAction: onWorkAction, pinned: true,
-                                                         onNewDDL: isImage ? nil : { showNewDDL = true },
-                                                         beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
-                                    .frame(maxHeight: .infinity)
-                            } else if model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty {
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 14) {
-                                        PipelineCompletionView(model: model)
-                                        PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords)
-                                        if !isImage && display.visible("ddl_tools") { newDDLHeading }
-                                    }.frame(maxWidth: .infinity, alignment: .leading)
-                                }.frame(maxHeight: .infinity)
-                            } else if !isImage && display.visible("ddl_tools") {
-                                newDDLHeading
+                    CreationPanelViewport {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if !isBatch {
+                                if let work = workspaceWork {
+                                    CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
+                                                             disabled: controlsDisabled, onWorkAction: onWorkAction, pinned: true,
+                                                             onNewDDL: isImage ? nil : { showNewDDL = true },
+                                                             beforeReview: isImage ? savedImageRecord?["before_review"].string : nil)
+                                        .frame(maxHeight: .infinity)
+                                } else if model.patchReview != nil || !model.completionIssues.isEmpty || !model.diagnosticsJSON.isEmpty {
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 14) {
+                                            PipelineCompletionView(model: model)
+                                            PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords)
+                                            if !isImage && display.visible("ddl_tools") { newDDLHeading }
+                                        }.frame(maxWidth: .infinity, alignment: .leading)
+                                    }.frame(maxHeight: .infinity)
+                                } else if !isImage && display.visible("ddl_tools") {
+                                    newDDLHeading
+                                }
                             }
-                        }
-                    }.frame(maxWidth: .infinity, maxHeight: hasLowerScroll ? .infinity : nil, alignment: .topLeading)
-                        .clipped()
+                        }.frame(maxWidth: .infinity, maxHeight: hasLowerScroll ? .infinity : nil, alignment: .topLeading)
+                    }
+                    .clipped()
+                    .contentShape(Rectangle())
                     VStack(alignment: .leading, spacing: 0) {
                         if !isBatch { statusFooter }
                     }.frame(maxWidth: .infinity, alignment: .leading)

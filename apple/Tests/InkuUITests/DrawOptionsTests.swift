@@ -4,6 +4,7 @@ import ImageIO
 import InkuHost
 import InkuPersistence
 import UniformTypeIdentifiers
+import SwiftUI
 import XCTest
 @testable import InkuUI
 
@@ -16,6 +17,14 @@ import XCTest
         let constrained = CreationPanelSizing.heights(content: 900, available: 500, action: 60, footer: 20)
         XCTAssertEqual(constrained.upper, 210)
         XCTAssertEqual(constrained.lower, 210)
+        let upperViewport = CreationPanelSizing.viewportSize(proposal: ProposedViewSize(width: 420, height: constrained.upper),
+                                                            natural: CGSize(width: 420, height: 900))
+        XCTAssertTrue(upperViewport.height.isFinite)
+        XCTAssertLessThan(upperViewport.height, 900)
+        XCTAssertEqual(upperViewport.height, constrained.upper)
+        let unbounded = CreationPanelSizing.viewportSize(proposal: ProposedViewSize(width: 420, height: .infinity),
+                                                        natural: CGSize(width: 420, height: 900))
+        XCTAssertEqual(unbounded.height, 900)
         XCTAssertEqual(CreationPanelSizing.heights(content: 0, available: 900, action: 60, footer: 20).upper, 120)
         XCTAssertEqual(CreationPanelSizing.heights(content: 900, available: 0, action: 60, footer: 20).upper, 0)
         XCTAssertEqual(CreationPanelSizing.heights(content: .infinity, available: 500, action: 60, footer: 20).upper, 210)

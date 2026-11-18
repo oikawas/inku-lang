@@ -2912,6 +2912,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{#if !leftPanelCollapsed}
 			{@const hasWorkRecord = work.inputMode !== 'batch' && (work.result !== null || work.ddl !== null || work.sketchText !== null || work.imageBeforeReviewDdl !== null || work.limitNotesShown.length > 0)}
 			{@const selectedVisionRef = work.drawOptions.models.vision ?? qualifiedModelRef(visionProvider, visionModel)}
+			{@const visionUnavailableReason = selectedVisionRef.startsWith('chatgpt:') ? (chatgptPlanAvailable ? 'unpublished' : 'disconnected') : availableModelCatalog.some(group => group.models.some(model => model.qualified_id === selectedVisionRef)) ? 'not_vision' : 'missing'}
 			{#snippet newDdlAction()}
 				<Tooltip placement="left" text={t().tooltipDdlNew}>
 					<button class="ghost-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
@@ -2938,6 +2939,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{drawActionTarget}
 						tabsTarget={inputTabsTarget}
 						visionCatalogReady={modelCatalogStatus === 'ready' && modelCatalogOwner === session.currentUser?.id}
+						{visionUnavailableReason}
 						nextDrawParentNodeId={work.nextDrawParentNodeId}
 						chatgptPlanSelected={(work.drawOptions.models.stage1 ?? '').startsWith('chatgpt:')}
 						{chatgptUsageUrl}

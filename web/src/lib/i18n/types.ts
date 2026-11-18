@@ -30,6 +30,9 @@ export interface LangPack {
 	imageChooseFile: string;
 	imageChooseButton: string;
 	imageVisionUnavailableShort: string;
+	imageVisionNotPublished: string;
+	imageVisionNotConnected: string;
+	imageVisionNotListed: string;
 	imageUploading: string;
 	imageUploadNoticeMessage: string;
 	imageUploadNoticeContinue: string;

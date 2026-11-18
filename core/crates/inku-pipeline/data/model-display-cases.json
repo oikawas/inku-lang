@@ -1,0 +1,132 @@
+{
+  "schema": "inku.model-display-cases.v1",
+  "description": "履歴の帯のモデルの略称（core の model_catalog の action strip_label と、resolve_display の strip_label）。端末はこの表で確かめる。最初の 14 件は Swift の HistoryModelNameChecks（2026-10-15 の Web の出力）を API の名で直した物、続く 5 件は作者が承けた例（topics/server-task/model-api-names-20261118/PLAN.ja.md §2）。",
+  "cases": [
+    {
+      "owner": "ChatGPT plan",
+      "owner_abbreviation": null,
+      "name": "gpt-6-luna",
+      "strip_label": "Ch GPT6Lu"
+    },
+    {
+      "owner": "OpenAI API Platform",
+      "owner_abbreviation": null,
+      "name": "gpt-5.1-mini",
+      "strip_label": "Op GPT5.1Mi"
+    },
+    {
+      "owner": "Claude API",
+      "owner_abbreviation": null,
+      "name": "claude-opus-4-7",
+      "strip_label": "Cl Op4.7"
+    },
+    {
+      "owner": "Gemini API",
+      "owner_abbreviation": null,
+      "name": "gemini-2.5-flash-lite",
+      "strip_label": "Ge 2.5FlL"
+    },
+    {
+      "owner": "Ollama",
+      "owner_abbreviation": null,
+      "name": "qwen3.5:4b-q4_K_M",
+      "strip_label": "Ol Qw3.5·4BQ4KM"
+    },
+    {
+      "owner": "Ollama Cloud (ollama.com)",
+      "owner_abbreviation": null,
+      "name": "deepseek-v4-flash",
+      "strip_label": "Oc DS4Fl"
+    },
+    {
+      "owner": "NVIDIA NIM",
+      "owner_abbreviation": null,
+      "name": "google/gemma-4-31b-it",
+      "strip_label": "NV Gm4·31BI"
+    },
+    {
+      "owner": "NVIDIA NIM",
+      "owner_abbreviation": null,
+      "name": "meta/llama-3.3-70b-instruct",
+      "strip_label": "NV Ll3.3·70BI"
+    },
+    {
+      "owner": "Ollama",
+      "owner_abbreviation": null,
+      "name": "gemma4:e4b-it-q4_K_M",
+      "strip_label": "Ol Gm4E4BIQ4KM"
+    },
+    {
+      "owner": "Acme",
+      "owner_abbreviation": null,
+      "name": "vendor/unknown-reasoning-2-31b-preview",
+      "strip_label": "Ac unknownR2·31BPv"
+    },
+    {
+      "owner": "",
+      "owner_abbreviation": null,
+      "name": "",
+      "strip_label": ""
+    },
+    {
+      "owner": " Claude API ",
+      "owner_abbreviation": null,
+      "name": "claude-sonnet-4-6",
+      "strip_label": "Cl ClSo4.6"
+    },
+    {
+      "owner": "Gemini API",
+      "owner_abbreviation": null,
+      "name": "gemma-4-31b-it",
+      "strip_label": "Ge Gm4·31BI"
+    },
+    {
+      "owner": "Ollama Cloud",
+      "owner_abbreviation": null,
+      "name": "qwen3-coder-480b-a35b-instruct",
+      "strip_label": "Oc Qw3Cdr480BA35BI"
+    },
+    {
+      "owner": "Claude API",
+      "owner_abbreviation": null,
+      "name": "claude-haiku-5-5",
+      "strip_label": "Cl Ha5.5"
+    },
+    {
+      "owner": "ChatGPT でサインイン",
+      "owner_abbreviation": "SIWC",
+      "name": "gpt-6.1-sol",
+      "strip_label": "SIWC GPT6.1So"
+    },
+    {
+      "owner": "Gemini API",
+      "owner_abbreviation": null,
+      "name": "gemini-3.5-flash-lite",
+      "strip_label": "Ge 3.5FlL"
+    },
+    {
+      "owner": "OpenAI",
+      "owner_abbreviation": null,
+      "name": "gpt-5.4-2026-03-05",
+      "strip_label": "Op GPT5.4"
+    },
+    {
+      "owner": "Ollama Cloud",
+      "owner_abbreviation": null,
+      "name": "gpt-oss:120b",
+      "strip_label": "Oc GPToss120B"
+    },
+    {
+      "owner": "OpenAI",
+      "owner_abbreviation": null,
+      "name": "gpt-4o-20240806",
+      "strip_label": "Op GPT4o"
+    },
+    {
+      "owner": "Ollama",
+      "owner_abbreviation": null,
+      "name": "qwen3.5:4b-q4_K_M (3.4GB)",
+      "strip_label": "Ol Qw3.5·4BQ4KM"
+    }
+  ]
+}

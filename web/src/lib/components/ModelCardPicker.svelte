@@ -75,7 +75,7 @@
 <div class="context-model-picker">
 	<span class="field-label">{label}</span>
 	<button class="picker-launch" type="button" {disabled} bind:this={launchButton} onclick={openPicker}>
-		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{providerGroupLabel(selected.group, t().code)}</small>{:else if offer.notInList && (!catalogLoad || catalogLoad.status() === 'ready')}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
+		<span><strong>{selected?.model.id ?? selectedModel}</strong>{#if selected}<small>{providerGroupLabel(selected.group, t().code)}</small>{:else if offer.notInList && (!catalogLoad || catalogLoad.status() === 'ready')}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
 		<span class="change-label">{t().modelSelectButton}</span>
 	</button>
 </div>
@@ -93,7 +93,7 @@
 					{#each sortModels(group.models, purpose) as model (model.id)}
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} class:not-recommended={purposeUnsupported(model, purpose)} disabled={isModelUnselectable(model)} onclick={() => choose(group.id, model.id)}>
 							<div class="model-button-heading">
-								<strong>{model.label}</strong>
+								<strong>{model.id}</strong>
 								<span class="model-recommendation" aria-label={`${t().settingsModelRecommendationFields[purpose === 'vision' ? 'recommendation_vision' : 'recommendation_llm']} ${modelRecommendation(model, purpose)}`}>{modelRecommendationStars(model, purpose)}</span>
 							</div>
 							{#if purposeUnsupported(model, purpose)}<small class="not-recommended-note">{t().modelNotRecommended}</small>{/if}

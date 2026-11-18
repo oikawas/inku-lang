@@ -114,15 +114,20 @@ export function modelDisplayName(ref: string | null | undefined, _groups?: Provi
 	if (!ref) return '';
     const answer = modelReference({action:'resolve_display', ref, default_provider: defaultProvider});
     if (!answer) return ref;
-    return answer.provider_label ? `${answer.provider_label} / ${answer.model_label}` : (answer.model_label ?? ref);
+    return answer.display_name ?? ref;
 }
 export function modelShortName(ref: string | null | undefined, _groups?: ProviderGroup[], defaultProvider?: Provider): string {
 	ref = ref?.trim();
 	if (!ref) return '';
     const answer = modelReference({action:'resolve_display', ref, default_provider: defaultProvider});
-    const name = answer?.model_label ?? ref;
-    const slash = name.indexOf('/');
-    return slash === -1 ? name : name.slice(slash + 1);
+    return answer?.model_label ?? ref;
+}
+
+/** The shared core names a model for the history strip. */
+export function modelStripName(ref: string | null | undefined): string {
+	ref = ref?.trim();
+	if (!ref) return '';
+	return modelReference({action:'resolve_display', ref})?.strip_label ?? ref;
 }
 export type PickerSelection = {
     groups: ProviderGroup[];

@@ -522,7 +522,7 @@
 												<div class="model-publish-group-title">{purpose === 'llm' ? 'LLM' : 'Vision'}<span>{models.length}</span></div>
 												<div class="model-publish-chips">
 													{#each models as model, modelIndex (`${purpose}:${model.id}:${modelIndex}`)}
-														<span>{model.label}</span>
+														<span>{model.id}</span>
 													{/each}
 												</div>
 											</div>
@@ -674,9 +674,9 @@
 									disabled={!modelPickerCanToggle(model)}
 								onchange={(e) => setModelPublished(model, (e.currentTarget as HTMLInputElement).checked)}
 								/>
-									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{#each modelStatusParts(model, t().code === 'ja') as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:unselectable={part.blocking}>{part.text}</span>{/each}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
+									<span><strong>{model.id}</strong>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{#each modelStatusParts(model, t().code === 'ja') as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:unselectable={part.blocking}>{part.text}</span>{/each}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
-								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
+								<div class="model-purpose-controls" aria-label={`${model.id} LLM / Vision`}>
 									{#each ['llm', 'vision'] as const as purpose (purpose)}
 										<button type="button" class:active={modelPurposeSelected(model.id, purpose)} class:not-recommended={purposeUnsupported(model, purpose)} aria-pressed={modelPurposeSelected(model.id, purpose)} disabled={purposeLocked(model, purpose)} onclick={() => toggleModelPurpose(model.id, purpose)}>{purpose === 'llm' ? 'LLM' : 'Vision'}</button>
 									{/each}

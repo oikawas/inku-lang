@@ -10,6 +10,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - The read-and-draw and image-writing prompts now include Saijiki word explanations and a fineness combination example. They broaden the choice of surface and movement words; in the author's comparison the drawings were as good as or better than before.
 
+- Web: show model names as API IDs, use SIWC for the ChatGPT provider, and read history strip abbreviations from core.
+
+- Web: display selected model and color catalog values at 12px in the description, image, and batch tabs.
+
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.
 
 - Android: clean documents and execution records no longer linked to a work when discarding candidates, permanently deleting a work, and starting the app. Active documents, parent relationships, and restored executions are preserved.

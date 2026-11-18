@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 export type ReferenceQuery = { action: 'split_ref' | 'qualify_ref' | 'resolve_ref' | 'resolve_display'; ref: string; provider?: string; default_provider?: string };
-export type ReferenceResult = { outcome: string; ref?: string; provider?: string | null; model?: string; provider_label?: string; provider_abbreviation?: string; model_label?: string };
+export type ReferenceResult = { outcome: string; ref?: string; provider?: string | null; model?: string; provider_label?: string; provider_abbreviation?: string; model_label?: string; display_name?: string; strip_label?: string };
 type Transport = (path: string, init?: RequestInit) => Promise<Response>;
 const answers = new SvelteMap<string, ReferenceResult>();
 const waiting = new Map<string, ReferenceQuery>();

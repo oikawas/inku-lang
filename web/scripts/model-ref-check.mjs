@@ -9,8 +9,8 @@ for (let i = 0; i < fixture.queries.length; i++) {
 }
 assert.deepEqual(splitModelReference('chatgpt:model'), {provider:'chatgpt',model:'model'}); checks++;
 assert.equal(qualifiedModelRef('nim','plain-model'), 'nim:plain-model'); checks++;
-assert.equal(modelDisplayName('nim:plain-model'), 'NVIDIA NIM (Cloud) / Plain Model'); checks++;
-assert.equal(modelShortName('nim:google/gemma-4-31b-it'), 'gemma-4-31b-it'); checks++;
+assert.equal(modelDisplayName('nim:plain-model'), 'NVIDIA NIM (Cloud) / plain-model'); checks++;
+assert.equal(modelShortName('nim:google/gemma-4-31b-it'), 'google/gemma-4-31b-it'); checks++;
 const groups=[{id:'nim',label:'NVIDIA NIM (Cloud)',models:[{id:'plain-model',label:'Plain Model',qualified_id:'nim:plain-model'}]}];
 assert.equal(pickerSelection(groups,'nim:plain-model').selected?.model.id,'plain-model'); checks++;
 const source=readFileSync(new URL('../src/lib/models.ts',import.meta.url),'utf8');

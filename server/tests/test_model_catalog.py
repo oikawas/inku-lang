@@ -96,6 +96,7 @@ def test_a_provider_an_operator_added_follows_the_catalog_that_names_it():
     assert models["mlx-community/gemma-4-12B-it-4bit"]["label"] == "gemma 12B"
     assert provider["enabled_models"]["mlx-community/gemma-4-12B-it-4bit"] is False
     shown = next(group for group in model_provider_catalog(stored) if group["id"] == "local-mlx")
+    assert all(model["label"] == model["id"] for model in shown["models"])
     labels = {model["id"]: model["labels"] for model in shown["models"]}
     assert labels == {"mlx-community/gemma-4-12B-it-4bit": [], "someone/unmeasured-4bit": ["unmeasured"]}
     # A provider the catalog does not name keeps what the installation stored.

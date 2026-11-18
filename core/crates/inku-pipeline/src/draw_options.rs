@@ -301,6 +301,10 @@ pub fn options_for_tab(record: &Value, tab: &str, defaults: &Value) -> Option<Va
 
 /// The same as [`options_for_tab`], from options already read with
 /// [`options_of_work`] (what the history API returns as `draw_options`).
+///
+/// Lifting the stroke limit (`wild`) is never taken from the work: the next
+/// drawing always uses the tab's default, so opening a work does not change it
+/// (2026-11-18 author's ruling). The recorded value is only shown with the work.
 #[must_use]
 pub fn options_for_recorded(work: &Value, tab: &str, defaults: &Value) -> Option<Value> {
     if !TABS.contains(&tab) {
@@ -313,6 +317,11 @@ pub fn options_for_recorded(work: &Value, tab: &str, defaults: &Value) -> Option
     };
     let mut result = Map::new();
     for &(key, on_off) in DRAW_OPTIONS {
+        if key == "wild" {
+            let default = valid_string(&defaults[key], &["on", "off"]).unwrap_or("off");
+            result.insert(key.into(), json!(default));
+            continue;
+        }
         let value = &work[key];
         let mut selected = if value.is_null() {
             if on_off {
@@ -385,7 +394,9 @@ mod tests {
             assert!(missing["options"][key].is_null(), "{key}");
             assert_eq!(
                 adopted["options"][key],
-                if on_off {
+                if key == "wild" {
+                    defaults["describe"][key].clone()
+                } else if on_off {
                     json!("off")
                 } else {
                     defaults["describe"][key].clone()
@@ -396,6 +407,8 @@ mod tests {
                 present["options"][key],
                 if key == "catalog" {
                     json!({"id":"ink","mode":"fixed"})
+                } else if key == "wild" {
+                    defaults["describe"][key].clone()
                 } else {
                     expected[key].clone()
                 },
@@ -596,6 +609,23 @@ mod tests {
         assert_eq!(model["settings"]["stage1_model"], "chosen");
         assert_eq!(model["settings"]["stage2_model"], "chosen");
         assert!(model["settings"].get("vision_model").is_none());
+    }
+
+    #[test]
+    fn wild_always_comes_from_the_tab_default_not_the_work() {
+        let mut defaults = release_draw_defaults();
+        for (recorded, default) in [("1", "off"), ("0", "on"), ("1", "on")] {
+            defaults["describe"]["wild"] = json!(default);
+            let record = json!({"render_wild": recorded, "sketch_requested": "1"});
+            let options = options_for_tab(&record, "describe", &defaults).unwrap();
+            assert_eq!(options["wild"], default, "recorded {recorded}");
+            assert_eq!(
+                options["sketch"], "on",
+                "other on/off choices still come from the work"
+            );
+        }
+        let unknown = options_for_recorded(&json!({}), "describe", &json!({})).unwrap();
+        assert_eq!(unknown["wild"], "off");
     }
 
     #[test]

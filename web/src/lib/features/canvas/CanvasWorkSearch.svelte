@@ -44,7 +44,7 @@
 </form>
 
 <style>
-	.canvas-work-search { position: relative; flex: 1 1 14rem; min-width: min(10rem, 100%); max-width: 22rem; margin: 5px 8px; }
+	.canvas-work-search { position: relative; flex: 1 1 14rem; min-width: min(5rem, 100%); max-width: 22rem; margin: 5px 8px; }
 	.search-input-wrap { display: flex; align-items: center; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); background: var(--panel); }
 	.search-input-wrap:focus-within { outline: 1px solid var(--fg3); }
 	input { flex: 1; min-width: 0; width: 100%; border: 0; padding: var(--btn-sm-padding); background: transparent; color: var(--fg); font: inherit; font-size: var(--btn-sm-font-size); outline: none; }

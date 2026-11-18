@@ -398,6 +398,7 @@
 	}
 	.history-head {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
 		align-items: center;
 		gap: 8px;
@@ -407,6 +408,8 @@
 		margin-bottom: 0;
 	}
 	.history-title-btn {
+		flex: 0 0 auto;
+		white-space: nowrap;
 		border: 1px solid var(--border2);
 		border-radius: 16px;
 		background: var(--panel);
@@ -428,7 +431,7 @@
 	}
 	.history-count { color: var(--fg3); font-weight: 400; }
 	.history-head-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
-	.history-filter-group { display: flex; align-items: center; gap: 4px; min-width: 0; margin-left: 1em; }
+	.history-filter-group { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; margin-left: 1em; white-space: nowrap; }
 	.history-filter-label {
 		color: var(--fg3);
 		font-size: var(--ui-font-size-12);

@@ -244,7 +244,7 @@ class DrawOptionsForTabBody(BaseModel):
 
 
 class DrawOptionsForTabResponse(BaseModel):
-    options: dict = Field(description="The tab's choices: recorded values, off for an unrecorded on/off choice, and the signed-in user's tab default for any other unrecorded choice.")
+    options: dict = Field(description="The tab's choices: wild from the signed-in user's tab default (off if absent), other recorded values, off for an unrecorded on/off choice, and the tab default for any other unrecorded choice.")
 
 
 @router.post("/api/auth/me/draw-options/for-tab", response_model=DrawOptionsForTabResponse,

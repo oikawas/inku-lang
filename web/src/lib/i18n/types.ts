@@ -28,6 +28,8 @@ export interface LangPack {
 	settingsImageProvenanceExif: string;
 	settingsImageProvenanceExifNote: string;
 	imageChooseFile: string;
+	imageChooseButton: string;
+	imageVisionUnavailableShort: string;
 	imageUploading: string;
 	imageUploadNoticeMessage: string;
 	imageUploadNoticeContinue: string;

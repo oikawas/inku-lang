@@ -51,7 +51,7 @@ export type DrawOptionNames = {
 
 /** The input panel's "next work" conditions, top to bottom. The canvas strip
  *  of the displayed work traces them left to right (author, 2026-11-05). */
-export const INPUT_PANEL_ORDER = ['models', 'catalog', 'route', 'sketch', 'composition', 'wild', 'canvas_aspect'] as const satisfies readonly (typeof DRAW_OPTIONS[number])[];
+export const INPUT_PANEL_ORDER = ['canvas_aspect', 'models', 'catalog', 'route', 'sketch', 'composition', 'wild'] as const satisfies readonly (typeof DRAW_OPTIONS[number])[];
 
 export function drawOptionRows(options: RecordedDrawOptions | null | undefined, labels: import('../i18n/types.ts').LangPack,
 	view: { image?: boolean; names?: DrawOptionNames; order?: readonly (typeof DRAW_OPTIONS[number])[] } = {}) {

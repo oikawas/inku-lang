@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getLang, t } from '$lib/i18n/index.svelte';
+	import { placeIn } from '$lib/place-in';
 	import {
 		type CanvasAspectOption,
 		type CanvasAspectId,
@@ -10,18 +11,37 @@
 		options: CanvasAspectOption[];
 		open: boolean;
 		showValue?: boolean;
+		row?: boolean;
 		onToggle: () => void;
 		onSelect: (id: CanvasAspectId) => void | Promise<void>;
 	};
 
-	let { selected, options, open = false, showValue = false, onToggle, onSelect }: Props = $props();
+	let { selected, options, open = false, showValue = false, row = false, onToggle, onSelect }: Props = $props();
+	let trigger = $state<HTMLButtonElement | null>(null);
+	function overlay(node: HTMLElement) {
+		if (!row) return;
+		const portal = placeIn(node, document.body);
+		function position() {
+			const rect = trigger?.getBoundingClientRect();
+			if (!rect) return;
+			node.style.top = `${rect.bottom + 6}px`;
+			node.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+			node.style.maxHeight = `${Math.max(0, Math.min(520, window.innerHeight - rect.bottom - 14))}px`;
+		}
+		position();
+		window.addEventListener('resize', position);
+		window.addEventListener('scroll', position, true);
+		return { destroy() { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); portal.destroy(); } };
+	}
 
 	const isJa = $derived(getLang() === 'ja');
 	const selectedLabel = $derived(options.find((option) => option.id === selected)?.label ?? '');
 </script>
 
-<div class="canvas-aspect-plugin">
+<div class="canvas-aspect-plugin" class:row>
+	{#if row}<span class="aspect-label">{t().canvasAspectButton}</span><span class="aspect-value">{selectedLabel}</span>{/if}
 	<button
+		bind:this={trigger}
 		type="button"
 		class="ghost-btn aspect-trigger"
 		onclick={(event) => {
@@ -31,10 +51,10 @@
 		aria-haspopup="menu"
 		aria-expanded={open}
 	>
-		<span>{t().canvasAspectButton}{#if showValue}<span class="aspect-trigger-value">{isJa ? '：' : ': '}{selectedLabel}</span>{/if}</span>
+		<span>{row ? t().editButton : t().canvasAspectButton}{#if showValue && !row}<span class="aspect-trigger-value">{isJa ? '：' : ': '}{selectedLabel}</span>{/if}</span>
 	</button>
 	{#if open}
-		<div class="aspect-menu" role="menu">
+		<div><div class="aspect-menu" class:overlay={row} role="menu" use:overlay>
 			<div class="aspect-menu-head">{t().canvasAspectTitle}</div>
 			{#each options as option (option.id)}
 				<button
@@ -52,7 +72,7 @@
 					<span class="option-intent">{isJa ? option.intentJa : option.intentEn}</span>
 				</button>
 			{/each}
-		</div>
+		</div></div>
 	{/if}
 </div>
 
@@ -62,13 +82,17 @@
 		display: inline-flex;
 	}
 	.aspect-trigger { display: inline-flex; align-items: center; }
+	.canvas-aspect-plugin.row { align-items: center; gap: 5px; }
+	.aspect-label, .aspect-value { font-size: var(--ui-font-size-11); white-space: nowrap; }
+	.aspect-label { color: var(--fg3); }
+	.aspect-value { color: var(--fg2); max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
 	.aspect-trigger-value { color: var(--fg2); font-weight: 400; }
 	.aspect-menu {
 		position: absolute;
 		top: calc(100% + 6px);
 		left: 0;
 		z-index: 80;
-		width: 310px;
+		width: min(310px, calc(100vw - 16px));
 		max-height: min(520px, 70vh);
 		overflow: auto;
 		border: 1px solid var(--border2);
@@ -77,6 +101,7 @@
 		box-shadow: 0 10px 32px rgba(0,0,0,0.18);
 		padding: 6px;
 	}
+	.aspect-menu.overlay { position: fixed; left: auto; z-index: 1100; }
 	.aspect-menu-head {
 		padding: 6px 8px 8px;
 		font-size: var(--ui-font-size-11);

@@ -119,21 +119,18 @@ test('an image without Exif, or bytes that are not an image, give no facts rathe
 	assert.equal(readExifFacts(broken), null);
 });
 
-test('the note has the file name first, then one line per shooting fact', () => {
+test('the note combines file and capture time, then camera and exposure', () => {
 	const facts = readExifFacts(jpeg(camera(false)));
 	assert.equal(
 		imageProvenanceText('IMG_1234.jpg', facts, ALL, LABELS),
 		[
-			'ファイル名: IMG_1234.jpg',
-			'撮影日時: 2026:10:20 14:32:05',
-			'カメラ: Apple iPhone 15 Pro',
-			'レンズ: iPhone 15 Pro back camera 6.86mm f/1.78',
-			'露出: f/1.8 · 1/120 s · ISO 64 · 6.9 mm',
+			'ファイル名: IMG_1234.jpg · 2026:10:20 14:32:05',
+			'Apple iPhone 15 Pro · f/1.8 · 1/120 s · ISO 64 · 6.9 mm',
 		].join('\n'),
 	);
 	// A model that already names the maker does not repeat it.
-	assert.equal(imageProvenanceText('x.jpg', { make: 'Canon', model: 'Canon EOS R5' }, ALL, LABELS), 'ファイル名: x.jpg\nカメラ: Canon EOS R5');
-	assert.equal(imageProvenanceText('x.jpg', { exposureTime: 2 }, ALL, LABELS), 'ファイル名: x.jpg\n露出: 2 s');
+	assert.equal(imageProvenanceText('x.jpg', { make: 'Canon', model: 'Canon EOS R5' }, ALL, LABELS), 'ファイル名: x.jpg\nCanon EOS R5');
+	assert.equal(imageProvenanceText('x.jpg', { exposureTime: 2 }, ALL, LABELS), 'ファイル名: x.jpg\n2 s');
 });
 
 test('each setting leaves its part out, and with both off the note stays empty', () => {

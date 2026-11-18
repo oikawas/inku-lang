@@ -516,6 +516,7 @@
 	let availableModelsLoaded = $state(false);
 	let modelCatalogStatus = $state<'loading' | 'ready' | 'error'>('loading');
 	let drawActionTarget = $state<HTMLElement | null>(null);
+	let inputTabsTarget = $state<HTMLElement | null>(null);
 	let modelSettingsTarget = $state<string | null>(null);
 	setContext('model-settings-target', { get: () => modelSettingsTarget, clear: () => { modelSettingsTarget = null; } });
 	setContext('model-catalog-load', { status: () => modelCatalogStatus, retry: () => loadAvailableModels() });
@@ -2909,8 +2910,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		<div class="body">
 			<!-- ── LEFT PANEL ── -->
 			{#if !leftPanelCollapsed}
-			{@const hasWorkRecord = work.result !== null || work.ddl !== null || work.sketchText !== null || work.imageBeforeReviewDdl !== null || (work.inputMode === 'single' && work.limitNotesShown.length > 0)}
+			{@const hasWorkRecord = work.inputMode !== 'batch' && (work.result !== null || work.ddl !== null || work.sketchText !== null || work.imageBeforeReviewDdl !== null || work.limitNotesShown.length > 0)}
+			{@const selectedVisionRef = work.drawOptions.models.vision ?? qualifiedModelRef(visionProvider, visionModel)}
+			{#snippet newDdlAction()}
+				<Tooltip placement="left" text={t().tooltipDdlNew}>
+					<button class="ghost-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
+				</Tooltip>
+			{/snippet}
 			<div class="left-panel">
+				<div class="input-tabs-target" bind:this={inputTabsTarget}></div>
 				<div class="panel-scroll" class:description-scroll={work.inputMode === 'single'} class:empty-record={!hasWorkRecord}>
 					{#if demoRunning}
 						<div class="demo-running-banner">
@@ -2928,6 +2936,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{/if}
 					<InputPanel
 						{drawActionTarget}
+						tabsTarget={inputTabsTarget}
+						visionCatalogReady={modelCatalogStatus === 'ready' && modelCatalogOwner === session.currentUser?.id}
 						nextDrawParentNodeId={work.nextDrawParentNodeId}
 						chatgptPlanSelected={(work.drawOptions.models.stage1 ?? '').startsWith('chatgpt:')}
 						{chatgptUsageUrl}
@@ -2948,8 +2958,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						imageUploading={work.imageUploading}
 						imageRunning={work.imageRunning}
 						imageCanvasAspectId={work.imageCanvasAspectId}
-						visionModelName={statusModelName(work.drawOptions.models.vision ?? qualifiedModelRef(visionProvider, visionModel))}
-						visionModelAvailable={availableVisionModelCatalog.some((group) => group.models.some((model) => model.qualified_id === work.drawOptions.models.vision))}
+						visionModelName={statusModelName(selectedVisionRef)}
+						visionModelAvailable={availableVisionModelCatalog.some((group) => group.models.some((model) => model.qualified_id === selectedVisionRef))}
 						onSelectImage={work.selectImage}
 						onImageProvenanceInput={work.noteImageProvenanceTyped}
 						onSubmitImage={work.requestSubmitImage}
@@ -3023,13 +3033,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onForkDescription={work.forkPipelineDescription}
 						onStop={work.stopBatch}
 					/>
-					{#if work.inputMode === 'single'}
-						<div class="ddl-new-action">
-							<Tooltip placement="left" text={t().tooltipDdlNew}>
-								<button class="ghost-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
-							</Tooltip>
-						</div>
-					{/if}
 
 					<!-- thinking -->
 					{#if work.thinking}
@@ -3057,9 +3060,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					/>
 
 				</div><!-- /panel-scroll -->
-				<div class="description-action-target" class:visible={work.inputMode === 'single'} bind:this={drawActionTarget}></div>
+				<div class="description-action-target" bind:this={drawActionTarget}></div>
+				{#if !hasWorkRecord && work.inputMode === 'single'}<div class="ddl-empty-head ddl-new-action"><span>{t().ddlLabel}</span>{@render newDdlAction()}</div>{/if}
 				{#if hasWorkRecord}
 				<div class="work-record-scroll">
+					{#if work.ddl === null && work.inputMode === 'single'}<div class="ddl-empty-head ddl-new-action"><span>{t().ddlLabel}</span>{@render newDdlAction()}</div>{/if}
 					{#if work.inputMode !== 'batch' && (work.result !== null || work.ddl !== null || work.sketchText !== null)}
 						<h3 class="displayed-work-heading">{t().displayedWorkProcessWithComposition}</h3>
 					{/if}
@@ -3137,6 +3142,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								savedDdl={work.ddlGeneratedBaseline}
 								onConfirmDiscard={confirmDiscardEdits}
 								label={t().ddlLabel}
+								newAction={work.inputMode === 'single' ? newDdlAction : undefined}
 								lang={shownDdlLang}
 								ranges={compositionRanges}
 								completionWork={currentCompletionWork}
@@ -3995,6 +4001,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-drawing-settings :global(.section-head),
 	.ui-hide-drawing-settings :global(.current-selection),
 	.ui-hide-drawing-settings :global(.conditions-heading),
+	.ui-hide-drawing-settings :global(.conditions-head),
 	.ui-hide-drawing-settings :global(.condition-rows),
 	.ui-hide-ddl-tools .ddl-new-action,
 	.ui-hide-ddl-tools :global(.ddl-viewer),
@@ -4166,19 +4173,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.panel-scroll.empty-record { flex: 1 1 auto; }
 	.description-scroll { overflow-x: hidden; }
-	.description-action-target { display: none; flex: 0 0 auto; padding: 0 16px 10px; }
-	.description-action-target.visible { display: block; }
+	.input-tabs-target { flex: 0 0 auto; padding: 0 22px 0 16px; }
+	.description-action-target { flex: 0 0 auto; padding: 0 22px 10px 16px; }
 	.work-record-scroll { flex: 1 1 140px; min-height: 140px; overflow-y: auto; overflow-x: hidden; padding: 14px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+	.panel-scroll, .work-record-scroll { scrollbar-gutter: stable; }
 	@media (max-width: 1180px) {
 		.panel-scroll, .work-record-scroll, .description-action-target { padding-inline: 12px; }
+		.input-tabs-target, .description-action-target { padding-left: 12px; padding-right: 18px; }
 	}
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
-	.ddl-new-action { display: flex; justify-content: flex-end; margin-top: -6px; }
+	.ddl-empty-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--border); color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.image-before-review summary { cursor: pointer; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.image-before-review p { color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.6; }
 	.image-before-review pre {
-		max-height: 20rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+		white-space: pre-wrap; overflow-wrap: anywhere;
 		font-family: inherit; font-size: var(--ui-font-size-14); line-height: 1.78; color: var(--fg);
 	}
 	.displayed-work-heading {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { placeIn } from '$lib/place-in';
 	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import LabelHighlight from './LabelHighlight.svelte';
@@ -21,6 +22,7 @@
 	};
 
 	type Props = {
+		actionTarget?: HTMLElement | null;
 		batchInput: string;
 		lineNumbersText: string;
 		batchNonEmpty: number;
@@ -134,7 +136,7 @@
 		onSubmit,
 		onStop,
 		settings,
-		sourceSwitch,
+		sourceSwitch, actionTarget = null,
 	}: Props = $props();
 
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
@@ -232,7 +234,6 @@
 		</div>
 	</div>
 {/if}
-{#if batchNonEmpty > 0 && !batchRunning}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 
 <!-- Restoring a past batch refills the input box, so the picker sits directly
      under it rather than down with the run options.
@@ -278,6 +279,7 @@
 			</div>
 		{/if}
 		{/if}
+		{#if batchNonEmpty > 0}<span class="batch-count">{t().batchCount(batchNonEmpty)}</span>{/if}
 	</div>
 {/if}
 
@@ -306,16 +308,13 @@
 {/if}
 
 <section class="batch-next-conditions" aria-label={t().batchNextConditionsLabel} aria-busy={batchResuming}>
-	<div class="batch-next-conditions-head">
-		<span>{t().batchNextConditionsLabel}</span>
-		{#if batchResuming}<span>{t().batchResumeScanning}</span>{/if}
-	</div>
 	<div class:batch-controls-busy={batchResuming} inert={batchResuming}>
 		{@render settings?.()}
 	</div>
 </section>
 
 
+<div><div class="batch-fixed-action" use:placeIn={actionTarget}>
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress-wrap">
 		<BatchRunSummary current={batchSummaryCurrent} total={batchSummaryTotal} startedAt={batchStartedAt} averageWorkMs={batchAverageWorkMs} />
@@ -343,6 +342,7 @@
 
 {#if error}<p class="error-text">{error}</p>{/if}
 {#if batchServerLost && !batchRunning}<p class="batch-info">{t().batchServerLost}</p>{/if}
+</div></div>
 <!-- Sketch from life (Stage 0.5), read-only here. Above the instructions because it comes
      before them, the same order the describe tab keeps. Written when a line
      returns, so it is the prose of the work the observer below is showing. -->
@@ -394,6 +394,7 @@
 {/if}
 
 <style>
+	.batch-count { margin-left: auto; color: var(--fg2); font-size: var(--ui-font-size-12); white-space: nowrap; }
 	/* Same shape as the label over the description box in InputPanel. */
 	.batch-label {
 		display: flex;
@@ -565,16 +566,6 @@
 		padding-top: 10px;
 		border-top: 1px solid var(--border);
 	}
-	.batch-next-conditions-head {
-		display: flex;
-		justify-content: space-between;
-		gap: 8px;
-		margin-bottom: 6px;
-		color: var(--fg2);
-		font-size: var(--ui-font-size-12);
-		font-weight: 600;
-	}
-	.batch-next-conditions-head span:last-child { color: var(--fg3); font-weight: 400; }
 	.batch-controls-busy { cursor: wait; opacity: 0.62; }
 	.batch-resume-card {
 		display: flex;

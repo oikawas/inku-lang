@@ -82,6 +82,7 @@
 		// The shared button row and settings readout, rendered by the parent but
 		// placed here so it sits between the input box and the batch options.
 		settings?: Snippet;
+		readiness?: Snippet;
 		/** The descriptions / pictures switch, at the right end of the heading line. */
 		sourceSwitch?: Snippet;
 	};
@@ -135,7 +136,7 @@
 		onClearInput,
 		onSubmit,
 		onStop,
-		settings,
+		settings, readiness,
 		sourceSwitch, actionTarget = null,
 	}: Props = $props();
 
@@ -338,6 +339,7 @@
 	<div class="batch-actions" class:batch-actions-busy={batchResuming}>
 		<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled || batchResuming}>{t().batchNewRunBtn}</PaintButton>
 	</div>
+	{@render readiness?.()}
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}

@@ -33,8 +33,8 @@ test('refinement confirmation restores settings and never persists drawing choic
 	assert.doesNotMatch(refinement, /drawOptions|persistModelSelection|invalidateWorkOptions/);
 	const opener = page.slice(page.indexOf('function openRefinementModelSelection('), page.indexOf('async function persistModelSelection()'));
 	assert.ok(opener.indexOf('splitModelReference(current') < opener.indexOf('openModelSelection(false'));
-	assert.match(page, /if \(!refinementModelSelection && Object\.keys\(userModels\)\.length > 0\)/);
-	assert.match(page, /if \(!refinementModelSelection && stage1Provider/);
+	assert.match(page, /if \(!modelSelectionOpen && !refinementModelSelection && Object\.keys\(userModels\)\.length > 0\)/);
+	assert.match(page, /if \(!modelSelectionOpen && !refinementModelSelection && stage1Provider/);
 	const settings = read('../../components/SettingsModal.svelte');
 	assert.match(settings, /topLayerDialog\?\.showModal\(\)/);
 	assert.match(settings, /oncancel=\{\(event\) => \{ event\.preventDefault\(\); onClose\(\); \}\}/);

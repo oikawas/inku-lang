@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import { providerGroupLabel, type Provider, type ProviderGroup } from '$lib/models';
@@ -31,6 +32,8 @@
 		onSetStage1Provider, onSetStage1Model, onSetStage2Provider, onSetStage2Model,
 		onSetVisionProvider, onSetVisionModel, onCancel, onConfirm
 	}: Props = $props();
+	const catalogLoad = getContext<{ status: () => 'loading' | 'ready' | 'error'; retry: () => Promise<void> } | undefined>('model-catalog-load');
+	const catalogReady = $derived(!catalogLoad || catalogLoad.status() === 'ready');
 
 	const isJapanese = $derived(t().closeLabel !== 'Close');
 	// One model draws both stages (2026-09-30, the author): the drawing tab
@@ -70,8 +73,10 @@
 		</div>
 		{/if}
 	<div class="settings-body">
+			{#if catalogLoad?.status() === 'loading'}<p role="status">{t().modelCatalogLoading}</p>{/if}
+			{#if catalogLoad?.status() === 'error'}<p role="alert">{t().modelCatalogLoadFailed} <button type="button" onclick={() => void catalogLoad.retry()}>{t().modelCatalogRetry}</button></p>{/if}
 			{#if modelSelectionTab === 'vision'}<p class="model-selection-hint">{t().modelSelectionVisionHint}</p>{/if}
-			{#if !visionOnlySelection && stage1Provider === 'chatgpt'}
+			{#if catalogReady && !visionOnlySelection && stage1Provider === 'chatgpt'}
 				<p>{providerGroups.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.id === stage1Model)) ? t().chatgptUsingPlan : t().chatgptModelUnavailable}</p>
 			{/if}
 			<div class="generation-model-groups">
@@ -113,7 +118,7 @@
 			{/if}
 	</div>
 		<div class="catalog-modal-foot">
-			<span class="model-selection-current">{t().modelSelectionSelected(selectedName)}</span>
+			<span class="model-selection-current">{catalogReady ? t().modelSelectionSelected(selectedName) : catalogLoad?.status() === 'error' ? t().modelCatalogLoadFailed : t().modelCatalogLoading}</span>
 			<button class="ghost-btn" onclick={onCancel}>{t().confirmCancel}</button>
-			<button class="ghost-btn primary-inline" onclick={onConfirm}>{t().colorCatalogConfirm}</button>
+			<button class="ghost-btn primary-inline" onclick={onConfirm} disabled={!catalogReady}>{t().colorCatalogConfirm}</button>
 		</div>

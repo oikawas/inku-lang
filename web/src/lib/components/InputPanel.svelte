@@ -602,7 +602,7 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		color: var(--fg);
-		font-size: var(--ui-font-size-14);
+		font-size: var(--ui-font-size-12);
 		line-height: 1.35;
 		white-space: nowrap;
 		overflow: hidden;

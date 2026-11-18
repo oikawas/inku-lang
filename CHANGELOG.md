@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: display selected model and color catalog values at 12px in the description, image, and batch tabs.
+
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.
 
 - Android: clean documents and execution records no longer linked to a work when discarding candidates, permanently deleting a work, and starting the app. Active documents, parent relationships, and restored executions are preserved.

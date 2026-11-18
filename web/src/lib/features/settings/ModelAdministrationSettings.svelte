@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { getContext, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { isModelUnselectable, modelFold, modelFolds, modelFoldTitle, modelStatusLabel, modelStatusParts, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
 	import { isSignInGroup, providerGroupLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
@@ -44,6 +44,8 @@
 	let modelPickerOpenFolds = $state<Partial<Record<ModelFold, boolean>>>({});
 	let serviceDialogError = $state<string | null>(null);
 	let activeProviderId = $state<Provider | null>(null);
+	const requestedProvider = getContext<{ get: () => string | null; clear: () => void } | undefined>('model-settings-target');
+	$effect(() => { const id = requestedProvider?.get(); if (id && settingsProviderGroups.some((provider) => provider.id === id)) { activeProviderId = id; requestedProvider?.clear(); } });
 	let editProviderId = $state<Provider | null>(null);
 	let editProviderLabel = $state('');
 	let memoProviderId = $state<Provider | null>(null);
@@ -545,7 +547,8 @@
 								<div class="model-connection-actions"><button class="ghost-btn" onclick={() => saveRateLimits(activeProvider!.id, activeProviderSetting!)} disabled={modelSettingsLoading || !rateLimitDrafts[activeProvider.id] || !rateDraftValid(activeProvider.id, activeProviderSetting)}>{t().profileSaveButton}</button></div>
 							</div>
 						</details>
-						<details class="model-connection-details">
+						{#key activeProvider.id}
+						<details class="model-connection-details" open={activeProvider.requires_api_key === true && !activeProviderSetting.api_key_set}>
 							<summary>{t().settingsModelConnectionDetails}</summary>
 							<div class="model-connection-fields">
 								<label><span>{t().settingsModelBaseUrl}</span><div class="model-base-url-row"><input value={baseUrlValue(activeProvider.id, activeProviderSetting)} oninput={(e) => setBaseUrlDraft(activeProvider!.id, (e.currentTarget as HTMLInputElement).value)} /><button class="ghost-btn" onclick={() => saveBaseUrl(activeProvider!.id, activeProviderSetting!)} disabled={modelSettingsLoading || !baseUrlChanged(activeProvider.id, activeProviderSetting)}>{t().profileSaveButton}</button></div></label>
@@ -553,6 +556,7 @@
 								<div class="model-connection-actions"><button class="ghost-btn" onclick={() => openMemoProvider(activeProvider!)} disabled={modelSettingsLoading}>{t().settingsModelServiceMemoButton}</button><button class="ghost-btn model-service-delete" onclick={() => onAskDeleteModelProvider(activeProvider!.id)} disabled={modelSettingsLoading}>{t().settingsModelDeleteService}</button></div>
 							</div>
 						</details>
+						{/key}
 						{/if}
 					</div>
 				{/if}

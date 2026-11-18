@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { describeApiErrorDetail } from './apiError.ts';
+import { describeApiErrorDetail, describeDrawingApiErrorDetail } from './apiError.ts';
 import { ja } from './i18n/ja.ts';
 import { en } from './i18n/en.ts';
 
@@ -124,4 +124,12 @@ test('a work saved before the Saijiki migration says so in the page language', (
 		describeApiErrorDetail({ code: 'saijiki_migration_required', message: 'saijiki migration required' }, 409, ja),
 		ja.errorSaijikiMigrationRequired
 	);
+});
+
+test('an unknown HTTP code has a drawing-specific sentence only for drawing', () => {
+	for (const strings of [ja, en]) {
+		assert.equal(describeDrawingApiErrorDetail({code: 'http_500'}, 500, strings), strings.drawingStartFailed);
+		assert.equal(describeDrawingApiErrorDetail('http_500', 500, strings), strings.drawingStartFailed);
+		assert.equal(describeDrawingApiErrorDetail({code: 'model_not_offered'}, 403, strings), strings.errorModelNotOffered);
+	}
 });

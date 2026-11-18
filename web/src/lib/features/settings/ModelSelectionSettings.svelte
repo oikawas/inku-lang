@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { missingApiKey } from '$lib/model-readiness';
 	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import { providerGroupLabel, type Provider, type ProviderGroup } from '$lib/models';
 	import './model-selection-settings.css';
@@ -81,7 +82,7 @@
 				{#each (modelSelectionTab === 'vision' ? visionProviderGroups : providerGroups) as provider (provider.id)}
 					{#if provider.models.length > 0}
 						<section class="generation-model-provider">
-							<h3>{providerGroupLabel(provider, t().code)}</h3>
+							<h3>{providerGroupLabel(provider, t().code)}{#if missingApiKey(provider)} · {t().settingsModelApiKeyUnset}{/if}</h3>
 							<div class="generation-model-grid">
 								{#each (provider.id === 'chatgpt' ? provider.models : sortModels(provider.models, recommendationPurpose, recommendationStage)) as model (model.id)}
 								<button

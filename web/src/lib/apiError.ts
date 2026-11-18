@@ -61,6 +61,13 @@ const RENDER_REFUSALS = new Set([
 ]);
 
 /** Turn a Server failure detail into one human-readable line. */
+export function describeDrawingApiErrorDetail(detail: unknown, status: number, strings: LangPack, describe = describeApiErrorDetail): string {
+	const code = typeof detail === 'string' ? detail : object(detail)?.code;
+	return typeof code === 'string' && /^http_\d+$/.test(code)
+		? strings.drawingStartFailed
+		: describe(detail, status, strings);
+}
+
 export function describeApiErrorDetail(detail: unknown, status: number, strings: LangPack): string {
 	const imageCode = typeof detail === 'string' ? detail : object(detail)?.code;
 	if (imageCode === 'image_missing' || imageCode === 'image_expired') return strings.imageMissing;

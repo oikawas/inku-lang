@@ -2,6 +2,7 @@ import { pipelineDescription } from '$lib/description-labels';
 import { hasDdlBody } from '$lib/ddl-source';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
+import { describeDrawingApiErrorDetail } from '$lib/apiError';
 import { normalizeSketchState, type SketchState } from '$lib/sketch';
 import {
 	compositionOption, sketchModeForRoute,
@@ -942,7 +943,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		try {
 			await ensureVisibleLineageParentId();
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
+			error = cause instanceof PipelineApiError ? describeDrawingApiErrorDetail(cause.detail, cause.status, t(), describeApiError) : cause instanceof Error ? cause.message : String(cause);
 			return;
 		}
 
@@ -1003,7 +1004,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			}
 		} catch (cause) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
-				error = cause instanceof Error ? cause.message : String(cause);
+				error = cause instanceof PipelineApiError ? describeDrawingApiErrorDetail(cause.detail, cause.status, t(), describeApiError) : cause instanceof Error ? cause.message : String(cause);
 				// The work the author opened meanwhile keeps its picture.
 				if (pipelineController.lastRunWasShown) result = null;
 			}
@@ -1076,7 +1077,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			});
 		} catch (cause) {
 			if (!batch.interrupted) {
-				error = cause instanceof Error ? cause.message : String(cause);
+				error = cause instanceof PipelineApiError ? describeDrawingApiErrorDetail(cause.detail, cause.status, t(), describeApiError) : cause instanceof Error ? cause.message : String(cause);
 				result = null;
 			}
 		} finally {

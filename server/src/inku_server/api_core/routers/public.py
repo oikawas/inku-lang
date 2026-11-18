@@ -18,7 +18,7 @@ from ...saijiki import display_categories
 from ...saijiki_generated import BUNDLES
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
-from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model
+from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model, public_model_settings
 from ...verified_model_catalog import core_catalog, sign_in_provider_groups
 from ...text_provider import send_text
 from ...request_timeout import request_timeout_seconds
@@ -218,16 +218,20 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
         )
     except (ChatGPTError, ValueError, KeyError):
         profile_id = generation = None
+    key_status = public_model_settings(settings, include_developer=developer_mode)["providers"]
+    def with_key_status(groups):
+        return [{**group, "api_key_set": bool(key_status.get(group["id"], {}).get("api_key_set", False))}
+                for group in groups]
     return ModelSettingsResponse(
-        drawing_catalog=drawing, chatgpt_profile_id=profile_id, chatgpt_generation=generation,
+        drawing_catalog=with_key_status(drawing), chatgpt_profile_id=profile_id, chatgpt_generation=generation,
         chatgpt_plan_available=chatgpt_available,
-        catalog=model_provider_catalog(
+        catalog=with_key_status(model_provider_catalog(
             settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
-        ),
-        llm_catalog=model_provider_catalog(
+        )),
+        llm_catalog=with_key_status(model_provider_catalog(
             settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
-        ),
-        vision_catalog=vision,
+        )),
+        vision_catalog=with_key_status(vision),
         settings={"model_settings": actor.get("model_settings") or {}, "model_defaults": default_user_model_settings()},
     )
 

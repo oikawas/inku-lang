@@ -44,6 +44,31 @@ async function requestBatch(queries: ReferenceQuery[], version: number): Promise
 	}
 }
 
+// Replace a refresh's answers only after every new answer has arrived, keeping
+// the displayed names intact during network requests.
+export async function refreshModelReferences(queries: ReferenceQuery[], current: () => boolean): Promise<void> {
+	if (!transport) throw new Error('model reference transport unavailable');
+	const version = generation;
+	const lang = language() === 'ja' ? 'ja' : 'en';
+	const unique = new Map(queries.map(query => [keyOf(query, lang), query]));
+	for (const key of answers.keys()) {
+		const [action, ref, provider, default_provider, answerLang] = JSON.parse(key) as string[];
+		if (action === 'resolve_display' && answerLang === lang) unique.set(key, {action: 'resolve_display', ref, provider: provider || undefined, default_provider: default_provider || undefined});
+	}
+	const all = [...unique.values()];
+	const next = new Map<string, ReferenceResult>();
+	for (let index = 0; index < all.length; index += 256) {
+		const batch = all.slice(index, index + 256);
+		const response = await transport('/api/model-references', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({queries: batch, language: lang})});
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		const data = await response.json() as {results: ReferenceResult[]};
+		if (!Array.isArray(data.results) || data.results.length !== batch.length || data.results.some(result => result.outcome !== 'ok')) throw new Error('invalid model reference response');
+		batch.forEach((query, i) => next.set(keyOf(query, lang), data.results[i]));
+	}
+	if (version !== generation || !current()) return;
+	for (const [key, value] of next) answers.set(key, value);
+}
+
 export async function loadModelReferences(queries: ReferenceQuery[]): Promise<void> {
 	const unique = new Map(queries.map((query) => [keyOf(query), query]));
 	let version: number;

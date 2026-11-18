@@ -392,7 +392,7 @@ class UserAccountRow(Base):
     # folder's display name, and the browser holds the permission.
     download_folder_enabled = Column(Boolean, nullable=False, default=False)
     download_folder_name = Column(String, nullable=True)
-    settings_tab  = Column(String, nullable=False, default="db")
+    settings_tab  = Column(String, nullable=False, default="models")
     model_settings = Column(Text, nullable=False, default="{}")
     image_generation_count = Column(Integer, nullable=False, default=0)
     batch_prompt_history = Column(Text, nullable=False, default="[]")

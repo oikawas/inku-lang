@@ -505,3 +505,14 @@ test('demo drawing sends its shared model to both stages even with a legacy stag
 	assert.equal(body?.stage1_model, 'chatgpt:drawing');
 	assert.equal(body?.stage2_model, 'chatgpt:drawing');
 });
+
+test('a pipeline error while preparing a drawing is described for the author', async () => {
+	const { PipelineApiError } = await import('../pipeline/api.ts');
+	const work = imageWork(async () => { throw new Error('no network request expected'); }, {
+		ensureVisibleLineageParentId: async () => { throw new PipelineApiError(403, {code:'model_not_offered', message:'model not offered'}); },
+		describeApiError: () => 'translated failure',
+	});
+	work.input = 'a line';
+	await work.submit();
+	assert.equal(work.error, 'translated failure');
+});

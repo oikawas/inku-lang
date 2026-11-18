@@ -419,7 +419,7 @@ class ProductPipelineEffects:
         for key in ("request_idempotency_key", "history_at", "history_input", "history_source_text"):
             if key not in options:
                 selected.pop(key, None)
-        if "lineage_parent_node_id" not in options and (work or {}).get("result", {}).get("lineage_node_id"):
+        if "lineage_parent_node_id" not in options and ((work or {}).get("result") or {}).get("lineage_node_id"):
             selected["lineage_parent_node_id"] = work["result"]["lineage_node_id"]
         config = self.settings.config_for(owner, work, requested_limits)
         if kind == "image":

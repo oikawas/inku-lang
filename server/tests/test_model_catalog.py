@@ -26,6 +26,30 @@ CASES = json.loads((Path(__file__).parents[2] / "core/crates/inku-pipeline/data/
 _PUBLISHABLE = {label["id"]: label["publishable"] for label in MODEL_LABELS}
 
 
+def test_public_model_catalog_only_exposes_key_presence(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from inku_server.api_core.deps import _current_user
+    from inku_server.api_core.routers import public
+    from inku_server import chatgpt_runtime
+    from inku_server.chatgpt_store import ChatGPTError
+
+    settings = default_model_settings()
+    settings["providers"]["openai"]["api_key"] = "fixture-private-key"
+    monkeypatch.setattr(public._db, "get_model_settings", lambda: settings)
+    monkeypatch.setattr(chatgpt_runtime, "check_owner", lambda _owner: (_ for _ in ()).throw(ChatGPTError("chatgpt_not_connected")))
+    app = FastAPI()
+    app.include_router(public.router)
+    app.dependency_overrides[_current_user] = lambda: {"id": "fixture-owner"}
+    response = TestClient(app).get("/api/models")
+    assert response.status_code == 200
+    body = response.json()
+    assert "fixture-private-key" not in response.text and "api_key_hint" not in response.text
+    for catalog in ("catalog", "llm_catalog", "drawing_catalog", "vision_catalog"):
+        assert all(type(group["api_key_set"]) is bool for group in body[catalog])
+        assert next(group for group in body[catalog] if group["id"] == "openai")["api_key_set"] is True
+
+
 def _kept_by_the_server(model: dict) -> dict:
     """A model in the common format as the Server keeps it: each stored label as its boolean."""
     kept = {key: value for key, value in model.items() if key != "labels"}

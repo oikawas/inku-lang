@@ -197,6 +197,17 @@ def test_creator_rolls_back_the_account_when_permission_assignment_fails(tmp_pat
         engine.dispose()
 
 
+def test_new_account_starts_on_models_tab(tmp_path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'new-account.db'}")
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine)
+    creator = _creator_or_skip()(sessions, lambda: "new-user", lambda: 123,
+        lambda _password: "hash", lambda _groups: ["users"], lambda _groups: "user",
+        lambda *_args: None, lambda row, _group: {"settings_tab": row.settings_tab})
+    assert creator.add_user("name", "mail@example.test", "secret", ["users"], None)["settings_tab"] == "models"
+    engine.dispose()
+
+
 def test_creator_exceptions_propagate() -> None:
     creator_type = _creator_or_skip()
 

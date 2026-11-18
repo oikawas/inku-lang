@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { missingApiKey } from '$lib/model-readiness';
 	import { pickerSelection, providerGroupLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose } from '$lib/modelMeta';
 
@@ -89,7 +90,7 @@
 		{#if selectionError}<p class="selection-error" role="alert">{selectionError}</p>{/if}
 		{#if !catalogLoad || catalogLoad.status() === 'ready'}<div class="picker-groups">
 			{#each configuredGroups as group (group.id)}
-				<section><h3>{providerGroupLabel(group, t().code)}</h3><div class="model-grid">
+				<section><h3>{providerGroupLabel(group, t().code)}{#if missingApiKey(group)} · {t().settingsModelApiKeyUnset}{/if}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} class:not-recommended={purposeUnsupported(model, purpose)} disabled={isModelUnselectable(model)} onclick={() => choose(group.id, model.id)}>
 							<div class="model-button-heading">

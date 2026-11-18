@@ -6,7 +6,7 @@
 	import { captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { generationInfoSettings } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { textSizeSettings } from '$lib/features/appearance/text-size.svelte';
-	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
+	import { UI_VISIBILITY_KEYS, resolveUiVisibility, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import './appearance-settings.css';
 
@@ -125,7 +125,7 @@
 					<div class="ui-custom-grid">
 						{#each UI_VISIBILITY_KEYS as key (key)}
 							<label class="setting-toggle">
-								<input type="checkbox" checked={uiCustom[key] === true} disabled={uiModeSaving} onchange={(event) => onSetUiCustomItem(key, event.currentTarget.checked)} />
+								<input type="checkbox" checked={resolveUiVisibility('custom', uiCustom)[key]} disabled={uiModeSaving} onchange={(event) => onSetUiCustomItem(key, event.currentTarget.checked)} />
 								<span>{key === 'input_modes' ? t().uiModeInputModes : key === 'drawing_settings' ? t().uiModeDrawingSettings : key === 'ddl_tools' ? t().uiModeDdlTools : key === 'detail_status' ? t().uiModeDetailStatus : key === 'work_tools' ? t().uiModeWorkTools : key === 'history' ? t().uiModeHistory : t().uiModeAuxiliary}</span>
 							</label>
 						{/each}

@@ -135,6 +135,11 @@
 	const placeholderTransform = $derived(placeholderMotifTransform(placeholderWidth, placeholderHeight));
 	const shareTarget = $derived(shareTargetOf(statusHistoryItem));
 	const activeZoom = $derived(zoomControls ?? viewport);
+	let leftControlsHeight = $state(0);
+	let rightControlsHeight = $state(0);
+	// Both rows sit 14px from the bottom; retain the existing 10px gap above
+	// the taller row, including any extra lines produced by wrapping.
+	const captionBottom = $derived(Math.max(58, 24 + Math.max(leftControlsHeight, rightControlsHeight)));
 
 	// The `#` button copies the work's UUID, not its render hash: two saved works
 	// can share one rh3, and a stored rh3 is rewritten when its scheme changes.
@@ -253,7 +258,7 @@
 				     favourite, it wants another pass. They sit beside the caption
 				     toggle rather than in a bar of their own, because all three are
 				     about the drawing on screen and nothing else. -->
-				<div class="canvas-corner-controls canvas-corner-left" onpointerdown={(event) => event.stopPropagation()}>
+				<div class="canvas-corner-controls canvas-corner-left" bind:clientHeight={leftControlsHeight} onpointerdown={(event) => event.stopPropagation()}>
 					<Tooltip placement="top-right" text={t().tooltipCanvasCaption}>
 						<button
 							type="button"
@@ -337,7 +342,7 @@
 				     than below the picture because every one of these acts on the
 				     work being looked at; the fullscreen button stays last, at the
 				     corner, so it keeps the position it has always had. -->
-				<div class="canvas-corner-controls canvas-corner-right" onpointerdown={(event) => event.stopPropagation()}>
+				<div class="canvas-corner-controls canvas-corner-right" bind:clientHeight={rightControlsHeight} onpointerdown={(event) => event.stopPropagation()}>
 					{@render leadingCornerControls?.()}
 					{#if copyableWorkId}
 						<Tooltip placement="top-left" text={copiedWorkId === copyableWorkId ? t().historyHashCopied : t().historyIdCopyTitle}>
@@ -463,7 +468,7 @@
 					</Tooltip>
 				</div>
 				{#if instructionCaptionVisible && canShowInstructionCaption}
-					<div class="instruction-caption" class:vertical={instructionCaptionVertical} class:caption-right={instructionCaptionPosition === 'right'} aria-live="polite"><CaptionText text={displayInstructionText} highlight={captionHighlight} /></div>
+					<div class="instruction-caption" class:vertical={instructionCaptionVertical} class:caption-right={instructionCaptionPosition === 'right'} style:--caption-bottom="{captionBottom}px" aria-live="polite"><CaptionText text={displayInstructionText} highlight={captionHighlight} /></div>
 				{/if}
 </div>
 			<div class="zoom-controls">
@@ -619,7 +624,7 @@
 		position: absolute;
 		left: 10%;
 		right: 10%;
-		bottom: 58px;
+		bottom: var(--caption-bottom, 58px);
 		z-index: 12;
 		box-sizing: border-box;
 		padding: 9px 14px;
@@ -638,7 +643,7 @@
 		--caption-nav-space: max(68px, calc(68px * var(--ui-text-scale, 1)));
 		top: 58px;
 		right: auto;
-		bottom: 58px;
+		bottom: var(--caption-bottom, 58px);
 		left: var(--caption-nav-space);
 		width: fit-content;
 		max-width: min(40%, 13em, calc(100% - 2 * var(--caption-nav-space)));

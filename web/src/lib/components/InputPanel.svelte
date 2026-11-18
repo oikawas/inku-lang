@@ -29,6 +29,8 @@
 		failures: BatchFailure[];
 	};
 	type Props = {
+		drawActionTarget?: HTMLElement | null;
+		nextDrawParentNodeId?: string | null;
 		chatgptPlanSelected?: boolean;
 		chatgptUsageUrl?: string | null;
 		modelReadiness?: ModelReadiness;
@@ -131,6 +133,7 @@
 	};
 
 	let {
+		drawActionTarget = null, nextDrawParentNodeId = null,
 		chatgptPlanSelected = false,
 		chatgptUsageUrl = null,
 		modelReadiness = null, onOpenConnectionSettings,
@@ -215,6 +218,21 @@
 	}: Props = $props();
 
 	const isJapanese = $derived(t().code === 'ja');
+	// Keep the existing action and its tooltips in this component while the
+	// page places the action between the two scroll regions.
+	function placeDrawAction(node: HTMLElement, target: HTMLElement | null) {
+		const marker = document.createComment('draw-action');
+		node.before(marker);
+		function place(next: HTMLElement | null) {
+			if (next) next.appendChild(node);
+			else if (marker.parentNode) marker.after(node);
+		}
+		place(target);
+		return {
+			update: place,
+			destroy() { node.remove(); marker.remove(); }
+		};
+	}
 
 	// Progress sits on the tab only while the batch is running, so the tab returns
 	// to its plain label the moment the run stops. batchCurrent is 0 outside a run.
@@ -350,7 +368,7 @@
 				</div>
 				<div class="input-description">{t().inputSectionHint}</div>
 			</div>
-			<Tooltip placement="left" text={t().tooltipInputClear}>
+			<Tooltip placement="left" text={t().tooltipDescriptionNew}>
 				<button class="ghost-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
 			</Tooltip>
 		</div>
@@ -391,7 +409,9 @@
 				onStop={onStop}
 			/>
 			</div>
-		{:else}
+		{/if}
+		<div class="description-action-placeholder"><div class="description-action" use:placeDrawAction={drawActionTarget}>
+		{#if !(singleRunning && !hideRunStatus)}
 			{#if descriptionLocked}
 				<!-- Drawing a held work from its description is the fork, named as such,
 				     never a plain "draw" that throws the edited DDL away. -->
@@ -403,6 +423,7 @@
 					<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
 				</Tooltip>
 			{/if}
+			{#if nextDrawParentNodeId !== null}<p class="description-parent-note">{t().nextDrawChildNotice}</p>{/if}
 			{#if modelReadiness}
 				<div role="status">
 					<p>{modelReadiness.kind === 'chatgpt_unavailable' ? t().chatgptModelUnavailable : modelReadiness.kind === 'no_models_admin' ? t().drawingNoModelsAdmin : modelReadiness.kind === 'no_models_user' ? t().drawingNoModelsUser : modelReadiness.kind === 'unavailable' ? t().drawingModelUnavailable : modelReadiness.kind === 'missing_key_admin' ? t().drawingKeyMissingAdmin : t().drawingKeyMissingUser}</p>
@@ -411,8 +432,8 @@
 				</div>
 			{/if}
 		{/if}
-
 		{#if error}<p class="error-text">{error}</p>{/if}
+		</div></div>
 	{:else if inputMode === 'image'}
 		<button class="ghost-btn" onclick={onClearInput} disabled={singleRunning || generationDisabled}>{t().clearInputBtn}</button>
 		<label class="input-heading" for="image-provenance">{t().imageProvenanceLabel}</label>
@@ -595,6 +616,9 @@
 		animation: inkupulse 1s ease-in-out infinite;
 	}
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
+	.description-action { display: flex; flex-direction: column; gap: 6px; }
+	.description-action :global(.tooltip-wrap) { width: 100%; }
+	.description-parent-note { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-11); line-height: 1.5; }
 	.conditions-heading { margin: 8px 0 2px; font-size: var(--ui-font-size-12); font-weight: 500; color: var(--fg2); }
 	.condition-rows {
 		display: grid;

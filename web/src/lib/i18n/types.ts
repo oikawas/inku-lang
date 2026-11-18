@@ -655,6 +655,8 @@ export interface LangPack {
 	tooltipInputLang: string;
 	tooltipInputModel: string;
 	tooltipInputClear: string;
+	tooltipDescriptionNew: string;
+	nextDrawChildNotice: string;
 	tooltipInputSketch: string;
 	tooltipInputRoute: string;
 	tooltipInputComposition: string;

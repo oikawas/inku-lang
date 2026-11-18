@@ -515,6 +515,7 @@
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	let modelCatalogStatus = $state<'loading' | 'ready' | 'error'>('loading');
+	let drawActionTarget = $state<HTMLElement | null>(null);
 	let modelSettingsTarget = $state<string | null>(null);
 	setContext('model-settings-target', { get: () => modelSettingsTarget, clear: () => { modelSettingsTarget = null; } });
 	setContext('model-catalog-load', { status: () => modelCatalogStatus, retry: () => loadAvailableModels() });
@@ -2908,8 +2909,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		<div class="body">
 			<!-- ── LEFT PANEL ── -->
 			{#if !leftPanelCollapsed}
+			{@const hasWorkRecord = work.result !== null || work.ddl !== null || work.sketchText !== null || work.imageBeforeReviewDdl !== null || (work.inputMode === 'single' && work.limitNotesShown.length > 0)}
 			<div class="left-panel">
-				<div class="panel-scroll" class:description-scroll={work.inputMode === 'single'}>
+				<div class="panel-scroll" class:description-scroll={work.inputMode === 'single'} class:empty-record={!hasWorkRecord}>
 					{#if demoRunning}
 						<div class="demo-running-banner">
 							<button class="ghost-btn" onclick={() => settings.openSettings('demo')}>{t().demoOpenSettings}</button>
@@ -2925,6 +2927,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</div>
 					{/if}
 					<InputPanel
+						{drawActionTarget}
+						nextDrawParentNodeId={work.nextDrawParentNodeId}
 						chatgptPlanSelected={(work.drawOptions.models.stage1 ?? '').startsWith('chatgpt:')}
 						{chatgptUsageUrl}
 						modelReadiness={modelReadiness(modelCatalogOwner === session.currentUser?.id ? modelCatalogStatus : 'loading', availableModelCatalog, work.drawOptions.models.stage1 ?? '', session.isAdmin, chatgptPlanAvailable)}
@@ -3052,6 +3056,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onDecline={work.declinePipelinePatch}
 					/>
 
+				</div><!-- /panel-scroll -->
+				<div class="description-action-target" class:visible={work.inputMode === 'single'} bind:this={drawActionTarget}></div>
+				{#if hasWorkRecord}
+				<div class="work-record-scroll">
 					{#if work.inputMode !== 'batch' && (work.result !== null || work.ddl !== null || work.sketchText !== null)}
 						<h3 class="displayed-work-heading">{t().displayedWorkProcessWithComposition}</h3>
 					{/if}
@@ -3226,7 +3234,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-				</div><!-- /panel-scroll -->
+				</div><!-- /work-record-scroll -->
+				{/if}
 			</div><!-- /left-panel -->
 			{/if}
 
@@ -4144,18 +4153,25 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	@media (max-width: 1180px) {
 		.left-panel { width: min(calc(400px * var(--ui-text-scale, 1)), 42vw); }
-		.panel-scroll { padding-inline: 12px; }
 	}
 
 	.panel-scroll {
-		flex: 1;
+		flex: 0 1 auto;
+		min-height: 0;
 		overflow-y: auto;
 		padding: 14px 16px;
 		display: flex;
 		flex-direction: column;
 		gap: 14px;
 	}
+	.panel-scroll.empty-record { flex: 1 1 auto; }
 	.description-scroll { overflow-x: hidden; }
+	.description-action-target { display: none; flex: 0 0 auto; padding: 0 16px 10px; }
+	.description-action-target.visible { display: block; }
+	.work-record-scroll { flex: 1 1 140px; min-height: 140px; overflow-y: auto; overflow-x: hidden; padding: 14px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+	@media (max-width: 1180px) {
+		.panel-scroll, .work-record-scroll, .description-action-target { padding-inline: 12px; }
+	}
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
 	.ddl-new-action { display: flex; justify-content: flex-end; margin-top: -6px; }
@@ -4167,8 +4183,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.displayed-work-heading {
 		margin: 4px 0 0;
-		padding-top: 16px;
-		border-top: 1px solid var(--border);
 		color: var(--fg);
 		font-size: var(--ui-font-size-12);
 		font-weight: 600;

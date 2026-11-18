@@ -774,6 +774,8 @@ export const ja: LangPack = {
 	tooltipSketchToggle: '写生層が書いた文章を表示します。開閉の状態はアカウントごとに保存されます',
 	tooltipStatsToggle: "指示書を書く工程・補完それぞれの所要時間とトークン数を表示します",
 	tooltipInputClear: '入力をクリアする',
+	tooltipDescriptionNew: '記述と条件を空にし、表示中の作品から切り離して新しい作品を始めます。',
+	nextDrawChildNotice: '表示中の作品の子として描きます。新しい作品にするときは「新規作成」。',
 	tooltipSubmit: '入力文を読み取り、配置とタッチを決めて1枚生成します。',
 	tooltipDdlPaint: "表示中の指示書（正規化DDL）を必要に応じて補完して描き直します。記述から指示書を書き直さないので、読みは変わりません。",
 	tooltipInputTabSingle: '自由な自然言語で記述を入力して1枚ずつ描画します',

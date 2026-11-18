@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- The read-and-draw and image-writing prompts now include Saijiki word explanations and a fineness combination example. They broaden the choice of surface and movement words; in the author's comparison the drawings were as good as or better than before.
+
 - Swift (macOS and iOS): cleans up result and drawing log files when works are permanently deleted and after the backup cleanup grace period.
 
 - Android: clean documents and execution records no longer linked to a work when discarding candidates, permanently deleting a work, and starting the app. Active documents, parent relationships, and restored executions are preserved.

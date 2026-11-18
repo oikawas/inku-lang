@@ -8,6 +8,23 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class DrawOptionsTests: XCTestCase {
+    func testImageFolderSummaryFormatsCountsInBothLanguages() {
+        let display = DisplaySettings()
+        display.preferences.language = "ja"
+        XCTAssertEqual(CreationView.imageFolderSummary(display: display, folder: "/tmp/photos", total: 12, completed: 3),
+                       "photos：12 枚（描き終えた 3 枚）")
+        display.preferences.language = "en"
+        XCTAssertEqual(CreationView.imageFolderSummary(display: display, folder: "/tmp/photos", total: 12, completed: 3),
+                       "photos: 12 pictures (3 painted)")
+    }
+
+    func testEmptyVisionReferenceIsNotReportedUnavailable() {
+        let settings = HostSettings()
+        XCTAssertFalse(CreationView.imageVisionUnavailable(reference: "", settings: settings))
+        XCTAssertFalse(CreationView.imageVisionUnavailable(reference: "missing:model", settings: nil))
+        XCTAssertTrue(CreationView.imageVisionUnavailable(reference: "missing:model", settings: settings))
+    }
+
     func testRecordedWildKeepsDefault() throws {
         var defaults = DrawOptionsCore.release
         defaults["describe"]?.wild = "off"

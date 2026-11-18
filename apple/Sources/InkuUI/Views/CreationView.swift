@@ -630,6 +630,7 @@ struct CreationView: View {
                     else if isImage { imageActions }
                     else { generationAction }
                 }.padding(.vertical, 8)
+                if isBatch { statusFooter }
                 if !isBatch {
                     if let work = workspaceWork {
                         CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
@@ -762,7 +763,7 @@ struct CreationView: View {
                        onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                        followsLatestWork: batchWorkspace.followsLatest,
                        selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision,
-                       onNewBatch: { batchWorkspace.showHistory() }, ui: ui)
+                       onNewBatch: { batchWorkspace.showHistory() }, ui: ui, actionFooter: AnyView(statusFooter))
     }
 
     private var imageFolderPanel: some View {
@@ -771,7 +772,7 @@ struct CreationView: View {
                 if imageBatch.folder.isEmpty {
                     Text(display.webCopy("imageFolderHint", "中の画像を名前の順に1枚ずつ描きます")).inkuFont(12).foregroundStyle(.secondary)
                 } else {
-                    Text(display.webCopyFormat("imageFolderSummary", "%@：%@ 枚（描き終えた %@ 枚）", URL(fileURLWithPath: imageBatch.folder).lastPathComponent, imageBatch.total, imageBatch.completed))
+                    Text(Self.imageFolderSummary(display: display, folder: imageBatch.folder, total: imageBatch.total, completed: imageBatch.completed))
                         .inkuFont(12).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength: 0)
@@ -839,7 +840,8 @@ struct CreationView: View {
                 if let input = model.imageInput, let preview = imagePreview {
                     Image(decorative: preview, scale: 1).resizable().scaledToFill().frame(width: 40, height: 40).clipped()
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(model.imageFileName).inkuFont(12).lineLimit(1).truncationMode(.middle)
+                        Text(model.imageFileName.isEmpty ? display.localized("写真") : model.imageFileName)
+                            .inkuFont(12).lineLimit(1).truncationMode(.middle)
                         Text("\(input.originalWidth) × \(input.originalHeight)").inkuFont(11).foregroundStyle(.secondary)
                     }
                 }
@@ -900,11 +902,21 @@ struct CreationView: View {
 
     private var imageVisionRow: some View {
         let reference = model.imageVisionModel
-        let unavailable = visionSettings.map { !SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: $0) } ?? false
+        let unavailable = Self.imageVisionUnavailable(reference: reference, settings: visionSettings)
         return DrawingConditionRow(display: display, label: display.webCopy("modelButton", "モデル"),
                                    value: model.modelDisplayName(reference, empty: display.localized("選択してください")),
                                    help: "Vision", unavailable: unavailable) { showImageModelPicker = true }
             .disabled(controlsDisabled)
+    }
+
+    static func imageFolderSummary(display: DisplaySettings, folder: String, total: Int, completed: Int) -> String {
+        display.webCopyFormat("imageFolderSummary", "%@：%@ 枚（描き終えた %@ 枚）",
+                              URL(fileURLWithPath: folder).lastPathComponent, String(total), String(completed))
+    }
+
+    static func imageVisionUnavailable(reference: String, settings: HostSettings?) -> Bool {
+        guard !reference.isEmpty, let settings else { return false }
+        return !SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: settings)
     }
 
     private func chooseImage() {

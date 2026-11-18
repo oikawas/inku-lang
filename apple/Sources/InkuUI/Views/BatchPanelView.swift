@@ -15,6 +15,7 @@ struct BatchPanelView: View {
     @State private var clearResume = false
     /// The creation panel keeps these on WorkspaceUIState, so switching 記述／バッチ does not reset them.
     var ui: WorkspaceUIState? = nil
+    var actionFooter: AnyView? = nil
     @State private var localResultsExpanded = false
     @State private var localIssuesExpanded = false
     @State private var selectedHistoryPrompt = ""
@@ -76,7 +77,10 @@ struct BatchPanelView: View {
             } else {
                 ScrollView { batchContent(includeActions: false) }
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        actions.padding(.vertical, 8).background(InkuColor.bg)
+                        VStack(alignment: .leading, spacing: 2) {
+                            actions
+                            actionFooter
+                        }.padding(.vertical, 8).background(InkuColor.bg)
                     }
             }
         }

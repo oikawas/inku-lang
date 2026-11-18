@@ -114,7 +114,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 作者の指示（2026-11-14「web/swift/androidのモデル設定、モデル選択で、chatGPTを先頭に変更。」）と、正式の名（日本語「ChatGPT でサインイン」、英語「Sign in with ChatGPT」、略称「SIWC」）。共通coreの`model_catalog_json`の`provider_groups`・`sign_in_services`・`resolve_display`を使う。
 
 - 並び：設定の保存の読み書き（`ProviderCoreSettings.fromCore`）、ChatGPTの公開の写し（`SettingsModel.mirroringPersonalPlan`）、接続を有効にした時の足し（`ChatGPTPlanSettingsModel.setEnabled`）は、ChatGPTの接続を末尾に足さず、coreの`provider_groups`の並び（サインインの接続が先頭、ほかのサービスは今の順）にする（`ProviderCoreSettings.orderedBySignIn`）。モデル設定のカード（`SettingsModel.serviceCardProviders`。Ollamaを前に出す並べ方はその後ろで今のまま）、モデル選択（`BatchModelPickerView`）、比べ（`ComparisonModel`）も同じ並び。
-- 名札：接続の名は、coreの記述の名札を表示の言語で使う（設定の節・ChatGPTの頁の見出し・モデル設定のカード・公開モデル選択の題）。保存したモデルの名（`ModelNaming`）は、coreの`resolve_display`に表示の言語を渡し、名札と略称を受け取る。直書きの「ChatGPT plan」は消した。履歴の帯の略称は「Ch」から「SIWC」になる。
+- 名札：接続の名は、coreの記述の名札を表示の言語で使う（設定の節・ChatGPTの頁の見出し・モデル設定のカード・公開モデル選択の題）。モデル名の表示だけは、coreの`resolve_display`の`display_name`と`strip_label`を使い、ChatGPTは `SIWC / <id>` と表示する。端末に保存したmodel labelは画面に出さずAPIのidを使い、保存値は書き換えない。
 - 文言：接続の名を言う字を替えた（「ChatGPT でサインインを有効にする」、有効・無効にした知らせ、失敗の文の既定・無効・起動入口・未接続。未接続は「ChatGPT でサインインしてください。」）。利用者のプランそのものを言う字（「本人のChatGPTプランで描画できます。…」など）は替えない。記述タブのモデルの横の使用量の頁へのリンクは「利用枠を管理」（Webの`chatgptManageUsage`）にし、頁のURLはcoreの記述から読む。使われていなかった訳の2行（「個人ChatGPTプラン」「Personal ChatGPTのモデルは…」）を消した。
 - 変わらない物：id `chatgpt`、モデル名`chatgpt:…`、失敗の印、送信・保存・作品の記録。Webのコピー（`ui-reference.json`）の`chatgptPlanLabel`は名札に使わなくなった（Webの文言の写しは、WebのServerの変更と合わせて書き出し直す）。
 - 確かめ：共通の試験データ`sign-in-cases.json`の21行を、アプリと同じ口（`InkuCore.modelCatalog`）で通し、答えの全体を照らす（`InkuAppCheck --sign-in-only`）。
@@ -570,7 +570,7 @@ Webの`HistoryThumbnail.svelte`と同じく、画像ごとの待機アニメー�
 
 作品プレビューは画像、開き方の補足、記述全文、系譜・推敲・書出し、作品情報の表、コメントの順に並べる。画像のダブルクリックまたはキーボード操作でその作品を制作で開く。調べるだけでは制作欄を置き換えない。同じ作品を閉じて開き直しても未保存のコメントを保持し、別の作品の情報を混ぜない。作品情報は保存時刻・段階ごとのモデル（同じなら1行）・色カタログ・キャンバス・秒数・SVG容量・描画版・世代・短いhashと全hashのコピーを示す。書出しは形式を選んで、その作品を対象に設定画面を開く。
 
-検索は記述／hash／作品IDのラベル・説明と、入力欄内のクリア操作をWebへ揃える。クリア後も入力focusを保つ。既存の記述・DDL・モデル・色の検索に加えて、hashの先頭と作品IDの全体／先頭も照合する。履歴帯のモデル名はWebと同じ語の省略規則を使い、版・サイズ・variant・量子化を保つ。長い名前は小さい文字で折り返す。保存モデルの表示名は、接続が現在なくてもcatalogから読める場合はその名を使い、描画モデルを登録／有効化しない。
+検索は記述／hash／作品IDのラベル・説明と、入力欄内のクリア操作をWebへ揃える。クリア後も入力focusを保つ。既存の記述・DDL・モデル・色の検索に加えて、hashの先頭と作品IDの全体／先頭も照合する。履歴帯のモデル名はcoreの`strip_label`を使い、API名の版・サイズ・variant・量子化を保つ。長い名前は小さい文字で折り返す。保存モデルの表示はAPIのidを使い、描画モデルを登録／有効化しない。
 
 共有の代わりに置いていたnativeの「書き出し用」の印・フィルタ・作品属性を廃止する。これは実際のServerの共有権限を表すものではない。Swift物理schema v4の[migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql)で`library_annotations.for_share`だけを削除し、コメント・推敲印と作品・系譜・実行記録は保持する。正本は[Swift schema export](../persistence/reference/swift-schema-v4.json)。既知のv1〜v3を移行し、旧backupの復元も隔離snapshotでv4へ移行する。v4 DBは古いbinaryでは開けないため、旧版へ戻す場合は移行前backupと旧版を組にする。実際のファイル書出し機能は保持する。
 
@@ -857,7 +857,7 @@ macOS版を初めて配布するにあたり、画面・操作・保存した選
 - 配置の候補づくり、色カタログとモデルの比較は、Webの`runRefinementFanout`と同じく候補を同時に走らせる（作者の報告、2026-10-12）。同時に走らせる数はServerの`render_fanout_limit`の既定と同じ4で、頼んだ順に始める。候補は終わった順でなく頼んだ順に並べ、失敗した候補はほかの候補を止めない。止めると残りを止め、遅れて来た答えは採らない。描画の土台は実行ごとに分かれ、サービスの回数の上限はDBで判定するので、同時の要求でも守る。ChatGPTプランは同じ登録への要求を順番に送る（Serverと同じ）。進捗の表示は最後に動いた候補のもので、候補ごとの状態は列が示す。
 - 作品まわりの操作（拡大縮小、キャプション・印・書き出し、前後移動）は作品の上に重ねる。作品域の外側余白と枠をなくし、Webと同じ式（基準400、倍率min((幅−120)/基準幅, (高さ−96)/基準高さ)、0.25〜10）で合わせる。ズームのボタン・ホイール・ピンチは表示エリア中心の作品の位置を保つ。パンした後や倍率1を通過する場合も中央へ戻さず、明示した「用紙に合わせる」で位置と倍率を戻す。
 - 文字はWebの`--ui-font-size-N`と同じ値に文字サイズ設定の倍率を掛ける。文字サイズ設定がすべての文字に効く。画面ごとの大見出しは置かない。
-- 履歴帯はサムネ82×58、件数floor((窓幅−40)/89)。ライブラリはminmax(142,1fr)の格子で、1ページの件数を実寸から計算してページ送りし、スクロールに頼らない。モデル名はWebの`shortModel`（カード）と`abbreviateStripModel`（履歴帯）と同じ規則で省略する。
+- 履歴帯はサムネ82×58、件数floor((窓幅−40)/89)。ライブラリはminmax(142,1fr)の格子で、1ページの件数を実寸から計算してページ送りし、スクロールに頼らない。カードはcoreの`display_name`、履歴帯はcoreの`strip_label`を表示する。
 - ダイアログはWebと同じ大きさの式（例: DDL編集min(1360, 窓−40)×min(940, 窓高−40)）で開く。推敲は作品域の中、生成情報は作品上の引き出し、歳時記は右端の引き出しとして出す。
 
 ### 選択の保存

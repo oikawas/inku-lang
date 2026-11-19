@@ -1234,7 +1234,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				lineageParentNodeId: replayParentNodeId,
 				derivationKind: replayKind,
 				derivationMetadata: replayDerivationMetadata,
-				renderOverrides: wildOverride(unedited ? recordedWild : currentOptions().wild === 'on'),
+				renderOverrides: wildOverride(replayParentNodeId ? recordedWild : currentOptions().wild === 'on'),
 			}, abortController.signal);
 			if (view.result) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;

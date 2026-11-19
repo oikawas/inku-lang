@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 import { ja } from '../../i18n/ja.ts';
@@ -191,8 +191,8 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 			},
 			models: { stage1: () => 'reader', stage2: () => 'performer' },
 			seeds: { composition: (excluded: Set<number>) => { assert.ok(excluded.has(7)); return 42; } },
-			// The work's recorded switch is off; the input panel's is on.
-			render: { canvasAspectId: () => 'square', wild: () => false, layoutWild: () => true, fanoutLimit: () => 1 },
+			// Both refinement paths use the work's recorded switch, here off.
+			render: { canvasAspectId: () => 'square', wild: () => false, layoutWild: () => false, fanoutLimit: () => 1 },
 			catalog: { defaultId: () => 'catalog', effectiveId: () => 'catalog', available: () => [], name: (id: string) => id },
 			lineageParentId: () => 'parent-node', ensureVisibleLineageParentId: async () => 'parent-node',
 			apiFetch: async (path: string, init?: RequestInit) => {
@@ -206,10 +206,9 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 				// The server forks the candidate from this saved work, with its
 				// saved settings and seeds (SPEC §12.7.1).
 				assert.equal(payload.work_id, 'parent-work');
-				// The layout options draw with the input panel's model and stroke
-				// limit, not the work's (2026-11-06, the author).
+				// The model is the input panel's; the stroke limit is the work's.
 				assert.equal(payload.model, 'performer');
-				assert.equal(payload.wild, true);
+				assert.equal(payload.wild, false);
 				return new Response(JSON.stringify({ ddl: 'recomposed instructions', svg: '<svg/>', score: { instructions: [] } }));
 			},
 			pushHistory: async (item: HistoryItem, options?: SaveHistoryOptions) => {
@@ -233,6 +232,11 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 	} finally {
 		host.window = previousWindow;
 	}
+});
+
+test('layout refinement is wired to the same recorded stroke limit as refinement', () => {
+	const page = readFileSync(new URL('../../../routes/+page.svelte', import.meta.url), 'utf8');
+	assert.match(page, /wild: \(\) => effectiveRefineWild,\s*layoutWild: \(\) => effectiveRefineWild/);
 });
 
 test('a saved work opened beside an unfinished draft is refined from its own words and instructions', async () => {

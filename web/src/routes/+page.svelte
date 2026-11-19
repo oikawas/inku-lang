@@ -1658,7 +1658,7 @@
 		render: {
 			canvasAspectId: effectiveCanvasAspectId,
 			wild: () => effectiveRefineWild,
-			layoutWild: () => work.drawOptions.wild === 'on',
+			layoutWild: () => effectiveRefineWild,
 			fanoutLimit: () => renderFanoutLimit
 		},
 		seeds: {

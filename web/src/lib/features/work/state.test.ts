@@ -109,10 +109,29 @@ for (const unchanged of [false, true]) {
 		assert.equal(options.lineage_parent_node_id, 'image-node');
 		assert.equal(options.derivation_kind, 'ddl_edit');
 		assert.equal(options.canvas_fit, 'contain');
-		assert.equal(options.wild, unchanged);
+		assert.equal(options.wild, !unchanged);
 		assert.equal(original.ddl, unchanged ? beforeReview : afterReview);
 		assert.equal(work.ddlGeneratedBaseline, original.ddl);
 		assert.equal(work.input, '');
+	});
+}
+
+for (const wild of [false, true]) {
+	test(`new instructions use the current tab's stroke limit (${wild})`, async () => {
+		const requests: Array<Record<string, unknown>> = [];
+		const work = imageWork(async (path, init) => {
+			assert.equal(path, '/api/pipeline/variations');
+			requests.push(JSON.parse(String(init?.body)));
+			return Response.json({ detail: 'captured before provider' }, { status: 400 });
+		}, { ensureVisibleLineageParentId: async () => null });
+		work.inputMode = 'single';
+		work.drawOptions.wild = wild ? 'on' : 'off';
+		work.ddl = '円を置く。';
+		await work.replay({ ddlEdit: true });
+		assert.equal(requests.length, 1);
+		const options = requests[0].options as Record<string, unknown>;
+		assert.equal(options.wild, wild);
+		assert.equal(options.lineage_parent_node_id, undefined);
 	});
 }
 

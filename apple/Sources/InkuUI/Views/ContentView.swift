@@ -310,13 +310,14 @@ public struct ContentView: View {
                         onReplayWork: openReplay, onWorkAction: openWorkAction,
                         writingLocked: model.isBusy || automation.isOccupied,
                         onSelectionExport: openSelectionExport, phoneLayout: true,
-                        onPhoneCreate: { showCreation(tab: nil) }, onPhoneCamera: { cameraRequest += 1 },
+                        onPhoneCreate: { showCreation(tab: "artwork") }, onPhoneCamera: { cameraRequest += 1 },
                         onPhoneSettings: { openSettings(nil) }, phoneRunStatus: automation.running ? automation.status : model.status)
                 .disabled(importing)
                 .background(InkuColor.bg)
         } settings: {
             SettingsView(model: model, automation: automation, maintenance: maintenance, section: $ui.settingsSection,
                          onClose: closeSettings, phoneLayout: true, phonePage: $ui.settingsPhonePage,
+                         phoneBackToLibrary: ui.libraryOpen,
                          onOpenDrawingLogs: { if dialog == nil, !importing { dialog = .drawingLogs } })
                 .disabled(importing)
                 .background(InkuColor.bg)
@@ -534,6 +535,8 @@ public struct ContentView: View {
 
     private func openLibrary() {
         InkuWindow.removeFocus()
+        // An iPhone work preview is a pushed page, not a side panel. Return to the list before focusing the work.
+        if phoneLayout { libraryPreview.close() }
         ui.settingsOpen = false
         ui.libraryOpen = true
         // Web `openManager()`: the library opens at the saved work shown in Create; an unsaved candidate is not one,

@@ -42,7 +42,7 @@ struct DescriptionLibraryGroup: View {
                                                 Text(childLabel(record.derivationKind)).inkuFont(10).foregroundStyle(.secondary)
                                             }
                                         }
-                                    }.buttonStyle(.plain).onTapGesture(count: 2) { onOpen(item.work) }
+                                    }.buttonStyle(.plain).onTapGesture(count: 2) { onOpen(item.work) }.id(item.id)
                                 }
                             }.frame(width: 120, alignment: .topLeading)
                         }

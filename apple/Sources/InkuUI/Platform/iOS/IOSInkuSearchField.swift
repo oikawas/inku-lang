@@ -16,6 +16,7 @@ struct InkuSearchField: UIViewRepresentable {
     var onCancel: (() -> Void)? = nil
     /// Raised by `InkuClearableSearchField`'s "×", as on the Mac: each new value empties the field.
     var clearRequest = 0
+    var onDraftChange: (Bool) -> Void = { _ in }
     let onSearch: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -72,6 +73,7 @@ struct InkuSearchField: UIViewRepresentable {
         func clear(_ field: UITextField) {
             pending?.cancel()
             field.text = ""
+            parent.onDraftChange(false)
             parent.value = ""
             parent.onSearch("")
             field.becomeFirstResponder()
@@ -87,6 +89,7 @@ struct InkuSearchField: UIViewRepresentable {
         @objc func changed(_ field: UITextField) {
             self.field = field
             pending?.cancel()
+            parent.onDraftChange(!(field.text ?? "").isEmpty || field.markedTextRange != nil)
             guard field.markedTextRange == nil else { return }
             let text = limitedText(of: field)
             parent.value = text

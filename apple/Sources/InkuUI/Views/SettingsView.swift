@@ -63,6 +63,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var phoneLayout = false
     /// The page pushed over the list (`WorkspaceUIState.settingsPhonePage`).
     var phonePage: Binding<SettingsSection?> = .constant(nil)
+    var phoneBackToLibrary = true
     /// The rail's drawing log, which the iPhone reaches from this list.
     var onOpenDrawingLogs: () -> Void = {}
 
@@ -190,7 +191,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             .toolbar { ToolbarItem(placement: .navigation) {
                 if phonePage.wrappedValue == nil {
                     Button(action: onClose) { Image(systemName: "chevron.left") }
-                        .accessibilityLabel(display.webCopy("historyLibraryTitle", "ライブラリ"))
+                        .accessibilityLabel(phoneBackToLibrary ? display.webCopy("historyLibraryTitle", "ライブラリ") : display.localized("制作"))
                 }
             } }
             .inkuPhoneTabBarHidden()

@@ -8,10 +8,13 @@ private struct PhoneLibraryOffset: PreferenceKey {
 }
 
 private extension View {
-    @ViewBuilder func phoneLibraryScrollTracking(enabled: Bool, atTop: Binding<Bool>) -> some View {
+    @ViewBuilder func phoneLibraryScrollTracking(enabled: Bool, atTop: Binding<Bool>, onPull: @escaping () -> Void) -> some View {
         if enabled {
             coordinateSpace(name: "phoneLibraryScroll")
-                .onPreferenceChange(PhoneLibraryOffset.self) { atTop.wrappedValue = $0 >= -1 }
+                .onPreferenceChange(PhoneLibraryOffset.self) { offset in
+                    atTop.wrappedValue = offset >= -1
+                    if offset >= 20 { onPull() }
+                }
         } else { self }
     }
 }
@@ -59,7 +62,10 @@ struct LibraryView: View {
     /// The iPhone's 選択: a tap toggles a work's selection instead of opening it, as in Photos.
     @State private var phoneSelecting = false
     @State private var phoneSearchVisible = false
+    @State private var phoneSearchHasDraft = false
     @State private var phoneScrollAtTop = true
+    @State private var phoneScrolledVisit: Int?
+    @State private var phoneGroupLoadingVisit: Int?
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
     private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language) }
@@ -113,7 +119,7 @@ struct LibraryView: View {
         .onChange(of: phoneLayout, initial: true) { _, phone in library.continuous = phone }
         .onChange(of: library.isGrouped) { _, _ in applyGroupedPageSize() }
         .onChange(of: phoneScrollAtTop) { _, atTop in
-            if phoneLayout && !atTop && library.query.isEmpty { phoneSearchVisible = false }
+            if phoneLayout && !atTop && library.query.isEmpty && !phoneSearchHasDraft { phoneSearchVisible = false }
         }
         .inkuOnEscape { onClose?() }
         .alert(item: $deletion) { request in
@@ -156,10 +162,16 @@ struct LibraryView: View {
                     previewContent.frame(minWidth: 280, idealWidth: 360, maxWidth: 360, maxHeight: .infinity)
                 }
             }
-            .simultaneousGesture(DragGesture(minimumDistance: 40).onEnded { value in
-                if phoneLayout && phoneScrollAtTop && value.translation.height > 55 && abs(value.translation.height) > abs(value.translation.width) {
-                    withAnimation { phoneSearchVisible = true }
+            .simultaneousGesture(DragGesture(minimumDistance: 12).onEnded { value in
+                guard phoneLayout, abs(value.translation.height) > abs(value.translation.width) else { return }
+                if phoneScrollAtTop && value.translation.height > 20 {
+                    showPhoneSearch()
+                } else if value.translation.height < -20 && library.query.isEmpty && !phoneSearchHasDraft {
+                    phoneSearchVisible = false
                 }
+            })
+            .simultaneousGesture(TapGesture().onEnded {
+                if phoneLayout && library.query.isEmpty && !phoneSearchHasDraft { phoneSearchVisible = false }
             })
             if phoneLayout { phoneFooter }
         }
@@ -172,8 +184,13 @@ struct LibraryView: View {
     private var phoneSearchRow: some View {
         HStack {
             searchField
-            Button(display.localized("キャンセル")) { library.query = ""; phoneSearchVisible = false }
+            Button(display.localized("キャンセル")) { library.query = ""; phoneSearchHasDraft = false; phoneSearchVisible = false }
         }.padding(8)
+    }
+
+    private func showPhoneSearch() {
+        guard phoneLayout, !phoneSearchVisible else { return }
+        withAnimation { phoneSearchVisible = true }
     }
 
     private var phoneHeader: some View {
@@ -465,7 +482,8 @@ struct LibraryView: View {
         return Group {
             // HistoryManager.svelte:1090-1097: the field and its "×" inside one box.
             InkuClearableSearchField(value: $library.query, placeholder: placeholder, label: label, display: display,
-                                     onCancel: phoneLayout ? { phoneSearchVisible = false; library.query = "" } : onClose,
+                                     onCancel: phoneLayout ? { phoneSearchVisible = false; phoneSearchHasDraft = false; library.query = "" } : onClose,
+                                     onDraftChange: { if phoneLayout { phoneSearchHasDraft = $0 } },
                                      onSearch: { library.query = $0 })
         }
         // Web `.history-search`: flex 0 1 22rem, at least 10rem.
@@ -522,19 +540,23 @@ struct LibraryView: View {
         } else if library.total == 0 {
             emptyLibrary
         } else if library.grouping == .description {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    phoneScrollMarker
-                    ForEach(library.groups) { group in
-                        DescriptionLibraryGroup(model: model, group: group, members: library.groupMembers[group.id] ?? [],
-                            records: library.descriptionCompositions,
-                            onOpen: { work in if !(phoneLayout && phoneSelecting) { openInWorkTab(work) } }, onPreview: { work in
-                                if phoneLayout && phoneSelecting { library.toggleSelection(work.id) } else { openWork(work) }
-                            }, selecting: phoneLayout && phoneSelecting)
-                    }
-                }.padding(12)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        phoneScrollMarker
+                        ForEach(library.groups) { group in
+                            DescriptionLibraryGroup(model: model, group: group, members: library.groupMembers[group.id] ?? [],
+                                records: library.descriptionCompositions,
+                                onOpen: { work in if !(phoneLayout && phoneSelecting) { openInWorkTab(work) } }, onPreview: { work in
+                                    if phoneLayout && phoneSelecting { library.toggleSelection(work.id) } else { openWork(work) }
+                                }, selecting: phoneLayout && phoneSelecting)
+                        }
+                    }.padding(12)
+                }
+                .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+                .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
+                .onChange(of: phoneGroupedWorkIDs, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
             }
-            .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop)
         } else if library.isGrouped {
             lineageList
         } else if library.layout == .list {
@@ -563,11 +585,9 @@ struct LibraryView: View {
                 }
                 moreWorksFooter
             }
-            .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop)
-            .onChange(of: library.focusRequest?.visit) { _, _ in
-                guard let id = library.focusRequest?.workID, library.works.contains(where: { $0.id == id }) else { return }
-                proxy.scrollTo(id, anchor: .center)
-            }
+            .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+            .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
+            .onChange(of: library.works.map(\.id), initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
         }
     }
 
@@ -585,10 +605,47 @@ struct LibraryView: View {
                 }
                 moreWorksFooter
             }
-            .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop)
-            .onChange(of: library.focusRequest?.visit) { _, _ in
-                guard let id = library.focusRequest?.workID, library.works.contains(where: { $0.id == id }) else { return }
-                proxy.scrollTo(id, anchor: .center)
+            .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+            .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
+            .onChange(of: library.works.map(\.id), initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
+        }
+    }
+
+    private func scrollPhoneToFocusedWork(_ proxy: ScrollViewProxy) {
+        guard let request = library.focusRequest, phoneScrolledVisit != request.visit,
+              library.works.contains(where: { $0.id == request.workID }) else { return }
+        phoneScrolledVisit = request.visit
+        Task { @MainActor in proxy.scrollTo(request.workID, anchor: .center) }
+    }
+
+    private var phoneGroupedWorkIDs: [String] {
+        library.groups.flatMap { library.groupMembers[$0.id]?.map(\.id) ?? [] }
+    }
+
+    private func scrollPhoneToGroupedWork(_ proxy: ScrollViewProxy) {
+        guard phoneLayout, let request = library.focusRequest, phoneScrolledVisit != request.visit else { return }
+        if phoneGroupedWorkIDs.contains(request.workID) {
+            phoneScrolledVisit = request.visit
+            Task { @MainActor in proxy.scrollTo(request.workID, anchor: .center) }
+            return
+        }
+        // The anchored lineage starts this page, but its first read may contain only the first 100 works.
+        guard library.grouping == .lineage, !library.loading, phoneGroupLoadingVisit != request.visit,
+              let group = library.groups.first,
+              (library.groupMembers[group.id]?.count ?? 0) < (library.groupMemberTotals[group.id] ?? 0) else { return }
+        phoneGroupLoadingVisit = request.visit
+        Task { @MainActor in
+            defer { if phoneGroupLoadingVisit == request.visit { phoneGroupLoadingVisit = nil } }
+            while library.focusRequest?.visit == request.visit, library.grouping == .lineage,
+                  !phoneGroupedWorkIDs.contains(request.workID) {
+                let count = library.groupMembers[group.id]?.count ?? 0
+                guard count < (library.groupMemberTotals[group.id] ?? 0) else { break }
+                await library.loadGroup(root: group.id, append: true)
+                guard (library.groupMembers[group.id]?.count ?? 0) > count else { break }
+            }
+            if library.focusRequest?.visit == request.visit, phoneGroupedWorkIDs.contains(request.workID) {
+                phoneScrolledVisit = request.visit
+                proxy.scrollTo(request.workID, anchor: .center)
             }
         }
     }
@@ -885,11 +942,12 @@ struct LibraryView: View {
     }
 
     private var emptyLibrary: some View {
-        ContentUnavailableView {
-            Label(display.localized(hasFilters ? "一致する作品がありません" : library.isTrash ? "ごみ箱は空です" : "ライブラリに作品がありません"),
+        let emptyLineage = phoneLayout && !hasFilters && !library.isTrash && library.grouping == .lineage && library.layout == .grid
+        return ContentUnavailableView {
+            Label(emptyLineage ? display.label("表示できる系譜がありません", "No lineages to show") : display.localized(hasFilters ? "一致する作品がありません" : library.isTrash ? "ごみ箱は空です" : "ライブラリに作品がありません"),
                   systemImage: library.isTrash ? "trash" : "square.grid.2x2")
         } description: {
-            Text(phoneLayout && !hasFilters && !library.isTrash
+            Text(emptyLineage ? display.label("派生のある系譜はまだありません。", "There are no lineages with derived works yet.") : phoneLayout && !hasFilters && !library.isTrash
                  ? display.label("下の欄から、最初の作品を描けます。", "Paint your first work from the box below.")
                  : display.localized(hasFilters ? "検索や印の条件を変えてください。" : library.isTrash
                                          ? "ごみ箱へ移した作品をここから戻せます。" : "制作画面で保存した作品がここに表示されます。"))
@@ -918,7 +976,10 @@ struct LibraryView: View {
                 }
                 .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
             }
-            .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop)
+            .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+            .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
+            .onChange(of: phoneGroupedWorkIDs, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
+            .onChange(of: library.loading) { _, _ in scrollPhoneToGroupedWork(proxy) }
             .inkuFocusSection()
             .background { focusFollower(scroll: proxy) }
         }
@@ -985,10 +1046,10 @@ struct LibraryView: View {
                     } else if thumbs {
                         // Web wraps the generations with minmax(132px, 1fr) rather than a horizontal lane.
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .top)], alignment: .leading, spacing: 8) {
-                            ForEach(members) { item in memberCard(item.work) }
+                            ForEach(members) { item in memberCard(item.work).id(item.id) }
                         }
                     } else {
-                        ForEach(members) { item in memberRow(item.work) }
+                        ForEach(members) { item in memberRow(item.work).id(item.id) }
                     }
                     HStack {
                         Text(display.localizedFormat("%ld / %ld 作品", members.count, library.groupMemberTotals[group.id] ?? group.itemCount))

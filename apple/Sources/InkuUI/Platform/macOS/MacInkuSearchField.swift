@@ -24,6 +24,7 @@ struct InkuSearchField: NSViewRepresentable {
     var onCancel: (() -> Void)? = nil
     /// Raised by `InkuClearableSearchField`'s "×" (Web `CanvasWorkSearch` `clear`): each new value empties the field.
     var clearRequest = 0
+    var onDraftChange: (Bool) -> Void = { _ in }
     let onSearch: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }

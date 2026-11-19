@@ -12,13 +12,15 @@ struct InkuClearableSearchField: View {
     var maxLength: Int? = nil
     var delay: Duration? = nil
     var onCancel: (() -> Void)? = nil
+    var onDraftChange: (Bool) -> Void = { _ in }
     let onSearch: (String) -> Void
     @State private var clearRequest = 0
 
     var body: some View {
         HStack(spacing: 0) {
             InkuSearchField(value: $value, placeholder: placeholder, label: label, maxLength: maxLength, delay: delay,
-                            borderless: true, onCancel: onCancel, clearRequest: clearRequest, onSearch: onSearch)
+                            borderless: true, onCancel: onCancel, clearRequest: clearRequest,
+                            onDraftChange: onDraftChange, onSearch: onSearch)
                 .inkuSearchFieldHeight()
             let clear = display.webCopy("historySearchClear", "検索をクリア")
             Button { clearRequest += 1 } label: {

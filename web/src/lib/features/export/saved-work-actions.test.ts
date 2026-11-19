@@ -58,6 +58,29 @@ const { makeSavedWorkExportActions } = await import('./saved-work-actions.ts');
 const { DEFAULT_ANIMATION_EXPORT_SETTINGS } = await import('../../animationExport.ts');
 hooks.deregister();
 
+test('work pack sends selection order and saves the returned file', async () => {
+	const items = [{ id: 'newer', at: 2, input: 'Newer', score: {} }, { id: 'older', at: 1, input: 'Older', score: {} }];
+	const snapshot = snapshotSavedWorkExport({ kind: 'selection', works: items });
+	assert.ok(snapshot);
+	let sent: string[] = [];
+	const actions = makeSavedWorkExportActions({
+		apiFetch: async (path, init) => {
+			if (path === '/api/history/export-workpack') {
+				sent = JSON.parse(String(init?.body)).ids;
+				return new Response('pack');
+			}
+			const id = path.includes('newer') ? 'newer' : 'older';
+			return Response.json({ nodes: [{ history: items.find((item) => item.id === id) }] });
+		},
+		catalogName: () => '', formatDate: () => '', previewText: (text) => text,
+	});
+	outcomes.push({ kind: 'folder', folderName: 'Exports' });
+	await actions.onDownloadWorkPack(snapshot);
+	assert.deepEqual(sent, ['newer', 'older']);
+	assert.match(saves.at(-1)?.filename ?? '', /^inku-works-\d{8}-\d{4}\.inkupack$/);
+	saves.length = 0;
+});
+
 test('all saved-work export formats carry folder fallback outcomes to their menu caller', async () => {
 	const item = { id: 'saved', at: 1, input: 'Work', svg: '<svg />', score: {} };
 	const snapshot = snapshotSavedWorkExport({ kind: 'current', works: [item] });

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: export a work, selected works, or a lineage path as a work pack; Library selections show their selection order.
+
 - iOS: increases text on iPhone home, the viewer, work information and related screens, with a 13pt minimum for inku text.
 
 - Swift (macOS and iOS): passes saved instructions and their recorded language to 3D so glass layers follow titled groups.

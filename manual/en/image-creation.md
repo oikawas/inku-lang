@@ -541,6 +541,8 @@ In single-user mode, group-sharing buttons, the sharing dialog, sharing filters 
 
 ## 14. Export Images
 
+Choose `Export work pack` from the shared `Export` menu to save the displayed work, the Library selection, or a lineage path as an `.inkupack`. The works keep their saved times. Numbers in the Library selection boxes show the order in which works were selected.
+
 Open `Export` at the bottom of the Work tab, check that the target is `Displayed work`, then choose an SVG format or PNG size. When exporting from the Library or Lineage, check the selected count or path from the origin shown in the menu. The `?` by the menu's SVG heading opens the same explanation as the table below.
 
 Only a saved work is exported. A picture that is not saved (one drawn by the demo with saving off, for instance) is saved first, then exported. In the simple UI the `Export` button exports the `Share card` alone, directly.

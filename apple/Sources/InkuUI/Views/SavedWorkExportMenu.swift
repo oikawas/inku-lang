@@ -8,6 +8,7 @@ struct SavedWorkExportMenu: View {
     var title: String? = nil
     var symbolOnly = false
     var includesWorkPack = false
+    var librarySelectionStyle = false
     let onAction: (String) -> Void
 
     var body: some View {
@@ -51,7 +52,9 @@ struct SavedWorkExportMenu: View {
             }
         } label: {
             if symbolOnly { Image(systemName: "square.and.arrow.down") }
-            else { Text(title ?? model.display.localized("書き出す")) }
+            else if librarySelectionStyle {
+                Text(title ?? model.display.localized("書き出す")).modifier(LibraryGhostSurface())
+            } else { Text(title ?? model.display.localized("書き出す")) }
         }
         .inkuBorderlessMenu(includingIOS: true).fixedSize()
         .accessibilityLabel(title ?? model.display.localized("書き出す"))

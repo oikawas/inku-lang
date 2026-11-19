@@ -2,6 +2,15 @@ import InkuHost
 import InkuPersistence
 import SwiftUI
 
+private struct PhoneViewerTopHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+private struct PhoneViewerBottomHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
 /// Browsing stays separate from the work selected by the creation workspace.
 @MainActor
 struct PhoneWorkViewer: View {
@@ -28,6 +37,8 @@ struct PhoneWorkViewer: View {
     @State private var threeDimensional = false
     @State private var controller = Ddl3DController()
     @State private var starOverride: Bool?
+    @State private var topHeight: CGFloat = 44
+    @State private var bottomHeight: CGFloat = 58
     private var display: DisplaySettings { model.display }
     private var starred: Bool { starOverride ?? model.library.works.first(where: { $0.id == work.id })?.starred ?? work.starred }
     private var permissions: PhoneViewingPermissions {
@@ -44,7 +55,7 @@ struct PhoneWorkViewer: View {
                                 initialView: Ddl3DInitialView(pixelWidth: geometry.size.width, pixelHeight: geometry.size.height,
                                                               panX: 0, panY: 0, zoom: 1),
                                 onReturn: { threeDimensional = false }, onEscape: { false })
-                        .padding(.top, model.hasActiveRun ? 100 : 48)
+                        .padding(.top, max(topHeight, 48))
                 } else {
                     ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText,
                                   style: .viewer, showsZoomControls: false, aspectRatio: work.renderCanvasAspectRatio,
@@ -69,10 +80,12 @@ struct PhoneWorkViewer: View {
                 }
                 if overlayVisible || threeDimensional {
                     VStack(spacing: 0) {
-                        topBar
-                        if model.hasActiveRun { PhoneRunStatusRow(model: model, status: runStatus, onOpen: onRun) }
+                        VStack(spacing: 0) {
+                            topBar
+                            if model.hasActiveRun { PhoneRunStatusRow(model: model, status: runStatus, onOpen: onRun) }
+                        }.background { GeometryReader { Color.clear.preference(key: PhoneViewerTopHeight.self, value: $0.size.height) } }
                         Spacer()
-                        bottomBar
+                        bottomBar.background { GeometryReader { Color.clear.preference(key: PhoneViewerBottomHeight.self, value: $0.size.height) } }
                     }
                 }
             }
@@ -80,13 +93,15 @@ struct PhoneWorkViewer: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden)
         .inkuPhoneTabBarHidden()
+        .onPreferenceChange(PhoneViewerTopHeight.self) { if $0 > 0 { topHeight = $0 } }
+        .onPreferenceChange(PhoneViewerBottomHeight.self) { if $0 > 0 { bottomHeight = $0 } }
         .onChange(of: work.id) { _, _ in viewport = CanvasViewport(); threeDimensional = false; starOverride = nil }
         .task(id: work.id) { await model.loadWorkActionState(work) }
     }
 
     private func acceptsTap(_ location: CGPoint, height: CGFloat) -> Bool {
         guard overlayVisible else { return true }
-        return location.y >= (model.hasActiveRun ? 100 : 44) && location.y < height - 58
+        return location.y >= topHeight && location.y < height - bottomHeight
     }
 
     private var topBar: some View {
@@ -104,29 +119,46 @@ struct PhoneWorkViewer: View {
 
     @ViewBuilder private var bottomBar: some View {
         if isTrash {
-            HStack {
-                Button(display.localized("戻す")) { onDelete(work, false) }
-                Spacer()
-                Button(display.localized("完全に削除"), role: .destructive) { onDelete(work, true) }
+            ViewThatFits(in: .horizontal) {
+                trashButtons(vertical: false).fixedSize(horizontal: true, vertical: false)
+                trashButtons(vertical: true)
             }.disabled(writingLocked || model.isBusy || model.library.mutating)
-                .frame(minHeight: 54).padding(.horizontal, 20).background(.black.opacity(0.65))
+                .frame(maxWidth: .infinity, minHeight: 54).padding(.horizontal, 20).background(.black.opacity(0.65))
         } else {
-            HStack(spacing: 16) {
+            ViewThatFits(in: .horizontal) {
+                workButtons(vertical: false)
+                workButtons(vertical: true)
+            }.foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 58).padding(.horizontal, 16).background(.black.opacity(0.65))
+        }
+    }
+
+    private func trashButtons(vertical: Bool) -> some View {
+        let layout = vertical ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 16))
+        return layout {
+                Button { onDelete(work, false) } label: { Text(display.localized("戻す")).frame(minWidth: 44, minHeight: 44) }
+                Button(role: .destructive) { onDelete(work, true) } label: { Text(display.localized("完全に削除")).frame(minWidth: 44, minHeight: 44) }
+        }.frame(minHeight: 44)
+    }
+
+    private func workButtons(vertical: Bool) -> some View {
+        let layout = vertical ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 16))
+        return layout {
                 Button {
                     var target = work; target.starred = starred
                     Task {
                         await model.library.toggleStar(target)
                         if let saved = try? await model.auxiliaryDatabase().work(id: work.id) { starOverride = saved.starred }
                     }
-                } label: { Label(display.label("スター", "Star"), systemImage: starred ? "star.fill" : "star") }
+                } label: { Label(display.label("スター", "Star"), systemImage: starred ? "star.fill" : "star")
+                    .fixedSize(horizontal: !vertical, vertical: false).frame(minHeight: 44) }
                     .disabled(!permissions.canStar)
-                Spacer()
-                Button(display.webCopy("historyPreviewRefine", "推敲する")) { onRefine(work) }.disabled(!permissions.canWrite)
+                if !vertical { Spacer(minLength: 0) }
+                Button { onRefine(work) } label: { Text(display.webCopy("historyPreviewRefine", "推敲する"))
+                    .fixedSize(horizontal: !vertical, vertical: false).frame(minHeight: 44) }.disabled(!permissions.canWrite)
                 Button { onShare(work) } label: {
-                    HStack { if sharing { ProgressView() }; Text(display.label("共有", "Share")) }
+                    HStack { if sharing { ProgressView() }; Text(display.label("共有", "Share")).fixedSize(horizontal: !vertical, vertical: false) }
                         .frame(minWidth: 76, minHeight: 44)
                 }.buttonStyle(.borderedProminent).disabled(!permissions.canShare)
-            }.foregroundStyle(.white).frame(minHeight: 58).padding(.horizontal, 16).background(.black.opacity(0.65))
         }
     }
 

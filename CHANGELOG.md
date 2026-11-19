@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: increases text on iPhone home, the viewer, work information and related screens, with a 13pt minimum for inku text.
+
 - Swift (macOS and iOS): passes saved instructions and their recorded language to 3D so glass layers follow titled groups.
 
 - iOS: fixes sharing immediately after swiping away work information, which could fail and leave sharing stuck.

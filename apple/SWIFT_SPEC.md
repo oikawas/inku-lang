@@ -119,6 +119,10 @@ The author's instruction (2026-11-14: put ChatGPT first in the model settings an
 - Unchanged: the id `chatgpt`, model names `chatgpt:…`, failure codes, and what is sent, saved and recorded for a work. The Web copy (`ui-reference.json`) `chatgptPlanLabel` is no longer used as the name (the copy of the Web text is exported again together with the Web change on the Server side).
 - Check: the 21 shared rows of `sign-in-cases.json` go through the app's binding (`InkuCore.modelCatalog`) and the whole answer is compared (`InkuAppCheck --sign-in-only`).
 
+## 2026-11-20 iPhone front screen text
+
+The iPhone front screens (home, viewer, work information, progress row and home sheets) multiply the inku text-size setting by 17/14, use a 13pt minimum for `inkuFont`, and set an xLarge Dynamic Type minimum for system controls. Making, Mac, iPad and the settings scale remain unchanged.
+
 ## 2026-11-13 The iPhone library scrolls through every work
 
 The author's instruction (2026-11-13): the iPhone library shows every work in one scroll, as Photos does. The tiles take Photos' form and the newest works come first (the author's choices).

@@ -79,6 +79,7 @@ struct LibraryExpandableTitle: View {
 /// Web `modelLines` on a library card: "解釈:" / "描画:" only when the two stages differ (HistoryManager.svelte:364-374).
 @MainActor
 struct LibraryModelLinesView: View {
+    @Environment(\.inkuPhoneLayout) private var phone
     let lines: [ModelNaming.Line]
     let display: DisplaySettings
 
@@ -99,7 +100,8 @@ struct LibraryModelLinesView: View {
                                                             fallback: $0 == .interpretation ? "解釈" : "描画") }
                 let unrecorded = display.webCopy("historyModelUnrecorded", fallback: "未記録")
                 (Text(role.map { $0 + ":" } ?? "").foregroundStyle(.secondary) + Text(line.compact ?? unrecorded))
-                    .lineLimit(1).truncationMode(.tail)
+                    .lineLimit(phone ? nil : 1).truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: phone)
                     .inkuTooltip(display.tooltipValue((role.map { $0 + ": " } ?? "") + (line.full ?? unrecorded)), focus: .none)
             }
         }
@@ -290,16 +292,31 @@ struct LibraryGhostButtonStyle: ButtonStyle {
     var minHeight: CGFloat? = nil
     /// Web `.danger-btn`.
     var danger = false
-    @Environment(\.isEnabled) private var isEnabled
-
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        configuration.label.modifier(LibraryGhostSurface(active: active, minWidth: minWidth, minHeight: minHeight,
+                                                          danger: danger, pressed: configuration.isPressed))
+    }
+}
+
+/// The same label surface also lets a Menu match adjacent library buttons.
+struct LibraryGhostSurface: ViewModifier {
+    var active = false
+    var minWidth: CGFloat? = nil
+    var minHeight: CGFloat? = nil
+    var danger = false
+    var pressed = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.inkuMinimumFontSize) private var minimumFontSize
+    func body(content: Content) -> some View {
+        content
             .inkuFont(12)
-            .lineLimit(1).fixedSize()
+            .lineLimit(minimumFontSize > 0 ? nil : 1)
+            .fixedSize(horizontal: minimumFontSize == 0, vertical: true)
             .padding(.vertical, 4).padding(.horizontal, 10)
-            .frame(minWidth: minWidth, minHeight: minHeight)
+            .frame(minWidth: minimumFontSize > 0 ? max(minWidth ?? 0, 44) : minWidth,
+                   minHeight: minimumFontSize > 0 ? max(minHeight ?? 0, 44) : minHeight)
             .foregroundStyle(active || danger ? Color.white : Color.primary)
-            .background(danger ? Color.red : active ? Color.accentColor : Color.primary.opacity(configuration.isPressed ? 0.12 : 0.04),
+            .background(danger ? Color.red : active ? Color.accentColor : Color.primary.opacity(pressed ? 0.12 : 0.04),
                         in: RoundedRectangle(cornerRadius: 4))
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(danger ? Color.red : active ? Color.accentColor : LibraryChrome.border))
             .opacity(isEnabled ? 1 : 0.45)

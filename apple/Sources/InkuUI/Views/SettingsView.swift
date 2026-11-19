@@ -47,9 +47,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @State private var restoreRequested = false
     @Environment(InkuFileDialogs.self) private var fileDialogs: InkuFileDialogs?
     @Environment(\.inkuTextScale) private var textScale
-    /// iPhone (author 2026-11-12, "the settings' text is small, with much space"): the pages' 14-point Web text
-    /// reads as the iPhone's 17-point body text; every size on the settings scales with it.
-    private static let phoneTextScale = 17.0 / 14.0
     @State private var backupDeleteName: String?
     @State private var backupRestoreName: String?
     @State private var backupRestoreFinal = false
@@ -204,12 +201,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 .background(InkuColor.bg)
                 .inkuInlineNavigationTitle()
                 .inkuPhoneTabBarHidden()
-                .environment(\.inkuTextScale, textScale * Self.phoneTextScale)
+                .environment(\.inkuTextScale, textScale * InkuTypography.phoneTextScale)
             }
         }
         .overlay(alignment: .leading) { if phonePage.wrappedValue == nil { PhoneBackEdge(action: onClose) } }
         .inkuPhoneTabBarHidden()
-        .environment(\.inkuTextScale, textScale * Self.phoneTextScale)
+        .environment(\.inkuTextScale, textScale * InkuTypography.phoneTextScale)
         // The system's own controls (menu pickers' values, segmented controls, section titles) do not take inkuFont;
         // at least one Dynamic Type step up brings them to the scaled text around them (screen check of Build 138).
         .dynamicTypeSize(.xLarge ... .accessibility5)

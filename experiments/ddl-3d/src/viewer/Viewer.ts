@@ -10,8 +10,16 @@ import { applyPaint, rasterizePaint, type PaintAppearanceResources } from './cir
 import { preparePresence } from './presence';
 import { objectDepth } from './objectDepth';
 import { paintInTurn, paintOrder } from './paintQueue';
+import { OrbitMotion } from './orbitMotion';
+import { adaptResolution, FULL_RESOLUTION, solidsFold, type Resolution } from './motion';
+import { foldedShare, smallestLayerGap } from '../scene/fold';
 
 type Projection = ViewState['projection'];
+export type SolidsSettings = NonNullable<ViewState['solids']>;
+/** Turning keeps going until touched, the light comes from the upper left,
+ * and layers open as the view turns away from the front. */
+export const SOLIDS_DEFAULTS: SolidsSettings = { frictionless: true, light: 0, open: true };
+const DEG = Math.PI / 180;
 /** An object, or the presence plane, whose paint could not be prepared. */
 export type Unpainted = { sourceIndex: number; performedIndex: number; instanceIndex: number; role: MeshPacket['role']; reason: string }
   | { role: 'presence'; reason: string };
@@ -53,6 +61,12 @@ export class Viewer {
   private flat = false;
   private wire = false;
   private sceneExtent = 1;
+  settings: SolidsSettings = { ...SOLIDS_DEFAULTS };
+  private motion: OrbitMotion;
+  /** How far the solids stand up from their layers; at the front they lie flat. */
+  private fold = { inflate: -1, open: -1 };
+  private frameTimes: number[] = [];
+  private resolution: Resolution = FULL_RESOLUTION;
 
   constructor(private host: HTMLElement, readonly packet: ScenePacket,
     private changed: (state: ViewState) => void,
@@ -61,7 +75,7 @@ export class Viewer {
     try { this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false }); }
     catch { throw new Error('webgl_unavailable'); }
     this.renderer.setClearColor(0x000000, 0);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     const canvas = this.renderer.domElement;
@@ -75,9 +89,11 @@ export class Viewer {
     this.controls.enableDamping = false;
     this.controls.minDistance = 0.01; this.controls.maxDistance = 1000;
     this.controls.minZoom = 0.01; this.controls.maxZoom = 100;
-    this.controls.autoRotateSpeed = 1;
-    this.controls.addEventListener('change', this.controlChanged);
-    this.controls.addEventListener('end', this.rememberNow);
+    // The view state goes to the host when a drag ends or the turning stops,
+    // not on every frame of a turn.
+    this.motion = new OrbitMotion(this.controls, () => this.camera, {
+      frictionless: () => this.settings.frictionless, changed: this.rememberNow, requestDraw: () => this.requestDraw(),
+    });
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8c8c8c, 0.65));
     const key = new THREE.DirectionalLight(0xffffff, 0.35); key.position.set(-2, 3, 4); this.scene.add(key);
     this.model.name = 'DDL solids';
@@ -112,9 +128,13 @@ export class Viewer {
     this.placeSupport();
     this.resize = new ResizeObserver(() => this.resizeView());
     this.resize.observe(host);
-    canvas.addEventListener('pointerdown', e => { this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true }); }, { signal: this.events.signal });
+    canvas.addEventListener('pointerdown', e => {
+      this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true });
+      if (this.motion.touch()) this.rememberNow();
+    }, { signal: this.events.signal });
     canvas.addEventListener('pointerup', e => {
-      if (this.startPointer && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < 4 && e.button === 0) this.pick(e);
+      // A tap that stopped the turning does not also select.
+      if (this.startPointer && !this.motion.haltedByTouch && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < 4 && e.button === 0) this.pick(e);
       this.startPointer = null;
     }, { signal: this.events.signal });
     canvas.addEventListener('dblclick', () => this.focus(), { signal: this.events.signal });
@@ -139,8 +159,38 @@ export class Viewer {
   /** Draw at once, so the shape is on screen before the host hears of it. */
   drawNow() {
     cancelAnimationFrame(this.frame); this.frame = 0;
-    this.renderer.render(this.scene, this.camera);
+    this.updateFold(); this.renderer.render(this.scene, this.camera);
   }
+
+  /** The angle between the view and the front of the paper. */
+  private frontAngle() { return this.camera.position.clone().sub(this.controls.target).angleTo(new THREE.Vector3(0, 0, 1)); }
+  /** Fold the solids flat at the front and stand them up as the view turns.
+   * Layers open with one scale of the whole model, so joint depths baked into
+   * the line vertices open with their layers; a solid's own thickness does not
+   * grow with the opening. True when anything changed. */
+  private updateFold(force = false): boolean {
+    const next = solidsFold(this.frontAngle(), this.settings.open);
+    if (!force && Math.abs(next.inflate - this.fold.inflate) < 1e-4 && Math.abs(next.open - this.fold.open) < 1e-4) return false;
+    this.fold = next; this.model.scale.z = next.open;
+    for (const mesh of this.meshPackets.keys()) this.foldMesh(mesh);
+    this.placeSupport(); if (this.selected) this.selection.setFromObject(this.selected);
+    return true;
+  }
+  /** At the front a solid keeps only a sliver of its thickness, thin enough
+   * that it stays between the layers before and after it. */
+  private foldMesh(mesh: THREE.Mesh) {
+    if (this.meshPackets.get(mesh)?.depthPath) return;
+    let size = this.solidDepths.get(mesh);
+    if (size === undefined) {
+      mesh.geometry.computeBoundingBox();
+      const box = mesh.geometry.boundingBox!; size = box.max.z - box.min.z; this.solidDepths.set(mesh, size);
+    }
+    const share = foldedShare(size * this.depth, this.layerGap * this.layerSpacing);
+    mesh.scale.z = this.depth * Math.max(this.fold.inflate, share) / Math.max(1, this.fold.open);
+  }
+  private solidDepths = new Map<THREE.Mesh, number>();
+  private get layerGap() { return this.gap ??= smallestLayerGap(this.packet.meshes.map(mesh => mesh.layerZ)); }
+  private gap: number | undefined;
   get paintTotal() { return (this.packet.presenceSvg ? 1 : 0) + this.packet.meshes.filter(packet => packet.appearance).length; }
 
   /** Paint the shown solids: the presence plane first, then marks from the
@@ -167,6 +217,9 @@ export class Viewer {
         if (unpainted.length) this.model.userData.unpaintedObjects = unpainted;
         clearTimeout(this.paintTimer); this.paintTimer = 0;
         this.placeSupport(); this.requestDraw();
+        // At the front the solids lie flat like the 2D picture; one small turn
+        // shows that they stand up.
+        this.motion.swayOnce(() => this.disposed);
       }
       return unpainted;
     });
@@ -193,7 +246,7 @@ export class Viewer {
       this.appearances.set(mesh, resource);
     } catch (error) { painted.dispose(); throw error; }
     finally {
-      const update = objectDepth(mesh, packet); this.objectDepths.set(mesh, update); update(this.depth, this.layerSpacing);
+      const update = objectDepth(mesh, packet); this.objectDepths.set(mesh, update); update(this.depth, this.layerSpacing); this.foldMesh(mesh);
       if (this.selected === mesh) this.selection.setFromObject(mesh);
       this.paintedDraw();
     }
@@ -225,18 +278,44 @@ export class Viewer {
   private draw = (time: number) => {
     this.frame = 0;
     if (this.disposed) return;
-    if (this.controls.autoRotate) this.controls.update(Math.min(0.05, (time - this.lastTime) / 1000 || 0));
-    this.lastTime = time;
+    const dt = Math.min(0.05, (time - this.lastTime) / 1000 || 0); this.lastTime = time;
+    const animating = this.motion.step(dt);
+    this.updateFold();
+    this.adaptResolution(time);
     this.renderer.render(this.scene, this.camera);
-    if (this.controls.autoRotate) this.requestDraw();
+    if (animating || performance.now() - this.motion.moving < 200) this.requestDraw();
   };
 
+  private pixelRatio() { return Math.min(window.devicePixelRatio || 1, 2) * this.resolution.value; }
+  /** Heavy frames while moving lower the drawing resolution and light ones
+   * raise it again; it is full 0.15 seconds after the motion stops. */
+  private adaptResolution(time: number) {
+    const moving = performance.now() - this.motion.moving < 150 || this.motion.dragging;
+    let average: number | null = null;
+    if (moving) {
+      this.frameTimes.push(time); if (this.frameTimes.length > 11) this.frameTimes.shift();
+      if (this.frameTimes.length === 11) average = (this.frameTimes[10] - this.frameTimes[0]) / 10;
+    }
+    const next = adaptResolution(this.resolution, average, moving, performance.now());
+    const changed = next.value !== this.resolution.value;
+    this.resolution = next;
+    if (changed) { this.frameTimes = []; this.renderer.setPixelRatio(this.pixelRatio()); this.resizeView(); }
+  }
+
   private rememberNow = () => { if (!this.disposed) this.changed(this.state()); };
+  /** Whether the automatic rotation is on; a touch ends it. */
+  get spinning() { return this.motion.spinning; }
+  set(change: Partial<SolidsSettings>) {
+    this.settings = { ...this.settings, ...change };
+    this.updateFold(true); this.controlChanged();
+  }
   state(): ViewState { return { position: this.camera.position.toArray(), target: this.controls.target.toArray(), zoom: this.camera.zoom, projection: this.projection, depth: this.depth,
     layerSpacing: this.layerSpacing, background: this.background, referenceHeight: this.referenceHeight, displayZoom: this.displayZoom(),
-    orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2, viewMode: 'solids' }; }
+    orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2, viewMode: 'solids',
+    solids: { ...this.settings } }; }
 
   restore(state: ViewState) {
+    if (state.solids) this.settings = { ...this.settings, ...state.solids };
     this.setProjection(state.projection); this.setDepth(state.depth); this.setLayerSpacing(state.layerSpacing ?? 1);
     this.setBackground(state.background ?? 'paint'); this.referenceHeight = state.referenceHeight ?? this.referenceHeight;
     this.camera.position.fromArray(state.position); this.controls.target.fromArray(state.target); this.camera.zoom = state.zoom;
@@ -270,11 +349,12 @@ export class Viewer {
       front: [0, 0, 1], back: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0], top: [0, 1, 0.00001], bottom: [0, -1, 0.00001], iso: [1, 0.8, 1.8],
     };
     this.camera.up.set(0, 1, 0);
-    this.camera.position.copy(this.controls.target).add(new THREE.Vector3(...directions[name]));
-    this.fit();
+    // Turn there smoothly, then frame the work; a chosen direction ends any turning.
+    this.motion.turnTo(new THREE.Vector3(...directions[name]), 400, () => this.fit());
   }
 
   match2D() {
+    this.motion.stop();
     this.setProjection('orthographic');
     const view = frontView(this.packet.canvas, this.host.clientWidth, this.host.clientHeight, this.initialView);
     this.referenceHeight = view.referenceHeight;
@@ -284,7 +364,7 @@ export class Viewer {
     camera.position.copy(this.controls.target).add(new THREE.Vector3(0, 0, this.sceneExtent * 4 + 1));
     camera.up.set(0, 1, 0); this.resizeView(); this.controls.update(); this.controlChanged();
   }
-  reset() { this.controls.autoRotate = false; this.setDepth(1); this.setLayerSpacing(1); this.match2D(); }
+  reset() { this.motion.stop(); this.setDepth(1); this.setLayerSpacing(1); this.match2D(); }
   private displayZoom(): number {
     const height = this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom
       : 2 * this.camera.position.distanceTo(this.controls.target) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
@@ -342,6 +422,7 @@ export class Viewer {
   }
   private updateObjectDepths() {
     for (const update of this.objectDepths.values()) update(this.depth, this.layerSpacing);
+    for (const mesh of this.objectDepths.keys()) this.foldMesh(mesh);
   }
   private placeSupport() {
     const box = new THREE.Box3().setFromObject(this.model);
@@ -353,7 +434,8 @@ export class Viewer {
   setOption(option: string, checked: boolean) {
     if (option === 'grid') this.grid.visible = checked;
     if (option === 'axes') this.axes.visible = checked;
-    if (option === 'spin') this.controls.autoRotate = checked;
+    // The automatic rotation is a steady turn of 6 degrees a second.
+    if (option === 'spin') this.motion.spin(checked ? 6 * DEG : 0);
     if (option === 'wire' || option === 'unlit') {
       if (option === 'wire') this.wire = checked; else this.flat = checked;
       this.model.traverse(object => {
@@ -396,16 +478,22 @@ export class Viewer {
   async png(): Promise<Blob> {
     await this.painting;
     if (this.disposed) throw new Error('disposed');
-    this.renderer.render(this.scene, this.camera);
+    if (this.resolution.value !== 1) { this.resolution = FULL_RESOLUTION; this.renderer.setPixelRatio(this.pixelRatio()); this.resizeView(); }
+    this.updateFold(); this.renderer.render(this.scene, this.camera);
     return new Promise((resolve, reject) => this.renderer.domElement.toBlob(blob => blob ? resolve(blob) : reject(new Error('empty_png')), 'image/png'));
   }
   async glb(): Promise<Blob> {
     // Geometry, current depth, source IDs and color/opacity; guides and selection stay in the viewer.
     await this.painting;
     if (this.disposed) throw new Error('disposed');
+    // The file holds the solids fully stood up and not opened, whatever the view.
+    const fold = this.fold; this.fold = { inflate: 1, open: 1 };
+    this.model.scale.z = 1; for (const mesh of this.meshPackets.keys()) this.foldMesh(mesh);
+    this.placeSupport();
     const group = new THREE.Group(); group.add(this.model.clone(true));
     if (this.presence) group.add(this.presence.mesh.clone());
     if (this.support.visible) group.add(this.support.clone());
+    this.fold = fold; this.updateFold(true);
     const bytes = await new GLTFExporter().parseAsync(group, { binary: true, onlyVisible: true });
     if (!(bytes instanceof ArrayBuffer)) throw new Error('invalid_glb');
     return new Blob([bytes], { type: 'model/gltf-binary' });
@@ -415,7 +503,7 @@ export class Viewer {
     if (this.disposed) return;
     this.changed(this.state()); this.disposed = true;
     cancelAnimationFrame(this.frame); clearTimeout(this.stateTimer); clearTimeout(this.paintTimer);
-    this.events.abort(); this.resize.disconnect(); this.controls.removeEventListener('change', this.controlChanged); this.controls.removeEventListener('end', this.rememberNow); this.controls.dispose();
+    this.events.abort(); this.resize.disconnect(); this.motion.dispose(); this.controls.dispose();
     const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
     this.scene.traverse(object => {
       const drawable = object as THREE.Mesh;

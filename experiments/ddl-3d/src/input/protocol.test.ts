@@ -20,3 +20,13 @@ test('an unknown view or a glass setting out of its range is refused', () => {
   const { angle: _angle, ...missing } = glass;
   assert.equal(validState({ ...base, glass: missing }), false);
 });
+
+test('the solids settings are kept in their ranges', () => {
+  const solids = { frictionless: true, light: 0, open: true };
+  assert.equal(validState({ ...base, viewMode: 'solids', solids }), true);
+  assert.equal(validState({ ...base, viewMode: 'solids', solids: { frictionless: false, light: -1, open: false } }), true);
+  for (const change of [{ light: 1.01 }, { light: Number.NaN }, { open: 'yes' }, { frictionless: 0 }]) {
+    assert.equal(validState({ ...base, viewMode: 'solids', solids: { ...solids, ...change } }), false, JSON.stringify(change));
+  }
+  assert.equal(validState({ ...base, solids: { frictionless: true, light: 0 } }), false);
+});

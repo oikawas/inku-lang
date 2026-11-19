@@ -7,6 +7,8 @@ import { skyTexture, type Background } from './background';
 import { frontView } from './frontView';
 import { rasterSizedSvg } from './circleAppearance';
 import { paintInTurn } from './paintQueue';
+import { OrbitMotion } from './orbitMotion';
+import { adaptResolution, FULL_RESOLUTION, type Resolution } from './motion';
 import { BACK_GLASS, fanGeometry, glassLayerPlan, planeZ, type FanGeometry, type GlassLayerPlan } from '../scene/glassLayers';
 import { glassFragment, glassVertex, MAX_SLOTS } from './glassShader';
 import type { Unpainted } from './Viewer';
@@ -33,7 +35,6 @@ export type RememberedGlass = Pick<GlassSettings, 'angle' | 'leaf' | 'light' | '
 const PAINT_PIXELS = navigator.vendor.startsWith('Apple') ? 4 * 1024 * 1024 : 16 * 1024 * 1024;
 const DEG = Math.PI / 180;
 const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const ease = (t: number) => t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
 
 /** sRGB 0..1 of a CSS colour, as the 2D painter wrote it. */
 function srgb(color: string): THREE.Vector3 {
@@ -87,16 +88,14 @@ export class GlassViewer {
   private last = 0;
   private disposed = false;
   private painting: Promise<unknown> = Promise.resolve();
-  // Motion: drag samples, inertia, tweens, sway and the light that follows the pointer.
-  private dragging = false;
-  private samples: { t: number; az: number; po: number }[] = [];
-  private inertia: { az: number; po: number } | null = null;
-  private tween: { from: THREE.Vector3; to: THREE.Vector3; start: number; length: number; then?: () => void } | null = null;
+  // Motion: the shared turning, sway and the light that follows the pointer.
+  private motion: OrbitMotion;
   private swayTime = 0;
   private lightTarget = [0, 0]; private lightNow = [0, 0];
-  private moving = 0;
+  private swayMoved = 0;
   private frameTimes: number[] = [];
   private resolution = 1;
+  private resolutionState: Resolution = FULL_RESOLUTION;
   private startPointer: [number, number] | null = null;
 
   constructor(private host: HTMLElement, readonly packet: ScenePacket,
@@ -119,9 +118,10 @@ export class GlassViewer {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = false; this.controls.rotateSpeed = 0.6;
     this.controls.minZoom = 0.01; this.controls.maxZoom = 100;
-    this.controls.addEventListener('change', this.onChange);
-    this.controls.addEventListener('start', this.onStart);
-    this.controls.addEventListener('end', this.onEnd);
+    this.motion = new OrbitMotion(this.controls, () => this.camera, {
+      frictionless: () => this.settings.frictionless, changed: () => { if (!this.disposed) this.changed(this.state()); },
+      requestDraw: () => this.requestDraw(), started: () => { this.settings.sway = false; },
+    });
 
     // Layers: chunks in paint order; marks keep the painter's order inside one.
     const painted = packet.meshes.filter(mesh => mesh.appearance);
@@ -185,13 +185,14 @@ export class GlassViewer {
 
     this.resize = new ResizeObserver(() => this.resizeView());
     this.resize.observe(host);
-    canvas.addEventListener('pointerdown', e => { this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true }); this.stopMotion(); }, { signal: this.events.signal });
+    canvas.addEventListener('pointerdown', e => { this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true }); this.motion.touch(); }, { signal: this.events.signal });
     canvas.addEventListener('pointerup', e => {
-      if (this.startPointer && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < 4 && e.button === 0) this.pick(e);
+      // A tap that stopped the turning does not also select.
+      if (this.startPointer && !this.motion.haltedByTouch && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < 4 && e.button === 0) this.pick(e);
       this.startPointer = null;
     }, { signal: this.events.signal });
     canvas.addEventListener('pointermove', e => {
-      if (this.dragging || e.pointerType === 'touch') return;
+      if (this.motion.dragging || e.pointerType === 'touch') return;
       const rect = canvas.getBoundingClientRect();
       this.lightTarget = [((e.clientX - rect.left) / rect.width * 2 - 1), -((e.clientY - rect.top) / rect.height * 2 - 1)];
       this.requestDraw();
@@ -302,7 +303,7 @@ export class GlassViewer {
         }
         this.reveal(i);
       }
-      if (!this.disposed && GLASS_FIXED.swayOnce) this.swayOnce();
+      if (!this.disposed && GLASS_FIXED.swayOnce) this.motion.swayOnce(() => this.disposed);
       return unpainted;
     })();
     this.painting = run.catch(() => undefined);
@@ -361,95 +362,21 @@ export class GlassViewer {
     this.requestDraw();
   }
 
-  private swayOnce() {
-    const start = () => {
-      const target = this.controls.target, offset = this.camera.position.clone().sub(target);
-      const turned = offset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 6 * DEG);
-      this.tween = { from: offset.clone(), to: turned, start: performance.now(), length: 800,
-        then: () => { this.tween = { from: turned, to: offset, start: performance.now(), length: 800 }; } };
-      this.requestDraw();
-    };
-    setTimeout(() => { if (!this.disposed && !this.dragging) start(); }, 300);
-  }
-
-  // Motion -------------------------------------------------------------------
-
-  private onStart = () => { this.dragging = true; this.samples = []; this.inertia = null; this.tween = null; this.settings.sway = false; };
-  private onEnd = () => {
-    this.dragging = false;
-    const now = performance.now(), recent = this.samples.filter(s => now - s.t <= 100);
-    if (recent.length >= 2) {
-      const a = recent[0], b = recent[recent.length - 1], dt = Math.max(1e-3, (b.t - a.t) / 1000);
-      let az = (b.az - a.az) / dt, po = (b.po - a.po) / dt;
-      const speed = Math.hypot(az, po) / DEG;
-      if (speed >= 20) {
-        const cap = Math.min(1, 180 / speed); az *= cap; po *= cap;
-        this.inertia = { az, po };
-      }
-    }
-    if (!this.inertia) this.snapFront();
-    this.changed(this.state()); this.requestDraw();
-  };
-  private onChange = () => {
-    if (this.dragging) this.samples.push({ t: performance.now(), az: this.controls.getAzimuthalAngle(), po: this.controls.getPolarAngle() });
-    this.moving = performance.now();
-    this.requestDraw();
-  };
-  private stopMotion() { this.inertia = null; this.tween = null; }
-
-  private snapFront() {
-    const offset = this.camera.position.clone().sub(this.controls.target);
-    const angle = offset.angleTo(new THREE.Vector3(0, 0, 1));
-    if (angle > 1e-4 && angle < 3 * DEG) {
-      this.tween = { from: offset, to: new THREE.Vector3(0, 0, offset.length()), start: performance.now(), length: 250 };
-    }
-  }
-
-  private turnTo(direction: THREE.Vector3, length: number) {
-    const offset = this.camera.position.clone().sub(this.controls.target);
-    this.tween = { from: offset, to: direction.clone().normalize().multiplyScalar(offset.length()), start: performance.now(), length };
-    this.requestDraw();
-  }
-
   private requestDraw() { if (!this.disposed && !document.hidden && !this.frame) this.frame = requestAnimationFrame(this.draw); }
 
   private draw = (time: number) => {
     this.frame = 0;
     if (this.disposed) return;
     const dt = Math.min(0.05, (time - this.last) / 1000 || 0); this.last = time;
-    let animating = false;
-    if (this.inertia) {
-      // Without friction (an option, on by default) it turns at the release speed
-      // until touched; with it, the speed halves about every 0.35 seconds. The
-      // vertical part ends where the orbit reaches the top or bottom.
-      const { az, po } = this.inertia, polar = this.controls.getPolarAngle();
-      this.controls.rotateLeft(-az * dt); this.controls.rotateUp(-po * dt); this.controls.update();
-      const decay = this.settings.frictionless ? 1 : Math.exp(-dt / 0.5);
-      const stuck = po !== 0 && Math.abs(this.controls.getPolarAngle() - polar) < Math.abs(po * dt) * 0.5;
-      this.inertia = { az: az * decay, po: stuck ? 0 : po * decay };
-      if (Math.hypot(this.inertia.az, this.inertia.po) / DEG < (this.settings.frictionless ? 1e-6 : 1.5)) {
-        this.inertia = null; this.snapFront(); this.changed(this.state());
-      }
-      animating = true; this.moving = performance.now();
-    }
-    if (this.tween) {
-      const k = Math.min(1, (performance.now() - this.tween.start) / this.tween.length);
-      const from = this.tween.from, to = this.tween.to;
-      const q = new THREE.Quaternion().setFromUnitVectors(from.clone().normalize(), to.clone().normalize());
-      const partial = new THREE.Quaternion().slerp(q, ease(k));
-      const length = from.length() + (to.length() - from.length()) * ease(k);
-      this.camera.position.copy(this.controls.target).add(from.clone().normalize().applyQuaternion(partial).multiplyScalar(length));
-      this.camera.lookAt(this.controls.target); this.controls.update();
-      if (k >= 1) { const then = this.tween.then; this.tween = null; then?.(); this.changed(this.state()); }
-      animating = true; this.moving = performance.now();
-    }
-    if (this.settings.sway && !this.dragging) {
+    // Inertia (without friction it turns at the release speed until touched) and tweens.
+    let animating = this.motion.step(dt);
+    if (this.settings.sway && !this.motion.dragging) {
       this.swayTime += dt;
       const az = (10 + 35 * Math.sin(2 * Math.PI * this.swayTime / 16)) * DEG, el = 6 * Math.sin(2 * Math.PI * this.swayTime / 23) * DEG;
       const distance = this.camera.position.distanceTo(this.controls.target);
       this.camera.position.copy(this.controls.target).add(new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(distance));
       this.camera.lookAt(this.controls.target); this.controls.update();
-      animating = true; this.moving = performance.now();
+      animating = true; this.swayMoved = performance.now();
     }
     // The light follows the pointer over about 0.15 seconds.
     const follow = 1 - Math.exp(-dt / 0.15);
@@ -463,20 +390,22 @@ export class GlassViewer {
     for (const layer of this.layers) if (layer.pulse > 0) { layer.pulse = Math.max(0, layer.pulse - dt / 0.6 * 0.5); animating = true; }
     this.adaptResolution(time);
     this.render();
-    if (animating || now - this.moving < 200) this.requestDraw();
+    if (animating || now - this.lastMoved() < 200) this.requestDraw();
   };
 
-  /** Heavy frames while moving lower the drawing resolution; it comes back
-   * 0.15 seconds after the motion stops. */
+  private lastMoved() { return Math.max(this.swayMoved, this.motion.moving); }
+  /** Heavy frames while moving lower the drawing resolution and light ones
+   * raise it again; it is full 0.15 seconds after the motion stops. */
   private adaptResolution(time: number) {
-    const moving = performance.now() - this.moving < 150 || this.dragging;
+    const moving = performance.now() - this.lastMoved() < 150 || this.motion.dragging;
+    let average: number | null = null;
     if (moving) {
       this.frameTimes.push(time); if (this.frameTimes.length > 11) this.frameTimes.shift();
-      if (this.frameTimes.length === 11) {
-        const average = (this.frameTimes[10] - this.frameTimes[0]) / 10;
-        if (average > 22 && this.resolution > 0.6) { this.resolution = this.resolution > 0.75 ? 0.75 : 0.6; this.applyResolution(); this.frameTimes = []; }
-      }
-    } else if (this.resolution !== 1) { this.resolution = 1; this.applyResolution(); this.frameTimes = []; }
+      if (this.frameTimes.length === 11) average = (this.frameTimes[10] - this.frameTimes[0]) / 10;
+    }
+    const next = adaptResolution(this.resolutionState, average, moving, performance.now());
+    if (next.value !== this.resolution) { this.resolution = next.value; this.applyResolution(); this.frameTimes = []; }
+    this.resolutionState = next;
   }
   private applyResolution() { this.renderer.setPixelRatio(this.pixelRatio()); this.resizeView(false); }
 
@@ -546,9 +475,11 @@ export class GlassViewer {
     const directions: Record<string, [number, number, number]> = {
       front: [0, 0, 1], back: [0, 0, -1], left: [-1, 0, 0.0001], right: [1, 0, 0.0001], top: [0, 1, 0.0001], bottom: [0, -1, 0.0001], iso: [1, 0.8, 1.8],
     };
-    this.camera.up.set(0, 1, 0); this.turnTo(new THREE.Vector3(...directions[name]), 400);
+    this.camera.up.set(0, 1, 0); this.motion.turnTo(new THREE.Vector3(...directions[name]), 400);
   }
   match2D() {
+    // A chosen direction ends any turning.
+    this.motion.stop();
     this.setProjection('orthographic');
     const view = frontView(this.packet.canvas, this.host.clientWidth, this.host.clientHeight, this.initialView);
     this.referenceHeight = view.referenceHeight;
@@ -559,13 +490,12 @@ export class GlassViewer {
     camera.up.set(0, 1, 0); this.resizeView(); this.controls.update(); this.notify();
   }
   reset() {
-    this.stopMotion();
+    this.motion.stop();
     this.settings = { ...this.settings, angle: GLASS_DEFAULTS.angle, spacing: GLASS_DEFAULTS.spacing, leaf: GLASS_DEFAULTS.leaf, light: GLASS_DEFAULTS.light, sway: false };
     this.rebuild();
     const offset = this.camera.position.clone().sub(this.controls.target);
     if (this.camera instanceof THREE.OrthographicCamera && offset.angleTo(new THREE.Vector3(0, 0, 1)) > 1e-3) {
-      this.turnTo(new THREE.Vector3(0, 0, 1), 400);
-      const done = this.tween!; done.then = () => this.match2D();
+      this.motion.turnTo(new THREE.Vector3(0, 0, 1), 400, () => this.match2D());
     } else this.match2D();
   }
   private displayZoom(): number {
@@ -659,7 +589,7 @@ export class GlassViewer {
       if (angle < best.angle) best = { angle, azimuth: az };
     }
     if (best.angle > 15 * DEG) { this.fit(); return; }
-    this.turnTo(new THREE.Vector3(Math.sin(best.azimuth) * Math.sin(polar), Math.cos(polar), Math.cos(best.azimuth) * Math.sin(polar)), 500);
+    this.motion.turnTo(new THREE.Vector3(Math.sin(best.azimuth) * Math.sin(polar), Math.cos(polar), Math.cos(best.azimuth) * Math.sin(polar)), 500);
   }
 
   private keyboard = (event: KeyboardEvent) => {
@@ -722,7 +652,7 @@ export class GlassViewer {
     this.changed(this.state()); this.disposed = true;
     cancelAnimationFrame(this.frame); clearTimeout(this.stateTimer);
     this.events.abort(); this.resize.disconnect();
-    this.controls.removeEventListener('change', this.onChange); this.controls.removeEventListener('start', this.onStart); this.controls.removeEventListener('end', this.onEnd);
+    this.motion.dispose();
     this.controls.dispose();
     this.box.geometry.dispose(); this.box.material.dispose(); this.texture.dispose(); this.backgroundTexture?.dispose();
     this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer.domElement.remove();

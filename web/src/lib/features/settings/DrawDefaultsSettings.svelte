@@ -13,10 +13,12 @@
 		providerGroups: ProviderGroup[];
 		visionProviderGroups: ProviderGroup[];
 		onSave: (value: DrawDefaults) => Promise<void>;
+		onDraftChange: (value: DrawDefaults) => void;
 	};
-	let { defaults, catalogs, canvases, providerGroups, visionProviderGroups, onSave }: Props = $props();
+	let { defaults, catalogs, canvases, providerGroups, visionProviderGroups, onSave, onDraftChange }: Props = $props();
 	let draft = $state<DrawDefaults>(untrack(() => copyDrawDefaults(defaults)));
 	let saving = $state(false);
+	let pending = false;
 	let saved = $state(false);
 	let failed = $state(false);
 	let pickerTab = $state<DrawTab | null>(null);
@@ -27,10 +29,17 @@
 	const tabName = (tab: DrawTab) => tab === 'describe' ? t().drawDefaultsDescribe : tab === 'image' ? t().drawDefaultsImage
 		: tab === 'batch_text' ? t().drawDefaultsBatchText : t().drawDefaultsBatchImage;
 	async function save() {
-		saving = true; failed = false; saved = false;
-		try { await onSave(copyDrawDefaults(draft)); saved = true; }
-		catch { failed = true; }
-		finally { saving = false; }
+		onDraftChange(copyDrawDefaults(draft));
+		pending = true; failed = false; saved = false;
+		if (saving) return;
+		saving = true;
+		try {
+			while (pending) {
+				pending = false;
+				try { await onSave(copyDrawDefaults(draft)); if (!pending) saved = true; }
+				catch { if (!pending) failed = true; }
+			}
+		} finally { saving = false; }
 	}
 	async function chooseModel(tab: DrawTab) {
 		const ref = (isImageTab(tab) ? draft[tab].models.vision : draft[tab].models.stage1) ?? '';
@@ -50,13 +59,12 @@
 		if (!ref) return;
 		if (isImageTab(pickerTab)) draft[pickerTab].models.vision = ref;
 		else draft[pickerTab].models.stage1 = draft[pickerTab].models.stage2 = ref;
-		saved = false;
 		pickerTab = null;
+		void save();
 	}
 	function chooseCatalog(tab: DrawTab, selected: string) {
 		draft[tab].catalog.mode = selected === 'auto' ? 'auto' : 'fixed';
 		if (selected !== 'auto') draft[tab].catalog.id = selected;
-		saved = false;
 	}
 </script>
 
@@ -66,7 +74,7 @@
 		<div class="popover-group-label">{tabName(tab)}</div>
 		<div class="db-test-result">{tab === 'describe' ? t().drawDefaultsHintDescribe : tab === 'image' ? t().drawDefaultsHintImage
 			: tab === 'batch_text' ? t().drawDefaultsHintBatchText : t().drawDefaultsHintBatchImage}</div>
-		<div class="db-backup-grid" oninput={() => (saved = false)}>
+		<div class="db-backup-grid" onchange={() => void save()}>
 			{#if !image}
 			<label data-draw-option="route"><span>{t().drawDefaultsRoute}</span><select bind:value={draft[tab].route}><option value="read_and_draw">{t().drawDefaultsRead}</option><option value="stages">{t().drawDefaultsStages}</option></select></label>
 			<label data-draw-option="sketch"><span>{t().sketchLabel}</span><select bind:value={draft[tab].sketch}><option value="off">{t().drawDefaultsOff}</option><option value="on">{t().drawDefaultsOn}</option></select></label>
@@ -86,7 +94,6 @@
 	</div>
 {/each}
 <div class="settings-inline-actions">
-	<button type="button" class="ghost-btn primary-inline" disabled={saving} onclick={save}>{t().drawDefaultsSave}</button>
 	{#if saved}<div class="inline-message">{t().drawDefaultsSaved}</div>{/if}
 	{#if failed}<div class="inline-message error-text" role="alert">{t().drawDefaultsSaveFailed}</div>{/if}
 </div>

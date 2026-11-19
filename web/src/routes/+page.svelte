@@ -703,7 +703,26 @@
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 	}
 
-	async function saveDrawDefaults(defaults: DrawDefaults): Promise<void> {
+	let pendingDrawDefaults = $state<DrawDefaults | null>(null);
+	let pendingDrawDefaultsOwner = $state<string | null>(null);
+	let drawDefaultsSaveChain: Promise<void> = Promise.resolve();
+	function rememberDrawDefaultsDraft(defaults: DrawDefaults) {
+		pendingDrawDefaultsOwner = session.currentUser?.id ?? null;
+		pendingDrawDefaults = defaults;
+	}
+	function saveDrawDefaults(defaults: DrawDefaults): Promise<void> {
+		const owner = session.currentUser?.id;
+		const snapshot = JSON.stringify(defaults);
+		const save = drawDefaultsSaveChain.catch(() => {}).then(async () => {
+			if (!owner || session.currentUser?.id !== owner) throw new Error('account changed');
+			if (pendingDrawDefaultsOwner !== owner || JSON.stringify(pendingDrawDefaults) !== snapshot) return;
+			await persistDrawDefaults(defaults);
+			if (pendingDrawDefaultsOwner === owner && JSON.stringify(pendingDrawDefaults) === snapshot) pendingDrawDefaults = null;
+		});
+		drawDefaultsSaveChain = save;
+		return save;
+	}
+	async function persistDrawDefaults(defaults: DrawDefaults): Promise<void> {
 		const user = session.currentUser;
 		if (!user) throw new Error('not signed in');
 		const token = session.beginSettingsUpdate();
@@ -3538,10 +3557,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
 		<SettingsModal
 			topLayer={refinementModelSelection}
-			drawDefaults={work.drawDefaults}
+			drawDefaults={pendingDrawDefaultsOwner === session.currentUser?.id && pendingDrawDefaults ? pendingDrawDefaults : work.drawDefaults}
 			drawCatalogs={colorCatalogs}
 			drawCanvases={canvasAspectOptions}
 			onSaveDrawDefaults={saveDrawDefaults}
+			onDrawDefaultsDraftChange={rememberDrawDefaultsDraft}
 			chatgptAvailable={chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id}
 			{demoContent}
 			settings={settings}

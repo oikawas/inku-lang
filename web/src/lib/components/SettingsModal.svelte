@@ -35,6 +35,7 @@
 		drawCatalogs: { id: string; name: string }[];
 		drawCanvases: { id: string; label: string }[];
 		onSaveDrawDefaults: (value: DrawDefaults) => Promise<void>;
+		onDrawDefaultsDraftChange: (value: DrawDefaults) => void;
 		settings: SettingsController;
 		demoContent?: Snippet;
 		singleUserMode: boolean;
@@ -86,7 +87,7 @@
 	};
 
 	let {
-		drawDefaults, drawCatalogs, drawCanvases, onSaveDrawDefaults,
+		drawDefaults, drawCatalogs, drawCanvases, onSaveDrawDefaults, onDrawDefaultsDraftChange,
 		settings,
 		topLayer = false,
 		demoContent,
@@ -509,7 +510,7 @@
 			{:else if settingsTab === 'image'}
 				<ImageSettings />
 			{:else if settingsTab === 'draw_defaults'}
-				<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} providerGroups={drawingProviderGroups} {visionProviderGroups} onSave={onSaveDrawDefaults} />
+				<DrawDefaultsSettings defaults={drawDefaults} catalogs={drawCatalogs} canvases={drawCanvases} providerGroups={drawingProviderGroups} {visionProviderGroups} onSave={onSaveDrawDefaults} onDraftChange={onDrawDefaultsDraftChange} />
 			{:else if settingsTab === 'demo'}
 				{@render demoContent?.()}
 			{:else}

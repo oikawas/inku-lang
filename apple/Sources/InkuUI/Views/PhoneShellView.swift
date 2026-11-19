@@ -35,7 +35,10 @@ struct PhoneShellView<Creation: View, Library: View, Settings: View>: View {
                 .tabItem { Label(model.display.webCopy("historyLibraryTitle", "ライブラリ"), systemImage: "square.grid.3x3") }.tag(PhoneShellTab.library)
             settings()
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if model.hasActiveRun { PhoneRunStatusRow(model: model, status: runStatus) { tab = PhoneShellTab.creation } }
+                    if model.hasActiveRun {
+                        PhoneRunStatusRow(model: model, status: runStatus) { tab = PhoneShellTab.creation }
+                            .inkuPhoneFrontText(true, textScale: model.display.preferences.textScale)
+                    }
                 }
                 .inkuPhoneTabBarHidden()
                 .tabItem { Label(model.display.webCopy("settingsTitle", "設定"), systemImage: "gearshape") }.tag(PhoneShellTab.settings)
@@ -65,9 +68,9 @@ struct PhoneRunStatusRow: View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
             Text(status.isEmpty ? model.display.localized("描画中") : model.display.message(status))
-                .inkuFont(12).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                .inkuFont(12).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
             Button(role: .destructive) { Task { await model.stopEveryRun() } } label: {
-                Label(model.display.localized("停止"), systemImage: "stop.fill").inkuFont(12)
+                Label(model.display.localized("停止"), systemImage: "stop.fill").inkuFont(12).frame(minWidth: 44, minHeight: 44)
             }.buttonStyle(.bordered).controlSize(.small)
         }
         .padding(.horizontal, 14).padding(.vertical, 8).background(InkuColor.bg)

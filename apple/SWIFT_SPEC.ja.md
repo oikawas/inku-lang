@@ -119,6 +119,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 変わらない物：id `chatgpt`、モデル名`chatgpt:…`、失敗の印、送信・保存・作品の記録。Webのコピー（`ui-reference.json`）の`chatgptPlanLabel`は名札に使わなくなった（Webの文言の写しは、WebのServerの変更と合わせて書き出し直す）。
 - 確かめ：共通の試験データ`sign-in-cases.json`の21行を、アプリと同じ口（`InkuCore.modelCatalog`）で通し、答えの全体を照らす（`InkuAppCheck --sign-in-only`）。
 
+## 2026-11-20 iPhone の手前の画面の文字
+
+iPhone の手前の画面（ホーム、見る画面、作品情報、進みの行とホームのシート）は、inku の文字サイズ設定に 17/14 を掛け、`inkuFont` の最小を 13pt、標準部品の Dynamic Type の下限を xLarge とする。制作画面・Mac・iPad と設定画面の倍率は変えない。
+
 ## 2026-11-13 iPhone のライブラリの全件スクロール
 
 作者の指示（2026-11-13「iphoneのライブラリは、写真アプリのように全件スクロール表示として」）。札の形は「写真アプリの形」、並びは「新しい作品が上」（作者の選択）。

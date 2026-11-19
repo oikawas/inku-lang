@@ -133,7 +133,10 @@ public struct ContentView: View {
 
     public var body: some View {
         mainBody
-            .sheet(item: $workPack) { session in workPackSheet(session).environment(model.display) }
+            .sheet(item: $workPack) { session in
+                workPackSheet(session).environment(model.display)
+                    .inkuPhoneFrontText(phoneLayout, textScale: model.display.preferences.textScale)
+            }
             .onOpenURL { url in
                 if url.pathExtension.lowercased() == "inkupack" { readWorkPack(url) }
             }
@@ -216,6 +219,7 @@ public struct ContentView: View {
                 .environment(\.locale, Locale(identifier: model.display.preferences.language))
                 .environment(\.inkuWindowSize, windowSize)
                 .environment(\.inkuPhoneLayout, phoneLayout)
+                .inkuPhoneFrontText(phoneLayout && ui.libraryOpen, textScale: model.display.preferences.textScale)
                 #if os(macOS)
                 .safeAreaInset(edge: .bottom, spacing: 0) { errorNotice }
                 #endif
@@ -863,6 +867,16 @@ public struct ContentView: View {
 
     @ViewBuilder private func workPackSheet(_ session: WorkPackSession) -> some View {
         NavigationStack {
+            Group {
+                if phoneLayout { ScrollView { workPackContents(session).frame(maxWidth: .infinity, alignment: .leading) } }
+                else { workPackContents(session) }
+            }
+            .navigationTitle(model.display.label("作品パックを取り込む", "Import work pack"))
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(model.display.localized("閉じる")) { workPack = nil } } }
+        }
+    }
+
+    private func workPackContents(_ session: WorkPackSession) -> some View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(model.display.label("\(session.decision.workIDs.count) 作品を取り込みます", "Import \(session.decision.workIDs.count) works"))
                     .font(.headline)
@@ -878,8 +892,8 @@ public struct ContentView: View {
                 if model.isBusy || automation.isOccupied {
                     Text(model.display.label("描き終わってから取り込めます", "Import is available after drawing finishes"))
                 }
-                Spacer()
-                Button(model.display.label("取り込む", "Import")) {
+                if !phoneLayout { Spacer() }
+                Button {
                     workPackImporting = true
                     Task {
                         defer { workPackImporting = false }
@@ -892,12 +906,11 @@ public struct ContentView: View {
                             workPackResult = model.display.label("\(result.workIDs.count) 作品を取り込み、\(result.skipped) 作品を飛ばしました", "Imported \(result.workIDs.count) works; skipped \(result.skipped)")
                         } catch { model.errorText = error.localizedDescription }
                     }
+                } label: {
+                    Text(model.display.label("取り込む", "Import")).frame(minHeight: phoneLayout ? 44 : 0)
                 }.buttonStyle(.borderedProminent)
                     .disabled(model.isBusy || automation.isOccupied || workPackImporting || session.decision.workIDs.isEmpty)
             }.padding()
-                .navigationTitle(model.display.label("作品パックを取り込む", "Import work pack"))
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(model.display.localized("閉じる")) { workPack = nil } } }
-        }
     }
 
     private func exportWorkPack(_ ids: [String]) {

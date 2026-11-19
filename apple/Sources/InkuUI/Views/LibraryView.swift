@@ -34,6 +34,8 @@ struct LibrarySelectionPresentation {
 struct LibraryView: View {
     @Bindable var model: AppModel
     @Bindable var preview: LibraryPreviewModel
+    @Environment(\.inkuTextScale) private var textScale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
@@ -113,7 +115,7 @@ struct LibraryView: View {
             if phoneLayout {
                 // iPhone (ios-app step 7b): a work opens as its own page, the preview's contents on the whole
                 // width; going back closes the preview. The page turns with the phone.
-                phoneNavigation
+                phoneNavigation.inkuPhoneFrontText(true, textScale: textScale)
             } else {
                 surface
             }
@@ -142,7 +144,10 @@ struct LibraryView: View {
             preview.show(work)
         }
         .sheet(isPresented: Binding(get: { phoneInformationWork != nil }, set: { if !$0 { phoneInformationWork = nil } })) {
-            if let work = phoneInformationWork { PhoneWorkInformation(model: model, work: work, writingLocked: writingDisabled) }
+            if let work = phoneInformationWork {
+                PhoneWorkInformation(model: model, work: work, writingLocked: writingDisabled)
+                    .inkuPhoneFrontText(phoneLayout, textScale: textScale)
+            }
         }
         .sheet(isPresented: Binding(get: { phoneRefineWork != nil }, set: { if !$0 { phoneRefineWork = nil } }), onDismiss: {
             if let (work, action) = phonePendingAction {
@@ -162,7 +167,7 @@ struct LibraryView: View {
                 }, writingLocked: writingDisabled) }
                 .navigationTitle(display.webCopy("historyPreviewRefine", "推敲する"))
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button(display.localized("閉じる")) { phoneRefineWork = nil } } }
-            }
+            }.inkuPhoneFrontText(phoneLayout, textScale: textScale)
             }
         }
         .inkuOnEscape { onClose?() }
@@ -246,7 +251,9 @@ struct LibraryView: View {
     private var phoneSearchRow: some View {
         HStack {
             searchField
-            Button(display.localized("キャンセル")) { library.query = ""; phoneSearchHasDraft = false; phoneSearchVisible = false }
+            Button { library.query = ""; phoneSearchHasDraft = false; phoneSearchVisible = false } label: {
+                Text(display.localized("キャンセル")).frame(minWidth: 44, minHeight: 44)
+            }
         }.padding(8)
     }
 
@@ -256,27 +263,54 @@ struct LibraryView: View {
     }
 
     private var phoneHeader: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize { phoneHeaderContents(vertical: true) }
+            else {
+                ViewThatFits(in: .horizontal) {
+                    phoneHeaderContents(vertical: false).fixedSize(horizontal: true, vertical: false)
+                    phoneHeaderContents(vertical: true)
+                }
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+            .disabled(library.mutating || model.isBrowsingLocked)
+    }
+
+    private func phoneHeaderContents(vertical: Bool) -> some View {
         @Bindable var library = library
-        return HStack(spacing: 10) {
+        let layout = vertical ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             if library.isTrash {
                 Text(display.localized("ごみ箱")).font(.headline)
-                Spacer()
-                if !phoneSelecting { Button(display.localized("選択")) { phoneSelecting = true } }
-                Button(display.localized("完了")) {
+                if !vertical { Spacer() }
+                if !phoneSelecting { Button { phoneSelecting = true } label: { Text(display.localized("選択")).frame(minWidth: 44, minHeight: 44) } }
+                Button {
                     if phoneSelecting { phoneSelecting = false } else { library.isTrash = false }
                     library.selectedIDs.removeAll()
-                }
+                } label: { Text(display.localized("完了")).frame(minWidth: 44, minHeight: 44) }
             } else if phoneSelecting {
                 Text(display.label("\(library.selectedIDs.count) 件を選択", "\(library.selectedIDs.count) selected"))
-                Spacer()
-                Button(display.localized("完了")) { phoneSelecting = false; library.selectedIDs.removeAll() }
+                if !vertical { Spacer() }
+                Button { phoneSelecting = false; library.selectedIDs.removeAll() } label: { Text(display.localized("完了")).frame(minWidth: 44, minHeight: 44) }
             } else {
-                Picker(display.webCopy("historyFilterLabel", "絞り込み"), selection: $library.starredOnly) {
-                    Text(display.label("すべて", "All")).tag(false)
-                    Text(display.label("スター", "Starred")).tag(true)
-                }.pickerStyle(.segmented).frame(maxWidth: 230)
+                if vertical {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button { library.starredOnly = false } label: {
+                            Label(display.label("すべて", "All"), systemImage: library.starredOnly ? "circle" : "checkmark.circle.fill")
+                                .frame(minHeight: 44)
+                        }
+                        Button { library.starredOnly = true } label: {
+                            Label(display.label("スター", "Starred"), systemImage: library.starredOnly ? "checkmark.circle.fill" : "circle")
+                                .frame(minHeight: 44)
+                        }
+                    }
+                } else {
+                    Picker(display.webCopy("historyFilterLabel", "絞り込み"), selection: $library.starredOnly) {
+                        Text(display.label("すべて", "All")).tag(false)
+                        Text(display.label("スター", "Starred")).tag(true)
+                    }.pickerStyle(.segmented).frame(minWidth: 180, maxWidth: 230, minHeight: 44)
+                }
                 LibraryLoadingIndicator(library: library)
-                Spacer(minLength: 0)
+                if !vertical { Spacer(minLength: 0) }
                 Menu {
                     Section(countText) {
                         Button(display.localized("選択")) { phoneSelecting = true }
@@ -298,12 +332,12 @@ struct LibraryView: View {
                     Button(display.label("ごみ箱 (\(library.trashTotal))", "Trash (\(library.trashTotal))")) { library.isTrash = true; phoneSelecting = false }
                     Button(display.label("作品パックを取り込む", "Import work pack"), action: onImportWorkPack)
                     Button(display.localized("更新")) { Task { await library.refresh() } }
-                } label: { Image(systemName: "ellipsis.circle").font(.title3) }
+                } label: { Image(systemName: "ellipsis.circle").font(.title3).frame(width: 44, height: 44) }
                     .accessibilityLabel(display.localized("ライブラリの操作"))
-                Button(action: onPhoneSettings) { Image(systemName: "gearshape").font(.title3) }
+                Button(action: onPhoneSettings) { Image(systemName: "gearshape").font(.title3).frame(width: 44, height: 44) }
                     .accessibilityLabel(display.webCopy("settingsTitle", "設定"))
             }
-        }.disabled(library.mutating || model.isBrowsingLocked)
+        }
     }
 
     @ViewBuilder private var phoneFooter: some View {
@@ -326,9 +360,9 @@ struct LibraryView: View {
             HStack(spacing: 12) {
                 Button(action: onPhoneCreate) {
                     Text(display.webCopy("inputSectionHint", "短い文で、表現したいものを入力。"))
-                        .foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 }.buttonStyle(.plain)
-                Button(action: onPhoneCamera) { Image(systemName: "camera.fill") }
+                Button(action: onPhoneCamera) { Image(systemName: "camera.fill").frame(width: 44, height: 44) }
                     .accessibilityLabel(display.localized("カメラ"))
             }.padding(14).background(RoundedRectangle(cornerRadius: 16).fill(InkuColor.panel))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(InkuColor.border2))
@@ -744,11 +778,10 @@ struct LibraryView: View {
                     .overlay { ArtworkThumbnail(work: work, thumbnails: model.thumbnails, fills: true) }
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(model.workPresentationTitle(work)).inkuFont(15).lineLimit(2).foregroundStyle(.primary)
-                    HStack(spacing: 6) {
-                        Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
-                        if work.starred { Image(systemName: "star.fill") }
-                        if annotation.forRevision { Image(systemName: "pencil.circle.fill") }
+                    Text(model.workPresentationTitle(work)).inkuFont(15).fixedSize(horizontal: false, vertical: true).foregroundStyle(.primary)
+                    ViewThatFits(in: .horizontal) {
+                        phoneWorkSummary(work, annotation: annotation).fixedSize(horizontal: true, vertical: false)
+                        phoneWorkSummary(work, annotation: annotation, vertical: true)
                     }
                     .inkuFont(12).foregroundStyle(.secondary)
                     LibraryModelLinesView(work: work, display: display, naming: naming)
@@ -766,6 +799,17 @@ struct LibraryView: View {
         .disabled(model.isBrowsingLocked)
         .contextMenu { workMenu(work) }
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func phoneWorkSummary(_ work: SavedWork, annotation: LibraryAnnotation, vertical: Bool = false) -> some View {
+        let layout = vertical ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(spacing: 6))
+        return layout {
+            Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
+            HStack(spacing: 6) {
+                if work.starred { Image(systemName: "star.fill") }
+                if annotation.forRevision { Image(systemName: "pencil.circle.fill") }
+            }
+        }
     }
 
     /// Read the next works while this row is on screen; again after each read, as long as it stays in view.
@@ -1078,8 +1122,8 @@ struct LibraryView: View {
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.workPresentationTitle(group.representative.work))
-                        .inkuFont(12, weight: .semibold).lineLimit(1)
-                    Text(groupSummary(group)).inkuFont(10).foregroundStyle(.tertiary).lineLimit(1)
+                        .inkuFont(12, weight: .semibold).lineLimit(phoneLayout ? nil : 1)
+                    Text(groupSummary(group)).inkuFont(10).foregroundStyle(.tertiary).lineLimit(phoneLayout ? nil : 1)
                     if current {
                         Text(display.webCopy("historyCurrentLineage", fallback: "表示中作品の系譜"))
                             .inkuFont(10).foregroundStyle(Color.accentColor)
@@ -1173,7 +1217,7 @@ struct LibraryView: View {
                         .aspectRatio(82.0 / 58.0, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: 110)
                     Text(model.workPresentationTitle(work))
-                        .inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
+                        .inkuFont(10).foregroundStyle(.secondary).lineLimit(phoneLayout ? nil : 1)
                 }
             }
             .buttonStyle(.plain).disabled(model.isBrowsingLocked)
@@ -1206,7 +1250,7 @@ struct LibraryView: View {
                 HStack(spacing: 8) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 48, height: 48)
                     Text(model.workPresentationTitle(work))
-                        .inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
+                        .inkuFont(10).foregroundStyle(.secondary).lineLimit(phoneLayout ? nil : 1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }.contentShape(Rectangle())
             }
@@ -1512,7 +1556,8 @@ struct LibraryView: View {
     @ViewBuilder private func generationBadge(_ work: SavedWork) -> some View {
         if let generation = work.lineageNodeID.flatMap({ library.generations[$0] }) {
             Text("\(generation)")
-                .font(.system(size: 9 * display.preferences.textScale, weight: .regular))
+                .font(.system(size: phoneLayout ? InkuTypography.size(9, scale: textScale * InkuTypography.phoneTextScale, minimum: 13)
+                              : 9 * display.preferences.textScale, weight: .regular))
                 .monospacedDigit().foregroundStyle(Color.accentColor)
                 .padding(.horizontal, 5).padding(.vertical, 1).frame(minWidth: 16)
                 .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))

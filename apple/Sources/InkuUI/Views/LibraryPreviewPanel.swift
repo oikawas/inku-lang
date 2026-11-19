@@ -14,12 +14,14 @@ struct LibraryPreviewPanel: View {
     let onWorkAction: (SavedWork, String) -> Void
     var writingLocked = false
     var storedSVGBytes: Int64? = nil
+    var informationOnly = false
     @State private var generation: Int?
     private var display: DisplaySettings { model.display }
     private var disabled: Bool { model.isBrowsingLocked || work.trashed }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !informationOnly {
             ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                 .frame(maxWidth: .infinity).frame(height: 236)
                 .background(LibraryChrome.panel2, in: RoundedRectangle(cornerRadius: 4))
@@ -41,6 +43,7 @@ struct LibraryPreviewPanel: View {
                 Button(display.webCopy("historyPreviewRefine", "推敲する")) { onWorkAction(work, "refine-menu") }
                     .buttonStyle(LibraryGhostButtonStyle()).disabled(disabled || writingLocked)
                 exportMenu
+            }
             }
             VStack(alignment: .leading, spacing: 0) {
                 Text(display.webCopy("historyPreviewDetails", "作品情報")).inkuFont(12, weight: .semibold).padding(.bottom, 8)

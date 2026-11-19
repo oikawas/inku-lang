@@ -2336,6 +2336,24 @@ public final class AppModel {
     }
 
 
+    /// The iPhone's direct share card reads a saved snapshot only; it never starts or stops a drawing.
+    public func preparePhoneShareCard(workID: String) async throws -> ExportArtifact {
+        guard let database else { throw HostError("export_busy_or_unavailable") }
+        let revision = restorationRevision
+        guard let work = try await database.work(id: workID), !work.trashed, !work.svg.isEmpty,
+              revision == restorationRevision else { throw HostError("saved_export_work_changed") }
+        var options = display.preferences.exportDefaults.options
+        options.format = .shareCard
+        options.pixelHeight = display.preferences.exportDefaults.resolution == 0
+            ? display.preferences.exportDefaults.customHeight : display.preferences.exportDefaults.resolution
+        let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options.normalized())
+        guard revision == restorationRevision, let latest = try await database.work(id: workID), !latest.trashed,
+              latest.renderHash == work.renderHash, latest.at == work.at, let artifact = artifacts.first else {
+            throw HostError("saved_export_work_changed")
+        }
+        return artifact
+    }
+
     public func prepareExportSources(works: [SavedWork], profile: String = "display", requiresPluginDefinitions: Bool = false, lineAnimation: Bool = false) async throws -> [ExportSource] {
         guard !isBusy, let host, let database else { throw HostError("export_busy_or_unavailable") }
         let exportRevision = restorationRevision

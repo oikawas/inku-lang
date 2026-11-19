@@ -21,7 +21,7 @@ struct ArtworkReplacement {
 struct ArtworkCanvas: View {
     /// `.embedded` keeps the framed preview used by dialogs and the library. `.workspace` is the Web canvas area:
     /// no frame or outer margin, the Web fit (CanvasPanel.svelte:587-598) and the zoom capsule over the work.
-    enum Style { case embedded, workspace }
+    enum Style { case embedded, workspace, viewer }
 
     let svg: String
     let renderer: DisplayRenderer
@@ -69,8 +69,23 @@ struct ArtworkCanvas: View {
         Group { switch style {
         case .embedded: embeddedBody
         case .workspace: workspaceBody
+        case .viewer: viewerBody
         } }
         .onChange(of: caption, initial: true) { _, value in verticalCaption = CanvasInteraction.supportsVerticalCaption(value) }
+    }
+
+    /// Full-screen iPhone viewing: fit to the whole available area, with the existing pinch and pan behavior.
+    private var viewerBody: some View {
+        GeometryReader { geometry in
+            let ratio = CGFloat(aspectRatio ?? Double(imageAspect))
+            let safeRatio = ratio.isFinite && ratio > 0 ? ratio : 1
+            let width = min(geometry.size.width, geometry.size.height * safeRatio)
+            let box = CGSize(width: max(1, width), height: max(1, width / safeRatio))
+            interactiveCanvas(size: geometry.size, box: box)
+                .task(id: covered ? nil : requestKey(box: box)) { if !covered { await render(box: box) } }
+        }
+        .onAppear { svgKey = svg.hashValue; adoptViewport() }
+        .onChange(of: svg) { _, value in svgKey = value.hashValue; picture.clear(); reset() }
     }
 
     /// A kept viewport belongs to one picture; the gesture origins resume from it.
@@ -216,7 +231,11 @@ struct ArtworkCanvas: View {
                             .onChanged { value in
                                 setScale(gestureScale * value, updatingGestureScale: false)
                             }
-                            .onEnded { _ in gestureScale = scale })
+                            .onEnded { _ in
+                                if case .viewer = style, scale < 1 {
+                                    withAnimation(.easeOut(duration: 0.2)) { reset() }
+                                } else { gestureScale = scale }
+                            })
                         .simultaneousGesture(DragGesture()
                             .onChanged { value in
                                 guard scale > 1 else { return }

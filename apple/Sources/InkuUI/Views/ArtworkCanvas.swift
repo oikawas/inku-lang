@@ -257,7 +257,9 @@ struct ArtworkCanvas: View {
                         .padding(.horizontal, box == nil ? 0 : 56)
                 }
                 if picture.image != nil, display.preferences.captionVisible, !caption.isEmpty {
-                    if box == nil { captionOverlay(size: size) } else { workspaceCaption(size: size) }
+                    if case .viewer = style, phone {
+                        phoneViewerCaption(size: size, pictureWidth: box?.width ?? size.width)
+                    } else if box == nil { captionOverlay(size: size) } else { workspaceCaption(size: size) }
                 }
                 if (picture.loading || picture.windowLoading) && picture.image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
               }
@@ -378,6 +380,35 @@ struct ArtworkCanvas: View {
         if let quote = activeQuote, let range = value.range(of: quote) { value[range].backgroundColor = .accentColor.opacity(0.4) }
         return value
     }
+    /// The phone viewer has its own larger Mincho caption; the workspace plate keeps its existing typography.
+    private func phoneViewerCaption(size: CGSize, pictureWidth: CGFloat) -> some View {
+        let right = display.preferences.captionPosition == "right"
+        let fontSize = CGFloat(20 * display.preferences.textScale)
+        let factor = fontSize / 15
+        let availableWidth = max(1, size.width - 48)
+        return HStack(alignment: .bottom) {
+            if right { Spacer(minLength: 0) }
+            Group {
+                if display.preferences.captionVertical && verticalCaption {
+                    VerticalCaption(text: caption, color: Color(white: 0.99), highlight: activeQuote, fontSize: fontSize)
+                        // The viewer used the workspace's already wider and taller frame. Never shrink that frame;
+                        // grow it for larger text where the phone's width allows it.
+                        .frame(width: max(1, min(max(170 * factor, 13 * 14 * 1.55), size.width * 0.4, availableWidth - 24)),
+                               height: max(80, size.height - 116))
+                } else {
+                    Text(markedCaption).font(.system(size: fontSize, design: .serif)).lineLimit(7)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: max(1, min(pictureWidth * 0.8, availableWidth) - 24), alignment: .leading)
+                }
+            }
+            .foregroundStyle(Color(white: 0.99)).padding(12)
+            .background(Color(white: 0.07, opacity: 0.78), in: RoundedRectangle(cornerRadius: 8))
+            if !right { Spacer(minLength: 0) }
+        }
+        .padding(.horizontal, 24).frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 58)
+        .textSelection(.enabled).allowsHitTesting(true)
+    }
+
     private func captionOverlay(size: CGSize) -> some View {
         HStack(alignment: .bottom) {
             if display.preferences.captionPosition == "right" { Spacer(minLength: 0) }
@@ -524,10 +555,11 @@ private struct VerticalCaption: View {
     let text: String
     var color: Color? = nil
     var highlight: String? = nil
+    var fontSize: CGFloat = 15
     var body: some View {
         Canvas { context, size in
             context.withCGContext { cg in
-                let font = CTFontCreateWithName("HiraginoMincho-W3" as CFString, 15, nil)
+                let font = CTFontCreateWithName("HiraginoMincho-W3" as CFString, fontSize, nil)
                 let attributes: [NSAttributedString.Key: Any] = [
                     NSAttributedString.Key(kCTFontAttributeName as String): font,
                     NSAttributedString.Key(kCTVerticalFormsAttributeName as String): true,

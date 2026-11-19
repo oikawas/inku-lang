@@ -10,8 +10,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - iOS: fixes sharing immediately after swiping away work information, which could fail and leave sharing stuck.
 
-- 3D gains a Glass presentation that shows the work's chunks as illuminated layers. The existing Solids view remains available; Glass is the initial 3D presentation.
-
 - Apple: export selected works as a work pack and import it on Mac, iPad and iPhone. Existing works are skipped and lineage is reconstructed in the destination.
 
 - iOS: iPhone home opens a viewing screen with paging, zoom, 3D, Star, Refine, and Share. Share sends a card directly to the share sheet; Star and Share remain available during drawing. The long-press menu is reordered.
@@ -765,6 +763,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.373 (2026-11-20 / Build 1449)
+
+- 3D gains a Glass presentation that shows the work's chunks as illuminated layers. The existing Solids view remains available; Glass is the initial 3D presentation.
 
 ## v2.15.372 (2026-11-19 / Build 1448)
 

@@ -33,6 +33,12 @@ const en = {
   round_detail_adapted: 'Round surface detail follows the size and number of shapes; all objects are retained.',
   invalid_color_defaulted: 'Invalid saved colors use core defaults.', missing_saved_seed: 'No saved performance seed; core defaults are used.',
   missing_saved_colors: 'No saved concrete colors; core defaults are used.',
+  viewMode: 'View', glass: 'Glass', solids: 'Solids', planeAngle: 'Plane angle', leafSheen: 'Leaf sheen',
+  lightDirection: 'Light direction', glassColor: 'Glass color', clearGlass: 'Clear', backgroundGlass: 'Background color',
+  layerGlass: 'Layer colors', frontGlass: 'Front glass thickness', backTilt: 'Back face tilt', sway: 'Sway',
+  swayOnce: 'Sway once at the start', frictionless: 'Keep turning without friction', roomDarkness: 'Room brightness', bluishSilver: 'Bluish silver',
+  glassLayers: 'Glass layers', glassLayer: 'Layer', glassHelp: 'Turn the work: the layers open like a fan about the left edge, the leaf catches the light one layer after another, and the side faces mirror the layers. Move the pointer to move the light. [ and ] change the plane angle.',
+  prototypeOnly: 'Trial only', layersByInstruction: 'Each instruction is a layer (the saved DDL gives no chunks).',
 };
 const ja: typeof en = {
   title: '3D表示 · 実験', open: 'JSONを開く', ready: '保存したScore JSONを選択してください。', preparing: '3Dを準備中…',
@@ -69,6 +75,12 @@ const ja: typeof en = {
   round_detail_adapted: '円・楕円の大きさと数に合わせて球面の細かさを調整し、すべての図形を保持しています。',
   invalid_color_defaulted: '無効な保存色をcoreの既定色で補いました。', missing_saved_seed: '保存seedが無いためcoreの既定値を使います。',
   missing_saved_colors: '保存された具体色が無いためcoreの既定色を使います。',
+  viewMode: '見せ方', glass: 'ガラス', solids: '立体', planeAngle: '面の角度', leafSheen: '箔の光り',
+  lightDirection: '光の向き', glassColor: 'ガラスの色', clearGlass: '無色', backgroundGlass: '作品の背景の色',
+  layerGlass: '層の色', frontGlass: '表のガラスの厚み', backTilt: '背の面の傾き', sway: 'ゆらす',
+  swayOnce: '最初に一度ゆらす', frictionless: '摩擦なしで回り続ける', roomDarkness: '部屋の明るさ', bluishSilver: '銀を青みに',
+  glassLayers: 'ガラスの層', glassLayer: '層', glassHelp: '作品を回すと、層が左の辺を軸に扇のように開き、箔が層ごとに順に光り、横の面に層が映ります。マウスを動かすと光が動きます。「[」と「]」で面の角度を変えます。',
+  prototypeOnly: '試作だけ', layersByInstruction: '保存した指示書からまとまりが取れないので、命令ごとに層にしています。',
 };
 export const labels = (locale: 'ja' | 'en') => locale === 'ja' ? ja : en;
 export type Labels = typeof en;

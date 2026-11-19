@@ -1,14 +1,19 @@
 import './style.css';
 import { Viewer, type Unpainted } from './viewer/Viewer';
+import { GlassViewer, GLASS_DEFAULTS, type GlassColor, type GlassSettings } from './viewer/GlassViewer';
 import { labels, type Labels } from './viewer/labels';
 import { PROTOCOL, MAX_INPUT_BYTES, validLoad, type LoadMessage } from './input/protocol';
 import type { ScenePacket } from './scene/types';
+import type { ViewState } from './input/protocol';
 import type { Background } from './viewer/background';
 
 const root = document.querySelector<HTMLElement>('#app')!;
 const embedded = window.parent !== window;
 const mountId = new URLSearchParams(location.hash.slice(1)).get('mount') || 'standalone';
-let current: LoadMessage | null = null, viewer: Viewer | null = null, worker: Worker | null = null;
+let current: LoadMessage | null = null, viewer: Viewer | GlassViewer | null = null, worker: Worker | null = null;
+// The glass is the first view; the solids stay one switch away.
+let mode: 'glass' | 'solids' = 'glass', lastPacket: ScenePacket | null = null;
+let glassSettings: GlassSettings = { ...GLASS_DEFAULTS };
 let generation = 0, timeout = 0, locale: 'ja' | 'en' = 'ja';
 let words = labels(locale);
 let stage: HTMLElement, status: HTMLElement, details: HTMLElement, selection: HTMLElement, overlay: HTMLElement, recoveryNotice: HTMLElement, paintNotice: HTMLElement;
@@ -83,6 +88,11 @@ function ui() {
     status.textContent = words.fullFailed; element('p', details, error instanceof Error ? error.message : String(error));
   }); }, false);
   const options = element('div', toolbar); options.className = 'controls';
+  const modeLabel = element('label', options, words.viewMode), modeSelect = element('select', modeLabel);
+  modeSelect.dataset.option = 'viewMode'; modeSelect.setAttribute('aria-label', words.viewMode);
+  for (const [value, label] of [['glass', words.glass], ['solids', words.solids]]) { const option = element('option', modeSelect, label); option.value = value; }
+  modeSelect.value = mode;
+  modeSelect.addEventListener('change', () => switchMode(modeSelect.value as 'glass' | 'solids')); sceneControls.push(modeSelect);
   let spin: HTMLInputElement;
   const backgroundLabel = element('label', options, words.background), background = element('select', backgroundLabel);
   background.dataset.option = 'background'; background.setAttribute('aria-label', words.background);
@@ -92,7 +102,9 @@ function ui() {
   }
   background.addEventListener('change', () => viewer?.setBackground(background.value as Background)); sceneControls.push(background);
   for (const key of ['grid', 'axes', 'wire', 'unlit', 'spin'] as const) {
-    const label = element('label', options), input = element('input', label); input.type = 'checkbox'; input.dataset.option = key; label.append(words[key]);
+    const label = element('label', options), input = element('input', label); input.type = 'checkbox'; input.dataset.option = key;
+    label.append(key === 'spin' && mode === 'glass' ? words.sway : words[key]);
+    if (mode === 'glass' && key !== 'spin') label.hidden = true;
     input.addEventListener('change', () => viewer?.setOption(key, input.checked)); sceneControls.push(input); if (key === 'spin') spin = input;
   }
   for (const [key, label, minimum, action] of [
@@ -100,12 +112,14 @@ function ui() {
     ['layerSpacing', words.layerDepth, '0', (value: number) => viewer?.setLayerSpacing(value)],
   ] as const) {
     const controlLabel = element('label', options, label), input = element('input', controlLabel);
-    input.type = 'range'; input.min = minimum; input.max = '3'; input.step = '0.1'; input.value = '1'; input.dataset.option = key;
+    input.type = 'range'; input.min = minimum; input.max = '3'; input.step = mode === 'glass' ? '0.01' : '0.1'; input.value = '1'; input.dataset.option = key;
     const output = element('output', controlLabel, '1.0'); output.dataset.value = key;
     input.setAttribute('aria-label', label);
-    input.addEventListener('input', () => { output.value = Number(input.value).toFixed(1); action(Number(input.value)); });
+    input.addEventListener('input', () => { output.value = Number(input.value).toFixed(mode === 'glass' ? 2 : 1); action(Number(input.value)); });
+    if (mode === 'glass' && key === 'depth') controlLabel.hidden = true;
     sceneControls.push(input);
   }
+  if (mode === 'glass') glassControls(options);
   button(options, words.focus, () => viewer?.focus());
   for (const format of ['png', 'glb'] as const) button(options, words[format], () => { void save(format); });
   const help = element('details', toolbar); element('summary', help, words.help); element('p', help, words.helpText); element('p', help, words.layerHelp);
@@ -141,72 +155,152 @@ function load(value: LoadMessage) {
     if (localGeneration !== generation) return;
     clearTimeout(timeout); worker?.terminate(); worker = null;
     if (!event.data.ok || !event.data.packet) { fail(event.data.error ?? 'preparation_failed'); return; }
-    const packet = event.data.packet;
-    try {
-      viewer = new Viewer(stage, packet, viewState => {
-        root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = viewState.projection;
-        root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewState.background ?? 'paint';
-        updateDepthControls(viewState.depth, viewState.layerSpacing ?? 1);
-        if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
-        post('view-state', { viewState });
-      }, data => {
-        selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
-      }, fail, value.initialView);
-      const preparedViewer = viewer;
-      // The plain solids come first; paint follows once they can be moved.
-      viewer.prepareShape();
-      if (value.viewState) {
-        viewer.restore(value.viewState);
-        root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = value.viewState.projection;
-        updateDepthControls(value.viewState.depth, value.viewState.layerSpacing ?? 1);
-      }
-      root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewer.background;
-      viewer.drawNow();
-      overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
-      const counts = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)} · ${words.layer}: ${packet.layerCount}`;
-      status.textContent = counts;
-      if (packet.recoveries.length || packet.emptyPaths.length) {
-        recoveryNotice.hidden = false;
-        element('summary', recoveryNotice, packet.recoveries.length ? `${words.recovered} (${packet.recoveries.length})` : `${words.emptyPaths} (${packet.emptyPaths.length})`);
-        if (packet.recoveries.length) element('p', recoveryNotice, words.recoveredText);
-        if (packet.emptyPaths.length) {
-          element('p', recoveryNotice, `${words.emptyPaths}: ${packet.emptyPaths.length}`);
-          element('p', recoveryNotice, words.emptyPathsText);
-          element('p', recoveryNotice, `${words.instruction}: ${[...new Set(packet.emptyPaths.map(path => path.sourceIndex + 1))].join(', ')}`);
-        }
-        for (const recovery of packet.recoveries) {
-          const source = recovery.anchor_index !== undefined ? `${words.anchor} #${recovery.anchor_index + 1}`
-            : recovery.instruction_index !== undefined ? `${words.instruction} #${recovery.instruction_index + 1}` : words.resourceGroup;
-          const action = recovery.kind === 'relation_omitted' || recovery.disposition === 'relation_omitted' ? words.relationRecovered : words.contentOmitted;
-          element('p', recoveryNotice, `${source}: ${action}`);
-          const info = element('details', recoveryNotice); element('summary', info, words.details);
-          element('pre', info, JSON.stringify(recovery, null, 2));
-        }
-      }
-      details.replaceChildren();
-      element('p', details, words.layerHelp);
-      if (packet.diagnostics.length) element('strong', details, words.approximations);
-      for (const note of packet.diagnostics) element('p', details, words[note as keyof Labels] ?? note);
-      if (packet.clippedObjects) element('p', details, `${words.clipped}: ${packet.clippedObjects}`);
-      element('p', details, `${packet.mappingVersion} · Engine ${packet.engineVersion} · ${packet.inputDigest}`);
-      const total = viewer.paintTotal;
-      if (total) { stage.setAttribute('aria-busy', 'true'); status.textContent = `${counts} · ${words.painting} 0/${total}`; }
-      post('rendered', { inputDigest: packet.inputDigest, objectCount: packet.objectCount, triangles: packet.triangles, bytes: packet.bytes, preparationMs: Math.round(performance.now() - started) });
-      post('view-state', { viewState: viewer.state() });
-      if (packet.diagnostics.length) post('diagnostic', { diagnostics: packet.diagnostics });
-      const shown = () => localGeneration === generation && viewer === preparedViewer;
-      preparedViewer.paint((done, all) => { if (shown()) status.textContent = `${counts} · ${words.painting} ${done}/${all}`; }).then(unpainted => {
-        if (!shown()) return;
-        stage.removeAttribute('aria-busy'); status.textContent = counts;
-        if (unpainted.length) showUnpainted(unpainted);
-      }, error => { if (shown()) fail(error instanceof Error && error.message ? error.message : String(error) || 'paint_failed'); });
-    } catch (error) {
-      if (localGeneration !== generation) return;
-      // Only a renderer that could not be created means no GPU; keep any other cause.
-      fail(error instanceof Error && error.message ? error.message : String(error) || 'preparation_failed');
-    }
+    lastPacket = event.data.packet;
+    present(event.data.packet, value, started, localGeneration);
   };
   worker.postMessage({ inputJson: value.inputJson, wasmUrl: new URL('wasm/score_adapter.js', document.baseURI).href });
+}
+
+function present(packet: ScenePacket, value: LoadMessage, started: number, localGeneration: number) {
+  try {
+    const changed = (viewState: ViewState) => {
+      root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = viewState.projection;
+      root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewState.background ?? 'paint';
+      updateDepthControls(viewState.depth, viewState.layerSpacing ?? 1);
+      if (viewer instanceof GlassViewer) {
+        glassSettings = { ...viewer.settings }; root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.settings.sway;
+        for (const input of root.querySelectorAll<HTMLInputElement>('input[type=range][data-glass]')) {
+          const key = input.dataset.glass as keyof GlassSettings; input.value = String(glassSettings[key]);
+          const output = root.querySelector<HTMLOutputElement>(`output[data-glass=${key}]`); if (output) output.value = Number(glassSettings[key]).toFixed(key === 'backTilt' ? 1 : 2);
+        }
+      }
+      else if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
+      post('view-state', { viewState });
+    };
+    const selected = (data: Record<string, unknown> | null) => {
+      if (data && 'glassLayer' in data) {
+        selection.textContent = `${words.selected}: ${words.glassLayer} ${Number(data.glassLayer) + 1}${data.name ? ` 「${data.name}」` : ''} · #${(data.instructions as number[]).join(', #')}`;
+        return;
+      }
+      selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
+    };
+    viewer = mode === 'glass' ? new GlassViewer(stage, packet, changed, selected, fail, value.initialView)
+      : new Viewer(stage, packet, changed, selected, fail, value.initialView);
+    if (viewer instanceof GlassViewer) { viewer.settings = { ...glassSettings, sway: false }; viewer.set({}); }
+    // The standalone page lets a trial script drive the viewer; embedded hosts never see it.
+    if (!embedded) (window as unknown as { inkuViewer: unknown }).inkuViewer = viewer;
+    const preparedViewer = viewer;
+    // The plain solids come first; paint follows once they can be moved.
+    viewer.prepareShape();
+    if (value.viewState) {
+      viewer.restore(value.viewState);
+      root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = value.viewState.projection;
+      updateDepthControls(value.viewState.depth, value.viewState.layerSpacing ?? 1);
+    }
+    root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewer.background;
+    viewer.drawNow();
+    overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
+    const counts = viewer instanceof GlassViewer
+      ? `${words.objects}: ${packet.objectCount} · ${words.glassLayers}: ${viewer.layers.length}`
+      : `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)} · ${words.layer}: ${packet.layerCount}`;
+    if (viewer instanceof GlassViewer && viewer.plan.source === 'instructions' && packet.chunkSource !== 'ddl') element('p', details, words.layersByInstruction);
+    status.textContent = counts;
+    if (packet.recoveries.length || packet.emptyPaths.length) {
+      recoveryNotice.hidden = false;
+      element('summary', recoveryNotice, packet.recoveries.length ? `${words.recovered} (${packet.recoveries.length})` : `${words.emptyPaths} (${packet.emptyPaths.length})`);
+      if (packet.recoveries.length) element('p', recoveryNotice, words.recoveredText);
+      if (packet.emptyPaths.length) {
+        element('p', recoveryNotice, `${words.emptyPaths}: ${packet.emptyPaths.length}`);
+        element('p', recoveryNotice, words.emptyPathsText);
+        element('p', recoveryNotice, `${words.instruction}: ${[...new Set(packet.emptyPaths.map(path => path.sourceIndex + 1))].join(', ')}`);
+      }
+      for (const recovery of packet.recoveries) {
+        const source = recovery.anchor_index !== undefined ? `${words.anchor} #${recovery.anchor_index + 1}`
+          : recovery.instruction_index !== undefined ? `${words.instruction} #${recovery.instruction_index + 1}` : words.resourceGroup;
+        const action = recovery.kind === 'relation_omitted' || recovery.disposition === 'relation_omitted' ? words.relationRecovered : words.contentOmitted;
+        element('p', recoveryNotice, `${source}: ${action}`);
+        const info = element('details', recoveryNotice); element('summary', info, words.details);
+        element('pre', info, JSON.stringify(recovery, null, 2));
+      }
+    }
+    details.replaceChildren();
+    element('p', details, viewer instanceof GlassViewer ? words.glassHelp : words.layerHelp);
+    if (packet.diagnostics.length) element('strong', details, words.approximations);
+    for (const note of packet.diagnostics) element('p', details, words[note as keyof Labels] ?? note);
+    if (packet.clippedObjects) element('p', details, `${words.clipped}: ${packet.clippedObjects}`);
+    element('p', details, `${packet.mappingVersion} · Engine ${packet.engineVersion} · ${packet.inputDigest}`);
+    const total = viewer.paintTotal;
+    if (total) { stage.setAttribute('aria-busy', 'true'); status.textContent = `${counts} · ${words.painting} 0/${total}`; }
+    post('rendered', { inputDigest: packet.inputDigest, objectCount: packet.objectCount, triangles: packet.triangles, bytes: packet.bytes, preparationMs: Math.round(performance.now() - started) });
+    post('view-state', { viewState: viewer.state() });
+    if (packet.diagnostics.length) post('diagnostic', { diagnostics: packet.diagnostics });
+    const shown = () => localGeneration === generation && viewer === preparedViewer;
+    preparedViewer.paint((done, all) => {
+      if (!shown()) return;
+      status.textContent = `${counts} · ${words.painting} ${done}/${all}`;
+      // Name the layer that has just appeared, from the back.
+      if (preparedViewer instanceof GlassViewer) {
+        const ready = preparedViewer.layers.filter(layer => layer.pixels).length;
+        const name = ready ? preparedViewer.layers[ready - 1].name : null;
+        if (name) status.textContent += ` · ${words.glassLayer} ${ready}「${name}」`;
+      }
+    }).then(unpainted => {
+      if (!shown()) return;
+      stage.removeAttribute('aria-busy'); status.textContent = counts;
+      if (unpainted.length) showUnpainted(unpainted);
+    }, error => { if (shown()) fail(error instanceof Error && error.message ? error.message : String(error) || 'paint_failed'); });
+  } catch (error) {
+    if (localGeneration !== generation) return;
+    // Only a renderer that could not be created means no GPU; keep any other cause.
+    fail(error instanceof Error && error.message ? error.message : String(error) || 'preparation_failed');
+  }
+}
+
+function switchMode(next: 'glass' | 'solids') {
+  if (next === mode) return;
+  if (viewer instanceof GlassViewer) glassSettings = { ...viewer.settings };
+  mode = next;
+  if (!lastPacket || !current) { ui(); return; }
+  const packet = lastPacket, value = { ...current, viewState: undefined };
+  viewer?.dispose(); viewer = null;
+  ui(); present(packet, value, performance.now(), generation);
+}
+
+/** The glass's own controls; uniforms only, so dragging moves the fan smoothly. */
+function glassControls(parent: HTMLElement) {
+  const glass = () => viewer instanceof GlassViewer ? viewer : null;
+  const slider = (into: HTMLElement, key: keyof GlassSettings, label: string, min: number, max: number, step: number, digits = 2) => {
+    const controlLabel = element('label', into, label), input = element('input', controlLabel);
+    input.type = 'range'; input.min = String(min); input.max = String(max); input.step = String(step);
+    input.value = String(glassSettings[key]); input.dataset.glass = key; input.setAttribute('aria-label', label);
+    const output = element('output', controlLabel, Number(glassSettings[key]).toFixed(digits)); output.dataset.glass = key;
+    input.addEventListener('input', () => {
+      output.value = Number(input.value).toFixed(digits);
+      glassSettings = { ...glassSettings, [key]: Number(input.value) }; glass()?.set({ [key]: Number(input.value) });
+    });
+    sceneControls.push(input);
+  };
+  slider(parent, 'angle', words.planeAngle, 0, 2, 0.01);
+  slider(parent, 'leaf', words.leafSheen, 0, 1, 0.01);
+  slider(parent, 'light', words.lightDirection, -1, 1, 0.01);
+  const colorLabel = element('label', parent, words.glassColor), color = element('select', colorLabel);
+  color.dataset.glass = 'glassColor'; color.setAttribute('aria-label', words.glassColor);
+  for (const [value, label] of [['none', words.clearGlass], ['background', words.backgroundGlass], ['layers', words.layerGlass]] as const) {
+    if (value === 'background' && lastPacket && !GlassViewer.hasHue(lastPacket.background)) continue;
+    const option = element('option', color, label); option.value = value;
+  }
+  color.value = glassSettings.glassColor;
+  color.addEventListener('change', () => { glassSettings = { ...glassSettings, glassColor: color.value as GlassColor }; glass()?.set({ glassColor: color.value as GlassColor }); });
+  sceneControls.push(color);
+  const trial = element('fieldset', parent); element('legend', trial, words.prototypeOnly);
+  slider(trial, 'front', words.frontGlass, 0.03, 3, 0.01);
+  slider(trial, 'backTilt', words.backTilt, 0, 30, 0.5, 1);
+  slider(trial, 'room', words.roomDarkness, 0.5, 0.8, 0.01);
+  for (const [into, key, label] of [[parent, 'frictionless', words.frictionless], [trial, 'swayOnce', words.swayOnce], [trial, 'bluish', words.bluishSilver]] as const) {
+    const box = element('label', into), input = element('input', box); input.type = 'checkbox'; input.checked = glassSettings[key]; box.append(label);
+    input.addEventListener('change', () => { glassSettings = { ...glassSettings, [key]: input.checked }; glass()?.set({ [key]: input.checked }); });
+    sceneControls.push(input);
+  }
 }
 
 function showUnpainted(unpainted: Unpainted[]) {

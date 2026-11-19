@@ -105,7 +105,7 @@ pub use canvas_ratio::{
 };
 pub use chunk_title::{
     DdlChunk, DdlTitleLine, ddl_title_lines, ddl_title_name, ddl_title_text, print_ddl_titles,
-    split_ddl_titles, without_ddl_title_lines,
+    score_instruction_chunks, split_ddl_titles, without_ddl_title_lines,
 };
 pub use clause::{
     CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSegment, ClauseSeparator, ClauseSeparatorKind,

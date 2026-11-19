@@ -165,3 +165,28 @@ fn a_quoted_phrase_inside_a_sentence_is_no_title() {
             .is_some_and(|document| document.ast.chunks.is_empty())
     );
 }
+
+/// Failure: the 3D viewer's layers put another chunk's marks on one glass
+/// layer. Each Score instruction names the chunk of its sentence, a chunk
+/// named again keeps its name, and a sentence after an empty title has none.
+#[test]
+fn each_score_instruction_names_its_chunk() {
+    let titled = "画面比1:1。\n背景を黒で埋める。\n\n「黒い水面」\n\
+        画面の横0.5、縦0.691の位置に、幅1.0、高さ0.618の青の薄い塗りの四角を1個置く。\n\n\
+        「光の線」\n画面の横0.118、縦0.381966から横0.882、縦0.381966まで、白の太い線を1本引く。\n\n\
+        「」\n画面の横0.3、縦0.618034の位置に、幅0.12、高さ0.03の黒の塗りの四角を1個置く。\n\n\
+        「光の線」\n画面の横0.1、縦0.78から横0.9、縦0.78まで、灰の細い線を1本引く。\n\n\
+        「星」\n画面の横0.02〜0.98、縦0.02〜0.98の範囲に、直径0.009の白の鉛筆の点を160個散らす。";
+    let result = compile(titled, ResolvedInstructionLanguage::Ja);
+    let names = inku_ddl::score_instruction_chunks(&result).expect("a Score with origins");
+    assert_eq!(
+        names,
+        [
+            Some("黒い水面".to_owned()),
+            Some("光の線".to_owned()),
+            None,
+            Some("光の線".to_owned()),
+            Some("星".to_owned()),
+        ]
+    );
+}

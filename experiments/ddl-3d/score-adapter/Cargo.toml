@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 inku-score = { path = "../../../core/crates/inku-score" }
+inku-ddl = { path = "../../../core/crates/inku-ddl" }
 inku-render = { path = "../../../core/crates/inku-render", features = ["geometry-export"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }

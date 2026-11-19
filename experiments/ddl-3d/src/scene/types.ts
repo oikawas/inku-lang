@@ -20,7 +20,10 @@ export interface GeometryRecovery {
 }
 export interface GeometryScene { canvas: XY; background: string; ground: boolean; presenceSvg?: string; marks: GeometryMark[]; diagnostics: string[]; recoveries: GeometryRecovery[] }
 export interface PreparedScene {
-  ok: true; scene: GeometryScene; inputDigest: string; schemaDigest: string; mappingVersion: string; engineVersion: number;
+  ok: true; scene: GeometryScene;
+  /** The chunk name of each Score instruction, when the saved DDL compiles to it. */
+  chunks?: (string | null)[] | null; chunkSource?: 'ddl' | 'no_ddl' | 'ddl_mismatch';
+  inputDigest: string; schemaDigest: string; mappingVersion: string; engineVersion: number;
 }
 export interface MeshPacket {
   positions: Float32Array; normals: Float32Array; indices: Uint32Array | null;
@@ -38,4 +41,5 @@ export interface ScenePacket {
   objectCount: number; triangles: number; bytes: number; clippedObjects: number; layerCount: number;
   emptyPaths: { sourceIndex: number; performedIndex: number; instanceIndex: number }[];
   inputDigest: string; schemaDigest: string; mappingVersion: string; engineVersion: number;
+  chunks?: (string | null)[] | null; chunkSource?: 'ddl' | 'no_ddl' | 'ddl_mismatch';
 }

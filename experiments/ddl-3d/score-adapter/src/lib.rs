@@ -22,6 +22,46 @@ fn seed(value: Option<&Value>) -> Result<Option<Seed>, String> {
     }
 }
 
+/// The chunk (DDL 27 title) of each saved Score instruction, read by compiling
+/// the saved DDL again. `None` when it does not compile to as many instructions
+/// as the saved Score has (plugin words, a later edit of the Score, an engine
+/// change): the viewer then gives each instruction its own layer.
+fn score_chunks(
+    ddl: &str,
+    language: Option<&str>,
+    composition_seed: Option<Seed>,
+    expected: usize,
+    hard: &HardResourcePolicy,
+    operational: ResourceBudget,
+) -> Option<Vec<Option<String>>> {
+    use inku_ddl::ResolvedInstructionLanguage as Language;
+    let language = match language {
+        Some("ja") => Language::Ja,
+        Some("en") => Language::En,
+        _ if ddl.chars().any(|c| ('\u{3040}'..='\u{9fff}').contains(&c)) => Language::Ja,
+        _ => Language::En,
+    };
+    // Generous, caller-owned limits: this compile only reads the chunks.
+    let limits = inku_ddl::MacroExpansionLimits {
+        max_invocations: 4096,
+        max_depth: 32,
+        max_evaluation_steps: 1_000_000,
+        max_nodes_per_invocation: 4096,
+        max_total_nodes: 65_536,
+    };
+    let result = inku_ddl::compile_ddl_to_score_with_resources(
+        inku_ddl::NormalizedDdlDocument::new(ddl, language, Vec::new()).ok()?,
+        &[],
+        composition_seed.and_then(|seed| u64::try_from(seed).ok()),
+        limits,
+        inku_ddl::ScoreLoweringContext::resolve("square", inku_score::Color::White).ok()?,
+        inku_ddl::ScoreErrorPolicy::OmitAndContinue,
+        hard.clone(),
+        OperationalResourceBudget(operational),
+    );
+    inku_ddl::score_instruction_chunks(&result).filter(|names| names.len() == expected)
+}
+
 fn convert(input: &str) -> Result<Value, String> {
     if input.len() > 16 * 1024 * 1024 {
         return Err("input_budget_exceeded".into());
@@ -123,6 +163,22 @@ fn convert(input: &str) -> Result<Value, String> {
         OperationalResourceBudget(operational),
         4096,
     )?;
+    let (chunks, chunk_source) = match value.get("ddl").and_then(Value::as_str) {
+        None => (Value::Null, "no_ddl"),
+        Some(ddl) => match score_chunks(
+            ddl,
+            value
+                .get("instruction_lang_resolved")
+                .and_then(Value::as_str),
+            request.options.composition_seed,
+            request.score.instructions.len(),
+            &hard,
+            operational,
+        ) {
+            Some(names) => (json!(names), "ddl"),
+            None => (Value::Null, "ddl_mismatch"),
+        },
+    };
     if request.options.render_seed.is_none() {
         scene.diagnostics.push("missing_saved_seed".into());
     }
@@ -130,7 +186,7 @@ fn convert(input: &str) -> Result<Value, String> {
         scene.diagnostics.push("missing_saved_colors".into());
     }
     Ok(json!({
-        "ok": true, "scene": scene,
+        "ok": true, "scene": scene, "chunks": chunks, "chunkSource": chunk_source,
         "inputDigest": Sha256::digest(input.as_bytes()).iter().map(|b| format!("{b:02x}")).collect::<String>(),
         "schemaDigest": inku_score::score_schema_digest(),
         "mappingVersion": "solid-mapping-v1", "engineVersion": inku_render::RENDER_ENGINE_VERSION,

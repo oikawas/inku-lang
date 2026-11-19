@@ -190,6 +190,44 @@ pub(crate) fn remap_chunks(chunks: &[DdlChunk], index_map: &[Option<usize>]) -> 
         .collect()
 }
 
+/// The chunk each instruction of a compiled Score belongs to, in Score order:
+/// the chunk's name, or `None` for an instruction outside every chunk. An
+/// instruction a macro emitted belongs to its source instruction's chunk.
+/// `None` when the compilation has no Score or its origins do not cover the
+/// Score's instructions one to one.
+#[must_use]
+pub fn score_instruction_chunks(
+    result: &crate::CompilerResourceExecutionResult,
+) -> Option<Vec<Option<String>>> {
+    let score = result.score()?;
+    let origins = result.instruction_origins();
+    if origins.len() != score.instructions.len() {
+        return None;
+    }
+    let semantic = result.compilation().semantic_document.as_ref()?;
+    let chunks = &semantic.ast.chunks;
+    Some(
+        origins
+            .iter()
+            .map(|origin| {
+                let index = match origin {
+                    crate::ScoreInstructionOrigin::SourceInstruction { instruction_index } => {
+                        *instruction_index
+                    }
+                    crate::ScoreInstructionOrigin::MacroEmit {
+                        source_instruction_index,
+                        ..
+                    } => *source_instruction_index,
+                };
+                chunks
+                    .iter()
+                    .find(|chunk| chunk.instruction_indices.contains(&index))
+                    .map(|chunk| chunk.name.clone())
+            })
+            .collect(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- iOS: enlarges horizontal and vertical captions in the iPhone viewer and gives long captions more room to wrap.
+- iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.
 
 - iOS: increases text on iPhone home, the viewer, work information and related screens, with a 13pt minimum for inku text.
 

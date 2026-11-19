@@ -258,7 +258,7 @@ struct ArtworkCanvas: View {
                 }
                 if picture.image != nil, display.preferences.captionVisible, !caption.isEmpty {
                     if case .viewer = style, phone {
-                        phoneViewerCaption(size: size, pictureWidth: box?.width ?? size.width)
+                        phoneViewerCaption(size: size)
                     } else if box == nil { captionOverlay(size: size) } else { workspaceCaption(size: size) }
                 }
                 if (picture.loading || picture.windowLoading) && picture.image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
@@ -380,32 +380,39 @@ struct ArtworkCanvas: View {
         if let quote = activeQuote, let range = value.range(of: quote) { value[range].backgroundColor = .accentColor.opacity(0.4) }
         return value
     }
-    /// The phone viewer has its own larger Mincho caption; the workspace plate keeps its existing typography.
-    private func phoneViewerCaption(size: CGSize, pictureWidth: CGFloat) -> some View {
+    /// The phone viewer enlarges the caption while keeping the workspace's horizontal plate.
+    private func phoneViewerCaption(size: CGSize) -> some View {
         let right = display.preferences.captionPosition == "right"
         let fontSize = CGFloat(20 * display.preferences.textScale)
         let factor = fontSize / 15
         let availableWidth = max(1, size.width - 48)
-        return HStack(alignment: .bottom) {
-            if right { Spacer(minLength: 0) }
-            Group {
-                if display.preferences.captionVertical && verticalCaption {
+        return Group {
+            if display.preferences.captionVertical && verticalCaption {
+                HStack(alignment: .bottom) {
+                    if right { Spacer(minLength: 0) }
                     VerticalCaption(text: caption, color: Color(white: 0.99), highlight: activeQuote, fontSize: fontSize)
                         // The viewer used the workspace's already wider and taller frame. Never shrink that frame;
                         // grow it for larger text where the phone's width allows it.
                         .frame(width: max(1, min(max(170 * factor, 13 * 14 * 1.55), size.width * 0.4, availableWidth - 24)),
                                height: max(80, size.height - 116))
-                } else {
-                    Text(markedCaption).font(.system(size: fontSize, design: .serif)).lineLimit(7)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: max(1, min(pictureWidth * 0.8, availableWidth) - 24), alignment: .leading)
+                        .foregroundStyle(Color(white: 0.99)).padding(12)
+                        .background(Color(white: 0.07, opacity: 0.78), in: RoundedRectangle(cornerRadius: 8))
+                    if !right { Spacer(minLength: 0) }
                 }
+                .padding(.horizontal, 24).frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 58)
+            } else {
+                Text(markedCaption).font(.system(size: fontSize)).lineSpacing(14 * 0.55).lineLimit(4)
+                    .multilineTextAlignment(right ? .trailing : .leading)
+                    .foregroundStyle(Color(white: 0.99))
+                    .frame(maxWidth: .infinity, alignment: right ? .trailing : .leading)
+                    .padding(.vertical, 9).padding(.horizontal, 14)
+                    .background(Color(white: 0.07, opacity: 0.78), in: RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: .black.opacity(0.22), radius: 9, y: 4)
+                    .padding(.horizontal, size.width * 0.1)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 58)
             }
-            .foregroundStyle(Color(white: 0.99)).padding(12)
-            .background(Color(white: 0.07, opacity: 0.78), in: RoundedRectangle(cornerRadius: 8))
-            if !right { Spacer(minLength: 0) }
         }
-        .padding(.horizontal, 24).frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 58)
         .textSelection(.enabled).allowsHitTesting(true)
     }
 

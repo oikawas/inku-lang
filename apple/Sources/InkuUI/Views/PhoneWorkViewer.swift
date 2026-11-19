@@ -44,15 +44,20 @@ struct PhoneWorkViewer: View {
                                 initialView: Ddl3DInitialView(pixelWidth: geometry.size.width, pixelHeight: geometry.size.height,
                                                               panX: 0, panY: 0, zoom: 1),
                                 onReturn: { threeDimensional = false }, onEscape: { false })
+                        .padding(.top, model.hasActiveRun ? 100 : 48)
                 } else {
                     ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText,
                                   style: .viewer, showsZoomControls: false, aspectRatio: work.renderCanvasAspectRatio,
                                   viewport: $viewport)
                         .contentShape(Rectangle())
-                        .simultaneousGesture(TapGesture(count: 2).exclusively(before: TapGesture()).onEnded { tap in
+                        .simultaneousGesture(SpatialTapGesture(count: 2).exclusively(before: SpatialTapGesture()).onEnded { tap in
                             switch tap {
-                            case .first: if Ddl3DInstallation.available { threeDimensional = true; overlayVisible = true }
-                            case .second: withAnimation(.easeInOut(duration: 0.15)) { overlayVisible.toggle() }
+                            case .first(let value):
+                                guard acceptsTap(value.location, height: geometry.size.height) else { return }
+                                if Ddl3DInstallation.available { threeDimensional = true; overlayVisible = true }
+                            case .second(let value):
+                                guard acceptsTap(value.location, height: geometry.size.height) else { return }
+                                withAnimation(.easeInOut(duration: 0.15)) { overlayVisible.toggle() }
                             }
                         })
                         .simultaneousGesture(DragGesture(minimumDistance: 35).onEnded { value in
@@ -77,6 +82,11 @@ struct PhoneWorkViewer: View {
         .inkuPhoneTabBarHidden()
         .onChange(of: work.id) { _, _ in viewport = CanvasViewport(); threeDimensional = false; starOverride = nil }
         .task(id: work.id) { await model.loadWorkActionState(work) }
+    }
+
+    private func acceptsTap(_ location: CGPoint, height: CGFloat) -> Bool {
+        guard overlayVisible else { return true }
+        return location.y >= (model.hasActiveRun ? 100 : 44) && location.y < height - 58
     }
 
     private var topBar: some View {
@@ -121,18 +131,18 @@ struct PhoneWorkViewer: View {
     }
 
     @ViewBuilder private var menu: some View {
-        Section(display.label("表示", "Display")) {
-            Toggle(display.localized("詞書の表示"), isOn: Bindable(display).preferences.captionVisible)
-            Toggle(display.label("詞書の縦書き", "Vertical caption"), isOn: Bindable(display).preferences.captionVertical)
-            Picker(display.label("詞書の表示位置", "Caption position"), selection: Bindable(display).preferences.captionPosition) {
+        Section(display.label("詞書", "Caption")) {
+            Toggle(display.webCopy("canvasCaptionToggle", "詞書の表示"), isOn: Bindable(display).preferences.captionVisible)
+            Toggle(display.webCopy("canvasCaptionWritingMode", "詞書の書字方向"), isOn: Bindable(display).preferences.captionVertical)
+            Picker(display.webCopy("settingsCaptionPosition", "詞書の表示位置"), selection: Bindable(display).preferences.captionPosition) {
                 Text(display.localized("左")).tag("left")
                 Text(display.localized("右")).tag("right")
             }
         }
         Button(display.webCopy("historyPreviewDetails", "作品情報")) { onInfo(work) }
         Button(display.localized("生成情報")) { onAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
-        Button(display.localized("系譜")) { onLineage(work) }.disabled(!permissions.canWrite || work.lineageNodeID == nil)
-        Button(display.localized("制作で開く")) { onCreate(work) }.disabled(!permissions.canWrite)
+        Button(display.localized("系譜")) { onLineage(work) }.disabled(!permissions.canBrowse || work.lineageNodeID == nil)
+        Button(display.localized("制作で開く")) { onCreate(work) }.disabled(!permissions.canBrowse)
         SavedWorkExportMenu(model: model, count: 1) { onAction(work, $0) }.disabled(!permissions.canWrite)
         Button(display.localized("クリップボードにコピー")) { Task { await model.copyImage(work: work) } }.disabled(!permissions.canWrite)
         Button(display.localized("推敲の印")) { Task { await model.library.toggleRevision(work) } }.disabled(!permissions.canWrite || model.library.mutating)
@@ -162,12 +172,31 @@ struct PhoneWorkInformation: View {
                                     writingLocked: writingLocked, informationOnly: true).padding(16)
             }
             .navigationTitle(model.display.webCopy("historyPreviewDetails", "作品情報"))
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(model.display.localized("閉じる")) { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(model.display.localized("閉じる")) { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(model.display.webCopy("historyPreviewCommentSave", "保存")) { saveNote() }
+                        .disabled(writingLocked || model.library.mutating || !comment.canSave)
+                }
+            }
         }
         .task {
             preview.show(work)
             providers = await model.hostSettings().providers
             await preview.loadAnnotation(using: { try await model.auxiliaryDatabase().libraryAnnotation(id: $0) })
+        }
+    }
+
+    private func saveNote() {
+        Task {
+            let value = await comment.save { id, submitted in
+                await model.library.saveNote(id: id, note: submitted)
+                if let error = model.library.errorText {
+                    throw NSError(domain: "InkuLibraryNote", code: 1, userInfo: [NSLocalizedDescriptionKey: error])
+                }
+                return try await model.auxiliaryDatabase().libraryAnnotation(id: id)
+            }
+            if let value { preview.adoptAnnotation(value, workID: work.id) }
         }
     }
 }

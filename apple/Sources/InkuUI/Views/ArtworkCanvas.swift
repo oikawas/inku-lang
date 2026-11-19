@@ -231,7 +231,11 @@ struct ArtworkCanvas: View {
                             .onChanged { value in
                                 setScale(gestureScale * value, updatingGestureScale: false)
                             }
-                            .onEnded { _ in gestureScale = scale })
+                            .onEnded { _ in
+                                if case .viewer = style, scale < 1 {
+                                    withAnimation(.easeOut(duration: 0.2)) { reset() }
+                                } else { gestureScale = scale }
+                            })
                         .simultaneousGesture(DragGesture()
                             .onChanged { value in
                                 guard scale > 1 else { return }

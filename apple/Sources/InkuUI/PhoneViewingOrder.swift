@@ -44,6 +44,14 @@ struct PhoneViewingOrder: Equatable {
     }
 }
 
+/// The timeline continues with the filter that was active when the viewer opened.
+struct PhoneViewingPageReader {
+    let query: LibraryQuery
+    func page(database: InkuDatabase, offset: Int, limit: Int) async throws -> LibraryPage {
+        try await database.libraryPage(query: query, limit: limit, offset: offset, includeSVG: false)
+    }
+}
+
 /// The iPhone viewer's two read-only exceptions do not unlock other saved-work actions.
 struct PhoneViewingPermissions {
     let browsingLocked: Bool
@@ -53,5 +61,6 @@ struct PhoneViewingPermissions {
     let sharing: Bool
     var canStar: Bool { !mutating && !trashed }
     var canShare: Bool { !trashed && !sharing }
+    var canBrowse: Bool { !browsingLocked && !trashed }
     var canWrite: Bool { !browsingLocked && !writingLocked && !trashed }
 }

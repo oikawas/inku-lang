@@ -1,8 +1,29 @@
 import Foundation
+import InkuPersistence
 import XCTest
 @testable import InkuUI
 
 @MainActor final class PhoneViewingTests: XCTestCase {
+    func testTimelinePagesKeepOpeningStarAndSearchFilter() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-view-filter-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = try InkuDatabase(url: root.appendingPathComponent("works.sqlite"))
+        for (index, input, starred) in [(1, "moon", true), (2, "moon", false), (3, "sun", true), (4, "moon", true)] {
+            let id = "work-\(index)", node = "node-\(index)"
+            var work = SavedWork(id: id, at: Int64(index), input: input, score: "{}", svg: "<svg/>", lineageNodeID: node)
+            work.starred = starred
+            try await database.save(work, node: LineageNode(id: node, historyID: id, at: Int64(index)))
+        }
+        var homeQuery = LibraryQuery(text: "moon", starred: true)
+        let reader = PhoneViewingPageReader(query: homeQuery)
+        homeQuery.starred = false
+        let first = try await reader.page(database: database, offset: 0, limit: 1)
+        let second = try await reader.page(database: database, offset: 1, limit: 1)
+        var order = PhoneViewingOrder(ids: first.items.map(\.id), currentID: "work-4")
+        order.append(second.items.map(\.id))
+        XCTAssertEqual(order.ids, ["work-4", "work-1"])
+        XCTAssertEqual(first.total, 2)
+    }
     func testSnapshotKeepsUnstarredWorkAndHandlesPagingDeletionAndNewWorks() {
         var order = PhoneViewingOrder(ids: ["a", "b", "c", "b"], currentID: "b")
         // A filtered library may now omit b; it must not rewrite the session's snapshot.
@@ -42,9 +63,9 @@ import XCTest
         guard await latch.entered, app.isBusy else { await latch.release(); _ = await running.value; XCTFail("fixture did not enter busy state"); return }
         let permissions = PhoneViewingPermissions(browsingLocked: app.isBrowsingLocked, writingLocked: app.isBusy,
                                                   mutating: false, trashed: false, sharing: false)
-        XCTAssertTrue(permissions.canStar); XCTAssertTrue(permissions.canShare); XCTAssertFalse(permissions.canWrite)
+        XCTAssertTrue(permissions.canStar); XCTAssertTrue(permissions.canShare); XCTAssertTrue(permissions.canBrowse); XCTAssertFalse(permissions.canWrite)
         let locked = PhoneViewingPermissions(browsingLocked: true, writingLocked: true, mutating: false, trashed: false, sharing: false)
-        XCTAssertTrue(locked.canStar); XCTAssertTrue(locked.canShare); XCTAssertFalse(locked.canWrite)
+        XCTAssertTrue(locked.canStar); XCTAssertTrue(locked.canShare); XCTAssertFalse(locked.canBrowse); XCTAssertFalse(locked.canWrite)
         await app.library.toggleStar(starredWork)
         let starred = try await app.auxiliaryDatabase().work(id: work.id)
         XCTAssertEqual(starred?.starred, false)

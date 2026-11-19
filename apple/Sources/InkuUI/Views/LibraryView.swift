@@ -70,6 +70,10 @@ struct LibraryView: View {
     @State private var phoneScrolledVisit: Int?
     @State private var phoneGroupLoadingVisit: Int?
     @State private var phoneOrder: PhoneViewingOrder?
+    @State private var phoneOrderQuery: LibraryQuery?
+    @State private var phoneOrderOffset = 0
+    @State private var phoneOrderTotal = 0
+    @State private var phoneOpening = UUID()
     @State private var phoneShareInProgress = false
     @State private var phoneInformationWork: SavedWork?
     @State private var phoneRefineWork: SavedWork?
@@ -86,6 +90,13 @@ struct LibraryView: View {
         if phoneLayout && library.grouping == .description {
             return library.groups.flatMap {
                 DescriptionLibraryGroup.orderedIDs(members: library.groupMembers[$0.id] ?? [], records: library.descriptionCompositions)
+            }
+        }
+        if phoneLayout && library.grouping == .lineage {
+            return library.groups.flatMap { group in
+                let members = library.groupMembers[group.id]?.map(\.id) ?? []
+                if library.layout != .list { return members }
+                return [group.representative.id] + (library.expandedGroups.contains(group.id) ? members : [])
             }
         }
         return library.isGrouped
@@ -248,7 +259,11 @@ struct LibraryView: View {
             if library.isTrash {
                 Text(display.localized("ごみ箱")).font(.headline)
                 Spacer()
-                Button(display.localized("完了")) { library.isTrash = false; library.selectedIDs.removeAll(); phoneSelecting = false }
+                if !phoneSelecting { Button(display.localized("選択")) { phoneSelecting = true } }
+                Button(display.localized("完了")) {
+                    if phoneSelecting { phoneSelecting = false } else { library.isTrash = false }
+                    library.selectedIDs.removeAll()
+                }
             } else if phoneSelecting {
                 Text(display.label("\(library.selectedIDs.count) 件を選択", "\(library.selectedIDs.count) selected"))
                 Spacer()
@@ -278,7 +293,7 @@ struct LibraryView: View {
                         Text(display.webCopy("historyThumbsTab", "サムネイル")).tag(LibraryLayout.grid)
                         Text(display.webCopy("historyListTab", "リスト")).tag(LibraryLayout.list)
                     }
-                    Button(display.label("ごみ箱 (\(library.trashTotal))", "Trash (\(library.trashTotal))")) { library.isTrash = true; phoneSelecting = true }
+                    Button(display.label("ごみ箱 (\(library.trashTotal))", "Trash (\(library.trashTotal))")) { library.isTrash = true; phoneSelecting = false }
                     Button(display.localized("更新")) { Task { await library.refresh() } }
                 } label: { Image(systemName: "ellipsis.circle").font(.title3) }
                     .accessibilityLabel(display.localized("ライブラリの操作"))
@@ -289,7 +304,7 @@ struct LibraryView: View {
     }
 
     @ViewBuilder private var phoneFooter: some View {
-        if phoneSelecting || library.isTrash {
+        if phoneSelecting {
             if model.hasActiveRun { phoneRunRow }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -300,6 +315,8 @@ struct LibraryView: View {
                     selectionActions
                 }.buttonStyle(LibraryGhostButtonStyle()).padding(10)
             }.disabled(library.mutating || model.isBrowsingLocked)
+        } else if library.isTrash {
+            if model.hasActiveRun { phoneRunRow }
         } else if model.hasActiveRun {
             phoneRunRow
         } else {
@@ -1043,7 +1060,7 @@ struct LibraryView: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 if !thumbs {
-                    LibraryClickButton(preview: { openWork(group.representative.work) },
+                    LibraryClickButton(preview: { phoneOpenOrSelect(group.representative.work) },
                                        open: { openThumbnail(group.representative.work) }) {
                         ArtworkThumbnail(work: group.representative.work, thumbnails: model.thumbnails).frame(width: 56, height: 56)
                     }
@@ -1141,7 +1158,7 @@ struct LibraryView: View {
     private func memberCard(_ work: SavedWork) -> some View {
         let selected = library.selectedIDs.contains(work.id)
         return VStack(alignment: .leading, spacing: 4) {
-            LibraryClickButton(preview: { openWork(work) }, open: { openThumbnail(work) }) {
+            LibraryClickButton(preview: { phoneOpenOrSelect(work) }, open: { openThumbnail(work) }) {
                 VStack(alignment: .leading, spacing: 4) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                         .aspectRatio(82.0 / 58.0, contentMode: .fit)
@@ -1176,7 +1193,7 @@ struct LibraryView: View {
     private func memberRow(_ work: SavedWork) -> some View {
         HStack(spacing: 8) {
             selectionCheck(work)
-            LibraryClickButton(preview: { openWork(work) }, open: { openThumbnail(work) }) {
+            LibraryClickButton(preview: { phoneOpenOrSelect(work) }, open: { openThumbnail(work) }) {
                 HStack(spacing: 8) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 48, height: 48)
                     Text(model.workPresentationTitle(work))
@@ -1199,10 +1216,32 @@ struct LibraryView: View {
 
     // MARK: Actions
 
+    private func phoneOpenOrSelect(_ work: SavedWork) {
+        if phoneLayout && phoneSelecting { library.toggleSelection(work.id) } else { openWork(work) }
+    }
+
     private func openWork(_ work: SavedWork) {
         guard !model.isBrowsingLocked else { return }
-        if phoneLayout { phoneOrder = PhoneViewingOrder(ids: visibleIDs, currentID: work.id) }
-        preview.show(work)
+        guard phoneLayout else { preview.show(work); return }
+        let token = UUID(), query = library.filter, ids = visibleIDs
+        phoneOpening = token
+        guard library.continuous && !library.isGrouped else {
+            phoneOrderQuery = nil
+            phoneOrder = PhoneViewingOrder(ids: ids, currentID: work.id)
+            preview.show(work)
+            return
+        }
+        Task { @MainActor in
+            do {
+                let page = try await PhoneViewingPageReader(query: query).page(database: model.auxiliaryDatabase(), offset: 0, limit: min(1000, max(ids.count, LibraryModel.continuousChunk)))
+                guard phoneOpening == token, library.filter == query, !model.isBrowsingLocked else { return }
+                phoneOrderQuery = query
+                phoneOrderOffset = page.items.count
+                phoneOrderTotal = page.total
+                phoneOrder = PhoneViewingOrder(ids: page.items.map(\.id), currentID: work.id)
+                preview.show(work)
+            } catch { model.errorText = error.localizedDescription }
+        }
     }
 
     /// Web `openThumbnail` (HistoryManager.svelte:638): one click previews and a double click opens the work, in the
@@ -1350,11 +1389,14 @@ struct LibraryView: View {
     private func movePhoneViewer(_ delta: Int) {
         Task { @MainActor in
             guard var order = phoneOrder, let current = order.currentID else { return }
-            if delta > 0, order.ids.last == current, library.continuous, !library.isGrouped,
-               library.works.count < library.total {
-                await library.loadMore()
+            if delta > 0, order.ids.last == current, let query = phoneOrderQuery, phoneOrderOffset < phoneOrderTotal {
+                do {
+                    let page = try await PhoneViewingPageReader(query: query).page(database: model.auxiliaryDatabase(), offset: phoneOrderOffset, limit: LibraryModel.continuousChunk)
+                    guard preview.work?.id == current, phoneOrderQuery == query else { return }
+                    phoneOrderOffset += page.items.count; phoneOrderTotal = page.total
+                    order.append(page.items.map(\.id))
+                } catch { model.errorText = error.localizedDescription; return }
                 guard preview.work?.id == current else { return }
-                order.append(library.works.map(\.id))
             }
             order.move(delta)
             phoneOrder = order
@@ -1365,12 +1407,14 @@ struct LibraryView: View {
     private func movePhoneViewerToBoundary(first: Bool) {
         Task { @MainActor in
             guard var order = phoneOrder else { return }
-            if !first && library.continuous && !library.isGrouped {
-                while library.works.count < library.total {
-                    let before = library.works.count
-                    await library.loadMore()
-                    guard preview.work != nil, library.works.count > before else { break }
-                    order.append(library.works.map(\.id))
+            if !first, let query = phoneOrderQuery {
+                while phoneOrderOffset < phoneOrderTotal {
+                    do {
+                        let page = try await PhoneViewingPageReader(query: query).page(database: model.auxiliaryDatabase(), offset: phoneOrderOffset, limit: LibraryModel.continuousChunk)
+                        guard preview.work != nil, phoneOrderQuery == query, !page.items.isEmpty else { break }
+                        phoneOrderOffset += page.items.count; phoneOrderTotal = page.total
+                        order.append(page.items.map(\.id))
+                    } catch { model.errorText = error.localizedDescription; return }
                 }
             }
             if first { order.first() } else { order.last() }

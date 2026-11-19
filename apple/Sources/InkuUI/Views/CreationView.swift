@@ -288,6 +288,7 @@ struct CreationView: View {
     @State private var pendingPhoneAction: (SavedWork, String)?
     @State private var phoneConditionsOpen = false
     @State private var lineageMounted = false
+    @State private var phoneCanvasAppearance = 0
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
     @State private var ddl3d = Ddl3DController()
     @Environment(\.inkuWindowSize) private var windowSize
@@ -407,7 +408,10 @@ struct CreationView: View {
             if !display.preferences.keepGenerationInfo { ui.generationInfoOpen = false }
         }
         .onAppear {
-            if !phoneLayout {
+            if phoneLayout {
+                // Re-request the visible work even if SwiftUI cancelled its hidden-tab render with the same SVG.
+                phoneCanvasAppearance &+= 1
+            } else {
                 model.inputMode = "description"
                 if !["off", "on"].contains(model.sketchMode) { model.sketchMode = "off" }
                 if !["auto", "fixed"].contains(model.catalogMode) { model.catalogMode = "fixed" }
@@ -452,12 +456,13 @@ struct CreationView: View {
     private var phoneWorkspace: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                if ui.workspaceTab == "lineage" && workspaceWork != nil {
-                    canvasArea
-                } else {
-                    canvasArea
-                        .frame(height: max(150, geometry.size.height * 0.4))
-                        .simultaneousGesture(phoneSwipe)
+                let showsLineage = ui.workspaceTab == "lineage" && workspaceWork != nil
+                // Keep one canvas identity across both modes; changing a tab while this page is hidden must not
+                // leave a newly created canvas with a cancelled render and no later request.
+                canvasArea
+                    .frame(height: showsLineage ? geometry.size.height : max(150, geometry.size.height * 0.4))
+                    .simultaneousGesture(phoneSwipe, including: showsLineage ? .subviews : .all)
+                if !showsLineage {
                     phoneWorkRow
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -1422,7 +1427,7 @@ struct CreationView: View {
             } else {
                 let showsLineage = ui.workspaceTab == "lineage" && workspaceWork != nil
                 AnyView(artwork)
-                    .environment(\.inkuTooltipsCovered, covered || showsLineage)
+                    .environment(\.inkuTooltipsCovered, covered || showsLineage || (phoneLayout && workspaceCovered))
                     .opacity(showsLineage ? 0 : 1)
                     .allowsHitTesting(!showsLineage)
                     .accessibilityHidden(showsLineage)
@@ -1479,6 +1484,7 @@ struct CreationView: View {
     private var artwork: some View {
         CreationArtworkLayer(canvas: AnyView(ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.displayRenderer,
                           caption: workspaceWork?.effectiveSourceText ?? "", style: .workspace,
+                          appearanceRevision: phoneLayout ? phoneCanvasAppearance : 0,
                           showsZoomControls: display.visible("work_tools"),
                           // Below about 740pt the capsule would sit on the right corner row (seven 34pt buttons).
                           zoomControlsAtTop: rightPanelWidth < 740 * display.preferences.textScale,

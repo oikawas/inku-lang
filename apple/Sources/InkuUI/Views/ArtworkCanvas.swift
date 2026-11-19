@@ -27,6 +27,8 @@ struct ArtworkCanvas: View {
     let renderer: DisplayRenderer
     var caption = ""
     var style = Style.embedded
+    /// An owner can renew an otherwise identical request when a retained screen becomes visible again.
+    var appearanceRevision = 0
     var showsZoomControls = true
     /// A canvas too narrow for the zoom capsule between the corner rows carries it at the top instead.
     var zoomControlsAtTop = false
@@ -334,7 +336,7 @@ struct ArtworkCanvas: View {
         return true
     }
 
-    private struct RequestKey: Hashable { let svg: String; let width: UInt32; let height: UInt32 }
+    private struct RequestKey: Hashable { let svg: String; let width: UInt32; let height: UInt32; let appearanceRevision: Int }
     private struct DetailRequest: Equatable { let svg: String; let plan: CanvasDetailPlan? }
     private func requestKey(box: CGSize) -> RequestKey {
         // The whole is drawn for 100%; a zoomed canvas adds the visible window on top (detailLayer).
@@ -342,7 +344,7 @@ struct ArtworkCanvas: View {
         var height = max(128, min(4096, ceil(max(1, box.height) * displayScale / 128) * 128))
         let factor = min(1, sqrt(8_000_000 / (width * height)))
         width *= factor; height *= factor
-        return RequestKey(svg: svg, width: UInt32(width), height: UInt32(height))
+        return RequestKey(svg: svg, width: UInt32(width), height: UInt32(height), appearanceRevision: appearanceRevision)
     }
     private func render(box: CGSize) async {
         let request = requestKey(box: box)

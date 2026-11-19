@@ -11,8 +11,9 @@ import { preparePresence } from './presence';
 import { objectDepth } from './objectDepth';
 import { paintInTurn, paintOrder } from './paintQueue';
 import { OrbitMotion } from './orbitMotion';
-import { adaptResolution, FULL_RESOLUTION, solidsFold, type Resolution } from './motion';
+import { adaptResolution, frontWeight, FULL_RESOLUTION, solidsFold, type Resolution } from './motion';
 import { foldedShare, smallestLayerGap } from '../scene/fold';
+import { shadeSolid, solidUniforms, type SolidUniforms } from './solidShading';
 
 type Projection = ViewState['projection'];
 export type SolidsSettings = NonNullable<ViewState['solids']>;
@@ -62,6 +63,8 @@ export class Viewer {
   private wire = false;
   private sceneExtent = 1;
   settings: SolidsSettings = { ...SOLIDS_DEFAULTS };
+  private sun = new THREE.DirectionalLight(0xffffff, 1);
+  private shared: SolidUniforms;
   private motion: OrbitMotion;
   /** How far the solids stand up from their layers; at the front they lie flat. */
   private fold = { inflate: -1, open: -1 };
@@ -74,6 +77,7 @@ export class Viewer {
     private failed: (reason: string) => void, private initialView?: InitialView) {
     try { this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false }); }
     catch { throw new Error('webgl_unavailable'); }
+    this.shared = solidUniforms(packet.background);
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -94,8 +98,10 @@ export class Viewer {
     this.motion = new OrbitMotion(this.controls, () => this.camera, {
       frictionless: () => this.settings.frictionless, changed: this.rememberNow, requestDraw: () => this.requestDraw(),
     });
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8c8c8c, 0.65));
-    const key = new THREE.DirectionalLight(0xffffff, 0.35); key.position.set(-2, 3, 4); this.scene.add(key);
+    // Faces are shaded in their own shader (solidShading.ts); the one
+    // directional light is the shadow's, fixed 10 degrees up and left of the
+    // paper's normal, so a shadow falls close behind what casts it.
+    this.sun.position.set(-0.12, 0.13, 1); this.scene.add(this.sun, this.sun.target);
     this.model.name = 'DDL solids';
     this.model.userData = { inputDigest: packet.inputDigest, mappingVersion: packet.mappingVersion,
       schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries, emptyPaths: packet.emptyPaths,
@@ -147,8 +153,9 @@ export class Viewer {
   }
 
   private material(color: string | number | THREE.Color, opacity: number): THREE.Material {
-    const options = { color, opacity, transparent: opacity < 1, depthWrite: opacity >= 1, wireframe: this.wire, side: THREE.FrontSide };
-    return this.flat ? new THREE.MeshBasicMaterial(options) : new THREE.MeshLambertMaterial(options);
+    // Plain solids are shaded like painted ones, so paint arriving does not change their light.
+    const material = new THREE.MeshLambertMaterial({ color, opacity, transparent: opacity < 1, depthWrite: opacity >= 1, wireframe: this.wire, side: THREE.FrontSide });
+    shadeSolid(material, this.shared); return material;
   }
 
   /** Joint depths and the support for the plain solids, before any paint. */
@@ -159,7 +166,7 @@ export class Viewer {
   /** Draw at once, so the shape is on screen before the host hears of it. */
   drawNow() {
     cancelAnimationFrame(this.frame); this.frame = 0;
-    this.updateFold(); this.renderer.render(this.scene, this.camera);
+    this.updateFold(); this.updateLight(); this.updateBoards(); this.renderer.render(this.scene, this.camera);
   }
 
   /** The angle between the view and the front of the paper. */
@@ -188,6 +195,22 @@ export class Viewer {
     const share = foldedShare(size * this.depth, this.layerGap * this.layerSpacing);
     mesh.scale.z = this.depth * Math.max(this.fold.inflate, share) / Math.max(1, this.fold.open);
   }
+  /** Shading grows over 2-20 degrees from the front. The face light sits up
+   * and left; the light control turns it by up to 15 degrees either way. */
+  private updateLight() {
+    this.shared.uWeight.value = frontWeight(this.frontAngle(), 2, 20);
+    const turn = this.settings.light * 15 * DEG;
+    this.shared.uR.value.set(-0.24, 0.24, 0.94).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), turn);
+  }
+  /** A board stands at the back; seen from behind it would hide the whole
+   * work, so it is not drawn then. It turns edge-on at the switch. */
+  private updateBoards() {
+    for (const [mesh, packet] of this.meshPackets) {
+      if (!packet.board || packet.board < 0.5) continue;
+      mesh.visible = this.camera.position.z >= mesh.getWorldPosition(this.scratch).z;
+    }
+  }
+  private scratch = new THREE.Vector3();
   private solidDepths = new Map<THREE.Mesh, number>();
   private get layerGap() { return this.gap ??= smallestLayerGap(this.packet.meshes.map(mesh => mesh.layerZ)); }
   private gap: number | undefined;
@@ -241,7 +264,7 @@ export class Viewer {
     if (packet.depthPath) this.objectDepths.get(mesh)?.(1, 0);
     const old = mesh.material as THREE.Material;
     try {
-      const resource = applyPaint(mesh, packet, this.packet.canvas, painted);
+      const resource = applyPaint(mesh, packet, this.packet.canvas, painted, this.shared);
       old.dispose(); resource.materials.forEach(material => { material.wireframe = this.wire; });
       this.appearances.set(mesh, resource);
     } catch (error) { painted.dispose(); throw error; }
@@ -280,7 +303,7 @@ export class Viewer {
     if (this.disposed) return;
     const dt = Math.min(0.05, (time - this.lastTime) / 1000 || 0); this.lastTime = time;
     const animating = this.motion.step(dt);
-    this.updateFold();
+    this.updateFold(); this.updateLight(); this.updateBoards();
     this.adaptResolution(time);
     this.renderer.render(this.scene, this.camera);
     if (animating || performance.now() - this.motion.moving < 200) this.requestDraw();
@@ -436,17 +459,12 @@ export class Viewer {
     if (option === 'axes') this.axes.visible = checked;
     // The automatic rotation is a steady turn of 6 degrees a second.
     if (option === 'spin') this.motion.spin(checked ? 6 * DEG : 0);
-    if (option === 'wire' || option === 'unlit') {
-      if (option === 'wire') this.wire = checked; else this.flat = checked;
+    // Flat colour turns the shading and shadows off in every solid at once.
+    if (option === 'unlit') { this.flat = checked; this.shared.uLit.value = checked ? 0 : 1; }
+    if (option === 'wire') {
+      this.wire = checked;
       this.model.traverse(object => {
-        if (object instanceof THREE.Mesh) {
-          const appearance = this.appearances.get(object);
-          if (appearance) appearance.materials.forEach(material => { material.wireframe = this.wire; });
-          else {
-            const old = object.material as THREE.MeshLambertMaterial;
-            object.material = this.material(old.color, old.opacity); old.dispose();
-          }
-        }
+        if (object instanceof THREE.Mesh) (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => { material.wireframe = checked; });
       });
     }
     this.requestDraw();
@@ -479,7 +497,7 @@ export class Viewer {
     await this.painting;
     if (this.disposed) throw new Error('disposed');
     if (this.resolution.value !== 1) { this.resolution = FULL_RESOLUTION; this.renderer.setPixelRatio(this.pixelRatio()); this.resizeView(); }
-    this.updateFold(); this.renderer.render(this.scene, this.camera);
+    this.updateFold(); this.updateLight(); this.updateBoards(); this.renderer.render(this.scene, this.camera);
     return new Promise((resolve, reject) => this.renderer.domElement.toBlob(blob => blob ? resolve(blob) : reject(new Error('empty_png')), 'image/png'));
   }
   async glb(): Promise<Blob> {

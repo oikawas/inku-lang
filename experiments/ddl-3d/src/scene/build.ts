@@ -109,7 +109,9 @@ export function dashedPaths(points: XY[], pattern: number[]): XY[][] {
   return parts;
 }
 
-function prism(points: XY[], depth?: number): BufferGeometry {
+/** A contour pushed through its thickness. The walls have a ring halfway, so
+ * the paint can fold in from both edges and turn back at the middle. */
+function prism(points: XY[], depth?: number, steps = 2): BufferGeometry {
   const contour = clean(points, true);
   const bounds = extent(contour);
   const thickness = depth ?? Math.min(bounds[0], bounds[1]);
@@ -118,8 +120,44 @@ function prism(points: XY[], depth?: number): BufferGeometry {
   shape.moveTo(...contour[0]);
   for (const point of contour.slice(1)) shape.lineTo(...point);
   shape.closePath();
-  return attributes(new ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, steps: 1 }).translate(0, 0, -thickness / 2));
+  return attributes(new ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, steps }).translate(0, 0, -thickness / 2));
 }
+
+/** The share of the canvas a contour covers once placed, inside the canvas. */
+export function canvasCoverage(points: XY[], transform: number[], canvas: XY): number {
+  const [a, b, c, d, e, f] = transform;
+  let polygon: XY[] = points.map(([x, y]) => [a * x + c * y + e, b * x + d * y + f]);
+  // Clip to the canvas, one edge at a time.
+  const edges: [(p: XY) => number, (p: XY, q: XY) => XY][] = [0, 1].flatMap(axis => [0, canvas[axis]].map(limit => {
+    const inside = (p: XY) => limit === 0 ? p[axis] : limit - p[axis];
+    return [inside, (p: XY, q: XY): XY => {
+      const t = inside(p) / (inside(p) - inside(q));
+      return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    }] as [(p: XY) => number, (p: XY, q: XY) => XY];
+  }));
+  for (const [inside, cross] of edges) {
+    const next: XY[] = [];
+    polygon.forEach((p, i) => {
+      const q = polygon[(i + 1) % polygon.length];
+      if (inside(p) >= 0) next.push(p);
+      if ((inside(p) >= 0) !== (inside(q) >= 0)) next.push(cross(p, q));
+    });
+    polygon = next;
+    if (polygon.length < 3) return 0;
+  }
+  const area = Math.abs(polygon.reduce((sum, p, i) => sum + p[0] * polygon[(i + 1) % polygon.length][1] - polygon[(i + 1) % polygon.length][0] * p[1], 0)) / 2;
+  return area / (canvas[0] * canvas[1]);
+}
+
+/** How far a filled square becomes a board: 0 below a fifth of the canvas, 1
+ * from half of it (the author's choice, 2026-11-20: the ground is a board
+ * standing at the back, not a block that holds every other layer). */
+export function boardShare(coverage: number): number {
+  const t = Math.min(1, Math.max(0, (coverage - 0.2) / 0.3));
+  return t * t * (3 - 2 * t);
+}
+/** A board's thickness, in short sides of the canvas. */
+export const BOARD = 0.02;
 
 function extent(points: XY[]): XY {
   return [Math.max(...points.map(p => p[0])) - Math.min(...points.map(p => p[0])),
@@ -217,7 +255,19 @@ function roundSegments(mark: GeometryMark, count: number): number {
   return Math.max(16, Math.floor(Math.min(96, visual, share) / 4) * 4);
 }
 
-function localGeometry(mark: GeometryMark, roundCount: number): BufferGeometry {
+/** The z scale `world` gives a placed solid: its transform's smaller stretch. */
+function zScaleOf(transform: number[]): number {
+  const [a, b, c, d] = transform, sum = a*a + b*b + c*c + d*d, det = a*d - b*c;
+  return Math.sqrt(Math.max(0, (sum - Math.sqrt(Math.max(0, sum*sum - 4*det*det))) / 2));
+}
+
+/** A filled square's board share (see boardShare); other marks are 0. */
+export function markBoard(mark: GeometryMark, canvas: XY): number {
+  if (mark.primitive !== 'square' || !mark.filled || mark.shape.kind !== 'contour' || mark.transform.length !== 6 || !mark.transform.every(finite)) return 0;
+  return boardShare(canvasCoverage(mark.shape.points, mark.transform, canvas));
+}
+
+function localGeometry(mark: GeometryMark, roundCount: number, canvas: XY): BufferGeometry {
   const { shape, width } = mark;
   if (!(width > 0 && finite(width))) throw new Error('invalid_width');
   if (shape.kind === 'round') {
@@ -232,7 +282,13 @@ function localGeometry(mark: GeometryMark, roundCount: number): BufferGeometry {
   }
   // A smooth cloud's solid has no edge sharp enough to outline; trace the contour itself.
   if (mark.primitive === 'cloudform' && !mark.filled) return stroke3d(points.map(p => new Vector3(...p, 0)), width, mark.dash, true);
-  const solid = mark.primitive === 'triangle' ? pyramid(points) : mark.primitive === 'cloudform' ? cloud(points) : prism(points);
+  // A filled square that covers much of the canvas thins toward a board.
+  const board = markBoard(mark, canvas);
+  const thickness = board > 0 ? (() => {
+    const own = Math.min(...extent(points)), boardDepth = BOARD * Math.min(...canvas) / Math.max(EPS, zScaleOf(mark.transform));
+    return own + (Math.min(own, boardDepth) - own) * board;
+  })() : undefined;
+  const solid = mark.primitive === 'triangle' ? pyramid(points) : mark.primitive === 'cloudform' ? cloud(points) : prism(points, thickness);
   if (mark.filled) return solid;
   const edges = new EdgesGeometry(solid, 28), positions = edges.getAttribute('position');
   const parts: BufferGeometry[] = [];
@@ -271,7 +327,7 @@ function clip(geometry: BufferGeometry, contours: XY[][], canvas: XY): BufferGeo
     for (const contour of contours) {
       geometry.computeBoundingBox();
       const depth = Math.max(32, 2 * Math.max(Math.abs(geometry.boundingBox!.min.z), Math.abs(geometry.boundingBox!.max.z)) + 2);
-      const boundary = world(prism(contour, depth), [1, 0, 0, 1, 0, 0], canvas);
+      const boundary = world(prism(contour, depth, 1), [1, 0, 0, 1, 0, 0], canvas);
       const left = new Brush(geometry, material), right = new Brush(boundary, material);
       left.updateMatrixWorld(); right.updateMatrixWorld();
       const result = evaluator.evaluate(left, right, INTERSECTION);
@@ -336,12 +392,13 @@ export function buildScene(input: PreparedScene): ScenePacket {
       output.meshes.push({ positions, normals, indices, color: mark.color, opacity: mark.opacity,
         sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex, primitive: mark.primitive,
         role, filled: role === 'pair-fill' || mark.filled, layerIndex: 0, layerZ: 0, ...(appearance ? { appearance } : {}),
+        ...(role === 'object' && markBoard(mark, scene.canvas) > 0 ? { board: markBoard(mark, scene.canvas) } : {}),
         ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex,
           relatedPerformedIndex: mark.pairFill?.performedIndex, relatedInstanceIndex: mark.pairFill?.instanceIndex } : {}) });
     } finally { geometry.dispose(); }
   };
   for (const mark of marks) {
-    append(world(localGeometry(lineDepth.mark(mark), roundCount), mark.transform, scene.canvas), mark, 'object');
+    append(world(localGeometry(lineDepth.mark(mark), roundCount, scene.canvas), mark.transform, scene.canvas), mark, 'object');
     if (mark.pairFill) append(world(prism(mark.pairFill.points), [1, 0, 0, 1, 0, 0], scene.canvas),
       { ...mark, color: mark.pairFill.color, opacity: mark.pairFill.opacity }, 'pair-fill');
   }

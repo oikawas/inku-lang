@@ -1,47 +1,67 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BoxGeometry, SphereGeometry } from 'three';
-import { mapPaintSurfaces, sidePaintPixels } from '../viewer/circleAppearance.ts';
+import { extendColor, mapPaintSurfaces } from '../viewer/circleAppearance.ts';
 import { assignLayers } from './layers.ts';
 import type { MeshPacket } from './types.ts';
 
-// Failure: extruded walls have constant canvas UVs and sample a blank stripe.
-test('box walls unfold their thickness through the filtered paint', () => {
-  const source = new BoxGeometry(0.2, 0.2, 0.2);
-  const geometry = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], true);
-  const position = geometry.getAttribute('position'), uv = geometry.getAttribute('uv');
-  assert.equal(uv.count, position.count);
-  assert.ok(geometry.groups.some(group => group.materialIndex === 0));
-  assert.ok(geometry.groups.some(group => group.materialIndex === 1));
-  const wall = geometry.groups.find(group => group.materialIndex === 1)!;
-  const values = Array.from({ length: wall.count }, (_, i) => uv.getX(wall.start + i));
-  assert.ok(Math.max(...values) - Math.min(...values) > 0.5);
+// Failure (2026-11-20): walls sampled the paint by depth, a column unrelated
+// to their edge, so every cube and sphere showed a seam where face met face.
+test('a wall folds the paint in from its edge, meeting the cap at both edges', () => {
+  const source = new BoxGeometry(0.2, 0.2, 0.2, 1, 1, 2);
+  const options = { walls: true, round: false, filled: true, texel: 0 };
+  const geometry = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], options);
+  const position = geometry.getAttribute('position'), uv = geometry.getAttribute('uv'), surf = geometry.getAttribute('surf');
+  const cap = (x: number, y: number) => [(x + 0.5 - 0.35) / 0.3, 1 - (0.5 - y - 0.35) / 0.3];
+  let edges = 0, middles = 0;
+  for (let i = 0; i < position.count; i++) {
+    if (surf.getX(i) !== 1) continue;
+    const z = position.getZ(i), [u, v] = cap(position.getX(i), position.getY(i));
+    if (Math.abs(Math.abs(z) - 0.1) < 1e-6) {
+      edges++; assert.ok(Math.abs(uv.getX(i) - u) < 1e-6 && Math.abs(uv.getY(i) - v) < 1e-6, 'an edge samples the cap texel');
+    } else if (Math.abs(z) < 1e-6) {
+      // Half the thickness in from the edge: 0.1 of 0.3 in u or v.
+      middles++; assert.ok(Math.abs(Math.hypot(uv.getX(i) - u, uv.getY(i) - v) - 0.1 / 0.3) < 1e-6, 'the middle reaches in by half the thickness');
+    }
+  }
+  assert.ok(edges > 0 && middles > 0);
   assert.ok(Array.from(uv.array).every(Number.isFinite));
+  assert.equal(geometry.groups.length, 0);
   source.dispose(); geometry.dispose();
 });
 
-// Failure: the sphere's equator samples transparent SVG fringe, splitting it.
-test('a filled sphere retains pigment around its equator', () => {
+// Failure (2026-11-20): a sphere switched material at 30 degrees of latitude,
+// a crease that was seen from every side.
+test('a filled sphere is one surface that knows its height; an outline is not blended', () => {
   const source = new SphereGeometry(0.12, 32, 16);
-  const geometry = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], true);
-  const positions = geometry.getAttribute('position');
-  const wallVertices = geometry.groups.filter(g => g.materialIndex === 1)
-    .flatMap(g => Array.from({ length: g.count }, (_, i) => g.start + i));
-  assert.ok(wallVertices.length > 0);
-  assert.ok(wallVertices.some(i => Math.abs(positions.getZ(i)) < 1e-6));
-  const outline = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], false);
-  assert.ok(outline.groups.every(g => g.materialIndex === 0));
+  const geometry = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], { walls: true, round: true, filled: true, texel: 0 });
+  const surf = geometry.getAttribute('surf'), position = geometry.getAttribute('position');
+  for (let i = 0; i < surf.count; i++) {
+    assert.equal(surf.getX(i), 0);
+    assert.ok(Math.abs(surf.getY(i) - position.getZ(i) / 0.12) < 1e-6);
+  }
+  const outline = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], { walls: false, round: true, filled: false, texel: 0 });
+  assert.ok(Array.from({ length: outline.getAttribute('surf').count }, (_, i) => outline.getAttribute('surf').getY(i)).every(y => y === 2));
   source.dispose(); geometry.dispose(); outline.dispose();
 });
 
-// Failure: transparent SVG padding becomes a white band instead of pigment.
-test('solid side paint keeps object pigment and filtered opacity as texture', () => {
-  const pixels = new Uint8ClampedArray([255, 255, 255, 0, 51, 102, 153, 128, 51, 102, 153, 255]);
-  const original = pixels.slice(), result = sidePaintPixels(pixels, '#336699');
-  assert.deepEqual(Array.from(result.slice(0, 4)), [31, 61, 92, 255]);
-  assert.deepEqual(Array.from(result.slice(8)), [51, 102, 153, 255]);
-  assert.ok(result[4] > result[0] && result[4] < result[8]);
-  assert.deepEqual(pixels, original);
+// Failure: transparent SVG padding became a white band instead of pigment.
+test('the paint colour spreads into its transparent pixels, keeping alpha', () => {
+  // 4 x 2: one blue pixel at the top left, the rest transparent white.
+  const data = new Uint8ClampedArray(4 * 2 * 4);
+  for (let i = 0; i < 8; i++) data.set([255, 255, 255, 0], i * 4);
+  data.set([0, 0, 255, 255], 0);
+  const original = data.slice(), { filled, blur } = extendColor(data, 4, 2, '#ff0000');
+  // Rows run bottom to top: the blue pixel is in the second row.
+  assert.deepEqual(Array.from(filled.slice(16, 20)), [0, 0, 255, 255]);
+  for (let i = 0; i < 8; i++) {
+    if (i === 4) continue;
+    assert.deepEqual(Array.from(filled.slice(i * 4, i * 4 + 4)), [0, 0, 255, 0], `pixel ${i}`);
+  }
+  assert.ok(blur.width <= 16 && blur.height <= 16 && blur.data.every((v, i) => i % 4 !== 3 || v === 255));
+  assert.deepEqual(data, original);
+  const empty = extendColor(new Uint8ClampedArray(16), 2, 2, '#336699');
+  assert.deepEqual(Array.from(empty.filled.slice(0, 4)), [0x33, 0x66, 0x99, 0]);
 });
 
 const mesh = (performedIndex: number, sourceIndex = 0): MeshPacket => ({

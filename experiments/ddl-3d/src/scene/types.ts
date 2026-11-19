@@ -32,6 +32,8 @@ export interface MeshPacket {
   relatedPerformedIndex?: number; relatedInstanceIndex?: number; filled?: boolean;
   layerIndex: number; layerZ: number;
   depthPath?: { points: XY[]; depths: number[] };
+  /** How far a filled square that covers much of the canvas has thinned to a board (0..1). */
+  board?: number;
   appearance?: PaintAppearance;
 }
 export interface ScenePacket {

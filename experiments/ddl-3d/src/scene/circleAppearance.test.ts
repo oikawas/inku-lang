@@ -53,13 +53,13 @@ test('raster-sized SVG changes only the root width and height', () => {
 // worker already expanded a tube, multiplying GPU memory, GLB size and depth work.
 test('painted surfaces keep shared vertices and the same corners', () => {
   const sphere = new SphereGeometry(0.1, 8, 6).translate(0.2, -0.1, 0);
-  const shared = mapPaintSurfaces(sphere.clone(), [0.2, 0.2, 0.4, 0.4], [1, 1], true);
-  const expanded = mapPaintSurfaces(sphere.clone().toNonIndexed(), [0.2, 0.2, 0.4, 0.4], [1, 1], true);
+  const options = { walls: true, round: true, filled: true, texel: 0 };
+  const shared = mapPaintSurfaces(sphere.clone(), [0.2, 0.2, 0.4, 0.4], [1, 1], options);
+  const expanded = mapPaintSurfaces(sphere.clone().toNonIndexed(), [0.2, 0.2, 0.4, 0.4], [1, 1], options);
   assert.ok(shared.index, 'indexed');
   assert.ok(shared.getAttribute('position').count < expanded.getAttribute('position').count);
   const corners = shared.toNonIndexed();
-  for (const name of ['position', 'normal', 'uv']) assert.deepEqual(corners.getAttribute(name).array, expanded.getAttribute(name).array, name);
-  assert.deepEqual(shared.groups, expanded.groups);
+  for (const name of ['position', 'normal', 'uv', 'surf']) assert.deepEqual(corners.getAttribute(name).array, expanded.getAttribute(name).array, name);
   const tube = buildScene({ ok: true, inputDigest: '', schemaDigest: '', mappingVersion: '', engineVersion: 1,
     scene: { canvas: [1, 1], background: '#ffffff', ground: false, diagnostics: [], recoveries: [], marks: [{
       sourceIndex: 0, performedIndex: 0, instanceIndex: 0, primitive: 'line',

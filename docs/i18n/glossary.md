@@ -189,6 +189,8 @@ composition / color catalog と食い違って見える（→ §8）。
 ## 7. 本表の運用
 
 3D表示の背景選択（2026-10-17、作者指定）では、なし = None、支持面 = Support、青空 = Blue sky、星空 = Starry sky とする。青空を天候全般へ広げる Weather、星空を宇宙空間全般へ広げる Space は使わない。3D専用の開閉パネルは「3D操作」= 3D controls とする。
+
+3D の見せ方は「ガラス」= Glass、「立体」= Solids。「ゆらす」= Sway、「光の向き」= Light direction、「箔の光り」= Leaf sheen、「面の角度」= Plane angle、「ガラスの色」= Glass color、その値は「無色」= Clear、「作品の背景の色」= Background color、「層の色」= Layer colors。「摩擦なしで回り続ける」= Keep turning without friction とする。
 同日の追加指定は、背景の塗色 = Background fill color、白背景 = White background、黒背景 = Black background とする。背景の塗色は保存作品から解決した背景色を指し、任意色を選ぶ Color picker とは区別する。
 
 1. **日本語を先に書く。** 概念を本表で引き、あれば必ずその英語を使う。

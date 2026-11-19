@@ -35,6 +35,8 @@ export type PaintScore = {
 export type Seed = number | string;
 
 export type PaintResult = {
+	/** The DDL that wrote this Score, when the result carries it (a new paint, or a saved work); the 3D glass reads its chunks. */
+	ddl?: string | null;
 	draw_options?: import('../draw-options').RecordedDrawOptions | null;
 	plugin_offers?: import('../canvas/plugin-offers').PluginOfferRecord[];
 	image_ddl?: Record<string, unknown> | null;

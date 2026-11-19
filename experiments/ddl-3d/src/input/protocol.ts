@@ -8,6 +8,20 @@ export interface ViewState {
   background?: 'none' | 'support' | 'sky' | 'stars' | 'paint' | 'white' | 'black';
   referenceHeight?: number;
   displayZoom?: number;
+  /** Which way the work was shown; absent means glass, the first view. */
+  viewMode?: 'glass' | 'solids';
+  glass?: {
+    angle: number; leaf: number; light: number;
+    glassColor: 'none' | 'background' | 'layers'; frictionless: boolean;
+  };
+}
+/** The glass settings a view state may carry: each in its control's range. */
+export function validGlassState(g: unknown): boolean {
+  if (!g || typeof g !== 'object') return false;
+  const v = g as NonNullable<ViewState['glass']>;
+  const within = (n: number, low: number, high: number) => Number.isFinite(n) && n >= low && n <= high;
+  return within(v.angle, 0, 2) && within(v.leaf, 0, 1) && within(v.light, -1, 1)
+    && ['none', 'background', 'layers'].includes(v.glassColor) && typeof v.frictionless === 'boolean';
 }
 export interface LoadMessage {
   protocol: typeof PROTOCOL; type: 'load-work'; requestId: number; mountId: string;
@@ -24,6 +38,8 @@ export function validState(value: unknown): value is ViewState {
     && (v.background === undefined || ['none', 'support', 'sky', 'stars', 'paint', 'white', 'black'].includes(v.background))
     && (v.referenceHeight === undefined || (Number.isFinite(v.referenceHeight) && v.referenceHeight > 0 && v.referenceHeight < 1000))
     && (v.displayZoom === undefined || (Number.isFinite(v.displayZoom) && v.displayZoom > 0 && v.displayZoom <= 10000))
+    && (v.viewMode === undefined || v.viewMode === 'glass' || v.viewMode === 'solids')
+    && (v.glass === undefined || validGlassState(v.glass))
     && Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;
 }
 export function validLoad(value: unknown): value is LoadMessage {

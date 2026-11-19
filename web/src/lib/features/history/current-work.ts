@@ -23,6 +23,7 @@ export function projectHistoryCurrentWork(item: HistoryItem): HistoryCurrentWork
 		sketchGrain: item.sketch_grain,
 		sketchState: item.sketch_state,
 		result: {
+			ddl: item.ddl ?? null,
 			draw_options: item.draw_options,
 			image_ddl: item.image_ddl,
 			description_ddl: item.description_ddl,

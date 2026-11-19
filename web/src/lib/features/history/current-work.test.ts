@@ -65,6 +65,8 @@ test('T-295: current-work projection preserves saved source, render identity, se
 
 	assert.equal(projection.sourceText, 'canonical source');
 	assert.equal(projection.ddl, 'saved ddl');
+	// The 3D glass names its layers from the DDL that wrote the Score.
+	assert.equal(projection.result.ddl, 'saved ddl');
 	assert.equal('expandedDdl' in projection, false);
 	assert.equal(projection.sketchText, 'sketch prose');
 	assert.equal(projection.sketchGrain, 'coarse');

@@ -234,7 +234,7 @@ export class Viewer {
   private rememberNow = () => { if (!this.disposed) this.changed(this.state()); };
   state(): ViewState { return { position: this.camera.position.toArray(), target: this.controls.target.toArray(), zoom: this.camera.zoom, projection: this.projection, depth: this.depth,
     layerSpacing: this.layerSpacing, background: this.background, referenceHeight: this.referenceHeight, displayZoom: this.displayZoom(),
-    orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2 }; }
+    orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2, viewMode: 'solids' }; }
 
   restore(state: ViewState) {
     this.setProjection(state.projection); this.setDepth(state.depth); this.setLayerSpacing(state.layerSpacing ?? 1);

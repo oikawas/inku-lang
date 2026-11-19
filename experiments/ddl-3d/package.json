@@ -9,7 +9,7 @@
     "check": "tsc --noEmit",
     "build:wasm": "node scripts/build-wasm.mjs",
     "build": "npm run check && vite build",
-    "test": "node --experimental-strip-types --test src/scene/*.test.ts",
+    "test": "node --experimental-strip-types --test src/scene/*.test.ts src/input/*.test.ts",
     "install:viewer": "node scripts/install-viewer.mjs"
   },
   "dependencies": {

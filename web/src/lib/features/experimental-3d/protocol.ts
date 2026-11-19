@@ -9,7 +9,16 @@ export type ViewState = {
 	background?: 'none' | 'support' | 'sky' | 'stars' | 'paint' | 'white' | 'black';
 	referenceHeight?: number;
 	displayZoom?: number;
+	viewMode?: 'glass' | 'solids';
+	glass?: { angle: number; leaf: number; light: number; glassColor: 'none' | 'background' | 'layers'; frictionless: boolean };
 };
+function validGlass(value: unknown): boolean {
+	if (!value || typeof value !== 'object') return false;
+	const g = value as NonNullable<ViewState['glass']>;
+	const within = (n: number, low: number, high: number) => Number.isFinite(n) && n >= low && n <= high;
+	return within(g.angle, 0, 2) && within(g.leaf, 0, 1) && within(g.light, -1, 1)
+		&& ['none', 'background', 'layers'].includes(g.glassColor) && typeof g.frictionless === 'boolean';
+}
 export function validViewState(value: unknown): value is ViewState {
 	if (!value || typeof value !== 'object') return false;
 	const v = value as ViewState;
@@ -20,6 +29,8 @@ export function validViewState(value: unknown): value is ViewState {
 		&& (v.background === undefined || ['none', 'support', 'sky', 'stars', 'paint', 'white', 'black'].includes(v.background))
 		&& (v.referenceHeight === undefined || (Number.isFinite(v.referenceHeight) && v.referenceHeight > 0 && v.referenceHeight < 1000))
 		&& (v.displayZoom === undefined || (Number.isFinite(v.displayZoom) && v.displayZoom > 0 && v.displayZoom <= 10000))
+		&& (v.viewMode === undefined || v.viewMode === 'glass' || v.viewMode === 'solids')
+		&& (v.glass === undefined || validGlass(v.glass))
 		&& Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;
 }
 let previous: { inputJson: string; state: ViewState } | null = null;

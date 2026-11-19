@@ -20,8 +20,11 @@ struct CompactRunStatusView<Details: View>: View {
 
     var body: some View {
         let display = model.display
+        let mascot = display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
         TimelineView(.periodic(from: model.runJournal?.beganAt ?? startedAt ?? appearedAt, by: 1)) { context in
             HStack(spacing: 6) {
+                MascotView(kind: mascot, accessibilityText: display.localized(mascot == "yuragi" ? "Yuragiが描画中" : "Incuが描画中"))
+                    .fixedSize()
                 VStack(alignment: .leading, spacing: 1) {
                     let current = model.runJournal?.report["current"]
                     Text(current.map { RunJournalView.currentLabel($0, label: label, attempt: nil, display: display) } ?? display.message(label))

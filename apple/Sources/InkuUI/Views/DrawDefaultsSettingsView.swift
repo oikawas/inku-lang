@@ -20,7 +20,7 @@ import InkuHost
     private func binding<T>(_ tab: String, _ path: WritableKeyPath<DrawOptions, T>) -> Binding<T> {
         Binding(get: { options(tab)[keyPath: path] }, set: { value in
             if draft[tab] == nil { draft[tab] = options(tab) }
-            draft[tab]?[keyPath: path] = value; saved = false
+            draft[tab]?[keyPath: path] = value; commit()
         })
     }
     private func options(_ tab: String) -> DrawOptions {
@@ -53,7 +53,7 @@ import InkuHost
         // tab, which only its own row opens.
         if phone {
             phoneSections
-            phoneSaveSection.modifier(loader)
+            if saved || failed { phoneSaveSection }
         } else {
             presenters(wideBody)
         }
@@ -84,7 +84,7 @@ import InkuHost
                 if draft[tab] == nil { draft[tab] = options(tab) }
                 if imageTab(tab) { draft[tab]?.models.vision = reference }
                 else { draft[tab]?.models.stage1 = reference; draft[tab]?.models.stage2 = reference }
-                saved = false
+                commit()
             })
     }
 
@@ -128,7 +128,8 @@ import InkuHost
                 }
                 .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
             } header: {
-                Text(tabTitle(tab))
+                if tab == tabs[0] { Text(tabTitle(tab)).modifier(loader) }
+                else { Text(tabTitle(tab)) }
             } footer: {
                 Text(hint(tab))
             }
@@ -139,17 +140,14 @@ import InkuHost
 
     private var phoneSaveSection: some View {
         Section {
-            saveButton
             if saved { Text(copy("drawDefaultsSaved", "保存しました。記述と記述のバッチは次に「新規作成」を押すと反映されます。")) }
             if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
         }
     }
 
-    private var saveButton: some View {
-        Button(copy("drawDefaultsSave", "デフォルトを保存")) {
-            do { try model.saveDrawDefaults(draft); saved = true; failed = false }
-            catch { failed = true; saved = false }
-        }
+    private func commit() {
+        do { try model.saveDrawDefaults(draft); saved = true; failed = false }
+        catch { failed = true; saved = false }
     }
 
     private func switchBinding(_ tab: String, _ path: WritableKeyPath<DrawOptions, String>) -> Binding<Bool> {
@@ -165,7 +163,7 @@ import InkuHost
             if draft[tab] == nil { draft[tab] = options(tab) }
             draft[tab]?.catalog.mode = value == "auto" ? "auto" : "fixed"
             if value != "auto" { draft[tab]?.catalog.id = value }
-            saved = false
+            commit()
         })) {
             Text(copy("colorCatalogAuto", "記述から自動選択")).tag("auto")
             ForEach(model.catalogs) { Text($0.name).tag($0.id) }
@@ -201,7 +199,7 @@ import InkuHost
                         if draft[tab] == nil { draft[tab] = options(tab) }
                         draft[tab]?.catalog.mode = value == "auto" ? "auto" : "fixed"
                         if value != "auto" { draft[tab]?.catalog.id = value }
-                        saved = false
+                        commit()
                     })) {
                         Text(copy("colorCatalogAuto", "記述から自動選択")).tag("auto")
                         ForEach(model.catalogs) { Text($0.name).tag($0.id) }
@@ -218,10 +216,6 @@ import InkuHost
                         Button(copy("editButton", "変更")) { pickerTab = tab }
                     }
                 }.padding(.vertical, 8)
-            }
-            Button(copy("drawDefaultsSave", "デフォルトを保存")) {
-                do { try model.saveDrawDefaults(draft); saved = true; failed = false }
-                catch { failed = true; saved = false }
             }
             if saved { Text(copy("drawDefaultsSaved", "保存しました。記述と記述のバッチは次に「新規作成」を押すと反映されます。")) }
             if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }

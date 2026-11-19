@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: fixes sharing immediately after swiping away work information, which could fail and leave sharing stuck.
+
 - Apple: export selected works as a work pack and import it on Mac, iPad and iPhone. Existing works are skipped and lineage is reconstructed in the destination.
 
 - iOS: iPhone home opens a viewing screen with paging, zoom, 3D, Star, Refine, and Share. Share sends a card directly to the share sheet; Star and Share remain available during drawing. The long-press menu is reordered.

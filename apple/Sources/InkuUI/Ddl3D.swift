@@ -115,12 +115,12 @@ public struct Ddl3DInputError: Error, Equatable, Sendable {
 /// projection is the shared core's (`ddl3d_snapshot`, as Android's): it picks the Web's fields in their order, leaves
 /// out nulls, refuses an unsafe numeric seed, drops the white space outside strings and keeps the 16 MiB budget.
 public enum Ddl3DInput {
-    /// The Web's fields in its order (`input.ts`, core `ddl3d::FIELDS`). Saved works here carry no render build number
-    /// or DDL versions, so the app's snapshot holds a subset of them.
+    /// The Web's 16 fields in order (`input.ts`, core `ddl3d::FIELDS`). Saved works here carry no render build number
+    /// or DDL versions, so an individual snapshot can hold a subset of them.
     public static let webFields = ["score", "render_seed", "composition_seed", "render_wild", "render_canvas_aspect_id",
                                    "render_canvas_aspect_ratio", "render_canvas_aspect", "render_color_map",
                                    "render_color_catalog_id", "render_engine_id", "render_engine_version",
-                                   "render_build_number", "ddl_version", "ddl_engine_version"]
+                                   "render_build_number", "ddl_version", "ddl_engine_version", "instruction_lang_resolved", "ddl"]
 
     /// The render metadata the core reads, from this app's saved columns: Android hands the stored metadata text,
     /// which works saved here do not keep. Seeds stay decimal strings and never pass through a binary number, so
@@ -142,12 +142,15 @@ public enum Ddl3DInput {
         string("render_color_catalog_id", work.renderColorCatalogID)
         string("render_engine_id", work.renderEngineID)
         string("render_engine_version", work.renderEngineVersion)
+        string("instruction_lang_resolved", work.instructionLangResolved)
         return "{" + members.map { ExactJSON.string($0.0).text + ":" + $0.1 }.joined(separator: ",") + "}"
     }
 
     /// The core's answer, or its reason (`invalid_score_json`, `unsafe_numeric_seed`, `input_budget_exceeded`, ...).
     public static func snapshot(_ work: SavedWork) throws(Ddl3DInputError) -> String {
-        let request = ExactJSON.object(["score": .string(work.score), "metadata": .string(metadata(work))]).data
+        var members: [String: ExactJSON] = ["score": .string(work.score), "metadata": .string(metadata(work))]
+        if let ddl = work.ddl, !ddl.isEmpty { members["ddl"] = .string(ddl) }
+        let request = ExactJSON.object(members).data
         guard let answer = try? ExactJSON(data: InkuCore.ddl3dSnapshot(request)) else {
             throw Ddl3DInputError(reason: "internal_invariant")
         }

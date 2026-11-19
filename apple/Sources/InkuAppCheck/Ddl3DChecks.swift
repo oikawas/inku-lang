@@ -151,7 +151,7 @@ func runDdl3DChecks(arguments: [String]) async throws {
                          renderColorMap: String(decoding: try ExactJSON.rawMember("render_color_map", in: fixture), as: UTF8.self),
                          renderCanvasAspect: "square", renderCanvasAspectID: "square", renderCanvasAspectRatio: 1.4,
                          renderSeed: "9007199254740993", renderWild: false, compositionSeed: "9007199254740995",
-                         interpretationSeed: "77", seedText: "check", renderHash: String(repeating: "a", count: 64),
+                         interpretationSeed: "77", seedText: "check", instructionLangResolved: "en", renderHash: String(repeating: "a", count: 64),
                          descriptionHash: String(repeating: "b", count: 64), lineageNodeID: "node")
     let snapshot = try Ddl3DInput.snapshot(work)
     let webSource = try String(contentsOf: product.appendingPathComponent("web/src/lib/features/experimental-3d/input.ts"), encoding: .utf8)
@@ -165,8 +165,16 @@ func runDdl3DChecks(arguments: [String]) async throws {
     print("Q3 snapshot: \(snapshot.utf8.count) bytes, keys \(members.keys.sorted()); Web fields \(webFields.count); "
           + "absent here \(webFields.filter { !keys.contains($0) })")
     guard webFields == Ddl3DInput.webFields, keys.isSubset(of: Set(webFields)), members["render_seed"] == .string("9007199254740993"),
-          members["composition_seed"] == .string("9007199254740995"), snapshot.contains(#""render_seed":"9007199254740993""#) else {
+          members["composition_seed"] == .string("9007199254740995"), members["ddl"] == .string("place one red circle at center."),
+          members["instruction_lang_resolved"] == .string("en"), snapshot.contains(#""render_seed":"9007199254740993""#) else {
         throw CheckFailure.message("Q3 failed: Web fields \(webFields), Swift \(Ddl3DInput.webFields), keys \(keys.sorted()), seed \(members["render_seed"] ?? .null)")
+    }
+    for missing in [nil, ""] as [String?] {
+        var withoutDDL = work; withoutDDL.ddl = missing
+        let absent = try Ddl3DInput.snapshot(withoutDDL)
+        guard case .object(let fields) = try ExactJSON(data: Data(absent.utf8)), fields["ddl"] == nil else {
+            throw CheckFailure.message("Q3: absent or empty DDL must not enter the snapshot")
+        }
     }
     controller.retry()
     _ = try await wait("ready for Q3", seconds: 15) { controller.ready || controller.failure != nil }

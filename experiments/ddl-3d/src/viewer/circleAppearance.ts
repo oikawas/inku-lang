@@ -210,6 +210,53 @@ export async function rasterizePaint(packet: MeshPacket, maxSize = MAX_RASTER_SI
   return { pixels, filled, blur, dispose() { /* Plain arrays; nothing to release. */ } };
 }
 
+/** Move each ring of a painted line's tube onto the brush stroke: across the
+ * line, to the centre of the paint's coverage, and as wide as the paint.
+ * The core gives a straight centre line; the 2D brush wavers off it, and a
+ * tube left on the centre line was transparent wherever the stroke strayed
+ * (2026-11-20, about half the lines). `positions` are on the canvas plane
+ * (x right, y up, origin at the centre); the paint raster runs top down. */
+export function followStroke(positions: { count: number; getX(i: number): number; getY(i: number): number; setXY(i: number, x: number, y: number): unknown },
+  axis: Float32Array, data: Uint8ClampedArray, width: number, height: number,
+  bounds: [number, number, number, number], canvas: XY) {
+  const texel = Math.max(bounds[2] / width, bounds[3] / height);
+  const alphaAt = (x: number, y: number) => {
+    const px = Math.floor((x + canvas[0] / 2 - bounds[0]) / bounds[2] * width), py = Math.floor((canvas[1] / 2 - y - bounds[1]) / bounds[3] * height);
+    return px < 0 || py < 0 || px >= width || py >= height ? 0 : data[(py * width + px) * 4 + 3] / 255;
+  };
+  // Rings in path order, with the radius of each.
+  const rings = new Map<string, { cx: number; cy: number; nx: number; ny: number; radius: number; shift: number; half: number }>();
+  for (let i = 0; i < positions.count; i++) {
+    const cx = axis[i * 4], cy = axis[i * 4 + 1], key = `${cx} ${cy}`;
+    let ring = rings.get(key);
+    if (!ring) { ring = { cx, cy, nx: -axis[i * 4 + 3], ny: axis[i * 4 + 2], radius: 0, shift: 0, half: 0 }; rings.set(key, ring); }
+    ring.radius = Math.max(ring.radius, Math.abs((positions.getX(i) - cx) * ring.nx + (positions.getY(i) - cy) * ring.ny));
+  }
+  const list = [...rings.values()];
+  for (const ring of list) {
+    const reach = Math.max(4 * ring.radius, 16 * texel, 0.015);
+    let sum = 0, moment = 0, low = Infinity, high = -Infinity, peak = 0;
+    const samples: [number, number][] = [];
+    for (let s = -reach; s <= reach; s += texel / 2) {
+      const a = alphaAt(ring.cx + ring.nx * s, ring.cy + ring.ny * s);
+      samples.push([s, a]); sum += a; moment += a * s; peak = Math.max(peak, a);
+    }
+    if (sum < 1e-6) { ring.half = ring.radius; continue; }
+    for (const [s, a] of samples) if (a >= peak / 4) { low = Math.min(low, s); high = Math.max(high, s); }
+    ring.shift = moment / sum; ring.half = Math.max(ring.radius, (high - low) / 2 + texel / 2);
+  }
+  // A light smoothing along the line keeps the tube from kinking at every ring.
+  const shift = list.map((_, i) => (list[Math.max(0, i - 1)].shift + 2 * list[i].shift + list[Math.min(list.length - 1, i + 1)].shift) / 4);
+  list.forEach((ring, i) => { ring.shift = shift[i]; });
+  for (let i = 0; i < positions.count; i++) {
+    const ring = rings.get(`${axis[i * 4]} ${axis[i * 4 + 1]}`)!;
+    const x = positions.getX(i), y = positions.getY(i);
+    const across = (x - ring.cx) * ring.nx + (y - ring.cy) * ring.ny;
+    const moved = ring.shift + (ring.radius > 1e-9 ? across * ring.half / ring.radius : across) - across;
+    positions.setXY(i, x + ring.nx * moved, y + ring.ny * moved);
+  }
+}
+
 /** Fit the solid to the decoded paint and give it one lit, painted material. */
 export function applyPaint(mesh: Mesh, packet: MeshPacket, canvas: XY, painted: PaintRaster, shared: SolidUniforms): PaintAppearanceResources {
   const { bounds, center } = packet.appearance!;
@@ -236,6 +283,7 @@ export function applyPaint(mesh: Mesh, packet: MeshPacket, canvas: XY, painted: 
       }
     }
   }
+  if (packet.axis && packet.axis.length === positions.count * 4) followStroke(positions, packet.axis, pixels.data, width, height, bounds, canvas);
   positions.needsUpdate = true;
   // A round keeps the ellipsoid's own normals: normals taken again from the
   // stepped painted outline would crease along the meridians in the light.
@@ -255,7 +303,7 @@ export function applyPaint(mesh: Mesh, packet: MeshPacket, canvas: XY, painted: 
   }
   const material = new MeshLambertMaterial({ map: texture, color: 0xffffff, opacity: 1,
     transparent: true, alphaTest: 1 / 255, side: FrontSide });
-  shadeSolid(material, shared, { blur: blurTexture, wallOpacity: packet.opacity });
+  shadeSolid(material, shared, { blur: blurTexture, wallOpacity: packet.opacity, texel: [1 / width, 1 / height] });
   mesh.material = material;
   return { texture, materials: [material], dispose() {
     texture.dispose(); blurTexture.dispose(); material.dispose(); painted.dispose();

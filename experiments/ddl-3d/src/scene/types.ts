@@ -32,6 +32,8 @@ export interface MeshPacket {
   relatedPerformedIndex?: number; relatedInstanceIndex?: number; filled?: boolean;
   layerIndex: number; layerZ: number;
   depthPath?: { points: XY[]; depths: number[] };
+  /** A painted path's tube: per vertex its ring's centre (x, y) and unit tangent (x, y), on the canvas plane. */
+  axis?: Float32Array;
   /** How far a filled square that covers much of the canvas has thinned to a board (0..1). */
   board?: number;
   appearance?: PaintAppearance;

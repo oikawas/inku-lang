@@ -24,7 +24,7 @@ function clean(points: XY[], closed = false): XY[] {
 }
 
 function attributes(geometry: BufferGeometry): BufferGeometry {
-  for (const key of Object.keys(geometry.attributes)) if (key !== 'position' && key !== 'normal') geometry.deleteAttribute(key);
+  for (const key of Object.keys(geometry.attributes)) if (key !== 'position' && key !== 'normal' && key !== 'axis') geometry.deleteAttribute(key);
   geometry.clearGroups();
   if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
   return geometry;
@@ -32,6 +32,8 @@ function attributes(geometry: BufferGeometry): BufferGeometry {
 
 function combine(parts: BufferGeometry[]): BufferGeometry {
   if (!parts.length) throw new Error('empty_geometry');
+  // A tube's ring axes survive only when every part has them.
+  if (!parts.every(g => g.getAttribute('axis'))) parts.forEach(g => g.deleteAttribute('axis'));
   // Tubes share their ring vertices; keep that unless a part has no index.
   const indexed = parts.every(g => g.index);
   const source = parts.map(g => attributes(g.index && !indexed ? g.toNonIndexed() : g));
@@ -41,9 +43,11 @@ function combine(parts: BufferGeometry[]): BufferGeometry {
   return merged;
 }
 
-/** A closed tube around a polyline. Its circular section has no end holes. */
+/** A closed tube around a polyline. Its circular section has no end holes.
+ * Each vertex keeps its ring's axis (centre x, y and the unit tangent x, y),
+ * so paint can later move a ring onto the brush stroke it belongs to. */
 function tube(points: Vector3[], radius: number, closed = false, sides = 6): BufferGeometry {
-  const positions: number[] = [], indices: number[] = [];
+  const positions: number[] = [], indices: number[] = [], axis: number[] = [];
   const n = points.length;
   if (n < 2 || n > 8192 || !(radius > 0 && finite(radius))) throw new Error('invalid_tube');
   // Parallel-transported frames also work for the sphere's latitude/longitude rings.
@@ -55,10 +59,12 @@ function tube(points: Vector3[], radius: number, closed = false, sides = 6): Buf
     if (Math.abs(tangent.dot(normal)) > 0.98) normal = new Vector3(0, 1, 0);
     const binormal = tangent.clone().cross(normal).normalize();
     normal = binormal.clone().cross(tangent).normalize();
+    const flat = Math.hypot(tangent.x, tangent.y) || 1;
     for (let j = 0; j < sides; j++) {
       const theta = 2 * Math.PI * j / sides;
       const p = points[i].clone().addScaledVector(normal, radius * Math.cos(theta)).addScaledVector(binormal, radius * Math.sin(theta));
       positions.push(p.x, p.y, p.z);
+      axis.push(points[i].x, points[i].y, tangent.x / flat, tangent.y / flat);
     }
   }
   for (let i = 0; i < (closed ? n : n - 1); i++) {
@@ -70,6 +76,7 @@ function tube(points: Vector3[], radius: number, closed = false, sides = 6): Buf
   }
   if (!closed) {
     positions.push(...points[0].toArray(), ...points[n - 1].toArray());
+    axis.push(...axis.slice(0, 4), ...axis.slice((n - 1) * sides * 4, (n - 1) * sides * 4 + 4));
     for (let j = 0; j < sides; j++) {
       indices.push(n * sides, (j + 1) % sides, j);
       indices.push(n * sides + 1, (n - 1) * sides + j, (n - 1) * sides + (j + 1) % sides);
@@ -77,9 +84,26 @@ function tube(points: Vector3[], radius: number, closed = false, sides = 6): Buf
   }
   const result = new BufferGeometry();
   result.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  result.setAttribute('axis', new Float32BufferAttribute(axis, 4));
   result.setIndex(indices);
   result.computeVertexNormals();
   return result;
+}
+
+/** A painted path gets a ring at least every 0.02 of its length (at most 64
+ * per piece), so its tube can bend with the brush. */
+function ringed(points: XY[]): XY[] {
+  const length = points.slice(1).reduce((sum, p, i) => sum + distance(p, points[i]), 0);
+  const spacing = Math.max(0.02, length / 64), out: XY[] = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const from = points[i - 1], to = points[i], steps = Math.floor(distance(from, to) / spacing);
+    for (let k = 1; k <= steps; k++) {
+      const t = k / (steps + 1);
+      out.push([from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]);
+    }
+    out.push(to);
+  }
+  return out;
 }
 
 /** Segment dash lengths in source units, carrying phase across every vertex. */
@@ -278,7 +302,7 @@ function localGeometry(mark: GeometryMark, roundCount: number, canvas: XY): Buff
   }
   const points = clean(shape.points, shape.kind === 'contour');
   if (shape.kind === 'path') {
-    return combine(dashedPaths(points, mark.dash).map(path => tube(path.map(p => new Vector3(...p, 0)), width / 2)));
+    return combine(dashedPaths(points, mark.dash).map(path => tube((mark.appearance ? ringed(path) : path).map(p => new Vector3(...p, 0)), width / 2)));
   }
   // A smooth cloud's solid has no edge sharp enough to outline; trace the contour itself.
   if (mark.primitive === 'cloudform' && !mark.filled) return stroke3d(points.map(p => new Vector3(...p, 0)), width, mark.dash, true);
@@ -309,6 +333,13 @@ function world(geometry: BufferGeometry, transform: number[], canvas: XY): Buffe
   const matrix = new Matrix4().set(a, c, 0, e - canvas[0] / 2, -b, -d, 0, canvas[1] / 2 - f, 0, 0, zScale, 0, 0, 0, 0, 1);
   if (Math.abs(matrix.determinant()) < EPS) throw new Error('singular_transform');
   geometry.applyMatrix4(matrix);
+  // Ring axes move with the solid: centres as points, tangents as directions.
+  const axis = geometry.getAttribute('axis');
+  if (axis) for (let i = 0; i < axis.count; i++) {
+    const p = new Vector3(axis.getX(i), axis.getY(i), 0).applyMatrix4(matrix);
+    const t = new Vector3(axis.getZ(i), axis.getW(i), 0).transformDirection(matrix);
+    axis.setXYZW(i, p.x, p.y, t.x, t.y);
+  }
   if (matrix.determinant() < 0) {
     const count = geometry.getAttribute('position').count;
     const index = geometry.index ? Array.from(geometry.index.array) : Array.from({ length: count }, (_, i) => i);
@@ -374,6 +405,8 @@ export function buildScene(input: PreparedScene): ScenePacket {
     try {
       if (mark.clips.length) geometry = clip(geometry, mark.clips, scene.canvas);
       const positions = new Float32Array(geometry.getAttribute('position').array);
+      const axisAttribute = geometry.getAttribute('axis');
+      const axis = role === 'object' && mark.shape.kind === 'path' && mark.appearance && axisAttribute ? new Float32Array(axisAttribute.array) : null;
       if (!positions.length) { if (role === 'object') output.clippedObjects++; return; }
       if (positions.some(v => !finite(v))) throw new Error('invalid_vertices');
       const normals = new Float32Array(geometry.getAttribute('normal').array);
@@ -389,7 +422,8 @@ export function buildScene(input: PreparedScene): ScenePacket {
         output.bytes += appearance.svg.length * 2;
       }
       if (output.triangles > MAX_TRIANGLES || output.bytes > MAX_BYTES) throw new Error('mesh_budget_exceeded');
-      output.meshes.push({ positions, normals, indices, color: mark.color, opacity: mark.opacity,
+      if (axis) output.bytes += axis.byteLength;
+      output.meshes.push({ ...(axis ? { axis } : {}), positions, normals, indices, color: mark.color, opacity: mark.opacity,
         sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex, primitive: mark.primitive,
         role, filled: role === 'pair-fill' || mark.filled, layerIndex: 0, layerZ: 0, ...(appearance ? { appearance } : {}),
         ...(role === 'object' && markBoard(mark, scene.canvas) > 0 ? { board: markBoard(mark, scene.canvas) } : {}),
@@ -412,6 +446,7 @@ export function unpackMesh(packet: MeshPacket): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(packet.positions, 3));
   geometry.setAttribute('normal', new Float32BufferAttribute(packet.normals, 3));
+  if (packet.axis) geometry.setAttribute('axis', new Float32BufferAttribute(packet.axis, 4));
   if (packet.indices) geometry.setIndex(new Uint32BufferAttribute(packet.indices, 1));
   return geometry;
 }

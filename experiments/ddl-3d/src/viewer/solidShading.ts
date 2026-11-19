@@ -1,4 +1,4 @@
-import { Color, Vector3, type MeshLambertMaterial, type Texture } from 'three';
+import { Color, Vector2, Vector3, type MeshLambertMaterial, type Texture } from 'three';
 
 /** Uniforms every solid shares, updated once a frame. */
 export interface SolidUniforms {
@@ -35,7 +35,18 @@ const declarations = /* glsl */ `
 uniform float uWeight; uniform vec3 uR; uniform vec3 uTone; uniform float uLit;
 varying vec2 vSurf;
 #ifdef SOLID_PAINT
-uniform sampler2D uBlur; uniform float uWallOpacity;
+uniform sampler2D uBlur; uniform float uWallOpacity; uniform vec2 uTexel;
+#endif
+`;
+/** After three declares `map`. */
+const height = /* glsl */ `
+#ifdef SOLID_PAINT
+// The paint's height: mostly its coverage (much paint keeps its grain in
+// alpha, one colour), a little its lightness.
+float paintHeight( vec2 uv ) {
+  vec4 p = texture2D( map, uv );
+  return p.a * ( 1.0 + 0.5 * ( dot( p.rgb, vec3( 0.299, 0.587, 0.114 ) ) - 0.5 ) );
+}
 #endif
 `;
 
@@ -43,19 +54,34 @@ uniform sampler2D uBlur; uniform float uWallOpacity;
  * shadows, colour space, alpha test and wireframe stay three's. `surf` is per
  * vertex: x = 1 on a wall, y = the sphere's height (-1 back .. 1 front; 2 for
  * no blend). At the front (weight 0) the colour is the 2D paint itself. */
-export function shadeSolid(material: MeshLambertMaterial, shared: SolidUniforms, paint?: { blur: Texture; wallOpacity: number }) {
+export function shadeSolid(material: MeshLambertMaterial, shared: SolidUniforms, paint?: { blur: Texture; wallOpacity: number; texel: [number, number] }) {
   material.defines = { ...(material.defines ?? {}), ...(paint ? { SOLID_PAINT: '' } : {}) };
   material.customProgramCacheKey = () => paint ? 'inku-solid-paint' : 'inku-solid';
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, shared);
-    if (paint) { shader.uniforms.uBlur = { value: paint.blur }; shader.uniforms.uWallOpacity = { value: paint.wallOpacity }; }
+    if (paint) {
+      shader.uniforms.uBlur = { value: paint.blur }; shader.uniforms.uWallOpacity = { value: paint.wallOpacity };
+      shader.uniforms.uTexel = { value: new Vector2(...paint.texel) };
+    }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${paint ? 'attribute vec2 surf;' : ''}\nvarying vec2 vSurf;`)
       .replace('#include <uv_vertex>', `#include <uv_vertex>\n${paint ? 'vSurf = surf;' : 'vSurf = vec2(0.0, 2.0);'}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${declarations}`)
+      .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>\n${height}`)
       .replace('#include <map_fragment>', /* glsl */ `
+        float solidRelief = 0.0;
 #ifdef SOLID_PAINT
+        // Raking light raises the brush marks: the slope of the paint's height
+        // toward the light, as the view turns. Where a texel spans more than two
+        // screen pixels the relief fades, so coarse paint does not turn to tiles.
+        if ( vSurf.x < 0.5 ) {
+          vec2 g = vec2( paintHeight( vMapUv + vec2( uTexel.x, 0.0 ) ) - paintHeight( vMapUv - vec2( uTexel.x, 0.0 ) ),
+                         paintHeight( vMapUv + vec2( 0.0, uTexel.y ) ) - paintHeight( vMapUv - vec2( 0.0, uTexel.y ) ) ) * 0.5;
+          vec2 r = length( uR.xy ) > 1e-4 ? normalize( uR.xy ) : vec2( 0.0 );
+          float pixelsPerTexel = 1.0 / max( length( fwidth( vMapUv ) / uTexel ), 1e-4 );
+          solidRelief = -0.5 * dot( g, r ) * min( 1.0, 2.0 / max( pixelsPerTexel, 1e-4 ) );
+        }
         // Walls take the paint's colour folded in from the edge, opaque; a sphere
         // turns from the front paint to its blurred colour toward the back.
         vec4 paint = texture2D( map, vMapUv );
@@ -73,7 +99,7 @@ export function shadeSolid(material: MeshLambertMaterial, shared: SolidUniforms,
           // One shade from the faces' turn away from the paper's front, and the
           // shadow of the one directional light; darkness takes the paper's tint.
           vec3 nW = inverseTransformDirection( normal, viewMatrix );
-          float s = 1.0 + uWeight * ( 0.29 * ( dot( nW, uR ) - uR.z ) + 0.10 * nW.y );
+          float s = 1.0 + uWeight * ( 0.29 * ( dot( nW, uR ) - uR.z ) + 0.10 * nW.y + solidRelief );
           s = clamp( s, 0.62, 1.10 );
           float shadow = 1.0;
 #if NUM_DIR_LIGHTS > 0

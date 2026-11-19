@@ -182,7 +182,9 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
       else if (viewer) {
         solidsSettings = { ...viewer.settings };
         root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.spinning;
-        for (const input of root.querySelectorAll<HTMLInputElement>('input[data-solids]')) input.checked = !!solidsSettings[input.dataset.solids as 'frictionless' | 'open'];
+        for (const input of root.querySelectorAll<HTMLInputElement>('input[type=checkbox][data-solids]')) input.checked = !!solidsSettings[input.dataset.solids as 'frictionless' | 'open'];
+        const light = root.querySelector<HTMLInputElement>('input[type=range][data-solids=light]');
+        if (light) { light.value = String(solidsSettings.light); root.querySelector<HTMLOutputElement>('output[data-solids=light]')!.value = solidsSettings.light.toFixed(2); }
       }
       post('view-state', { viewState });
     };
@@ -191,7 +193,8 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
         selection.textContent = `${words.selected}: ${words.glassLayer} ${Number(data.glassLayer) + 1}${data.name ? ` 「${data.name}」` : ''} · #${(data.instructions as number[]).join(', #')}`;
         return;
       }
-      selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
+      // The chunk of the instructions a solid came from, when the saved DDL names it.
+      selection.textContent = data ? `${words.selected}: ${data.chunk ? `「${data.chunk}」 · ` : ''}${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
     };
     viewer = mode === 'glass' ? new GlassViewer(stage, packet, changed, selected, fail, value.initialView)
       : new Viewer(stage, packet, changed, selected, fail, value.initialView);
@@ -316,6 +319,15 @@ function solidsControls(parent: HTMLElement) {
     input.addEventListener('change', () => { solidsSettings = { ...solidsSettings, [key]: input.checked }; solids()?.set({ [key]: input.checked }); });
     sceneControls.push(input);
   }
+  const lightLabel = element('label', parent, words.lightDirection), light = element('input', lightLabel);
+  light.type = 'range'; light.min = '-1'; light.max = '1'; light.step = '0.01'; light.value = String(solidsSettings.light);
+  light.dataset.solids = 'light'; light.setAttribute('aria-label', words.lightDirection);
+  const output = element('output', lightLabel, solidsSettings.light.toFixed(2)); output.dataset.solids = 'light';
+  light.addEventListener('input', () => {
+    output.value = Number(light.value).toFixed(2);
+    solidsSettings = { ...solidsSettings, light: Number(light.value) }; solids()?.set({ light: Number(light.value) });
+  });
+  sceneControls.push(light);
 }
 
 function showUnpainted(unpainted: Unpainted[]) {

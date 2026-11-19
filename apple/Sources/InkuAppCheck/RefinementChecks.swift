@@ -67,7 +67,7 @@ func runRefinementChecks() async throws {
           // Each option's instructions are the ranges it chose again from the saved DDL (the parent's when unchanged).
           layout.candidates.contains(where: { $0.recomposition?.source != nil }),
           layout.candidates.allSatisfy({ $0.work.renderSeed == "0" && $0.work.ddl == ($0.recomposition?.source ?? parent.ddl)
-              && $0.work.renderColorCatalogID == app.catalogID && $0.work.renderWild == false
+              && $0.work.renderColorCatalogID == app.catalogID && $0.work.renderWild == true
               && $0.work.stage1Model == "check:layout" && $0.work.stage2Model == "check:layout"
               && $0.work.interpretationSeed == nil }),
           await provider.calls == initialCalls, try await database.list().count == initialRows,

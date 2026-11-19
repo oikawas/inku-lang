@@ -139,7 +139,7 @@ public final class RefinementModel {
         let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let selectedKind = kind
         let selectedMode = recomposeMode
-        let selectedWild: Bool? = app.wild
+        let selectedWild = parent.renderWild ?? false
         let selectedModel: String? = app.nextDrawingModelReference
         let run = UUID()
         runID = run; running = true; saving = !selection.isEmpty; stopping = false; app.runStops.track(self)

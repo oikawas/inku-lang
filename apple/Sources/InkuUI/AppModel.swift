@@ -1445,7 +1445,7 @@ public final class AppModel {
             let saved = try await savedConfiguration(workID: work.id)
             var options = try ExactJSON(data: saved.renderOptions)
             let target = paperID ?? options["canvas_aspect_id"].string ?? work.renderCanvasAspectID ?? canvasID
-            let unchanged = !forceEdit && source == work.ddl && options["wild"].bool == wild
+            let unchanged = !forceEdit && source == work.ddl
                 && work.stage1Model == nextDrawingModelReference && work.stage2Model == nextDrawingModelReference
             let fit = await chooseCanvasFit(source: source, recordedWork: unchanged ? work : nil,
                                              paperID: target, presentation: presentation)
@@ -1456,7 +1456,7 @@ public final class AppModel {
                 options["canvas_aspect_id"] = .string(paper.canvasID)
                 options["canvas"] = .object(["width": .number(String(Int(paper.canvasWidth))), "height": .number(String(Int(paper.canvasHeight)))])
             }
-            options["wild"] = .bool(wild)
+            options["wild"] = .bool(work.renderWild ?? false)
             guard let catalog = options["catalog_id"].string, options["resolved_color_map"].object != nil else {
                 throw HostError("saved_refinement_options_unavailable")
             }

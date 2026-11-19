@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: iPhone home opens a viewing screen with paging, zoom, 3D, Star, Refine, and Share. Share sends a card directly to the share sheet; Star and Share remain available during drawing. The long-press menu is reordered.
+
 - iOS: fixes a blank artwork when returning to Making after viewing a lineage and the iPhone home.
 
 - iOS: iPhone opens the work library as home with All / Starred, a menu, settings, and a temporary field leading to Making or the camera. A back button or left-edge swipe returns from Making and settings. Progress and stop appear in the appropriate places during a run. Swift's favorite wording now uses Star.

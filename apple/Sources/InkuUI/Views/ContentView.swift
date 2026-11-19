@@ -104,6 +104,9 @@ public struct ContentView: View {
     @State private var phoneHomeStarted = false
     @State private var appInitialized = false
     @State private var phoneWorkspaceInitialized = false
+    @State private var phoneViewingEvents = PhoneViewingEvents()
+    @State private var phoneRefinementResult: SavedWork?
+    @State private var phoneViewerRefinement = false
     /// Bumped by the iPhone tab bar's camera (`PhoneCameraFlow`).
     @State private var cameraRequest = 0
     /// The window's file dialogs, which the menu's "open DDL" also asks.
@@ -142,7 +145,10 @@ public struct ContentView: View {
             }
         }
         #endif
-        .onChange(of: dialog?.id) { _, _ in batchWorkspace.invalidateReads() }
+        .onChange(of: dialog?.id) { _, id in
+            batchWorkspace.invalidateReads()
+            if id == nil { phoneViewerRefinement = false; phoneViewingEvents.selectSavedWork = false }
+        }
         .onChange(of: model.works) { _, _ in
             historyRefreshTask?.cancel()
             historyRefreshTask = Task {
@@ -263,8 +269,10 @@ public struct ContentView: View {
             appInitialized = true
             if phoneLayout { initializePhoneWorkspace() }
             await refreshDrawingKeyState()
-            model.onSavedWork = { [weak model = model, weak maintenance = maintenance] work in
+            model.onSavedWork = { [weak model = model, weak maintenance = maintenance, weak events = phoneViewingEvents] work in
                 guard let model, let maintenance else { return }
+                events?.savedWork = work
+                if events?.selectSavedWork == true { events?.refinementWork = work }
                 await maintenance.log(work: work, enabled: model.display.preferences.saveResultLog)
             }
             model.onDrawingLog = { [weak model = model, weak maintenance = maintenance] record in
@@ -311,7 +319,14 @@ public struct ContentView: View {
                         writingLocked: model.isBusy || automation.isOccupied,
                         onSelectionExport: openSelectionExport, phoneLayout: true,
                         onPhoneCreate: { showCreation(tab: "artwork") }, onPhoneCamera: { cameraRequest += 1 },
-                        onPhoneSettings: { openSettings(nil) }, phoneRunStatus: automation.running ? automation.status : model.status)
+                        onPhoneSettings: { openSettings(nil) }, phoneRunStatus: automation.running ? automation.status : model.status,
+                        phoneSavedWork: phoneViewingEvents.savedWork,
+                        phoneRefinementResult: phoneRefinementResult ?? phoneViewingEvents.refinementWork,
+                        onPhoneViewerAction: { work, action in
+                            phoneRefinementResult = nil; phoneViewingEvents.refinementWork = nil
+                            phoneViewingEvents.selectSavedWork = true; phoneViewerRefinement = true
+                            openWorkAction(work, action)
+                        })
                 .disabled(importing)
                 .background(InkuColor.bg)
         } settings: {
@@ -607,7 +622,12 @@ public struct ContentView: View {
                 .id(session.id)
                 .environment(model.display)
         case .edit(let session):
-            WorkEditView(model: model, work: session.work, mode: session.mode, onCommitted: { closeLibrary() })
+            WorkEditView(model: model, work: session.work, mode: session.mode, onCommitted: {
+                if phoneViewerRefinement, phoneLayout, ui.libraryOpen {
+                    phoneRefinementResult = phoneViewingEvents.refinementWork ?? model.selectedWork
+                    phoneViewerRefinement = false
+                } else { closeLibrary() }
+            })
                 .id(session.id)
                 .environment(model.display)
                 .inkuDialogFrame(.workEdit)
@@ -662,6 +682,11 @@ public struct ContentView: View {
     }
 
     private func refinementCommitted(_ work: SavedWork) {
+        if phoneViewerRefinement, phoneLayout, ui.libraryOpen, libraryPreview.work != nil {
+            phoneViewerRefinement = false
+            phoneRefinementResult = work
+            return
+        }
         Task {
             batchWorkspace.showHistory()
             await model.showSavedRefinement(work)

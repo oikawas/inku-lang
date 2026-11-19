@@ -9,6 +9,17 @@ import UIKit
 #endif
 
 @MainActor
+enum InkuPhoneShare {
+    static func present(_ url: URL) async -> Bool {
+        #if os(iOS)
+        return await InkuShareSheet.present([url])
+        #else
+        return false
+        #endif
+    }
+}
+
+@MainActor
 enum InkuPasteboard {
     @discardableResult
     static func copy(text: String, includingIOS: Bool = true) -> Bool {

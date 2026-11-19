@@ -48,6 +48,9 @@ struct LibraryView: View {
     var onPhoneCamera: () -> Void = {}
     var onPhoneSettings: () -> Void = {}
     var phoneRunStatus = ""
+    var phoneSavedWork: SavedWork? = nil
+    var phoneRefinementResult: SavedWork? = nil
+    var onPhoneViewerAction: (SavedWork, String) -> Void = { _, _ in }
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @State private var providers: [ProviderSettings] = []
@@ -66,6 +69,11 @@ struct LibraryView: View {
     @State private var phoneScrollAtTop = true
     @State private var phoneScrolledVisit: Int?
     @State private var phoneGroupLoadingVisit: Int?
+    @State private var phoneOrder: PhoneViewingOrder?
+    @State private var phoneShareInProgress = false
+    @State private var phoneInformationWork: SavedWork?
+    @State private var phoneRefineWork: SavedWork?
+    @State private var phonePendingAction: (SavedWork, String)?
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
     private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language) }
@@ -75,7 +83,12 @@ struct LibraryView: View {
             || library.starredOnly || library.revisionOnly
     }
     private var visibleIDs: [String] {
-        library.isGrouped
+        if phoneLayout && library.grouping == .description {
+            return library.groups.flatMap {
+                DescriptionLibraryGroup.orderedIDs(members: library.groupMembers[$0.id] ?? [], records: library.descriptionCompositions)
+            }
+        }
+        return library.isGrouped
             ? library.groups.flatMap { library.groupMembers[$0.id]?.map(\.id) ?? [$0.representative.id] }
             : library.works.map(\.id)
     }
@@ -87,22 +100,7 @@ struct LibraryView: View {
             if phoneLayout {
                 // iPhone (ios-app step 7b): a work opens as its own page, the preview's contents on the whole
                 // width; going back closes the preview. The page turns with the phone.
-                NavigationStack(path: Binding(get: { preview.work.map { [$0.id] } ?? [] },
-                                              set: { if $0.isEmpty { preview.close() } })) {
-                    surface
-                        .inkuHidesNavigationBar()
-                        .inkuPhoneTabBarHidden()
-                        .navigationDestination(for: String.self) { _ in
-                            previewContent
-                                .inkuInlineNavigationTitle()
-                                .inkuAllowsLandscape()
-                                .inkuPhoneTabBarHidden()
-                                .safeAreaInset(edge: .bottom, spacing: 0) {
-                                    if model.hasActiveRun { phoneRunRow }
-                                }
-                        }
-                }
-                .inkuPhoneTabBarHidden()
+                phoneNavigation
             } else {
                 surface
             }
@@ -121,23 +119,74 @@ struct LibraryView: View {
         .onChange(of: phoneScrollAtTop) { _, atTop in
             if phoneLayout && !atTop && library.query.isEmpty && !phoneSearchHasDraft { phoneSearchVisible = false }
         }
+        .onChange(of: phoneSavedWork?.id) { _, _ in
+            guard phoneLayout, preview.work != nil, let work = phoneSavedWork else { return }
+            phoneOrder?.insertFirst(work.id, select: false)
+        }
+        .onChange(of: phoneRefinementResult?.id) { _, _ in
+            guard phoneLayout, preview.work != nil, let work = phoneRefinementResult else { return }
+            phoneOrder?.insertFirst(work.id, select: true)
+            preview.show(work)
+        }
+        .sheet(isPresented: Binding(get: { phoneInformationWork != nil }, set: { if !$0 { phoneInformationWork = nil } })) {
+            if let work = phoneInformationWork { PhoneWorkInformation(model: model, work: work, writingLocked: writingDisabled) }
+        }
+        .sheet(isPresented: Binding(get: { phoneRefineWork != nil }, set: { if !$0 { phoneRefineWork = nil } }), onDismiss: {
+            if let (work, action) = phonePendingAction {
+                phonePendingAction = nil
+                if preview.work != nil {
+                    Task {
+                        do { onPhoneViewerAction(try await library.fullWork(id: work.id), action) }
+                        catch { model.errorText = error.localizedDescription }
+                    }
+                } else { performWorkAction(work, action) }
+            }
+        }) {
+            if let work = phoneRefineWork {
+            NavigationStack {
+                List { SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
+                    phonePendingAction = (target, action); phoneRefineWork = nil
+                }, writingLocked: writingDisabled) }
+                .navigationTitle(display.webCopy("historyPreviewRefine", "推敲する"))
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(display.localized("閉じる")) { phoneRefineWork = nil } } }
+            }
+            }
+        }
         .inkuOnEscape { onClose?() }
         .alert(item: $deletion) { request in
           if request.movesToTrash {
             return Alert(title: Text(display.localizedFormat("%ld件をごみ箱に移動しますか？", request.ids.count)),
                   primaryButton: .default(Text(display.localized("実行"))) {
                       guard !library.mutating, !writingDisabled else { return }
-                      Task { await library.trash(ids: request.ids) }
+                      Task { await library.trash(ids: request.ids); await reconcilePhoneRemoval(request.ids) }
                   }, secondaryButton: .cancel(Text(display.localized("キャンセル"))))
           } else {
             return Alert(title: Text(display.localized(request.empty ? "ごみ箱を空にしますか？" : "選択した作品を完全に削除しますか？")),
                   message: Text(display.localized("作品を復元することはできません。系譜には削除済みの節点が残ります。")),
                   primaryButton: .destructive(Text(display.localized("完全に削除"))) {
                       guard !library.mutating, !writingDisabled else { return }
-                      Task { if request.empty { await library.emptyTrash() } else { await library.permanentlyDelete(ids: request.ids) } }
+                      Task {
+                          if request.empty { await library.emptyTrash() } else { await library.permanentlyDelete(ids: request.ids) }
+                          await reconcilePhoneRemoval(request.ids)
+                      }
                   }, secondaryButton: .cancel(Text(display.localized("キャンセル"))))
           }
         }
+    }
+
+    private var phonePath: Binding<[String]> {
+        Binding(get: { preview.work == nil ? [] : ["viewer"] }, set: { if $0.isEmpty { preview.close() } })
+    }
+
+    private var phoneNavigation: some View {
+        NavigationStack(path: phonePath) {
+            surface
+                .inkuHidesNavigationBar()
+                .inkuPhoneTabBarHidden()
+                .navigationDestination(for: String.self) { _ in
+                    phoneViewer.inkuInlineNavigationTitle().inkuAllowsLandscape().inkuPhoneTabBarHidden()
+                }
+        }.inkuPhoneTabBarHidden()
     }
 
     /// The heading, the tools, the status and the listing; beside them the preview on the Mac and the iPad.
@@ -549,7 +598,8 @@ struct LibraryView: View {
                                 records: library.descriptionCompositions,
                                 onOpen: { work in if !(phoneLayout && phoneSelecting) { openInWorkTab(work) } }, onPreview: { work in
                                     if phoneLayout && phoneSelecting { library.toggleSelection(work.id) } else { openWork(work) }
-                                }, selecting: phoneLayout && phoneSelecting)
+                                }, selecting: phoneLayout && phoneSelecting,
+                                contextMenu: phoneLayout ? { AnyView(workMenu($0)) } : nil)
                         }
                     }.padding(12)
                 }
@@ -689,7 +739,7 @@ struct LibraryView: View {
         }
         .buttonStyle(.plain)
         .disabled(model.isBrowsingLocked)
-        .contextMenu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: menuActions) }
+        .contextMenu { workMenu(work) }
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -730,7 +780,7 @@ struct LibraryView: View {
         }
         .buttonStyle(.plain)
         .disabled(model.isBrowsingLocked)
-        .contextMenu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: menuActions) }
+        .contextMenu { workMenu(work) }
         .accessibilityLabel(model.workPresentationTitle(work))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -1151,6 +1201,7 @@ struct LibraryView: View {
 
     private func openWork(_ work: SavedWork) {
         guard !model.isBrowsingLocked else { return }
+        if phoneLayout { phoneOrder = PhoneViewingOrder(ids: visibleIDs, currentID: work.id) }
         preview.show(work)
     }
 
@@ -1214,8 +1265,49 @@ struct LibraryView: View {
         }
     }
 
-    private func workMenu(_ work: SavedWork) -> some View {
-        LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: menuActions)
+    @ViewBuilder private func workMenu(_ work: SavedWork) -> some View {
+        if phoneLayout {
+            if !work.trashed {
+                Button(display.label("共有", "Share"), systemImage: "square.and.arrow.up") { sharePhoneWork(work) }
+                    .disabled(phoneShareInProgress)
+                Button(display.localized(work.starred ? "スターを外す" : "スターを付ける"), systemImage: "star") {
+                    Task { await library.toggleStar(work) }
+                }.disabled(library.mutating)
+                Button(display.webCopy("historyPreviewRefine", "推敲する"), systemImage: "pencil") { phoneRefineWork = work }
+                    .disabled(writingDisabled || model.isBrowsingLocked)
+                if work.lineageNodeID != nil {
+                    Button(display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(work) }
+                        .disabled(model.isBrowsingLocked || writingDisabled)
+                }
+                Button(display.localized("制作で開く"), systemImage: "pencil") { openInWorkTab(work) }
+                    .disabled(model.isBrowsingLocked || writingDisabled)
+                Button(display.webCopy("historyPreviewDetails", "作品情報"), systemImage: "info.circle") {
+                    Task { if let full = try? await library.fullWork(id: work.id) { phoneInformationWork = full } }
+                }.disabled(model.isBrowsingLocked)
+                Divider()
+            }
+            Button(display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") {
+                library.toggleSelection(work.id)
+            }.disabled(library.mutating || model.isBrowsingLocked)
+            if !work.trashed {
+                Button(display.localized("推敲の印"), systemImage: "pencil.circle") { Task { await library.toggleRevision(work) } }
+                    .disabled(library.mutating || writingDisabled)
+                Button(display.label("作品 UUID をコピー", "Copy work UUID"), systemImage: "doc.on.doc") { library.copyHash(work.id) }
+                SavedWorkExportMenu(model: model, count: 1) { action in performWorkAction(work, action) }.disabled(writingDisabled)
+            }
+            Divider()
+            if work.trashed {
+                Button(display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }
+                    .disabled(library.mutating || writingDisabled)
+                Button(display.localized("完全に削除"), role: .destructive) { deletion = LibraryDeletion(ids: [work.id]) }
+                    .disabled(library.mutating || writingDisabled)
+            } else {
+                Button(display.localized("ごみ箱へ"), role: .destructive) { deletion = LibraryDeletion(ids: [work.id], movesToTrash: true) }
+                    .disabled(library.mutating || writingDisabled)
+            }
+        } else {
+            LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: menuActions)
+        }
     }
 
     private var menuActions: LibraryWorkMenuActions {
@@ -1234,6 +1326,92 @@ struct LibraryView: View {
     }
 
     // MARK: Preview (Web .history-preview, minmax(280px, 360px))
+
+    @ViewBuilder private var phoneViewer: some View {
+        if let work = preview.work {
+            PhoneWorkViewer(model: model, work: work, isTrash: work.trashed || library.isTrash,
+                writingLocked: writingDisabled, sharing: phoneShareInProgress, runStatus: phoneRunStatus,
+                onClose: { preview.close() }, onMove: { movePhoneViewer($0) },
+                onFirst: { movePhoneViewerToBoundary(first: true) }, onLast: { movePhoneViewerToBoundary(first: false) },
+                onRun: onPhoneCreate, onShare: sharePhoneWork, onRefine: { phoneRefineWork = $0 },
+                onInfo: { work in Task {
+                    do { phoneInformationWork = try await library.fullWork(id: work.id) }
+                    catch { model.errorText = error.localizedDescription }
+                } }, onAction: performWorkAction,
+                onLineage: openLineage, onCreate: { work in openInCreate(work) },
+                onDelete: { work, permanent in
+                    if work.trashed && !permanent {
+                        Task { await library.restore(ids: [work.id]); await reconcilePhoneRemoval([work.id]) }
+                    } else { deletion = LibraryDeletion(ids: [work.id], movesToTrash: !permanent) }
+                })
+        }
+    }
+
+    private func movePhoneViewer(_ delta: Int) {
+        Task { @MainActor in
+            guard var order = phoneOrder, let current = order.currentID else { return }
+            if delta > 0, order.ids.last == current, library.continuous, !library.isGrouped,
+               library.works.count < library.total {
+                await library.loadMore()
+                guard preview.work?.id == current else { return }
+                order.append(library.works.map(\.id))
+            }
+            order.move(delta)
+            phoneOrder = order
+            await showPhoneViewerWork(order.currentID)
+        }
+    }
+
+    private func movePhoneViewerToBoundary(first: Bool) {
+        Task { @MainActor in
+            guard var order = phoneOrder else { return }
+            if !first && library.continuous && !library.isGrouped {
+                while library.works.count < library.total {
+                    let before = library.works.count
+                    await library.loadMore()
+                    guard preview.work != nil, library.works.count > before else { break }
+                    order.append(library.works.map(\.id))
+                }
+            }
+            if first { order.first() } else { order.last() }
+            phoneOrder = order
+            await showPhoneViewerWork(order.currentID)
+        }
+    }
+
+    private func showPhoneViewerWork(_ id: String?) async {
+        guard let id else { preview.close(); return }
+        do {
+            let work = try await library.fullWork(id: id)
+            guard phoneOrder?.currentID == id, preview.work != nil else { return }
+            preview.show(work)
+        } catch { model.errorText = error.localizedDescription }
+    }
+
+    private func reconcilePhoneRemoval(_ ids: [String]) async {
+        guard phoneLayout, let current = preview.work, ids.contains(current.id), var order = phoneOrder else { return }
+        let saved = try? await model.auxiliaryDatabase().work(id: current.id)
+        guard saved == nil || saved?.trashed != current.trashed else { return }
+        order.remove(current.id); phoneOrder = order
+        await showPhoneViewerWork(order.currentID)
+    }
+
+    private func sharePhoneWork(_ work: SavedWork) {
+        guard !phoneShareInProgress, !work.trashed else { return }
+        phoneShareInProgress = true
+        Task { @MainActor in
+            defer { phoneShareInProgress = false }
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-phone-share-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: folder) }
+            do {
+                let artifact = try await model.preparePhoneShareCard(workID: work.id)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let url = folder.appendingPathComponent(artifact.name)
+                try artifact.data.write(to: url, options: .atomic)
+                _ = await InkuPhoneShare.present(url)
+            } catch { model.errorText = model.failureMessage(error) }
+        }
+    }
 
     @ViewBuilder
     private var previewContent: some View {

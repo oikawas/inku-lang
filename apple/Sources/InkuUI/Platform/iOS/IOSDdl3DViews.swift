@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 import WebKit
 
-/// The viewer's web view. iOS has no 3D switch yet (`Ddl3DInstallation.available`); this keeps the shared host compiling.
+/// The viewer's web view, used by the iOS 3D canvas when the bundled viewer is available.
 public final class Ddl3DWebView: WKWebView {
     /// Kept while the view is on screen; `Ddl3DWebHost.close()` lets it go.
     var bridge: Ddl3DWebHost?

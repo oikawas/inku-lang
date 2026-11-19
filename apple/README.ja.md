@@ -241,7 +241,7 @@ UI差分の限定確認は`--library-browsing-only`、`--lineage-presentation-on
 
 ### iPadとiPhoneのアプリ
 
-iOSのアプリ（target `InkuIOS`、bundle ID `app.inku.ios`、iOS 18以降）は、iPadとiPhoneに入ります。iPadではMacと同じ画面とメニューを1枚の窓で全画面に出します。iPhoneは作品の並びをホームとして開き、下の描く欄から制作の頁または撮影へ進みます。上の帯には「すべて｜スター」、メニュー、設定があり、検索は並びを下へ引くと出ます。制作と設定からは戻るボタンまたは左端からの払いで戻れます。撮った写真は「描くときのデフォルト」の「画像」の条件で描きます（iPadの画像タブには「撮影」があります）。ホームは正方形のサムネイルを3列に並べ、全件を縦にスクロールします（系譜ごとの表示はページ送りのままです）。iPhoneは縦に留め、作品の頁とプレゼンテーションだけ横にも回ります（[Swift仕様](SWIFT_SPEC.ja.md)の「2026-11-07 iOS（iPad）のアプリ」の節）。product repository rootから次を実行すると、署名せずにiOSシミュレータ向けにbuildします。Apple account、Team、証明書は使いません。先に上の`rustup target add`でiOSのtargetを入れておいてください。
+iOSのアプリ（target `InkuIOS`、bundle ID `app.inku.ios`、iOS 18以降）は、iPadとiPhoneに入ります。iPadではMacと同じ画面とメニューを1枚の窓で全画面に出します。iPhoneは作品の並びをホームとして開き、下の描く欄から制作の頁または撮影へ進みます。作品を押すと黒い地の見る画面が開き、左右にめくり、ピンチで拡大し、2回押しで3Dへ切り替えられます。スター・推敲・共有があり、共有はカードをiOSの共有シートへ直接渡します。上の帯には「すべて｜スター」、メニュー、設定があり、検索は並びを下へ引くと出ます。制作と設定からは戻るボタンまたは左端からの払いで戻れます。撮った写真は「描くときのデフォルト」の「画像」の条件で描きます（iPadの画像タブには「撮影」があります）。ホームは正方形のサムネイルを3列に並べ、全件を縦にスクロールします（系譜ごとの表示はページ送りのままです）。iPhoneは縦に留め、作品の頁とプレゼンテーションだけ横にも回ります（[Swift仕様](SWIFT_SPEC.ja.md)の「2026-11-07 iOS（iPad）のアプリ」の節）。product repository rootから次を実行すると、署名せずにiOSシミュレータ向けにbuildします。Apple account、Team、証明書は使いません。先に上の`rustup target add`でiOSのtargetを入れておいてください。
 
 ```sh
 apple/scripts/build-ios.sh Release

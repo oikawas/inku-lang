@@ -12,8 +12,18 @@ struct DescriptionLibraryGroup: View {
     let onOpen: (SavedWork) -> Void
     let onPreview: (SavedWork) -> Void
     var selecting = false
+    var contextMenu: ((SavedWork) -> AnyView)? = nil
     private var language: String { model.display.preferences.language }
     private var forms: [String] { CompositionNames.formIDs + [""] }
+
+    static func orderedIDs(members: [InkuPersistence.LibraryItem], records: [String: CompositionRecordSnapshot]) -> [String] {
+        (CompositionNames.formIDs + [""]).flatMap { form in
+            members.filter { item in
+                let value = records[item.id].flatMap { ($0.own ?? $0.inherited)?["answer"]["form"].string } ?? ""
+                return (CompositionNames.formIDs.contains(value) ? value : "") == form
+            }.map(\.id)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -27,6 +37,21 @@ struct DescriptionLibraryGroup: View {
                                 Text(form.isEmpty ? model.display.webCopy("historyDescriptionNoRecord", "構図の記録なし") : CompositionNames.formName(form, language: language))
                                     .inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
                                 ForEach(items) { item in
+                                    if let contextMenu {
+                                        itemButton(item).contextMenu { contextMenu(item.work) }
+                                    } else {
+                                        itemButton(item)
+                                    }
+                                }
+                            }.frame(width: 120, alignment: .topLeading)
+                        }
+                    }
+                }
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func itemButton(_ item: InkuPersistence.LibraryItem) -> some View {
                                     Button { onPreview(item.work) } label: {
                                         VStack(alignment: .leading, spacing: 4) {
                                             ArtworkThumbnail(work: item.work, thumbnails: model.thumbnails)
@@ -43,13 +68,6 @@ struct DescriptionLibraryGroup: View {
                                             }
                                         }
                                     }.buttonStyle(.plain).onTapGesture(count: 2) { onOpen(item.work) }.id(item.id)
-                                }
-                            }.frame(width: 120, alignment: .topLeading)
-                        }
-                    }
-                }
-            }
-        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func formID(_ work: SavedWork) -> String {

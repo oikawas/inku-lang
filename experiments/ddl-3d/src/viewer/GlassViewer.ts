@@ -13,14 +13,22 @@ import type { Unpainted } from './Viewer';
 
 export type GlassColor = 'none' | 'background' | 'layers';
 export interface GlassSettings {
-  angle: number; spacing: number; leaf: number; light: number; glassColor: GlassColor;
-  front: number; backTilt: number; sway: boolean; swayOnce: boolean; room: number; bluish: boolean;
+  angle: number; spacing: number; leaf: number; light: number; glassColor: GlassColor; sway: boolean;
   /** Keep turning at the release speed until touched (no friction). */ frictionless: boolean;
 }
 export const GLASS_DEFAULTS: GlassSettings = {
-  angle: 1, spacing: 1, leaf: 0.6, light: 0, glassColor: 'none', front: 0.03, backTilt: 0,
-  sway: false, swayOnce: true, room: 0.55, bluish: false, frictionless: true,
+  angle: 1, spacing: 1, leaf: 0.6, light: 0, glassColor: 'none', sway: false, frictionless: true,
 };
+/** The vessel and room the author judged in the trial (2026-11-20); not adjustable. */
+export const GLASS_FIXED = {
+  /** Front glass thickness, in short sides. */ front: 0.03,
+  /** Back face tilt, degrees. */ backTilt: 0,
+  /** Room brightness against the background. */ room: 0.55,
+  /** Silver stays neutral, not bluish. */ bluish: false,
+  /** One small turn once every layer has appeared. */ swayOnce: true,
+} as const;
+/** The glass settings a view state remembers; sway is left out so a return never starts moving. */
+export type RememberedGlass = Pick<GlassSettings, 'angle' | 'leaf' | 'light' | 'glassColor' | 'frictionless'>;
 
 const PAINT_PIXELS = navigator.vendor.startsWith('Apple') ? 4 * 1024 * 1024 : 16 * 1024 * 1024;
 const DEG = Math.PI / 180;
@@ -203,7 +211,7 @@ export class GlassViewer {
    * vertices change, so the controls move the fan smoothly. */
   private rebuild() {
     const s = this.settings, [W, H] = this.packet.canvas, u = this.box.material.uniforms;
-    this.fan = fanGeometry(this.layers.length, this.packet.canvas, { angle: s.angle, spacing: s.spacing, front: s.front, backTilt: s.backTilt });
+    this.fan = fanGeometry(this.layers.length, this.packet.canvas, { angle: s.angle, spacing: s.spacing, front: GLASS_FIXED.front, backTilt: GLASS_FIXED.backTilt });
     const fan = this.fan, axis = fan.axisX;
     const back = (x: number) => fan.backOffset - (x - axis) * fan.backTan;
     // Eight corners; a box keeps its winding when its z is moved.
@@ -243,8 +251,8 @@ export class GlassViewer {
         sigma[base + i].copy(absorption(this.layers[i].average, floor, Math.max(gap, 1e-3)));
       }
     }
-    u.uLeaf.value = s.leaf; u.uBluish.value = s.bluish; u.uRoom.value = s.room;
-    u.uBounces.value = s.front > 0.5 ? 6 : 4;
+    u.uLeaf.value = s.leaf; u.uBluish.value = GLASS_FIXED.bluish; u.uRoom.value = GLASS_FIXED.room;
+    u.uBounces.value = GLASS_FIXED.front > 0.5 ? 6 : 4;
     this.placeLights();
     this.requestDraw();
   }
@@ -294,7 +302,7 @@ export class GlassViewer {
         }
         this.reveal(i);
       }
-      if (!this.disposed && this.settings.swayOnce) this.swayOnce();
+      if (!this.disposed && GLASS_FIXED.swayOnce) this.swayOnce();
       return unpainted;
     })();
     this.painting = run.catch(() => undefined);
@@ -503,15 +511,16 @@ export class GlassViewer {
   private stateTimer = 0;
   private notify() { if (!this.stateTimer) this.stateTimer = window.setTimeout(() => { this.stateTimer = 0; if (!this.disposed) this.changed(this.state()); }, 120); }
 
-  state(): ViewState & { glass: GlassSettings; viewMode: 'glass' } {
+  state(): ViewState & { glass: RememberedGlass; viewMode: 'glass' } {
     return { position: this.camera.position.toArray(), target: this.controls.target.toArray(), zoom: this.camera.zoom, projection: this.projection,
       depth: 1, layerSpacing: this.settings.spacing, background: this.background, referenceHeight: this.referenceHeight, displayZoom: this.displayZoom(),
       orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2,
-      glass: { ...this.settings }, viewMode: 'glass' };
+      glass: { angle: this.settings.angle, leaf: this.settings.leaf, light: this.settings.light, glassColor: this.settings.glassColor, frictionless: this.settings.frictionless },
+      viewMode: 'glass' };
   }
-  restore(state: ViewState & { glass?: Partial<GlassSettings> }) {
+  restore(state: ViewState) {
     this.setProjection(state.projection);
-    if (state.glass) this.settings = { ...this.settings, ...state.glass, sway: false };
+    this.settings = { ...this.settings, ...(state.glass ?? {}), spacing: state.layerSpacing ?? this.settings.spacing, sway: false };
     this.setBackground(state.background ?? 'paint'); this.referenceHeight = state.referenceHeight ?? this.referenceHeight;
     this.camera.position.fromArray(state.position); this.controls.target.fromArray(state.target); this.camera.zoom = state.zoom;
     if (this.camera instanceof THREE.OrthographicCamera) { this.camera.top = state.orthoHeight / 2; this.camera.bottom = -state.orthoHeight / 2; this.resizeView(); }
@@ -700,7 +709,7 @@ export class GlassViewer {
       mesh.userData = { glassLayer: i, chunk: layer.name, instructions: layer.instructions };
       group.add(mesh); disposables.push(geometry, material, texture);
     });
-    group.userData = { layerMapping: 'glass-fan-v1', glass: { ...this.settings }, inputDigest: this.packet.inputDigest };
+    group.userData = { layerMapping: 'glass-fan-v1', glass: { ...this.settings, ...GLASS_FIXED }, inputDigest: this.packet.inputDigest };
     try {
       const bytes = await new GLTFExporter().parseAsync(group, { binary: true });
       if (!(bytes instanceof ArrayBuffer)) throw new Error('invalid_glb');

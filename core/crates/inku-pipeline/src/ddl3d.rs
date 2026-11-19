@@ -12,8 +12,10 @@
 
 use serde_json::Value;
 
-/// Web's fields, in its order.
-pub const FIELDS: [&str; 14] = [
+/// Web's fields, in its order. `ddl` is the host's own text (the DDL that
+/// wrote the Score, for the glass layers' chunks); every other field comes
+/// from the stored metadata.
+pub const FIELDS: [&str; 16] = [
     "score",
     "render_seed",
     "composition_seed",
@@ -28,6 +30,8 @@ pub const FIELDS: [&str; 14] = [
     "render_build_number",
     "ddl_version",
     "ddl_engine_version",
+    "instruction_lang_resolved",
+    "ddl",
 ];
 
 /// Web's input budget.
@@ -40,18 +44,26 @@ const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 ///
 /// The Score wins over a `score` member of the metadata. A metadata text that
 /// is empty or not an object contributes nothing, as a work without metadata
-/// has none to give. Errors are Web's reasons.
-pub fn snapshot(score: &str, metadata: &str) -> Result<String, &'static str> {
+/// has none to give. `ddl` is the stored DDL text, or None when the host has
+/// none; a `ddl` member of the metadata is never read. Errors are Web's
+/// reasons.
+pub fn snapshot(score: &str, metadata: &str, ddl: Option<&str>) -> Result<String, &'static str> {
     let score = score.trim();
     match serde_json::from_str::<Value>(score) {
         Ok(Value::Object(_)) => {}
         _ => return Err("invalid_score_json"),
     }
     let saved = top_level_members(metadata.trim()).unwrap_or_default();
+    let ddl = ddl.map(|text| serde_json::to_string(text).expect("a string serialises"));
     let mut out = String::from("{");
     for field in FIELDS {
         let raw = if field == "score" {
             score
+        } else if field == "ddl" {
+            match &ddl {
+                Some(raw) => raw.as_str(),
+                None => continue,
+            }
         } else {
             match saved.iter().find(|(key, _)| key == field) {
                 Some((_, raw)) => raw,
@@ -83,8 +95,8 @@ pub fn snapshot(score: &str, metadata: &str) -> Result<String, &'static str> {
     Ok(out)
 }
 
-/// The host's call: `{"score": "<text>", "metadata": "<text>"}` in,
-/// `{"json": "<input>"}` or `{"error": "<reason>"}` out.
+/// The host's call: `{"score": "<text>", "metadata": "<text>", "ddl": "<text>"}`
+/// in (`ddl` optional), `{"json": "<input>"}` or `{"error": "<reason>"}` out.
 pub fn snapshot_json(input: &[u8]) -> Vec<u8> {
     let answer = match serde_json::from_slice::<Value>(input) {
         Ok(Value::Object(request)) => match (request.get("score"), request.get("metadata")) {
@@ -93,7 +105,11 @@ pub fn snapshot_json(input: &[u8]) -> Vec<u8> {
                     Some(Value::String(text)) => text.as_str(),
                     _ => "",
                 };
-                match snapshot(score, metadata) {
+                let ddl = match request.get("ddl") {
+                    Some(Value::String(text)) => Some(text.as_str()),
+                    _ => None,
+                };
+                match snapshot(score, metadata, ddl) {
                     Ok(json) => serde_json::json!({ "json": json }),
                     Err(reason) => serde_json::json!({ "error": reason }),
                 }
@@ -231,7 +247,7 @@ mod tests {
         let metadata = r##"{"render_engine_version":"14","render_seed":"9007199254740993","other":1,
             "render_color_map":{"white":"#f5f2eb","black":"#333333"},"render_wild":null,
             "render_canvas_aspect_ratio":1.4,"composition_seed":"9007199254740995"}"##;
-        let json = snapshot(r#" {"version":"0.1.0", "items": [ ]} "#, metadata).unwrap();
+        let json = snapshot(r#" {"version":"0.1.0", "items": [ ]} "#, metadata, None).unwrap();
         assert_eq!(
             json,
             r##"{"score":{"version":"0.1.0","items":[]},"render_seed":"9007199254740993","composition_seed":"9007199254740995","render_canvas_aspect_ratio":1.4,"render_color_map":{"white":"#f5f2eb","black":"#333333"},"render_engine_version":"14"}"##
@@ -241,27 +257,42 @@ mod tests {
     #[test]
     fn a_large_integer_seed_is_refused_and_a_safe_one_is_kept_as_written() {
         assert_eq!(
-            snapshot("{}", r#"{"render_seed":9007199254740993}"#),
+            snapshot("{}", r#"{"render_seed":9007199254740993}"#, None),
             Err("unsafe_numeric_seed")
         );
         assert_eq!(
-            snapshot("{}", r#"{"render_seed":9007199254740991}"#).unwrap(),
+            snapshot("{}", r#"{"render_seed":9007199254740991}"#, None).unwrap(),
             r#"{"score":{},"render_seed":9007199254740991}"#
         );
     }
 
     #[test]
     fn a_score_that_is_not_an_object_and_an_oversized_input_are_refused() {
-        assert_eq!(snapshot("[]", "{}"), Err("invalid_score_json"));
-        assert_eq!(snapshot("{", "{}"), Err("invalid_score_json"));
+        assert_eq!(snapshot("[]", "{}", None), Err("invalid_score_json"));
+        assert_eq!(snapshot("{", "{}", None), Err("invalid_score_json"));
         let big = format!(r#"{{"text":"{}"}}"#, "a".repeat(MAXIMUM_BYTES));
-        assert_eq!(snapshot(&big, "{}"), Err("input_budget_exceeded"));
+        assert_eq!(snapshot(&big, "{}", None), Err("input_budget_exceeded"));
     }
 
     #[test]
     fn strings_keep_their_spaces_and_escapes() {
-        let json = snapshot(r#"{"a" : "x  \" y\\" , "b":[1, 2]}"#, "").unwrap();
+        let json = snapshot(r#"{"a" : "x  \" y\\" , "b":[1, 2]}"#, "", None).unwrap();
         assert_eq!(json, r#"{"score":{"a":"x  \" y\\","b":[1,2]}}"#);
+    }
+
+    #[test]
+    fn the_hosts_ddl_comes_last_after_the_language_and_a_metadata_ddl_is_not_read() {
+        let metadata =
+            r#"{"ddl":"metadata text","instruction_lang_resolved":"ja","ddl_version":"31"}"#;
+        let json = snapshot("{}", metadata, Some("「灯台」\n白い円\t\"引用\"")).unwrap();
+        assert_eq!(
+            json,
+            r#"{"score":{},"ddl_version":"31","instruction_lang_resolved":"ja","ddl":"「灯台」\n白い円\t\"引用\""}"#
+        );
+        assert_eq!(
+            snapshot("{}", metadata, None).unwrap(),
+            r#"{"score":{},"ddl_version":"31","instruction_lang_resolved":"ja"}"#
+        );
     }
 
     #[test]
@@ -272,7 +303,7 @@ mod tests {
         .unwrap();
         let score = serde_json::to_string(&fixture["score"]).unwrap();
         let metadata = include_str!("../../../../experiments/ddl-3d/fixtures/solids.json");
-        let json = snapshot(&score, metadata).unwrap();
+        let json = snapshot(&score, metadata, None).unwrap();
         let read: Value = serde_json::from_str(&json).unwrap();
         assert_eq!(read["score"], fixture["score"]);
         assert_eq!(read["render_seed"], "9007199254740993");
@@ -292,6 +323,11 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(answer["json"], r#"{"score":{},"render_wild":true}"#);
+        let answer: Value = serde_json::from_slice(&snapshot_json(
+            r#"{"score":"{}","metadata":"{}","ddl":"白い円"}"#.as_bytes(),
+        ))
+        .unwrap();
+        assert_eq!(answer["json"], r#"{"score":{},"ddl":"白い円"}"#);
         let answer: Value = serde_json::from_slice(&snapshot_json(br#"{"score":"1"}"#)).unwrap();
         assert_eq!(answer["error"], "invalid_score_json");
         let answer: Value = serde_json::from_slice(&snapshot_json(b"[]")).unwrap();

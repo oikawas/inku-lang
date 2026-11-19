@@ -42,7 +42,12 @@
     && (v.background === undefined || ['none', 'support', 'sky', 'stars', 'paint', 'white', 'black'].includes(v.background))
     && (v.referenceHeight === undefined || (Number.isFinite(v.referenceHeight) && v.referenceHeight > 0 && v.referenceHeight < 1000))
     && (v.displayZoom === undefined || (Number.isFinite(v.displayZoom) && v.displayZoom > 0 && v.displayZoom <= 10000))
+    && (v.viewMode === undefined || v.viewMode === 'glass' || v.viewMode === 'solids')
+    && (v.glass === undefined || validGlass(v.glass))
     && Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;
+  const within = (n, low, high) => Number.isFinite(n) && n >= low && n <= high;
+  const validGlass = g => !!g && typeof g === 'object' && within(g.angle, 0, 2) && within(g.leaf, 0, 1) && within(g.light, -1, 1)
+    && ['none', 'background', 'layers'].includes(g.glassColor) && typeof g.frictionless === 'boolean';
   function deliver(message) {
     if (!frame || !frame.contentWindow) return;
     try { frame.contentWindow.postMessage(message, location.origin); }

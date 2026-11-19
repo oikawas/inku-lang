@@ -145,6 +145,9 @@ function updateDepthControls(depth: number, layerSpacing: number) {
 
 function load(value: LoadMessage) {
   stop(); current = value; locale = value.locale; words = labels(locale); document.documentElement.lang = locale;
+  // A return from 2D reopens the way the work was last shown, with its glass settings.
+  if (value.viewState?.viewMode) mode = value.viewState.viewMode;
+  if (value.viewState?.glass) glassSettings = { ...glassSettings, ...value.viewState.glass };
   document.documentElement.dataset.theme = value.theme; ui(); message(words.preparing, true);
   const localGeneration = generation;
   const started = performance.now();
@@ -171,7 +174,7 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
         glassSettings = { ...viewer.settings }; root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.settings.sway;
         for (const input of root.querySelectorAll<HTMLInputElement>('input[type=range][data-glass]')) {
           const key = input.dataset.glass as keyof GlassSettings; input.value = String(glassSettings[key]);
-          const output = root.querySelector<HTMLOutputElement>(`output[data-glass=${key}]`); if (output) output.value = Number(glassSettings[key]).toFixed(key === 'backTilt' ? 1 : 2);
+          const output = root.querySelector<HTMLOutputElement>(`output[data-glass=${key}]`); if (output) output.value = Number(glassSettings[key]).toFixed(2);
         }
       }
       else if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
@@ -187,8 +190,6 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
     viewer = mode === 'glass' ? new GlassViewer(stage, packet, changed, selected, fail, value.initialView)
       : new Viewer(stage, packet, changed, selected, fail, value.initialView);
     if (viewer instanceof GlassViewer) { viewer.settings = { ...glassSettings, sway: false }; viewer.set({}); }
-    // The standalone page lets a trial script drive the viewer; embedded hosts never see it.
-    if (!embedded) (window as unknown as { inkuViewer: unknown }).inkuViewer = viewer;
     const preparedViewer = viewer;
     // The plain solids come first; paint follows once they can be moved.
     viewer.prepareShape();
@@ -269,13 +270,13 @@ function switchMode(next: 'glass' | 'solids') {
 /** The glass's own controls; uniforms only, so dragging moves the fan smoothly. */
 function glassControls(parent: HTMLElement) {
   const glass = () => viewer instanceof GlassViewer ? viewer : null;
-  const slider = (into: HTMLElement, key: keyof GlassSettings, label: string, min: number, max: number, step: number, digits = 2) => {
+  const slider = (into: HTMLElement, key: 'angle' | 'leaf' | 'light', label: string, min: number, max: number, step: number) => {
     const controlLabel = element('label', into, label), input = element('input', controlLabel);
     input.type = 'range'; input.min = String(min); input.max = String(max); input.step = String(step);
     input.value = String(glassSettings[key]); input.dataset.glass = key; input.setAttribute('aria-label', label);
-    const output = element('output', controlLabel, Number(glassSettings[key]).toFixed(digits)); output.dataset.glass = key;
+    const output = element('output', controlLabel, Number(glassSettings[key]).toFixed(2)); output.dataset.glass = key;
     input.addEventListener('input', () => {
-      output.value = Number(input.value).toFixed(digits);
+      output.value = Number(input.value).toFixed(2);
       glassSettings = { ...glassSettings, [key]: Number(input.value) }; glass()?.set({ [key]: Number(input.value) });
     });
     sceneControls.push(input);
@@ -292,15 +293,10 @@ function glassControls(parent: HTMLElement) {
   color.value = glassSettings.glassColor;
   color.addEventListener('change', () => { glassSettings = { ...glassSettings, glassColor: color.value as GlassColor }; glass()?.set({ glassColor: color.value as GlassColor }); });
   sceneControls.push(color);
-  const trial = element('fieldset', parent); element('legend', trial, words.prototypeOnly);
-  slider(trial, 'front', words.frontGlass, 0.03, 3, 0.01);
-  slider(trial, 'backTilt', words.backTilt, 0, 30, 0.5, 1);
-  slider(trial, 'room', words.roomDarkness, 0.5, 0.8, 0.01);
-  for (const [into, key, label] of [[parent, 'frictionless', words.frictionless], [trial, 'swayOnce', words.swayOnce], [trial, 'bluish', words.bluishSilver]] as const) {
-    const box = element('label', into), input = element('input', box); input.type = 'checkbox'; input.checked = glassSettings[key]; box.append(label);
-    input.addEventListener('change', () => { glassSettings = { ...glassSettings, [key]: input.checked }; glass()?.set({ [key]: input.checked }); });
-    sceneControls.push(input);
-  }
+  const box = element('label', parent), frictionless = element('input', box);
+  frictionless.type = 'checkbox'; frictionless.checked = glassSettings.frictionless; frictionless.dataset.glass = 'frictionless'; box.append(words.frictionless);
+  frictionless.addEventListener('change', () => { glassSettings = { ...glassSettings, frictionless: frictionless.checked }; glass()?.set({ frictionless: frictionless.checked }); });
+  sceneControls.push(frictionless);
 }
 
 function showUnpainted(unpainted: Unpainted[]) {

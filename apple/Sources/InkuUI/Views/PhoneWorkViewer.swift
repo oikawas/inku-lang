@@ -134,16 +134,18 @@ struct PhoneWorkViewer: View {
         Section(display.label("詞書", "Caption")) {
             Toggle(display.webCopy("canvasCaptionToggle", "詞書の表示"), isOn: Bindable(display).preferences.captionVisible)
             Toggle(display.webCopy("canvasCaptionWritingMode", "詞書の書字方向"), isOn: Bindable(display).preferences.captionVertical)
-            Picker(display.webCopy("settingsCaptionPosition", "詞書の表示位置"), selection: Bindable(display).preferences.captionPosition) {
-                Text(display.localized("左")).tag("left")
-                Text(display.localized("右")).tag("right")
+            Menu(display.webCopy("settingsCaptionPosition", "詞書の表示位置")) {
+                Picker(display.webCopy("settingsCaptionPosition", "詞書の表示位置"), selection: Bindable(display).preferences.captionPosition) {
+                    Text(display.localized("左")).tag("left")
+                    Text(display.localized("右")).tag("right")
+                }
             }
         }
         Button(display.webCopy("historyPreviewDetails", "作品情報")) { onInfo(work) }
         Button(display.localized("生成情報")) { onAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
         Button(display.localized("系譜")) { onLineage(work) }.disabled(!permissions.canBrowse || work.lineageNodeID == nil)
         Button(display.localized("制作で開く")) { onCreate(work) }.disabled(!permissions.canBrowse)
-        SavedWorkExportMenu(model: model, count: 1) { onAction(work, $0) }.disabled(!permissions.canWrite)
+        SavedWorkExportMenu(model: model, count: 1, includesWorkPack: true) { onAction(work, $0) }.disabled(!permissions.canWrite)
         Button(display.localized("クリップボードにコピー")) { Task { await model.copyImage(work: work) } }.disabled(!permissions.canWrite)
         Button(display.localized("推敲の印")) { Task { await model.library.toggleRevision(work) } }.disabled(!permissions.canWrite || model.library.mutating)
         Button(display.label("作品 UUID をコピー", "Copy work UUID")) { model.library.copyHash(work.id) }

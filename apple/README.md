@@ -1,5 +1,7 @@
 # Apple clients
 
+
+A work pack exports works selected in the library and can be imported on Mac, iPad and iPhone. See [work packs](../persistence/workpack.md) for the format and duplicate and lineage rules.
 This SwiftUI client is developed for macOS first. DDL, Score, prompts, state transitions, seeds, SVG generation, and rasterization use the same Rust core as Server and Android. The Swift host owns networking, Keychain, SQLite, OS lifecycle, and native presentation. The application runs without an inku Server or embedded Python runtime. The macOS application has no camera feature.
 
 Swift-specific behavior is defined by the Japanese canonical [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) and its maintained English version, [SWIFT_SPEC.md](SWIFT_SPEC.md). Following Android's workflow, update the Japanese specification first and then synchronize English. Add dated product changes to the repository-root [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md); Swift SPEC records the current behavior and incomplete scope. Root SPEC remains canonical for shared DDL, Score, and rendering meaning.

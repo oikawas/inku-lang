@@ -2502,6 +2502,18 @@ public final class AppModel {
         catch { report(error) }
     }
 
+    public func importWorkPack(_ reader: WorkPackReader) async throws -> WorkPackDecision {
+        guard !isBusy else { throw PersistenceError.invalidRecord("drawing in progress") }
+        isBusy = true
+        defer { isBusy = false }
+        let result = try await auxiliaryDatabase().importWorkPack(reader)
+        await library.resetAfterRestore()
+        await thumbnails.synchronize()
+        try await reloadWorks()
+        status = display.label("\(result.workIDs.count) 作品を取り込み、\(result.skipped) 作品を飛ばしました", "Imported \(result.workIDs.count) works; skipped \(result.skipped)")
+        return result
+    }
+
     public func copyImage(work target: SavedWork? = nil) async {
         guard InkuPasteboard.supportsImages else { return }
         guard !isBusy, let work = target ?? displayedWork, !work.svg.isEmpty else { return }

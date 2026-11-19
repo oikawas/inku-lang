@@ -7,10 +7,12 @@ struct SavedWorkExportMenu: View {
     let count: Int
     var title: String? = nil
     var symbolOnly = false
+    var includesWorkPack = false
     let onAction: (String) -> Void
 
     var body: some View {
         Menu {
+            if includesWorkPack { Button(model.display.label("作品パックに書き出す", "Export work pack")) { onAction("export-workpack") } }
             if count == 1 {
                 Section("SVG") {
                     Menu(model.display.webCopy("svgExportHelpTitle", "SVGの用途と特徴")) {

@@ -42,12 +42,14 @@ struct LibraryView: View {
     /// Web `onClose` ("制作に戻る"). The button is shown only when the owner can close the library.
     var onClose: (() -> Void)? = nil
     var onSelectionExport: ([String], String) -> Void = { _, _ in }
+    var onImportWorkPack: () -> Void = {}
     /// The iPhone's library tab (ios-app step 7b).
     var phoneLayout = false
     var onPhoneCreate: () -> Void = {}
     var onPhoneCamera: () -> Void = {}
     var onPhoneSettings: () -> Void = {}
     var phoneRunStatus = ""
+    var phoneScrollToTopRevision = 0
     var phoneSavedWork: SavedWork? = nil
     var phoneRefinementResult: SavedWork? = nil
     var onPhoneViewerAction: (SavedWork, String) -> Void = { _, _ in }
@@ -294,6 +296,7 @@ struct LibraryView: View {
                         Text(display.webCopy("historyListTab", "リスト")).tag(LibraryLayout.list)
                     }
                     Button(display.label("ごみ箱 (\(library.trashTotal))", "Trash (\(library.trashTotal))")) { library.isTrash = true; phoneSelecting = false }
+                    Button(display.label("作品パックを取り込む", "Import work pack"), action: onImportWorkPack)
                     Button(display.localized("更新")) { Task { await library.refresh() } }
                 } label: { Image(systemName: "ellipsis.circle").font(.title3) }
                     .accessibilityLabel(display.localized("ライブラリの操作"))
@@ -475,6 +478,8 @@ struct LibraryView: View {
             Button(display.label("ごみ箱 (\(library.trashTotal))", "trash (\(library.trashTotal))")) { library.isTrash.toggle() }
                 .buttonStyle(LibraryGhostButtonStyle(active: library.isTrash))
                 .inkuTooltip(display.tooltip("ごみ箱の作品を表示・復元できます。", serverKey: "tooltipHistoryTrashView"), placement: .bottom)
+            Button(display.label("作品パックを取り込む", "Import work pack"), action: onImportWorkPack)
+                .buttonStyle(LibraryGhostButtonStyle())
             selectionActions
             Picker(display.localized("順序"), selection: $library.order) {
                 Text(display.localized("新しい順")).tag(LibraryOrder.newest)
@@ -523,7 +528,7 @@ struct LibraryView: View {
         } else {
             let exportIDs = library.selectedIDs.sorted()
             SavedWorkExportMenu(model: model, count: exportIDs.count,
-                                title: display.webCopy("exportLabel", "書き出す")) { action in
+                                title: display.webCopy("exportLabel", "書き出す"), includesWorkPack: true) { action in
                 onSelectionExport(exportIDs, action)
             }.disabled(exportIDs.isEmpty || writingDisabled)
             Button { deletion = LibraryDeletion(ids: library.selectedIDs.sorted(), movesToTrash: true) } label: {
@@ -621,6 +626,7 @@ struct LibraryView: View {
                     }.padding(12)
                 }
                 .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+                .onChange(of: phoneScrollToTopRevision) { _, _ in proxy.scrollTo("phone-library-top", anchor: .top) }
                 .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
                 .onChange(of: phoneGroupedWorkIDs, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
             }
@@ -653,6 +659,7 @@ struct LibraryView: View {
                 moreWorksFooter
             }
             .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+            .onChange(of: phoneScrollToTopRevision) { _, _ in proxy.scrollTo("phone-library-top", anchor: .top) }
             .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
             .onChange(of: library.works.map(\.id), initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
         }
@@ -673,6 +680,7 @@ struct LibraryView: View {
                 moreWorksFooter
             }
             .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+            .onChange(of: phoneScrollToTopRevision) { _, _ in proxy.scrollTo("phone-library-top", anchor: .top) }
             .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
             .onChange(of: library.works.map(\.id), initial: true) { _, _ in scrollPhoneToFocusedWork(proxy) }
         }
@@ -721,7 +729,7 @@ struct LibraryView: View {
         if phoneLayout {
             GeometryReader { geometry in
                 Color.clear.preference(key: PhoneLibraryOffset.self, value: geometry.frame(in: .named("phoneLibraryScroll")).minY)
-            }.frame(height: 0)
+            }.frame(height: 0).id("phone-library-top")
         }
     }
 
@@ -1044,6 +1052,7 @@ struct LibraryView: View {
                 .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
             }
             .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop, onPull: showPhoneSearch)
+            .onChange(of: phoneScrollToTopRevision) { _, _ in proxy.scrollTo("phone-library-top", anchor: .top) }
             .onChange(of: library.focusRequest?.visit, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
             .onChange(of: phoneGroupedWorkIDs, initial: true) { _, _ in scrollPhoneToGroupedWork(proxy) }
             .onChange(of: library.loading) { _, _ in scrollPhoneToGroupedWork(proxy) }
@@ -1332,7 +1341,7 @@ struct LibraryView: View {
                 Button(display.localized("推敲の印"), systemImage: "pencil.circle") { Task { await library.toggleRevision(work) } }
                     .disabled(library.mutating || writingDisabled)
                 Button(display.label("作品 UUID をコピー", "Copy work UUID"), systemImage: "doc.on.doc") { library.copyHash(work.id) }
-                SavedWorkExportMenu(model: model, count: 1) { action in performWorkAction(work, action) }.disabled(writingDisabled)
+                SavedWorkExportMenu(model: model, count: 1, includesWorkPack: true) { action in performWorkAction(work, action) }.disabled(writingDisabled)
             }
             Divider()
             if work.trashed {
@@ -1821,6 +1830,7 @@ private struct LibraryWorkMenu: View {
         }.disabled(model.isBrowsingLocked || work.trashed)
         SavedWorkRefinementActions(model: model, work: work, onAction: actions.perform, writingLocked: writingDisabled)
         Button(display.localized("書き出す"), systemImage: "square.and.arrow.up") { actions.perform(work, "export") }.disabled(writingDisabled || work.trashed)
+        Button(display.label("作品パックに書き出す", "Export work pack")) { actions.perform(work, "export-workpack") }.disabled(writingDisabled || work.trashed)
         if work.lineageNodeID != nil { Button(display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { actions.openLineage(work) }.disabled(model.isBrowsingLocked) }
         Divider()
         Button(display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }

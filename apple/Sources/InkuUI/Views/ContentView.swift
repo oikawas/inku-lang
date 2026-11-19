@@ -2,6 +2,14 @@ import InkuPersistence
 import InkuHost
 import InkuExport
 import SwiftUI
+import UniformTypeIdentifiers
+
+private struct WorkPackSession: Identifiable {
+    let id = UUID()
+    let reader: WorkPackReader
+    let decision: WorkPackDecision
+    let previews: [WorkPackPreview]
+}
 
 extension Notification.Name {
     static let inkuOpenSection = Notification.Name("inku.open-section")
@@ -112,6 +120,11 @@ public struct ContentView: View {
     /// The window's file dialogs, which the menu's "open DDL" also asks.
     @State private var fileDialogs = InkuFileDialogs()
     @State private var importer = DDLImportController()
+    @State private var workPack: WorkPackSession?
+    @State private var workPackRequest = UUID()
+    @State private var workPackImporting = false
+    @State private var workPackRevision = 0
+    @State private var workPackResult: String?
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -119,6 +132,18 @@ public struct ContentView: View {
     public init(model: AppModel) { self.model = model }
 
     public var body: some View {
+        mainBody
+            .sheet(item: $workPack) { session in workPackSheet(session).environment(model.display) }
+            .onOpenURL { url in
+                if url.pathExtension.lowercased() == "inkupack" { readWorkPack(url) }
+            }
+            .alert(model.display.label("取り込みが完了しました", "Import complete"), isPresented: Binding(
+                get: { workPackResult != nil }, set: { if !$0 { workPackResult = nil } })) {
+                Button(model.display.localized("閉じる")) { workPackResult = nil }
+            } message: { Text(workPackResult ?? "") }
+    }
+
+    private var mainBody: some View {
         // In two parts, in the same modifier order: one chain is more than the iOS type checker finishes in time.
         startedShell
         .onChange(of: model.selectedWorkID) { _, _ in
@@ -317,9 +342,9 @@ public struct ContentView: View {
             LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) },
                         onReplayWork: openReplay, onWorkAction: openWorkAction,
                         writingLocked: model.isBusy || automation.isOccupied,
-                        onSelectionExport: openSelectionExport, phoneLayout: true,
+                        onSelectionExport: openSelectionExport, onImportWorkPack: chooseWorkPack, phoneLayout: true,
                         onPhoneCreate: { showCreation(tab: "artwork") }, onPhoneCamera: { cameraRequest += 1 },
-                        onPhoneSettings: { openSettings(nil) }, phoneRunStatus: automation.running ? automation.status : model.status,
+                        onPhoneSettings: { openSettings(nil) }, phoneRunStatus: automation.running ? automation.status : model.status, phoneScrollToTopRevision: workPackRevision,
                         phoneSavedWork: phoneViewingEvents.savedWork,
                         phoneRefinementResult: phoneRefinementResult ?? phoneViewingEvents.refinementWork,
                         onPhoneViewerAction: { work, action in
@@ -381,7 +406,7 @@ public struct ContentView: View {
         LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) },
                     onReplayWork: openReplay, onWorkAction: openWorkAction,
                     writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary,
-                    onSelectionExport: openSelectionExport)
+                    onSelectionExport: openSelectionExport, onImportWorkPack: chooseWorkPack)
             .disabled(importing)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(InkuColor.bg)
@@ -709,6 +734,7 @@ public struct ContentView: View {
         guard !work.trashed,
               canUseWork || (canReadWork && SavedWorkActionState.isBrowsingAction(action)) else { return }
         switch action {
+        case "export-workpack": exportWorkPack([work.id])
         case "info":
             // CanvasGenerationInfo is a drawer over the canvas; elsewhere the same view opens as a sheet.
             if !ui.libraryOpen, work.id == workspaceWork?.id { ui.generationInfoOpen.toggle() }
@@ -810,8 +836,94 @@ public struct ContentView: View {
         } catch { model.errorText = error.localizedDescription }
     }
 
+    private func chooseWorkPack() {
+        Task {
+            let type = UTType(exportedAs: "app.inku.workpack", conformingTo: .data)
+            if let url = await fileDialogs.choose(InkuFileRequest(types: [type])) { readWorkPack(url) }
+        }
+    }
+
+    private func readWorkPack(_ url: URL) {
+        let request = UUID(); workPackRequest = request; workPack = nil
+        Task {
+            do {
+                let reader = try await Task.detached(priority: .userInitiated) {
+                    try InkuSecurityScope.access(url) {
+                        try InkuSecurityScope.download(url)
+                        return try WorkPackReader(url: url)
+                    }
+                }.value
+                let decision = try await model.auxiliaryDatabase().previewWorkPack(reader)
+                let previews = try reader.previews()
+                guard request == workPackRequest else { return }
+                workPack = WorkPackSession(reader: reader, decision: decision, previews: previews)
+            } catch { if request == workPackRequest { model.errorText = error.localizedDescription } }
+        }
+    }
+
+    @ViewBuilder private func workPackSheet(_ session: WorkPackSession) -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(model.display.label("\(session.decision.workIDs.count) 作品を取り込みます", "Import \(session.decision.workIDs.count) works"))
+                    .font(.headline)
+                Text(model.display.label("\(session.decision.skipped) 作品は既にあります", "\(session.decision.skipped) works already exist"))
+                ScrollView(.horizontal) {
+                    HStack {
+                        ForEach(session.previews, id: \.id) { preview in
+                            ArtworkCanvas(svg: preview.svg, renderer: model.displayRenderer, caption: preview.sourceText, showsZoomControls: false)
+                                .frame(width: 120, height: 120)
+                        }
+                    }
+                }
+                if model.isBusy || automation.isOccupied {
+                    Text(model.display.label("描き終わってから取り込めます", "Import is available after drawing finishes"))
+                }
+                Spacer()
+                Button(model.display.label("取り込む", "Import")) {
+                    workPackImporting = true
+                    Task {
+                        defer { workPackImporting = false }
+                        guard !model.isBusy, !automation.isOccupied else { return }
+                        do {
+                            let result = try await model.importWorkPack(session.reader)
+                            await history.library.resetAfterRestore()
+                            workPackRevision += 1
+                            if workPack?.id == session.id { workPack = nil }
+                            workPackResult = model.display.label("\(result.workIDs.count) 作品を取り込み、\(result.skipped) 作品を飛ばしました", "Imported \(result.workIDs.count) works; skipped \(result.skipped)")
+                        } catch { model.errorText = error.localizedDescription }
+                    }
+                }.buttonStyle(.borderedProminent)
+                    .disabled(model.isBusy || automation.isOccupied || workPackImporting || session.decision.workIDs.isEmpty)
+            }.padding()
+                .navigationTitle(model.display.label("作品パックを取り込む", "Import work pack"))
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(model.display.localized("閉じる")) { workPack = nil } } }
+        }
+    }
+
+    private func exportWorkPack(_ ids: [String]) {
+        guard !ids.isEmpty, !model.isBusy, !automation.isOccupied else { return }
+        let title = model.display.label("作品パックに書き出す", "Export work pack")
+        let type = UTType(exportedAs: "app.inku.workpack", conformingTo: .data)
+        guard let url = NativeFilePanels.exportFile(title: title, type: type, name: "works.inkupack") else { return }
+        Task {
+            do {
+                let info = Bundle.main.infoDictionary ?? [:]
+                let version = info["CFBundleShortVersionString"] as? String ?? "unknown"
+                let build = Int(info["CFBundleVersion"] as? String ?? "") ?? 0
+                #if os(macOS)
+                let host = "apple-macos"
+                #else
+                let host = "apple-ios"
+                #endif
+                try await model.auxiliaryDatabase().exportWorkPack(ids: ids, to: url, host: host, appVersion: version, build: build)
+                _ = await NativeFilePanels.handOff([url], dialogs: fileDialogs, share: true)
+            } catch { model.errorText = error.localizedDescription }
+        }
+    }
+
     private func openSelectionExport(_ ids: [String], action: String) {
         guard !ids.isEmpty, !model.isBrowsingLocked else { return }
+        if action == "export-workpack" { exportWorkPack(ids); return }
         let format: SavedExportFormat?
         var profile: String?
         var height: Int?

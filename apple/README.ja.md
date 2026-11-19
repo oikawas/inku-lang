@@ -1,5 +1,7 @@
 # Appleクライアント
 
+
+作品パックはライブラリで選んだ作品を書き出し、Mac・iPad・iPhone で取り込める。形式と重複・系譜の決まりは [作品パック](../persistence/workpack.ja.md) を参照。
 macOS先行のSwiftUIクライアントです。DDL、Score、prompt、状態遷移、seed、SVG生成とrasterはServer／Androidと同じRust coreを使います。Swift hostがnetwork、Keychain、SQLite、OS lifecycleとnative表示を担当します。実行時にinku ServerやPython runtimeは不要です。macOSにcamera機能はありません。
 
 Swift固有の仕様正本は[SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md)、対応英語版は[SWIFT_SPEC.md](SWIFT_SPEC.md)です。Androidと同じく、日本語の仕様を先に更新し、英語を同期します。製品の変更履歴はrepository rootの[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ日付付きで追記し、確定した仕様と未実装範囲はSwift SPECへ記します。共有DDL／Score／renderの意味はroot SPECを正本とします。

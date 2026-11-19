@@ -96,6 +96,7 @@ struct LibraryPreviewPanel: View {
 
     private var exportMenu: some View {
         Menu {
+            Button(display.label("作品パックに書き出す", "Export work pack")) { onWorkAction(work, "export-workpack") }
             Text(display.webCopy("savedWorkExportCurrentScope", "表示中の作品") + " · " + work.id.prefix(8))
             Section("SVG") {
                 ForEach(["Display", "Editable", "Compat", "Live"], id: \.self) { profile in

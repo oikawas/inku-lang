@@ -187,6 +187,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 }
             }
             .navigationTitle(display.webCopy("settingsTitle", "設定"))
+            .toolbar { ToolbarItem(placement: .navigation) {
+                if phonePage.wrappedValue == nil {
+                    Button(action: onClose) { Image(systemName: "chevron.left") }
+                        .accessibilityLabel(display.webCopy("historyLibraryTitle", "ライブラリ"))
+                }
+            } }
+            .inkuPhoneTabBarHidden()
             .navigationDestination(for: SettingsSection.self) { _ in
                 VStack(spacing: 0) {
                     pageHeading
@@ -195,9 +202,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 .inkuFont(14)
                 .background(InkuColor.bg)
                 .inkuInlineNavigationTitle()
+                .inkuPhoneTabBarHidden()
                 .environment(\.inkuTextScale, textScale * Self.phoneTextScale)
             }
         }
+        .overlay(alignment: .leading) { if phonePage.wrappedValue == nil { PhoneBackEdge(action: onClose) } }
+        .inkuPhoneTabBarHidden()
         .environment(\.inkuTextScale, textScale * Self.phoneTextScale)
         // The system's own controls (menu pickers' values, segmented controls, section titles) do not take inkuFont;
         // at least one Dynamic Type step up brings them to the scaled text around them (screen check of Build 138).

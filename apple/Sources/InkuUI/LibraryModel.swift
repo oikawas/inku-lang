@@ -747,7 +747,7 @@ public final class LibraryModel {
     }
 
     public func toggleStar(_ work: SavedWork) async {
-        await mutate(ids: [work.id]) { try await $0.setStarred(ids: [work.id], starred: !work.starred); return "お気に入りを更新しました" }
+        await mutate(ids: [work.id]) { try await $0.setStarred(ids: [work.id], starred: !work.starred); return "スターを更新しました" }
     }
 
     public func toggleRevision(_ work: SavedWork) async {

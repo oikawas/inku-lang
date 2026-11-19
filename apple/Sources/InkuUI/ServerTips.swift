@@ -42,7 +42,7 @@ public enum ServerTips {
         "独立した編集画面でDDLを変更します。": "tooltipDdlEdit",
         "ごみ箱の作品を表示・復元できます。": "tooltipHistoryTrashView",
         "同じ系譜の作品をまとめて表示します。": "tooltipHistoryLineageGrouped",
-        "お気に入りの作品に絞り込みます。": "tooltipHistoryStarredOnly",
+        "スターを付けた作品だけに絞ります": "tooltipHistoryStarredOnly",
         "推敲の印を付けた作品に絞り込みます。": "tooltipHistoryForRevisionOnly",
         "最新の履歴": "tooltipCanvasNavLatest",
         "最古の履歴": "tooltipCanvasNavOldest",

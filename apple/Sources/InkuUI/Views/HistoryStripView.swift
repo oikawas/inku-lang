@@ -130,7 +130,7 @@ import SwiftUI
             Text(display.webCopy("historyFilterLabel", fallback: "絞り込み")).inkuFont(12).foregroundStyle(.tertiary).fixedSize()
             filterButton(display.webCopy("historyStarredOnly", fallback: "スターのみ"),
                          isOn: Binding(get: { library.starredOnly }, set: { library.starredOnly = $0 }),
-                         tooltip: display.tooltip("お気に入りの作品に絞り込みます。", serverKey: "tooltipHistoryStarredOnly"))
+                         tooltip: display.tooltip("スターを付けた作品だけに絞ります", serverKey: "tooltipHistoryStarredOnly"))
             filterButton(display.webCopy("historyForRevisionOnly", fallback: "推敲マークのみ"),
                          isOn: Binding(get: { library.revisionOnly }, set: { library.revisionOnly = $0 }),
                          tooltip: display.tooltip("推敲の印を付けた作品に絞り込みます。", serverKey: "tooltipHistoryForRevisionOnly"))

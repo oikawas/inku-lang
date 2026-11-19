@@ -407,9 +407,11 @@ struct CreationView: View {
             if !display.preferences.keepGenerationInfo { ui.generationInfoOpen = false }
         }
         .onAppear {
-            model.inputMode = "description"
-            if !["off", "on"].contains(model.sketchMode) { model.sketchMode = "off" }
-            if !["auto", "fixed"].contains(model.catalogMode) { model.catalogMode = "fixed" }
+            if !phoneLayout {
+                model.inputMode = "description"
+                if !["off", "on"].contains(model.sketchMode) { model.sketchMode = "off" }
+                if !["auto", "fixed"].contains(model.catalogMode) { model.catalogMode = "fixed" }
+            }
             onWorkspaceWorkChange(workspaceWork)
         }
     }

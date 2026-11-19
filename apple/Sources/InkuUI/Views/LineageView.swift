@@ -431,7 +431,7 @@ struct LineageView: View {
                             .background(Color.secondary.opacity(0.08), in: Circle()).overlay(Circle().stroke(InkuColor.border))
                     }
                         .foregroundStyle(work.starred ? Color.orange : Color.secondary)
-                        .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
+                        .accessibilityLabel(model.display.localized(work.starred ? "スターを外す" : "スターを付ける"))
                         .disabled(writingDisabled || library.mutating)
                     Button { Task { await library.toggleRevision(work) } } label: {
                         Image(systemName: "flag.fill").inkuFont(12).frame(width: 24, height: 24)
@@ -580,7 +580,7 @@ struct LineageView: View {
             Button(model.display.localized(checkedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") {
                 if checkedIDs.contains(work.id) { checkedIDs.remove(work.id) } else { checkedIDs.insert(work.id) }
             }.disabled(library.mutating || model.isBrowsingLocked || work.trashed)
-            Button(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
+            Button(model.display.localized(work.starred ? "スターを外す" : "スターを付ける"), systemImage: "star") { Task { await library.toggleStar(work) } }
                 .disabled(library.mutating || writingDisabled)
             Button(model.display.localized("推敲の印"), systemImage: library.lineageAnnotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
                 .disabled(library.mutating || writingDisabled)

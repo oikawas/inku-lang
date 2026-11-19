@@ -12,6 +12,13 @@ private struct InkuSearchFieldHeight: ViewModifier {
 }
 
 extension View {
+    @ViewBuilder func inkuPhoneTabBarHidden() -> some View {
+        #if os(iOS)
+        toolbar(.hidden, for: .tabBar)
+        #else
+        self
+        #endif
+    }
     /// One control high: 26 points, taller with a larger text size.
     func inkuSearchFieldHeight() -> some View { modifier(InkuSearchFieldHeight()) }
 

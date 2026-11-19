@@ -11,6 +11,7 @@ struct DescriptionLibraryGroup: View {
     let records: [String: CompositionRecordSnapshot]
     let onOpen: (SavedWork) -> Void
     let onPreview: (SavedWork) -> Void
+    var selecting = false
     private var language: String { model.display.preferences.language }
     private var forms: [String] { CompositionNames.formIDs + [""] }
 
@@ -31,6 +32,12 @@ struct DescriptionLibraryGroup: View {
                                             ArtworkThumbnail(work: item.work, thumbnails: model.thumbnails)
                                                 .aspectRatio(item.work.renderCanvasAspectRatio ?? 1, contentMode: .fit)
                                                 .frame(width: 110, height: 110)
+                                                .overlay(alignment: .topTrailing) {
+                                                    if selecting {
+                                                        Image(systemName: model.library.selectedIDs.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                                                            .padding(5).background(.thinMaterial, in: Circle())
+                                                    }
+                                                }
                                             if let record = records[item.id], record.own == nil, record.inherited != nil {
                                                 Text(childLabel(record.derivationKind)).inkuFont(10).foregroundStyle(.secondary)
                                             }

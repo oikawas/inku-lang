@@ -63,8 +63,8 @@
 "inkuの署名" = "inku seal";
 "macOS 14以降 · Universal · 単一利用者のローカルアプリ" = "macOS 14 or later · Universal · Local single-user app";
 "← 親の節点" = "← Parent node";
-"お気に入り" = "Star";
-"お気に入りを解除" = "Remove star";
+"スターを付ける" = "Star";
+"スターを外す" = "Remove star";
 "この作品の記述はロックされています。別の記述で生成するには「新規」を選んでください。" = "This work's description is locked. Choose New to generate from a different description.";
 "この候補を保存" = "Save this candidate";
 "この奥書を削除しますか？" = "Delete this colophon?";
@@ -527,7 +527,7 @@
 "シード: %@ · 筆致制限を外す: %@" = "Seed: %@ · Lift the stroke limit: %@";
 "ごみ箱 (%ld)" = "Trash (%ld)";
 "%ld 件選択" = "%ld selected";
-"%ld 作品 · お気に入り %ld · 推敲 %ld" = "%ld works · %ld starred · %ld marked for refinement";
+"%ld 作品 · スター %ld · 推敲 %ld" = "%ld works · %ld starred · %ld marked for refinement";
 "%ld 件" = "%ld items";
 "記述: %@" = "Description: %@";
 "作品 ID: %@" = "Work ID: %@";
@@ -920,7 +920,7 @@
 "保存作品を制作に開きます。制作中の内容が置き換わります。" = "Open the saved work in Paint, replacing the current inputs.";
 "保存時と現行の描画を比較します。" = "Compare the saved drawing with a new performance.";
 "ライブラリを開き、検索や複数選択を使えます。" = "Open the library to search and select multiple works.";
-"お気に入りの作品に絞り込みます。" = "Show favorite works.";
+"スターを付けた作品だけに絞ります" = "Show only the works you starred";
 "推敲の印を付けた作品に絞り込みます。" = "Show works marked for refinement.";
 "系譜の方向" = "Lineage direction";
 "縦" = "Vertical";
@@ -1202,7 +1202,7 @@
 "推敲方針: " = "Refinement intent: ";
 "補助モデルの処理を完了できませんでした。" = "The auxiliary model operation could not be completed.";
 "この作品には比較用の保存設定がありません: %@" = "This work has no saved settings for comparison: %@";
-"お気に入りを更新しました" = "Updated the star";
+"スターを更新しました" = "Updated the star";
 "推敲の印を更新しました" = "Updated the revision mark";
 "作品をライブラリへ追加しました" = "Added the work to the library";
 "APIキーの状態を確認できません。" = "Could not check the API key status.";

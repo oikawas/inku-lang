@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: iPhone opens the work library as home with All / Starred, a menu, settings, and a temporary field leading to Making or the camera. A back button or left-edge swipe returns from Making and settings. Progress and stop appear in the appropriate places during a run. Swift's favorite wording now uses Star.
+
 - Swift (macOS and iOS): restores the mascot to the compact drawing progress row on Mac and iPad and saves drawing defaults whenever they change.
 
 - Swift (macOS and iOS): drawing edited instructions and changing a work's layout use its recorded wild setting, or off when no setting was recorded.

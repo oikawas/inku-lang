@@ -124,7 +124,7 @@ struct LibraryWorkMarks: View {
                     Image(systemName: work.starred ? "star.fill" : "star")
                         .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
                 }
-                .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
+                .accessibilityLabel(model.display.localized(work.starred ? "スターを外す" : "スターを付ける"))
                 .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
                                                   serverKey: work.starred ? "starOn" : "starOff"))
             }

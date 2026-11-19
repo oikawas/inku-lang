@@ -101,6 +101,9 @@ public struct ContentView: View {
     @State private var windowSize = CGSize.zero
     /// The iPhone layout, read in the shell and handed into the sheets presented from here (ios-app step 7c).
     @State private var phoneLayout = false
+    @State private var phoneHomeStarted = false
+    @State private var appInitialized = false
+    @State private var phoneWorkspaceInitialized = false
     /// Bumped by the iPhone tab bar's camera (`PhoneCameraFlow`).
     @State private var cameraRequest = 0
     /// The window's file dialogs, which the menu's "open DDL" also asks.
@@ -203,7 +206,7 @@ public struct ContentView: View {
         InkuPhoneLayoutReader { phone in
             ZStack {
                 if phone {
-                    phoneShell.modifier(InkuCoveredView(covered: presentation, hidden: presentation))
+                    phoneShell.disabled(!phoneWorkspaceInitialized).modifier(InkuCoveredView(covered: presentation, hidden: presentation))
                 } else {
                     mainShell
                         .modifier(InkuCoveredView(covered: presentation || ui.libraryOpen || ui.settingsOpen, hidden: presentation))
@@ -213,7 +216,11 @@ public struct ContentView: View {
                 if presentation { presentationView.inkuAllowsLandscape(phone) }
             }
             .environment(\.inkuPhoneLayout, phone)
-            .onChange(of: phone, initial: true) { _, phone in phoneLayout = phone }
+            .onChange(of: phone, initial: true) { _, phone in
+                phoneLayout = phone
+                if phone && !phoneHomeStarted { phoneHomeStarted = true; ui.libraryOpen = true }
+                if phone && appInitialized { initializePhoneWorkspace() }
+            }
         }
         .background {
             GeometryReader { geometry in
@@ -253,6 +260,8 @@ public struct ContentView: View {
             await history.connect(app: model)
             maintenance.connect(app: model)
             restoreScreenChoices()
+            appInitialized = true
+            if phoneLayout { initializePhoneWorkspace() }
             await refreshDrawingKeyState()
             model.onSavedWork = { [weak model = model, weak maintenance = maintenance] work in
                 guard let model, let maintenance else { return }
@@ -294,13 +303,15 @@ public struct ContentView: View {
     /// The iPhone (ios-app step 7): the workspace, the library and the settings in tabs. Choosing a tab is opening the
     /// library or the settings here, so every command and guard that reads those states works as on the Mac.
     private var phoneShell: some View {
-        PhoneShellView(model: model, tab: phoneTab, runStatus: automation.running ? automation.status : model.status) {
+        PhoneShellView(model: model, tab: phoneTab, runStatus: automation.running ? automation.status : model.status, onHome: openLibrary) {
             creationView(phone: true)
         } library: {
             LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) },
                         onReplayWork: openReplay, onWorkAction: openWorkAction,
-                        writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary,
-                        onSelectionExport: openSelectionExport, phoneLayout: true)
+                        writingLocked: model.isBusy || automation.isOccupied,
+                        onSelectionExport: openSelectionExport, phoneLayout: true,
+                        onPhoneCreate: { showCreation(tab: nil) }, onPhoneCamera: { cameraRequest += 1 },
+                        onPhoneSettings: { openSettings(nil) }, phoneRunStatus: automation.running ? automation.status : model.status)
                 .disabled(importing)
                 .background(InkuColor.bg)
         } settings: {
@@ -318,7 +329,7 @@ public struct ContentView: View {
                 set: { tab in
             switch tab {
             case PhoneShellTab.library: if !ui.libraryOpen || ui.settingsOpen { openLibrary() }
-            case PhoneShellTab.settings: if !ui.settingsOpen { ui.libraryOpen = false; openSettings(nil) }
+            case PhoneShellTab.settings: if !ui.settingsOpen { openSettings(nil) }
             // The camera starts and the chosen tab stays (`PhoneCameraFlow`).
             case PhoneShellTab.camera: cameraRequest += 1
             default: showCreation(tab: nil)
@@ -328,7 +339,7 @@ public struct ContentView: View {
 
     private var phoneCameraFlow: PhoneCameraFlow {
         PhoneCameraFlow(model: model, automation: automation, ui: ui, request: cameraRequest, blocked: !canNavigateSections,
-                        onOpenSettings: { section in ui.libraryOpen = false; openSettings(section) },
+                        onOpenSettings: { section in openSettings(section) },
                         onShowCreation: {
                             batchWorkspace.showHistory()
                             ui.exitCanvasFullScreen()
@@ -531,6 +542,16 @@ public struct ContentView: View {
         Task { await model.library.open(at: shown) }
     }
     private func closeLibrary() { ui.libraryOpen = false }
+    private func initializePhoneWorkspace() {
+        guard !phoneWorkspaceInitialized else { return }
+        model.inputMode = "description"
+        if !["off", "on"].contains(model.sketchMode) { model.sketchMode = "off" }
+        if !["auto", "fixed"].contains(model.catalogMode) { model.catalogMode = "fixed" }
+        workspaceWork = model.displayedWork
+        Task { await history.locate(app: model, workID: workspaceWork?.id) }
+        openLibrary()
+        phoneWorkspaceInitialized = true
+    }
     /// Web `openSettings()`: with no destination, the tab the author last chose (`settings_tab`), else the first.
     private func openSettings(_ destination: SettingsSection?) {
         InkuWindow.removeFocus()
@@ -835,14 +856,14 @@ public struct ContentView: View {
         }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
     }
     private func preparePresentation(work target: SavedWork? = nil) async {
-        guard canReadWork, let work = target ?? workTarget, !work.svg.isEmpty else { return }
+        guard canReadWork, !ui.settingsOpen, let work = target ?? workTarget, !work.svg.isEmpty else { return }
         model.stopFollowingRun()
         let token = UUID(); presentationLoadID = token
         let fromLibrary = ui.libraryOpen
         let viewer = HistoryModel()
         await viewer.connect(app: model)
         await viewer.locate(app: model, workID: work.id)
-        guard canReadWork, ui.libraryOpen == fromLibrary, presentationLoadID == token else { return }
+        guard canReadWork, !ui.settingsOpen, ui.libraryOpen == fromLibrary, presentationLoadID == token else { return }
         presentationWork = work; presentationHistory = viewer
         enterPresentation()
     }

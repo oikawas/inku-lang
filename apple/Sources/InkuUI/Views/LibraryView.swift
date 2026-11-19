@@ -2,6 +2,20 @@ import InkuHost
 import InkuPersistence
 import SwiftUI
 
+private struct PhoneLibraryOffset: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+private extension View {
+    @ViewBuilder func phoneLibraryScrollTracking(enabled: Bool, atTop: Binding<Bool>) -> some View {
+        if enabled {
+            coordinateSpace(name: "phoneLibraryScroll")
+                .onPreferenceChange(PhoneLibraryOffset.self) { atTop.wrappedValue = $0 >= -1 }
+        } else { self }
+    }
+}
+
 @MainActor
 struct LibrarySelectionPresentation {
     let display: DisplaySettings
@@ -27,6 +41,10 @@ struct LibraryView: View {
     var onSelectionExport: ([String], String) -> Void = { _, _ in }
     /// The iPhone's library tab (ios-app step 7b).
     var phoneLayout = false
+    var onPhoneCreate: () -> Void = {}
+    var onPhoneCamera: () -> Void = {}
+    var onPhoneSettings: () -> Void = {}
+    var phoneRunStatus = ""
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @State private var providers: [ProviderSettings] = []
@@ -40,6 +58,8 @@ struct LibraryView: View {
     @State private var previewComment = LibraryNoteEditorModel()
     /// The iPhone's 選択: a tap toggles a work's selection instead of opening it, as in Photos.
     @State private var phoneSelecting = false
+    @State private var phoneSearchVisible = false
+    @State private var phoneScrollAtTop = true
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
     private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID, language: model.display.preferences.language) }
@@ -65,12 +85,18 @@ struct LibraryView: View {
                                               set: { if $0.isEmpty { preview.close() } })) {
                     surface
                         .inkuHidesNavigationBar()
+                        .inkuPhoneTabBarHidden()
                         .navigationDestination(for: String.self) { _ in
                             previewContent
                                 .inkuInlineNavigationTitle()
                                 .inkuAllowsLandscape()
+                                .inkuPhoneTabBarHidden()
+                                .safeAreaInset(edge: .bottom, spacing: 0) {
+                                    if model.hasActiveRun { phoneRunRow }
+                                }
                         }
                 }
+                .inkuPhoneTabBarHidden()
             } else {
                 surface
             }
@@ -86,6 +112,9 @@ struct LibraryView: View {
         // The iPhone's timeline scrolls through every work; the iPad and the Mac keep their pages.
         .onChange(of: phoneLayout, initial: true) { _, phone in library.continuous = phone }
         .onChange(of: library.isGrouped) { _, _ in applyGroupedPageSize() }
+        .onChange(of: phoneScrollAtTop) { _, atTop in
+            if phoneLayout && !atTop && library.query.isEmpty { phoneSearchVisible = false }
+        }
         .inkuOnEscape { onClose?() }
         .alert(item: $deletion) { request in
           if request.movesToTrash {
@@ -108,10 +137,17 @@ struct LibraryView: View {
     /// The heading, the tools, the status and the listing; beside them the preview on the Mac and the iPad.
     private var surface: some View {
         VStack(spacing: 0) {
-            head.padding(.vertical, 9).padding(.horizontal, 12)
-            Divider()
-            tools.padding(.vertical, 7).padding(.horizontal, 12)
-            Divider()
+            if phoneLayout {
+                phoneHeader.padding(.vertical, 8).padding(.horizontal, 12)
+                Divider()
+                if library.isGrouped { pager.padding(.vertical, 5) }
+                if phoneSearchVisible || !library.query.isEmpty { phoneSearchRow }
+            } else {
+                head.padding(.vertical, 9).padding(.horizontal, 12)
+                Divider()
+                tools.padding(.vertical, 7).padding(.horizontal, 12)
+                Divider()
+            }
             statusRows
             HStack(spacing: 0) {
                 listing.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -120,6 +156,97 @@ struct LibraryView: View {
                     previewContent.frame(minWidth: 280, idealWidth: 360, maxWidth: 360, maxHeight: .infinity)
                 }
             }
+            .simultaneousGesture(DragGesture(minimumDistance: 40).onEnded { value in
+                if phoneLayout && phoneScrollAtTop && value.translation.height > 55 && abs(value.translation.height) > abs(value.translation.width) {
+                    withAnimation { phoneSearchVisible = true }
+                }
+            })
+            if phoneLayout { phoneFooter }
+        }
+    }
+
+    private var phoneRunRow: some View {
+        PhoneRunStatusRow(model: model, status: phoneRunStatus, onOpen: onPhoneCreate)
+    }
+
+    private var phoneSearchRow: some View {
+        HStack {
+            searchField
+            Button(display.localized("キャンセル")) { library.query = ""; phoneSearchVisible = false }
+        }.padding(8)
+    }
+
+    private var phoneHeader: some View {
+        @Bindable var library = library
+        return HStack(spacing: 10) {
+            if library.isTrash {
+                Text(display.localized("ごみ箱")).font(.headline)
+                Spacer()
+                Button(display.localized("完了")) { library.isTrash = false; library.selectedIDs.removeAll(); phoneSelecting = false }
+            } else if phoneSelecting {
+                Text(display.label("\(library.selectedIDs.count) 件を選択", "\(library.selectedIDs.count) selected"))
+                Spacer()
+                Button(display.localized("完了")) { phoneSelecting = false; library.selectedIDs.removeAll() }
+            } else {
+                Picker(display.webCopy("historyFilterLabel", "絞り込み"), selection: $library.starredOnly) {
+                    Text(display.label("すべて", "All")).tag(false)
+                    Text(display.label("スター", "Starred")).tag(true)
+                }.pickerStyle(.segmented).frame(maxWidth: 230)
+                LibraryLoadingIndicator(library: library)
+                Spacer(minLength: 0)
+                Menu {
+                    Section(countText) {
+                        Button(display.localized("選択")) { phoneSelecting = true }
+                        Toggle(display.webCopy("historyForRevisionOnly", "推敲マークのみ"), isOn: $library.revisionOnly)
+                    }
+                    Picker(display.localized("順序"), selection: $library.order) {
+                        Text(display.localized("新しい順")).tag(LibraryOrder.newest)
+                        Text(display.localized("古い順")).tag(LibraryOrder.oldest)
+                    }
+                    Picker(display.webCopy("historyGrouping", "まとめ方"), selection: $library.grouping) {
+                        Text(display.webCopy("historyChronologicalMode", "時系列")).tag(LibraryModel.Grouping.timeline)
+                        Text(display.webCopy("historyLineageMode", "系譜ごと")).tag(LibraryModel.Grouping.lineage)
+                        Text(display.webCopy("historyDescriptionMode", "記述ごと")).tag(LibraryModel.Grouping.description)
+                    }
+                    Picker(display.webCopy("historyDisplayFormat", "表示形式"), selection: $library.layout) {
+                        Text(display.webCopy("historyThumbsTab", "サムネイル")).tag(LibraryLayout.grid)
+                        Text(display.webCopy("historyListTab", "リスト")).tag(LibraryLayout.list)
+                    }
+                    Button(display.label("ごみ箱 (\(library.trashTotal))", "Trash (\(library.trashTotal))")) { library.isTrash = true; phoneSelecting = true }
+                    Button(display.localized("更新")) { Task { await library.refresh() } }
+                } label: { Image(systemName: "ellipsis.circle").font(.title3) }
+                    .accessibilityLabel(display.localized("ライブラリの操作"))
+                Button(action: onPhoneSettings) { Image(systemName: "gearshape").font(.title3) }
+                    .accessibilityLabel(display.webCopy("settingsTitle", "設定"))
+            }
+        }.disabled(library.mutating || model.isBrowsingLocked)
+    }
+
+    @ViewBuilder private var phoneFooter: some View {
+        if phoneSelecting || library.isTrash {
+            if model.hasActiveRun { phoneRunRow }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Button(display.webCopy("historySelectAll", "すべて選択")) { library.selectVisible() }
+                        .disabled(visibleIDs.isEmpty)
+                    Button(display.webCopy("historyClearSelection", "すべて解除")) { library.selectedIDs.removeAll() }
+                        .disabled(library.selectedIDs.isEmpty)
+                    selectionActions
+                }.buttonStyle(LibraryGhostButtonStyle()).padding(10)
+            }.disabled(library.mutating || model.isBrowsingLocked)
+        } else if model.hasActiveRun {
+            phoneRunRow
+        } else {
+            HStack(spacing: 12) {
+                Button(action: onPhoneCreate) {
+                    Text(display.webCopy("inputSectionHint", "短い文で、表現したいものを入力。"))
+                        .foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                }.buttonStyle(.plain)
+                Button(action: onPhoneCamera) { Image(systemName: "camera.fill") }
+                    .accessibilityLabel(display.localized("カメラ"))
+            }.padding(14).background(RoundedRectangle(cornerRadius: 16).fill(InkuColor.panel))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(InkuColor.border2))
+                .padding(.horizontal, 12).padding(.vertical, 8)
         }
     }
 
@@ -256,7 +383,7 @@ struct LibraryView: View {
             HStack(spacing: 4) {
                 Text(display.webCopy("historyFilterLabel", fallback: "絞り込み")).inkuFont(12).foregroundStyle(.tertiary).fixedSize()
                 filterButton(display.webCopy("historyStarredOnly", fallback: "スターのみ"), isOn: $library.starredOnly,
-                             tooltip: display.tooltip("お気に入りの作品に絞り込みます。", serverKey: "tooltipHistoryStarredOnly"))
+                             tooltip: display.tooltip("スターを付けた作品だけに絞ります", serverKey: "tooltipHistoryStarredOnly"))
                 filterButton(display.webCopy("historyForRevisionOnly", fallback: "推敲マークのみ"), isOn: $library.revisionOnly,
                              tooltip: display.tooltip("推敲の印を付けた作品に絞り込みます。", serverKey: "tooltipHistoryForRevisionOnly"))
             }
@@ -338,7 +465,8 @@ struct LibraryView: View {
         return Group {
             // HistoryManager.svelte:1090-1097: the field and its "×" inside one box.
             InkuClearableSearchField(value: $library.query, placeholder: placeholder, label: label, display: display,
-                                     onCancel: onClose, onSearch: { library.query = $0 })
+                                     onCancel: phoneLayout ? { phoneSearchVisible = false; library.query = "" } : onClose,
+                                     onSearch: { library.query = $0 })
         }
         // Web `.history-search`: flex 0 1 22rem, at least 10rem.
         // iPhone (ios-app step 7b): the whole width of the screen.
@@ -350,7 +478,7 @@ struct LibraryView: View {
     // MARK: Status rows (Web .history-selection-status, .history-selection-reset)
 
     @ViewBuilder private var statusRows: some View {
-        if !library.selectedIDs.isEmpty {
+        if !phoneLayout && !library.selectedIDs.isEmpty {
             Text(display.label("選択 \(library.selectedIDs.count)件", "\(library.selectedIDs.count) selected"))
                 .inkuFont(12).foregroundStyle(Color.accentColor)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 5).padding(.horizontal, 12)
@@ -396,13 +524,17 @@ struct LibraryView: View {
         } else if library.grouping == .description {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
+                    phoneScrollMarker
                     ForEach(library.groups) { group in
                         DescriptionLibraryGroup(model: model, group: group, members: library.groupMembers[group.id] ?? [],
                             records: library.descriptionCompositions,
-                            onOpen: { openInWorkTab($0) }, onPreview: { openWork($0) })
+                            onOpen: { work in if !(phoneLayout && phoneSelecting) { openInWorkTab(work) } }, onPreview: { work in
+                                if phoneLayout && phoneSelecting { library.toggleSelection(work.id) } else { openWork(work) }
+                            }, selecting: phoneLayout && phoneSelecting)
                     }
                 }.padding(12)
             }
+            .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop)
         } else if library.isGrouped {
             lineageList
         } else if library.layout == .list {
@@ -423,6 +555,7 @@ struct LibraryView: View {
     private var phoneGrid: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                phoneScrollMarker
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
                     ForEach(library.works, id: \.id) { work in
                         phoneTile(work).id(work.id)
@@ -430,6 +563,7 @@ struct LibraryView: View {
                 }
                 moreWorksFooter
             }
+            .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop)
             .onChange(of: library.focusRequest?.visit) { _, _ in
                 guard let id = library.focusRequest?.workID, library.works.contains(where: { $0.id == id }) else { return }
                 proxy.scrollTo(id, anchor: .center)
@@ -442,6 +576,7 @@ struct LibraryView: View {
     private var phoneList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                phoneScrollMarker
                 LazyVStack(spacing: 0) {
                     ForEach(library.works, id: \.id) { work in
                         phoneRow(work).id(work.id)
@@ -450,10 +585,19 @@ struct LibraryView: View {
                 }
                 moreWorksFooter
             }
+            .phoneLibraryScrollTracking(enabled: true, atTop: $phoneScrollAtTop)
             .onChange(of: library.focusRequest?.visit) { _, _ in
                 guard let id = library.focusRequest?.workID, library.works.contains(where: { $0.id == id }) else { return }
                 proxy.scrollTo(id, anchor: .center)
             }
+        }
+    }
+
+    @ViewBuilder private var phoneScrollMarker: some View {
+        if phoneLayout {
+            GeometryReader { geometry in
+                Color.clear.preference(key: PhoneLibraryOffset.self, value: geometry.frame(in: .named("phoneLibraryScroll")).minY)
+            }.frame(height: 0)
         }
     }
 
@@ -745,14 +889,16 @@ struct LibraryView: View {
             Label(display.localized(hasFilters ? "一致する作品がありません" : library.isTrash ? "ごみ箱は空です" : "ライブラリに作品がありません"),
                   systemImage: library.isTrash ? "trash" : "square.grid.2x2")
         } description: {
-            Text(display.localized(hasFilters ? "検索や印の条件を変えてください。" : library.isTrash
+            Text(phoneLayout && !hasFilters && !library.isTrash
+                 ? display.label("下の欄から、最初の作品を描けます。", "Paint your first work from the box below.")
+                 : display.localized(hasFilters ? "検索や印の条件を変えてください。" : library.isTrash
                                          ? "ごみ箱へ移した作品をここから戻せます。" : "制作画面で保存した作品がここに表示されます。"))
         } actions: {
             if hasFilters {
                 Button(display.localized("検索条件を解除")) {
                     library.query = ""; library.starredOnly = false; library.revisionOnly = false
                 }
-            } else if !library.isTrash {
+            } else if !library.isTrash && !phoneLayout {
                 Button(display.localized("制作へ")) {
                     onClose?()
                     NotificationCenter.default.post(name: .inkuOpenSection, object: "create")
@@ -767,10 +913,12 @@ struct LibraryView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
+                    phoneScrollMarker
                     ForEach(library.groups) { group in groupCard(group) }
                 }
                 .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
             }
+            .phoneLibraryScrollTracking(enabled: phoneLayout, atTop: $phoneScrollAtTop)
             .inkuFocusSection()
             .background { focusFollower(scroll: proxy) }
         }
@@ -1394,7 +1542,7 @@ private struct LibraryWorkMenu: View {
         Divider()
         Button(display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
             .disabled(library.mutating || model.isBrowsingLocked)
-        Button(display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
+        Button(display.localized(work.starred ? "スターを外す" : "スターを付ける"), systemImage: "star") { Task { await library.toggleStar(work) } }
             .disabled(library.mutating || writingDisabled)
         Button(display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
             .disabled(library.mutating || writingDisabled)

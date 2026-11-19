@@ -57,7 +57,7 @@
 
 | 日本語（正本） | 英語 | 用法 | 退けた訳・注 |
 |---|---|---|---|
-| 演奏する（主動作ボタン） | **Paint** | 動詞・**lint 固定**。API `/api/paint` と一致 | ~~Generate~~、~~Create~~、~~Draw~~（ボタン語として） |
+| 描画する（主動作ボタン） | **Paint** | 動詞・**lint 固定**。API `/api/paint` と一致 | ~~Generate~~、~~Create~~、~~Draw~~（ボタン語として） |
 | 組（図形のまとまり） | **group** / **a group of …** | 複数図形を一つの配置単位として表す名詞句。歳時記チップは追加しない | ~~command block~~（描画命令の入れ子を表す語ではない） |
 | 純粋呼出し（プラグイン語だけの入力） | **pure invocation** | 名詞句。指示書を書く工程を飛ばして転写する判定の名 | — |
 | 転写・書き下し（プラグイン展開） | **writing-down** / **transcription** | 名詞。宣言的プラグイン文書の決定的展開。転写された instruction は transcribed instruction | ~~expansion~~ 単独（旧 Stage 1.5 の展開層・中間フィルタと紛れる文脈では避ける） |
@@ -118,6 +118,7 @@ composition / color catalog と食い違って見える（→ §8）。
 | 日本語（正本） | 英語 | 用法 | 退けた訳・注 |
 |---|---|---|---|
 | 履歴 | **history** | 名詞 | — |
+| スター（作品の印） | **Starred** | スター付き作品の絞り込みの札。iPhone の「すべて｜スター」は **All｜Starred** | — |
 | ごみ箱 | **trash** | 名詞 | — |
 | 生成情報 | **provenance** | 名詞。モデル・seed・版数のドロワー | ~~Generation Info~~ |
 | 画像（Vision入力タブ） | **Image** | Visionが実際に読む画像ファイル。画像からDDLを書く入力タブ | ~~Picture~~（描いた作品と混同する） |

@@ -884,8 +884,17 @@ public struct ContentView: View {
                 ScrollView(.horizontal) {
                     HStack {
                         ForEach(session.previews, id: \.id) { preview in
-                            ArtworkCanvas(svg: preview.svg, renderer: model.displayRenderer, caption: preview.sourceText, showsZoomControls: false)
-                                .frame(width: 120, height: 120)
+                            if phoneLayout {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    ArtworkCanvas(svg: preview.svg, renderer: model.displayRenderer, showsZoomControls: false)
+                                        .frame(width: 120, height: 120)
+                                    Text(preview.sourceText).inkuFont(15).lineLimit(1).truncationMode(.tail)
+                                        .frame(width: 120, alignment: .leading)
+                                }
+                            } else {
+                                ArtworkCanvas(svg: preview.svg, renderer: model.displayRenderer, caption: preview.sourceText, showsZoomControls: false)
+                                    .frame(width: 120, height: 120)
+                            }
                         }
                     }
                 }

@@ -126,7 +126,7 @@ struct PhoneWorkViewer: View {
                 .frame(maxWidth: .infinity, minHeight: 54).padding(.horizontal, 20).background(.black.opacity(0.65))
         } else {
             ViewThatFits(in: .horizontal) {
-                workButtons(vertical: false).fixedSize(horizontal: true, vertical: false)
+                workButtons(vertical: false)
                 workButtons(vertical: true)
             }.foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 58).padding(.horizontal, 16).background(.black.opacity(0.65))
         }
@@ -149,11 +149,14 @@ struct PhoneWorkViewer: View {
                         await model.library.toggleStar(target)
                         if let saved = try? await model.auxiliaryDatabase().work(id: work.id) { starOverride = saved.starred }
                     }
-                } label: { Label(display.label("スター", "Star"), systemImage: starred ? "star.fill" : "star").frame(minHeight: 44) }
+                } label: { Label(display.label("スター", "Star"), systemImage: starred ? "star.fill" : "star")
+                    .fixedSize(horizontal: !vertical, vertical: false).frame(minHeight: 44) }
                     .disabled(!permissions.canStar)
-                Button { onRefine(work) } label: { Text(display.webCopy("historyPreviewRefine", "推敲する")).frame(minHeight: 44) }.disabled(!permissions.canWrite)
+                if !vertical { Spacer(minLength: 0) }
+                Button { onRefine(work) } label: { Text(display.webCopy("historyPreviewRefine", "推敲する"))
+                    .fixedSize(horizontal: !vertical, vertical: false).frame(minHeight: 44) }.disabled(!permissions.canWrite)
                 Button { onShare(work) } label: {
-                    HStack { if sharing { ProgressView() }; Text(display.label("共有", "Share")) }
+                    HStack { if sharing { ProgressView() }; Text(display.label("共有", "Share")).fixedSize(horizontal: !vertical, vertical: false) }
                         .frame(minWidth: 76, minHeight: 44)
                 }.buttonStyle(.borderedProminent).disabled(!permissions.canShare)
         }

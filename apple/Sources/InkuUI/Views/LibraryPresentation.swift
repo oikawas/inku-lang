@@ -292,11 +292,23 @@ struct LibraryGhostButtonStyle: ButtonStyle {
     var minHeight: CGFloat? = nil
     /// Web `.danger-btn`.
     var danger = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.modifier(LibraryGhostSurface(active: active, minWidth: minWidth, minHeight: minHeight,
+                                                          danger: danger, pressed: configuration.isPressed))
+    }
+}
+
+/// The same label surface also lets a Menu match adjacent library buttons.
+struct LibraryGhostSurface: ViewModifier {
+    var active = false
+    var minWidth: CGFloat? = nil
+    var minHeight: CGFloat? = nil
+    var danger = false
+    var pressed = false
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.inkuMinimumFontSize) private var minimumFontSize
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+    func body(content: Content) -> some View {
+        content
             .inkuFont(12)
             .lineLimit(minimumFontSize > 0 ? nil : 1)
             .fixedSize(horizontal: minimumFontSize == 0, vertical: true)
@@ -304,7 +316,7 @@ struct LibraryGhostButtonStyle: ButtonStyle {
             .frame(minWidth: minimumFontSize > 0 ? max(minWidth ?? 0, 44) : minWidth,
                    minHeight: minimumFontSize > 0 ? max(minHeight ?? 0, 44) : minHeight)
             .foregroundStyle(active || danger ? Color.white : Color.primary)
-            .background(danger ? Color.red : active ? Color.accentColor : Color.primary.opacity(configuration.isPressed ? 0.12 : 0.04),
+            .background(danger ? Color.red : active ? Color.accentColor : Color.primary.opacity(pressed ? 0.12 : 0.04),
                         in: RoundedRectangle(cornerRadius: 4))
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(danger ? Color.red : active ? Color.accentColor : LibraryChrome.border))
             .opacity(isEnabled ? 1 : 0.45)

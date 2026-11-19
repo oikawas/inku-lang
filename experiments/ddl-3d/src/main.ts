@@ -296,8 +296,8 @@ function glassControls(parent: HTMLElement) {
   slider(trial, 'front', words.frontGlass, 0.03, 3, 0.01);
   slider(trial, 'backTilt', words.backTilt, 0, 30, 0.5, 1);
   slider(trial, 'room', words.roomDarkness, 0.5, 0.8, 0.01);
-  for (const [key, label] of [['swayOnce', words.swayOnce], ['bluish', words.bluishSilver]] as const) {
-    const box = element('label', trial), input = element('input', box); input.type = 'checkbox'; input.checked = glassSettings[key]; box.append(label);
+  for (const [into, key, label] of [[parent, 'frictionless', words.frictionless], [trial, 'swayOnce', words.swayOnce], [trial, 'bluish', words.bluishSilver]] as const) {
+    const box = element('label', into), input = element('input', box); input.type = 'checkbox'; input.checked = glassSettings[key]; box.append(label);
     input.addEventListener('change', () => { glassSettings = { ...glassSettings, [key]: input.checked }; glass()?.set({ [key]: input.checked }); });
     sceneControls.push(input);
   }

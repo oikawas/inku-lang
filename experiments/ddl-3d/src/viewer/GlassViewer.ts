@@ -15,10 +15,11 @@ export type GlassColor = 'none' | 'background' | 'layers';
 export interface GlassSettings {
   angle: number; spacing: number; leaf: number; light: number; glassColor: GlassColor;
   front: number; backTilt: number; sway: boolean; swayOnce: boolean; room: number; bluish: boolean;
+  /** Keep turning at the release speed until touched (no friction). */ frictionless: boolean;
 }
 export const GLASS_DEFAULTS: GlassSettings = {
   angle: 1, spacing: 1, leaf: 0.6, light: 0, glassColor: 'none', front: 0.03, backTilt: 0,
-  sway: false, swayOnce: true, room: 0.55, bluish: false,
+  sway: false, swayOnce: true, room: 0.55, bluish: false, frictionless: true,
 };
 
 const PAINT_PIXELS = navigator.vendor.startsWith('Apple') ? 4 * 1024 * 1024 : 16 * 1024 * 1024;
@@ -410,10 +411,17 @@ export class GlassViewer {
     const dt = Math.min(0.05, (time - this.last) / 1000 || 0); this.last = time;
     let animating = false;
     if (this.inertia) {
-      const { az, po } = this.inertia;
+      // Without friction (an option, on by default) it turns at the release speed
+      // until touched; with it, the speed halves about every 0.35 seconds. The
+      // vertical part ends where the orbit reaches the top or bottom.
+      const { az, po } = this.inertia, polar = this.controls.getPolarAngle();
       this.controls.rotateLeft(-az * dt); this.controls.rotateUp(-po * dt); this.controls.update();
-      const decay = Math.exp(-dt / 0.5); this.inertia = { az: az * decay, po: po * decay };
-      if (Math.hypot(az, po) / DEG < 1.5) { this.inertia = null; this.snapFront(); this.changed(this.state()); }
+      const decay = this.settings.frictionless ? 1 : Math.exp(-dt / 0.5);
+      const stuck = po !== 0 && Math.abs(this.controls.getPolarAngle() - polar) < Math.abs(po * dt) * 0.5;
+      this.inertia = { az: az * decay, po: stuck ? 0 : po * decay };
+      if (Math.hypot(this.inertia.az, this.inertia.po) / DEG < (this.settings.frictionless ? 1e-6 : 1.5)) {
+        this.inertia = null; this.snapFront(); this.changed(this.state());
+      }
       animating = true; this.moving = performance.now();
     }
     if (this.tween) {

@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.pipeline.NativePipelineBridge
 import org.json.JSONObject
@@ -89,6 +90,7 @@ object Ddl3DInput {
         core: (ByteArray) -> ByteArray = NativePipelineBridge::ddl3dSnapshot,
     ): Result<String> {
         val request = JSONObject().put("score", item.scoreJson).put("metadata", item.renderMetadataJson)
+        if (DdlSource.hasBody(item.normalizedDdl)) request.put("ddl", item.normalizedDdl)
         val answer = runCatching { JSONObject(core(request.toString().toByteArray(Charsets.UTF_8)).toString(Charsets.UTF_8)) }
             .getOrElse { return Result.failure(Ddl3DInputError("internal_invariant")) }
         answer.optString("json").takeIf { answer.has("json") }?.let { return Result.success(it) }

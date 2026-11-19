@@ -1,6 +1,7 @@
 package app.inku.mobile.ui.ddl3d
 
 import app.inku.mobile.pipeline.NativePipelineBridge
+import app.inku.mobile.data.db.HistoryItemEntity
 import java.io.File
 import java.security.MessageDigest
 import org.json.JSONObject
@@ -12,6 +13,30 @@ import org.junit.Test
 
 class Ddl3DTest {
     private fun property(name: String) = File(requireNotNull(System.getProperty(name)) { name })
+
+    @Test
+    fun snapshotIncludesDdlOnlyWhenItHasABody() {
+        val item = HistoryItemEntity(id = "work", createdAt = 0, updatedAt = 0, originalInput = "",
+            normalizedDdl = null, scoreJson = "score", displaySvg = "", stage1Model = null, stage2Model = null,
+            renderMetadataJson = "metadata", renderHash = "", renderHashShort = "", colorCatalogId = "",
+            canvasAspect = "square", starred = false, trashed = false, elapsedMs = null, tokenMetadataJson = null)
+        fun request(ddl: String?): JSONObject {
+            var captured: JSONObject? = null
+            val result = Ddl3DInput.snapshot(item.copy(normalizedDdl = ddl)) { bytes ->
+                captured = JSONObject(bytes.toString(Charsets.UTF_8))
+                """{"json":"snapshot"}""".toByteArray()
+            }
+            assertEquals("snapshot", result.getOrThrow())
+            return captured!!
+        }
+        val ddl = "  題: ガラス\nガラスの円  "
+        val withBody = request(ddl)
+        assertEquals(ddl, withBody.getString("ddl"))
+        assertEquals("score", withBody.getString("score"))
+        assertEquals("metadata", withBody.getString("metadata"))
+        listOf(null, "", " \n\u00a0\u3000").forEach { assertFalse(request(it).has("ddl")) }
+        assertEquals("\u200b", request("\u200b").getString("ddl"))
+    }
 
     /** The app's copy is Web's registered build, file by file, with the registration and the parent page. */
     @Test

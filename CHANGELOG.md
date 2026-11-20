@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- The iPhone 3D view now fits the paper instead of opening too large, and double-tapping 3D inside the iPhone and iPad apps returns to 2D. Scrolling the controls no longer activates a button by accident, and solid selection and Focus selection have smoother feedback.
-
 - iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.
 
 - iOS: increases text on iPhone home, the viewer, work information and related screens, with a 13pt minimum for inku text.
@@ -771,6 +769,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.377 (2026-11-20 / Build 1453)
+
+- The iPhone 3D view now fits the paper instead of opening too large, and double-tapping 3D inside the iPhone and iPad apps returns to 2D. Scrolling the controls no longer activates a button by accident, and solid selection and Focus selection have smoother feedback.
 
 ## v2.15.376 (2026-11-20 / Build 1452)
 

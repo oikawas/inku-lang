@@ -1,5 +1,5 @@
 import './style.css';
-import { Viewer, type Unpainted } from './viewer/Viewer';
+import { Viewer, SOLIDS_DEFAULTS, type SolidsSettings, type Unpainted } from './viewer/Viewer';
 import { GlassViewer, GLASS_DEFAULTS, type GlassColor, type GlassSettings } from './viewer/GlassViewer';
 import { labels, type Labels } from './viewer/labels';
 import { PROTOCOL, MAX_INPUT_BYTES, validLoad, type LoadMessage } from './input/protocol';
@@ -14,6 +14,7 @@ let current: LoadMessage | null = null, viewer: Viewer | GlassViewer | null = nu
 // The glass is the first view; the solids stay one switch away.
 let mode: 'glass' | 'solids' = 'glass', lastPacket: ScenePacket | null = null;
 let glassSettings: GlassSettings = { ...GLASS_DEFAULTS };
+let solidsSettings: SolidsSettings = { ...SOLIDS_DEFAULTS };
 let generation = 0, timeout = 0, locale: 'ja' | 'en' = 'ja';
 let words = labels(locale);
 let stage: HTMLElement, status: HTMLElement, details: HTMLElement, selection: HTMLElement, overlay: HTMLElement, recoveryNotice: HTMLElement, paintNotice: HTMLElement;
@@ -119,7 +120,7 @@ function ui() {
     if (mode === 'glass' && key === 'depth') controlLabel.hidden = true;
     sceneControls.push(input);
   }
-  if (mode === 'glass') glassControls(options);
+  if (mode === 'glass') glassControls(options); else solidsControls(options);
   button(options, words.focus, () => viewer?.focus());
   for (const format of ['png', 'glb'] as const) button(options, words[format], () => { void save(format); });
   const help = element('details', toolbar); element('summary', help, words.help); element('p', help, words.helpText); element('p', help, words.layerHelp);
@@ -148,6 +149,7 @@ function load(value: LoadMessage) {
   // A return from 2D reopens the way the work was last shown, with its glass settings.
   if (value.viewState?.viewMode) mode = value.viewState.viewMode;
   if (value.viewState?.glass) glassSettings = { ...glassSettings, ...value.viewState.glass };
+  if (value.viewState?.solids) solidsSettings = { ...solidsSettings, ...value.viewState.solids };
   document.documentElement.dataset.theme = value.theme; ui(); message(words.preparing, true);
   const localGeneration = generation;
   const started = performance.now();
@@ -177,7 +179,13 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
           const output = root.querySelector<HTMLOutputElement>(`output[data-glass=${key}]`); if (output) output.value = Number(glassSettings[key]).toFixed(2);
         }
       }
-      else if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
+      else if (viewer) {
+        solidsSettings = { ...viewer.settings };
+        root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.spinning;
+        for (const input of root.querySelectorAll<HTMLInputElement>('input[type=checkbox][data-solids]')) input.checked = !!solidsSettings[input.dataset.solids as 'frictionless' | 'open'];
+        const light = root.querySelector<HTMLInputElement>('input[type=range][data-solids=light]');
+        if (light) { light.value = String(solidsSettings.light); root.querySelector<HTMLOutputElement>('output[data-solids=light]')!.value = solidsSettings.light.toFixed(2); }
+      }
       post('view-state', { viewState });
     };
     const selected = (data: Record<string, unknown> | null) => {
@@ -185,11 +193,13 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
         selection.textContent = `${words.selected}: ${words.glassLayer} ${Number(data.glassLayer) + 1}${data.name ? ` 「${data.name}」` : ''} · #${(data.instructions as number[]).join(', #')}`;
         return;
       }
-      selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
+      // The chunk of the instructions a solid came from, when the saved DDL names it.
+      selection.textContent = data ? `${words.selected}: ${data.chunk ? `「${data.chunk}」 · ` : ''}${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
     };
     viewer = mode === 'glass' ? new GlassViewer(stage, packet, changed, selected, fail, value.initialView)
       : new Viewer(stage, packet, changed, selected, fail, value.initialView);
     if (viewer instanceof GlassViewer) { viewer.settings = { ...glassSettings, sway: false }; viewer.set({}); }
+    else viewer.settings = { ...solidsSettings };
     const preparedViewer = viewer;
     // The plain solids come first; paint follows once they can be moved.
     viewer.prepareShape();
@@ -260,6 +270,7 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
 function switchMode(next: 'glass' | 'solids') {
   if (next === mode) return;
   if (viewer instanceof GlassViewer) glassSettings = { ...viewer.settings };
+  else if (viewer) solidsSettings = { ...viewer.settings };
   mode = next;
   if (!lastPacket || !current) { ui(); return; }
   const packet = lastPacket, value = { ...current, viewState: undefined };
@@ -297,6 +308,26 @@ function glassControls(parent: HTMLElement) {
   frictionless.type = 'checkbox'; frictionless.checked = glassSettings.frictionless; frictionless.dataset.glass = 'frictionless'; box.append(words.frictionless);
   frictionless.addEventListener('change', () => { glassSettings = { ...glassSettings, frictionless: frictionless.checked }; glass()?.set({ frictionless: frictionless.checked }); });
   sceneControls.push(frictionless);
+}
+
+/** The solids' own controls, remembered across a switch of view. */
+function solidsControls(parent: HTMLElement) {
+  const solids = () => viewer instanceof Viewer ? viewer : null;
+  for (const [key, label] of [['frictionless', words.frictionless], ['open', words.openLayers]] as const) {
+    const box = element('label', parent), input = element('input', box);
+    input.type = 'checkbox'; input.checked = solidsSettings[key]; input.dataset.solids = key; box.append(label);
+    input.addEventListener('change', () => { solidsSettings = { ...solidsSettings, [key]: input.checked }; solids()?.set({ [key]: input.checked }); });
+    sceneControls.push(input);
+  }
+  const lightLabel = element('label', parent, words.lightDirection), light = element('input', lightLabel);
+  light.type = 'range'; light.min = '-1'; light.max = '1'; light.step = '0.01'; light.value = String(solidsSettings.light);
+  light.dataset.solids = 'light'; light.setAttribute('aria-label', words.lightDirection);
+  const output = element('output', lightLabel, solidsSettings.light.toFixed(2)); output.dataset.solids = 'light';
+  light.addEventListener('input', () => {
+    output.value = Number(light.value).toFixed(2);
+    solidsSettings = { ...solidsSettings, light: Number(light.value) }; solids()?.set({ light: Number(light.value) });
+  });
+  sceneControls.push(light);
 }
 
 function showUnpainted(unpainted: Unpainted[]) {

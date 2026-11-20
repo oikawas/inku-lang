@@ -11,7 +11,13 @@ export type ViewState = {
 	displayZoom?: number;
 	viewMode?: 'glass' | 'solids';
 	glass?: { angle: number; leaf: number; light: number; glassColor: 'none' | 'background' | 'layers'; frictionless: boolean };
+	solids?: { frictionless: boolean; light: number; open: boolean };
 };
+function validSolids(value: unknown): boolean {
+	if (!value || typeof value !== 'object') return false;
+	const s = value as NonNullable<ViewState['solids']>;
+	return typeof s.frictionless === 'boolean' && Number.isFinite(s.light) && s.light >= -1 && s.light <= 1 && typeof s.open === 'boolean';
+}
 function validGlass(value: unknown): boolean {
 	if (!value || typeof value !== 'object') return false;
 	const g = value as NonNullable<ViewState['glass']>;
@@ -31,6 +37,7 @@ export function validViewState(value: unknown): value is ViewState {
 		&& (v.displayZoom === undefined || (Number.isFinite(v.displayZoom) && v.displayZoom > 0 && v.displayZoom <= 10000))
 		&& (v.viewMode === undefined || v.viewMode === 'glass' || v.viewMode === 'solids')
 		&& (v.glass === undefined || validGlass(v.glass))
+		&& (v.solids === undefined || validSolids(v.solids))
 		&& Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;
 }
 let previous: { inputJson: string; state: ViewState } | null = null;

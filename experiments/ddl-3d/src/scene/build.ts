@@ -24,7 +24,7 @@ function clean(points: XY[], closed = false): XY[] {
 }
 
 function attributes(geometry: BufferGeometry): BufferGeometry {
-  for (const key of Object.keys(geometry.attributes)) if (key !== 'position' && key !== 'normal') geometry.deleteAttribute(key);
+  for (const key of Object.keys(geometry.attributes)) if (key !== 'position' && key !== 'normal' && key !== 'axis') geometry.deleteAttribute(key);
   geometry.clearGroups();
   if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
   return geometry;
@@ -32,6 +32,8 @@ function attributes(geometry: BufferGeometry): BufferGeometry {
 
 function combine(parts: BufferGeometry[]): BufferGeometry {
   if (!parts.length) throw new Error('empty_geometry');
+  // A tube's ring axes survive only when every part has them.
+  if (!parts.every(g => g.getAttribute('axis'))) parts.forEach(g => g.deleteAttribute('axis'));
   // Tubes share their ring vertices; keep that unless a part has no index.
   const indexed = parts.every(g => g.index);
   const source = parts.map(g => attributes(g.index && !indexed ? g.toNonIndexed() : g));
@@ -41,9 +43,11 @@ function combine(parts: BufferGeometry[]): BufferGeometry {
   return merged;
 }
 
-/** A closed tube around a polyline. Its circular section has no end holes. */
+/** A closed tube around a polyline. Its circular section has no end holes.
+ * Each vertex keeps its ring's axis (centre x, y and the unit tangent x, y),
+ * so paint can later move a ring onto the brush stroke it belongs to. */
 function tube(points: Vector3[], radius: number, closed = false, sides = 6): BufferGeometry {
-  const positions: number[] = [], indices: number[] = [];
+  const positions: number[] = [], indices: number[] = [], axis: number[] = [];
   const n = points.length;
   if (n < 2 || n > 8192 || !(radius > 0 && finite(radius))) throw new Error('invalid_tube');
   // Parallel-transported frames also work for the sphere's latitude/longitude rings.
@@ -55,10 +59,12 @@ function tube(points: Vector3[], radius: number, closed = false, sides = 6): Buf
     if (Math.abs(tangent.dot(normal)) > 0.98) normal = new Vector3(0, 1, 0);
     const binormal = tangent.clone().cross(normal).normalize();
     normal = binormal.clone().cross(tangent).normalize();
+    const flat = Math.hypot(tangent.x, tangent.y) || 1;
     for (let j = 0; j < sides; j++) {
       const theta = 2 * Math.PI * j / sides;
       const p = points[i].clone().addScaledVector(normal, radius * Math.cos(theta)).addScaledVector(binormal, radius * Math.sin(theta));
       positions.push(p.x, p.y, p.z);
+      axis.push(points[i].x, points[i].y, tangent.x / flat, tangent.y / flat);
     }
   }
   for (let i = 0; i < (closed ? n : n - 1); i++) {
@@ -70,6 +76,7 @@ function tube(points: Vector3[], radius: number, closed = false, sides = 6): Buf
   }
   if (!closed) {
     positions.push(...points[0].toArray(), ...points[n - 1].toArray());
+    axis.push(...axis.slice(0, 4), ...axis.slice((n - 1) * sides * 4, (n - 1) * sides * 4 + 4));
     for (let j = 0; j < sides; j++) {
       indices.push(n * sides, (j + 1) % sides, j);
       indices.push(n * sides + 1, (n - 1) * sides + j, (n - 1) * sides + (j + 1) % sides);
@@ -77,9 +84,26 @@ function tube(points: Vector3[], radius: number, closed = false, sides = 6): Buf
   }
   const result = new BufferGeometry();
   result.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  result.setAttribute('axis', new Float32BufferAttribute(axis, 4));
   result.setIndex(indices);
   result.computeVertexNormals();
   return result;
+}
+
+/** A painted path gets a ring at least every 0.02 of its length (at most 64
+ * per piece), so its tube can bend with the brush. */
+function ringed(points: XY[]): XY[] {
+  const length = points.slice(1).reduce((sum, p, i) => sum + distance(p, points[i]), 0);
+  const spacing = Math.max(0.02, length / 64), out: XY[] = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const from = points[i - 1], to = points[i], steps = Math.floor(distance(from, to) / spacing);
+    for (let k = 1; k <= steps; k++) {
+      const t = k / (steps + 1);
+      out.push([from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]);
+    }
+    out.push(to);
+  }
+  return out;
 }
 
 /** Segment dash lengths in source units, carrying phase across every vertex. */
@@ -109,7 +133,9 @@ export function dashedPaths(points: XY[], pattern: number[]): XY[][] {
   return parts;
 }
 
-function prism(points: XY[], depth?: number): BufferGeometry {
+/** A contour pushed through its thickness. The walls have a ring halfway, so
+ * the paint can fold in from both edges and turn back at the middle. */
+function prism(points: XY[], depth?: number, steps = 2): BufferGeometry {
   const contour = clean(points, true);
   const bounds = extent(contour);
   const thickness = depth ?? Math.min(bounds[0], bounds[1]);
@@ -118,8 +144,44 @@ function prism(points: XY[], depth?: number): BufferGeometry {
   shape.moveTo(...contour[0]);
   for (const point of contour.slice(1)) shape.lineTo(...point);
   shape.closePath();
-  return attributes(new ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, steps: 1 }).translate(0, 0, -thickness / 2));
+  return attributes(new ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, steps }).translate(0, 0, -thickness / 2));
 }
+
+/** The share of the canvas a contour covers once placed, inside the canvas. */
+export function canvasCoverage(points: XY[], transform: number[], canvas: XY): number {
+  const [a, b, c, d, e, f] = transform;
+  let polygon: XY[] = points.map(([x, y]) => [a * x + c * y + e, b * x + d * y + f]);
+  // Clip to the canvas, one edge at a time.
+  const edges: [(p: XY) => number, (p: XY, q: XY) => XY][] = [0, 1].flatMap(axis => [0, canvas[axis]].map(limit => {
+    const inside = (p: XY) => limit === 0 ? p[axis] : limit - p[axis];
+    return [inside, (p: XY, q: XY): XY => {
+      const t = inside(p) / (inside(p) - inside(q));
+      return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    }] as [(p: XY) => number, (p: XY, q: XY) => XY];
+  }));
+  for (const [inside, cross] of edges) {
+    const next: XY[] = [];
+    polygon.forEach((p, i) => {
+      const q = polygon[(i + 1) % polygon.length];
+      if (inside(p) >= 0) next.push(p);
+      if ((inside(p) >= 0) !== (inside(q) >= 0)) next.push(cross(p, q));
+    });
+    polygon = next;
+    if (polygon.length < 3) return 0;
+  }
+  const area = Math.abs(polygon.reduce((sum, p, i) => sum + p[0] * polygon[(i + 1) % polygon.length][1] - polygon[(i + 1) % polygon.length][0] * p[1], 0)) / 2;
+  return area / (canvas[0] * canvas[1]);
+}
+
+/** How far a filled square becomes a board: 0 below a fifth of the canvas, 1
+ * from half of it (the author's choice, 2026-11-20: the ground is a board
+ * standing at the back, not a block that holds every other layer). */
+export function boardShare(coverage: number): number {
+  const t = Math.min(1, Math.max(0, (coverage - 0.2) / 0.3));
+  return t * t * (3 - 2 * t);
+}
+/** A board's thickness, in short sides of the canvas. */
+export const BOARD = 0.02;
 
 function extent(points: XY[]): XY {
   return [Math.max(...points.map(p => p[0])) - Math.min(...points.map(p => p[0])),
@@ -217,7 +279,19 @@ function roundSegments(mark: GeometryMark, count: number): number {
   return Math.max(16, Math.floor(Math.min(96, visual, share) / 4) * 4);
 }
 
-function localGeometry(mark: GeometryMark, roundCount: number): BufferGeometry {
+/** The z scale `world` gives a placed solid: its transform's smaller stretch. */
+function zScaleOf(transform: number[]): number {
+  const [a, b, c, d] = transform, sum = a*a + b*b + c*c + d*d, det = a*d - b*c;
+  return Math.sqrt(Math.max(0, (sum - Math.sqrt(Math.max(0, sum*sum - 4*det*det))) / 2));
+}
+
+/** A filled square's board share (see boardShare); other marks are 0. */
+export function markBoard(mark: GeometryMark, canvas: XY): number {
+  if (mark.primitive !== 'square' || !mark.filled || mark.shape.kind !== 'contour' || mark.transform.length !== 6 || !mark.transform.every(finite)) return 0;
+  return boardShare(canvasCoverage(mark.shape.points, mark.transform, canvas));
+}
+
+function localGeometry(mark: GeometryMark, roundCount: number, canvas: XY): BufferGeometry {
   const { shape, width } = mark;
   if (!(width > 0 && finite(width))) throw new Error('invalid_width');
   if (shape.kind === 'round') {
@@ -228,11 +302,17 @@ function localGeometry(mark: GeometryMark, roundCount: number): BufferGeometry {
   }
   const points = clean(shape.points, shape.kind === 'contour');
   if (shape.kind === 'path') {
-    return combine(dashedPaths(points, mark.dash).map(path => tube(path.map(p => new Vector3(...p, 0)), width / 2)));
+    return combine(dashedPaths(points, mark.dash).map(path => tube((mark.appearance ? ringed(path) : path).map(p => new Vector3(...p, 0)), width / 2)));
   }
   // A smooth cloud's solid has no edge sharp enough to outline; trace the contour itself.
   if (mark.primitive === 'cloudform' && !mark.filled) return stroke3d(points.map(p => new Vector3(...p, 0)), width, mark.dash, true);
-  const solid = mark.primitive === 'triangle' ? pyramid(points) : mark.primitive === 'cloudform' ? cloud(points) : prism(points);
+  // A filled square that covers much of the canvas thins toward a board.
+  const board = markBoard(mark, canvas);
+  const thickness = board > 0 ? (() => {
+    const own = Math.min(...extent(points)), boardDepth = BOARD * Math.min(...canvas) / Math.max(EPS, zScaleOf(mark.transform));
+    return own + (Math.min(own, boardDepth) - own) * board;
+  })() : undefined;
+  const solid = mark.primitive === 'triangle' ? pyramid(points) : mark.primitive === 'cloudform' ? cloud(points) : prism(points, thickness);
   if (mark.filled) return solid;
   const edges = new EdgesGeometry(solid, 28), positions = edges.getAttribute('position');
   const parts: BufferGeometry[] = [];
@@ -253,6 +333,13 @@ function world(geometry: BufferGeometry, transform: number[], canvas: XY): Buffe
   const matrix = new Matrix4().set(a, c, 0, e - canvas[0] / 2, -b, -d, 0, canvas[1] / 2 - f, 0, 0, zScale, 0, 0, 0, 0, 1);
   if (Math.abs(matrix.determinant()) < EPS) throw new Error('singular_transform');
   geometry.applyMatrix4(matrix);
+  // Ring axes move with the solid: centres as points, tangents as directions.
+  const axis = geometry.getAttribute('axis');
+  if (axis) for (let i = 0; i < axis.count; i++) {
+    const p = new Vector3(axis.getX(i), axis.getY(i), 0).applyMatrix4(matrix);
+    const t = new Vector3(axis.getZ(i), axis.getW(i), 0).transformDirection(matrix);
+    axis.setXYZW(i, p.x, p.y, t.x, t.y);
+  }
   if (matrix.determinant() < 0) {
     const count = geometry.getAttribute('position').count;
     const index = geometry.index ? Array.from(geometry.index.array) : Array.from({ length: count }, (_, i) => i);
@@ -271,7 +358,7 @@ function clip(geometry: BufferGeometry, contours: XY[][], canvas: XY): BufferGeo
     for (const contour of contours) {
       geometry.computeBoundingBox();
       const depth = Math.max(32, 2 * Math.max(Math.abs(geometry.boundingBox!.min.z), Math.abs(geometry.boundingBox!.max.z)) + 2);
-      const boundary = world(prism(contour, depth), [1, 0, 0, 1, 0, 0], canvas);
+      const boundary = world(prism(contour, depth, 1), [1, 0, 0, 1, 0, 0], canvas);
       const left = new Brush(geometry, material), right = new Brush(boundary, material);
       left.updateMatrixWorld(); right.updateMatrixWorld();
       const result = evaluator.evaluate(left, right, INTERSECTION);
@@ -318,6 +405,8 @@ export function buildScene(input: PreparedScene): ScenePacket {
     try {
       if (mark.clips.length) geometry = clip(geometry, mark.clips, scene.canvas);
       const positions = new Float32Array(geometry.getAttribute('position').array);
+      const axisAttribute = geometry.getAttribute('axis');
+      const axis = role === 'object' && mark.shape.kind === 'path' && mark.appearance && axisAttribute ? new Float32Array(axisAttribute.array) : null;
       if (!positions.length) { if (role === 'object') output.clippedObjects++; return; }
       if (positions.some(v => !finite(v))) throw new Error('invalid_vertices');
       const normals = new Float32Array(geometry.getAttribute('normal').array);
@@ -333,15 +422,17 @@ export function buildScene(input: PreparedScene): ScenePacket {
         output.bytes += appearance.svg.length * 2;
       }
       if (output.triangles > MAX_TRIANGLES || output.bytes > MAX_BYTES) throw new Error('mesh_budget_exceeded');
-      output.meshes.push({ positions, normals, indices, color: mark.color, opacity: mark.opacity,
+      if (axis) output.bytes += axis.byteLength;
+      output.meshes.push({ ...(axis ? { axis } : {}), positions, normals, indices, color: mark.color, opacity: mark.opacity,
         sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex, primitive: mark.primitive,
         role, filled: role === 'pair-fill' || mark.filled, layerIndex: 0, layerZ: 0, ...(appearance ? { appearance } : {}),
+        ...(role === 'object' && markBoard(mark, scene.canvas) > 0 ? { board: markBoard(mark, scene.canvas) } : {}),
         ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex,
           relatedPerformedIndex: mark.pairFill?.performedIndex, relatedInstanceIndex: mark.pairFill?.instanceIndex } : {}) });
     } finally { geometry.dispose(); }
   };
   for (const mark of marks) {
-    append(world(localGeometry(lineDepth.mark(mark), roundCount), mark.transform, scene.canvas), mark, 'object');
+    append(world(localGeometry(lineDepth.mark(mark), roundCount, scene.canvas), mark.transform, scene.canvas), mark, 'object');
     if (mark.pairFill) append(world(prism(mark.pairFill.points), [1, 0, 0, 1, 0, 0], scene.canvas),
       { ...mark, color: mark.pairFill.color, opacity: mark.pairFill.opacity }, 'pair-fill');
   }
@@ -355,6 +446,7 @@ export function unpackMesh(packet: MeshPacket): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(packet.positions, 3));
   geometry.setAttribute('normal', new Float32BufferAttribute(packet.normals, 3));
+  if (packet.axis) geometry.setAttribute('axis', new Float32BufferAttribute(packet.axis, 4));
   if (packet.indices) geometry.setIndex(new Uint32BufferAttribute(packet.indices, 1));
   return geometry;
 }

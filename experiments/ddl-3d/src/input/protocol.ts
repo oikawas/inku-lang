@@ -14,6 +14,14 @@ export interface ViewState {
     angle: number; leaf: number; light: number;
     glassColor: 'none' | 'background' | 'layers'; frictionless: boolean;
   };
+  /** The solids' own settings: the turning, the light's direction, and whether layers open as the view turns. */
+  solids?: { frictionless: boolean; light: number; open: boolean };
+}
+/** The solids settings a view state may carry: each in its control's range. */
+export function validSolidsState(s: unknown): boolean {
+  if (!s || typeof s !== 'object') return false;
+  const v = s as NonNullable<ViewState['solids']>;
+  return typeof v.frictionless === 'boolean' && Number.isFinite(v.light) && v.light >= -1 && v.light <= 1 && typeof v.open === 'boolean';
 }
 /** The glass settings a view state may carry: each in its control's range. */
 export function validGlassState(g: unknown): boolean {
@@ -40,6 +48,7 @@ export function validState(value: unknown): value is ViewState {
     && (v.displayZoom === undefined || (Number.isFinite(v.displayZoom) && v.displayZoom > 0 && v.displayZoom <= 10000))
     && (v.viewMode === undefined || v.viewMode === 'glass' || v.viewMode === 'solids')
     && (v.glass === undefined || validGlassState(v.glass))
+    && (v.solids === undefined || validSolidsState(v.solids))
     && Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;
 }
 export function validLoad(value: unknown): value is LoadMessage {

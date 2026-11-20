@@ -21,12 +21,11 @@ out vec4 outColor;
 uniform sampler2DArray uLayers;
 uniform float uLayerSize;
 uniform int uSlots;
-uniform vec4 uPlane[SLOTS];   // tan, offset, sheen (0 or 1), opacity
-uniform vec4 uRect[SLOTS];    // content rectangle in world x, y: x0, y0, x1, y1
+uniform vec4 uPlane[SLOTS];   // z = c + gx x + gy y: gx, gy, c, opacity
+uniform int uPresence;        // 1 when slot 0 is the presence plane (no sheen)uniform vec4 uRect[SLOTS];    // content rectangle in world x, y: x0, y0, x1, y1
 uniform vec3 uSigma[SLOTS];   // absorption of the glass in front of slot k (between k and k+1)
 uniform float uPulse[SLOTS];
 uniform vec4 uBox[6];         // outward normal, offset: dot(n, p) <= d inside
-uniform float uAxisX;
 uniform vec3 uSigmaAll;       // absorption of the whole block, for one colour
 uniform bool uOrtho;
 uniform vec3 uViewDir;
@@ -36,10 +35,10 @@ uniform float uLeaf;
 uniform bool uBluish;
 uniform vec3 uBg;
 uniform float uRoom;
-uniform vec3 uLightC[2];      // centres of the lights A and B
-uniform vec3 uLightU[2];
-uniform vec3 uLightV[2];
-uniform vec3 uLightSize[2];   // half width, half height, brightness
+uniform vec3 uLightC[3];      // centres of the lights A, B and D
+uniform vec3 uLightU[3];
+uniform vec3 uLightV[3];
+uniform vec3 uLightSize[3];   // half width, half height, brightness
 uniform float uLightLow;
 uniform int uBounces;
 
@@ -65,7 +64,7 @@ float rectLight(int k, vec3 q, vec3 d, float soft) {
 
 float lights(vec3 q, vec3 d, float soft) {
   float low = uLightLow * smoothstep(0.0, -0.8, d.y);
-  return rectLight(0, q, d, soft) + rectLight(1, q, d, soft) + low;
+  return rectLight(0, q, d, soft) + rectLight(1, q, d, soft) + rectLight(2, q, d, soft) + low;
 }
 
 vec3 env(vec3 q, vec3 d) {
@@ -86,15 +85,15 @@ float exitBox(vec3 p, vec3 d, out int face) {
   return max(best, 0.0);
 }
 
-vec3 planeNormal(int k) { return normalize(vec3(-uPlane[k].x, 0.0, 1.0)); }
+vec3 planeNormal(int k) { return normalize(vec3(-uPlane[k].x, -uPlane[k].y, 1.0)); }
+float planeZ(int k, vec2 xy) { return uPlane[k].z + uPlane[k].x * xy.x + uPlane[k].y * xy.y; }
 
-// Hit of a layer plane z = offset + (x - axis) * tan.
+// Hit of a layer plane z = c + gx x + gy y.
 float hitPlane(int k, vec3 p, vec3 d) {
-  vec3 n = vec3(-uPlane[k].x, 0.0, 1.0);
-  float c = uPlane[k].y - uPlane[k].x * uAxisX;   // n.p = c on the plane
+  vec3 n = vec3(-uPlane[k].x, -uPlane[k].y, 1.0);   // n.p = c on the plane
   float dn = dot(n, d);
   if (abs(dn) < 1e-7) return -1.0;
-  return (c - dot(n, p)) / dn;
+  return (uPlane[k].z - dot(n, p)) / dn;
 }
 
 vec4 sampleLayer(int k, vec3 h, vec3 d) {
@@ -129,19 +128,18 @@ vec3 leafColor(vec3 c) {
   return mix(silver, c / max(m, 0.05), smoothstep(0.08, 0.35, sat));
 }
 
-int regionOf(vec3 p) {
-  int below = 0;
+// Layer colours: the glass takes the colour of the nearest layer behind the
+// point, where some layer is still in front of it (the glass in front of the
+// front layer stays clear, as before). Planes may cross away from the paint.
+vec3 sigmaAt(vec3 p) {
+  vec3 s = uSigmaAll;
+  float best = -1e9; int below = -1; bool above = false;
   for (int k = 0; k < SLOTS; k++) {
     if (k >= uSlots) break;
-    if (p.z > uPlane[k].y + (p.x - uAxisX) * uPlane[k].x) below = k + 1;
+    float z = planeZ(k, p.xy);
+    if (z < p.z) { if (z > best) { best = z; below = k; } } else above = true;
   }
-  return below; // between slot below-1 and slot below
-}
-
-vec3 sigmaAt(vec3 p) {
-  int r = regionOf(p) - 1;
-  vec3 s = uSigmaAll;
-  for (int k = 0; k < SLOTS; k++) if (k == r) s += uSigma[k];
+  if (below >= 0 && above) for (int k = 0; k < SLOTS; k++) if (k == below) s += uSigma[k];
   return s;
 }
 
@@ -165,25 +163,42 @@ void main() {
     if (bounce >= uBounces) break;
     int exitFace;
     float tExit = exitBox(p + d * 1e-5, d, exitFace) + 1e-5;
-    // Hits in index order: the planes never cross inside the block.
-    float hits[SLOTS];
+    // Hits along the path. Planes may cross where a later layer has no paint,
+    // so they are laid in distance order; at the front (weight 0) in index
+    // order, so the front view keeps the 2D overlap exactly.
+    float hits[SLOTS]; float keys[SLOTS]; int order[SLOTS]; int count = 0;
+    bool forward = d.z > 0.0;
     for (int k = 0; k < SLOTS; k++) {
       hits[k] = -1.0;
-      if (k < uSlots) { float t = hitPlane(k, p, d); if (t > 1e-5 && t < tExit) hits[k] = t; }
+      if (k >= uSlots) continue;
+      float t = hitPlane(k, p, d);
+      if (!(t > 1e-5 && t < tExit)) continue;
+      hits[k] = t;
+      // Equal distances: a path going in meets the later layer first.
+      float rank = forward ? float(k) : float(SLOTS - k);
+      float key = uWeight <= 0.0 ? rank : t + rank * 1e-6;
+      int at = count;
+      for (int j = SLOTS - 1; j > 0; j--) {
+        if (j > count) continue;
+        if (keys[j - 1] > key) { keys[j] = keys[j - 1]; order[j] = order[j - 1]; at = j - 1; } else break;
+      }
+      keys[at] = key; order[at] = k; count++;
     }
-    bool forward = d.z > 0.0;
     float last = 0.0;
     for (int j = 0; j < SLOTS; j++) {
-      int k = forward ? j : SLOTS - 1 - j;
-      if (k >= uSlots || hits[k] < 0.0) continue;
-      vec3 h = p + d * hits[k];
-      vec3 mid = p + d * (0.5 * (last + hits[k]));
-      tint *= exp(-sigmaAt(mid) * (hits[k] - last));
-      last = hits[k];
+      if (j >= count) break;
+      int k = order[j];
+      float th = hits[k];
+      vec3 h = p + d * th;
+      if (th > last) {
+        vec3 mid = p + d * (0.5 * (last + th));
+        tint *= exp(-sigmaAt(mid) * (th - last));
+        last = th;
+      }
       vec4 s = sampleLayer(k, h, d) * uPlane[k].w;
       if (s.a <= 1e-4) continue;
       vec3 c = s.rgb / s.a;
-      float glow = uPlane[k].z > 0.5 ? leafLight(k, h, d) : 0.0;
+      float glow = k >= uPresence ? leafLight(k, h, d) : 0.0;
       float hl = 1.0 - exp(-2.2 * (uLeaf + uPulse[k]) * glow * uWeight);
       vec3 lit = 1.0 - (1.0 - c) * (1.0 - leafColor(c) * hl);
       color += thr * tint * s.a * lit;

@@ -36,6 +36,8 @@ export interface MeshPacket {
   axis?: Float32Array;
   /** How far a filled square that covers much of the canvas has thinned to a board (0..1). */
   board?: number;
+  /** An unfilled round's outline on the canvas plane (x, y pairs), for the glass's footprint. */
+  outline?: Float32Array;
   appearance?: PaintAppearance;
 }
 export interface ScenePacket {

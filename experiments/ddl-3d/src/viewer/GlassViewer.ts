@@ -10,22 +10,22 @@ import { paintInTurn } from './paintQueue';
 import { OrbitMotion } from './orbitMotion';
 import { DoubleTap } from './doubleTap';
 import { adaptResolution, FULL_RESOLUTION, type Resolution } from './motion';
-import { BACK_GLASS, fanGeometry, glassLayerPlan, planeZ, type FanGeometry, type GlassLayerPlan } from '../scene/glassLayers';
+import { BACK_GLASS, glassLayerPlan, type GlassLayerPlan } from '../scene/glassLayers';
+import { axisLayers, axisLayout, chooseHinges, describeHinge, glassGeometry, glassLights, glintViews, planeZ,
+  type AxisLayout, type GlassGeometry, type Hinge } from '../scene/glassAxes';
 import { glassFragment, glassVertex, MAX_SLOTS } from './glassShader';
 import type { Unpainted } from './Viewer';
 
 export type GlassColor = 'none' | 'background' | 'layers';
 export interface GlassSettings {
   angle: number; spacing: number; leaf: number; light: number; glassColor: GlassColor; sway: boolean;
-  /** Keep turning at the release speed until touched (no friction). */ frictionless: boolean;
-}
+  /** Keep turning at the release speed until touched (no friction). */ frictionless: boolean;}
 export const GLASS_DEFAULTS: GlassSettings = {
   angle: 1, spacing: 1, leaf: 0.6, light: 0, glassColor: 'none', sway: false, frictionless: true,
 };
 /** The vessel and room the author judged in the trial (2026-11-20); not adjustable. */
 export const GLASS_FIXED = {
   /** Front glass thickness, in short sides. */ front: 0.03,
-  /** Back face tilt, degrees. */ backTilt: 0,
   /** Room brightness against the background. */ room: 0.55,
   /** Silver stays neutral, not bluish. */ bluish: false,
   /** One small turn once every layer has appeared. */ swayOnce: true,
@@ -77,7 +77,12 @@ export class GlassViewer {
   readonly plan: GlassLayerPlan;
   readonly layers: Layer[];
   private readonly presenceSlot: boolean;
-  private fan!: FanGeometry;
+  private geometry!: GlassGeometry;
+  private readonly layout: AxisLayout;
+  /** Each layer's hinge, chosen once per work. */
+  private readonly hinges: Hinge[];
+  /** Sway: one petal per shining layer, from the front to where it glints and back. */
+  private petals: { az: number; el: number }[] = [];
   private box: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   private texture: THREE.DataArrayTexture;
   private size: number;
@@ -151,6 +156,11 @@ export class GlassViewer {
       if (!(x1 > x0 && y1 > y0)) { x0 = 0; y0 = 0; x1 = W; y1 = H; }
       layer.rect = [x0, y0, x1, y1];
     }
+    // Hinges: from the marks' footprints, the same on every device; chosen once
+    // (at plane angle 1, layer depth 1 and the light control 0, whatever the controls say).
+    const footprint = axisLayers(this.layers.map(layer => layer.marks), packet.canvas);
+    this.layout = axisLayout(footprint.grid, footprint.layers, packet.canvas);
+    this.hinges = chooseHinges(this.layout);
     this.presenceSlot = !!packet.presenceSvg;
     const slots = this.layers.length + (this.presenceSlot ? 1 : 0);
     this.size = Math.max(64, Math.min(2048, Math.floor(Math.sqrt(PAINT_PIXELS / Math.max(1, slots)))));
@@ -174,12 +184,12 @@ export class GlassViewer {
         uSigma: { value: Array.from({ length: MAX_SLOTS }, () => new THREE.Vector3()) },
         uPulse: { value: new Array(MAX_SLOTS).fill(0) },
         uBox: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) },
-        uAxisX: { value: -W / 2 }, uSigmaAll: { value: new THREE.Vector3() },
+        uPresence: { value: 0 }, uSigmaAll: { value: new THREE.Vector3() },
         uOrtho: { value: true }, uViewDir: { value: new THREE.Vector3(0, 0, -1) }, uPixelWorld: { value: 0.001 },
         uWeight: { value: 0 }, uLeaf: { value: 0.6 }, uBluish: { value: false },
         uBg: { value: srgb(packet.background) }, uRoom: { value: 0.55 },
-        uLightC: { value: [new THREE.Vector3(), new THREE.Vector3()] }, uLightU: { value: [new THREE.Vector3(), new THREE.Vector3()] },
-        uLightV: { value: [new THREE.Vector3(), new THREE.Vector3()] }, uLightSize: { value: [new THREE.Vector3(), new THREE.Vector3()] },
+        uLightC: { value: [0, 1, 2].map(() => new THREE.Vector3()) }, uLightU: { value: [0, 1, 2].map(() => new THREE.Vector3()) },
+        uLightV: { value: [0, 1, 2].map(() => new THREE.Vector3()) }, uLightSize: { value: [0, 1, 2].map(() => new THREE.Vector3()) },
         uLightLow: { value: 0.25 }, uBounces: { value: 4 },
       },
     });
@@ -219,69 +229,82 @@ export class GlassViewer {
 
   private pixelRatio() { return Math.min(window.devicePixelRatio || 1, 2) * this.resolution; }
 
-  /** Fan, block and uniforms from the settings. Only uniforms and eight
-   * vertices change, so the controls move the fan smoothly. */
+  /** Planes, block and uniforms from the settings. Only uniforms and eight
+   * vertices change, so the controls open the layers smoothly. */
   private rebuild() {
     const s = this.settings, [W, H] = this.packet.canvas, u = this.box.material.uniforms;
-    this.fan = fanGeometry(this.layers.length, this.packet.canvas, { angle: s.angle, spacing: s.spacing, front: GLASS_FIXED.front, backTilt: GLASS_FIXED.backTilt });
-    const fan = this.fan, axis = fan.axisX;
-    const back = (x: number) => fan.backOffset - (x - axis) * fan.backTan;
+    this.geometry = glassGeometry(this.layout, this.hinges, s.angle, s.spacing, GLASS_FIXED.front, BACK_GLASS);
+    const g = this.geometry;
     // Eight corners; a box keeps its winding when its z is moved.
-    const geometry = new THREE.BoxGeometry(W, H, 1);
-    const position = geometry.getAttribute('position');
-    for (let i = 0; i < position.count; i++) position.setZ(i, position.getZ(i) > 0 ? fan.front : back(position.getX(i)));
-    geometry.computeBoundingBox(); geometry.computeBoundingSphere();
-    this.box.geometry.dispose(); this.box.geometry = geometry;
+    const box = new THREE.BoxGeometry(W, H, 1);
+    const position = box.getAttribute('position');
+    for (let i = 0; i < position.count; i++) position.setZ(i, position.getZ(i) > 0 ? g.front : g.back);
+    box.computeBoundingBox(); box.computeBoundingSphere();
+    this.box.geometry.dispose(); this.box.geometry = box;
     const planes = u.uPlane.value as THREE.Vector4[], rects = u.uRect.value as THREE.Vector4[];
     let slot = 0;
+    u.uPresence.value = this.presenceSlot ? 1 : 0;
     if (this.presenceSlot) {
-      planes[slot].set(0, fan.backOffset + BACK_GLASS / 2, 0, 1);
+      planes[slot].set(0, 0, g.back + BACK_GLASS / 2, 1);
       rects[slot].set(-W / 2, -H / 2, W / 2, H / 2); slot++;
     }
     this.layers.forEach((layer, i) => {
-      planes[slot].set(fan.planes[i].tan, fan.planes[i].offset, 1, layer.shown);
+      planes[slot].set(g.planes[i].gx, g.planes[i].gy, g.planes[i].c, layer.shown);
       const [x0, y0, x1, y1] = layer.rect;
       rects[slot].set(x0 - W / 2, H / 2 - y1, x1 - W / 2, H / 2 - y0); slot++;
     });
     const boxPlanes = u.uBox.value as THREE.Vector4[];
-    const n = new THREE.Vector3(-fan.backTan, 0, -1), len = n.length();
     boxPlanes[0].set(-1, 0, 0, W / 2); boxPlanes[1].set(1, 0, 0, W / 2);
     boxPlanes[2].set(0, -1, 0, H / 2); boxPlanes[3].set(0, 1, 0, H / 2);
-    boxPlanes[4].set(0, 0, 1, fan.front);
-    boxPlanes[5].set(n.x / len, 0, n.z / len, (-fan.backOffset - axis * fan.backTan) / len);
+    boxPlanes[4].set(0, 0, 1, g.front); boxPlanes[5].set(0, 0, -1, -g.back);
     // Glass colour: the hue of the background, or of each layer for the glass
     // in front of it; low chroma stays clear.
     const sigma = u.uSigma.value as THREE.Vector3[]; sigma.forEach(v => v.set(0, 0, 0));
     (u.uSigmaAll.value as THREE.Vector3).set(0, 0, 0);
     if (s.glassColor === 'background') {
-      const thickest = fan.front - back(W / 2);
-      (u.uSigmaAll.value as THREE.Vector3).copy(absorption(srgb(this.packet.background), 0.75, thickest));
+      (u.uSigmaAll.value as THREE.Vector3).copy(absorption(srgb(this.packet.background), 0.75, g.front - g.back));
     } else if (s.glassColor === 'layers' && this.layers.length > 1) {
+      // Each layer colours the glass between it and the nearest plane in
+      // front; the strength comes from the thickest such glass on the paper.
       const floor = 0.7 ** (1 / (this.layers.length - 1)), base = this.presenceSlot ? 1 : 0;
-      for (let i = 0; i + 1 < this.layers.length; i++) {
-        const gap = Math.max(...[axis, W / 2].map(x => planeZ(fan.planes[i + 1], axis, x) - planeZ(fan.planes[i], axis, x)));
-        sigma[base + i].copy(absorption(this.layers[i].average, floor, Math.max(gap, 1e-3)));
+      const thick = new Array(this.layers.length).fill(0);
+      for (let a = 0; a <= 8; a++) for (let b = 0; b <= 8; b++) {
+        const x = -W / 2 + W * a / 8, y = -H / 2 + H * b / 8, z = g.planes.map(p => planeZ(p, x, y));
+        z.forEach((zi, i) => {
+          const ahead = Math.min(...z.filter((zj, j) => j !== i && zj >= zi));
+          if (Number.isFinite(ahead)) thick[i] = Math.max(thick[i], ahead - zi);
+        });
       }
+      this.layers.forEach((layer, i) => { if (thick[i] > 1e-4) sigma[base + i].copy(absorption(layer.average, floor, thick[i])); });
     }
     u.uLeaf.value = s.leaf; u.uBluish.value = GLASS_FIXED.bluish; u.uRoom.value = GLASS_FIXED.room;
     u.uBounces.value = GLASS_FIXED.front > 0.5 ? 6 : 4;
     this.placeLights();
+    this.findPetals();
     this.requestDraw();
   }
 
-  /** A: tall, on the axis side, follows the pointer and the light control.
-   * B: wide, above. C: a soft glow from below. Sizes follow the paper. */
+  /** Sway visits each shining layer in paint order: the view nearest the
+   * front where light shows on the layer's centroid. */
+  private findPetals() {
+    const lights = glassLights(this.packet.canvas, this.settings.light);
+    this.petals = [];
+    this.layers.forEach((_, i) => {
+      const facts = this.layout.facts[i];
+      if (!facts.sheen) return;
+      const [x, y] = facts.centroid, plane = this.geometry.planes[i];
+      const found = glintViews(lights, [x, y, planeZ(plane, x, y)], plane, 40, 2)[0];
+      if (found) this.petals.push(found);
+    });
+  }
+
+  /** A: tall, on the left, B: wide, above, D: square, lower right. A and D
+   * follow the pointer and the light control. C: a soft glow from below. */
   private placeLights() {
-    const u = this.box.material.uniforms, L = Math.max(...this.packet.canvas);
-    const az = (50 + 15 * this.settings.light + 15 * this.lightNow[0]) * DEG, el = 8 * this.lightNow[1] * DEG;
-    const lights: [THREE.Vector3, number, number, number][] = [
-      [new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(1.6 * L), 0.15 * L, 1.0 * L, 1.0],
-      [new THREE.Vector3(-0.52, 0.95, 1.43).multiplyScalar(L), 1.1 * L, 0.25 * L, 0.7],
-    ];
-    lights.forEach(([c, hu, hv, power], k) => {
-      const n = c.clone().normalize();
-      const U = new THREE.Vector3(0, 1, 0).cross(n).normalize(), V = n.clone().cross(U).normalize();
-      u.uLightC.value[k].copy(c); u.uLightU.value[k].copy(U); u.uLightV.value[k].copy(V); u.uLightSize.value[k].set(hu, hv, power);
+    const u = this.box.material.uniforms;
+    glassLights(this.packet.canvas, this.settings.light, [this.lightNow[0], this.lightNow[1]]).forEach((light, k) => {
+      u.uLightC.value[k].set(...light.c); u.uLightU.value[k].set(...light.u); u.uLightV.value[k].set(...light.v);
+      u.uLightSize.value[k].set(light.hu, light.hv, light.power);
     });
   }
 
@@ -383,7 +406,16 @@ export class GlassViewer {
     let animating = this.motion.step(dt);
     if (this.settings.sway && !this.motion.dragging) {
       this.swayTime += dt;
-      const az = (10 + 35 * Math.sin(2 * Math.PI * this.swayTime / 16)) * DEG, el = 6 * Math.sin(2 * Math.PI * this.swayTime / 23) * DEG;
+      // Petals: from the front to where each shining layer glints and back,
+      // 6 seconds each, in paint order; the front shows the 2D picture between them.
+      let az: number, el: number;
+      if (this.petals.length) {
+        const petal = this.petals[Math.floor(this.swayTime / 6) % this.petals.length];
+        const a = (1 - Math.cos(2 * Math.PI * (this.swayTime % 6) / 6)) / 2;
+        az = a * petal.az * DEG; el = a * petal.el * DEG;
+      } else {
+        az = (10 + 35 * Math.sin(2 * Math.PI * this.swayTime / 16)) * DEG; el = 6 * Math.sin(2 * Math.PI * this.swayTime / 23) * DEG;
+      }
       const distance = this.camera.position.distanceTo(this.controls.target);
       this.camera.position.copy(this.controls.target).add(new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(distance));
       this.camera.lookAt(this.controls.target); this.controls.update();
@@ -558,12 +590,12 @@ export class GlassViewer {
     const normal = hit.face.normal.clone().transformDirection(this.box.matrixWorld);
     const d = refract(ray.ray.direction.clone(), normal, 1 / 1.5);
     if (!d) return -1;
-    const [W, H] = this.packet.canvas, fan = this.fan, S = this.size;
-    const hits = this.layers.map((layer, i) => {
-      const plane = fan.planes[i], n = new THREE.Vector3(-plane.tan, 0, 1), c = plane.offset - plane.tan * fan.axisX;
-      const t = (c - n.dot(hit.point)) / n.dot(d);
+    const [W, H] = this.packet.canvas, S = this.size;
+    const hits = this.layers.map((_, i) => {
+      const plane = this.geometry.planes[i], n = new THREE.Vector3(-plane.gx, -plane.gy, 1);
+      const t = (plane.c - n.dot(hit.point)) / n.dot(d);
       return { i, t };
-    }).filter(h => h.t > 0).sort((a, b) => a.t - b.t);
+    }).filter(h => h.t > 0).sort((a, b) => a.t - b.t || b.i - a.i);
     for (const { i, t } of hits) {
       const p = hit.point.clone().addScaledVector(d, t), layer = this.layers[i];
       if (!layer.pixels || Math.abs(p.x) > W / 2 || Math.abs(p.y) > H / 2) continue;
@@ -584,23 +616,19 @@ export class GlassViewer {
     } else this.selectedChanged(null);
     this.requestDraw();
   }
-  /** Turn to where light A shows on the selected layer, if it can. */
+  /** Turn to the nearest view, in azimuth and elevation, where light A, B or D
+   * shows on the selected layer's centroid, if there is one. */
   focus() {
     if (this.selectedLayer < 0) { this.fit(); return; }
-    const plane = this.fan.planes[this.selectedLayer], light = this.box.material.uniforms.uLightC.value[0].clone().normalize();
-    const n = new THREE.Vector3(-plane.tan, 0, 1).normalize();
-    const polar = this.controls.getPolarAngle();
-    let best = { angle: Infinity, azimuth: 0 };
-    for (let deg = -80; deg <= 80; deg += 0.5) {
-      const az = deg * DEG, view = new THREE.Vector3(Math.sin(az) * Math.sin(polar), Math.cos(polar), Math.cos(az) * Math.sin(polar));
-      const inside = refract(view.clone().negate(), new THREE.Vector3(0, 0, 1), 1 / 1.5); if (!inside) continue;
-      const reflected = inside.clone().reflect(n);
-      const out = refract(reflected, new THREE.Vector3(0, 0, -1), 1.5); if (!out) continue;
-      const angle = out.angleTo(light);
-      if (angle < best.angle) best = { angle, azimuth: az };
-    }
-    if (best.angle > 15 * DEG) { this.fit(); return; }
-    this.motion.turnTo(new THREE.Vector3(Math.sin(best.azimuth) * Math.sin(polar), Math.cos(polar), Math.cos(best.azimuth) * Math.sin(polar)), 500);
+    const facts = this.layout.facts[this.selectedLayer], plane = this.geometry.planes[this.selectedLayer];
+    const [x, y] = facts.centroid;
+    const views = glintViews(glassLights(this.packet.canvas, this.settings.light), [x, y, planeZ(plane, x, y)], plane, 60, 1);
+    if (!views.length) { this.fit(); return; }
+    const now = this.camera.position.clone().sub(this.controls.target).normalize();
+    const toVector = (v: { az: number; el: number }) => new THREE.Vector3(Math.sin(v.az * DEG) * Math.cos(v.el * DEG), Math.sin(v.el * DEG), Math.cos(v.az * DEG) * Math.cos(v.el * DEG));
+    let best = views[0], angle = Infinity;
+    for (const view of views) { const a = toVector(view).angleTo(now); if (a < angle - 1e-12) { angle = a; best = view; } }
+    this.motion.turnTo(toVector(best), 500);
   }
 
   private keyboard = (event: KeyboardEvent) => {
@@ -630,7 +658,7 @@ export class GlassViewer {
     const [W, H] = this.packet.canvas, S = this.size, disposables: { dispose(): void }[] = [];
     this.layers.forEach((layer, i) => {
       if (!layer.pixels) return;
-      const plane = this.fan.planes[i], [x0, y0, x1, y1] = layer.rect;
+      const plane = this.geometry.planes[i], [x0, y0, x1, y1] = layer.rect;
       const raster = document.createElement('canvas'); raster.width = S; raster.height = S;
       const image = raster.getContext('2d')!.createImageData(S, S);
       for (let p = 0; p < layer.pixels.length; p += 4) {
@@ -644,13 +672,13 @@ export class GlassViewer {
       const position = geometry.getAttribute('position');
       const cx = (x0 + x1) / 2 - W / 2, cy = H / 2 - (y0 + y1) / 2;
       for (let v = 0; v < position.count; v++) {
-        const x = position.getX(v) + cx; position.setXYZ(v, x, position.getY(v) + cy, planeZ(plane, this.fan.axisX, x));
+        const x = position.getX(v) + cx, y = position.getY(v) + cy; position.setXYZ(v, x, y, planeZ(plane, x, y));
       }
       const mesh = new THREE.Mesh(geometry, material); mesh.name = `layer-${i}${layer.name ? `-${layer.name}` : ''}`;
-      mesh.userData = { glassLayer: i, chunk: layer.name, instructions: layer.instructions };
+      mesh.userData = { glassLayer: i, chunk: layer.name, instructions: layer.instructions, hinge: describeHinge(this.hinges[i]) };
       group.add(mesh); disposables.push(geometry, material, texture);
     });
-    group.userData = { layerMapping: 'glass-fan-v1', glass: { ...this.settings, ...GLASS_FIXED }, inputDigest: this.packet.inputDigest };
+    group.userData = { layerMapping: 'glass-axes-v1', glass: { ...this.settings, ...GLASS_FIXED }, inputDigest: this.packet.inputDigest };
     try {
       const bytes = await new GLTFExporter().parseAsync(group, { binary: true });
       if (!(bytes instanceof ArrayBuffer)) throw new Error('invalid_glb');

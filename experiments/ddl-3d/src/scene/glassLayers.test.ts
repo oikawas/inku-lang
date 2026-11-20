@@ -1,27 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fanGeometry, glassLayerPlan, planeZ } from './glassLayers.ts';
-
-// Failure: layers cross inside the paper, so the front view's overlap order
-// differs from 2D. Every later layer stays at or in front of the one before,
-// at the paper's corners and along the axis, at the ends of both controls.
-test('fan layers never cross inside the paper', () => {
-  for (const canvas of [[1, 1], [1.5, 1], [1, 1.5]] as [number, number][]) {
-    for (const count of [1, 2, 5, 8]) for (const angle of [0, 1, 2]) for (const spacing of [0, 3]) {
-      const fan = fanGeometry(count, canvas, { angle, spacing, front: 0.03, backTilt: 0 });
-      for (const x of [-canvas[0] / 2, 0, canvas[0] / 2]) {
-        for (let i = 1; i < count; i++) {
-          assert.ok(planeZ(fan.planes[i], fan.axisX, x) >= planeZ(fan.planes[i - 1], fan.axisX, x) - 1e-12);
-        }
-        for (const plane of fan.planes) {
-          const z = planeZ(plane, fan.axisX, x);
-          assert.ok(z < fan.front && z > fan.backOffset - (x - fan.axisX) * fan.backTan);
-        }
-      }
-      if (count === 1) assert.ok(Math.abs(Math.atan(fan.planes[0].tan) - angle * 12 * Math.PI / 180) < 1e-12);
-    }
-  }
-});
+import { glassLayerPlan } from './glassLayers.ts';
 
 // Failure: another chunk's marks share a glass layer, or a chunk named again
 // after another one loses the 2D order.

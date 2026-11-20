@@ -371,6 +371,18 @@ function clip(geometry: BufferGeometry, contours: XY[][], canvas: XY): BufferGeo
   } finally { material.dispose(); }
 }
 
+/** An unfilled round's outline in world x, y (64 points), so the glass's
+ * footprint is its ring and not the sphere that stands for it. */
+function roundOutlinePoints(mark: GeometryMark, canvas: XY): Float32Array | null {
+  if (mark.shape.kind !== 'round' || mark.filled || mark.transform.length !== 6) return null;
+  const { center, radii } = mark.shape, [a, b, c, d, e, f] = mark.transform, out = new Float32Array(128);
+  for (let k = 0; k < 64; k++) {
+    const t = k / 64 * 2 * Math.PI, x = center[0] + radii[0] * Math.cos(t), y = center[1] + radii[1] * Math.sin(t);
+    out[2 * k] = a * x + c * y + e - canvas[0] / 2; out[2 * k + 1] = -b * x - d * y + canvas[1] / 2 - f;
+  }
+  return out.every(Number.isFinite) ? out : null;
+}
+
 export function buildScene(input: PreparedScene): ScenePacket {
   const { scene } = input;
   if (scene.marks.length > 4096 || !validPoint(scene.canvas) || scene.canvas.some(v => v <= 0)) throw new Error('object_budget_exceeded');
@@ -423,7 +435,9 @@ export function buildScene(input: PreparedScene): ScenePacket {
       }
       if (output.triangles > MAX_TRIANGLES || output.bytes > MAX_BYTES) throw new Error('mesh_budget_exceeded');
       if (axis) output.bytes += axis.byteLength;
-      output.meshes.push({ ...(axis ? { axis } : {}), positions, normals, indices, color: mark.color, opacity: mark.opacity,
+      const outline = role === 'object' ? roundOutlinePoints(mark, scene.canvas) : null;
+      if (outline) output.bytes += outline.byteLength;
+      output.meshes.push({ ...(axis ? { axis } : {}), ...(outline ? { outline } : {}), positions, normals, indices, color: mark.color, opacity: mark.opacity,
         sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex, primitive: mark.primitive,
         role, filled: role === 'pair-fill' || mark.filled, layerIndex: 0, layerZ: 0, ...(appearance ? { appearance } : {}),
         ...(role === 'object' && markBoard(mark, scene.canvas) > 0 ? { board: markBoard(mark, scene.canvas) } : {}),

@@ -4158,6 +4158,8 @@ files, PNG files, and other artifacts are derived outputs.
 
 The 3D presentation offers Glass and Solids, opening in Glass by default. Solids retains the existing object view; the spheres, tubes and individual-object depth described below apply to Solids.
 
+Solids GLB exports use an unlit material with paint and color only, without the viewer's lighting or shading.
+
 Solids fold flat at the front to preserve 2D overlap, retaining at most 0.2% of their thickness and a quarter of the smallest layer gap (subject to a tiny floor). Thickness returns over 2–12 degrees from the front. With Open the layers as it turns enabled, layers spread up to 1.6 times over 3–30 degrees, carrying line joints with them. A filled square covering 20–50% of the canvas continuously becomes a plate 2% of the short side thick; that plate is not drawn from behind.
 
 To reduce seams, walls fold the front edge's paint inward and spread color into transparent pixels. A sphere uses one material and gradually shows blurred color toward the back as it turns. A painted line's tube follows the center and width of its stroke coverage. Face lighting follows the paper normal, tinting dark faces toward the paper color; paint coverage supplies relief responding to the light. The pointer moves the light. For fill-color, white or black backgrounds, a paper board sits behind the work; rotation darkens the surroundings and a fixed-direction light's shadow, which is zero at the front. Pixels are allocated by face area. Selection also shows the instruction chunk name.

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- 3D Solids GLB exports use an unlit material with paint and color only, without the viewer's shading.
+
 - 3D Solids fold at the front to preserve the work's overlap, then regain depth and open their layers as they turn. Seams, lighting, paint relief, the paper board, shadows, inertia and view settings are refined.
 
 - iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.

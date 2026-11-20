@@ -4156,6 +4156,8 @@ files, PNG files, and other artifacts are derived outputs.
 
 ### Optional 3D viewing experiment
 
+The front view fits the paper within both the width and height of the host's display box. Inside the iPhone and iPad apps, double-tapping the 3D view returns to 2D in both Glass and Solids. In the controls, a touch starting on a button does not activate it if the finger moves more than 8 px or the panel moves. A selected solid glows for 0.6 seconds, and Focus selection moves smoothly over 0.4 seconds.
+
 The 3D presentation offers Glass and Solids, opening in Glass by default. Solids retains the existing object view; the spheres, tubes and individual-object depth described below apply to Solids.
 
 Solids GLB exports use an unlit material with paint and color only, without the viewer's lighting or shading.

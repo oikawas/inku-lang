@@ -54,13 +54,15 @@ The Android app does the same at build time: the Gradle task `syncDdl3dViewer` c
 
 ## Viewing and exports
 
+- The front view fits the paper within the host's display box in both dimensions. Inside the iPhone and iPad apps, double-tapping either 3D presentation returns to 2D. A touch that moves more than 8 px or moves the controls panel does not activate the button where it began. A selected solid glows for 0.6 seconds; Focus selection moves smoothly over 0.4 seconds.
+
 - Solids offers Keep turning without friction, Open the layers as it turns and Light direction. The paper board appears behind the work on fill-color, white and black backgrounds; shadows fade to zero at the front. Selection also reports the instruction chunk name.
 - Glass adds plane angle, layer depth, leaf sheen, light direction, glass color (Clear, Background color, Layer colors), Sway, and Keep turning without friction. Dragging has inertia; without the frictionless setting it decays. Pointer movement also changes the light. A stop near the front settles there; [ and ] change plane angle. Selection shows the front visible layer and its instruction numbers; focusing turns toward its light.
 - Glass PNG captures the view. Glass GLB contains painted layer planes and the visible support, not the glass block. A 2D round trip retains `viewMode` and `glass` settings (`angle`, `leaf`, `light`, `glassColor`, `frictionless`), as well as the previously retained view state; Sway is not retained.
 
 - Drag / one finger: orbit. Right drag or Shift-drag: pan. Wheel or two fingers: zoom. Arrow keys pan, `+`/`-` zoom while the canvas has focus. `F` fits, `R` resets, and `Esc` returns to 2D when embedded.
 - Front, back, left, right, top, bottom and oblique views; perspective/orthographic projection; fit/reset; full screen; grid/axes/support; wireframe/flat color; automatic rotation; separate solid thickness and layer depth controls.
-- Click selects a performed object and displays its original instruction number. Double-click or Focus selection fits it. GLB nodes retain zero-based source/performed/instance IDs and pair-fill provenance.
+- Click selects a performed object and displays its original instruction number. Focus selection fits it; a mouse double-click also fits it outside the embedded iPhone/iPad touch host. GLB nodes retain zero-based source/performed/instance IDs and pair-fill provenance.
 - PNG saves the current canvas view. GLB saves geometry, the current depth, colors/opacity and the visible support. Viewer guides, selection, camera, lights, automatic rotation, and wireframe inspection are not baked into GLB. Solids export uses an unlit material with paint and color only, without the viewer's shading.
 - Only the most recent snapshot's camera/projection/thickness/layer depth/background and Glass settings above survive a 2D round trip, together with `solids.frictionless`, `solids.light` and `solids.open`, in memory. Other display controls reset. Nothing persists across a page reload.
 

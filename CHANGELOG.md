@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- The iPhone 3D view now fits the paper instead of opening too large, and double-tapping 3D inside the iPhone and iPad apps returns to 2D. Scrolling the controls no longer activates a button by accident, and solid selection and Focus selection have smoother feedback.
+
 - iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.
 
 - iOS: increases text on iPhone home, the viewer, work information and related screens, with a 13pt minimum for inku text.

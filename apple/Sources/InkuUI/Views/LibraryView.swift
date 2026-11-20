@@ -49,6 +49,8 @@ struct LibraryView: View {
     var phoneLayout = false
     var onPhoneCreate: () -> Void = {}
     var onPhoneCamera: () -> Void = {}
+    var onPhoneDrawSettings: (SettingsSection) -> Void = { _ in }
+    var onPhoneDrawDetails: () -> Void = {}
     var onPhoneSettings: () -> Void = {}
     var phoneRunStatus = ""
     var phoneScrollToTopRevision = 0
@@ -68,6 +70,8 @@ struct LibraryView: View {
     @State private var previewComment = LibraryNoteEditorModel()
     /// The iPhone's 選択: a tap toggles a work's selection instead of opening it, as in Photos.
     @State private var phoneSelecting = false
+    @State private var phoneDrawSheet = false
+    @State private var phoneDrawFacts = PhoneDrawState.Facts()
     @State private var phoneSearchVisible = false
     @State private var phoneSearchHasDraft = false
     @State private var phoneScrollAtTop = true
@@ -126,6 +130,20 @@ struct LibraryView: View {
             await loadPreview()
         }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
+        .task(id: "\(model.providerSettingsRevision):\(model.drawDefaults["describe"]?.models.stage1 ?? ""):\(phoneLayout)") {
+            guard phoneLayout else { return }
+            let state = await model.phoneDrawingAvailability()
+            phoneDrawFacts.hasConnection = state.hasConnection; phoneDrawFacts.keyMissing = state.keyMissing
+            phoneDrawFacts.chatGPTSelected = state.chatGPT; phoneDrawFacts.signedIn = state.signedIn
+            phoneDrawFacts.modelAvailable = state.available
+        }
+        .sheet(isPresented: $phoneDrawSheet) {
+            PhoneDrawSheet(model: model, onDetails: { phoneDrawSheet = false; onPhoneDrawDetails() }, onDraw: {
+                phoneDrawSheet = false
+                Task { await model.drawPhoneDescription() }
+            })
+            .inkuPhoneFrontText(true, textScale: textScale)
+        }
         .task(id: visibleIDs) { await model.loadWorkActionStates(workIDs: visibleIDs) }
         .onAppear { applyGroupedPageSize() }
         // The iPhone's timeline scrolls through every work; the iPad and the Mac keep their pages.
@@ -222,6 +240,11 @@ struct LibraryView: View {
                 Divider()
             }
             statusRows
+            if phoneLayout && model.hasActiveRun && ["description", "image"].contains(model.activeSingleInputMode ?? "") {
+                Text(display.label("描いています", "Drawing"))
+                    .inkuFont(14, weight: .semibold).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12).background(InkuColor.panel)
+            }
             HStack(spacing: 0) {
                 listing.frame(maxWidth: .infinity, maxHeight: .infinity)
                 if preview.work != nil && !phoneLayout {
@@ -245,7 +268,9 @@ struct LibraryView: View {
     }
 
     private var phoneRunRow: some View {
-        PhoneRunStatusRow(model: model, status: phoneRunStatus, onOpen: onPhoneCreate)
+        PhoneRunStatusRow(model: model, status: phoneRunStatus,
+                          mascot: !phoneSelecting && ["description", "image"].contains(model.activeSingleInputMode ?? ""),
+                          onOpen: onPhoneCreate)
     }
 
     private var phoneSearchRow: some View {
@@ -352,21 +377,72 @@ struct LibraryView: View {
                     selectionActions
                 }.buttonStyle(LibraryGhostButtonStyle()).padding(10)
             }.disabled(library.mutating || model.isBrowsingLocked)
-        } else if library.isTrash {
-            if model.hasActiveRun { phoneRunRow }
         } else if model.hasActiveRun {
             phoneRunRow
         } else {
             HStack(spacing: 12) {
-                Button(action: onPhoneCreate) {
-                    Text(display.webCopy("inputSectionHint", "短い文で、表現したいものを入力。"))
-                        .foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                Button(action: phoneDrawAction) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(phoneDrawMessage).foregroundStyle(.secondary)
+                        if phoneDrawState != .empty && phoneDrawState != .editing && phoneDrawState != .stopped {
+                            Text(phoneDrawActionTitle)
+                        }
+                    }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain)
                 Button(action: onPhoneCamera) { Image(systemName: "camera.fill").frame(width: 44, height: 44) }
                     .accessibilityLabel(display.localized("カメラ"))
             }.padding(14).background(RoundedRectangle(cornerRadius: 16).fill(InkuColor.panel))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(InkuColor.border2))
                 .padding(.horizontal, 12).padding(.vertical, 8)
+        }
+    }
+
+    private var phoneDrawState: PhoneDrawState {
+        var facts = phoneDrawFacts
+        facts.activeRun = model.hasActiveRun
+        facts.drawing = ["description", "image"].contains(model.activeSingleInputMode ?? "")
+        facts.needsReview = model.phoneNeedsReview
+        facts.candidate = model.previewWork != nil
+        facts.stoppedInBackground = model.phoneBackgroundStopped
+        facts.failed = model.phoneDrawFailure != nil || model.errorText != nil
+        return PhoneDrawState.resolve(facts)
+    }
+
+    private var phoneDrawMessage: String {
+        switch phoneDrawState {
+        case .noConnection: return display.localized("モデル設定で接続先を追加してください。")
+        case .keyMissing: return display.localized("描くモデルの接続先に、API キーがありません。")
+        case .signIn: return display.localized("ChatGPT にサインインすると描けます。")
+        case .modelUnavailable: return display.localized("描くときのデフォルトで、使える描画モデルを選んでください。")
+        case .needsReview: return display.localized("確かめることがあります。")
+        case .candidate: return display.localized("保存していない候補があります。")
+        case .stoppedInBackground: return display.localized("アプリを離れている間に、描画が止まりました。")
+        case .failed: return model.phoneDrawFailure ?? model.errorText ?? ""
+        default: return model.phoneDrawText.isEmpty ? display.webCopy("inputSectionHint", "短い文で、表現したいものを入力。") : model.phoneDrawText
+        }
+    }
+
+    private var phoneDrawActionTitle: String {
+        switch phoneDrawState {
+        case .noConnection, .keyMissing: return display.label("接続設定を開く", "Open connection settings")
+        case .signIn: return display.label("サインイン", "Sign in")
+        case .modelUnavailable: return display.label("選ぶ", "Choose")
+        case .needsReview, .candidate: return display.label("開く", "Open")
+        case .stoppedInBackground, .failed: return display.label("再試行", "Retry")
+        default: return display.label("描く", "Draw")
+        }
+    }
+
+    private func phoneDrawAction() {
+        switch phoneDrawState {
+        case .noConnection, .keyMissing: onPhoneDrawSettings(.models)
+        case .signIn: onPhoneDrawSettings(.personalPlan)
+        case .modelUnavailable: onPhoneDrawSettings(.drawDefaults)
+        case .needsReview: model.openPhonePendingReview(); onPhoneCreate()
+        case .candidate: onPhoneCreate()
+        case .stoppedInBackground, .failed: model.clearPhoneDrawFailure(); phoneDrawSheet = true
+        case .empty, .editing, .stopped: phoneDrawSheet = true
+        default: break
         }
     }
 

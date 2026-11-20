@@ -51,6 +51,11 @@ public final class AppModel {
     public var imageInput: PreparedImageInput?
     public var activeDrawTab = "describe"
     public private(set) var drawDefaults = DrawOptionsCore.release
+    public var phoneDrawText = ""
+    public private(set) var phoneBackgroundStopped = false
+    public private(set) var phoneDrawFailure: String?
+    private var phonePendingReview: PipelineView?
+    private var phoneDefaultsInitialized = false
     public private(set) var drawSelections = DrawOptionsCore.release {
         didSet {
             let before = Set(oldValue.values.compactMap { $0.models.stage1 })
@@ -2050,19 +2055,20 @@ public final class AppModel {
     public func performSerialized(status: String, background: Bool = false, locksBrowsing: Bool = false, singleInputMode: String? = nil,
                                   clearProgressJournals: Bool = false,
                                   discardPreviousExecution: Bool = false,
+                                  preserveWorkspace: Bool = false,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
-        if discardPreviousExecution, !background, let currentExecutionID { discardUnsavedExecutions([currentExecutionID]) }
+        if discardPreviousExecution, !background, !preserveWorkspace, let currentExecutionID { discardUnsavedExecutions([currentExecutionID]) }
         let token = UUID()
         generationToken = token
         activeSingleInputMode = singleInputMode
         providerProgress = nil
         activeExecutionID = nil
         if clearProgressJournals { progressJournals.removeAll() }
-        if !background { currentExecutionID = nil }
+        if !background && !preserveWorkspace { currentExecutionID = nil }
         backgroundDrawing = background
         operationBrowsingLocked = locksBrowsing
-        runFollowed = true
+        runFollowed = !preserveWorkspace
         stopping = false
         isBusy = true
         errorText = nil
@@ -2093,15 +2099,19 @@ public final class AppModel {
 
     public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, background: Bool = false, locksBrowsing: Bool = false,
                               singleInputMode: String? = nil,
+                              phoneHome: Bool = false,
                               onExecutionStarted: (@MainActor @Sendable (String) async throws -> Void)? = nil) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
-        _ = await performSerialized(status: "生成中", background: background, locksBrowsing: locksBrowsing, singleInputMode: singleInputMode, discardPreviousExecution: true) { [weak self] token in
+        _ = await performSerialized(status: "生成中", background: background, locksBrowsing: locksBrowsing, singleInputMode: singleInputMode, discardPreviousExecution: true, preserveWorkspace: phoneHome) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
             let view = try await host.generate(request, image: image, onStarted: onExecutionStarted) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
+            }
+            if phoneHome && (view.phase == "awaiting_patch_approval" || view.phase == "needs_user_edit" || !view.completionIssues.isEmpty) {
+                self.phonePendingReview = view
             }
             if self.generationToken == token, !self.stopping {
                 self.activeExecutionID = view.executionID
@@ -2809,6 +2819,101 @@ public final class AppModel {
             drawSelections = drawDefaults
         } catch { report(error) }
     }
+
+    func initializePhoneDrawDefaults() {
+        guard !phoneDefaultsInitialized else { return }
+        phoneDefaultsInitialized = true
+        guard display.preferences.drawDefaults == nil else { return }
+        var options = drawDefaults
+        options["describe"]?.route = "stages"
+        options["describe"]?.models.stage1 = "chatgpt:gpt-6.1-terra"
+        options["describe"]?.models.stage2 = "chatgpt:gpt-6.1-terra"
+        drawDefaults = options
+        drawSelections["describe"] = options["describe"]
+    }
+
+    func phoneDrawingAvailability() async -> (hasConnection: Bool, keyMissing: Bool, chatGPT: Bool, signedIn: Bool, available: Bool) {
+        let reference = drawDefaults["describe"]?.models.stage1 ?? ""
+        let provider = settings.providers.first { reference.hasPrefix($0.id + ":") }
+        let missing = if let provider, provider.requiresAPIKey {
+            (try? await credentials.isConfigured(for: provider.credentialID)) == false
+        } else { false }
+        let chatGPT = reference.hasPrefix("chatgpt:")
+        let state = chatGPT ? try? await personalPlanRuntime().state() : nil
+        let signedIn = !chatGPT || (SignInConnectionView.make(state: state, busy: false, attempt: .init(), code: nil,
+                                                               lastOperation: nil, revocationConfirmed: nil)?.guide == true)
+        return (!settings.providers.isEmpty, missing, chatGPT, signedIn, SettingsModel.isModelAvailable(reference, settings: settings))
+    }
+
+    static func shouldAdoptPhoneChatGPTDefault(available: Bool, keyMissing: Bool, terraInCatalog: Bool) -> Bool {
+        (!available || keyMissing) && terraInCatalog
+    }
+
+    func adoptPhoneChatGPTDefaultIfNeeded() async throws {
+        let availability = await phoneDrawingAvailability()
+        let runtime = try personalPlanRuntime()
+        let publication = try await runtime.publication()
+        let modelID = "gpt-6.1-terra"
+        guard Self.shouldAdoptPhoneChatGPTDefault(available: availability.available, keyMissing: availability.keyMissing,
+                                                 terraInCatalog: publication.models.contains { $0.id == modelID }) else { return }
+        var selected = publication.published
+        selected.insert(modelID)
+        var purposes = publication.purposes
+        purposes[modelID] = Array(Set((purposes[modelID] ?? []) + ["llm"]))
+        _ = try await runtime.savePublication(profileID: publication.profileID, generation: publication.generation,
+                                              models: selected.sorted(), purposes: purposes)
+        await synchronizePersonalPlanModels()
+        guard SettingsModel.isModelAvailable("chatgpt:" + modelID, settings: settings) else { return }
+        var defaults = drawDefaults
+        defaults["describe"]?.models.stage1 = "chatgpt:" + modelID
+        defaults["describe"]?.models.stage2 = "chatgpt:" + modelID
+        try saveDrawDefaults(defaults)
+    }
+
+    func requestForPhoneDescription(_ text: String) throws -> GenerationRequest {
+        guard let bootstrap, let options = drawDefaults["describe"] else { throw HostError("installation_unavailable") }
+        let reference = options.models.stage1 ?? ""
+        guard SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
+        var requestSettings = settings
+        requestSettings.models.stage1Model = reference
+        requestSettings.models.stage2Model = options.models.stage2 ?? reference
+        var request = try bootstrap.request(inputMode: "description", source: "", description: text,
+            language: instructionLanguage(for: text), catalogID: options.catalog.id, canvasID: options.canvasAspect,
+            seed: "", wild: options.wild == "on", settings: requestSettings, parentWorkID: nil,
+            derivationKind: "new", catalogMode: options.catalog.mode, sketch: options.sketch == "on" ? .on : .off)
+        if options.route == "read_and_draw" {
+            request.drawRoute = "read_and_draw"
+            request.descriptionComposition = options.composition == "on"
+            request.descriptionReview = SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: requestSettings)
+        }
+        request.recordsDrawOptions = true
+        request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
+        return request
+    }
+
+    @discardableResult func drawPhoneDescription() async -> SavedWork? {
+        guard !hasActiveRun, previewWork == nil, !phoneNeedsReview, DescriptionLabels.hasDrawableText(phoneDrawText) else { return nil }
+        let availability = await phoneDrawingAvailability()
+        guard !hasActiveRun, previewWork == nil, !phoneNeedsReview, availability.hasConnection, !availability.keyMissing,
+              (!availability.chatGPT || availability.signedIn), availability.available else { return nil }
+        phoneBackgroundStopped = false; phoneDrawFailure = nil; phonePendingReview = nil
+        do {
+            let request = try requestForPhoneDescription(phoneDrawText)
+            let work = await runAutomation(request: request, singleInputMode: "description", phoneHome: true)
+            if work == nil && !phoneBackgroundStopped && phonePendingReview == nil {
+                phoneDrawFailure = automationFailureMessage ?? errorText
+                errorText = nil
+            }
+            return work
+        } catch { phoneDrawFailure = failureMessage(error); return nil }
+    }
+    var phoneNeedsReview: Bool { phonePendingReview != nil || patchReview != nil || !completionIssues.isEmpty || authoringPhase == "needs_user_edit" }
+    func openPhonePendingReview() {
+        guard let view = phonePendingReview else { return }
+        currentExecutionID = view.executionID; apply(view); phonePendingReview = nil
+    }
+    func markPhoneBackgroundStop() { if hasActiveRun { phoneBackgroundStopped = true } }
+    func clearPhoneDrawFailure() { phoneDrawFailure = nil; phoneBackgroundStopped = false; errorText = nil }
 
     public func saveDrawDefaults(_ defaults: [String: DrawOptions]) throws {
         let updated = try DrawOptionsCore.update(defaults, settings: settings, preferences: display.preferences,

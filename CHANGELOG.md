@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: the iPhone home drawing field accepts descriptions and draws parentless works with the defaults. It guides unavailable connections, stops and reviews, and sets first-use and post-sign-in drawing defaults.
+
 - Swift (macOS and iOS): shows and logs the reason when line-by-line animation is refused, explaining mismatches between saved drawing and instruction settings.
 
 - iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.

@@ -1566,3 +1566,11 @@
 "「描くときのデフォルト」の「画像」で、画像を読むモデルを選んでください。" = "Choose the model that reads images under Image in Drawing defaults.";
 "このモデルを使えません。「描くときのデフォルト」の「画像」で、画像を読むモデルを選び直してください。" = "This model is not available. Choose the model that reads images again under Image in Drawing defaults.";
 "このモデルのAPIキーがありません。「モデル設定」でキーを入れてください。" = "This model has no API key. Enter the key in Model settings.";
+"詳しく描く" = "Draw in detail";
+"描くモデルの接続先に、API キーがありません。" = "The drawing model's provider has no API key.";
+"ChatGPT にサインインすると描けます。" = "Sign in to ChatGPT to draw.";
+"確かめることがあります。" = "There is something to review.";
+"保存していない候補があります。" = "There is an unsaved candidate.";
+"アプリを離れている間に、描画が止まりました。" = "Drawing stopped while the app was away.";
+"画像を読むモデルを使えません。描くときのデフォルトで選び直してください。" = "The image-reading model is unavailable. Choose another in drawing defaults.";
+"画像を読むモデルの接続先に、API キーがありません。" = "The image-reading model's provider has no API key.";

@@ -44,13 +44,14 @@ public final class ChatGPTPlanSettingsModel {
             try await app.updateHostSettings(settings)
         }
     }
-    public func authorize(consent: Bool = false, newRegistration: Bool = false, app: AppModel,
+    public func authorize(consent: Bool = false, newRegistration: Bool = false, app: AppModel, phoneLayout: Bool = false,
                           openURL: @escaping @MainActor (URL) -> Void,
                           closeLogin: @escaping @MainActor () -> Void = {}) async {
         guard !busy else { return }
         busy = true; authorizing = true; clear()
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
+            var authorized = false
             do {
                 try await self.enable(app: app)
                 let runtime = try app.personalPlanRuntime()
@@ -62,6 +63,7 @@ public final class ChatGPTPlanSettingsModel {
                 openURL(attempt.authorizationURL)
                 // iOS: the login sheet stays open over the app until the callback reaches the loopback listener.
                 do { _ = try await runtime.finishAuthorization(attempt.id) } catch { closeLogin(); throw error }
+                authorized = true
                 closeLogin()
                 try Task.checkCancellation()
                 // A connected profile has a fresh catalog before the pickers are synchronized.
@@ -72,6 +74,10 @@ public final class ChatGPTPlanSettingsModel {
             if let id = self.attemptID { try? await app.personalPlanRuntime().cancelAuthorization(id) }
             self.attemptID = nil; self.authorizationURL = nil
             await self.load(app: app)
+            if authorized && phoneLayout && !Task.isCancelled {
+                do { try await app.adoptPhoneChatGPTDefaultIfNeeded() }
+                catch { if !Task.isCancelled { self.report(error) } }
+            }
         }
         operation = task; await task.value
         operation = nil; busy = false; authorizing = false

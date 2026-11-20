@@ -62,7 +62,7 @@ The Android app does the same at build time: the Gradle task `syncDdl3dViewer` c
 
 - Drag / one finger: orbit. Right drag or Shift-drag: pan. Wheel or two fingers: zoom. Arrow keys pan, `+`/`-` zoom while the canvas has focus. `F` fits, `R` resets, and `Esc` returns to 2D when embedded.
 - Front, back, left, right, top, bottom and oblique views; perspective/orthographic projection; fit/reset; full screen; grid/axes/support; wireframe/flat color; automatic rotation; separate solid thickness and layer depth controls.
-- Click selects a performed object and displays its original instruction number. Focus selection fits it; a mouse double-click also fits it outside the embedded iPhone/iPad touch host. GLB nodes retain zero-based source/performed/instance IDs and pair-fill provenance.
+- Click selects a performed object and displays its original instruction number. Focus selection or a mouse double-click fits it, including a mouse used with an iPad. GLB nodes retain zero-based source/performed/instance IDs and pair-fill provenance.
 - PNG saves the current canvas view. GLB saves geometry, the current depth, colors/opacity and the visible support. Viewer guides, selection, camera, lights, automatic rotation, and wireframe inspection are not baked into GLB. Solids export uses an unlit material with paint and color only, without the viewer's shading.
 - Only the most recent snapshot's camera/projection/thickness/layer depth/background and Glass settings above survive a 2D round trip, together with `solids.frictionless`, `solids.light` and `solids.open`, in memory. Other display controls reset. Nothing persists across a page reload.
 

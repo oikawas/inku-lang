@@ -10,13 +10,14 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Requ
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ...animation_export import build_animation, build_layer_animation
 from ...card_export import build_card
+from ...workpack_export import export_workpack
 from ...limits import limits_as_dict
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
 from ...sketch import SketchDetail, normalize_sketch_grain, sketch_state_of
 from ... import db as _db
 from ... import thumbs_db as _thumbs_db
-from ..common import DESCRIPTION_LOCKED_DETAIL, _unexpected_http_error
+from ..common import DESCRIPTION_LOCKED_DETAIL, _unexpected_http_error, _APP_VERSION, _build_number
 from ...persistence.description_lock import DESCRIPTION_READING_KINDS
 from ...persistence.schema import LineageNodeRow
 from ...persistence.variation_authority import LAWS_RECORD_KEYS
@@ -36,6 +37,22 @@ class HistoryIdsBody(BaseModel):
         max_length=1000,
         description="Ids of the works to act on. Ids that are not found for the caller are skipped. Empty by default.",
     )
+
+
+class WorkPackExportBody(BaseModel):
+    ids: list[str] = Field(..., min_length=1, max_length=1000)
+
+
+@router.post("/api/history/export-workpack", summary="Export works as a work pack")
+def api_history_export_workpack(body: WorkPackExportBody, actor: dict = Depends(_current_user)) -> Response:
+    try:
+        payload = export_workpack(_db.SessionLocal, actor, body.ids, app_version=_APP_VERSION, build=int(_build_number() or 0))
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return Response(content=payload, media_type="application/x-ndjson", headers={
+        "Content-Disposition": 'attachment; filename="inku-works.inkupack"', "Cache-Control": "no-store"})
 
 
 class AnimationExportBody(BaseModel):

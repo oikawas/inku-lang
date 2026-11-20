@@ -2410,6 +2410,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		apiFetch, catalogName, formatDate: formatHistoryDate, previewText: historyPreviewText,
 		rememberAnimation: (value) => exportSettings.rememberAnimation(session.currentUser?.id ?? null, value)
 	});
+	setContext('workpack-export', savedWorkExportActions.onDownloadWorkPack);
 
 	// The canvas toolbar builds the card from the work it is showing, which is
 	// the listed item when one is selected and the fresh drawing otherwise. The

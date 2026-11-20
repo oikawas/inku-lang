@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.
+
 - iOS: increases text on iPhone home, the viewer, work information and related screens, with a 13pt minimum for inku text.
 
 - Swift (macOS and iOS): passes saved instructions and their recorded language to 3D so glass layers follow titled groups.
@@ -767,6 +769,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.374 (2026-11-20 / Build 1450)
+
+- Web: export a work, selected works, or a lineage path as a work pack; Library selections show their selection order.
 
 ## v2.15.373 (2026-11-20 / Build 1449)
 

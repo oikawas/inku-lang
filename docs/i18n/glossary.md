@@ -45,6 +45,7 @@
 | 楽譜 | **score**（固有表記は **JSON Score**） | 名詞 | — |
 | 演奏 | **performance** / **perform** | 名詞／動詞 | ~~rendering~~（技術文脈のみ） |
 | 作品 | **work**（複数 works） | 名詞 | ~~artwork~~（**禁止**）、~~image~~ |
+| 作品パック | **Work pack** | 保存作品と系譜などを運ぶ `.inkupack` | — |
 | エディション／刷り | **edition** / **impression** | 名詞。`rh3` は edition ID、個々の SVG は an impression | — |
 | 版木・版 | **block** / **state** | 版画の文脈のみ。engine の版数は **engine version** | — |
 | 起点（新規作成） | **origin**（動作は **New**） | 名詞。系譜の根の札も origin | ~~Root~~（graph の語。web の旧表示は 2026-08-17 実測で解消済み） |

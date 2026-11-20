@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { getContext, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import AnimationExportModal from '$lib/components/AnimationExportModal.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -46,6 +46,7 @@
 	}: SavedWorkExportMenuProps = $props();
 
 	let open = $state(false);
+	const onDownloadWorkPack = getContext<((snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult) | undefined>('workpack-export');
 	let animationOpen = $state(false);
 	let snapshot = $state<SavedWorkExportSnapshot | null>(null);
 	let busy = $state(false);
@@ -319,6 +320,7 @@
 				{/if}
 			{/if}
 			<div class="saved-work-export-group">
+				{#if onDownloadWorkPack}<button type="button" role="menuitem" disabled={busy} onclick={() => void run(onDownloadWorkPack)}>{t().savedWorkExportWorkPack}</button>{/if}
 				<button type="button" role="menuitem" disabled={busy} onclick={openAnimation}>{single ? t().savedWorkExportLayerAnimation : t().savedWorkExportTransitionAnimation}</button>
 				{#if transition}
 					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadContactSheet(target, 'review'))}>{t().savedWorkExportContactSheet}</button>

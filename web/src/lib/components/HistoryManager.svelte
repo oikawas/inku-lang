@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { selectionOrder } from '$lib/features/history/selection-order';
 	import Tooltip from './Tooltip.svelte';
 	import { onMount, tick, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
@@ -1303,7 +1304,7 @@
 								{#snippet memberCard(it: HistoryItem)}
 										{@const composition = byDescription ? workComposition(it) : null}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
-											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
+										<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={selectionOrder(selectedHistoryIds, it.id) ? t().historySelectedOrder(selectionOrder(selectedHistoryIds, it.id)) : t().historySelectItem(false)} onclick={() => toggleSelection(it)}><span aria-hidden="true">{selectionOrder(selectedHistoryIds, it.id) || ''}</span></button>
 											{#if lineageThumbsMode && it.id && currentHistoryId === it.id}<span class="lineage-current-badge">{t().historyCurrentBadge}</span>{:else if lineageThumbsMode && !byDescription && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
 											<div class="lineage-member-content">
 												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)}>
@@ -1355,9 +1356,9 @@
 	title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
 	role="checkbox"
 	aria-checked={!!it.id && selectedHistoryIds.includes(it.id)}
-	aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
+	aria-label={selectionOrder(selectedHistoryIds, it.id) ? t().historySelectedOrder(selectionOrder(selectedHistoryIds, it.id)) : t().historySelectItem(false)}
 	onclick={(event) => { event.stopPropagation(); toggleSelection(it); }}
-><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
+><span aria-hidden="true">{selectionOrder(selectedHistoryIds, it.id) || ''}</span></button>
 						{#if it.lineage_generation}
 							<span class="manager-generation" title={t().historyGenerationTitle}>{it.lineage_generation}</span>
 						{/if}
@@ -1426,7 +1427,7 @@
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr class:current-work={currentHistoryId === it.id}>
-							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); toggleSelection(it); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
+							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={selectionOrder(selectedHistoryIds, it.id) ? t().historySelectedOrder(selectionOrder(selectedHistoryIds, it.id)) : t().historySelectItem(false)} onclick={(event) => { event.stopPropagation(); toggleSelection(it); }}><span aria-hidden="true">{selectionOrder(selectedHistoryIds, it.id) || ''}</span></button></td>
 							<td class="table-thumb-cell">
 								<button
 									use:focusWork={it.id}
@@ -1917,6 +1918,7 @@
 	color: var(--accent-fg);
 	cursor: pointer;
 	font: 700 var(--ui-font-size-12)/1 system-ui, sans-serif;
+	font-size: min(var(--ui-font-size-12), 9px);
 	box-shadow: 0 1px 3px rgba(0,0,0,.16);
 }
 .selection-checkbox:hover { border-color: var(--accent); }

@@ -72,6 +72,7 @@ FROM python-runtime AS runtime
 
 WORKDIR /app
 COPY shared/ /app/shared/
+COPY persistence/contract.json /app/persistence/contract.json
 COPY server/ /app/server/
 COPY LICENSE /app/LICENSE
 COPY --from=native-builder /wheelhouse/RUST_THIRD_PARTY_NOTICES.txt /app/licenses/RUST_THIRD_PARTY_NOTICES.txt

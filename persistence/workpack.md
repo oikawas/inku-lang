@@ -2,6 +2,8 @@
 
 An `.inkupack` file is UTF-8 JSON Lines separated by LF. The first line contains `format: "inku.workpack"`, `format_version: 1`, `persistence_contract_version: 2`, `exported_at` (Unix milliseconds), `producer` (host, app_version, build, schema_version), and `counts`. Following lines carry `kind` in this order: history, lineage_node, lineage_edge, annotation, colophon. Counts give the number of each kind; a mismatch indicates an incomplete file. Ignore unknown fields and kinds in the same format version; reject a newer format version.
 
+The Server producer uses host `server` and its `MIGRATION_VERSION` as schema_version.
+
 The history, lineage_node and lineage_edge fields are the logical names classified `required_common` or `optional_common` in the corresponding records in [contract.json](contract.json). Required fields include explicit nulls. Do not carry host_only fields. Preserve stored SVG, JSON strings and hashes unchanged.
 
 ## Encoding and JSON types

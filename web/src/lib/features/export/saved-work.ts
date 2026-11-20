@@ -19,6 +19,7 @@ export type SavedWorkExportScope = {
 export type SavedWorkExportSnapshot = {
 	kind: SavedWorkExportScopeKind;
 	ids: string[];
+	workpackIds: string[];
 	works: SavedWorkExportItem[];
 	description: string | null;
 };
@@ -45,6 +46,7 @@ export function snapshotSavedWorkExport(scope: SavedWorkExportScope | null | und
 	return {
 		kind: scope.kind,
 		ids: works.map((work) => work.id),
+		workpackIds: scope.works.map((work) => work.id),
 		works,
 		description: scope.description ?? null,
 	};

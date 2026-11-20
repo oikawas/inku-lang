@@ -1477,6 +1477,8 @@ export interface LangPack {
 	historyLineageCollapse: string;
 	historySelectLineage: string;
 	historySelectItem: (selected: boolean) => string;
+	historySelectedOrder: (order: number) => string;
+	savedWorkExportWorkPack: string;
 	historySelectAll: string;
 	historyClearSelection: string;
 	historyContactSheet: string;

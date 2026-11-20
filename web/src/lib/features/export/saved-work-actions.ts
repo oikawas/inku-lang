@@ -131,6 +131,18 @@ export function makeSavedWorkExportActions(deps: SavedWorkExportActionsDeps) {
 	}
 
 	return {
+		onDownloadWorkPack: async (snapshot: SavedWorkExportSnapshot) => {
+			const items = await resolveSnapshot(snapshot);
+			const response = await deps.apiFetch('/api/history/export-workpack', {
+				method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ids: snapshot.workpackIds }),
+			});
+			if (!response.ok) throw await responseError(response);
+			const now = new Date();
+			const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+			const filename = items.length === 1 ? savedWorkFilename(items[0], 'inkupack') : `inku-works-${stamp}.inkupack`;
+			return saveBlob(await response.blob(), filename, { enabled: downloadFolderSettings.enabled });
+		},
 		onValidateSnapshot: async (snapshot: SavedWorkExportSnapshot): Promise<boolean> => {
 			try {
 				validatedSnapshots.set(snapshot, await readSnapshot(snapshot));

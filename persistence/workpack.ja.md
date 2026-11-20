@@ -2,6 +2,8 @@
 
 `.inkupack` は UTF-8、LF 区切りの JSON Lines。最初の行に `format: "inku.workpack"`、`format_version: 1`、`persistence_contract_version: 2`、`exported_at`（Unix ミリ秒）、`producer`（host、app_version、build、schema_version）、`counts` を置く。続く行は `kind` を持ち、history、lineage_node、lineage_edge、annotation、colophon の順に置く。counts はこれらの種類ごとの件数で、食い違えば不完全なファイルとして断る。同じ版の未知の欄と kind は無視し、より大きな format_version は断る。
 
+Server の producer は host が `server`、schema_version は Server の `MIGRATION_VERSION` である。
+
 history、lineage_node、lineage_edge の欄は [contract.json](contract.json) の対応する records の `required_common` と `optional_common` の論理名を使う。required は null も明示し、host_only は運ばない。保存済み SVG、JSON 文字列、ハッシュは書き換えない。
 
 ## encoding と JSON の型

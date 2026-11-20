@@ -521,7 +521,10 @@ export class Viewer {
   /** Draw the shadow map again when the solids have moved against each other.
    * At the front, where shadows are not shown, it waits for the turn. */
   private renderShadows() {
-    if (this.shadowDirty && this.sun.shadow.intensity > 0 && !this.flat) { this.renderer.shadowMap.needsUpdate = true; this.shadowDirty = false; }
+    // The map is drawn once at the start as well: until then the shaders would
+    // sample a shadow texture that does not exist yet (a WebGL warning per draw).
+    const first = !this.sun.shadow.map;
+    if (first || (this.shadowDirty && this.sun.shadow.intensity > 0 && !this.flat)) { this.renderer.shadowMap.needsUpdate = true; this.shadowDirty = false; }
   }
   private placeSupport() {
     const box = new THREE.Box3().setFromObject(this.model);
@@ -589,9 +592,21 @@ export class Viewer {
     if (this.presence) group.add(this.presence.mesh.clone());
     if (this.support.visible) group.add(this.support.clone());
     this.fold = fold; this.updateFold(true);
-    const bytes = await new GLTFExporter().parseAsync(group, { binary: true, onlyVisible: true });
-    if (!(bytes instanceof ArrayBuffer)) throw new Error('invalid_glb');
-    return new Blob([bytes], { type: 'model/gltf-binary' });
+    // glTF has no place for the view's own shading: the file carries plain
+    // materials with the paint and colour, as the front of the work shows them.
+    const plain: THREE.Material[] = [];
+    group.traverse(object => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh || !(mesh.material instanceof THREE.MeshLambertMaterial)) return;
+      const from = mesh.material, to = new THREE.MeshBasicMaterial({ color: from.color, map: from.map, opacity: from.opacity,
+        transparent: from.transparent, alphaTest: from.alphaTest, side: from.side, name: from.name });
+      mesh.material = to; plain.push(to);
+    });
+    try {
+      const bytes = await new GLTFExporter().parseAsync(group, { binary: true, onlyVisible: true });
+      if (!(bytes instanceof ArrayBuffer)) throw new Error('invalid_glb');
+      return new Blob([bytes], { type: 'model/gltf-binary' });
+    } finally { plain.forEach(material => material.dispose()); }
   }
 
   dispose() {

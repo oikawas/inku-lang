@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- 3D Glass chooses each layer's opening from multiple axes for the work, preserving front-view overlap and following the layers' directions with lighting and Sway.
+
 - Swift (macOS and iOS): shows and logs the reason when line-by-line animation is refused, explaining mismatches between saved drawing and instruction settings.
 
 - iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.

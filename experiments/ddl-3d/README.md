@@ -1,6 +1,6 @@
 # DDL 3D experiment
 
-The 3D presentation opens in Glass: painted chunks form up to eight fan-shaped layers in a refracting glass block, with colored or silver leaf sheen. Solids retains the object view described below. The front orthographic Glass view follows the 2D positions, overlap and colors.
+The 3D presentation opens in Glass: painted chunks form up to eight layers, each opening about an axis chosen for the work, in a refracting glass block with colored or silver leaf sheen. Solids retains the object view described below. The front orthographic Glass view follows the 2D positions, overlap and colors.
 
 Solids fold at the front to preserve the 2D overlap, then regain thickness and open layers as they turn. Their paint wraps inward at the edges; lighting, paint relief, a rear paper board and shadows reveal depth. Filled large squares become thin plates. Glass and Solids share inertia.
 
@@ -67,6 +67,8 @@ The Android app does the same at build time: the Gradle task `syncDdl3dViewer` c
 - Only the most recent snapshot's camera/projection/thickness/layer depth/background and Glass settings above survive a 2D round trip, together with `solids.frictionless`, `solids.light` and `solids.open`, in memory. Other display controls reset. Nothing persists across a page reload.
 
 ## Mapping and compatibility
+
+Glass chooses each layer's axis from eight rise directions, five positions and three angle fractions, plus flat. Paint bounds and nominal shapes form device-independent grids with 48 cells along the long side. The depth rule keeps each later layer's paint at least 0.002 in front of every earlier plane. A width-48 beam search selects once at default angle, depth and light, scoring depth order, lift, a quiet ground, visible tilt, light rhythm and thickness; controls change angle and spacing continuously. At zero front weight the shader composites in drawing order, and elsewhere by light-path distance. The lower-right light D moves with the main light; Sway visits and returns from each layer's lit direction in six-second petals. Focus selection turns to the nearest lit direction from lights A, B or D. Glass GLB carries `layerMapping: glass-axes-v1` and a `hinge` per layer.
 
 Glass uses the optional `ddl` and `instruction_lang_resolved` input to compile the source with resource limits and associate Score instructions with chunks. `chunkSource` is `ddl` when matched, `no_ddl` when absent, and `ddl_mismatch` when compilation fails or the instruction count differs. Missing or single-chunk mappings use instruction layers, capped at eight by merging adjacent layers. The WASM adapter includes `inku-ddl`. These inputs are also available through the core snapshot boundary.
 

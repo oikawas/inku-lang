@@ -101,6 +101,7 @@ export class GlassViewer {
   /** Set by the page inside the iPhone and iPad apps: a double tap returns to 2D. */
   returnTo2D: (() => void) | null = null;
   private doubleTap = new DoubleTap();
+  private lastPointerType = 'mouse';
 
   constructor(private host: HTMLElement, readonly packet: ScenePacket,
     private changed: (state: ViewState) => void,
@@ -189,7 +190,7 @@ export class GlassViewer {
 
     this.resize = new ResizeObserver(() => this.resizeView());
     this.resize.observe(host);
-    canvas.addEventListener('pointerdown', e => { this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true }); this.motion.touch(); }, { signal: this.events.signal });
+    canvas.addEventListener('pointerdown', e => { this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true }); this.lastPointerType = e.pointerType; this.motion.touch(); }, { signal: this.events.signal });
     canvas.addEventListener('pointerup', e => {
       const tapped = this.startPointer && e.button === 0
         && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < (e.pointerType === 'touch' ? 10 : 4);
@@ -207,7 +208,8 @@ export class GlassViewer {
       this.requestDraw();
     }, { signal: this.events.signal });
     canvas.addEventListener('pointerleave', () => { this.lightTarget = [0, 0]; this.requestDraw(); }, { signal: this.events.signal });
-    canvas.addEventListener('dblclick', () => { if (!this.returnTo2D) this.focus(); }, { signal: this.events.signal });
+    // A mouse's double click focuses, also on an iPad; a touch double tap is handled on pointerup.
+    canvas.addEventListener('dblclick', () => { if (this.lastPointerType !== 'touch') this.focus(); }, { signal: this.events.signal });
     canvas.addEventListener('keydown', this.keyboard, { signal: this.events.signal });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { cancelAnimationFrame(this.frame); this.frame = 0; } else this.requestDraw();

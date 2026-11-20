@@ -64,6 +64,7 @@ export class Viewer {
   /** Set by the page inside the iPhone and iPad apps: a double tap returns to 2D. */
   returnTo2D: (() => void) | null = null;
   private doubleTap = new DoubleTap();
+  private lastPointerType = 'mouse';
   private flat = false;
   private wire = false;
   private sceneExtent = 1;
@@ -172,7 +173,7 @@ export class Viewer {
     this.resize = new ResizeObserver(() => this.resizeView());
     this.resize.observe(host);
     canvas.addEventListener('pointerdown', e => {
-      this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true });
+      this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true }); this.lastPointerType = e.pointerType;
       this.flight = null;
       if (this.motion.touch()) this.rememberNow();
     }, { signal: this.events.signal });
@@ -194,7 +195,8 @@ export class Viewer {
       this.requestDraw();
     }, { signal: this.events.signal });
     canvas.addEventListener('pointerleave', () => { this.lightTarget = [0, 0]; this.requestDraw(); }, { signal: this.events.signal });
-    canvas.addEventListener('dblclick', () => { if (!this.returnTo2D) this.focus(); }, { signal: this.events.signal });
+    // A mouse's double click focuses, also on an iPad; a touch double tap is handled on pointerup.
+    canvas.addEventListener('dblclick', () => { if (this.lastPointerType !== 'touch') this.focus(); }, { signal: this.events.signal });
     canvas.addEventListener('keydown', this.keyboard, { signal: this.events.signal });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { cancelAnimationFrame(this.frame); this.frame = 0; }

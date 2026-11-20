@@ -2,6 +2,7 @@ import './style.css';
 import { Viewer, SOLIDS_DEFAULTS, type SolidsSettings, type Unpainted } from './viewer/Viewer';
 import { GlassViewer, GLASS_DEFAULTS, type GlassColor, type GlassSettings } from './viewer/GlassViewer';
 import { labels, type Labels } from './viewer/labels';
+import { appleTouch } from './viewer/doubleTap';
 import { PROTOCOL, MAX_INPUT_BYTES, validLoad, type LoadMessage } from './input/protocol';
 import type { ScenePacket } from './scene/types';
 import type { ViewState } from './input/protocol';
@@ -50,6 +51,7 @@ function fail(reason: string) {
 function ui() {
   root.replaceChildren(); sceneControls.length = 0;
   const toolbar = element('details', root); toolbar.className = 'toolbar';
+  guardScrollTaps(toolbar);
   element('summary', toolbar, words.controls);
   const heading = element('div', toolbar); heading.className = 'heading'; element('strong', heading, words.title);
   if (!embedded) {
@@ -137,6 +139,23 @@ function ui() {
   message(words.ready);
 }
 
+/** A finger that starts on a control and scrolls the panel does not press it
+ * (swift's iPhone check, 2026-11-20). A touch that moved more than 8 pixels
+ * ends without its click. */
+function guardScrollTaps(panel: HTMLElement) {
+  let start: [number, number] | null = null, moved = false;
+  panel.addEventListener('pointerdown', e => { start = e.pointerType === 'touch' ? [e.clientX, e.clientY] : null; moved = false; }, true);
+  panel.addEventListener('pointermove', e => {
+    if (start && e.pointerType === 'touch' && Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 8) moved = true;
+  }, true);
+  // A scroll takes the touch over without a pointermove; count it as moving.
+  panel.addEventListener('scroll', () => { if (start) moved = true; }, true);
+  panel.addEventListener('click', e => {
+    if (moved) { e.preventDefault(); e.stopImmediatePropagation(); }
+    start = null; moved = false;
+  }, true);
+}
+
 function updateDepthControls(depth: number, layerSpacing: number) {
   for (const [key, value] of [['depth', depth], ['layerSpacing', layerSpacing]] as const) {
     root.querySelector<HTMLInputElement>(`input[data-option=${key}]`)!.value = String(value);
@@ -199,6 +218,8 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
     viewer = mode === 'glass' ? new GlassViewer(stage, packet, changed, selected, fail, value.initialView)
       : new Viewer(stage, packet, changed, selected, fail, value.initialView);
     if (viewer instanceof GlassViewer) { viewer.settings = { ...glassSettings, sway: false }; viewer.set({}); }
+    // Inside the iPhone and iPad apps, a double tap on the view returns to 2D.
+    if (embedded && appleTouch()) viewer.returnTo2D = () => { stop(); post('return-2d'); };
     else viewer.settings = { ...solidsSettings };
     const preparedViewer = viewer;
     // The plain solids come first; paint follows once they can be moved.

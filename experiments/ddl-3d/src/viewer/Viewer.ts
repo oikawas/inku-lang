@@ -11,11 +11,13 @@ import { preparePresence } from './presence';
 import { objectDepth } from './objectDepth';
 import { paintInTurn, paintOrder } from './paintQueue';
 import { OrbitMotion } from './orbitMotion';
+import { DoubleTap } from './doubleTap';
 import { adaptResolution, frontWeight, FULL_RESOLUTION, solidsFold, turnBetween, type Resolution } from './motion';
 import { foldedShare, smallestLayerGap } from '../scene/fold';
-import { paperTone, shadeSolid, solidUniforms, type SolidUniforms } from './solidShading';
+import { glowOf, paperTone, shadeSolid, solidUniforms, type SolidUniforms } from './solidShading';
 
 type Projection = ViewState['projection'];
+type Flight = { position: THREE.Vector3; target: THREE.Vector3; zoom: number; top: number };
 export type SolidsSettings = NonNullable<ViewState['solids']>;
 /** Turning keeps going until touched, the light comes from the upper left,
  * and layers open as the view turns away from the front. */
@@ -59,6 +61,9 @@ export class Viewer {
   private disposed = false;
   private lastTime = 0;
   private startPointer: [number, number] | null = null;
+  /** Set by the page inside the iPhone and iPad apps: a double tap returns to 2D. */
+  returnTo2D: (() => void) | null = null;
+  private doubleTap = new DoubleTap();
   private flat = false;
   private wire = false;
   private sceneExtent = 1;
@@ -168,12 +173,18 @@ export class Viewer {
     this.resize.observe(host);
     canvas.addEventListener('pointerdown', e => {
       this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true });
+      this.flight = null;
       if (this.motion.touch()) this.rememberNow();
     }, { signal: this.events.signal });
     canvas.addEventListener('pointerup', e => {
-      // A tap that stopped the turning does not also select.
-      if (this.startPointer && !this.motion.haltedByTouch && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < 4 && e.button === 0) this.pick(e);
+      const tapped = this.startPointer && e.button === 0
+        && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < (e.pointerType === 'touch' ? 10 : 4);
       this.startPointer = null;
+      // On iPhone and iPad, a double tap returns to 2D.
+      if (tapped && e.pointerType === 'touch' && this.returnTo2D && this.doubleTap.tap(e.timeStamp, e.clientX, e.clientY)) { this.returnTo2D(); return; }
+      if (!tapped || e.pointerType !== 'touch') this.doubleTap.clear();
+      // A tap that stopped the turning does not also select.
+      if (tapped && !this.motion.haltedByTouch) this.pick(e);
     }, { signal: this.events.signal });
     canvas.addEventListener('pointermove', e => {
       this.pointerKind = e.pointerType;
@@ -183,7 +194,7 @@ export class Viewer {
       this.requestDraw();
     }, { signal: this.events.signal });
     canvas.addEventListener('pointerleave', () => { this.lightTarget = [0, 0]; this.requestDraw(); }, { signal: this.events.signal });
-    canvas.addEventListener('dblclick', () => this.focus(), { signal: this.events.signal });
+    canvas.addEventListener('dblclick', () => { if (!this.returnTo2D) this.focus(); }, { signal: this.events.signal });
     canvas.addEventListener('keydown', this.keyboard, { signal: this.events.signal });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { cancelAnimationFrame(this.frame); this.frame = 0; }
@@ -366,6 +377,16 @@ export class Viewer {
     if (this.disposed) return;
     const dt = Math.min(0.05, (time - this.lastTime) / 1000 || 0); this.lastTime = time;
     let animating = this.motion.step(dt);
+    if (this.flight) {
+      const k = Math.min(1, (performance.now() - this.flight.start) / 400);
+      this.applyFlight(k); animating = true;
+      if (k >= 1) { this.flight = null; this.rememberNow(); }
+    }
+    if (this.pulse) {
+      const k = (performance.now() - this.pulse.start) / 600;
+      glowOf(this.pulse.mesh.material as THREE.Material).value = Math.max(0, 0.5 * (1 - k));
+      if (k >= 1) this.pulse = null; else animating = true;
+    }
     this.updateFold(); if (this.updateLight(dt)) animating = true; this.updateBoards();
     this.adaptResolution(time);
     this.renderShadows();
@@ -441,7 +462,7 @@ export class Viewer {
   }
 
   match2D() {
-    this.motion.stop();
+    this.motion.stop(); this.flight = null;
     this.setProjection('orthographic');
     const view = frontView(this.packet.canvas, this.host.clientWidth, this.host.clientHeight, this.initialView);
     this.referenceHeight = view.referenceHeight;
@@ -556,11 +577,33 @@ export class Viewer {
     ray.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), this.camera);
     this.model.updateMatrixWorld(true);
     this.selected = ray.intersectObject(this.model, true)[0]?.object ?? null;
-    this.selection.visible = !!this.selected;
-    if (this.selected) this.selection.setFromObject(this.selected);
+    // The picked solid glows for 0.6 seconds, as a glass layer does; no box is drawn.
+    this.selection.visible = false;
+    if (this.pulse) glowOf(this.pulse.mesh.material as THREE.Material).value = 0;
+    this.pulse = this.selected instanceof THREE.Mesh ? { mesh: this.selected, start: performance.now() } : null;
     this.selectedChanged(this.selected?.userData ?? null); this.requestDraw();
   }
-  focus() { if (this.selected) this.fit(this.selected); }
+  /** Move to the selection over 0.4 seconds rather than jumping there. */
+  focus() {
+    if (!this.selected) return;
+    const capture = () => ({ position: this.camera.position.clone(), target: this.controls.target.clone(), zoom: this.camera.zoom,
+      top: this.camera instanceof THREE.OrthographicCamera ? this.camera.top : 0 });
+    const from = capture(); this.fit(this.selected); const to = capture();
+    this.motion.stop(); this.flight = { from, to, start: performance.now() };
+    this.applyFlight(0); this.requestDraw();
+  }
+  private flight: { from: Flight; to: Flight; start: number } | null = null;
+  private applyFlight(k: number) {
+    const { from, to } = this.flight!, e = k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k);
+    this.camera.position.lerpVectors(from.position, to.position, e); this.controls.target.lerpVectors(from.target, to.target, e);
+    this.camera.zoom = from.zoom + (to.zoom - from.zoom) * e;
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      const top = from.top + (to.top - from.top) * e, aspect = (this.camera.right - this.camera.left) / Math.max(1e-9, this.camera.top - this.camera.bottom);
+      this.camera.top = top; this.camera.bottom = -top; this.camera.left = -top * aspect; this.camera.right = top * aspect;
+    }
+    this.camera.updateProjectionMatrix(); this.controls.update();
+  }
+  private pulse: { mesh: THREE.Mesh; start: number } | null = null;
 
   private keyboard = (event: KeyboardEvent) => {
     const key = event.key.toLowerCase();

@@ -8,6 +8,7 @@ import { frontView } from './frontView';
 import { rasterSizedSvg } from './circleAppearance';
 import { paintInTurn } from './paintQueue';
 import { OrbitMotion } from './orbitMotion';
+import { DoubleTap } from './doubleTap';
 import { adaptResolution, FULL_RESOLUTION, type Resolution } from './motion';
 import { BACK_GLASS, fanGeometry, glassLayerPlan, planeZ, type FanGeometry, type GlassLayerPlan } from '../scene/glassLayers';
 import { glassFragment, glassVertex, MAX_SLOTS } from './glassShader';
@@ -97,6 +98,9 @@ export class GlassViewer {
   private resolution = 1;
   private resolutionState: Resolution = FULL_RESOLUTION;
   private startPointer: [number, number] | null = null;
+  /** Set by the page inside the iPhone and iPad apps: a double tap returns to 2D. */
+  returnTo2D: (() => void) | null = null;
+  private doubleTap = new DoubleTap();
 
   constructor(private host: HTMLElement, readonly packet: ScenePacket,
     private changed: (state: ViewState) => void,
@@ -187,9 +191,14 @@ export class GlassViewer {
     this.resize.observe(host);
     canvas.addEventListener('pointerdown', e => { this.startPointer = [e.clientX, e.clientY]; canvas.focus({ preventScroll: true }); this.motion.touch(); }, { signal: this.events.signal });
     canvas.addEventListener('pointerup', e => {
-      // A tap that stopped the turning does not also select.
-      if (this.startPointer && !this.motion.haltedByTouch && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < 4 && e.button === 0) this.pick(e);
+      const tapped = this.startPointer && e.button === 0
+        && Math.hypot(e.clientX - this.startPointer[0], e.clientY - this.startPointer[1]) < (e.pointerType === 'touch' ? 10 : 4);
       this.startPointer = null;
+      // On iPhone and iPad, a double tap returns to 2D.
+      if (tapped && e.pointerType === 'touch' && this.returnTo2D && this.doubleTap.tap(e.timeStamp, e.clientX, e.clientY)) { this.returnTo2D(); return; }
+      if (!tapped || e.pointerType !== 'touch') this.doubleTap.clear();
+      // A tap that stopped the turning does not also select.
+      if (tapped && !this.motion.haltedByTouch) this.pick(e);
     }, { signal: this.events.signal });
     canvas.addEventListener('pointermove', e => {
       if (this.motion.dragging || e.pointerType === 'touch') return;
@@ -198,7 +207,7 @@ export class GlassViewer {
       this.requestDraw();
     }, { signal: this.events.signal });
     canvas.addEventListener('pointerleave', () => { this.lightTarget = [0, 0]; this.requestDraw(); }, { signal: this.events.signal });
-    canvas.addEventListener('dblclick', () => this.focus(), { signal: this.events.signal });
+    canvas.addEventListener('dblclick', () => { if (!this.returnTo2D) this.focus(); }, { signal: this.events.signal });
     canvas.addEventListener('keydown', this.keyboard, { signal: this.events.signal });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { cancelAnimationFrame(this.frame); this.frame = 0; } else this.requestDraw();

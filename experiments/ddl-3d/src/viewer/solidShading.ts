@@ -32,7 +32,7 @@ export function faceShade(normal: Vector3, light: Vector3, weight: number): numb
 }
 
 const declarations = /* glsl */ `
-uniform float uWeight; uniform vec3 uR; uniform vec3 uTone; uniform float uLit;
+uniform float uWeight; uniform vec3 uR; uniform vec3 uTone; uniform float uLit; uniform float uGlow;
 varying vec2 vSurf;
 #ifdef SOLID_PAINT
 uniform sampler2D uBlur; uniform float uWallOpacity; uniform vec2 uTexel;
@@ -59,6 +59,7 @@ export function shadeSolid(material: MeshLambertMaterial, shared: SolidUniforms,
   material.customProgramCacheKey = () => paint ? 'inku-solid-paint' : 'inku-solid';
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, shared);
+    shader.uniforms.uGlow = glowOf(material);
     if (paint) {
       shader.uniforms.uBlur = { value: paint.blur }; shader.uniforms.uWallOpacity = { value: paint.wallOpacity };
       shader.uniforms.uTexel = { value: new Vector2(...paint.texel) };
@@ -108,8 +109,15 @@ export function shadeSolid(material: MeshLambertMaterial, shared: SolidUniforms,
           float shade = mix( 1.0, s * shadow, uLit );
           float dark = clamp( ( 1.0 - shade ) / 0.38, 0.0, 1.0 );
           outgoingLight = diffuseColor.rgb * shade * mix( vec3( 1.0 ), uTone, 0.35 * dark );
+          // A picked solid glows for a moment, lifting toward white.
+          outgoingLight = mix( outgoingLight, vec3( 1.0 ), 0.45 * uGlow );
         }
         #include <opaque_fragment>`);
   };
   material.needsUpdate = true;
+}
+
+/** The picked solid's glow, 0..1, read by its material's shader. */
+export function glowOf(material: { userData: Record<string, unknown> }): { value: number } {
+  return (material.userData.glow ??= { value: 0 }) as { value: number };
 }

@@ -20,3 +20,14 @@ test('front projection preserves 2D pixels and pan at every layer depth', () => 
   }
   assert.equal(view.referenceHeight / view.height, 1.5);
 });
+
+// Failure (iPhone, 2026-11-20): the work viewer sent its whole screen as the
+// picture's box, and the square paper filled the screen's height in 3D.
+test('the paper fits inside a box larger than the picture, as in 2D', () => {
+  const screen = frontView([1, 1], 430, 840, { pixelWidth: 430, pixelHeight: 932, panX: 0, panY: 0, zoom: 1 });
+  // 430 pixels for the paper's side: the paper is 430 / 840 of the view's height.
+  assert.ok(Math.abs(1 / screen.height - 430 / 840) < 1e-12);
+  // A box of the picture's own shape gives the same scale as before.
+  const exact = frontView([1.4, 1], 1200, 800, { pixelWidth: 840, pixelHeight: 600, panX: 0, panY: 0, zoom: 1 });
+  assert.ok(Math.abs(exact.height - 800 / 600) < 1e-12);
+});

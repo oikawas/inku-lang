@@ -125,8 +125,21 @@ public struct ExportArtifact: Sendable {
 
 public struct ExportFailure: LocalizedError, Sendable {
     public let message: String
-    public var errorDescription: String? { message }
-    public init(_ message: String) { self.message = message }
+    public let detail: String?
+    public var errorDescription: String? { [message, detail].compactMap { $0 }.joined(separator: "\n") }
+    public init(_ message: String, detail: String? = nil) { self.message = message; self.detail = detail }
+
+    public func displayMessage(language: String) -> String {
+        let heading: String
+        if message == "render_refused", detail?.hasPrefix("render identity mismatch") == true {
+            heading = language == "en"
+                ? "This work's drawing settings differ from its instruction settings, so a line-by-line animation cannot be created."
+                : "この作品は描いた時の設定と指示書の設定が食い違っているため、行ごとのアニメーションを作れません。"
+        } else {
+            heading = message
+        }
+        return [heading, detail].compactMap { $0 }.joined(separator: "\n")
+    }
 }
 
 public enum ExportService {

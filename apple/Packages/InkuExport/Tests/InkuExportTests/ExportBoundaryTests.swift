@@ -46,6 +46,18 @@ final class ExportBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(AnimationEncoder.order(frameCount: 4, replay: "reverse"), [3, 0, 1, 2, 3, 2, 1, 0])
     }
 
+    func testLineAnimationRefusalPreservesCodeAndReason() throws {
+        let response = try ExactJSON(data: Data(#"{"error":"render_refused","message":"render identity mismatch: ResolvedCatalog"}"#.utf8))
+        XCTAssertThrowsError(try AnimationEncoder.checkCoreResponse(response, workID: "work")) { error in
+            guard let failure = error as? ExportFailure else { return XCTFail("Expected ExportFailure") }
+            XCTAssertEqual(failure.message, "render_refused")
+            XCTAssertEqual(failure.detail, "render identity mismatch: ResolvedCatalog")
+            XCTAssertEqual(failure.displayMessage(language: "ja"), "この作品は描いた時の設定と指示書の設定が食い違っているため、行ごとのアニメーションを作れません。\nrender identity mismatch: ResolvedCatalog")
+            XCTAssertTrue(failure.displayMessage(language: "en").hasSuffix("\nrender identity mismatch: ResolvedCatalog"))
+            XCTAssertEqual(ExportFailure("other", detail: "reason").displayMessage(language: "en"), "other\nreason")
+        }
+    }
+
     func testBundledFontPaintsTextInRaster() throws {
         let font = try XCTUnwrap(AnimationEncoder.fontURL)
         let fonts = try InkuCore.prepareRasterFonts([font.path])

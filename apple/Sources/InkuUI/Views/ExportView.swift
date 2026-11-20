@@ -319,7 +319,10 @@ struct ExportView: View {
                 status = "書き出しを中止しました。"
                 if directFormat { model.reportExportStatus(status); dismiss() }
             }
-            catch { self.error = error.localizedDescription; status = "" }
+            catch {
+                self.error = (error as? ExportFailure)?.displayMessage(language: model.display.preferences.language) ?? error.localizedDescription
+                status = ""
+            }
         }
     }
 

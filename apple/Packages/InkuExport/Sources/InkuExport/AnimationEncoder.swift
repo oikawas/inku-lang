@@ -4,8 +4,20 @@ import ImageIO
 import UniformTypeIdentifiers
 import InkuCore
 import InkuHost
+import OSLog
 
 enum AnimationEncoder {
+    private static let logger = Logger(subsystem: "app.inku", category: "export")
+
+    static func checkCoreResponse(_ result: ExactJSON, workID: String) throws {
+        guard let error = result["error"].string else { return }
+        let detail = result["message"].string
+        // Escape line breaks so a core response remains one log entry on one line.
+        let logDetail = (detail ?? "").replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\r", with: "\\r")
+        logger.error("Line animation refused work=\(workID, privacy: .public) error=\(error, privacy: .public) message=\(logDetail, privacy: .public)")
+        throw ExportFailure(error, detail: detail)
+    }
+
     static var fontURL: URL? { Bundle.module.url(forResource: "NotoSerifJP-Variable", withExtension: "ttf") }
     static func order(frameCount: Int, replay: String) -> [Int] {
         guard frameCount > 0 else { return [] }
@@ -25,7 +37,7 @@ enum AnimationEncoder {
             request["font_family"] = .string("Noto Serif JP")
             request["font_files"] = .array([.string(font.path)])
             let result = try ExactJSON(data: InkuCore.lineAnimation(request.data))
-            if let error = result["error"].string { throw ExportFailure(error) }
+            try checkCoreResponse(result, workID: sources[0].work.id)
             guard let frames = result["frames"].array, !frames.isEmpty,
                   let match = result["matches_saved_svg"].bool, let resultOutcome = result["outcome"].string else {
                 throw ExportFailure("行ごとのアニメーションの応答が不正です。")

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Swift (macOS and iOS): shows and logs the reason when line-by-line animation is refused, explaining mismatches between saved drawing and instruction settings.
+
 - iOS: enlarges horizontal and vertical captions in the iPhone viewer and allows four lines in the horizontal plate.
 
 - iOS: increases text on iPhone home, the viewer, work information and related screens, with a 13pt minimum for inku text.

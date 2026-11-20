@@ -218,9 +218,9 @@ function present(packet: ScenePacket, value: LoadMessage, started: number, local
     viewer = mode === 'glass' ? new GlassViewer(stage, packet, changed, selected, fail, value.initialView)
       : new Viewer(stage, packet, changed, selected, fail, value.initialView);
     if (viewer instanceof GlassViewer) { viewer.settings = { ...glassSettings, sway: false }; viewer.set({}); }
+    else viewer.settings = { ...solidsSettings };
     // Inside the iPhone and iPad apps, a double tap on the view returns to 2D.
     if (embedded && appleTouch()) viewer.returnTo2D = () => { stop(); post('return-2d'); };
-    else viewer.settings = { ...solidsSettings };
     const preparedViewer = viewer;
     // The plain solids come first; paint follows once they can be moved.
     viewer.prepareShape();

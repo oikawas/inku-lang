@@ -206,7 +206,7 @@ export class Viewer {
   /** Draw at once, so the shape is on screen before the host hears of it. */
   drawNow() {
     cancelAnimationFrame(this.frame); this.frame = 0;
-    this.updateFold(); this.updateLight(); this.updateBoards(); this.renderer.render(this.scene, this.camera);
+    this.updateFold(); this.updateLight(); this.updateBoards(); this.renderShadows(); this.renderer.render(this.scene, this.camera);
   }
 
   /** The angle between the view and the front of the paper. */
@@ -577,7 +577,7 @@ export class Viewer {
     await this.painting;
     if (this.disposed) throw new Error('disposed');
     if (this.resolution.value !== 1) { this.resolution = FULL_RESOLUTION; this.renderer.setPixelRatio(this.pixelRatio()); this.resizeView(); }
-    this.updateFold(); this.updateLight(); this.updateBoards(); this.renderer.render(this.scene, this.camera);
+    this.updateFold(); this.updateLight(); this.updateBoards(); this.renderShadows(); this.renderer.render(this.scene, this.camera);
     return new Promise((resolve, reject) => this.renderer.domElement.toBlob(blob => blob ? resolve(blob) : reject(new Error('empty_png')), 'image/png'));
   }
   async glb(): Promise<Blob> {

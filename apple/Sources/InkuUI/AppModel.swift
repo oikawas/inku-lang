@@ -509,8 +509,10 @@ public final class AppModel {
             // One connection per host (the author, 2026-11-14): the core keeps the chosen registration once at start.
             Task { try? await personalRuntime.tidy() }
             self.managedTransport = routed
-            self.host = PipelineHost(database: database, transport: routed, credentials: credentials,
-                                     svgLimitBytes: { try await store.svgLimitBytes() })
+            let host = PipelineHost(database: database, transport: routed, credentials: credentials,
+                                    svgLimitBytes: { try await store.svgLimitBytes() })
+            await host.cancelInterruptedExecutionsAtStartup()
+            self.host = host
             self.settingsStore = store
             self.settings = settings
             updateStageDefaultProviderID()

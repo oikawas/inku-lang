@@ -84,6 +84,67 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         let afterRestore = await host.activeExecutionCount
         XCTAssertEqual(afterRestore, 0)
     }
+    func testStartupCancelsInterruptedExecutionWithoutSendingOrChangingOtherRecords() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-startup-cancel-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let originalDB = try InkuDatabase(url: folder.appendingPathComponent("previous.sqlite"))
+        let transport = CancelledObservationProvider()
+        let original = PipelineHost(database: originalDB, transport: transport, credentials: EmptyCredentials())
+        let progress = ViewCapture()
+        let generation = Task {
+            try await original.generate(fixture(.description("a red circle", autoCatalog: false)), progress: { progress.receive($0) })
+        }
+        defer {
+            generation.cancel()
+            Task { await transport.release() }
+        }
+        for _ in 0..<300 {
+            if await transport.waiting { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let waiting = await transport.waiting
+        XCTAssertTrue(waiting)
+        let id = try XCTUnwrap(progress.executionID)
+        let interruptedLog = try await original.drawingLog(executionID: id)
+        XCTAssertEqual(interruptedLog?.phase, "awaiting_llm")
+        let previousRecord = try await originalDB.loadExecution(id: id)
+        let interrupted = try XCTUnwrap(previousRecord)
+        _ = try await original.cancel(executionID: id)
+        await transport.release()
+        _ = try? await generation.value
+
+        let database = try InkuDatabase(url: folder.appendingPathComponent("next.sqlite"))
+        let stored = try await database.compareAndSwapExecution(id: id, expectedRevision: nil, snapshot: interrupted.snapshot)
+        let wrapper = try XCTUnwrap(JSONSerialization.jsonObject(with: stored.snapshot) as? [String: Any])
+        let bytes = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(wrapper["snapshot"] as? String)))
+        var unchanged: [ExecutionSnapshot] = []
+        for phase in ["awaiting_patch_approval", "needs_user_edit", "completed", "failed", "cancelled"] {
+            var core = try ExactJSON(data: bytes)
+            core["phase"]["tag"] = .string(phase)
+            var record = wrapper
+            record["snapshot"] = core.data.base64EncodedString()
+            unchanged.append(try await database.compareAndSwapExecution(
+                id: phase, expectedRevision: nil, snapshot: JSONSerialization.data(withJSONObject: record)))
+        }
+        // Recovery also reaches interrupted records outside the ordinary log's most recent 100.
+        for index in 0..<100 {
+            _ = try await database.compareAndSwapExecution(id: "unrelated-\(index)", expectedRevision: nil, snapshot: Data("{}".utf8))
+        }
+        let nextTransport = ImmediateProvider()
+        let next = PipelineHost(database: database, transport: nextTransport, credentials: EmptyCredentials())
+        await next.cancelInterruptedExecutionsAtStartup()
+
+        let log = try await next.drawingLog(executionID: id)
+        XCTAssertEqual(log?.phase, "cancelled")
+        XCTAssertTrue(log?.events.contains { $0.tag == "cancelled" } == true)
+        for record in unchanged {
+            let persisted = try await database.loadExecution(id: record.id)
+            XCTAssertEqual(persisted, record)
+        }
+        let sends = await nextTransport.calls
+        XCTAssertEqual(sends, 0)
+    }
+
     func testCancelledProviderPersistsFinalObservation() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-cancelled-observation-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }

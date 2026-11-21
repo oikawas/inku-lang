@@ -217,10 +217,6 @@ struct PhoneWorkInformation: View {
             .navigationTitle(model.display.webCopy("historyPreviewDetails", "作品情報"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(model.display.localized("閉じる")) { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(model.display.webCopy("historyPreviewCommentSave", "保存")) { saveNote() }
-                        .disabled(writingLocked || model.library.mutating || !comment.canSave)
-                }
             }
         }
         .task {
@@ -230,16 +226,4 @@ struct PhoneWorkInformation: View {
         }
     }
 
-    private func saveNote() {
-        Task {
-            let value = await comment.save { id, submitted in
-                await model.library.saveNote(id: id, note: submitted)
-                if let error = model.library.errorText {
-                    throw NSError(domain: "InkuLibraryNote", code: 1, userInfo: [NSLocalizedDescriptionKey: error])
-                }
-                return try await model.auxiliaryDatabase().libraryAnnotation(id: id)
-            }
-            if let value { preview.adoptAnnotation(value, workID: work.id) }
-        }
-    }
 }

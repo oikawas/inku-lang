@@ -989,10 +989,13 @@ public actor InkuDatabase {
     }
 
     /// Read stored executions without restoring drivers or repeating provider effects.
-    public func listExecutionIDs(limit: Int = 100) throws -> [String] {
+    public func listExecutionIDs(limit: Int? = 100) throws -> [String] {
         try queue.read { db in
-            try String.fetchAll(db, sql: "SELECT id FROM execution_snapshots ORDER BY rowid DESC LIMIT ?",
-                                arguments: [min(100, max(1, limit))])
+            let sql = "SELECT id FROM execution_snapshots ORDER BY rowid DESC"
+            if let limit {
+                return try String.fetchAll(db, sql: sql + " LIMIT ?", arguments: [min(100, max(1, limit))])
+            }
+            return try String.fetchAll(db, sql: sql)
         }
     }
 

@@ -123,6 +123,8 @@ The author's instruction (2026-11-14: put ChatGPT first in the model settings an
 
 The iPhone front screens (home, viewer, work information, progress row and home sheets) multiply the inku text-size setting by 17/14, use a 13pt minimum for `inkuFont`, and set an xLarge Dynamic Type minimum for system controls. Making, Mac, iPad and the settings scale remain unchanged.
 
+Lineage in Making does not affect the canvas dimensions on Mac or iPad. In iPhone Work Information, the Save button below the comment field saves the comment. At startup, the app marks executions interrupted in a previous launch as stopped using core’s cancel event. It leaves review and edit states and terminal records intact and does not resume requests.
+
 ## 2026-11-13 The iPhone library scrolls through every work
 
 The author's instruction (2026-11-13): the iPhone library shows every work in one scroll, as Photos does. The tiles take Photos' form and the newest works come first (the author's choices).

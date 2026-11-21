@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import CryptoKit
 import ImageIO
 import UniformTypeIdentifiers
@@ -163,6 +164,41 @@ public actor PipelineHost {
         let driver = try await acquireExecution(executionID)
         defer { releaseExecution(executionID) }
         return try await driver.cancel(progress: { _ in })
+    }
+
+    /// Run before publishing the host. Cancel carried-over work through core without resuming any effects.
+    public func cancelInterruptedExecutionsAtStartup() async {
+        let logger = Logger(subsystem: "app.inku", category: "drawing")
+        let ids: [String]
+        do { ids = try await database.listExecutionIDs(limit: nil) }
+        catch {
+            logger.error("Could not list interrupted drawing executions at startup")
+            return
+        }
+        for id in ids {
+            if Task.isCancelled { return }
+            do {
+                guard let record = try await database.loadExecution(id: id),
+                      try interruptedAtStartup(record), executions[id] == nil, executionUsers[id] == nil else { continue }
+                _ = try await cancel(executionID: id)
+            } catch {
+                logger.error("Could not cancel interrupted drawing execution at startup")
+            }
+        }
+    }
+
+    private func interruptedAtStartup(_ record: ExecutionSnapshot) throws -> Bool {
+        struct Header: Decodable {
+            let schema: String?
+            let snapshot: Data?
+            let svgFailure: String?
+        }
+        let header = try JSONDecoder().decode(Header.self, from: record.snapshot)
+        guard header.schema == "inku.swift-pipeline-execution.v1", header.svgFailure == nil,
+              let bytes = header.snapshot else { return false }
+        let core = try ExactJSON(data: bytes)
+        guard let phase = core["phase"]["tag"].string ?? core["phase"].string else { return false }
+        return !["completed", "failed", "cancelled", "awaiting_patch_approval", "needs_user_edit"].contains(phase)
     }
 
     /// An explicit editor action can bind a previously unbound execution; an old pin is never replaced.

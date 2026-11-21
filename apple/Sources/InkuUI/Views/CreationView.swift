@@ -1431,26 +1431,12 @@ struct CreationView: View {
                     .opacity(showsLineage ? 0 : 1)
                     .allowsHitTesting(!showsLineage)
                     .accessibilityHidden(showsLineage)
-                if (lineageMounted || showsLineage) && workspaceWork != nil {
-                    AnyView(LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
-                                writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
-                                onOpenInCanvas: { work in
-                                    batchWorkspace.showHistory()
-                                    Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
-                                }, onDetach: {
-                                    batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
-                                }))
-                        .background(InkuColor.bg)
-                        .padding(.horizontal, display.visible("history") && !phoneLayout ? 68 : 0)
-                        // Native scroll views can still receive pointer events while their SwiftUI
-                        // parent is transparent and hit testing is disabled. Keep the lineage
-                        // mounted, but move it outside the clipped canvas when artwork is shown.
-                        .offset(x: showsLineage ? 0 : max(rightPanelWidth, windowSize?.width ?? 1320) + 128)
-                        .opacity(showsLineage ? 1 : 0)
-                        .allowsHitTesting(showsLineage)
-                        .accessibilityHidden(!showsLineage)
-                        .environment(\.inkuTooltipsCovered, covered || ui.generationInfoOpen || ui.saijikiOpen)
-                }
+                if phoneLayout { mountedLineage(showsLineage: showsLineage) }
+            }
+        }
+        .overlay {
+            if !phoneLayout, inlinePanel == nil {
+                mountedLineage(showsLineage: ui.workspaceTab == "lineage" && workspaceWork != nil)
             }
         }
         .overlay(alignment: .leading) {
@@ -1469,6 +1455,30 @@ struct CreationView: View {
             }
         }
         .clipped()
+    }
+
+    /// The mounted desktop/tablet lineage must not contribute its toolbar's ideal width to the canvas.
+    @ViewBuilder private func mountedLineage(showsLineage: Bool) -> some View {
+        if (lineageMounted || showsLineage), let work = workspaceWork {
+            AnyView(LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: work,
+                        writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
+                        onOpenInCanvas: { work in
+                            batchWorkspace.showHistory()
+                            Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
+                        }, onDetach: {
+                            batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
+                        }))
+                .background(InkuColor.bg)
+                .padding(.horizontal, display.visible("history") && !phoneLayout ? 68 : 0)
+                // Native scroll views can still receive pointer events while their SwiftUI
+                // parent is transparent and hit testing is disabled. Keep the lineage
+                // mounted, but move it outside the clipped canvas when artwork is shown.
+                .offset(x: showsLineage ? 0 : max(rightPanelWidth, windowSize?.width ?? 1320) + 128)
+                .opacity(showsLineage ? 1 : 0)
+                .allowsHitTesting(showsLineage)
+                .accessibilityHidden(!showsLineage)
+                .environment(\.inkuTooltipsCovered, covered || ui.generationInfoOpen || ui.saijikiOpen)
+        }
     }
 
     private func canvasControls(_ corner: CreationCanvasControls.Corner) -> some View {

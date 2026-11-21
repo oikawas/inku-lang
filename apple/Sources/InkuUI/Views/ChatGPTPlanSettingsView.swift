@@ -8,6 +8,7 @@ public struct ChatGPTPlanSettingsView: View {
     @State private var controller = ChatGPTPlanSettingsModel()
     @State private var confirmingSignOut = false
     @Environment(\.openURL) private var openURL
+    @Environment(\.inkuPhoneLayout) private var phoneLayout
     @State private var login = InkuLoginPresenter()
     public init(model: AppModel, onOpenModelSettings: @escaping () -> Void) { app = model; self.onOpenModelSettings = onOpenModelSettings }
     private var language: String { app.display.preferences.language }
@@ -105,7 +106,7 @@ public struct ChatGPTPlanSettingsView: View {
     private func authorize(consent: Bool = false, newRegistration: Bool = false) {
         let fallback = openURL
         Task {
-            await controller.authorize(consent: consent, newRegistration: newRegistration, app: app,
+            await controller.authorize(consent: consent, newRegistration: newRegistration, app: app, phoneLayout: phoneLayout,
                 openURL: { url in login.open(url, fallback: fallback) { Task { await controller.cancel(app: app) } } },
                 closeLogin: { login.close() })
         }

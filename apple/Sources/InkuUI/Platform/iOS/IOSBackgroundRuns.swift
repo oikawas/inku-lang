@@ -73,13 +73,13 @@ final class IOSBackgroundRunKeeper {
         guard model.hasActiveRun, continued == nil, graceStop == nil else { return }
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "inku.stop") { [weak self] in
             Task { @MainActor in
-                await model.stopEveryRun()
+                model.markPhoneBackgroundStop(); await model.stopEveryRun()
                 self?.endBackgroundTask()
             }
         }
         graceStop = Task { @MainActor [weak self] in
             do { try await Task.sleep(for: .seconds(Self.graceSeconds)) } catch { return }
-            await model.stopEveryRun()
+            model.markPhoneBackgroundStop(); await model.stopEveryRun()
             self?.graceStop = nil
             self?.endBackgroundTask()
         }
@@ -119,7 +119,7 @@ final class IOSBackgroundRunKeeper {
         continued = task; continuedPending = false
         task.expirationHandler = { [weak self] in
             Task { @MainActor in
-                await model.stopEveryRun()
+                model.markPhoneBackgroundStop(); await model.stopEveryRun()
                 task.setTaskCompleted(success: false)
                 self?.continued = nil; self?.continuedLoop = nil
             }

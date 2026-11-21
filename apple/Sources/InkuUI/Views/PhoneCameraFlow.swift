@@ -135,10 +135,10 @@ struct PhoneCameraFlow: ViewModifier {
             case .busy: return display.localized("描いている間は撮影できません。描き終わるか、停止してから押してください。")
             case .previewOpen: return display.localized("保存していない候補を表示している間は撮影できません。")
             case .noModel: return display.localized("「描くときのデフォルト」の「画像」で、画像を読むモデルを選んでください。")
-            case .modelUnavailable(let reference):
-                return reference + "\n\n" + display.localized("このモデルを使えません。「描くときのデフォルト」の「画像」で、画像を読むモデルを選び直してください。")
-            case .keyMissing(let reference):
-                return reference + "\n\n" + display.localized("このモデルのAPIキーがありません。「モデル設定」でキーを入れてください。")
+            case .modelUnavailable:
+                return display.localized("画像を読むモデルを使えません。描くときのデフォルトで選び直してください。")
+            case .keyMissing:
+                return display.localized("画像を読むモデルの接続先に、API キーがありません。")
             }
         }
     }

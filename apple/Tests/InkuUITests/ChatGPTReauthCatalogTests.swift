@@ -5,6 +5,33 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class ChatGPTReauthCatalogTests: XCTestCase {
+    func testPhoneAdoptsTerraOnlyWhenCurrentDefaultCannotBeUsed() async throws {
+        for usable in [false, true] {
+            let fixture = try ReauthFixture(existing: true, failure: .none)
+            defer { fixture.remove() }
+            var vault = try fixture.store.load()
+            var profile = try XCTUnwrap(vault.profiles[fixture.profileID])
+            profile.models = (profile.models ?? []) + [.init(id: "gpt-6.1-terra", label: "Terra")]
+            vault.profiles[fixture.profileID] = profile
+            try fixture.store.write(vault)
+            await fixture.app.initialize()
+            var settings = await fixture.app.hostSettings()
+            settings.providers.append(.personalPlan)
+            try await fixture.app.updateHostSettings(settings)
+            await fixture.app.synchronizePersonalPlanModels()
+            var defaults = fixture.app.drawDefaults
+            let reference = usable ? "chatgpt:offered" : "missing:model"
+            defaults["describe"]?.models.stage1 = reference
+            defaults["describe"]?.models.stage2 = reference
+            try fixture.app.saveDrawDefaults(defaults)
+            try await fixture.app.adoptPhoneChatGPTDefaultIfNeeded()
+            let publication = try await fixture.runtime.publication()
+            XCTAssertEqual(publication.published.contains("gpt-6.1-terra"), !usable)
+            XCTAssertEqual(fixture.app.drawDefaults["describe"]?.models.stage1, usable ? "chatgpt:offered" : "chatgpt:gpt-6.1-terra")
+            XCTAssertEqual(fixture.app.display.preferences.drawDefaults?["describe"]?.models.stage2, usable ? "chatgpt:offered" : "chatgpt:gpt-6.1-terra")
+        }
+    }
+
     func testAuthorizationRefreshesOnceAndPreservesPublication() async throws {
         for mode in ["new", "reauth", "consent"] {
             let fixture = try ReauthFixture(existing: mode != "new", failure: .none)

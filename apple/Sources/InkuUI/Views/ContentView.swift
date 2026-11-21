@@ -348,6 +348,11 @@ public struct ContentView: View {
                         writingLocked: model.isBusy || automation.isOccupied,
                         onSelectionExport: openSelectionExport, onImportWorkPack: chooseWorkPack, phoneLayout: true,
                         onPhoneCreate: { showCreation(tab: "artwork") }, onPhoneCamera: { cameraRequest += 1 },
+                        onPhoneDrawSettings: { openSettings($0) }, onPhoneDrawDetails: {
+                            model.descriptionText = model.phoneDrawText
+                            automation.selectInputTab("description", app: model)
+                            showCreation(tab: "artwork")
+                        },
                         onPhoneSettings: { openSettings(nil) }, phoneRunStatus: automation.running ? automation.status : model.status, phoneScrollToTopRevision: workPackRevision,
                         phoneSavedWork: phoneViewingEvents.savedWork,
                         phoneRefinementResult: phoneRefinementResult ?? phoneViewingEvents.refinementWork,
@@ -591,6 +596,7 @@ public struct ContentView: View {
     private func closeLibrary() { ui.libraryOpen = false }
     private func initializePhoneWorkspace() {
         guard !phoneWorkspaceInitialized else { return }
+        model.initializePhoneDrawDefaults()
         model.inputMode = "description"
         if !["off", "on"].contains(model.sketchMode) { model.sketchMode = "off" }
         if !["auto", "fixed"].contains(model.catalogMode) { model.catalogMode = "fixed" }

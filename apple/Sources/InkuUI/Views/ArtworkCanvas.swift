@@ -36,6 +36,8 @@ struct ArtworkCanvas: View {
     var aspectRatio: Double? = nil
     /// The workspace keeps its zoom and pan here while the canvas view is rebuilt (tab switch, refine panel).
     var viewport: Binding<CanvasViewport>? = nil
+    /// The completed drawing's existing pixels when the iPhone opens the viewer.
+    var handoffPicture: CanvasPicture? = nil
     /// Web DdlRangePreview: the numeric range the instructions' caret or pointer is on, over the work.
     var rangePreview: CompositionRanges.Preview? = nil
     var compositionUnits: [ExactJSON] = []
@@ -47,7 +49,8 @@ struct ArtworkCanvas: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.inkuTooltipsCovered) private var covered
     @Environment(\.inkuPhoneLayout) private var phone
-    @State private var picture = CanvasPicture()
+    @State private var localPicture = CanvasPicture()
+    private var picture: CanvasPicture { handoffPicture ?? localPicture }
     @State private var localViewport = CanvasViewport()
     @State private var gestureScale: CGFloat = 1
     @State private var dragOrigin = CGSize.zero
@@ -247,7 +250,7 @@ struct ArtworkCanvas: View {
                     detailLayer(size: size, box: box)
                     rangeFrame(size: size, box: box)
                     compositionFrame(size: size, box: box)
-                } else if picture.loading {
+                } else if picture.loading || (picture.error == nil && style == .viewer && !svg.isEmpty) {
                     ProgressView(display.localized("作品を表示中"))
                 } else if let error = picture.error {
                     ContentUnavailableView(display.localized("作品を表示できません"), systemImage: "exclamationmark.triangle", description: Text(error))
@@ -357,7 +360,13 @@ struct ArtworkCanvas: View {
         return true
     }
 
-    private struct RequestKey: Hashable { let svg: String; let width: UInt32; let height: UInt32; let appearanceRevision: Int }
+    private struct RequestKey: Hashable {
+        let svg: String
+        let width: UInt32
+        let height: UInt32
+        let appearanceRevision: Int
+        let picture: ObjectIdentifier
+    }
     private struct DetailRequest: Equatable { let svg: String; let plan: CanvasDetailPlan? }
     private func requestKey(box: CGSize) -> RequestKey {
         // The whole is drawn for 100%; a zoomed canvas adds the visible window on top (detailLayer).
@@ -365,7 +374,8 @@ struct ArtworkCanvas: View {
         var height = max(128, min(4096, ceil(max(1, box.height) * displayScale / 128) * 128))
         let factor = min(1, sqrt(8_000_000 / (width * height)))
         width *= factor; height *= factor
-        return RequestKey(svg: svg, width: UInt32(width), height: UInt32(height), appearanceRevision: appearanceRevision)
+        return RequestKey(svg: svg, width: UInt32(width), height: UInt32(height),
+                          appearanceRevision: appearanceRevision, picture: ObjectIdentifier(picture))
     }
     private func render(box: CGSize) async {
         let request = requestKey(box: box)
@@ -504,6 +514,12 @@ public final class CanvasPicture {
     private var windowGeneration: UInt64 = 0
 
     public init() {}
+
+    func seedIfEmpty(_ frame: CGImage, svg: String) {
+        guard image == nil else { return }
+        image = frame
+        imageSVG = svg
+    }
 
     public func clear() { image = nil; imageSVG = nil; painter = nil; error = nil; window = nil; pendingWindow = nil }
 

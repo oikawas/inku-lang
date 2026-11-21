@@ -14,7 +14,7 @@ struct PhoneDrawingWaitView: View {
     let onPrevious: () -> Void
     let onRetry: () -> Void
     let onReview: () -> Void
-    let onFinish: (SavedWork, Bool) -> Void
+    let onFinish: (SavedWork, Bool, CanvasPicture) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var scale
@@ -23,6 +23,8 @@ struct PhoneDrawingWaitView: View {
     @State private var shownRows = 0
     @State private var pausedUntil: ContinuousClock.Instant?
     @State private var frame: PhoneDrawingAssembly.Frame?
+    @State private var finalFrame: CGImage?
+    @State private var savedPicture = CanvasPicture()
     @State private var finished: SavedWork?
     @State private var revealing = false
     @State private var showFullPicture = false
@@ -93,13 +95,14 @@ struct PhoneDrawingWaitView: View {
 
     private var picture: some View {
         Button {
-            if let finished { onFinish(finished, controls) }
+            if let finished { finish(finished) }
             else if !revealing { controls.toggle() }
         } label: {
             ZStack {
                 if let finished {
                     ArtworkCanvas(svg: finished.svg, renderer: model.displayRenderer, style: .viewer,
-                                  showsZoomControls: false, aspectRatio: finished.renderCanvasAspectRatio)
+                                  showsZoomControls: false, aspectRatio: finished.renderCanvasAspectRatio,
+                                  handoffPicture: savedPicture)
                         .allowsHitTesting(false).opacity(showFullPicture ? 1 : 0)
                 }
                 if let frame {
@@ -365,6 +368,7 @@ struct PhoneDrawingWaitView: View {
         }
         wait.cancelPreflight()
         guard !Task.isCancelled else { return }
+        finalFrame = frames.last?.image
         if !frames.isEmpty {
             let interval = PhoneDrawingAssembly.frameInterval(count: frames.count)
             let start = clock.now
@@ -377,7 +381,12 @@ struct PhoneDrawingWaitView: View {
             withAnimation(.easeIn(duration: 0.18)) { showFullPicture = true }
             do { try await Task.sleep(for: .milliseconds(180)) } catch { return }
         }
-        if !Task.isCancelled { onFinish(work, controls) }
+        if !Task.isCancelled { finish(work) }
+    }
+
+    private func finish(_ work: SavedWork) {
+        if let finalFrame { savedPicture.seedIfEmpty(finalFrame, svg: work.svg) }
+        onFinish(work, controls, savedPicture)
     }
 }
 

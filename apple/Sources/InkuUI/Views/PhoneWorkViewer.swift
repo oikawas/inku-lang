@@ -34,6 +34,7 @@ struct PhoneWorkViewer: View {
     let onDelete: (SavedWork, Bool) -> Void
     var initialControls = true
     var onCompletedDrawing: (() -> Void)? = nil
+    var handoffPicture: CanvasPicture? = nil
     @State private var viewport = CanvasViewport()
     @State private var overlayVisible = true
     @State private var threeDimensional = false
@@ -61,7 +62,7 @@ struct PhoneWorkViewer: View {
                 } else {
                     ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText,
                                   style: .viewer, showsZoomControls: false, aspectRatio: work.renderCanvasAspectRatio,
-                                  viewport: $viewport)
+                                  viewport: $viewport, handoffPicture: handoffPicture)
                         .contentShape(Rectangle())
                         .simultaneousGesture(SpatialTapGesture(count: 2).exclusively(before: SpatialTapGesture()).onEnded { tap in
                             switch tap {

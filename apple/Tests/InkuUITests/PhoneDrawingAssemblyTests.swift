@@ -4,6 +4,22 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class PhoneDrawingAssemblyTests: XCTestCase {
+    func testViewerKeepsHandedOffFrameUntilItsOwnRenderReplacesIt() async throws {
+        let svg = #"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>"#
+        let picture = CanvasPicture()
+        let finalFrame = try testFrame().image
+        picture.seedIfEmpty(finalFrame, svg: svg)
+        let renderer = DisplayRenderer(windows: .cpu)
+        let loading = Task { await picture.load(svg: svg, width: 20, height: 20, renderer: renderer) }
+        XCTAssertTrue(picture.image === finalFrame)
+        await loading.value
+        let rendered = try XCTUnwrap(picture.image)
+        XCTAssertEqual(rendered.width, 20)
+        XCTAssertEqual(picture.imageSVG, svg)
+        picture.seedIfEmpty(finalFrame, svg: svg)
+        XCTAssertTrue(picture.image === rendered)
+    }
+
     func testReadyFramesPlayForAtMostSixSeconds() async throws {
         let savedAt = ContinuousClock.now
         let frame = try testFrame()

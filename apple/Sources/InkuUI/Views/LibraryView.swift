@@ -72,6 +72,7 @@ struct LibraryView: View {
     @State private var phoneSelecting = false
     @State private var phoneDrawSheet = false
     @State private var phoneViewerControls = true
+    @State private var phonePictureHandoff: (workID: String, picture: CanvasPicture)?
     @State private var phoneDrawFacts = PhoneDrawState.Facts()
     @State private var phoneSearchVisible = false
     @State private var phoneSearchHasDraft = false
@@ -162,7 +163,9 @@ struct LibraryView: View {
             viewPhoneDrawing(id)
         }
         .onChange(of: preview.work?.id, initial: true) { _, id in
-            if phoneLayout, let id { model.updatePhoneCompletion(.opened(id)) }
+            guard phoneLayout else { return }
+            if phonePictureHandoff?.workID != id { phonePictureHandoff = nil }
+            if let id { model.updatePhoneCompletion(.opened(id)) }
         }
         .onChange(of: phoneRefinementResult?.id) { _, _ in
             guard phoneLayout, preview.work != nil, let work = phoneRefinementResult else { return }
@@ -320,8 +323,9 @@ struct LibraryView: View {
                 closePhoneDrawingWait(); preview.close()
                 model.openPhonePendingReview()
                 onPhoneCreate()
-            }, onFinish: { work, controls in
+            }, onFinish: { work, controls, picture in
                 guard wait.visible else { return }
+                phonePictureHandoff = (work.id, picture)
                 showPhoneDrawing(work, controls: controls)
                 wait.visible = false
                 PhoneDrawingNotice.finishPicture()
@@ -1595,7 +1599,8 @@ struct LibraryView: View {
                         Task { await library.restore(ids: [work.id]); await reconcilePhoneRemoval([work.id]) }
                     } else { deletion = LibraryDeletion(ids: [work.id], movesToTrash: !permanent) }
                 }, initialControls: phoneViewerControls,
-                onCompletedDrawing: model.phoneCompletionID.map { id in { viewPhoneDrawing(id) } })
+                onCompletedDrawing: model.phoneCompletionID.map { id in { viewPhoneDrawing(id) } },
+                handoffPicture: phonePictureHandoff.flatMap { $0.workID == work.id ? $0.picture : nil })
         }
     }
 

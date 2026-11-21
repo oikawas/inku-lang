@@ -757,6 +757,8 @@ PNG 書き出しの選択肢は、設定モーダルのエクスポートタブ�
 
 口 `line_animation`（Python は `pipeline_line_animation`）は UTF-8 JSON bytes で `document`、`definitions`、`compiler`、描画 `options`、`clip`、`saved_svg`、`show_ddl`、`font_family`、`font_files` を受ける。前5項は既存の compile／render 境界と同じ型である。答えの `frames` は `instruction_count`、今回強調する1始まり・両端を含む `lines`、選択された `svg`（`show_ddl` が真なら DDL と絵を合成した SVG、偽なら絵だけ）を持つ。コマ 0 の `lines` は、どの instruction の出所でもない行である。`matches_saved_svg` は最後のコマの絵（DDL 欄を合成する前の SVG）と保存 SVG のバイト一致であり、合成した SVG との比較ではない。compile の `outcome` と診断・省略も返す。`font_files` は host が rasterize に渡せるよう返し、core は system font を選ばない。
 
+`saved_score` に保存 Score の JSON を渡すと、保存したコンパイラ設定で求めた命令の出所を使い、保存 Score 自体を描く。コンパイル結果と保存 Score の正準ダイジェストおよび命令数を照合し、異なれば `saved_score_mismatch` を返す。描画の用紙形式と縦横比を確認し、保存された描画・クリップ条件とコンパイラの資源方針を適用する。この経路の成功応答には `source: "saved_score"` が入る。最後の絵が保存 SVG と違う場合も `matches_saved_svg: false` として返す。欄を省く場合は従来のコンパイル・描画経路と従来の応答を使う。
+
 UniFFI の `prepare_raster_fonts(font_files)` は、指定された字体ファイルだけを読み込んだ字体の表（`RasterFonts`）を返し、読めないファイルは `font_file_unreadable` で断る。その `prepare_scene(svg)` が、この字体だけを使って SVG を画像化用に準備する。複数コマでは同じ `RasterFonts` を使い回して各 scene を準備する。字体を渡さない既定の `prepare_raster_scene` は字体を読み込まない。
 
 2作品以上では、チェックした作品は古い順、系譜経路は起点から表示中までの順で切り替える。設定のエクスポートタブの値を初期値として、形式（APNG／GIF）、解像度と任意の高さ、1作品用のDDL表示・間隔・リプレイ、複数作品用の切り替えパターン・表示秒数を管理する。出力モーダルには対象数に対応する項目を表示する。サイズと保存先は両方式で共通で、対応ブラウザでは保存先パス指定ボタンからフォルダを選択できる。書き出し実行時の設定はこのブラウザに利用者ごとに保存して次回に使い、設定タブからも変更できる。モーダルで指定した保存先は今回だけに適用する。保存先の指定がない場合は既存の保存先設定に従い、フォルダ選択に非対応のブラウザではブラウザのダウンロード設定を使う。今回指定したフォルダへの保存失敗はモーダル内に表示し、別の保存先へ自動で切り替えない。

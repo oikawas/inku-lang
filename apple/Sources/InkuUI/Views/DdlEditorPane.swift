@@ -20,6 +20,7 @@ struct DdlEditorPane: View {
     @State private var pluginSource = ""
     @State private var hoverIndex: Int?
     @State private var instructionLanguage = "ja"
+    @Environment(\.inkuPhoneLayout) private var phone
     @Environment(\.inkuTooltipsCovered) private var tooltipsCovered
     @State private var rangeStatus = RangeEditorStatus()
     /// Web DdlEditorDialog: an invalid range or an IME composition holds the draw back.
@@ -45,22 +46,21 @@ struct DdlEditorPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            toolbar
-            GeometryReader { geometry in
-                VStack(alignment: .leading, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        editor.frame(minHeight: 80)
-                        if completionSource == text { CompletionRangeSummary(display: display, states: completionStates) }
-                        if invalidSource {
-                            Text(display.localized("横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です"))
-                                .inkuFont(12).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
-                        }
-                        if !unknownNames.isEmpty || showGuide { support.frame(maxHeight: min(150, geometry.size.height * 0.24)) }
-                    }.frame(height: showVocabulary ? max(160, geometry.size.height * (showGuide || !unknownNames.isEmpty ? 0.46 : 0.50)) : nil)
-                    if showVocabulary {
-                        SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
-                            wordLanguage: instructionLanguage, inline: true)
-                            .disabled(disabled)
+            if phone {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        toolbar
+                        editorSection(minimumEditorHeight: 180, supportHeight: 150)
+                        vocabulary
+                    }
+                }
+            } else {
+                toolbar
+                GeometryReader { geometry in
+                    VStack(alignment: .leading, spacing: 10) {
+                        editorSection(minimumEditorHeight: 80, supportHeight: min(150, geometry.size.height * 0.24))
+                            .frame(height: showVocabulary ? max(160, geometry.size.height * (showGuide || !unknownNames.isEmpty ? 0.46 : 0.50)) : nil)
+                        vocabulary
                     }
                 }
             }
@@ -72,13 +72,34 @@ struct DdlEditorPane: View {
         .onChange(of: display.preferences.language) { _, _ in instructionLanguage = model.instructionLanguage(for: text) }
     }
 
+    private func editorSection(minimumEditorHeight: CGFloat, supportHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            editor.frame(minHeight: minimumEditorHeight)
+            if completionSource == text { CompletionRangeSummary(display: display, states: completionStates) }
+            if invalidSource {
+                Text(display.localized("横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です"))
+                    .inkuFont(12).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            }
+            if !unknownNames.isEmpty || showGuide { support.frame(maxHeight: supportHeight) }
+        }
+    }
+
+    @ViewBuilder private var vocabulary: some View {
+        if showVocabulary {
+            SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
+                        wordLanguage: instructionLanguage, inline: true)
+                .disabled(disabled)
+        }
+    }
+
     /// `.ddl-editor-toolbar`: the language label with its tooltip, the switches, and the status at the right.
     private var toolbar: some View {
         let lines = text.components(separatedBy: "\n").count
         let characters = text.utf16.count
-        return HStack(spacing: 8) {
+        let layout = phone ? AnyLayout(WrappingHStack(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
             Text(display.localized(instructionLanguage == "ja" ? "指示書（日本語DDL）" : "指示書（英語DDL）"))
-                .inkuFont(12, weight: .medium).foregroundStyle(.secondary).lineLimit(1)
+                .inkuFont(12, weight: .medium).foregroundStyle(.secondary).lineLimit(phone ? nil : 1)
                 .inkuTooltip(display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
             Button(display.webCopy("ddlEditorVocabulary", "歳時記の語彙")) { showVocabulary.toggle() }
                 .buttonStyle(InkuGhostButtonStyle(active: showVocabulary))
@@ -87,9 +108,9 @@ struct DdlEditorPane: View {
             Button(display.webCopy("ddlEditorSyntaxGuideToggle", "簡易ガイド")) { showGuide.toggle() }
                 .buttonStyle(InkuGhostButtonStyle(active: showGuide))
                 .accessibilityValue(display.localized(showGuide ? "オン" : "オフ"))
-            Spacer(minLength: 8)
+            if !phone { Spacer(minLength: 8) }
             Text(english ? "\(lines) lines · \(characters) characters" : "\(lines) 行・\(characters) 文字")
-                .inkuFont(12).monospacedDigit().foregroundStyle(.tertiary).lineLimit(1)
+                .inkuFont(12).monospacedDigit().foregroundStyle(.tertiary).lineLimit(phone ? nil : 1)
         }
     }
 

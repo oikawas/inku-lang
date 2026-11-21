@@ -5,6 +5,7 @@ public struct SaijikiView: View {
     @Bindable var model: AppModel
     private let onInsertWord: ((String) -> Void)?
     private let wordLanguage: String?
+    @Environment(\.inkuPhoneLayout) private var phone
     private let inline: Bool
     private let onClose: (() -> Void)?
     @State private var selection: Selection?
@@ -87,20 +88,26 @@ public struct SaijikiView: View {
                     .inkuFont(11).foregroundStyle(.secondary)
             }.padding(.horizontal, 10).padding(.top, 8)
             Divider()
-            GeometryReader { geometry in
-                if geometry.size.width >= 580 {
-                    let previewWidth = min(220, geometry.size.width * 0.25)
-                    HStack(alignment: .top, spacing: 10) {
-                        inlineWords(columns: min(4, max(1, Int((geometry.size.width - previewWidth - 20) / 145))))
-                        previewPane.frame(width: previewWidth)
+            if phone {
+                inlineWordGrid(columns: [GridItem(.adaptive(minimum: 140), alignment: .top)])
+                    .padding(.horizontal, 10)
+                previewPane.frame(height: 108).padding(.horizontal, 10).padding(.bottom, 8)
+            } else {
+                GeometryReader { geometry in
+                    if geometry.size.width >= 580 {
+                        let previewWidth = min(220, geometry.size.width * 0.25)
+                        HStack(alignment: .top, spacing: 10) {
+                            inlineWords(columns: min(4, max(1, Int((geometry.size.width - previewWidth - 20) / 145))))
+                            previewPane.frame(width: previewWidth)
+                        }
+                    } else {
+                        VStack(spacing: 8) {
+                            inlineWords(columns: max(1, Int(geometry.size.width / 155)))
+                            previewPane.frame(height: min(140, geometry.size.height * 0.4))
+                        }
                     }
-                } else {
-                    VStack(spacing: 8) {
-                        inlineWords(columns: max(1, Int(geometry.size.width / 155)))
-                        previewPane.frame(height: min(140, geometry.size.height * 0.4))
-                    }
-                }
-            }.padding(.horizontal, 10).padding(.bottom, 8)
+                }.padding(.horizontal, 10).padding(.bottom, 8)
+            }
         }
         .background(InkuColor.bg2, in: RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
@@ -108,35 +115,39 @@ public struct SaijikiView: View {
 
     private func inlineWords(columns: Int) -> some View {
         ScrollView {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count: columns), alignment: .leading, spacing: 8) {
-                ForEach(bundles) { bundle in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(bundle.label(language: uiLanguage))
-                            .inkuFont(12, weight: .medium)
-                        ForEach(bundle.categories(in: model.saijiki)) { category in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(uiLanguage == "ja" ? category.name : category.englishName ?? category.name)
-                                    .inkuFont(12, weight: .medium)
-                                SaijikiFlowLayout {
-                                    ForEach(category.words) { word in wordChip(name(word), selection: .builtin(word.id)) }
-                                }
-                            }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
-                        }
-                    }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
-                }
-                if !model.pluginWords.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Plugin").inkuFont(12, weight: .medium)
-                        SaijikiFlowLayout {
-                            ForEach(model.pluginWords) { word in wordChip(word.displayName(language: offeredLanguage), selection: .plugin(word.id)) }
-                        }
-                    }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
-                }
-            }.padding(1)
+            inlineWordGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count: columns))
         }
+    }
+
+    private func inlineWordGrid(columns: [GridItem]) -> some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(bundles) { bundle in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(bundle.label(language: uiLanguage))
+                        .inkuFont(12, weight: .medium)
+                    ForEach(bundle.categories(in: model.saijiki)) { category in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(uiLanguage == "ja" ? category.name : category.englishName ?? category.name)
+                                .inkuFont(12, weight: .medium)
+                            SaijikiFlowLayout {
+                                ForEach(category.words) { word in wordChip(name(word), selection: .builtin(word.id)) }
+                            }
+                        }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+                    }
+                }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+            }
+            if !model.pluginWords.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Plugin").inkuFont(12, weight: .medium)
+                    SaijikiFlowLayout {
+                        ForEach(model.pluginWords) { word in wordChip(word.displayName(language: offeredLanguage), selection: .plugin(word.id)) }
+                    }
+                }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+            }
+        }.padding(1)
     }
 
     private var uiLanguage: String { model.display.preferences.language }

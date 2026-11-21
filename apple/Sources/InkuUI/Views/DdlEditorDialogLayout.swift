@@ -113,7 +113,20 @@ struct DdlDialogFooter<Conditions: View, Actions: View>: View {
     @ViewBuilder let conditions: () -> Conditions
     @ViewBuilder let actions: () -> Actions
 
+    @Environment(\.inkuPhoneLayout) private var phone
+
     var body: some View {
+        if phone {
+            VStack(alignment: .leading, spacing: 10) {
+                conditions().frame(maxWidth: .infinity, alignment: .leading)
+                actions().frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        } else {
+            wideFooter
+        }
+    }
+
+    private var wideFooter: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .bottom, spacing: 18) {
                 conditions().frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)

@@ -1,24 +1,29 @@
 #if os(iOS)
 import UIKit
 import OSLog
+import UniformTypeIdentifiers
 
 /// The system share sheet for files the app wrote (iOS plan step 2, author's choice 2026-11-08): "Save Image" puts an
 /// exported picture in Photos, "Save to Files" and AirDrop take any format.
 @MainActor
 enum InkuShareSheet {
     /// Shows the sheet over the frontmost screen; true when the author completed an action, false when cancelled.
-    static func present(_ urls: [URL], onActivityFinished: (() -> Void)? = nil) async -> Bool {
+    static func present(_ urls: [URL], pngCard: Bool = false) async -> Bool {
         guard !urls.isEmpty else { return false }
+        let folders = NativeFilePanels.beginSharing(urls)
+        defer { NativeFilePanels.endSharing(folders) }
         // UIKit can take several seconds to construct the activity controller. A presenter selected before that
         // work can have left the window by the time presentation begins.
-        let sheet = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+        let items: [Any] = pngCard ? urls.map { PNGShareItem(url: $0) } : urls
+        let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
         guard let top = await frontmost() else { return false }
         return await withCheckedContinuation { continuation in
             let completion = ShareSheetCompletion { continuation.resume(returning: $0) }
             let logger = Logger(subsystem: "app.inku", category: "share-sheet")
-            sheet.completionWithItemsHandler = { _, completed, _, _ in
-                logger.debug("Activity completion called (completed: \(completed))")
-                onActivityFinished?()
+            sheet.completionWithItemsHandler = { activityType, completed, _, error in
+                let activity = activityType?.rawValue ?? "none"
+                let activityError = error.map { $0 as NSError }
+                logger.notice("Activity completion (activityType: \(activity, privacy: .public), completed: \(completed), activityError: \(activityError?.domain ?? "none", privacy: .public)/\(activityError?.code ?? 0))")
                 completion.finish(completed)
             }
             if let popover = sheet.popoverPresentationController {
@@ -83,6 +88,26 @@ enum InkuShareSheet {
                 finish()
             }
         }
+    }
+}
+/// Provides the original named file with an explicit image type for share extensions and Photos.
+private final class PNGShareItem: NSObject, UIActivityItemSource {
+    let url: URL
+
+    init(url: URL) { self.url = url }
+
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
+        url
+    }
+
+    func activityViewController(_ activityViewController: UIActivityViewController,
+                                itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
+        url
+    }
+
+    func activityViewController(_ activityViewController: UIActivityViewController,
+                                dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String {
+        UTType.png.identifier
     }
 }
 #endif

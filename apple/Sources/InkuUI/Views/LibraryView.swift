@@ -966,7 +966,7 @@ struct LibraryView: View {
         return layout {
             Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
             HStack(spacing: 6) {
-                if work.starred { Image(systemName: "star.fill") }
+                if work.starred { Image(systemName: "star.fill").foregroundStyle(Color.yellow) }
                 if annotation.forRevision { Image(systemName: "pencil.circle.fill") }
             }
         }
@@ -993,7 +993,7 @@ struct LibraryView: View {
                 .clipped()
                 .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 3) {
-                        if work.starred { Image(systemName: "star.fill") }
+                        if work.starred { Image(systemName: "star.fill").foregroundStyle(Color.yellow) }
                         if annotation.forRevision { Image(systemName: "pencil.circle.fill") }
                     }
                     .inkuFont(11).foregroundStyle(.white).shadow(radius: 1.5).padding(4)
@@ -1665,14 +1665,9 @@ struct LibraryView: View {
         phoneShareInProgress = true
         Task { @MainActor in
             defer { phoneShareInProgress = false }
-            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-phone-share-\(UUID().uuidString)", isDirectory: true)
-            defer { try? FileManager.default.removeItem(at: folder) }
             do {
                 let artifact = try await model.preparePhoneShareCard(workID: work.id)
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                let url = folder.appendingPathComponent(artifact.name)
-                try artifact.data.write(to: url, options: .atomic)
-                _ = await InkuPhoneShare.present(url)
+                _ = try await InkuPhoneShare.presentPNG(artifact.data, named: artifact.name)
             } catch { model.errorText = model.failureMessage(error) }
         }
     }

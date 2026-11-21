@@ -28,9 +28,11 @@ final class ShareSheetCompletion {
 
 @MainActor
 enum InkuPhoneShare {
-    static func present(_ url: URL) async -> Bool {
+    static func presentPNG(_ data: Data, named name: String) async throws -> Bool {
         #if os(iOS)
-        return await InkuShareSheet.present([url])
+        let url = try NativeFilePanels.shareCard(named: name)
+        try data.write(to: url, options: .atomic)
+        return await InkuShareSheet.present([url], pngCard: true)
         #else
         return false
         #endif

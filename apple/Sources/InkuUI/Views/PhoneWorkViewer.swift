@@ -158,8 +158,18 @@ struct PhoneWorkViewer: View {
                         await model.library.toggleStar(target)
                         if let saved = try? await model.auxiliaryDatabase().work(id: work.id) { starOverride = saved.starred }
                     }
-                } label: { Label(display.label("スター", "Star"), systemImage: starred ? "star.fill" : "star")
-                    .fixedSize(horizontal: !vertical, vertical: false).frame(minHeight: 44) }
+                } label: {
+                    Label {
+                        Text(display.label("スター", "Star"))
+                    } icon: {
+                        if starred {
+                            Image(systemName: "star.fill").foregroundStyle(Color.yellow)
+                        } else {
+                            Image(systemName: "star")
+                        }
+                    }
+                    .fixedSize(horizontal: !vertical, vertical: false).frame(minHeight: 44)
+                }
                     .disabled(!permissions.canStar)
                 if !vertical { Spacer(minLength: 0) }
                 Button { onRefine(work) } label: { Text(display.webCopy("historyPreviewRefine", "推敲する"))

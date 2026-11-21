@@ -112,6 +112,7 @@ struct LibraryModelLinesView: View {
 
 @MainActor
 struct LibraryWorkMarks: View {
+    @Environment(\.inkuPhoneLayout) private var phone
     @Bindable var model: AppModel
     let work: SavedWork
     var spacing: CGFloat = 12
@@ -124,7 +125,7 @@ struct LibraryWorkMarks: View {
             if showStar {
                 Button { Task { await library.toggleStar(work) } } label: {
                     Image(systemName: work.starred ? "star.fill" : "star")
-                        .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
+                        .foregroundStyle(work.starred ? (phone ? Color.yellow : Color.accentColor) : Color.secondary)
                 }
                 .accessibilityLabel(model.display.localized(work.starred ? "スターを外す" : "スターを付ける"))
                 .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",

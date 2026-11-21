@@ -482,7 +482,7 @@ public final class AppModel {
         guard !initialized else { return }
         initialized = true
         #if os(iOS)
-        NativeFilePanels.removeAbandonedExportsAtStartup()
+        NativeFilePanels.removeExpiredShareFiles()
         #endif
         do {
             let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: InkuPlatform.hostIdentifier)

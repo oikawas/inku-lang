@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public enum ProviderObservationPolicy {
@@ -171,6 +172,7 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private let began = ContinuousClock.now
     private let options: ProviderObservationOptions
+    private let digestBodies: Bool
     private var value: ProviderAttemptObservation
     private var secrets: [String] = []
     private var received: ProviderHTTPRead?
@@ -187,6 +189,9 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
             throw HostError("pipeline_schema_violation")
         }
         self.options = options
+        // Server records only the digest and size of both bodies for an image effect:
+        // a provider can echo the input image even in an error response.
+        digestBodies = stage == .image || tag == "review_description_ddl" || effect["_transient_images"] != .null
         value = ProviderAttemptObservation(metric: ProviderAttemptMetric(identity: try ProviderActionIdentity(effect: effect),
             action: tag, stage: stage, requestedModelReference: reference, timeoutMS: timeout),
             raw: options.captureRaw ? ProviderRawObservation() : nil)
@@ -208,7 +213,7 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
     func recordFailure(_ error: any Error, httpStatus: Int? = nil, httpBody: Data? = nil) {
         lock.withLock {
             value.metric.diagnostic = ProviderDiagnosticSanitizer.diagnostic(error: error, endpoint: endpoint,
-                secrets: secrets, httpStatus: httpStatus, httpBody: httpBody, operation: operation)
+                secrets: secrets, httpStatus: httpStatus, httpBody: digestBodies ? nil : httpBody, operation: operation)
         }
     }
     func receive(_ response: ProviderHTTPRead) {
@@ -256,13 +261,22 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
         do { try await callback(snapshot) } catch { throw ProviderObservationFailure.outcomeSaveFailed }
     }
     private func bounded(_ data: Data, incomplete: Bool = false) -> (String, Bool) {
-        // Mask before slicing: a credential crossing the byte limit must not leak a prefix.
-        let masked = Data(ProviderSecretRedactor.redact(String(decoding: data, as: UTF8.self), secrets: secrets, incomplete: incomplete).utf8)
-        var end = min(masked.count, options.maximumRawBytes)
-        if end < masked.count {
-            while end > 0 && (masked[end] & 0xc0) == 0x80 { end -= 1 }
+        let recorded: Data
+        if digestBodies {
+            let sha = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let record: ExactJSON = .object(["capture": .string("digest_only"), "sha256": .string(sha),
+                                             "byte_len": .integer(data.count)])
+            recorded = record.data
+        } else {
+            // Mask before slicing: a credential crossing the byte limit must not leak a prefix.
+            recorded = Data(ProviderSecretRedactor.redact(String(decoding: data, as: UTF8.self),
+                                                          secrets: secrets, incomplete: incomplete).utf8)
         }
-        return (String(decoding: masked.prefix(end), as: UTF8.self), masked.count > options.maximumRawBytes)
+        var end = min(recorded.count, options.maximumRawBytes)
+        if end < recorded.count {
+            while end > 0 && (recorded[end] & 0xc0) == 0x80 { end -= 1 }
+        }
+        return (String(decoding: recorded.prefix(end), as: UTF8.self), recorded.count > options.maximumRawBytes)
     }
 }
 

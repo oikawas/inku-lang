@@ -39,6 +39,7 @@ pub mod recompose;
 pub mod replay;
 pub mod retouch;
 pub mod saved_variants;
+pub mod workpack;
 
 #[cfg(test)]
 mod composition_server_cases;

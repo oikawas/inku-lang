@@ -8,7 +8,7 @@
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyDict};
 use serde::Deserialize;
 
 fn catch_python_panic<T>(action: impl FnOnce() -> PyResult<T>) -> PyResult<T> {
@@ -535,6 +535,53 @@ fn pipeline_description_groups<'py>(
     })
 }
 
+#[pyfunction]
+fn pipeline_workpack_read_line<'py>(
+    py: Python<'py>,
+    line: &Bound<'py, PyBytes>,
+    line_number: u64,
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        let line = line.as_bytes();
+        let output =
+            py.detach(|| inku_pipeline_uniffi::workpack_read_line_bytes(line, line_number));
+        Ok(PyBytes::new(py, &output))
+    })
+}
+
+#[pyfunction]
+fn pipeline_workpack_plan<'py>(
+    py: Python<'py>,
+    request: &Bound<'py, PyBytes>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    catch_python_panic(|| {
+        let request = request.as_bytes().to_vec();
+        let output = py.detach(|| inku_pipeline_uniffi::workpack_plan(request));
+        Ok(PyBytes::new(py, &output))
+    })
+}
+
+#[pyfunction]
+fn pipeline_workpack_encode_line<'py>(
+    py: Python<'py>,
+    request: &Bound<'py, PyBytes>,
+) -> PyResult<Bound<'py, PyDict>> {
+    catch_python_panic(|| {
+        let request = request.as_bytes();
+        let output = py.detach(|| inku_pipeline_uniffi::workpack_encode_line_bytes(request));
+        let record = PyDict::new(py);
+        record.set_item(
+            "line",
+            output.line.as_deref().map(|line| PyBytes::new(py, line)),
+        )?;
+        record.set_item(
+            "error",
+            output.error.as_deref().map(|error| PyBytes::new(py, error)),
+        )?;
+        Ok(record)
+    })
+}
+
 /// The composition's theses to choose from (step 4): request, answer.
 #[pyfunction]
 fn pipeline_composition_theses<'py>(
@@ -1000,6 +1047,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_composition_names, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_rules, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_description_groups, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_workpack_read_line, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_workpack_plan, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_workpack_encode_line, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_theses, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_plugin_package, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;

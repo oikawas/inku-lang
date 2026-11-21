@@ -52,6 +52,38 @@ those values in the snapshot. Hosts must also enforce their transport byte cap
 before allocating ABI buffers. Snapshots are trusted host state with consistency
 digests, not authenticated bearer tokens for an untrusted client.
 
+## Work packs
+
+UniFFI exposes `workpack_read_line(line, line_number)`, `workpack_plan(request)`
+and `workpack_encode_line(request)`. Python exposes the same functions with a
+`pipeline_` prefix in `inku_render`. Request and response metadata use UTF-8
+JSON bytes. Line bytes exclude the newline.
+
+- `workpack_read_line` validates a raw line of up to 64 MiB. Line 1 returns
+  `outcome: "header"`, `format_version`, `counts`, and `producer`. Known records
+  return `outcome: "record"`, `kind`, `key`, and a small `identity` object.
+  Unknown record kinds return `outcome: "unknown_kind"`. A refusal includes
+  `outcome: "refused"`, `code`, `reason`, and `line`.
+- `workpack_plan` takes `action: "plan"`, header `counts`, and a file-ordered
+  `records` array of the `kind`, `key`, and `identity` values from the reader.
+  `existing` holds `works` (IDs), `node_roots` (node ID to root ID) and `parents`
+  (child ID to parent ID), limited to IDs relevant to the pack. Pass
+  `existing: {}` for file validation. On success, `works`, `edges`,
+  `annotations` and `colophons` are ID arrays in file order, `node_roots`
+  maps each imported node to its destination root, and `skipped` counts
+  skipped works. Annotation IDs are history IDs.
+- `workpack_encode_line` takes `kind: "header"` with `exported_at`, `producer`
+  and `counts`, or a record `kind` with `record` containing the logical fields.
+  The result contains optional `line` and `error` byte buffers (a dict in Python).
+  `line` is the canonical JSON line. `error` contains refusal JSON or
+  `{"outcome":"omit"}` for a blank, unmarked annotation. The host uses the
+  number of emitted lines per kind for the header counts.
+
+The host splits the file, limits it to 256 MiB, and stages the original
+payloads separately from record identities. Import writes run in one host
+database transaction, where database constraints still apply. See the
+[work pack format](../../../persistence/workpack.md).
+
 ## Effects and commit authority
 
 The eight effect tags are `select_description_catalog`, `generate_sketch`,

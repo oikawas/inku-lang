@@ -1,7 +1,7 @@
 {
  "schema": "inku.macos-third-party-notices.v1",
  "inputs": {
-  "core/Cargo.lock": "158777f0cf2274cf192ebed8aea04e2a3fc2ebaa2dbd9f422c41c0376ae6c375",
+  "core/Cargo.lock": "aaeee142cec5174d5fa6d023a81b95586073d89f33a3c9d2945c4761b6a5deb4",
   "apple/Package.resolved": "23397c5afe667533ac1394c1e35f27136e80cb6a872ad93e6a789727d9162acb"
  },
  "components": [
@@ -2440,6 +2440,28 @@
     {
      "label": "LICENSE-MIT",
      "text": "15656cc11a8331f2"
+    }
+   ]
+  },
+  {
+   "group": "rust",
+   "name": "unicode-segmentation",
+   "version": "1.13.3",
+   "license": "MIT OR Apache-2.0",
+   "source": "https://crates.io/crates/unicode-segmentation/1.13.3",
+   "note": "From crates.io.",
+   "texts": [
+    {
+     "label": "COPYRIGHT",
+     "text": "23860c2a7b5d96b2"
+    },
+    {
+     "label": "LICENSE-APACHE",
+     "text": "143368af9701a24e"
+    },
+    {
+     "label": "LICENSE-MIT",
+     "text": "7b63ecd5f1902af1"
     }
    ]
   },

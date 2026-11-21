@@ -246,6 +246,46 @@ pub fn description_groups(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+#[uniffi::export]
+pub fn workpack_read_line(line: Vec<u8>, line_number: u64) -> Vec<u8> {
+    workpack_read_line_bytes(&line, line_number)
+}
+
+pub fn workpack_read_line_bytes(line: &[u8], line_number: u64) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::workpack::read_line(line, line_number)
+    }))
+    .unwrap_or_else(|_| WORKPACK_INVARIANT.to_vec())
+}
+
+const WORKPACK_INVARIANT: &[u8] =
+    br#"{"outcome":"refused","code":"invalid","reason":"internal_invariant"}"#;
+
+#[uniffi::export]
+pub fn workpack_plan(request: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| inku_pipeline::workpack::plan(&request)))
+        .unwrap_or_else(|_| WORKPACK_INVARIANT.to_vec())
+}
+
+#[derive(uniffi::Record)]
+pub struct WorkpackLineOutput {
+    pub line: Option<Vec<u8>>,
+    pub error: Option<Vec<u8>>,
+}
+
+#[uniffi::export]
+pub fn workpack_encode_line(request: Vec<u8>) -> WorkpackLineOutput {
+    workpack_encode_line_bytes(&request)
+}
+
+pub fn workpack_encode_line_bytes(request: &[u8]) -> WorkpackLineOutput {
+    let (line, error) = catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::workpack::encode_line(request)
+    }))
+    .unwrap_or_else(|_| (None, Some(WORKPACK_INVARIANT.to_vec())));
+    WorkpackLineOutput { line, error }
+}
+
 /// The refinements that change one part of a saved Score (touches, support,
 /// color arrangement): one JSON request with an `action`, one JSON answer
 /// (`inku.saved-variants.v1`). A panic answers `{"error": "internal_invariant"}`.

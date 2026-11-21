@@ -6,6 +6,7 @@ FROM ghcr.io/pyo3/maturin@sha256:2519833ac5bf071e02fa231ce368b5b69fac8be1b077437
 
 WORKDIR /build
 COPY core/ /build/core/
+COPY persistence/contract.json /build/persistence/contract.json
 COPY server/scripts/build_rust_notices.py /build/server/scripts/
 COPY scripts/skia_notices.py /build/scripts/
 RUN toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' /build/core/rust-toolchain.toml)" \

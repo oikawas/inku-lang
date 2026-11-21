@@ -1,5 +1,7 @@
 # Work pack v1
 
+The shared core exports `workpack_read_line`, `workpack_plan`, and `workpack_encode_line` for line validation, import selection and lineage roots, and canonical JSON lines. The core enforces the 64 MiB limit per line. The host enforces the 256 MiB file limit, splits and stages lines, and owns database reads, writes and transactions.
+
 An `.inkupack` file is UTF-8 JSON Lines separated by LF. The first line contains `format: "inku.workpack"`, `format_version: 1`, `persistence_contract_version: 2`, `exported_at` (Unix milliseconds), `producer` (host, app_version, build, schema_version), and `counts`. Following lines carry `kind` in this order: history, lineage_node, lineage_edge, annotation, colophon. Counts give the number of each kind; a mismatch indicates an incomplete file. Ignore unknown fields and kinds in the same format version; reject a newer format version.
 
 The Server producer uses host `server` and its `MIGRATION_VERSION` as schema_version.

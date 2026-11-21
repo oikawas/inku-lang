@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import time
+from contextlib import ExitStack
 
 import httpx
 
@@ -23,6 +24,9 @@ from .chatgpt_models import offered as model_offered, publication
 from . import provider_wire
 
 logger = logging.getLogger(__name__)
+wire_wait_logger = logger.getChild("wire_wait")
+# Record successful waits at INFO even when the root logger defaults to WARNING.
+wire_wait_logger.setLevel(logging.INFO)
 
 # The codes a stored diagnostic may keep (pipeline_candidate) and the next
 # actions it may name: the shared core's lists, which classify the failures.
@@ -155,10 +159,11 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
     return publication(check(), listed["models"])["models"]
 
 
-async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float,
+async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float | None,
                   limit: int, cancel=None, observation=None, *, purpose: str = "llm",
                   transport: httpx.AsyncBaseTransport | None = None, images: list[str] | None = None,
-                  usage: list | None = None, on_bytes=None) -> str:
+                  usage: list | None = None, on_bytes=None, on_wire_wait_finished=None,
+                  on_request_saved=None) -> str:
     image_effect = auth_policy("operation", purpose=purpose, tag=action["tag"])["image_effect"]
 
     def capture_body(body: bytes) -> bytes:
@@ -169,7 +174,21 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
     built = (provider_wire.chatgpt_request(model, prompt, limit, images=images) if image_effect else None)
     check = session_checker(owner, profile_id, generation, cancel, validate=check_session)
     store = CredentialStore()
-    with store.lock("wire:" + owner + ":" + profile_id, deadline, check):
+    with ExitStack() as stack:
+        wait_started = time.monotonic()
+        try:
+            stack.enter_context(store.lock("wire:" + owner + ":" + profile_id, deadline, check))
+        finally:
+            wait_finished = time.monotonic()
+            if deadline is None:
+                wire_wait_logger.info("chatgpt_wire_wait action_id=%s attempt=%s wait_ms=%d",
+                                      action["identity"]["action_id"], action["identity"]["attempt"],
+                                      max(0, int((wait_finished - wait_started) * 1000)))
+                if on_wire_wait_finished is not None:
+                    on_wire_wait_finished(wait_finished)
+        if deadline is None:
+            # Pipeline attempts start their budget when the communication lock is acquired.
+            deadline = wait_finished + int(action["timeout_ms"]) / 1000
         try:
             models = await catalog(owner, profile_id, generation, deadline, cancel, _wire_held=True)
             if not model_offered(models, model, purpose):
@@ -185,6 +204,8 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                 capture, execution = observation
                 truncated = capture.request(owner, execution, action, provider_stage_record(action["tag"]), "chatgpt", model,
                                             capture_body(built["canonical"].encode()))
+                if on_request_saved is not None:
+                    on_request_saved(truncated)
                 if truncated:
                     raise ChatGPTError("chatgpt_observation_incomplete")
             decoder = TextSSEDecoder(limit) if action["tag"] == "vision" else SSEDecoder(limit)

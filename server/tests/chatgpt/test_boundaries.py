@@ -745,13 +745,15 @@ def test_composition_effect_preserves_wire_and_separate_observation(isolated, tm
         engine.dispose()
 
 
-@pytest.mark.parametrize("capture_raw", [False, True])
-def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolated, tmp_path, monkeypatch, capture_raw):
+@pytest.mark.parametrize("capture_raw, before_send_timeout", [
+    (False, False), (True, False), (True, True),
+], ids=["capture-off", "capture-on", "timeout-without-transcript"])
+def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolated, tmp_path, monkeypatch, capture_raw, before_send_timeout):
     from types import SimpleNamespace
 
     from sqlalchemy import create_engine
 
-    from inku_server import db
+    from inku_server import chatgpt_provider, db
     from inku_server.model_settings import default_model_settings
     from inku_server.persistence.schema import ProviderObservationRow
     from inku_server.pipeline_api import PipelineService
@@ -767,9 +769,15 @@ def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolate
     real_client = httpx.AsyncClient
 
     def handle(request):
+        assert not before_send_timeout, "the timed-out attempt must not send"
         assert request.url.path.endswith("/responses")
         return httpx.Response(200, content=wire, headers={"x-request-id": "req_fixture"})
 
+    async def token_timeout(*args):
+        raise TimeoutError
+
+    if before_send_timeout:
+        monkeypatch.setattr(chatgpt_provider, "access_token", token_timeout)
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
     action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "fixture", "attempt": "1"}, "timeout_ms": "5000",
               "payload": {"prompt": {"system": "system", "message": "message", "response_schema": {"type": "object"},
@@ -786,10 +794,16 @@ def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolate
     monkeypatch.setattr(db, "engine", engine)
     ProviderObservationRow.__table__.create(engine)
     try:
-        assert effects.provider_for("owner", context)(action)["failure"] == "provider_rejected"
-        expected = {"code": "chatgpt_response_failed", "action": "diagnose", "reported": "server_error",
-                    "status": 200, "param": "tool.choice", "request_id": "req_fixture",
-                    "event_count": 2, "last_event": "response.failed"}
+        failure = "transport_timeout" if before_send_timeout else "provider_rejected"
+        assert effects.provider_for("owner", context)(action)["failure"] == failure
+        if before_send_timeout:
+            expected = {"code": "chatgpt_transport_timeout", "action": "retry", "reported": None,
+                        "status": None, "param": None, "request_id": None, "event_count": 0, "last_event": None}
+            assert effects.provider_observations("owner", "execution") == []
+        else:
+            expected = {"code": "chatgpt_response_failed", "action": "diagnose", "reported": "server_error",
+                        "status": 200, "param": "tool.choice", "request_id": "req_fixture",
+                        "event_count": 2, "last_event": "response.failed"}
         assert context["provider_failure"]["chatgpt"] == expected
         # Read the persisted send independently of the latest failure: a later send may succeed.
         context.pop("provider_failure")
@@ -800,11 +814,12 @@ def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolate
         status = service.provider_capture_status("owner", "execution")
         assert status["capture_enabled"] is capture_raw
         row, = status["observations"]
-        assert row["diagnostic"] == expected and row["failure"] == "provider_rejected"
-        if capture_raw:
+        assert row["diagnostic"] == expected and row["failure"] == failure
+        if capture_raw and not before_send_timeout:
             assert row["response_body"] == wire.decode()
         else:
             assert "request_body" not in row and "response_body" not in row
+            assert row["capture_complete"] is False
     finally:
         engine.dispose()
 

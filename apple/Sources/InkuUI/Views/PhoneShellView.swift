@@ -84,18 +84,13 @@ struct PhoneBackEdge: View {
 struct PhoneRunStatusRow: View {
     @Bindable var model: AppModel
     let status: String
-    var mascot = false
     let onOpen: () -> Void
     var body: some View {
         HStack(spacing: 10) {
             Button(action: onOpen) {
                 HStack(spacing: 10) {
-                    if mascot {
-                        let kind = model.display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
-                        MascotView(kind: kind, accessibilityText: model.display.localized(kind == "yuragi" ? "Yuragiが描画中" : "Incuが描画中"))
-                    } else {
-                        ProgressView().controlSize(.small)
-                    }
+                    let kind = model.display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
+                    MascotView(kind: kind, accessibilityText: model.display.localized(kind == "yuragi" ? "Yuragiが描画中" : "Incuが描画中"))
                     Text(status.isEmpty ? model.display.localized("描画中") : model.display.message(status))
                         .inkuFont(12).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)

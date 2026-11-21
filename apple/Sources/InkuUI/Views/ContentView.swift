@@ -144,6 +144,7 @@ public struct ContentView: View {
                 get: { workPackResult != nil }, set: { if !$0 { workPackResult = nil } })) {
                 Button(model.display.localized("閉じる")) { workPackResult = nil }
             } message: { Text(workPackResult ?? "") }
+            .environment(\.inkuDrawingMotion, model.display.preferences.showDrawingMotion)
     }
 
     private var mainBody: some View {

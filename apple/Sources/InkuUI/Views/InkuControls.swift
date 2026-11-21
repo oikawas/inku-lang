@@ -103,6 +103,22 @@ struct InkuGhostButtonStyle: ButtonStyle {
     }
 }
 
+/// Supplies a timeline date while drawing motion is enabled, or a still frame when paused.
+struct DrawingMotionTimeline<Schedule: TimelineSchedule, Content: View>: View {
+    let schedule: Schedule
+    var paused = false
+    @ViewBuilder let content: (Date?) -> Content
+    @Environment(\.inkuDrawingMotion) private var showDrawingMotion
+
+    var body: some View {
+        if showDrawingMotion && !paused {
+            TimelineView(schedule) { content($0.date) }
+        } else {
+            content(nil)
+        }
+    }
+}
+
 /// Web `StopButton.svelte`'s `stopPulse` (2.2 s, ease-in-out) with its light and dark `--stop-*` colors. Colors
 /// are sRGB `[r, g, b, a]`.
 public enum StopPulse {
@@ -139,7 +155,7 @@ public enum StopPulse {
 }
 
 /// Web `StopButton.svelte` as `RunStatus.svelte` sizes it: 13px weight 500, padding 7×14, a dot with a 3px ring,
-/// a red frame that pulses. Reduced motion holds the 0 % frame, as the mascots stop.
+/// a red frame that pulses. Turning drawing motion off holds the 0 % frame, as the mascots stop.
 struct InkuStopButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View { InkuStopButtonFace(label: configuration.label) }
 }
@@ -150,13 +166,15 @@ private struct InkuStopButtonFace<Label: View>: View {
     var still: Double?
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start = Date()
 
     var body: some View {
         if let still { face(at: still) }
-        else if reduceMotion { face(at: 0) }
-        else { TimelineView(.animation) { timeline in face(at: timeline.date.timeIntervalSince(start)) } }
+        else {
+            DrawingMotionTimeline(schedule: .animation) { date in
+                face(at: date?.timeIntervalSince(start) ?? 0)
+            }
+        }
     }
 
     private func face(at time: Double) -> some View {

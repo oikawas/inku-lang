@@ -285,9 +285,7 @@ struct LibraryView: View {
     }
 
     private var phoneRunRow: some View {
-        PhoneRunStatusRow(model: model, status: phoneRunStatus,
-                          mascot: !phoneSelecting && ["description", "image"].contains(model.activeSingleInputMode ?? ""),
-                          onOpen: openPhoneRun)
+        PhoneRunStatusRow(model: model, status: phoneRunStatus, onOpen: openPhoneRun)
     }
 
     private func openPhoneRun() {

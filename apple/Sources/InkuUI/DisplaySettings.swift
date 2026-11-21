@@ -3,6 +3,10 @@ import InkuExport
 import Observation
 import SwiftUI
 
+extension EnvironmentValues {
+    @Entry var inkuDrawingMotion = true
+}
+
 extension ExportOptions {
     mutating func setSingleWorkPNGTransparent(_ transparent: Bool) { pngAlphaWhite = !transparent }
 }
@@ -24,6 +28,7 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var compositionExpanded: Bool?
     public var showTooltips = true
     public var mascot = "incu"
+    public var showDrawingMotion = true
     public var batchRetries = 0
     /// Local equivalent of Server client_limit; validated before a refinement starts.
     public var refinementFanoutLimit = 4

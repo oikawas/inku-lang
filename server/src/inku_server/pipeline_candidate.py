@@ -640,7 +640,9 @@ class CandidateExecution:
                 detail = existing["chatgpt"]
                 code = detail.get("code")
                 if isinstance(code, str) and (code in PUBLIC_CODES or (code.startswith("chatgpt_") and _safe_compiler_failure_detail(code))):
-                    diagnostic["chatgpt"] = {"code": code, "action": detail.get("action") if detail.get("action") in FAILURE_ACTIONS else "diagnose",
+                    diagnostic["chatgpt"] = {**{key: detail[key] for key in ("event_count", "tool_shapes", "streamed_calls", "finalized_calls") if key in detail},
+                                            "code": code, "action": detail.get("action") if detail.get("action") in FAILURE_ACTIONS else "diagnose",
+                                            "reported": safe_identifier(detail.get("reported")), "last_event": safe_identifier(detail.get("last_event")),
                                             "request_id": safe_identifier(detail.get("request_id")), "param": safe_identifier(detail.get("param")),
                                             "status": detail.get("status") if isinstance(detail.get("status"), int) and 100 <= detail["status"] <= 599 else None}
             _logger.warning(

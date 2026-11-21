@@ -628,11 +628,16 @@ class ProductPipelineEffects:
             metrics[recorded] = metrics.get(recorded, 0) + int(result["elapsed_ms"])
             _add_provider_usage(context, recorded, getattr(transport, "usage", None))
             used = getattr(transport, "usage", None) or {}
-            context.setdefault("provider_sends", []).append({
+            send = {
                 "action": action["tag"], "attempt": int(action["identity"]["attempt"]),
                 "input_tokens": used.get("input_tokens"), "output_tokens": used.get("output_tokens"),
                 "usage_reported": getattr(transport, "usage", None) is not None,
-            })
+            }
+            safe_detail = getattr(transport, "chatgpt_failure_detail", None)
+            if result["tag"] == "provider_failed" and safe_detail:
+                send.update(action_id=str(action["identity"]["action_id"]), stage=recorded,
+                            elapsed_ms=int(result["elapsed_ms"]), failure=result["failure"], diagnostic=safe_detail)
+            context.setdefault("provider_sends", []).append(send)
             if result["tag"] == "provider_failed":
                 context["provider_failure"] = {
                     "failure": result["failure"],
@@ -643,7 +648,6 @@ class ProductPipelineEffects:
                 detail = getattr(transport, "failure_detail", None)
                 if result["failure"] == "provider_rejected" and detail in {"credentials_unavailable", "observation_incomplete"}:
                     context["provider_failure"]["detail"] = detail
-                safe_detail = getattr(transport, "chatgpt_failure_detail", None)
                 if safe_detail:
                     context["provider_failure"].update(chatgpt=safe_detail, action_id=str(action["identity"]["action_id"]))
             else:

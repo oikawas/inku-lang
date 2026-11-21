@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Rust core development builds use less disk space and retain line numbers for backtraces.
+
 - iOS: keeps exported files available until Save to Files or another share-sheet activity finishes. Damaged work packs show a localized message and log the diagnostic reason.
 
 - Swift (macOS and iOS): uses the shared core to validate, plan imports, and export work packs. Export sorts keys, leaves `/` unescaped, and omits annotations with neither a comment nor a revision mark. Earlier Swift work packs still import.

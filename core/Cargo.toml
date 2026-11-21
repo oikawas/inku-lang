@@ -43,6 +43,12 @@ serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
 sha2 = "=0.11.0"
 uniffi = { version = "=0.32.0", default-features = false }
 
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = "line-tables-only"
+
 # Cross-crate inlining for the drawing and raster loops (I-732 FFI-11,
 # 2026-11-07): 1,073 drawings of 5173 works took 7.55 s instead of 9.51 s with
 # the same SVG, and the drawing crate's release build 32 s instead of 20 s.

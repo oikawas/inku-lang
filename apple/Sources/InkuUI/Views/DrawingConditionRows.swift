@@ -60,9 +60,10 @@ struct DrawingConditionsHeading: View {
             .accessibilityValue(canvas)
             if hasDetails {
                 Button { showDetails = true } label: {
-                    Image(systemName: "ellipsis").frame(minWidth: phone ? 24 : nil, minHeight: phone ? 36 : nil)
+                    // Use the same text line metrics as the neighboring Change button.
+                    if phone { Text("…") } else { Image(systemName: "ellipsis") }
                 }
-                    .buttonStyle(InkuGhostButtonStyle())
+                    .buttonStyle(InkuGhostButtonStyle(phoneTarget: true))
                     .accessibilityLabel(display.localized("生成条件の詳細"))
             }
         }

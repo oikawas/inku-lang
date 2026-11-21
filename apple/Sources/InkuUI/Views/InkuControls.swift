@@ -86,10 +86,11 @@ extension View {
 struct InkuGhostButtonStyle: ButtonStyle {
     var active = false
     var prominent = false
+    var phoneTarget = false
     @Environment(\.isEnabled) private var isEnabled
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
+        let plate = configuration.label
             .inkuFont(12)
             .lineLimit(1)
             .padding(.horizontal, 10).padding(.vertical, 4)
@@ -100,6 +101,7 @@ struct InkuGhostButtonStyle: ButtonStyle {
                 .stroke(active || prominent ? Color.accentColor : InkuColor.border2))
             .opacity(isEnabled ? 1 : 0.55)
             .contentShape(Rectangle())
+        if phoneTarget { plate.inkuPhoneTarget() } else { plate }
     }
 }
 

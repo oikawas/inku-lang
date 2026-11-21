@@ -8,6 +8,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: keeps the 2D paper size and center when switching to 3D in the iPhone viewer.
+- Swift (macOS and iOS): uses the saved score and drawing settings for line-by-line animation.
+
 - iOS: the iPhone home drawing field accepts descriptions and draws parentless works with the defaults. It guides unavailable connections, stops and reviews, and sets first-use and post-sign-in drawing defaults.
 
 - Swift (macOS and iOS): shows and logs the reason when line-by-line animation is refused, explaining mismatches between saved drawing and instruction settings.

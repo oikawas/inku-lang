@@ -180,6 +180,13 @@ public struct Ddl3DInitialView: Equatable, Sendable {
         self.pixelWidth = pixelWidth; self.pixelHeight = pixelHeight; self.panX = panX; self.panY = panY; self.zoom = zoom
     }
 
+    static func phoneViewer(area: CGSize, aspect: CGFloat, topInset: CGFloat) -> Self {
+        let paper = CanvasInteraction.viewerPaper(in: area, aspect: aspect)
+        let viewport = CGRect(x: 0, y: topInset, width: area.width, height: max(0, area.height - topInset))
+        return Self(pixelWidth: paper.width, pixelHeight: paper.height,
+                    panX: paper.midX - viewport.midX, panY: paper.midY - viewport.midY, zoom: 1)
+    }
+
     /// The viewer's `validInitialView`; an invalid one is left out and the viewer fits by itself.
     var message: [String: Double]? {
         guard [pixelWidth, pixelHeight, zoom].allSatisfy({ $0.isFinite && $0 > 0 && $0 < 100_000 }),

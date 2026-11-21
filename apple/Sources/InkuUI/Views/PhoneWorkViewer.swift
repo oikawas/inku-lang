@@ -33,6 +33,7 @@ struct PhoneWorkViewer: View {
     let onCreate: (SavedWork) -> Void
     let onDelete: (SavedWork, Bool) -> Void
     @State private var viewport = CanvasViewport()
+    @State private var paperAspect: CGFloat = 1
     @State private var overlayVisible = true
     @State private var threeDimensional = false
     @State private var controller = Ddl3DController()
@@ -51,14 +52,17 @@ struct PhoneWorkViewer: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 if threeDimensional, let registration = Ddl3DInstallation.registered {
+                    let topInset = max(topHeight, 48)
                     Ddl3DCanvas(controller: controller, registration: registration, work: work,
-                                initialView: Ddl3DInitialView(pixelWidth: geometry.size.width, pixelHeight: geometry.size.height,
-                                                              panX: 0, panY: 0, zoom: 1),
+                                initialView: .phoneViewer(area: geometry.size,
+                                                         aspect: work.renderCanvasAspectRatio.map { CGFloat($0) } ?? paperAspect,
+                                                         topInset: topInset),
                                 onReturn: { threeDimensional = false }, onEscape: { false })
-                        .padding(.top, max(topHeight, 48))
+                        .padding(.top, topInset)
                 } else {
                     ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText,
                                   style: .viewer, showsZoomControls: false, aspectRatio: work.renderCanvasAspectRatio,
+                                  onViewerAspect: { paperAspect = $0 },
                                   viewport: $viewport)
                         .contentShape(Rectangle())
                         .simultaneousGesture(SpatialTapGesture(count: 2).exclusively(before: SpatialTapGesture()).onEnded { tap in

@@ -36,6 +36,14 @@ public enum CanvasInteraction {
         return CGRect(x: container.midX - width / 2, y: container.midY - height / 2, width: width, height: height)
     }
 
+    /// The paper at 100% in the phone viewer, before any pinch or pan.
+    static func viewerPaper(in area: CGSize, aspect: CGFloat) -> CGRect {
+        let ratio = aspect.isFinite && aspect > 0 ? aspect : 1
+        let fit = fittedPicture(aspect: ratio, in: CGRect(origin: .zero, size: area))
+        let width = max(1, fit.width), height = max(1, fit.height)
+        return CGRect(x: (area.width - width) / 2, y: (area.height - height) / 2, width: width, height: height)
+    }
+
     /// Where the picture stands on screen: scaled about the canvas center, then moved by the pan offset.
     public static func zoomedPicture(_ picture: CGRect, area: CGSize, scale: CGFloat, offset: CGSize) -> CGRect {
         let center = CGPoint(x: area.width / 2, y: area.height / 2)

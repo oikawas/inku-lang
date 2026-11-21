@@ -4,6 +4,23 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class PhoneViewingTests: XCTestCase {
+    func test3DInitialViewKeepsTheFittedPaperAndCorrectsForTheTopInset() {
+        let portrait = CGSize(width: 402, height: 820)
+        let square = Ddl3DInitialView.phoneViewer(area: portrait, aspect: 1, topInset: 48)
+        XCTAssertEqual(square, Ddl3DInitialView(pixelWidth: 402, pixelHeight: 402, panX: 0, panY: -24, zoom: 1))
+
+        let wide = Ddl3DInitialView.phoneViewer(area: portrait, aspect: 809.0 / 500.0, topInset: 64)
+        XCTAssertEqual(wide.pixelWidth, 402)
+        XCTAssertEqual(wide.pixelHeight, 402.0 * 500.0 / 809.0, accuracy: 0.0001)
+        XCTAssertEqual(wide.panX, 0)
+        XCTAssertEqual(wide.panY, -32)
+        XCTAssertEqual(wide.zoom, 1)
+
+        let tall = Ddl3DInitialView.phoneViewer(area: portrait, aspect: 0.4, topInset: 48)
+        XCTAssertEqual(tall.pixelWidth, 328, accuracy: 0.0001)
+        XCTAssertEqual(tall.pixelHeight, 820, accuracy: 0.0001)
+    }
+
     func testTimelinePagesKeepOpeningStarAndSearchFilter() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-view-filter-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }

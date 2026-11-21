@@ -34,6 +34,8 @@ struct ArtworkCanvas: View {
     var zoomControlsAtTop = false
     /// The saved canvas proportion (width / height). The Web sizes the base box from it, not from the picture.
     var aspectRatio: Double? = nil
+    /// The fitted viewer may discover a legacy work's ratio from its rendered image.
+    var onViewerAspect: ((CGFloat) -> Void)? = nil
     /// The workspace keeps its zoom and pan here while the canvas view is rebuilt (tab switch, refine panel).
     var viewport: Binding<CanvasViewport>? = nil
     /// Web DdlRangePreview: the numeric range the instructions' caret or pointer is on, over the work.
@@ -78,11 +80,10 @@ struct ArtworkCanvas: View {
     private var viewerBody: some View {
         GeometryReader { geometry in
             let ratio = CGFloat(aspectRatio ?? Double(imageAspect))
-            let safeRatio = ratio.isFinite && ratio > 0 ? ratio : 1
-            let width = min(geometry.size.width, geometry.size.height * safeRatio)
-            let box = CGSize(width: max(1, width), height: max(1, width / safeRatio))
+            let box = CanvasInteraction.viewerPaper(in: geometry.size, aspect: ratio).size
             interactiveCanvas(size: geometry.size, box: box)
                 .task(id: covered ? nil : requestKey(box: box)) { if !covered { await render(box: box) } }
+                .onChange(of: ratio, initial: true) { _, ratio in onViewerAspect?(ratio) }
         }
         .onAppear { svgKey = svg.hashValue; adoptViewport() }
         .onChange(of: svg) { _, value in svgKey = value.hashValue; picture.clear(); reset() }

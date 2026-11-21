@@ -286,7 +286,7 @@ public actor PipelineHost {
         ])
         return .object(["document": document, "definitions": configuration["definitions"], "compiler": compiler,
                         "options": try ExactJSON(data: context.renderOptions), "clip": try ExactJSON(data: context.clipPolicy),
-                        "saved_svg": .string(work.svg)])
+                        "saved_svg": .string(work.svg), "saved_score": try ExactJSON(data: Data(work.score.utf8))])
     }
 
     public func savedAuthoringSummaries(workIDs: [String]) async throws -> [String: SavedAuthoringSummary] {

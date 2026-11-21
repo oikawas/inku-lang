@@ -16,8 +16,8 @@ public struct AboutInkuScreen: View {
         .environment(model.display)
         .environment(\.locale, Locale(identifier: model.display.preferences.language))
         .preferredColorScheme(model.display.colorScheme)
+        .inkuFont(13)
         .environment(\.inkuTextScale, model.display.preferences.textScale)
-        .font(.system(size: 13 * model.display.preferences.textScale))
     }
 }
 #endif
@@ -26,6 +26,7 @@ public struct AboutInkuScreen: View {
 struct AboutInkuView: View {
     @Bindable var model: AppModel
     @State private var showsLicenses = false
+    @Environment(\.inkuPhoneLayout) private var phone
 
     private static let bindingReport: [String: String] = {
         (try? JSONSerialization.jsonObject(with: Data(InkuCore.versionReport.utf8)) as? [String: String]) ?? [:]
@@ -94,7 +95,10 @@ struct AboutInkuView: View {
             }
         }
         .textSelection(.enabled)
-        .sheet(isPresented: $showsLicenses) { ThirdPartyNoticesView(display: model.display) }
+        .sheet(isPresented: $showsLicenses) {
+            ThirdPartyNoticesView(display: model.display)
+                .inkuPhoneFrontText(phone, textScale: model.display.preferences.textScale)
+        }
     }
 
     private func bundleValue(_ key: String) -> String {

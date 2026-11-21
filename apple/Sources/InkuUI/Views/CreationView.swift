@@ -91,7 +91,7 @@ private struct CanvasHeaderTab: View {
         Button(action: action) {
             Text(title).inkuFont(13, weight: selected ? .medium : .regular)
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
-                .padding(.horizontal, compact ? 12 : 16).frame(minHeight: 38, maxHeight: .infinity)
+                .padding(.horizontal, compact ? 12 : 16).frame(minHeight: 38, maxHeight: .infinity).inkuPhoneTarget()
                 .background(hovered && !selected && isEnabled ? InkuColor.bg2 : Color.clear)
                 .overlay(alignment: .bottom) { Rectangle().fill(selected ? Color.accentColor : Color.clear).frame(height: 2) }
                 .contentShape(Rectangle())

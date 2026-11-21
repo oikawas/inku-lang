@@ -16,6 +16,7 @@ struct DdlEditorDialogLayout<Footer: View>: View {
     let onClose: () -> Void
     let onRangeBlocked: (Bool) -> Void
     @ViewBuilder let footer: () -> Footer
+    @Environment(\.inkuPhoneLayout) private var phone
     @State private var preview: CompositionRanges.Preview?
 
     var body: some View {
@@ -26,7 +27,7 @@ struct DdlEditorDialogLayout<Footer: View>: View {
                     Text(subtitle).inkuFont(12).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Button(action: onClose) { Image(systemName: "xmark").frame(width: 26, height: 26) }
+                Button(action: onClose) { Image(systemName: "xmark").frame(width: 26, height: 26).inkuPhoneTarget() }
                     .buttonStyle(InkuGhostButtonStyle())
                     .accessibilityLabel(model.display.localized("閉じる")).disabled(disabled)
             }.padding(.horizontal, 18).padding(.vertical, 14)
@@ -40,7 +41,17 @@ struct DdlEditorDialogLayout<Footer: View>: View {
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         editor
-                        artworkPreview(compact: true).frame(height: 80)
+                        if phone {
+                            HStack(alignment: .top, spacing: 10) {
+                                previewImage(width: min(100, geometry.size.width * 0.25), height: 72)
+                                previewHint
+                            }
+                            .inkuFont(12).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
+                        } else {
+                            artworkPreview(compact: true).frame(height: 80)
+                        }
                     }
                 }
             }.padding(.horizontal, 18).padding(.vertical, 14)
@@ -102,7 +113,20 @@ struct DdlDialogFooter<Conditions: View, Actions: View>: View {
     @ViewBuilder let conditions: () -> Conditions
     @ViewBuilder let actions: () -> Actions
 
+    @Environment(\.inkuPhoneLayout) private var phone
+
     var body: some View {
+        if phone {
+            VStack(alignment: .leading, spacing: 10) {
+                conditions().frame(maxWidth: .infinity, alignment: .leading)
+                actions().frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        } else {
+            wideFooter
+        }
+    }
+
+    private var wideFooter: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .bottom, spacing: 18) {
                 conditions().frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)

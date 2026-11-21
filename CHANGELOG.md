@@ -10,6 +10,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Swift (macOS and iOS): fixes workspace displacement in Lineage and duplicate comment save buttons in iPhone Work Information. On launch, the app checks the 100 most recent drawing records and marks drawings interrupted by shutdown as stopped.
 
+- iOS: applies iPhone text scaling to the Making screen and detail screens and enlarges touch targets for key controls.
+
 - iOS: saving a drawing started from iPhone home clears its description field. Edits made while drawing are kept.
 
 - Swift (macOS and iOS): records ChatGPT refusal codes and stream event details for each failed attempt, even when provider body capture is off.

@@ -189,7 +189,7 @@ private struct NoticeTextView: View {
             // About one line between paragraphs, where the text had an empty line.
             LazyVStack(alignment: .leading, spacing: 15) {
                 ForEach(paragraphs.indices, id: \.self) { index in
-                    Text(paragraphs[index]).font(.system(size: 11, design: .monospaced)).lineSpacing(4)
+                    Text(paragraphs[index]).inkuFont(11, design: .monospaced, fixedSizeOutsidePhone: 11).lineSpacing(4)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }
             }

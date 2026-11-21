@@ -220,7 +220,7 @@ public struct ContentView: View {
                 .environment(\.locale, Locale(identifier: model.display.preferences.language))
                 .environment(\.inkuWindowSize, windowSize)
                 .environment(\.inkuPhoneLayout, phoneLayout)
-                .inkuPhoneFrontText(phoneLayout && ui.libraryOpen, textScale: model.display.preferences.textScale)
+                .inkuPhoneFrontText(phoneLayout, textScale: model.display.preferences.textScale)
                 #if os(macOS)
                 .safeAreaInset(edge: .bottom, spacing: 0) { errorNotice }
                 #endif
@@ -285,7 +285,7 @@ public struct ContentView: View {
         }
         .environment(\.locale, Locale(identifier: model.display.preferences.language))
         .preferredColorScheme(model.display.colorScheme)
-        .font(.system(size: 13 * model.display.preferences.textScale))
+        .inkuFont(13)
         .environment(\.inkuTextScale, model.display.preferences.textScale)
         .inkuBackgroundRuns(model: model) {
             Task { await maintenance.checkBackup(app: model, automationRunning: automation.isOccupied || dialog != nil) }

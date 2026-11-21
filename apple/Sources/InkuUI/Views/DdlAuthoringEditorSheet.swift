@@ -7,6 +7,7 @@ struct DdlAuthoringEditorSheet: View {
     @Bindable var model: AppModel
     @Bindable var session: DdlEditingSession
     var onPendingReview: () -> Void = {}
+    @Environment(\.inkuPhoneLayout) private var phone
     @Environment(\.dismiss) private var dismiss
     @State private var insertion: InkuEditorInsertion?
     @State private var rangeBlocked = false
@@ -29,7 +30,8 @@ struct DdlAuthoringEditorSheet: View {
                         RunStatusView(display: model.display, label: model.status, variant: .inline,
                                       onStop: { Task { await model.cancel() } }, journalModel: model) { EmptyView() }
                     } else {
-                        HStack(spacing: 8) {
+                        let layout = phone ? AnyLayout(WrappingHStack(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+                        layout {
                             if let target = session.discardTarget {
                                 // DdlEditorDialog: back to saved instructions as one undoable step; the box keeps its draft.
                                 Button(model.display.localized("編集を破棄")) { confirmingDiscard = true }
@@ -46,7 +48,7 @@ struct DdlAuthoringEditorSheet: View {
                             Button(model.display.localized("キャンセル")) { session.cancel(); dismiss() }
                                 .keyboardShortcut(.cancelAction)
                                 .inkuTooltip(tip("編集中の変更を破棄して閉じます。"))
-                            Button(model.display.webCopy("submitBtn", "描画する")) {
+                            Button {
                                 Task {
                                     let previous = model.patchReview
                                     let previousIssues = model.completionIssues
@@ -57,6 +59,8 @@ struct DdlAuthoringEditorSheet: View {
                                         dismiss()
                                     }
                                 }
+                            } label: {
+                                DdlSubmitLabel(display: model.display)
                             }
                             .buttonStyle(InkuPaintButtonStyle(block: false))
                             .disabled(!session.canSubmit(to: model) || rangeBlocked)
@@ -130,7 +134,7 @@ struct NewDdlAuthoringSheet: View {
                                           onStop: { Task { await model.cancel() } }, journalModel: model) { EmptyView() }
                         } else {
                             Button(model.display.localized("キャンセル")) { dismiss() }.keyboardShortcut(.cancelAction)
-                            Button(model.display.webCopy("submitBtn", "描画する")) {
+                            Button {
                                 Task {
                                     let previous = model.patchReview
                                     let previousIssues = model.completionIssues
@@ -141,7 +145,10 @@ struct NewDdlAuthoringSheet: View {
                                         dismiss()
                                     }
                                 }
-                            }.buttonStyle(InkuPaintButtonStyle(block: false)).keyboardShortcut(.defaultAction)
+                            } label: {
+                                DdlSubmitLabel(display: model.display)
+                            }
+                            .buttonStyle(InkuPaintButtonStyle(block: false)).keyboardShortcut(.defaultAction)
                                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rangeBlocked)
                         }
                     }
@@ -174,6 +181,22 @@ struct NewDdlAuthoringSheet: View {
                 draft = document.source
             } catch is CancellationError { }
             catch { importError = DDLImportErrorText.message(error, display: model.display) }
+        }
+    }
+}
+
+
+@MainActor
+private struct DdlSubmitLabel: View {
+    let display: DisplaySettings
+    @Environment(\.inkuPhoneLayout) private var phone
+
+    var body: some View {
+        let title = Text(display.webCopy("submitBtn", "描画する"))
+        if phone {
+            title.lineLimit(1).fixedSize(horizontal: true, vertical: false).inkuPhoneTarget()
+        } else {
+            title
         }
     }
 }

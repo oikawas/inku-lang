@@ -55,7 +55,8 @@ struct CreationWorkInfoView: View {
                 Text(model.display.localized("生成情報")).inkuFont(13, weight: .semibold)
                 Spacer()
                 if loading { ProgressView().controlSize(.small) }
-                Button(model.display.localized("閉じる")) { close() }.keyboardShortcut(.cancelAction)
+                Button(action: close) { Text(model.display.localized("閉じる")).inkuPhoneTarget() }
+                    .keyboardShortcut(.cancelAction)
                     .buttonStyle(InkuGhostButtonStyle())
                     .inkuTooltip(model.display.tooltip("閉じる"))
             }
@@ -125,7 +126,7 @@ struct CreationWorkInfoView: View {
                         Text(note.text.isEmpty ? "-" : note.text)
                     } else {
                     TextEditor(text: Binding(get: { note.text }, set: { note.text = LibraryNoteEditorModel.limited($0) }))
-                        .frame(height: 64).border(InkuColor.border)
+                        .inkuPhoneMinimumHeight(64).border(InkuColor.border)
                         .disabled(note.state.annotation == nil || note.saving || model.isBusy || work.trashed)
                     HStack {
                         Spacer()

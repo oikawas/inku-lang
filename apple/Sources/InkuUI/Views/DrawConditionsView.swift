@@ -49,8 +49,9 @@ import SwiftUI
     private func routeButton(_ route: String, _ title: String) -> some View {
         Button { model.selectDrawRoute(route) } label: {
             Text(title).inkuFont(12, weight: self.route == route ? .semibold : .regular)
-                .frame(maxWidth: .infinity).frame(height: 26)
+                .frame(maxWidth: .infinity).inkuPhoneMinimumHeight(26)
                 .background(self.route == route ? InkuColor.bg2 : Color.clear, in: RoundedRectangle(cornerRadius: 5))
+                .inkuPhoneTarget()
         }.buttonStyle(.plain).accessibilityAddTraits(self.route == route ? .isSelected : [])
     }
     private var drawingFlow: some View {
@@ -81,9 +82,10 @@ struct DrawSwitchChip: View {
             HStack(spacing: 6) {
                 Image(systemName: locked ? "lock" : on ? "checkmark" : "circle").foregroundStyle(on ? Color.accentColor : Color.secondary)
                 Text(title)
-            }.inkuFont(12).padding(.horizontal, 9).frame(height: 26)
+            }.inkuFont(12).padding(.horizontal, 9).inkuPhoneMinimumHeight(26)
                 .background(on ? Color.accentColor.opacity(0.12) : Color.clear, in: Capsule())
                 .overlay(Capsule().stroke(on ? Color.accentColor : InkuColor.border2))
+                .inkuPhoneTarget()
         }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
     }
 }

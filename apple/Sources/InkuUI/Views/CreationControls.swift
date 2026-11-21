@@ -466,23 +466,26 @@ struct CreationDisplayedProcess: View {
         }
     }
 
+    @Environment(\.inkuPhoneLayout) private var phone
+
     private var ddlHeader: some View {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(work.ddl == nil ? model.display.localized("指示書") : model.display.localized(ddlHeading)).inkuFont(12, weight: .semibold)
-                        .inkuTooltip(model.display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
-                    Spacer(minLength: 4)
-                    if let onNewDDL {
-                        Button(model.display.webCopy("ddlNewButton", "指示書を新規作成"), action: onNewDDL)
-                            .buttonStyle(InkuGhostButtonStyle()).disabled(disabled)
-                            .inkuTooltip(model.display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
-                    }
-                    if work.ddl != nil {
-                    Button(model.display.localized("指示書エディタ")) { onWorkAction(work, "ddl") }
-                        .buttonStyle(InkuGhostButtonStyle())
-                        .disabled(!saved || !hasDDL || disabled)
-                        .inkuTooltip(model.display.tooltip("表示中の作品の指示書を編集して、その子として描き直します", serverKey: "tooltipDdlEdit"))
-                    }
-                }
+        let layout = phone ? AnyLayout(WrappingHStack(spacing: 8)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+        return layout {
+            Text(work.ddl == nil ? model.display.localized("指示書") : model.display.localized(ddlHeading)).inkuFont(12, weight: .semibold)
+                .inkuTooltip(model.display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
+            if !phone { Spacer(minLength: 4) }
+            if let onNewDDL {
+                Button(model.display.webCopy("ddlNewButton", "指示書を新規作成"), action: onNewDDL)
+                    .buttonStyle(InkuGhostButtonStyle()).disabled(disabled)
+                    .inkuTooltip(model.display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
+            }
+            if work.ddl != nil {
+            Button(model.display.localized("指示書エディタ")) { onWorkAction(work, "ddl") }
+                .buttonStyle(InkuGhostButtonStyle())
+                .disabled(!saved || !hasDDL || disabled)
+                .inkuTooltip(model.display.tooltip("表示中の作品の指示書を編集して、その子として描き直します", serverKey: "tooltipDdlEdit"))
+            }
+        }
     }
 
     @ViewBuilder private var beforeReviewContent: some View {

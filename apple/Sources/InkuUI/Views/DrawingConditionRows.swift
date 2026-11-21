@@ -37,6 +37,7 @@ struct DrawingConditionsHeading: View {
     @Binding var showPaperPicker: Bool
     @Binding var showDetails: Bool
     var hasDetails = true
+    @Environment(\.inkuPhoneLayout) private var phone
     private var display: DisplaySettings { model.display }
     private var canvas: String {
         guard let canvasID else { return display.localized("未記録") }
@@ -58,8 +59,11 @@ struct DrawingConditionsHeading: View {
             }
             .accessibilityValue(canvas)
             if hasDetails {
-                Button { showDetails = true } label: { Image(systemName: "ellipsis") }
-                    .buttonStyle(InkuGhostButtonStyle())
+                Button { showDetails = true } label: {
+                    // Use the same text line metrics as the neighboring Change button.
+                    if phone { Text("…") } else { Image(systemName: "ellipsis") }
+                }
+                    .buttonStyle(InkuGhostButtonStyle(phoneTarget: true))
                     .accessibilityLabel(display.localized("生成条件の詳細"))
             }
         }

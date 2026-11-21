@@ -80,7 +80,7 @@ struct ReadDrawInfoView: View {
         }
     }
     private func pre(_ value: String) -> some View {
-        Text(value).font(.system(size: 12, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(InkuColor.bg2)
+        Text(value).inkuFont(12, design: .monospaced, fixedSizeOutsidePhone: 12).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(InkuColor.bg2)
     }
     var body: some View {
         let rounds = record["rounds"].array ?? []

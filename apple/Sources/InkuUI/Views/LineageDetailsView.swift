@@ -16,6 +16,8 @@ struct LineageDetailsView: View {
     @State private var information: SavedGenerationInformation?
     @State private var error: String?
 
+    @Environment(\.inkuPhoneLayout) private var phone
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
@@ -24,8 +26,10 @@ struct LineageDetailsView: View {
                     Text(operation).inkuFont(12).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(model.display.localized("閉じる"), systemImage: "xmark", action: onClose)
-                    .labelStyle(.iconOnly).keyboardShortcut(.cancelAction)
+                Button(action: onClose) {
+                    Label(model.display.localized("閉じる"), systemImage: "xmark")
+                        .labelStyle(.iconOnly).inkuPhoneTarget()
+                }.keyboardShortcut(.cancelAction)
             }.padding(20)
             Divider()
             ScrollView {
@@ -61,7 +65,7 @@ struct LineageDetailsView: View {
                         Divider()
                         Text(model.display.localized("作品へのコメント")).foregroundStyle(.secondary)
                         TextEditor(text: Binding(get: { note.text }, set: { note.text = LibraryNoteEditorModel.limited($0) }))
-                            .frame(height: 70).border(InkuColor.border)
+                            .inkuPhoneMinimumHeight(70).border(InkuColor.border)
                             .disabled(note.state.annotation == nil || note.saving || writingLocked || work.trashed)
                             .accessibilityLabel(model.display.localized("作品へのコメント"))
                         HStack {
@@ -98,7 +102,7 @@ struct LineageDetailsView: View {
 
     private func row(_ label: String, _ value: String?) -> some View {
         GridRow {
-            Text(label).foregroundStyle(.secondary).frame(minWidth: 135, alignment: .leading)
+            Text(label).foregroundStyle(.secondary).frame(minWidth: phone ? nil : 135, alignment: .leading)
             Text(value ?? "—").textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -106,7 +110,7 @@ struct LineageDetailsView: View {
     private func hashRow(_ prefix: String, _ hash: String?) -> some View {
         GridRow {
             Text(hash.flatMap { value in value.firstIndex(of: ":").map { String(value[..<$0]) } } ?? prefix)
-                .foregroundStyle(.secondary).frame(minWidth: 135, alignment: .leading)
+                .foregroundStyle(.secondary).frame(minWidth: phone ? nil : 135, alignment: .leading)
             HStack(spacing: 10) {
                 Text(hash.flatMap { $0.isEmpty ? nil : "…" + SavedWorkFacts.hashDigest($0).suffix(4) } ?? "—").monospaced()
                 if let hash, !hash.isEmpty {

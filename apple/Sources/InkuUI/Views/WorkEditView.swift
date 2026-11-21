@@ -24,7 +24,7 @@ public struct WorkEditView: View {
                 Text(model.display.localized(editor.mode == .description ? "記述を変える" : "写生なし／ありで描き直す"))
                     .inkuFont(16, weight: .semibold)
                     Spacer()
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                    Button { dismiss() } label: { Image(systemName: "xmark").inkuPhoneTarget() }
                         .accessibilityLabel(model.display.localized("閉じる")).disabled(editor.running || model.isBusy)
                 }
                 Text(model.display.localized(editor.mode == .description

@@ -74,6 +74,7 @@ struct LineageView: View {
     var onOpenInCanvas: (SavedWork) -> Void = { _ in }
     var onDetach: () -> Void = {}
     @Environment(\.inkuWindowSize) private var windowSize
+    @Environment(\.inkuPhoneLayout) private var phone
     @State private var checkedIDs: Set<String> = []
     @State private var afterOverview: (() -> Void)?
     @State private var details: LineageDetailsSession?
@@ -146,10 +147,20 @@ struct LineageView: View {
             let action = afterOverview; afterOverview = nil
             if let action { action() } else { Task { await Self.leaveNoFocus() } }
         }) {
-            panel(overview: true)
-                .frame(width: max(640, (windowSize?.width ?? 1000) - 36), height: max(500, (windowSize?.height ?? 760) - 70))
-                .environment(\.inkuWindowSize, windowSize)
-                .task { await Self.leaveNoFocus() }
+            Group {
+                if phone {
+                    GeometryReader { viewport in
+                        panel(overview: true)
+                            .frame(width: viewport.size.width, height: viewport.size.height, alignment: .topLeading)
+                    }
+                    .inkuPhoneSheet()
+                } else {
+                    panel(overview: true)
+                        .frame(width: max(640, (windowSize?.width ?? 1000) - 36), height: max(500, (windowSize?.height ?? 760) - 70))
+                }
+            }
+            .environment(\.inkuWindowSize, windowSize)
+            .task { await Self.leaveNoFocus() }
         }
         .task(id: initialWork?.id) {
             if let work = initialWork {
@@ -182,9 +193,25 @@ struct LineageView: View {
 
     private var toolbar: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 16) { toolbarTitle; toolbarActions }
-                VStack(alignment: .leading, spacing: 8) { toolbarTitle; toolbarActions }
+            Group {
+                if phone {
+                    VStack(alignment: .leading, spacing: 8) {
+                        toolbarTitle
+                        navigation
+                        Menu {
+                            workActions
+                        } label: {
+                            Label(model.display.localized("表示中の作品"), systemImage: "ellipsis.circle")
+                                .inkuPhoneTarget()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 16) { toolbarTitle; toolbarActions }
+                        VStack(alignment: .leading, spacing: 8) { toolbarTitle; toolbarActions }
+                    }
+                }
             }.buttonStyle(InkuGhostButtonStyle()).inkuFont(12)
             if let error = library.lineageError ?? library.errorText {
                 HStack(alignment: .top, spacing: 8) {
@@ -218,37 +245,42 @@ struct LineageView: View {
     private var toolbarActions: some View {
         LineageToolbarLayout {
                     toolbarGroup(model.display.webCopy("lineageViewTools", "表示")) { navigation }
-                    if let graph = library.lineageDisplayGraph {
-                        toolbarGroup(model.display.webCopy("lineageFocusedWork", "表示中の作品")) {
-                            Menu(model.display.localized("推敲する")) {
-                                if let work = focusWork {
-                                    SavedWorkRefinementActions(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
-                                }
-                            }.disabled(focusWork == nil || writingDisabled)
-                            Button(model.display.localized("作品を大きく見る")) { if let work = focusWork { openInCanvas(work) } }
-                                .disabled(focusWork == nil || model.isBrowsingLocked)
-                            exportButton(LineageWorkScope.focused(graph))
-                        }
-                        toolbarGroup(model.display.localizedFormat("起点から表示中まで %ld 件", LineageWorkScope.path(graph).workIDs.count)) {
-                            exportButton(LineageWorkScope.path(graph))
-                        }
-                        toolbarGroup(model.display.localizedFormat("選択 %ld 件", checkedScope.workIDs.count)) {
-                            exportButton(checkedScope)
-                            Button { trashConfirmation = LineageTrashConfirmation(ids: checkedScope.workIDs) } label: { Image(systemName: "trash") }
-                                .disabled(checkedIDs.isEmpty || writingDisabled || library.mutating)
-                                .accessibilityLabel(model.display.localized("チェックした作品をゴミ箱へ移動"))
-                                .inkuTooltip(tip("チェックした作品をゴミ箱へ移動"))
-                        }
-                    }
-                    HStack(spacing: 8) {
-                        Button(model.display.webCopy("okugakiRead", "奥書を読む")) { if let work = focusWork { dispatchWorkAction(work, "colophon") } }
-                            .disabled(focusWork == nil || writingDisabled)
-                            .inkuTooltip(model.display.tooltip("表示中の作品までの枝を、一人称の読み手として朗読します", serverKey: "okugakiTooltip"))
-                        Button(model.display.localized("新しい起点にする")) {
-                            performAfterOverview(onDetach)
-                        }.disabled(writingDisabled)
-                    }
+            workActions
         }.frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    @ViewBuilder private var workActions: some View {
+        if let graph = library.lineageDisplayGraph {
+            toolbarGroup(model.display.webCopy("lineageFocusedWork", "表示中の作品")) {
+                Menu(model.display.localized("推敲する")) {
+                    if let work = focusWork {
+                        SavedWorkRefinementActions(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
+                    }
+                }.disabled(focusWork == nil || writingDisabled)
+                Button(model.display.localized("作品を大きく見る")) { if let work = focusWork { openInCanvas(work) } }
+                    .disabled(focusWork == nil || model.isBrowsingLocked)
+                exportButton(LineageWorkScope.focused(graph))
+            }
+            toolbarGroup(model.display.localizedFormat("起点から表示中まで %ld 件", LineageWorkScope.path(graph).workIDs.count)) {
+                exportButton(LineageWorkScope.path(graph))
+            }
+            toolbarGroup(model.display.localizedFormat("選択 %ld 件", checkedScope.workIDs.count)) {
+                exportButton(checkedScope)
+                Button { trashConfirmation = LineageTrashConfirmation(ids: checkedScope.workIDs) } label: { Image(systemName: "trash").inkuPhoneTarget() }
+                    .disabled(checkedIDs.isEmpty || writingDisabled || library.mutating)
+                    .accessibilityLabel(model.display.localized("チェックした作品をゴミ箱へ移動"))
+                    .inkuTooltip(tip("チェックした作品をゴミ箱へ移動"))
+            }
+        }
+        let otherActions = Group {
+            Button(model.display.webCopy("okugakiRead", "奥書を読む")) { if let work = focusWork { dispatchWorkAction(work, "colophon") } }
+                .disabled(focusWork == nil || writingDisabled)
+                .inkuTooltip(model.display.tooltip("表示中の作品までの枝を、一人称の読み手として朗読します", serverKey: "okugakiTooltip"))
+            Button(model.display.localized("新しい起点にする")) {
+                performAfterOverview(onDetach)
+            }.disabled(writingDisabled)
+        }
+        if phone { otherActions } else { HStack(spacing: 8) { otherActions } }
     }
 
     private var checkedScope: LineageExportRequest {
@@ -256,12 +288,16 @@ struct LineageView: View {
         return LineageWorkScope.checked(graph, ids: checkedIDs)
     }
 
-    private func toolbarGroup<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 8) {
-            Rectangle().fill(InkuColor.border).frame(width: 1, height: 22)
-            Text(label).foregroundStyle(.secondary).fixedSize()
-            content()
-        }.fixedSize(horizontal: true, vertical: false)
+    @ViewBuilder private func toolbarGroup<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        if phone {
+            Section(label, content: content)
+        } else {
+            HStack(spacing: 8) {
+                Rectangle().fill(InkuColor.border).frame(width: 1, height: 22)
+                Text(label).foregroundStyle(.secondary).fixedSize()
+                content()
+            }.fixedSize(horizontal: true, vertical: false)
+        }
     }
 
     private func exportButton(_ request: LineageExportRequest) -> some View {
@@ -271,20 +307,21 @@ struct LineageView: View {
 
     private var navigation: some View {
         @Bindable var library = library
-        return HStack(spacing: 8) {
+        let layout = phone ? AnyLayout(WrappingHStack(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
             InkuSegmentedButtons(options: [(true, model.display.localized("縦")), (false, model.display.localized("横"))],
                                  selection: $library.lineageVertical)
                 .accessibilityLabel(model.display.localized("系譜の方向"))
                 .inkuTooltip(tip("親子のつながりを縦または横に並べます。"))
             if library.lineageBrowsing.overviewOpen {
                 Button { changeMapScale(-0.1) } label: {
-                    Image(systemName: "minus")
+                    Image(systemName: "minus").inkuPhoneTarget()
                 }.accessibilityLabel(model.display.localized("縮小"))
                     .disabled(library.lineageBrowsing.overviewScale <= 0.4).inkuTooltip(tip("全体図を縮小します。最小40%。"))
                 Text(library.lineageBrowsing.overviewScale, format: .percent.precision(.fractionLength(0)))
                     .inkuFont(12).monospacedDigit().frame(minWidth: 42)
                 Button { changeMapScale(0.1) } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus").inkuPhoneTarget()
                 }.accessibilityLabel(model.display.localized("拡大"))
                     .disabled(library.lineageBrowsing.overviewScale >= 1.4).inkuTooltip(tip("全体図を拡大します。最大140%。"))
                 Button(model.display.localized("全体図を閉じる")) { library.closeLineageOverview() }
@@ -403,8 +440,11 @@ struct LineageView: View {
     private func generationRow(_ graph: LineageSnapshot, generation: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             generationHeading(graph, generation: generation)
-            LineageWrappingRow {
-                ForEach(visibleNodes(graph).filter { $0.generation == generation }) { item in nodeCard(item, graph: graph).frame(width: 210) }
+            let layout = phone ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(LineageWrappingRow())
+            layout {
+                ForEach(visibleNodes(graph).filter { $0.generation == generation }) { item in
+                    nodeCard(item, graph: graph).inkuFixedWidth(210)
+                }
             }
         }
     }
@@ -420,15 +460,28 @@ struct LineageView: View {
             HStack(alignment: .top, spacing: 5) {
                 if let work = item.work {
                     if !work.trashed {
-                        Toggle(model.display.localized("一括操作の対象にする"), isOn: Binding(get: { checkedIDs.contains(work.id) }, set: { value in
+                        let selection = Binding(get: { checkedIDs.contains(work.id) }, set: { value in
                             if value { checkedIDs.insert(work.id) } else { checkedIDs.remove(work.id) }
-                        })).labelsHidden()
-                            .accessibilityLabel(model.display.localized("一括操作の対象にする"))
-                            .disabled(library.mutating || model.isBrowsingLocked)
+                        })
+                        let label = model.display.localized("一括操作の対象にする")
+                        Group {
+                            if phone {
+                                Button { selection.wrappedValue.toggle() } label: {
+                                    LibrarySelectionBox(selected: selection.wrappedValue)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(selection.wrappedValue ? .isSelected : [])
+                            } else {
+                                Toggle(label, isOn: selection).labelsHidden()
+                            }
+                        }
+                        .accessibilityLabel(label)
+                        .disabled(library.mutating || model.isBrowsingLocked)
                     }
                     Button { Task { await library.toggleStar(work) } } label: {
                         Text("★").inkuFont(19).frame(width: 22, height: 22)
                             .background(Color.secondary.opacity(0.08), in: Circle()).overlay(Circle().stroke(InkuColor.border))
+                            .inkuPhoneTarget()
                     }
                         .foregroundStyle(work.starred ? Color.orange : Color.secondary)
                         .accessibilityLabel(model.display.localized(work.starred ? "スターを外す" : "スターを付ける"))
@@ -436,21 +489,25 @@ struct LineageView: View {
                     Button { Task { await library.toggleRevision(work) } } label: {
                         Image(systemName: "flag.fill").inkuFont(12).frame(width: 24, height: 24)
                             .background(Color.secondary.opacity(0.08), in: Circle()).overlay(Circle().stroke(InkuColor.border))
+                            .inkuPhoneTarget()
                     }
                         .foregroundStyle(library.lineageAnnotation(for: work.id).forRevision ? Color.red : Color.secondary)
                         .accessibilityLabel(model.display.localized("推敲の印"))
                         .disabled(writingDisabled || library.mutating)
                 }
-                identityMarks(item, graph: graph)
+                if !phone { identityMarks(item, graph: graph) }
                 Spacer(minLength: 0)
                 if let work = item.work, !work.trashed {
                     Menu {
                         LineageNodeRefinementMenu(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
-                    } label: { Image(systemName: "ellipsis") }
+                    } label: { Image(systemName: "ellipsis").inkuPhoneTarget() }
                         .fixedSize().accessibilityLabel(model.display.webCopy("workActionOpenMenu", "作品編集メニューを開く"))
                         .disabled(writingDisabled)
                 }
             }.buttonStyle(.borderless).frame(minHeight: 22)
+            if phone {
+                identityMarks(item, graph: graph).fixedSize(horizontal: false, vertical: true)
+            }
             if let work = item.work {
                 LibraryClickButton(preview: { openWork(item) }, open: { openInCanvas(work) }) {
                     VStack(alignment: .leading, spacing: 6) {

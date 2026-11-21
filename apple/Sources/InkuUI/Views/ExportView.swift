@@ -250,21 +250,36 @@ struct ExportView: View {
     private var svgHelp: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(copy("svgExportHelpTitle", "SVGの用途と特徴")).inkuFont(14, weight: .semibold)
-            Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 12) {
-                GridRow {
-                    Text(copy("svgExportTableFormat", "形式")).bold()
-                    Text(copy("svgExportTableUse", "用途")).bold()
-                    Text(copy("svgExportTableFeature", "特徴")).bold()
-                }
+            if phone {
                 ForEach(["Display", "Editable", "Compat", "Live"], id: \.self) { profile in
-                    GridRow {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(copy("svgExport" + profile + "Name", profile)).fontWeight(.medium)
-                        Text(copy("svgExport" + profile + "Use", "")).frame(width: 140, alignment: .leading)
-                        Text(copy("svgExport" + profile + "Feature", "")).frame(width: 220, alignment: .leading)
+                        Text(copy("svgExport" + profile + "Use", ""))
+                        Text(copy("svgExport" + profile + "Feature", "")).foregroundStyle(.secondary)
                     }
                 }
-            }.inkuFont(13).fixedSize(horizontal: false, vertical: true)
+                .inkuFont(13).fixedSize(horizontal: false, vertical: true)
+            } else {
+                svgHelpTable
+            }
         }.padding(20).inkuFixedWidth(530)
+    }
+
+    private var svgHelpTable: some View {
+        Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 12) {
+            GridRow {
+                Text(copy("svgExportTableFormat", "形式")).bold()
+                Text(copy("svgExportTableUse", "用途")).bold()
+                Text(copy("svgExportTableFeature", "特徴")).bold()
+            }
+            ForEach(["Display", "Editable", "Compat", "Live"], id: \.self) { profile in
+                GridRow {
+                    Text(copy("svgExport" + profile + "Name", profile)).fontWeight(.medium)
+                    Text(copy("svgExport" + profile + "Use", "")).frame(width: 140, alignment: .leading)
+                    Text(copy("svgExport" + profile + "Feature", "")).frame(width: 220, alignment: .leading)
+                }
+            }
+        }.inkuFont(13).fixedSize(horizontal: false, vertical: true)
     }
 
     private func begin() {

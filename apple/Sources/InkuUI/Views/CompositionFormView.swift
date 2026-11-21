@@ -123,7 +123,7 @@ public struct CompositionFormView: View {
                         })).scrollIndicators(form.authorThesis.isEmpty ? .hidden : .automatic)
                         .focused($thesisFocused).onChange(of: thesisFocused) { _, focused in
                             if focused { form.change = .authorThesis }
-                        }.frame(height: 72).overlay(Rectangle().stroke(InkuColor.border2))
+                        }.inkuPhoneMinimumHeight(72).overlay(Rectangle().stroke(InkuColor.border2))
                             .disabled(form.running || model.isBusy)
                         #endif
                         thesisChoice(.proposedTheses, title: "compositionThesisPropose", fallback: "AI に別の命題を出させる", note: "compositionThesisProposeNote")

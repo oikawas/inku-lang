@@ -18,6 +18,8 @@ struct ColorCatalogView: View {
         _draftMode = State(initialValue: model.catalogMode == "auto" ? "auto" : "fixed")
     }
 
+    @Environment(\.inkuPhoneLayout) private var phone
+
     private var allowsDescriptionAuto: Bool { true }
     private var selectedCatalog: ColorCatalogOption? { model.catalogs.first { $0.id == draftCatalogID } }
     private var canConfirm: Bool {
@@ -30,7 +32,7 @@ struct ColorCatalogView: View {
             HStack {
                 Text(model.display.localized("色カタログ")).inkuFont(14, weight: .semibold)
                 Spacer()
-                Button { confirm() } label: { Image(systemName: "xmark") }
+                Button { confirm() } label: { Image(systemName: "xmark").inkuPhoneTarget() }
                     .buttonStyle(.plain)
                     .disabled(!canConfirm)
                     .accessibilityLabel(model.display.localized("閉じる"))
@@ -108,7 +110,7 @@ struct ColorCatalogView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 7) {
                         catalogHeading(catalog, selected: selected)
-                        catalogPalette(catalog, columns: 5)
+                        catalogPalette(catalog, columns: phone ? 3 : 5)
                     }
                 }
             }
@@ -159,10 +161,10 @@ struct ColorCatalogView: View {
             ForEach(Array(catalog.palette.enumerated()), id: \.offset) { _, swatch in
                 VStack(spacing: 2) {
                     CatalogSwatchShape(swatch: swatch).frame(height: 38)
-                    Text(swatch.code).inkuFont(8, design: .monospaced).foregroundStyle(.secondary).lineLimit(1)
-                    Text(swatch.name).inkuFont(9).lineLimit(1)
+                    Text(swatch.code).inkuFont(8, design: .monospaced).foregroundStyle(.secondary).lineLimit(phone ? nil : 1)
+                    Text(swatch.name).inkuFont(9).lineLimit(phone ? nil : 1)
                     if model.display.preferences.language == "ja", let japaneseName = swatch.japaneseName, !japaneseName.isEmpty {
-                        Text(japaneseName).inkuFont(8).foregroundStyle(.secondary).lineLimit(1)
+                        Text(japaneseName).inkuFont(8).foregroundStyle(.secondary).lineLimit(phone ? nil : 1)
                     }
                 }
                 .accessibilityElement(children: .combine)

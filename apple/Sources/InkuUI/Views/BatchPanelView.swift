@@ -168,7 +168,7 @@ struct BatchPanelView: View {
             path.move(to: CGPoint(x: 7, y: 11)); path.addLine(to: CGPoint(x: 11, y: 7))
         }.stroke(.secondary, lineWidth: 1)
             .frame(width: 14, height: 14).background(InkuColor.panel)
-            .contentShape(Rectangle()).padding(2)
+            .contentShape(Rectangle()).padding(2).inkuPhoneTarget()
             .gesture(DragGesture(minimumDistance: 1)
                 .onChanged { value in
                     if resizeStartHeight == nil { resizeStartHeight = inputHeight }

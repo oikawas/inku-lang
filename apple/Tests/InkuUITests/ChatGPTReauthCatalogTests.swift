@@ -5,6 +5,17 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class ChatGPTReauthCatalogTests: XCTestCase {
+    func testChatGPTRefusalsHaveSpecificStatusCopyInBothLanguages() {
+        XCTAssertEqual(ChatGPTStatusCopy.text("chatgpt_response_failed", language: "ja"),
+                       "ChatGPT の応答が途中で失敗しました。もう一度お試しください。")
+        XCTAssertEqual(ChatGPTStatusCopy.text("chatgpt_response_failed", language: "en"),
+                       "ChatGPT's response failed partway. Please try again.")
+        XCTAssertEqual(ChatGPTStatusCopy.text("subscription_sharing_invalid_user", language: "ja"),
+                       "このアカウントでは ChatGPT のプランを使えません。サインインし直してください。")
+        XCTAssertEqual(ChatGPTStatusCopy.text("subscription_sharing_invalid_user", language: "en"),
+                       "This account can't use the ChatGPT plan here. Please sign in again.")
+    }
+
     func testStoresReportedChatGPTRefusalWithAndWithoutBodyCapture() async throws {
         let previousMode = ProcessInfo.processInfo.environment["INKU_DEVELOPER_MODE"]
         setenv("INKU_DEVELOPER_MODE", "1", 1)

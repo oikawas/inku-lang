@@ -251,21 +251,35 @@ mod tests {
     fn recovered_score_keeps_drawable_content_and_reports_each_recovery() {
         let result = convert(RECOVERED).unwrap();
         let marks = result["scene"]["marks"].as_array().unwrap();
-        assert_eq!(marks.iter().map(|m| m["sourceIndex"].as_u64().unwrap()).collect::<Vec<_>>(), vec![0, 0, 1]);
-        assert_eq!(result["scene"]["recoveries"], json!([{
-            "kind": "execution", "instruction_index": 1, "dependency_instruction_index": 0,
-            "reason": "unsupported_joint_geometry", "disposition": "relation_omitted"
-        }]));
+        assert_eq!(
+            marks
+                .iter()
+                .map(|m| m["sourceIndex"].as_u64().unwrap())
+                .collect::<Vec<_>>(),
+            vec![0, 0, 1]
+        );
+        assert_eq!(
+            result["scene"]["recoveries"],
+            json!([{
+                "kind": "execution", "instruction_index": 1, "dependency_instruction_index": 0,
+                "reason": "unsupported_joint_geometry", "disposition": "relation_omitted"
+            }])
+        );
 
         let mut value: Value = serde_json::from_str(RECOVERED).unwrap();
-        value["score"]["resource_policy"]["operational_budget"]["maximum"]["primitive_marks"] = json!(1);
+        value["score"]["resource_policy"]["operational_budget"]["maximum"]["primitive_marks"] =
+            json!(1);
         let limited = convert(&value.to_string()).unwrap();
         let marks = limited["scene"]["marks"].as_array().unwrap();
         assert_eq!(marks.len(), 1);
         assert_eq!(marks[0]["sourceIndex"], json!(1));
         let recoveries = limited["scene"]["recoveries"].as_array().unwrap();
         assert!(recoveries.iter().any(|d| d["kind"] == "resource_omitted"));
-        assert!(recoveries.iter().any(|d| d["kind"] == "relation_omitted" && d["instruction_index"] == 1));
+        assert!(
+            recoveries
+                .iter()
+                .any(|d| d["kind"] == "relation_omitted" && d["instruction_index"] == 1)
+        );
     }
 
     // Failure: saved ratio/seed are replaced by current defaults or rounded in JS.
@@ -284,6 +298,36 @@ mod tests {
         assert!(seed(Some(&json!(9007199254740993_i64))).is_err());
         assert_eq!(result, convert(SOLIDS).unwrap());
         assert_eq!(result["scene"]["marks"].as_array().unwrap().len(), 9);
+    }
+
+    #[test]
+    fn contained_score_places_geometry_and_paint_in_the_same_paper_frame() {
+        let mut value: Value = serde_json::from_str(SOLIDS).unwrap();
+        value["render_canvas_aspect_id"] = json!("square");
+        value["render_canvas_aspect_ratio"] = json!(1);
+        let full = convert(&value.to_string()).unwrap();
+        value["score"]["canvas"] = json!({
+            "aspect": "square", "declared_ratio": {"width_units": 2, "height_units": 1},
+            "fit": "contain"
+        });
+        let fitted = convert(&value.to_string()).unwrap();
+        assert_eq!(fitted["scene"]["canvas"], json!([1.0, 1.0]));
+        let mark = &fitted["scene"]["marks"][0];
+        assert_eq!(
+            mark["shape"],
+            json!({"kind":"round","center":[0.2,0.125],"radii":[0.06,0.06]})
+        );
+        assert_eq!(mark["transform"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.25]));
+        let full_center = &full["scene"]["marks"][0]["appearance"]["center"];
+        let fitted_center = &mark["appearance"]["center"];
+        assert!(
+            (fitted_center[0].as_f64().unwrap() - full_center[0].as_f64().unwrap()).abs() < 1e-10
+        );
+        assert!(
+            (fitted_center[1].as_f64().unwrap() - (0.25 + full_center[1].as_f64().unwrap() / 2.0))
+                .abs()
+                < 1e-10
+        );
     }
 
     // Failure: macro/placement is expanded twice or arc-pair interiors disappear.

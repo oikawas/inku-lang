@@ -49,17 +49,18 @@ test-web: git-setup
 
 # Rust commands always enter through the pinned rustup toolchain guard.  The
 # wrapper overrides a Homebrew-first PATH and refuses non-rustup tool paths.
+# Verification builds leave no incremental cache (2026-11-22 author decision).
 rust-fmt:
 	$(RUST) fmt --all --check
 
 rust-check:
-	$(RUST) check --workspace --locked
+	CARGO_INCREMENTAL=0 $(RUST) check --workspace --locked
 
 rust-test:
-	$(RUST) test --workspace --locked
+	CARGO_INCREMENTAL=0 $(RUST) test --workspace --locked
 
 rust-clippy:
-	$(RUST) clippy --workspace --all-targets --locked -- -D warnings
+	CARGO_INCREMENTAL=0 $(RUST) clippy --workspace --all-targets --locked -- -D warnings
 
 rust-toolchain-test:
 	./scripts/test_rust_toolchain.sh

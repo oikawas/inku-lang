@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Rust verification commands run without creating an incremental compilation cache.
+
 - Rust core development builds use less disk space and retain line numbers for backtraces.
 
 - iOS: keeps exported files available until Save to Files or another share-sheet activity finishes. Damaged work packs show a localized message and log the diagnostic reason.

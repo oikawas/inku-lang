@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: saving a drawing started from iPhone home clears its description field. Edits made while drawing are kept.
+
 - Swift (macOS and iOS): records ChatGPT refusal codes and stream event details for each failed attempt, even when provider body capture is off.
 - Swift (macOS and iOS): fixes image review when developer provider capture is on. Image attempts record the SHA-256 digest and byte count of each request and response.
 - Swift (macOS and iOS): adds Show drawing motion to appearance settings. It controls drawing mascots and progress motion, including the iPhone waiting page’s build-up, and is on by default.

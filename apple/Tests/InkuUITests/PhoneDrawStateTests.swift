@@ -56,17 +56,8 @@ import InkuPersistence
     }
 
     func testPhoneDrawingUsesDefaultsAndPreservesWorkspace() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("phone-draw-\(UUID())")
+        let (app, root) = try await configuredDrawingApp(transport: PhoneDrawFixture())
         defer { try? FileManager.default.removeItem(at: root) }
-        let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"), transport: PhoneDrawFixture())
-        await app.initialize()
-        let provider = ProviderSettings(id: "fixture", baseURL: URL(string: "http://127.0.0.1:1")!, requiresAPIKey: false,
-                                        models: [.init(id: "model", purposes: ["llm"])])
-        try await app.updateHostSettings(HostSettings(providers: [provider], models: .init(stage1Model: "fixture:model", stage2Model: "fixture:model")))
-        var defaults = app.drawDefaults
-        defaults["describe"]?.models.stage1 = "fixture:model"; defaults["describe"]?.models.stage2 = "fixture:model"
-        defaults["describe"]?.route = "stages"; defaults["describe"]?.sketch = "off"; defaults["describe"]?.wild = "on"
-        try app.saveDrawDefaults(defaults)
         app.selectNextDrawingModel("fixture:model"); app.selectDrawRoute("stages"); app.sketchMode = "off"
         app.descriptionText = "a red circle"; await app.generate()
         let original = try XCTUnwrap(app.selectedWorkID)
@@ -80,6 +71,8 @@ import InkuPersistence
         let result = await app.drawPhoneDescription()
         XCTAssertNotNil(result); XCTAssertNotEqual(result?.id, original)
         XCTAssertEqual(app.phoneDrawingWait?.completion?.id, result?.id)
+        XCTAssertEqual(app.phoneDrawText, "")
+        XCTAssertEqual(app.phoneDrawingWait?.description, "a blue circle")
         XCTAssertNotNil(app.phoneDrawingWait?.report["finished"].array?.first)
         XCTAssertEqual(app.selectedWorkID, original); XCTAssertEqual(app.descriptionText, "draft")
         XCTAssertEqual(app.ddlText, "other draft"); XCTAssertEqual(app.activeDrawTab, "image")
@@ -98,11 +91,65 @@ import InkuPersistence
         XCTAssertEqual(frames.first?.image.width, 120)
         XCTAssertTrue(frames.contains { !$0.lines.isEmpty })
     }
+
+    func testFailedPhoneDrawingKeepsTheDescription() async throws {
+        let (app, root) = try await configuredDrawingApp(transport: PhoneDrawFixture(fails: true))
+        defer { try? FileManager.default.removeItem(at: root) }
+        app.phoneDrawText = "a blue circle"
+
+        let result = await app.drawPhoneDescription()
+
+        XCTAssertNil(result)
+        XCTAssertNil(app.phoneDrawingWait?.completion)
+        XCTAssertNotNil(app.phoneDrawFailure)
+        XCTAssertEqual(app.phoneDrawText, "a blue circle")
+    }
+
+    func testSavedPhoneDrawingKeepsTextEditedDuringTheRun() async throws {
+        let transport = PhoneDrawFixture()
+        let (app, root) = try await configuredDrawingApp(transport: transport)
+        defer { try? FileManager.default.removeItem(at: root) }
+        app.phoneDrawText = "a blue circle"
+        await transport.onDraw { [weak app] in
+            app?.phoneDrawText = "the next drawing"
+            app?.phoneDrawingWait?.visible = false
+        }
+
+        let result = await app.drawPhoneDescription()
+
+        let saved = try XCTUnwrap(result)
+        XCTAssertEqual(app.phoneDrawingWait?.completion?.id, saved.id)
+        XCTAssertEqual(app.phoneDrawingWait?.description, "a blue circle")
+        XCTAssertEqual(app.phoneDrawText, "the next drawing")
+    }
+
+    private func configuredDrawingApp(transport: PhoneDrawFixture) async throws -> (AppModel, URL) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("phone-draw-\(UUID())")
+        let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"), transport: transport)
+        await app.initialize()
+        let provider = ProviderSettings(id: "fixture", baseURL: URL(string: "http://127.0.0.1:1")!, requiresAPIKey: false,
+                                        models: [.init(id: "model", purposes: ["llm"])])
+        try await app.updateHostSettings(HostSettings(providers: [provider], models: .init(stage1Model: "fixture:model", stage2Model: "fixture:model")))
+        var defaults = app.drawDefaults
+        defaults["describe"]?.models.stage1 = "fixture:model"; defaults["describe"]?.models.stage2 = "fixture:model"
+        defaults["describe"]?.route = "stages"; defaults["describe"]?.sketch = "off"; defaults["describe"]?.wild = "on"
+        try app.saveDrawDefaults(defaults)
+        return (app, root)
+    }
 }
 
 private actor PhoneDrawFixture: ProviderTransport {
+    private let fails: Bool
+    private var beforeResponse: (@MainActor @Sendable () -> Void)?
+
+    init(fails: Bool = false) { self.fails = fails }
+
+    func onDraw(_ edit: @escaping @MainActor @Sendable () -> Void) { beforeResponse = edit }
+
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        if fails { throw HostError("description_ddl_failed") }
+        await beforeResponse?()
         let value = try ExactJSON(data: action)
         return ExactJSON.object(["tag": .string("normalized_ddl_generated"), "identity": value["identity"],
             "response": .string(#"{"normalized_ddl":"place one red circle at center.\nplace one blue circle at left."}"#), "elapsed_ms": .string("1")]).data

@@ -2968,6 +2968,7 @@ public final class AppModel {
         let alreadySaved = wait.completion != nil
         wait.receive(progress, at: instant)
         guard !alreadySaved, let completion = wait.completion, !wait.cancelled else { return }
+        if phoneDrawText == wait.description { phoneDrawText = "" }
         let outside = PhoneDrawingNotice.isOutsideApp
         let watching = wait.visible && !outside
         updatePhoneCompletion(.saved(id: completion.id, watching: watching))

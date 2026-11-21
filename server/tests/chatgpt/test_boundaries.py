@@ -442,6 +442,101 @@ def stream_bytes(*, failed=False):
     return b"".join(b"data: " + canonical(event) + b"\r\n\r\n" for event in events), arguments
 
 
+@pytest.fixture
+def observed_chatgpt_attempt(isolated, tmp_path, monkeypatch):
+    from sqlalchemy import create_engine
+    from inku_server.model_settings import default_model_settings
+    from inku_server.persistence.schema import ProviderObservationRow
+    from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
+    from inku_server.provider_observation import ProviderObservationStore
+
+    value = profile(published_models=["model"], catalog={
+        "expires_at": time.time() + 300, "models": [{"id": "model"}],
+    })
+    seed(isolated, value)
+    wire_name = "wire:owner:" + value["id"]
+    waiting = threading.Event()
+    original_lock = CredentialStore.lock
+
+    def lock(store, name, deadline=None, check=None, **kwargs):
+        if name == wire_name:
+            kwargs["on_busy"] = waiting.set
+        return original_lock(store, name, deadline, check, **kwargs)
+
+    monkeypatch.setattr(CredentialStore, "lock", lock)
+    engine = create_engine(f"sqlite:///{tmp_path / 'observed-attempt.db'}")
+    ProviderObservationRow.__table__.create(engine)
+    capture = ProviderObservationStore(engine, limit=16384)
+    cancel = threading.Event()
+    options = ProviderOptions(settings=default_model_settings(), stage1_model="chatgpt:model",
+                              stage2_model="chatgpt:model", max_tokens=1, max_response_bytes=4096,
+                              chatgpt_owner="owner", chatgpt_profile=value["id"], chatgpt_generation=1,
+                              chatgpt_cancel=cancel)
+    action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "fixture", "attempt": "1"},
+              "timeout_ms": "250", "payload": {"prompt": {"system": "Rust", "message": "Rust",
+                                                          "response_schema": {"type": "object"}}}}
+    try:
+        yield SingleAttemptProvider(options, observation=(capture, "owner", "execution")), action, capture, wire_name, waiting, cancel
+    finally:
+        engine.dispose()
+
+
+def test_observed_chatgpt_timeout_before_request_preserves_transport_failure(observed_chatgpt_attempt, monkeypatch):
+    from inku_server import chatgpt_provider
+
+    attempt, action, capture, *_ = observed_chatgpt_attempt
+
+    async def token_timeout(*args):
+        raise TimeoutError
+
+    monkeypatch.setattr(chatgpt_provider, "access_token", token_timeout)
+    monkeypatch.setattr(capture, "outcome", lambda *args, **kwargs: pytest.fail("no request to finalize"))
+    result = attempt(action)
+    assert result["tag"] == "provider_failed"
+    assert result["failure"] == "transport_timeout"
+    assert attempt.chatgpt_failure_detail["code"] == "chatgpt_transport_timeout"
+    assert attempt.chatgpt_failure_detail["action"] == "retry"
+    assert capture.read_execution("owner", "execution") == []
+
+
+def test_chatgpt_wire_wait_does_not_spend_attempt_budget(isolated, observed_chatgpt_attempt, caplog):
+    attempt, action, capture, wire_name, waiting, _ = observed_chatgpt_attempt
+    wire, arguments = stream_bytes()
+    attempt.transport = httpx.MockTransport(lambda _: httpx.Response(200, content=wire))
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with isolated.lock(wire_name):
+            future = pool.submit(attempt, action)
+            assert waiting.wait(2)
+            time.sleep(0.35)
+            assert not future.done()
+        result = future.result(timeout=2)
+
+    assert result["tag"] == "normalized_ddl_generated" and result["response"] == arguments
+    assert int(result["elapsed_ms"]) < int(action["timeout_ms"])
+    saved, = capture.read_execution("owner", "execution")
+    assert saved["elapsed_ms"] == int(result["elapsed_ms"]) and saved["capture_complete"]
+    logged, = [record for record in caplog.records if record.getMessage().startswith("chatgpt_wire_wait ")]
+    assert logged.args[:2] == ("fixture", "1")
+    assert logged.args[2] >= 350
+
+
+def test_chatgpt_wire_wait_can_be_cancelled(isolated, observed_chatgpt_attempt):
+    attempt, action, capture, wire_name, waiting, cancel = observed_chatgpt_attempt
+    attempt.transport = httpx.MockTransport(lambda _: pytest.fail("unexpected provider communication"))
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with isolated.lock(wire_name):
+            future = pool.submit(attempt, action)
+            assert waiting.wait(2)
+            cancel.set()
+            result = future.result(timeout=1)
+
+    assert result["tag"] == "provider_failed"
+    assert attempt.chatgpt_failure_detail["code"] == "chatgpt_cancelled"
+    assert capture.read_execution("owner", "execution") == []
+
+
 @pytest.mark.parametrize(("code", "failure", "action"), [
     ("subscription_sharing_usage_limit_exceeded", "provider_rejected", "usage"),
     ("subscription_sharing_usage_unavailable", "transport_unavailable", "retry"),
@@ -650,13 +745,15 @@ def test_composition_effect_preserves_wire_and_separate_observation(isolated, tm
         engine.dispose()
 
 
-@pytest.mark.parametrize("capture_raw", [False, True])
-def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolated, tmp_path, monkeypatch, capture_raw):
+@pytest.mark.parametrize("capture_raw, before_send_timeout", [
+    (False, False), (True, False), (True, True),
+], ids=["capture-off", "capture-on", "timeout-without-transcript"])
+def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolated, tmp_path, monkeypatch, capture_raw, before_send_timeout):
     from types import SimpleNamespace
 
     from sqlalchemy import create_engine
 
-    from inku_server import db
+    from inku_server import chatgpt_provider, db
     from inku_server.model_settings import default_model_settings
     from inku_server.persistence.schema import ProviderObservationRow
     from inku_server.pipeline_api import PipelineService
@@ -672,9 +769,15 @@ def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolate
     real_client = httpx.AsyncClient
 
     def handle(request):
+        assert not before_send_timeout, "the timed-out attempt must not send"
         assert request.url.path.endswith("/responses")
         return httpx.Response(200, content=wire, headers={"x-request-id": "req_fixture"})
 
+    async def token_timeout(*args):
+        raise TimeoutError
+
+    if before_send_timeout:
+        monkeypatch.setattr(chatgpt_provider, "access_token", token_timeout)
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
     action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "fixture", "attempt": "1"}, "timeout_ms": "5000",
               "payload": {"prompt": {"system": "system", "message": "message", "response_schema": {"type": "object"},
@@ -691,10 +794,16 @@ def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolate
     monkeypatch.setattr(db, "engine", engine)
     ProviderObservationRow.__table__.create(engine)
     try:
-        assert effects.provider_for("owner", context)(action)["failure"] == "provider_rejected"
-        expected = {"code": "chatgpt_response_failed", "action": "diagnose", "reported": "server_error",
-                    "status": 200, "param": "tool.choice", "request_id": "req_fixture",
-                    "event_count": 2, "last_event": "response.failed"}
+        failure = "transport_timeout" if before_send_timeout else "provider_rejected"
+        assert effects.provider_for("owner", context)(action)["failure"] == failure
+        if before_send_timeout:
+            expected = {"code": "chatgpt_transport_timeout", "action": "retry", "reported": None,
+                        "status": None, "param": None, "request_id": None, "event_count": 0, "last_event": None}
+            assert effects.provider_observations("owner", "execution") == []
+        else:
+            expected = {"code": "chatgpt_response_failed", "action": "diagnose", "reported": "server_error",
+                        "status": 200, "param": "tool.choice", "request_id": "req_fixture",
+                        "event_count": 2, "last_event": "response.failed"}
         assert context["provider_failure"]["chatgpt"] == expected
         # Read the persisted send independently of the latest failure: a later send may succeed.
         context.pop("provider_failure")
@@ -705,11 +814,12 @@ def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolate
         status = service.provider_capture_status("owner", "execution")
         assert status["capture_enabled"] is capture_raw
         row, = status["observations"]
-        assert row["diagnostic"] == expected and row["failure"] == "provider_rejected"
-        if capture_raw:
+        assert row["diagnostic"] == expected and row["failure"] == failure
+        if capture_raw and not before_send_timeout:
             assert row["response_body"] == wire.decode()
         else:
             assert "request_body" not in row and "response_body" not in row
+            assert row["capture_complete"] is False
     finally:
         engine.dispose()
 

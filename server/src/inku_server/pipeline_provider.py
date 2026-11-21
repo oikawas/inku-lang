@@ -91,11 +91,11 @@ class SingleAttemptProvider:
         self.images = list(images) if images is not None else None
         self.on_bytes = on_bytes
         self.failure_detail: str | None = None
-        self._observation_truncated = False
 
     def __call__(self, action: dict) -> dict:
         self.failure_detail = None
         self.chatgpt_failure_detail = None
+        self._observation_request_saved = False
         self._observation_truncated = False
         self._refusal: dict[str, Any] = {}
         self._target: tuple[str, str] = ("", "")
@@ -125,6 +125,11 @@ class SingleAttemptProvider:
         identity = dict(action["identity"])
         failure = None
         response = None
+
+        def wire_wait_finished(at: float) -> None:
+            nonlocal started
+            started = at
+
         try:
             if timeout <= 0:
                 raise TimeoutError
@@ -145,10 +150,11 @@ class SingleAttemptProvider:
                 try:
                     response = asyncio.run(request(
                         self.options.chatgpt_owner, self.options.chatgpt_profile, self.options.chatgpt_generation,
-                        model, action, started + timeout, self.options.max_response_bytes, self.options.chatgpt_cancel,
+                        model, action, None, self.options.max_response_bytes, self.options.chatgpt_cancel,
                         (self.observation[0], self.observation[2]) if self.observation else None,
                         purpose="vision" if action["tag"] in provider_wire.IMAGE_EFFECTS else "llm",
                         images=self.images, transport=self.transport, usage=chatgpt_usage, on_bytes=self.on_bytes,
+                        on_wire_wait_finished=wire_wait_finished, on_request_saved=self._request_saved,
                     ))
                 # A time limit or a broken connection is named by the shared core, so the
                 # failure detail keeps its code (step 4, 2026-11-14).
@@ -181,7 +187,7 @@ class SingleAttemptProvider:
                                           "request_id": getattr(error, "request_id", None), "param": getattr(error, "param", None),
                                           "status": getattr(error, "status", None), "reported": None, "event_count": 0, "last_event": None,
                                           **(error.diagnostic or {})}
-            self._observation_truncated = error.code in {"chatgpt_response_incomplete", "chatgpt_response_too_large", "chatgpt_cancelled"}
+            self._observation_truncated |= error.code in {"chatgpt_response_incomplete", "chatgpt_response_too_large", "chatgpt_cancelled"}
         except (TimeoutError, httpx.TimeoutException):
             failure = "rate_limited" if self.failure_detail == "rate_limit_wait" else "transport_timeout"
         except RateLimitUnavailable:
@@ -214,7 +220,7 @@ class SingleAttemptProvider:
         if chatgpt_usage:
             self.usage = chatgpt_usage[-1]
         elapsed_int = max(0, int((time.monotonic() - started) * 1000))
-        if self.observation is not None:
+        if self.observation is not None and self._observation_request_saved:
             store, owner_id, execution_id = self.observation
             try:
                 store.outcome(owner_id, execution_id, action, failure=failure, elapsed_ms=elapsed_int,
@@ -226,6 +232,10 @@ class SingleAttemptProvider:
         if failure is not None:
             return {"tag": "provider_failed", "identity": identity, "failure": failure, "elapsed_ms": elapsed}
         return {"tag": tags[action["tag"]], "identity": identity, "response": response, "elapsed_ms": elapsed}
+
+    def _request_saved(self, truncated: bool) -> None:
+        self._observation_request_saved = True
+        self._observation_truncated = truncated
 
     async def _request(self, connection: dict, model: str, action: dict, prompt: dict, timeout: float) -> str:
         # The shared core writes the body for the connection's dialect, byte for
@@ -252,7 +262,7 @@ class SingleAttemptProvider:
                 owner_id, execution_id, action, provider_stage_record(action["tag"]),
                 str(connection["id"]), model, capture_body(body_bytes),
             )
-            self._observation_truncated = request_truncated
+            self._request_saved(request_truncated)
             if request_truncated:
                 raise ProviderObservationError("request_capture_truncated")
         # asyncio's deadline covers connect, body streaming and decoding as one

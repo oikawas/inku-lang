@@ -778,6 +778,10 @@ Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal 
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
 
+## v2.15.381 (2026-11-21 / Build 1457)
+
+- Server: ChatGPT drawing starts the send deadline after acquiring the communication lock. Timeouts before the observation request record is saved remain eligible for normal retries.
+
 ## v2.15.380 (2026-11-21 / Build 1456)
 
 - Server: Drawing admission with Sign in with ChatGPT can use an expired model list while the communication lock is busy. This lets requests such as “Draw four versions” through admission. Model availability is checked again when each request is sent.

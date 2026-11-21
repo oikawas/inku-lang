@@ -1,5 +1,6 @@
 import CoreGraphics
 import Synchronization
+import SwiftUI
 import XCTest
 @testable import InkuUI
 
@@ -18,6 +19,38 @@ import XCTest
         XCTAssertEqual(picture.imageSVG, svg)
         picture.seedIfEmpty(finalFrame, svg: svg)
         XCTAssertTrue(picture.image === rendered)
+    }
+
+    func testDrawingMotionDefaultsOnAndPersistsOff() async throws {
+        let old = try DisplayPreferences.decodeInterfaceFile(Data("{}".utf8))
+        XCTAssertTrue(old.showDrawingMotion)
+
+        var preferences = old
+        preferences.showDrawingMotion = false
+        let data = try JSONEncoder().encode(preferences.forPersistence())
+        XCTAssertFalse(try DisplayPreferences.decodeInterfaceFile(data).showDrawingMotion)
+
+        let savedAt = ContinuousClock.now
+        let frame = try testFrame()
+        let frames = await PhoneDrawingAssembly.prepare(
+            savedAt: savedAt, showDrawingMotion: old.showDrawingMotion, now: { savedAt },
+            sleep: { _ in try await Task.sleep(for: .seconds(30)) }
+        ) { [frame, frame, frame] }
+        XCTAssertEqual(frames.count, 3)
+    }
+
+    func testSharedDrawingTimelineUsesAppSettingWithSystemReduceMotionOn() {
+        for enabled in [false, true] {
+            var isMoving: Bool?
+            let view = DrawingMotionTimeline(schedule: .animation) { date in
+                let _ = { isMoving = date != nil }()
+                Color.black.frame(width: 8, height: 8)
+            }
+            .environment(\.inkuDrawingMotion, enabled)
+            .environment(\._accessibilityReduceMotion, true)
+            XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+            XCTAssertEqual(isMoving, enabled)
+        }
     }
 
     func testReadyFramesPlayForAtMostSixSeconds() async throws {
@@ -108,15 +141,15 @@ import XCTest
         let timer: @Sendable (ContinuousClock.Instant) async throws -> Void = { _ in
             try await Task.sleep(for: .seconds(30))
         }
-        _ = await PhoneDrawingAssembly.prepare(savedAt: savedAt, reduceMotion: true, now: { later }, sleep: timer, onSkip: report) {
-            XCTFail("Reduce Motion skips preparation")
+        _ = await PhoneDrawingAssembly.prepare(savedAt: savedAt, showDrawingMotion: false, now: { later }, sleep: timer, onSkip: report) {
+            XCTFail("The app setting skips preparation")
             return []
         }
         _ = await PhoneDrawingAssembly.prepare(savedAt: savedAt, now: { later }, sleep: timer, onSkip: report) { [] }
         _ = await PhoneDrawingAssembly.prepare(savedAt: savedAt, now: { later }, sleep: timer, onSkip: report) {
             throw PhoneDrawingAssembly.Failure.refused(code: "render_refused", message: "test")
         }
-        XCTAssertEqual(reasons.withLock { $0 }, ["reduce_motion", "frame_count", "core_refused"])
+        XCTAssertEqual(reasons.withLock { $0 }, ["setting_off", "frame_count", "core_refused"])
     }
 
     func testPreviewGroupsFramesWithoutLosingSourceLines() throws {

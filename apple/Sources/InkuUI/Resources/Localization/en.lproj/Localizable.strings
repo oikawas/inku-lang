@@ -242,6 +242,8 @@
 "描画ハッシュ全体をコピー" = "Copy the full render hash";
 "描画モデル" = "Drawing model";
 "描画中のマスコット" = "Drawing mascot";
+"描画の動きを見せる" = "Show drawing motion";
+"描いている間のマスコット、過程の行の現れ方、描き上がりの組み上がり" = "Drawing mascots, how progress rows appear, and the finished picture’s build-up";
 "描画間隔（0.1〜30秒）" = "Drawing interval (0.1–30 seconds)";
 "文字サイズ" = "Text size";
 "新しい20件" = "20 newer works";

@@ -16,7 +16,7 @@ struct PhoneDrawingWaitView: View {
     let onReview: () -> Void
     let onFinish: (SavedWork, Bool, CanvasPicture) -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.inkuDrawingMotion) private var showDrawingMotion
     @Environment(\.displayScale) private var scale
     @Environment(\.scenePhase) private var scenePhase
     @State private var controls = true
@@ -61,7 +61,7 @@ struct PhoneDrawingWaitView: View {
             .task(id: wait.completion?.id) {
                 if let completion = wait.completion { await reveal(completion, pixels: pixels) }
             }
-            .onChange(of: reduceMotion || scenePhase == .background ? nil : pixels, initial: true) { _, target in
+            .onChange(of: showDrawingMotion && scenePhase != .background ? pixels : nil, initial: true) { _, target in
                 wait.setAssemblyTarget(target)
             }
         }
@@ -232,7 +232,7 @@ struct PhoneDrawingWaitView: View {
 
     private var scroll: some View {
         let materialRows = rows
-        let allVisible = reduceMotion || !wait.running
+        let allVisible = !showDrawingMotion || !wait.running
         return ScrollViewReader { reader in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 7) {
@@ -256,7 +256,7 @@ struct PhoneDrawingWaitView: View {
             }.onEnded { _ in
                 pausedUntil = .now.advanced(by: .seconds(3))
             })
-            .task(id: materialRows.map(\.id)) {
+            .task(id: allVisible ? [] : materialRows.map(\.id)) {
                 shownRows = max(1, min(shownRows, materialRows.count))
                 while shownRows < materialRows.count && !allVisible {
                     do { try await Task.sleep(for: .milliseconds(materialRows.count - shownRows > 5 ? 100 : 400)) }
@@ -302,7 +302,7 @@ struct PhoneDrawingWaitView: View {
         return TimelineView(.periodic(from: wait.started, by: 1)) { timeline in
             HStack(alignment: .top, spacing: 8) {
                 let kind = display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
-                if !reduceMotion && animated {
+                if showDrawingMotion && animated {
                     MascotView(kind: kind, accessibilityText: display.localized("描画中")).frame(width: 20, height: 20)
                 }
                 VStack(alignment: .leading) {
@@ -355,7 +355,8 @@ struct PhoneDrawingWaitView: View {
         finished = work
         let clock = ContinuousClock()
         let frames = await PhoneDrawingAssembly.prepare(
-            savedAt: completion.savedAt, commandCount: wait.commandCount, reduceMotion: reduceMotion,
+            savedAt: completion.savedAt, commandCount: wait.commandCount,
+            showDrawingMotion: showDrawingMotion,
             now: { clock.now }, sleep: { try await clock.sleep(until: $0) },
             onSkip: { skip, elapsed in progress.logSkip(skip, workID: work.id, elapsed: elapsed) }
         ) {
@@ -377,7 +378,7 @@ struct PhoneDrawingWaitView: View {
                 do { try await clock.sleep(until: start.advanced(by: interval * (index + 1))) }
                 catch { return }
             }
-        } else if !reduceMotion {
+        } else if showDrawingMotion {
             withAnimation(.easeIn(duration: 0.18)) { showFullPicture = true }
             do { try await Task.sleep(for: .milliseconds(180)) } catch { return }
         }

@@ -252,7 +252,6 @@ struct MascotView: View {
     let kind: String
     /// Web hides the mascot from assistive technology; the run status names it ("Incu is drawing").
     var accessibilityText: String?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.inkuTooltipsCovered) private var covered
     @State private var start = Date()
 
@@ -260,9 +259,8 @@ struct MascotView: View {
         Color.clear
             .frame(width: 32, height: 32)
             .overlay {
-                Group {
-                    if reduceMotion || covered { canvas(at: 0, still: true) }
-                    else { TimelineView(.periodic(from: start, by: 1.0 / 30.0)) { timeline in canvas(at: timeline.date.timeIntervalSince(start), still: false) } }
+                DrawingMotionTimeline(schedule: .periodic(from: start, by: 1.0 / 30.0), paused: covered) { date in
+                    canvas(at: date?.timeIntervalSince(start) ?? 0, still: date == nil)
                 }
                 .frame(width: 112, height: 112)
                 .allowsHitTesting(false)

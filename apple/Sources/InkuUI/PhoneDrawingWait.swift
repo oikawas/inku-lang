@@ -145,7 +145,7 @@ enum PhoneDrawingAssembly {
     }
 
     enum Skip: Sendable {
-        case deadline, frameCount, reduceMotion
+        case deadline, frameCount, settingOff
         case refused(code: String, message: String)
         case preparation(String)
 
@@ -153,7 +153,7 @@ enum PhoneDrawingAssembly {
             switch self {
             case .deadline: ("deadline", "")
             case .frameCount: ("frame_count", "")
-            case .reduceMotion: ("reduce_motion", "")
+            case .settingOff: ("setting_off", "")
             case .refused(let code, let message): ("core_refused", code + " " + message)
             case .preparation(let code): ("preparation_failed", code)
             }
@@ -193,14 +193,14 @@ enum PhoneDrawingAssembly {
     }
 
     static func prepare<Instant: InstantProtocol & Sendable>(
-        savedAt: Instant, commandCount: Int? = nil, reduceMotion: Bool = false,
+        savedAt: Instant, commandCount: Int? = nil, showDrawingMotion: Bool = true,
         now: @escaping @Sendable () -> Instant,
         sleep: @escaping @Sendable (Instant) async throws -> Void,
         onSkip: @Sendable (Skip, Duration) -> Void = { _, _ in },
         load: @escaping @Sendable () async throws -> [Frame]
     ) async -> [Frame] where Instant.Duration == Duration {
         let deadline = savedAt.advanced(by: preparationLimit)
-        if let skip: Skip = reduceMotion ? .reduceMotion : commandCount == 1 ? .frameCount : now() >= deadline ? .deadline : nil {
+        if let skip: Skip = !showDrawingMotion ? .settingOff : commandCount == 1 ? .frameCount : now() >= deadline ? .deadline : nil {
             onSkip(skip, savedAt.duration(to: now()))
             return []
         }

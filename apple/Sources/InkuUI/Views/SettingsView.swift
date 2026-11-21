@@ -429,6 +429,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             historySettings
             generationInfoSettings
             mascotSettings
+            drawingMotionSettings
             preferenceSaveError
         }
     }
@@ -546,6 +547,19 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(model.display.webCopy("settingsMascotYuragi", "Yuragi（蟹）")).tag("yuragi")
             }.labelsHidden()
             .inkuChoicePickerStyle()
+        }
+    }
+
+    private var drawingMotionSettings: some View {
+        @Bindable var display = model.display
+        return Section {
+            Toggle(isOn: $display.preferences.showDrawingMotion) {
+                VStack(alignment: .leading) {
+                    Text(display.localized("描画の動きを見せる"))
+                    Text(display.localized("描いている間のマスコット、過程の行の現れ方、描き上がりの組み上がり"))
+                        .inkuFont(13).foregroundStyle(.secondary)
+                }
+            }.toggleStyle(.switch)
         }
     }
 

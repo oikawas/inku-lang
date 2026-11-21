@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Swift (macOS and iOS): fixes workspace displacement in Lineage and duplicate comment save buttons in iPhone Work Information. Drawings interrupted by app shutdown are marked stopped on the next launch.
+- Swift (macOS and iOS): fixes workspace displacement in Lineage and duplicate comment save buttons in iPhone Work Information. On launch, the app checks the 100 most recent drawing records and marks drawings interrupted by shutdown as stopped.
 
 - iOS: saving a drawing started from iPhone home clears its description field. Edits made while drawing are kept.
 

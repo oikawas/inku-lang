@@ -166,11 +166,11 @@ public actor PipelineHost {
         return try await driver.cancel(progress: { _ in })
     }
 
-    /// Run before publishing the host. Cancel carried-over work through core without resuming any effects.
+    /// Run before publishing the host. Cancel interrupted work from the most recent drawing logs without resuming effects.
     public func cancelInterruptedExecutionsAtStartup() async {
         let logger = Logger(subsystem: "app.inku", category: "drawing")
         let ids: [String]
-        do { ids = try await database.listExecutionIDs(limit: nil) }
+        do { ids = try await database.listExecutionIDs() }
         catch {
             logger.error("Could not list interrupted drawing executions at startup")
             return

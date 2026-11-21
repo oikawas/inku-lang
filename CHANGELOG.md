@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server: ChatGPT drawing starts the send deadline after acquiring the communication lock. Timeouts before the observation request record is saved remain eligible for normal retries.
-
 - iOS: keeps the 2D paper size and center when switching to 3D in the iPhone viewer.
 - Swift (macOS and iOS): uses the saved score and drawing settings for line-by-line animation.
 - iOS: drawings started from words on iPhone home open a waiting page with progress and process details. The picture builds up there when ready. Elsewhere, the Drawing finished banner opens the work, and iOS can notify you outside the app.
@@ -779,6 +777,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.381 (2026-11-21 / Build 1457)
+
+- Server: ChatGPT drawing starts the send deadline after acquiring the communication lock. Timeouts before the observation request record is saved remain eligible for normal retries.
 
 ## v2.15.380 (2026-11-21 / Build 1456)
 

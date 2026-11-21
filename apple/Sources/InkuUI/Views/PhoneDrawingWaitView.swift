@@ -233,13 +233,14 @@ struct PhoneDrawingWaitView: View {
     private var scroll: some View {
         let materialRows = rows
         let allVisible = !showDrawingMotion || !wait.running
+        let visibleRowCount = allVisible ? materialRows.count : shownRows
         return ScrollViewReader { reader in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 7) {
-                    ForEach(materialRows.prefix(allVisible ? materialRows.count : shownRows)) { row in
+                    ForEach(materialRows.prefix(visibleRowCount)) { row in
                         waitRow(row).id(row.id)
                     }
-                    if wait.running { currentStage(animated: shownRows >= materialRows.count) }
+                    if wait.running { currentStage(showMascot: visibleRowCount >= materialRows.count) }
                     if let failure = wait.failure {
                         Text(failure).inkuFont(14)
                         Button(display.label("再試行", "Retry"), action: onRetry).frame(minHeight: 44)
@@ -297,12 +298,12 @@ struct PhoneDrawingWaitView: View {
         }
     }
 
-    private func currentStage(animated: Bool) -> some View {
+    private func currentStage(showMascot: Bool) -> some View {
         let attempt = model.providerProgress
         return TimelineView(.periodic(from: wait.started, by: 1)) { timeline in
             HStack(alignment: .top, spacing: 8) {
                 let kind = display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
-                if showDrawingMotion && animated {
+                if showMascot {
                     MascotView(kind: kind, accessibilityText: display.localized("描画中")).frame(width: 20, height: 20)
                 }
                 VStack(alignment: .leading) {

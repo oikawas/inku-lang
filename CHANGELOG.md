@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Shared core: line animation accepts the saved Score so works with changed drawing settings, such as a different colour catalogue, can replay under their saved settings.
-
 - iOS: the iPhone home drawing field accepts descriptions and draws parentless works with the defaults. It guides unavailable connections, stops and reviews, and sets first-use and post-sign-in drawing defaults.
 
 - Swift (macOS and iOS): shows and logs the reason when line-by-line animation is refused, explaining mismatches between saved drawing and instruction settings.
@@ -775,6 +773,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.379 (2026-11-21 / Build 1455)
+
+- Web: fixes a shader error that caused glass views to show only the background and aligns the 3D view with the 2D paper frame.
+- Shared core: line animation accepts the saved Score so works with changed drawing settings, such as a different colour catalogue, can replay under their saved settings.
 
 ## v2.15.378 (2026-11-20 / Build 1454)
 

@@ -745,6 +745,70 @@ def test_composition_effect_preserves_wire_and_separate_observation(isolated, tm
         engine.dispose()
 
 
+@pytest.mark.parametrize("capture_raw", [False, True])
+def test_failed_chatgpt_send_keeps_diagnostic_with_or_without_transcript(isolated, tmp_path, monkeypatch, capture_raw):
+    from types import SimpleNamespace
+
+    from sqlalchemy import create_engine
+
+    from inku_server import db
+    from inku_server.model_settings import default_model_settings
+    from inku_server.persistence.schema import ProviderObservationRow
+    from inku_server.pipeline_api import PipelineService
+    from inku_server.pipeline_product import ProductPipelineEffects
+
+    value = profile(published_models=["model"], catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
+    seed(isolated, value)
+    events = [
+        {"type": "response.created"},
+        {"type": "response.failed", "response": {"error": {"code": "server_error", "param": "tool.choice", "message": "private body"}}},
+    ]
+    wire = b"".join(b"data: " + canonical(event) + b"\n\n" for event in events)
+    real_client = httpx.AsyncClient
+
+    def handle(request):
+        assert request.url.path.endswith("/responses")
+        return httpx.Response(200, content=wire, headers={"x-request-id": "req_fixture"})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "fixture", "attempt": "1"}, "timeout_ms": "5000",
+              "payload": {"prompt": {"system": "system", "message": "message", "response_schema": {"type": "object"},
+                                     "prompt_id": "fixture", "prompt_digest": "fixture", "instruction_language": "en"}}}
+    context = {"execution_id": "execution", "host_options": {
+        "stage1_model": "chatgpt:model", "stage2_model": "chatgpt:model",
+        "chatgpt_profile": value["id"], "chatgpt_generation": 1, "developer_capture_provider_io": capture_raw,
+    }}
+    effects = object.__new__(ProductPipelineEffects)
+    effects.manifest = {"provider": {"stage1_model": "chatgpt:model", "stage2_model": "chatgpt:model", "max_tokens": 8},
+                        "pipeline": {"prompt_limits": {"max_response_bytes": 4096}}}
+    monkeypatch.setattr(db, "get_model_settings", default_model_settings)
+    engine = create_engine(f"sqlite:///{tmp_path / 'failed-observation.db'}")
+    monkeypatch.setattr(db, "engine", engine)
+    ProviderObservationRow.__table__.create(engine)
+    try:
+        assert effects.provider_for("owner", context)(action)["failure"] == "provider_rejected"
+        expected = {"code": "chatgpt_response_failed", "action": "diagnose", "reported": "server_error",
+                    "status": 200, "param": "tool.choice", "request_id": "req_fixture",
+                    "event_count": 2, "last_event": "response.failed"}
+        assert context["provider_failure"]["chatgpt"] == expected
+        # Read the persisted send independently of the latest failure: a later send may succeed.
+        context.pop("provider_failure")
+        saved = SimpleNamespace(state_bytes=json.dumps({"context": context}).encode())
+        service = object.__new__(PipelineService)
+        service.store = SimpleNamespace(read_execution=lambda owner, execution: saved if (owner, execution) == ("owner", "execution") else None)
+        service.provider_observations = effects.provider_observations
+        status = service.provider_capture_status("owner", "execution")
+        assert status["capture_enabled"] is capture_raw
+        row, = status["observations"]
+        assert row["diagnostic"] == expected and row["failure"] == "provider_rejected"
+        if capture_raw:
+            assert row["response_body"] == wire.decode()
+        else:
+            assert "request_body" not in row and "response_body" not in row
+    finally:
+        engine.dispose()
+
+
 def test_runtime_cancel_closes_blocked_stream_and_releases_slot(isolated, monkeypatch):
     from inku_server.chatgpt_provider import request
     value = profile(published_models=["model"], catalog={"expires_at": time.time() + 300, "models": [{"id": "model"}]})

@@ -185,7 +185,8 @@ class SingleAttemptProvider:
             failure = error.failure
             self.chatgpt_failure_detail = {"code": error.code, "action": error.action,
                                           "request_id": getattr(error, "request_id", None), "param": getattr(error, "param", None),
-                                          "status": getattr(error, "status", None)}
+                                          "status": getattr(error, "status", None), "reported": None, "event_count": 0, "last_event": None,
+                                          **(error.diagnostic or {})}
             self._observation_truncated |= error.code in {"chatgpt_response_incomplete", "chatgpt_response_too_large", "chatgpt_cancelled"}
         except (TimeoutError, httpx.TimeoutException):
             failure = "rate_limited" if self.failure_detail == "rate_limit_wait" else "transport_timeout"

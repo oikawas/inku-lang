@@ -901,8 +901,22 @@ class PipelineService:
         if record is None:
             raise HTTPException(404, "variation_not_found")
         saved = json.loads(record.state_bytes)
-        requested = bool(saved.get("context", {}).get("host_options", {}).get("developer_capture_provider_io"))
+        context = saved.get("context", {})
+        requested = bool(context.get("host_options", {}).get("developer_capture_provider_io"))
         observations = self.provider_observations(owner, execution_id) if requested and self.provider_observations else []
+        by_action = {row["action_id"]: row for row in observations}
+        for send in context.get("provider_sends", []):
+            if "diagnostic" not in send:
+                continue
+            action_id = send["action_id"]
+            row = by_action.get(action_id)
+            if row is None:
+                row = {"execution_id": execution_id, "action_id": action_id, "action_tag": send["action"],
+                       "provider_id": "chatgpt", "stage": send["stage"], "attempt": send["attempt"],
+                       "outcome": "completed", "failure": send["failure"], "elapsed_ms": send["elapsed_ms"],
+                       "http_status": send["diagnostic"].get("status"), "capture_complete": False}
+                observations.append(row)
+            row["diagnostic"] = send["diagnostic"]
         return {"capture_enabled": requested, "observations": observations}
 
     def system_prompts(self, owner: str, variation_id: str) -> dict:
@@ -1405,7 +1419,11 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 
     @router.get("/executions/{execution_id}/provider-observations", summary="Read an execution's provider observations")
     def provider_observations(execution_id: str = Path(description="ID of the execution."), actor: dict = Depends(actor_dependency)):
-        """Return the captured provider exchanges of an execution. Available only when developer mode is enabled; returns 404 (developer_provider_observations_not_available) otherwise. When the execution was not run with provider I/O capture, returns capture_enabled false and an empty observations list. Requires a signed-in user."""
+        """Return captured exchanges and ChatGPT failure diagnostics for the signed-in owner.
+
+        Developer mode is required. Failure diagnostics are available without
+        I/O capture. Request and response bodies require I/O capture.
+        """
         from .api_core.common import _env_flag
         if not _env_flag("INKU_DEVELOPER_MODE") or current_service().provider_observations is None:
             raise HTTPException(404, "developer_provider_observations_not_available")

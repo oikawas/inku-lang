@@ -39,7 +39,7 @@ class ResponseFailure(ChatGPTError):
     """A failure the ChatGPT backend reported, as the shared core classified it."""
 
     def __init__(self, answer: dict):
-        super().__init__(answer["code"], failure=answer["failure"], action=answer["action"])
+        super().__init__(answer["code"], failure=answer["failure"], action=answer["action"], diagnostic=answer.get("diagnostic"))
         self.status = answer.get("status")
         self.request_id = answer.get("request_id")
         self.param = answer.get("param")
@@ -101,15 +101,11 @@ class SSEDecoder:
         if len(self.wire) > self.wire_limit:
             raise transport_error("too_large")
 
-    def finish(self) -> str:
-        answer = provider_wire.chatgpt_stream(self.mode, self.argument_limit, bytes(self.wire))
+    def finish(self, *, status: int | None = None, request_id: str | None = None) -> str:
+        answer = provider_wire.chatgpt_stream(self.mode, self.argument_limit, bytes(self.wire), status=status, request_id=request_id)
         self.completed, self.terminal = answer["completed"], answer["terminal"]
         if answer["outcome"] == "answer":
             return answer["text"]
-        if answer["outcome"] == "malformed":
-            # The core names what a stream it could not read means (step 4, 2026-11-14):
-            # bytes that are not UTF-8 are rejected, other shapes are a malformed payload.
-            raise ChatGPTError(answer["code"], failure=answer["failure"], action=answer["action"])
         if answer.get("reported"):
             raise ResponseFailure(answer)
         if answer.get("tool_shapes") is not None:
@@ -117,7 +113,7 @@ class SSEDecoder:
             logger.warning("chatgpt_tool_shape %s streamed_calls=%d finalized_calls=%d",
                            json.dumps(answer["tool_shapes"], separators=(",", ":")),
                            answer["streamed_calls"], answer["finalized_calls"])
-        raise ChatGPTError(answer["code"], failure=answer["failure"], action=answer["action"])
+        raise ChatGPTError(answer["code"], failure=answer["failure"], action=answer["action"], diagnostic=answer.get("diagnostic"))
 
 
 class TextSSEDecoder(SSEDecoder):
@@ -223,12 +219,13 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                                            timeout=max(0.001, deadline - time.monotonic()))
                     response = await guarded(stream.__aenter__(), check, deadline)
                     status = response.status_code
+                    request_id = response.headers.get(built["request_id_header"])
                     try:
                         if not response.is_success:
                             content = await read_limited(response, check, deadline, built["error_limit"])
                             if observation and image_effect:
                                 raw.extend(content)
-                            raise response_error(status=status, request_id=response.headers.get(built["request_id_header"]),
+                            raise response_error(status=status, request_id=request_id,
                                                  body=_text(content))
                         async def consume():
                             received = 0
@@ -241,8 +238,18 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                                 if on_bytes is not None and received // 4096 > reported // 4096:
                                     reported = received
                                     on_bytes(received)
-                            return decoder.finish()
-                        answer = await guarded(consume(), check, deadline)
+                            return decoder.finish(status=status, request_id=request_id)
+                        try:
+                            answer = await guarded(consume(), check, deadline)
+                        except (TimeoutError, httpx.TransportError) as error:
+                            kind = "timeout" if isinstance(error, (TimeoutError, httpx.TimeoutException)) else "unavailable"
+                            failure = transport_error(kind)
+                            partial = provider_wire.chatgpt_stream(
+                                decoder.mode, decoder.argument_limit, bytes(decoder.wire),
+                                status=status, request_id=request_id,
+                            ).get("diagnostic", {})
+                            failure.diagnostic = {key: partial[key] for key in ("status", "request_id", "event_count", "last_event") if key in partial}
+                            raise failure from None
                         check(force=True)
                         return answer
                     finally:

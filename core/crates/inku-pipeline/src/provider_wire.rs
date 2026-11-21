@@ -2184,7 +2184,20 @@ fn answer(request: &Value, gated: bool) -> Result<Value, Refusal> {
             let wire = as_str(get(request, "wire_base64"))
                 .and_then(chatgpt::base64_decode)
                 .ok_or_else(|| Refusal::invalid("wire_base64 must be base64"))?;
-            Ok(chatgpt::stream_answer(text, limit_of(request)?, &wire))
+            let status = match get(request, "status") {
+                Some(Value::Integer(digits)) => digits
+                    .parse::<i64>()
+                    .ok()
+                    .filter(|status| (100..=599).contains(status)),
+                _ => None,
+            };
+            Ok(chatgpt::stream_answer(
+                text,
+                limit_of(request)?,
+                &wire,
+                status,
+                get(request, "request_id"),
+            ))
         }
         "chatgpt_error" => {
             let status = match get(request, "status") {

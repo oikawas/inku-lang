@@ -407,7 +407,8 @@ fn safe_identifier(value: Option<&Value>) -> Value {
             if (1..=160).contains(&text.chars().count())
                 && text.chars().all(|c| {
                     c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '[' | ']' | '-')
-                }) =>
+                })
+                && super::mask_key_like(text) == *text =>
         {
             Value::String(text.clone())
         }
@@ -421,9 +422,16 @@ struct Failure {
     failure: &'static str,
     action: &'static str,
     /// Set for a failure the provider itself reported (`ResponseFailure`).
-    reported: Option<(Value, Value, Value)>,
+    reported: Option<ReportedFailure>,
     /// The tool shapes logged for an unexpected tool, and the call counts.
     shapes: Option<(Vec<Value>, usize, usize)>,
+}
+
+struct ReportedFailure {
+    code: Value,
+    status: Value,
+    request_id: Value,
+    param: Value,
 }
 
 impl Failure {
@@ -453,11 +461,11 @@ impl Failure {
             ("failure".to_owned(), string(self.failure)),
             ("action".to_owned(), string(self.action)),
         ];
-        if let Some((status, request_id, param)) = &self.reported {
+        if let Some(reported) = &self.reported {
             members.push(("reported".to_owned(), Value::Bool(true)));
-            members.push(("status".to_owned(), status.clone()));
-            members.push(("request_id".to_owned(), request_id.clone()));
-            members.push(("param".to_owned(), param.clone()));
+            members.push(("status".to_owned(), reported.status.clone()));
+            members.push(("request_id".to_owned(), reported.request_id.clone()));
+            members.push(("param".to_owned(), reported.param.clone()));
         }
         if let Some((shapes, streamed, finalized)) = &self.shapes {
             members.push(("tool_shapes".to_owned(), Value::Array(shapes.clone())));
@@ -471,6 +479,60 @@ impl Failure {
             ));
         }
         members
+    }
+
+    fn diagnostic(
+        &self,
+        status: Option<i64>,
+        request_id: Option<&Value>,
+        event_count: usize,
+        last_event: Value,
+    ) -> Value {
+        let reported = self.reported.as_ref();
+        let request_id = match safe_identifier(request_id) {
+            Value::Null => reported.map_or(Value::Null, |reported| reported.request_id.clone()),
+            id => id,
+        };
+        let mut diagnostic = vec![
+            ("code", string(&self.code)),
+            ("action", string(self.action)),
+            (
+                "reported",
+                reported.map_or(Value::Null, |reported| reported.code.clone()),
+            ),
+            (
+                "status",
+                reported
+                    .map(|reported| reported.status.clone())
+                    .filter(|status| *status != Value::Null)
+                    .or_else(|| status.map(super::integer))
+                    .unwrap_or(Value::Null),
+            ),
+            (
+                "param",
+                reported.map_or(Value::Null, |reported| reported.param.clone()),
+            ),
+            ("request_id", request_id),
+            ("event_count", super::integer(event_count as i64)),
+            ("last_event", last_event),
+        ]
+        .into_iter()
+        .map(|(key, value)| (key.to_owned(), value))
+        .collect();
+        if let Some((shapes, streamed, finalized)) = &self.shapes {
+            set(&mut diagnostic, "tool_shapes", Value::Array(shapes.clone()));
+            set(
+                &mut diagnostic,
+                "streamed_calls",
+                super::integer(*streamed as i64),
+            );
+            set(
+                &mut diagnostic,
+                "finalized_calls",
+                super::integer(*finalized as i64),
+            );
+        }
+        Value::Object(diagnostic)
     }
 }
 
@@ -502,11 +564,16 @@ fn response_error(value: &Value, status: Option<i64>, request_id: Option<&Value>
         None => "chatgpt_response_failed",
     };
     let mut failure = Failure::of(code, status.is_some_and(|status| status >= 500));
-    failure.reported = Some((
-        status.map_or(Value::Null, super::integer),
-        safe_identifier(request_id),
-        safe_identifier(get(error, "param")),
-    ));
+    failure.reported = Some(ReportedFailure {
+        code: safe_identifier(get(error, "code")),
+        status: status.map_or(Value::Null, super::integer),
+        request_id: safe_identifier(
+            request_id
+                .or_else(|| get(error, "request_id"))
+                .or_else(|| get(value, "request_id")),
+        ),
+        param: safe_identifier(get(error, "param")),
+    });
     failure
 }
 
@@ -517,7 +584,12 @@ pub(super) fn error_answer(
     request_id: Option<&Value>,
 ) -> Value {
     let mut members = vec![("outcome".to_owned(), string("failed"))];
-    members.extend(response_error(value, status, request_id).answer());
+    let failure = response_error(value, status, request_id);
+    members.extend(failure.answer());
+    members.push((
+        "diagnostic".to_owned(),
+        failure.diagnostic(status, request_id, 0, Value::Null),
+    ));
     Value::Object(members)
 }
 
@@ -676,6 +748,8 @@ struct Decoder {
     arguments: Ordered<Value>,
     completed: Option<String>,
     terminal: Option<Value>,
+    event_count: usize,
+    last_event: Value,
 }
 
 impl Decoder {
@@ -689,6 +763,8 @@ impl Decoder {
             response_id: None,
             completed: None,
             terminal: None,
+            event_count: 0,
+            last_event: Value::Null,
         }
     }
 
@@ -708,6 +784,8 @@ impl Decoder {
             if !data.is_empty() && data != b"[DONE]" {
                 let text = std::str::from_utf8(&data).map_err(|_| Stop::Malformed("utf8"))?;
                 let event = python_loads(text).map_err(|_| Stop::Malformed("json"))?;
+                self.event_count += 1;
+                self.last_event = safe_identifier(get(&event, "type"));
                 if self.text {
                     self.text_event(&event)?;
                 } else {
@@ -1155,7 +1233,13 @@ fn event_data(raw: &[u8]) -> Vec<u8> {
 }
 
 /// The answer to a whole stream.
-pub(super) fn stream_answer(text: bool, answer_limit: usize, wire: &[u8]) -> Value {
+pub(super) fn stream_answer(
+    text: bool,
+    answer_limit: usize,
+    wire: &[u8],
+    status: Option<i64>,
+    request_id: Option<&Value>,
+) -> Value {
     let mut decoder = Decoder::new(text, answer_limit);
     let read = decoder.read(wire);
     let mut members: Vec<(String, Value)> = Vec::new();
@@ -1167,11 +1251,27 @@ pub(super) fn stream_answer(text: bool, answer_limit: usize, wire: &[u8]) -> Val
         Err(Stop::Failure(failure)) => {
             members.push(("outcome".to_owned(), string("failed")));
             members.extend(failure.answer());
+            members.push((
+                "diagnostic".to_owned(),
+                failure.diagnostic(
+                    status,
+                    request_id,
+                    decoder.event_count,
+                    decoder.last_event.clone(),
+                ),
+            ));
         }
         Err(Stop::Malformed(kind)) => {
             members.push(("outcome".to_owned(), string("malformed")));
             members.push(("kind".to_owned(), string(kind)));
             members.extend(malformed(kind));
+            let diagnostic = Failure::plain("chatgpt_response_invalid").diagnostic(
+                status,
+                request_id,
+                decoder.event_count,
+                decoder.last_event.clone(),
+            );
+            members.push(("diagnostic".to_owned(), diagnostic));
         }
     }
     // The observation keeps the last response and whether an answer completed.
@@ -1285,4 +1385,25 @@ pub(super) fn base64_decode(text: &str) -> Option<Vec<u8>> {
         }
     }
     Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stream_refusal_has_safe_report_and_event_position() {
+        let wire = b"data: {\"type\":\"response.created\"}\n\n\
+            data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"server_error\",\"param\":\"key-secret123\",\"message\":\"private text\"}}}\n\n\
+            data: {\"type\":\"response.completed\"}\n\n";
+        let request_id = string("req_fixture");
+        let answer = stream_answer(false, 4096, wire, Some(200), Some(&request_id));
+        assert_eq!(as_str(get(&answer, "failure")), Some("provider_rejected"));
+        assert!(matches!(get(&answer, "reported"), Some(Value::Bool(true))));
+        let diagnostic = get(&answer, "diagnostic").unwrap();
+        assert_eq!(
+            dumps(diagnostic),
+            r#"{"code":"chatgpt_response_failed","action":"diagnose","reported":"server_error","status":200,"param":null,"request_id":"req_fixture","event_count":2,"last_event":"response.failed"}"#
+        );
+    }
 }

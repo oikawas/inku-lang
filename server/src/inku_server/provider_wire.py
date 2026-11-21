@@ -115,10 +115,10 @@ def chatgpt_limits(answer_limit: int) -> dict:
     return _sign_in("limits", answer_limit=answer_limit)
 
 
-def chatgpt_stream(mode: str, answer_limit: int, wire: bytes) -> dict:
+def chatgpt_stream(mode: str, answer_limit: int, wire: bytes, *, status: int | None = None, request_id: str | None = None) -> dict:
     """The whole stream read once: ``answer`` with ``text``, ``failed`` or ``malformed``, with ``terminal``."""
     return _sign_in("stream", mode=mode, answer_limit=answer_limit,
-                wire_base64=base64.b64encode(wire).decode("ascii"))
+                wire_base64=base64.b64encode(wire).decode("ascii"), status=status, request_id=request_id)
 
 
 def chatgpt_error(value: Any = None, status: int | None = None, request_id: str | None = None, *, body: str | None = None) -> dict:

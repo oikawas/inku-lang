@@ -25,7 +25,7 @@ class ChatGPTError(Exception):
     has already classified passes both.
     """
 
-    def __init__(self, code: str, *, failure: str | None = None, action: str | None = None):
+    def __init__(self, code: str, *, failure: str | None = None, action: str | None = None, diagnostic: dict | None = None):
         super().__init__(code)
         if failure is None or action is None:
             from .provider_wire import chatgpt_failure
@@ -33,6 +33,7 @@ class ChatGPTError(Exception):
             named = chatgpt_failure(code)
             failure, action = failure or named["failure"], action or named["action"]
         self.code, self.failure, self.action = code, failure, action
+        self.diagnostic = diagnostic
 
 
 def canonical(value: dict) -> bytes:

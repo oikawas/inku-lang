@@ -161,6 +161,9 @@ struct LibraryView: View {
             guard phoneLayout, let id else { return }
             viewPhoneDrawing(id)
         }
+        .onChange(of: preview.work?.id, initial: true) { _, id in
+            if phoneLayout, let id { model.updatePhoneCompletion(.opened(id)) }
+        }
         .onChange(of: phoneRefinementResult?.id) { _, _ in
             guard phoneLayout, preview.work != nil, let work = phoneRefinementResult else { return }
             phoneOrder?.insertFirst(work.id, select: true)
@@ -270,8 +273,8 @@ struct LibraryView: View {
                 if phoneLayout && library.query.isEmpty && !phoneSearchHasDraft { phoneSearchVisible = false }
             })
             if phoneLayout {
-                if let completion = model.phoneCompletion {
-                    PhoneDrawingCompletionRow(display: display) { viewPhoneDrawing(completion.id) }
+                if let id = model.phoneCompletionID {
+                    PhoneDrawingCompletionRow(display: display) { viewPhoneDrawing(id) }
                 }
                 phoneFooter
             }
@@ -290,7 +293,7 @@ struct LibraryView: View {
     }
 
     private func closePhoneDrawingWait() {
-        if let wait = model.phoneDrawingWait, wait.visible { model.leavePhoneDrawingWait(wait) }
+        model.phoneDrawingWait?.visible = false
     }
 
     @ViewBuilder private var phoneDestination: some View {
@@ -329,6 +332,7 @@ struct LibraryView: View {
     }
 
     private func viewPhoneDrawing(_ id: String) {
+        model.updatePhoneCompletion(.opened(id))
         Task {
             guard let work = try? await library.fullWork(id: id) else {
                 if model.phoneWorkToView == id { model.phoneWorkToView = nil }
@@ -347,7 +351,7 @@ struct LibraryView: View {
         }
         phoneOrder?.insertFirst(work.id, select: true)
         preview.show(work)
-        if model.phoneCompletion?.id == work.id { model.phoneCompletion = nil }
+        model.updatePhoneCompletion(.opened(work.id))
     }
 
     private var phoneSearchRow: some View {
@@ -1591,7 +1595,7 @@ struct LibraryView: View {
                         Task { await library.restore(ids: [work.id]); await reconcilePhoneRemoval([work.id]) }
                     } else { deletion = LibraryDeletion(ids: [work.id], movesToTrash: !permanent) }
                 }, initialControls: phoneViewerControls,
-                onCompletedDrawing: model.phoneCompletion.map { completion in { viewPhoneDrawing(completion.id) } })
+                onCompletedDrawing: model.phoneCompletionID.map { id in { viewPhoneDrawing(id) } })
         }
     }
 

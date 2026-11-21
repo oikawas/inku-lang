@@ -218,6 +218,8 @@ public struct PipelineView: Sendable {
     public var phaseReason: String? = nil
     /// Decoded process material for the iPhone wait page. Never includes provider IO.
     public var phoneProcessJSON: Data? = nil
+    /// Optional preview request derived from the final Score before saving the work.
+    public var phoneAssemblyRequest: Data? = nil
 }
 
 /// One range a completion wrote, as the author has since left it (core `completion_range_states`).

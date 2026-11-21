@@ -36,10 +36,11 @@ struct PhoneShellView<Creation: View, Library: View, Settings: View>: View {
             settings()
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 0) {
-                        if let completion = model.phoneCompletion {
+                        if let id = model.phoneCompletionID {
                             PhoneDrawingCompletionRow(display: model.display) {
+                                model.updatePhoneCompletion(.opened(id))
                                 tab = PhoneShellTab.library
-                                model.phoneWorkToView = completion.id
+                                model.phoneWorkToView = id
                             }
                         }
                         if model.phoneProgressIsActive {
@@ -60,7 +61,7 @@ struct PhoneShellView<Creation: View, Library: View, Settings: View>: View {
         }
         .onChange(of: tab) { _, tab in
             if tab != PhoneShellTab.library, let wait = model.phoneDrawingWait, wait.visible {
-                model.leavePhoneDrawingWait(wait)
+                wait.visible = false
             }
         }
     }

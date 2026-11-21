@@ -42,6 +42,7 @@ struct PhoneDrawingWaitView: View {
         GeometryReader { geometry in
             let landscape = geometry.size.width > geometry.size.height
             let side = min(geometry.size.width, landscape ? geometry.size.height - 44 : geometry.size.height * 0.55)
+            let pixels = UInt32(max(1, min(CGFloat(PhoneDrawingAssembly.previewPixels), side * scale)))
             VStack(spacing: 0) {
                 if controls { header }
                 let layout = landscape ? AnyLayout(HStackLayout(spacing: 12)) : AnyLayout(VStackLayout(spacing: 0))
@@ -56,7 +57,10 @@ struct PhoneDrawingWaitView: View {
                 if !revealing && value.translation.width > max(70, abs(value.translation.height) * 1.4) { onPrevious() }
             })
             .task(id: wait.completion?.id) {
-                if let completion = wait.completion { await reveal(completion, pixels: UInt32(max(1, min(1200, side * scale)))) }
+                if let completion = wait.completion { await reveal(completion, pixels: pixels) }
+            }
+            .onChange(of: reduceMotion || scenePhase == .background ? nil : pixels, initial: true) { _, target in
+                wait.setAssemblyTarget(target)
             }
         }
         .foregroundStyle(.white)
@@ -68,8 +72,9 @@ struct PhoneDrawingWaitView: View {
             instructionLines = text.map(highlight) ?? []
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background && wait.completion != nil && wait.visible { model.leavePhoneDrawingWait(wait) }
+            if phase == .background && wait.completion != nil { wait.visible = false }
         }
+        .onDisappear { wait.setAssemblyTarget(nil) }
     }
 
     private var header: some View {
@@ -333,20 +338,32 @@ struct PhoneDrawingWaitView: View {
 
     private func reveal(_ completion: PhoneDrawingWait.Completion, pixels: UInt32) async {
         revealing = true
+        let inFlight = wait.preflight
+        let progress = inFlight?.progress ?? PhoneDrawingAssembly.Progress()
         guard let work = try? await model.library.fullWork(id: completion.id) else {
-            if !Task.isCancelled { model.leavePhoneDrawingWait(wait) }
+            if !Task.isCancelled {
+                progress.logSkip(.preparation("saved_work_unavailable"), workID: completion.id,
+                                 elapsed: completion.savedAt.duration(to: .now))
+                wait.visible = false
+            }
             return
         }
         guard !Task.isCancelled else { return }
         finished = work
         let clock = ContinuousClock()
-        let frames = reduceMotion ? [] : await PhoneDrawingAssembly.prepare(
-            savedAt: completion.savedAt, commandCount: wait.commandCount, now: { clock.now },
-            sleep: { try await clock.sleep(until: $0) }
+        let frames = await PhoneDrawingAssembly.prepare(
+            savedAt: completion.savedAt, commandCount: wait.commandCount, reduceMotion: reduceMotion,
+            now: { clock.now }, sleep: { try await clock.sleep(until: $0) },
+            onSkip: { skip, elapsed in progress.logSkip(skip, workID: work.id, elapsed: elapsed) }
         ) {
-            guard let context = await model.phoneAssemblyContext(work.id), !Task.isCancelled else { return [] }
-            return (try? PhoneDrawingAssembly.frames(work: work, context: context, pixels: pixels)) ?? []
+            if let inFlight { return try await inFlight.task.value }
+            guard let context = await model.phoneAssemblyContext(work.id) else {
+                throw HostError("saved_authoring_context_unavailable")
+            }
+            try Task.checkCancellation()
+            return try PhoneDrawingAssembly.frames(work: work, context: context, pixels: pixels, progress: progress)
         }
+        wait.cancelPreflight()
         guard !Task.isCancelled else { return }
         if !frames.isEmpty {
             let interval = PhoneDrawingAssembly.frameInterval(count: frames.count)

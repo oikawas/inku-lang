@@ -1599,7 +1599,23 @@ private actor ExecutionDriver {
                             completionIssues: state.svgFailure == nil ? HoleCompletionIssue.issues(snapshot: snapshot) : [],
                             actionTag: snapshot["action"]["tag"].string,
                             phaseReason: state.svgFailure == nil ? snapshot["phase"]["reason"].string : nil,
-                            phoneProcessJSON: phoneProcessMaterial())
+                            phoneProcessJSON: phoneProcessMaterial(),
+                            phoneAssemblyRequest: phase == "score_ready" ? phoneAssemblyRequest() : nil)
+    }
+
+    private func phoneAssemblyRequest() -> Data? {
+        guard phoneProcess, state.rendered == nil,
+              let instructions = snapshot["delivery"]["score"]["instructions"].array, instructions.count > 1,
+              let options = try? renderOptionsForDelivery() else { return nil }
+        let document = snapshot["document"]
+        let authority = snapshot["authority"]
+        let context = SavedAuthoringContext(
+            configuration: snapshot["config"].data, renderOptions: options.data, clipPolicy: state.clipPolicy,
+            document: document.object == nil ? nil : document.data, authority: "", origin: "",
+            revision: "", authorityJSON: authority.data)
+        // The final SVG does not exist yet. It is used only for the core's final-frame comparison.
+        let work = SavedWork(id: "", at: 0, input: "", score: snapshot["delivery"]["score"].text, svg: "")
+        return try? PipelineHost.lineAnimationRequest(work: work, context: context, locks: document["macro_locks"].array ?? []).data
     }
     private func phoneProcessMaterial() -> Data? {
         guard phoneProcess else { return nil }

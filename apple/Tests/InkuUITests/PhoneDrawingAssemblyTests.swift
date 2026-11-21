@@ -1,4 +1,5 @@
 import CoreGraphics
+import Synchronization
 import XCTest
 @testable import InkuUI
 
@@ -43,6 +44,8 @@ import XCTest
             let result = await PhoneDrawingAssembly.prepare(savedAt: savedAt, now: { savedAt }, sleep: { deadline in
                 XCTAssertEqual(savedAt.duration(to: deadline), .milliseconds(1500))
                 for await _ in started { break }
+            }, onSkip: { skip, _ in
+                XCTAssertEqual(skip.logFields.reason, "deadline")
             }) {
                 signalStart.yield(())
                 // A detached producer represents a synchronous core call that can't be interrupted.
@@ -76,6 +79,40 @@ import XCTest
             }) { returned }
             XCTAssertTrue(frames.isEmpty)
         }
+    }
+
+    func testEachSkipReportsItsReasonAndElapsedTimeOnce() async {
+        let savedAt = ContinuousClock.now
+        let later = savedAt.advanced(by: .milliseconds(200))
+        let reasons = Mutex<[String]>([])
+        let report: @Sendable (PhoneDrawingAssembly.Skip, Duration) -> Void = { skip, elapsed in
+            XCTAssertEqual(elapsed, .milliseconds(200))
+            reasons.withLock { $0.append(skip.logFields.reason) }
+        }
+        let timer: @Sendable (ContinuousClock.Instant) async throws -> Void = { _ in
+            try await Task.sleep(for: .seconds(30))
+        }
+        _ = await PhoneDrawingAssembly.prepare(savedAt: savedAt, reduceMotion: true, now: { later }, sleep: timer, onSkip: report) {
+            XCTFail("Reduce Motion skips preparation")
+            return []
+        }
+        _ = await PhoneDrawingAssembly.prepare(savedAt: savedAt, now: { later }, sleep: timer, onSkip: report) { [] }
+        _ = await PhoneDrawingAssembly.prepare(savedAt: savedAt, now: { later }, sleep: timer, onSkip: report) {
+            throw PhoneDrawingAssembly.Failure.refused(code: "render_refused", message: "test")
+        }
+        XCTAssertEqual(reasons.withLock { $0 }, ["reduce_motion", "frame_count", "core_refused"])
+    }
+
+    func testPreviewGroupsFramesWithoutLosingSourceLines() throws {
+        let raw = (0..<25).map { index in
+            PhoneDrawingAssembly.VectorFrame(
+                svg: #"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>"#,
+                lines: [[index, index]])
+        }
+        let frames = try PhoneDrawingAssembly.rasterize(raw, aspect: 1, pixels: 10)
+        XCTAssertEqual(frames.count, 8)
+        XCTAssertEqual(frames.first?.lines, [0...0])
+        XCTAssertEqual(frames.flatMap(\.lines).map(\.lowerBound), Array(0..<25))
     }
 
     private func testFrame() throws -> PhoneDrawingAssembly.Frame {

@@ -56,7 +56,7 @@ public final class AppModel {
     public private(set) var phoneDrawFailure: String?
     private(set) var phoneDrawingWait: PhoneDrawingWait?
     var phoneProgressIsActive: Bool { phoneDrawingWait?.running == true || hasActiveRun }
-    var phoneCompletion: PhoneDrawingWait.Completion?
+    private(set) var phoneCompletionID: String?
     var phoneWorkToView: String?
     private var phonePendingReview: PipelineView?
     private var phoneDefaultsInitialized = false
@@ -618,6 +618,11 @@ public final class AppModel {
     }
 
     public func cancel() async {
+        updatePhoneCompletion(.stopped)
+        if phoneDrawingWait?.running == true {
+            phoneDrawingWait?.cancelled = true
+            phoneDrawingWait?.cancelPreflight()
+        }
         guard let operation = activeOperation, !stopping else { return }
         stopping = true
         providerProgress?.finish(.cancelled, at: Date())
@@ -1946,6 +1951,7 @@ public final class AppModel {
 
     public func generateCandidate(request: GenerationRequest, token: UUID, comparison: Bool = true) async throws -> PreparedCandidate {
         guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        updatePhoneCompletion(.started)
         var request = request; request.saveHistory = false; request.historyVisibility = "normal"
         try await validatePinnedRequest(request)
         let models = request.models
@@ -2062,6 +2068,7 @@ public final class AppModel {
                                   preserveWorkspace: Bool = false,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
+        if singleInputMode != nil || discardPreviousExecution { updatePhoneCompletion(.started) }
         if discardPreviousExecution, !background, !preserveWorkspace, let currentExecutionID { discardUnsavedExecutions([currentExecutionID]) }
         let token = UUID()
         generationToken = token
@@ -2270,6 +2277,7 @@ public final class AppModel {
         }
         _ = await performSerialized(status: "DDLを処理中") { [weak self] token in
             guard let self else { return }
+            self.updatePhoneCompletion(.started)
             self.activeExecutionID = executionID
             if self.runFollowed { self.currentExecutionID = executionID }
             let stage2: Bool?
@@ -2907,6 +2915,7 @@ public final class AppModel {
         guard !hasActiveRun, phoneDrawingWait?.running != true, previewWork == nil, !phoneNeedsReview, availability.hasConnection, !availability.keyMissing,
               (!availability.chatGPT || availability.signedIn), availability.available else { return nil }
         phoneBackgroundStopped = false; phoneDrawFailure = nil; phonePendingReview = nil
+        updatePhoneCompletion(.started)
         let canvas = canvases.first { $0.id == drawDefaults["describe"]?.canvasAspect }
         let aspect = canvas.map { Double($0.widthRatio) / Double(max(1, $0.heightRatio)) } ?? 1
         let wait = PhoneDrawingWait(description: phoneDrawText, aspect: aspect)
@@ -2916,6 +2925,7 @@ public final class AppModel {
             wait.running = false
             if wait.completion == nil {
                 wait.failure = phoneBackgroundStopped ? display.localized("アプリを離れている間に、描画が止まりました。") : phoneDrawFailure
+                if wait.failure != nil { updatePhoneCompletion(.failed) }
                 if wait.failure == nil && !phoneNeedsReview { wait.visible = false }
             }
         }
@@ -2935,21 +2945,25 @@ public final class AppModel {
         guard let wait, phoneDrawingWait === wait else { return }
         let alreadySaved = wait.completion != nil
         wait.receive(progress, at: instant)
-        guard !alreadySaved, wait.completion != nil else { return }
-        if !wait.visible || PhoneDrawingNotice.isOutsideApp {
-            leavePhoneDrawingWait(wait)
+        guard !alreadySaved, let completion = wait.completion, !wait.cancelled else { return }
+        let outside = PhoneDrawingNotice.isOutsideApp
+        let watching = wait.visible && !outside
+        updatePhoneCompletion(.saved(id: completion.id, watching: watching))
+        if !watching {
+            wait.visible = false
+            PhoneDrawingNotice.announce(completion.id, display: display)
         }
     }
 
-    func leavePhoneDrawingWait(_ wait: PhoneDrawingWait) {
-        wait.visible = false
-        guard let completion = wait.completion, phoneCompletion?.id != completion.id else { return }
-        phoneCompletion = completion
-        PhoneDrawingNotice.announce(completion.id, display: display)
+    func updatePhoneCompletion(_ event: PhoneDrawingBanner.Event) {
+        let next = PhoneDrawingBanner.next(phoneCompletionID, for: event)
+        if next != phoneCompletionID { phoneCompletionID = next }
     }
 
     func stopPhoneDrawing() async {
+        updatePhoneCompletion(.stopped)
         phoneDrawingWait?.cancelled = true
+        phoneDrawingWait?.cancelPreflight()
         if hasActiveRun { await stopEveryRun() }
     }
 

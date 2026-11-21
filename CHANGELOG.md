@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Swift (macOS and iOS): uses the shared core to validate, plan imports, and export work packs. Export sorts keys, leaves `/` unescaped, and omits annotations with neither a comment nor a revision mark. Earlier Swift work packs still import.
+
 - Shared core: added work pack APIs to validate lines, select imports and lineage roots, and encode JSON lines with sorted keys.
 
 - Adds [Using the iPhone App](manual/en/iphone-app.md) to the manual.

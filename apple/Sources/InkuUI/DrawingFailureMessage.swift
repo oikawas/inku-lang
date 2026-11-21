@@ -210,6 +210,8 @@ public enum ChatGPTStatusCopy {
         // Sign in with ChatGPT step 4 (the author's answer): a time limit, and an answer that cannot be drawing data.
         "chatgpt_transport_timeout": ("ChatGPTの応答が制限時間内に返りませんでした。時間を置いて再試行してください。",
             "ChatGPT did not answer within the time limit. Try again later."),
+        "chatgpt_response_failed": ("ChatGPT の応答が途中で失敗しました。もう一度お試しください。",
+            "ChatGPT's response failed partway. Please try again."),
         "chatgpt_response_invalid": ("ChatGPTの応答を描画のデータとして受け取れませんでした。形式の診断が必要です。",
             "The ChatGPT response could not be used as drawing data. A protocol diagnosis is needed."),
         "chatgpt_response_too_large": ("ChatGPTの応答を描画のデータとして受け取れませんでした。形式の診断が必要です。",
@@ -218,6 +220,8 @@ public enum ChatGPTStatusCopy {
             "Plan usage reached its limit. Check your usage."),
         "subscription_sharing_usage_limit_exceeded": ("プラン利用の上限に達しました。利用枠を確認してください。",
             "Plan usage reached its limit. Check your usage."),
+        "subscription_sharing_invalid_user": ("このアカウントでは ChatGPT のプランを使えません。サインインし直してください。",
+            "This account can't use the ChatGPT plan here. Please sign in again."),
         "subscription_sharing_user_not_eligible": ("このアカウントではプランを利用できません。",
             "Plan usage is unavailable for this account."),
         "subscription_sharing_usage_unavailable": ("利用枠を確認できませんでした。時間を置いて再試行してください。",

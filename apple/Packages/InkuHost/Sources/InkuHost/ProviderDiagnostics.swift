@@ -8,6 +8,12 @@ public enum ProviderAttemptDiagnosticOperation: String, Codable, Sendable, Equat
 
 /// Safe ordinary failure facts. This value never contains a request URL, headers or response body.
 public struct ProviderAttemptDiagnostic: Codable, Sendable, Equatable {
+    public struct ToolShape: Codable, Sendable, Equatable {
+        public let type: String?
+        public let name: String?
+        public let namespace: String?
+    }
+
     public let kind: ProviderAttemptDiagnosticKind
     public let reason: String
     public let endpoint: String?
@@ -21,17 +27,27 @@ public struct ProviderAttemptDiagnostic: Codable, Sendable, Equatable {
     public let providerStatus: String?
     public let providerMessage: String?
     public let operation: ProviderAttemptDiagnosticOperation?
+    public let requestID: String?
+    public let eventCount: Int?
+    public let lastEvent: String?
+    public let toolShapes: [ToolShape]?
+    public let streamedCalls: Int?
+    public let finalizedCalls: Int?
 
     public init(kind: ProviderAttemptDiagnosticKind, reason: String, endpoint: String? = nil,
                 errorDomain: String? = nil, errorCode: Int? = nil, hostCode: String? = nil,
                 httpStatus: Int? = nil, providerCode: String? = nil, providerType: String? = nil,
                 providerParameter: String? = nil, providerStatus: String? = nil, providerMessage: String? = nil,
-                operation: ProviderAttemptDiagnosticOperation? = nil) {
+                operation: ProviderAttemptDiagnosticOperation? = nil, requestID: String? = nil,
+                eventCount: Int? = nil, lastEvent: String? = nil, toolShapes: [ToolShape]? = nil,
+                streamedCalls: Int? = nil, finalizedCalls: Int? = nil) {
         self.kind = kind; self.reason = reason; self.endpoint = endpoint
         self.errorDomain = errorDomain; self.errorCode = errorCode; self.hostCode = hostCode
         self.httpStatus = httpStatus; self.providerCode = providerCode; self.providerType = providerType
         self.providerParameter = providerParameter; self.providerStatus = providerStatus; self.providerMessage = providerMessage
         self.operation = operation
+        self.requestID = requestID; self.eventCount = eventCount; self.lastEvent = lastEvent
+        self.toolShapes = toolShapes; self.streamedCalls = streamedCalls; self.finalizedCalls = finalizedCalls
     }
 }
 

@@ -232,12 +232,14 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
         let snapshot = lock.withLock { value }
         do { try await callback(snapshot) } catch { throw ProviderObservationFailure.requestSaveFailed }
     }
-    func finish(failure: String?, cancelled: Bool = false, callback: ProviderObservationHandler) async throws {
+    func finish(failure: String?, cancelled: Bool = false, chatGPTDiagnostic: ChatGPTPlanDiagnostic? = nil,
+                callback: ProviderObservationHandler) async throws {
         let snapshot = lock.withLock {
             let parts = began.duration(to: .now).components
             value.metric.elapsedMS = UInt64(max(0, parts.seconds * 1_000 + parts.attoseconds / 1_000_000_000_000_000))
             value.metric.failure = failure
             value.metric.outcome = cancelled ? .cancelled : (failure == nil ? .completed : .failed)
+            if let chatGPTDiagnostic { value.metric.diagnostic = chatGPTAttemptDiagnostic(chatGPTDiagnostic) }
             if let received {
                 value.metric.sent = received.sent; value.metric.httpStatus = received.status
                 if options.captureRaw {
@@ -254,6 +256,22 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
             return value
         }
         do { try await callback(snapshot) } catch { throw ProviderObservationFailure.outcomeSaveFailed }
+    }
+
+    /// Called while holding the recorder lock, with the credential set from this attempt.
+    private func chatGPTAttemptDiagnostic(_ diagnostic: ChatGPTPlanDiagnostic) -> ProviderAttemptDiagnostic {
+        func identifier(_ value: String?) -> String? {
+            ChatGPTPlanDiagnostic.safe(value).map { ProviderSecretRedactor.redact($0, secrets: secrets) }
+        }
+        let status = diagnostic.status.flatMap { (100...599).contains($0) ? $0 : nil }
+        return ProviderAttemptDiagnostic(
+            kind: (status ?? 0) >= 400 ? .http : .host, reason: "The ChatGPT request could not be completed.",
+            hostCode: identifier(diagnostic.code), httpStatus: status, providerCode: identifier(diagnostic.reportedCode),
+            providerParameter: identifier(diagnostic.parameter), operation: .generation,
+            requestID: identifier(diagnostic.requestID), eventCount: diagnostic.eventCount, lastEvent: identifier(diagnostic.lastEvent),
+            toolShapes: diagnostic.toolShapes?.map {
+                .init(type: identifier($0.type), name: identifier($0.name), namespace: identifier($0.namespace))
+            }, streamedCalls: diagnostic.streamedCalls, finalizedCalls: diagnostic.finalizedCalls)
     }
     private func bounded(_ data: Data, incomplete: Bool = false) -> (String, Bool) {
         // Mask before slicing: a credential crossing the byte limit must not leak a prefix.

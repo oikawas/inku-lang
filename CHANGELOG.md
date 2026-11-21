@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Swift (macOS and iOS): records ChatGPT refusal codes and stream event details for each failed attempt, even when provider body capture is off.
+
 - iOS: keeps the 2D paper size and center when switching to 3D in the iPhone viewer.
 - Swift (macOS and iOS): uses the saved score and drawing settings for line-by-line animation.
 - iOS: drawings started from words on iPhone home open a waiting page with progress and process details. The picture builds up there when ready. Elsewhere, the Drawing finished banner opens the work, and iOS can notify you outside the app.

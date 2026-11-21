@@ -90,9 +90,10 @@ enum ChatGPTWire {
             "answer_limit": .integer(answerLimit)]))
     }
 
-    static func read(text: Bool, answerLimit: Int, wire: Data) throws -> Stream {
+    static func read(text: Bool, answerLimit: Int, wire: Data, status: Int? = nil, requestID: String? = nil) throws -> Stream {
         let result = try evaluate("stream", ["mode": .string(text ? "text" : "pipeline"),
-            "answer_limit": .integer(answerLimit), "wire_base64": .string(wire.base64EncodedString())])
+            "answer_limit": .integer(answerLimit), "wire_base64": .string(wire.base64EncodedString()),
+            "status": status.map { .integer($0) } ?? .null, "request_id": .optional(requestID)])
         let terminal = result["terminal"] == .null ? nil : result["terminal"]
         switch result["outcome"].string {
         case "answer":
@@ -150,10 +151,20 @@ enum ChatGPTWire {
 
     /// A failure the core classified while reading: its failure and next action come from the same table.
     private static func failure(_ result: ExactJSON) -> ChatGPTPlanFailure {
-        let code = result["code"].string ?? "chatgpt_response_failed"
+        let detail = result["diagnostic"]
+        let code = detail["code"].string ?? result["code"].string ?? "chatgpt_response_failed"
         let classified = result["failure"].string.flatMap { failure in result["action"].string.map { (failure, $0) } }
             ?? classify(code: code, temporary: nil)
-        return ChatGPTPlanFailure(diagnostic: ChatGPTPlanDiagnostic(code: code, status: int(result["status"]),
-            requestID: result["request_id"].string, parameter: result["param"].string, failure: classified.0, action: classified.1))
+        let shapes = (detail["tool_shapes"].array ?? result["tool_shapes"].array)?.map {
+            ProviderAttemptDiagnostic.ToolShape(type: $0["type"].string, name: $0["name"].string, namespace: $0["namespace"].string)
+        }
+        return ChatGPTPlanFailure(diagnostic: ChatGPTPlanDiagnostic(
+            code: code, status: int(detail["status"]) ?? int(result["status"]),
+            requestID: detail["request_id"].string ?? result["request_id"].string,
+            parameter: detail["param"].string ?? result["param"].string, failure: classified.0, action: classified.1,
+            reportedCode: detail["reported"].string, eventCount: int(detail["event_count"]),
+            lastEvent: detail["last_event"].string, toolShapes: shapes,
+            streamedCalls: int(detail["streamed_calls"]) ?? int(result["streamed_calls"]),
+            finalizedCalls: int(detail["finalized_calls"]) ?? int(result["finalized_calls"])))
     }
 }

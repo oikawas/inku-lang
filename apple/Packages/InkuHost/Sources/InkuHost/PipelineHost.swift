@@ -84,6 +84,7 @@ public actor PipelineHost {
 
     public func generate(_ request: GenerationRequest, image: PreparedImageInput? = nil,
                          onStarted: (@Sendable (String) async throws -> Void)?,
+                         phoneProcess: Bool = false,
                          progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
         var request = try request.normalizedForNewWork()
         if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
@@ -112,7 +113,7 @@ public actor PipelineHost {
         }
         let report = try ExactJSON(data: Data(InkuCore.versionReport.utf8))
         guard report["binding_version"].string == "1.1.0", report["protocol_version"].string == "1.0.0" else { throw HostError("binding_protocol_mismatch") }
-        let driver = try ExecutionDriver(request: request, image: image, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
+        let driver = try ExecutionDriver(request: request, image: image, database: database, transport: transport, credentials: credentials, phoneProcess: phoneProcess, svgLimitBytes: svgLimitBytes)
         let started = try await driver.start(progress: progress)
         executions[started.executionID] = driver
         executionUsers[started.executionID, default: 0] += 1
@@ -866,6 +867,7 @@ private actor ExecutionDriver {
     var state: StoredExecution
     private var viewRenderedBytes: Data?
     private var viewSVG: String?
+    private let phoneProcess: Bool
     var databaseRevision: Int64?
     var snapshot: ExactJSON
     // Only the live driver's last adopted step owns these reports; restored snapshots use the core readers.
@@ -882,12 +884,14 @@ private actor ExecutionDriver {
     let maximumExecutionRawBodyBytes = 64 * 1_024 * 1_024
 
     init(request: GenerationRequest, image: PreparedImageInput?, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore,
+         phoneProcess: Bool = false,
          svgLimitBytes: @escaping @Sendable () async throws -> UInt64) throws {
         guard try ExactJSON(data: request.configuration).object != nil,
               try ExactJSON(data: request.renderOptions).object != nil,
               try ExactJSON(data: request.clipPolicy).object != nil else { throw HostError("invalid_pipeline_configuration") }
         self.database = database; self.transport = transport; self.credentials = credentials
         self.svgLimitBytes = svgLimitBytes
+        self.phoneProcess = phoneProcess
         self.state = StoredExecution(snapshot: Data(), models: request.models, providers: request.providers,
                                      renderOptions: request.renderOptions, clipPolicy: request.clipPolicy,
                                      renderColorMaps: request.renderColorMaps,
@@ -923,6 +927,7 @@ private actor ExecutionDriver {
     }
     init(record: ExecutionSnapshot, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore,
          svgLimitBytes: @escaping @Sendable () async throws -> UInt64) throws {
+        self.phoneProcess = false
         let stored = try JSONDecoder().decode(StoredExecution.self, from: record.snapshot)
         guard stored.schema == "inku.swift-pipeline-execution.v1" else { throw HostError("stored_execution_invalid") }
         let snapshot = try ExactJSON(data: stored.snapshot)
@@ -1593,7 +1598,43 @@ private actor ExecutionDriver {
                             completionRangesJSON: snapshot["completion_ranges"].object == nil ? nil : snapshot["completion_ranges"].data,
                             completionIssues: state.svgFailure == nil ? HoleCompletionIssue.issues(snapshot: snapshot) : [],
                             actionTag: snapshot["action"]["tag"].string,
-                            phaseReason: state.svgFailure == nil ? snapshot["phase"]["reason"].string : nil)
+                            phaseReason: state.svgFailure == nil ? snapshot["phase"]["reason"].string : nil,
+                            phoneProcessJSON: phoneProcessMaterial(),
+                            phoneAssemblyRequest: phase == "score_ready" ? phoneAssemblyRequest() : nil)
+    }
+
+    private func phoneAssemblyRequest() -> Data? {
+        guard phoneProcess, state.rendered == nil,
+              let instructions = snapshot["delivery"]["score"]["instructions"].array, instructions.count > 1,
+              let options = try? renderOptionsForDelivery() else { return nil }
+        let document = snapshot["document"]
+        let authority = snapshot["authority"]
+        let context = SavedAuthoringContext(
+            configuration: snapshot["config"].data, renderOptions: options.data, clipPolicy: state.clipPolicy,
+            document: document.object == nil ? nil : document.data, authority: "", origin: "",
+            revision: "", authorityJSON: authority.data)
+        // The final SVG does not exist yet. It is used only for the core's final-frame comparison.
+        let work = SavedWork(id: "", at: 0, input: "", score: snapshot["delivery"]["score"].text, svg: "")
+        return try? PipelineHost.lineAnimationRequest(work: work, context: context, locks: document["macro_locks"].array ?? []).data
+    }
+    private func phoneProcessMaterial() -> Data? {
+        guard phoneProcess else { return nil }
+        let description = snapshot["description_ddl"]
+        let composition = description["composition"].object != nil ? description["composition"] : snapshot["composition"]
+        let plans = [snapshot["composition"]["plan"], snapshot["laws"]["composed"]["plan"],
+                     snapshot["colors"]["printed"]["plan"], snapshot["stage1_fallback_plan"]]
+        let plan = plans.first { $0.object != nil } ?? .null
+        return ExactJSON.object([
+            "sketch": snapshot["sketch"]["text"], "sketch_state": snapshot["sketch"]["state"],
+            "reading": description["reading_text"], "reading_state": description["reading_state"],
+            "dropped": description["dropped_items"],
+            "answer": composition["answer"], "targets": composition["targets"],
+            "before_review": description["before_review"],
+            "layers": plan["layers"].array.map { .integer($0.count) } ?? .null,
+            "support": plan["ground"],
+            "catalog": snapshot["config"]["compiler"]["host"]["resolved_catalog_id"],
+            "ground": description["composition"]["colors"]["ground"],
+        ]).data
     }
     private func executionID() throws -> String { try snapshot.requiredString("execution_id") }
     private func canonicalUnsigned(_ value: ExactJSON, key: String) throws -> UInt64 {

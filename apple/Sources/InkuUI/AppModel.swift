@@ -7,6 +7,7 @@ import InkuHost
 import InkuPersistence
 import InkuExport
 import Observation
+import Synchronization
 import UniformTypeIdentifiers
 
 /// Availability of the author-facing prompt journal, independent of whether a provider was called.
@@ -54,6 +55,10 @@ public final class AppModel {
     public var phoneDrawText = ""
     public private(set) var phoneBackgroundStopped = false
     public private(set) var phoneDrawFailure: String?
+    private(set) var phoneDrawingWait: PhoneDrawingWait?
+    var phoneProgressIsActive: Bool { phoneDrawingWait?.running == true || hasActiveRun }
+    private(set) var phoneCompletionID: String?
+    var phoneWorkToView: String?
     private var phonePendingReview: PipelineView?
     private var phoneDefaultsInitialized = false
     public private(set) var drawSelections = DrawOptionsCore.release {
@@ -614,6 +619,11 @@ public final class AppModel {
     }
 
     public func cancel() async {
+        updatePhoneCompletion(.stopped)
+        if phoneDrawingWait?.running == true {
+            phoneDrawingWait?.cancelled = true
+            phoneDrawingWait?.cancelPreflight()
+        }
         guard let operation = activeOperation, !stopping else { return }
         stopping = true
         providerProgress?.finish(.cancelled, at: Date())
@@ -1942,6 +1952,7 @@ public final class AppModel {
 
     public func generateCandidate(request: GenerationRequest, token: UUID, comparison: Bool = true) async throws -> PreparedCandidate {
         guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        updatePhoneCompletion(.started)
         var request = request; request.saveHistory = false; request.historyVisibility = "normal"
         try await validatePinnedRequest(request)
         let models = request.models
@@ -2058,6 +2069,7 @@ public final class AppModel {
                                   preserveWorkspace: Bool = false,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
+        if singleInputMode != nil || discardPreviousExecution { updatePhoneCompletion(.started) }
         if discardPreviousExecution, !background, !preserveWorkspace, let currentExecutionID { discardUnsavedExecutions([currentExecutionID]) }
         let token = UUID()
         generationToken = token
@@ -2081,6 +2093,8 @@ public final class AppModel {
                 if !Task.isCancelled { succeeded = true }
             } catch {
                 if self.generationToken == token && !Task.isCancelled {
+                    // A home drawing with a committed work can still encounter an error reloading the library.
+                    if preserveWorkspace, self.phoneDrawingWait?.completion != nil { return }
                     if background {
                         self.automationFailureMessage = self.failureMessage(error)
                         if !self.stopping { self.providerProgress?.finish(.failed, at: Date()) }
@@ -2102,20 +2116,42 @@ public final class AppModel {
                               phoneHome: Bool = false,
                               onExecutionStarted: (@MainActor @Sendable (String) async throws -> Void)? = nil) async -> SavedWork? {
         guard let host else { return nil }
+        let wait = phoneHome ? phoneDrawingWait : nil
         var result: SavedWork?
         _ = await performSerialized(status: "生成中", background: background, locksBrowsing: locksBrowsing, singleInputMode: singleInputMode, discardPreviousExecution: true, preserveWorkspace: phoneHome) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
-            let view = try await host.generate(request, image: image, onStarted: onExecutionStarted) { [weak self] progress in
-                Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
+            // The transport reports attempt diagnostics before core decides whether the run can continue.
+            let phoneOutcome = Mutex<(diagnostic: String?, savedAt: ContinuousClock.Instant?)>((nil, nil))
+            let view = try await host.generate(request, image: image, onStarted: onExecutionStarted, phoneProcess: wait != nil) { [weak self] progress in
+                let instant = ContinuousClock.now
+                if phoneHome {
+                    switch progress {
+                    case .providerDiagnostic(_, let diagnostic): phoneOutcome.withLock { $0.diagnostic = diagnostic.code }
+                    case .saved: phoneOutcome.withLock { $0.savedAt = instant }
+                    default: break
+                    }
+                }
+                Task { @MainActor in
+                    self?.receivePhoneDrawing(progress, wait: wait, at: instant)
+                    self?.receive(progress, token: token, models: request.models, presentProviderDiagnostic: !phoneHome)
+                }
+            }
+            if phoneHome {
+                let outcome = phoneOutcome.withLock { $0 }
+                if let id = view.savedWorkID {
+                    self.receivePhoneDrawing(.saved(executionID: view.executionID, workID: id), wait: wait, at: outcome.savedAt ?? .now)
+                } else if view.phase == "failed", let code = outcome.diagnostic {
+                    self.chatGPTFailureCodes[view.executionID] = code
+                }
             }
             if phoneHome && (view.phase == "awaiting_patch_approval" || view.phase == "needs_user_edit" || !view.completionIssues.isEmpty) {
                 self.phonePendingReview = view
             }
             if self.generationToken == token, !self.stopping {
                 self.activeExecutionID = view.executionID
-                if let message = self.drawingFailureText(view) {
+                if (!phoneHome || view.savedWorkID == nil), let message = self.drawingFailureText(view) {
                     self.automationFailureMessage = message
                     // Background batch failures belong to their original row, not the single-drawing notice.
                     if !background, self.errorText == nil { self.errorText = message }
@@ -2261,6 +2297,7 @@ public final class AppModel {
         }
         _ = await performSerialized(status: "DDLを処理中") { [weak self] token in
             guard let self else { return }
+            self.updatePhoneCompletion(.started)
             self.activeExecutionID = executionID
             if self.runFollowed { self.currentExecutionID = executionID }
             let stage2: Bool?
@@ -2604,7 +2641,8 @@ public final class AppModel {
         default: nil
         }
     }
-    private func receive(_ progress: PipelineProgress, token: UUID, models: ModelSelection? = nil) {
+    private func receive(_ progress: PipelineProgress, token: UUID, models: ModelSelection? = nil,
+                         presentProviderDiagnostic: Bool = true) {
         recordDrawingProgress(progress)
         guard generationToken == token, !stopping else { return }
         receiveProviderProgress(progress, models: models, comparison: false)
@@ -2624,7 +2662,8 @@ public final class AppModel {
             }
             else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）" }
-        case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
+        case .providerDiagnostic(let id, let diagnostic):
+            if presentProviderDiagnostic { receive(diagnostic, executionID: id) }
         case .providerMetric, .runProgress: break
         case .saved(_, _): status = "作品を保存しました"
         }
@@ -2892,22 +2931,68 @@ public final class AppModel {
     }
 
     @discardableResult func drawPhoneDescription() async -> SavedWork? {
-        guard !hasActiveRun, previewWork == nil, !phoneNeedsReview, DescriptionLabels.hasDrawableText(phoneDrawText) else { return nil }
+        guard !hasActiveRun, phoneDrawingWait?.running != true, previewWork == nil, !phoneNeedsReview,
+              DescriptionLabels.hasDrawableText(phoneDrawText) else { return nil }
         let availability = await phoneDrawingAvailability()
-        guard !hasActiveRun, previewWork == nil, !phoneNeedsReview, availability.hasConnection, !availability.keyMissing,
+        guard !hasActiveRun, phoneDrawingWait?.running != true, previewWork == nil, !phoneNeedsReview, availability.hasConnection, !availability.keyMissing,
               (!availability.chatGPT || availability.signedIn), availability.available else { return nil }
         phoneBackgroundStopped = false; phoneDrawFailure = nil; phonePendingReview = nil
+        updatePhoneCompletion(.started)
+        let canvas = canvases.first { $0.id == drawDefaults["describe"]?.canvasAspect }
+        let aspect = canvas.map { Double($0.widthRatio) / Double(max(1, $0.heightRatio)) } ?? 1
+        let wait = PhoneDrawingWait(description: phoneDrawText, aspect: aspect)
+        phoneDrawingWait = wait
+        PhoneDrawingNotice.requestPermission()
+        defer {
+            wait.running = false
+            if wait.completion == nil {
+                wait.failure = phoneBackgroundStopped ? display.localized("アプリを離れている間に、描画が止まりました。") : phoneDrawFailure
+                if wait.failure != nil { updatePhoneCompletion(.failed) }
+                if wait.failure == nil && !phoneNeedsReview { wait.visible = false }
+            }
+        }
         do {
             let freshRequest = try requestForPhoneDescription(phoneDrawText)
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
+            guard !wait.cancelled else { return nil }
             let work = await runAutomation(request: request, singleInputMode: "description", phoneHome: true)
-            if work == nil && !phoneBackgroundStopped && phonePendingReview == nil {
+            if work == nil && wait.completion == nil && !phoneBackgroundStopped && phonePendingReview == nil {
                 phoneDrawFailure = (automationFailureMessage ?? errorText).map(phoneDrawingFailureText)
                 errorText = nil
             }
             return work
         } catch { phoneDrawFailure = phoneDrawingFailureText(failureMessage(error)); return nil }
     }
+    private func receivePhoneDrawing(_ progress: PipelineProgress, wait: PhoneDrawingWait?, at instant: ContinuousClock.Instant) {
+        guard let wait, phoneDrawingWait === wait else { return }
+        let alreadySaved = wait.completion != nil
+        wait.receive(progress, at: instant)
+        guard !alreadySaved, let completion = wait.completion, !wait.cancelled else { return }
+        let outside = PhoneDrawingNotice.isOutsideApp
+        let watching = wait.visible && !outside
+        updatePhoneCompletion(.saved(id: completion.id, watching: watching))
+        if !watching {
+            wait.visible = false
+            PhoneDrawingNotice.announce(completion.id, display: display)
+        }
+    }
+
+    func updatePhoneCompletion(_ event: PhoneDrawingBanner.Event) {
+        let next = PhoneDrawingBanner.next(phoneCompletionID, for: event)
+        if next != phoneCompletionID { phoneCompletionID = next }
+    }
+
+    func stopPhoneDrawing() async {
+        updatePhoneCompletion(.stopped)
+        phoneDrawingWait?.cancelled = true
+        phoneDrawingWait?.cancelPreflight()
+        if hasActiveRun { await stopEveryRun() }
+    }
+
+    func phoneAssemblyContext(_ id: String) async -> SavedAuthoringContext? {
+        try? await host?.savedAuthoringContext(workID: id)
+    }
+
     func phoneDrawingFailureText(_ message: String) -> String {
         let code = message.range(of: #"^[a-z][a-z0-9_]*$"#, options: .regularExpression) != nil
         guard code else { return message }

@@ -4,6 +4,16 @@ import InkuPersistence
 @testable import InkuUI
 
 @MainActor final class PhoneDrawStateTests: XCTestCase {
+    func testCompletionBannerFollowsTheSavedWorkAndClearsAtLifecycleBoundaries() {
+        let banner = PhoneDrawingBanner.next(nil, for: .saved(id: "first", watching: false))
+        XCTAssertEqual(banner, "first")
+        XCTAssertEqual(PhoneDrawingBanner.next(banner, for: .opened("another")), banner)
+        XCTAssertNil(PhoneDrawingBanner.next(banner, for: .opened("first")))
+        XCTAssertNil(PhoneDrawingBanner.next(banner, for: .started))
+        XCTAssertNil(PhoneDrawingBanner.next(banner, for: .stopped))
+        XCTAssertNil(PhoneDrawingBanner.next(banner, for: .failed))
+        XCTAssertNil(PhoneDrawingBanner.next(banner, for: .saved(id: "second", watching: true)))
+    }
     func testEveryStateAndPriority() {
         var cases: [(PhoneDrawState.Facts, PhoneDrawState)] = []
         func add(_ expected: PhoneDrawState, _ mutate: (inout PhoneDrawState.Facts) -> Void) {
@@ -69,9 +79,24 @@ import InkuPersistence
         app.phoneDrawText = "a blue circle"
         let result = await app.drawPhoneDescription()
         XCTAssertNotNil(result); XCTAssertNotEqual(result?.id, original)
+        XCTAssertEqual(app.phoneDrawingWait?.completion?.id, result?.id)
+        XCTAssertNotNil(app.phoneDrawingWait?.report["finished"].array?.first)
         XCTAssertEqual(app.selectedWorkID, original); XCTAssertEqual(app.descriptionText, "draft")
         XCTAssertEqual(app.ddlText, "other draft"); XCTAssertEqual(app.activeDrawTab, "image")
         XCTAssertEqual(app.drawSelections, selections)
+        let work = try XCTUnwrap(result)
+        let lookup = await app.phoneAssemblyContext(work.id)
+        let context = try XCTUnwrap(lookup)
+        let earlyBytes = try XCTUnwrap(app.phoneDrawingWait?.assemblyRequest)
+        var early = try ExactJSON(data: PhoneDrawingAssembly.previewRequest(earlyBytes))
+        let saved = try ExactJSON(data: PhoneDrawingAssembly.animationRequest(work: work, context: context))
+        XCTAssertEqual(early["saved_svg"].string, "")
+        early["saved_svg"] = saved["saved_svg"]
+        XCTAssertEqual(early, saved)
+        let frames = try PhoneDrawingAssembly.frames(work: work, context: context, pixels: 120)
+        XCTAssertGreaterThan(frames.count, 2)
+        XCTAssertEqual(frames.first?.image.width, 120)
+        XCTAssertTrue(frames.contains { !$0.lines.isEmpty })
     }
 }
 
@@ -80,6 +105,6 @@ private actor PhoneDrawFixture: ProviderTransport {
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let value = try ExactJSON(data: action)
         return ExactJSON.object(["tag": .string("normalized_ddl_generated"), "identity": value["identity"],
-            "response": .string(#"{"normalized_ddl":"place one red circle at center."}"#), "elapsed_ms": .string("1")]).data
+            "response": .string(#"{"normalized_ddl":"place one red circle at center.\nplace one blue circle at left."}"#), "elapsed_ms": .string("1")]).data
     }
 }

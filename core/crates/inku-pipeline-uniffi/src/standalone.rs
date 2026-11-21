@@ -2,7 +2,9 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use inku_pipeline::core_boundary::{ClipPolicy, CompiledDelivery, CompilerOptions};
+use inku_pipeline::core_boundary::{
+    BoundaryError, CheckedDeliveryRender, ClipPolicy, CompiledDelivery, CompilerOptions,
+};
 use inku_pipeline::machine::{PipelineRenderOptions, VisibleDocument};
 use serde::Deserialize;
 
@@ -34,6 +36,7 @@ struct AnimationInput {
     options: PipelineRenderOptions,
     clip: ClipPolicy,
     saved_svg: String,
+    saved_score: Option<inku_score::Score>,
     show_ddl: bool,
     font_family: String,
     #[serde(default)]
@@ -251,13 +254,25 @@ pub fn line_animation_bytes(input_bytes: &[u8]) -> Vec<u8> {
         .map_err(|error| refusal("compile_refused", &error.to_string()))?;
         // The delivery is checked once and each frame draws its prefix; a
         // frame carries only the SVG a host reads (I-732, 2026-11-07).
-        let checked = inku_pipeline::core_boundary::CheckedDeliveryRender::new(
-            &delivery,
-            input.options.clone().into(),
-            &input.compiler,
-            input.clip,
-        )
-        .map_err(|error| refusal("render_refused", &error.to_string()))?;
+        let using_saved_score = input.saved_score.is_some();
+        let options = input.options.clone().into();
+        let checked = match input.saved_score {
+            Some(score) => CheckedDeliveryRender::for_saved_score(
+                &delivery,
+                score,
+                options,
+                &input.compiler,
+                input.clip,
+            ),
+            None => CheckedDeliveryRender::new(&delivery, options, &input.compiler, input.clip),
+        }
+        .map_err(|error| {
+            let code = match error {
+                BoundaryError::SavedScoreMismatch { .. } => "saved_score_mismatch",
+                _ => "render_refused",
+            };
+            refusal(code, &error.to_string())
+        })?;
         let panel = input
             .show_ddl
             .then(|| DdlPanel::new(&input.document.source, input.options.canvas.height));
@@ -303,7 +318,11 @@ pub fn line_animation_bytes(input_bytes: &[u8]) -> Vec<u8> {
                 serde_json::json!({"instruction_count": index, "lines": selected, "svg": svg}),
             );
         }
-        serde_json::to_vec(&serde_json::json!({"frames": frames, "matches_saved_svg": matches_saved, "font_files": input.font_files, "outcome": delivery.outcome, "upstream_diagnostics": delivery.upstream_diagnostics, "downstream_diagnostics": delivery.downstream_diagnostics, "resource_omissions": delivery.resource_omissions, "relation_omissions": delivery.relation_omissions})).map_err(|error| refusal("invalid_output", &error.to_string()))
+        let mut result = serde_json::json!({"frames": frames, "matches_saved_svg": matches_saved, "font_files": input.font_files, "outcome": delivery.outcome, "upstream_diagnostics": delivery.upstream_diagnostics, "downstream_diagnostics": delivery.downstream_diagnostics, "resource_omissions": delivery.resource_omissions, "relation_omissions": delivery.relation_omissions});
+        if using_saved_score {
+            result["source"] = serde_json::json!("saved_score");
+        }
+        serde_json::to_vec(&result).map_err(|error| refusal("invalid_output", &error.to_string()))
     })
 }
 
@@ -311,8 +330,7 @@ pub fn line_animation_bytes(input_bytes: &[u8]) -> Vec<u8> {
 mod line_animation_tests {
     use super::*;
 
-    #[test]
-    fn animation_compiles_the_source_and_reports_each_frame() {
+    fn animation_input() -> serde_json::Value {
         use inku_score::{CANVAS_FORMAT_REGISTRY_ID, Color, canvas_format_registry_digest};
         let map = std::collections::BTreeMap::new();
         let palette = inku_render::palette::work_palette_context(
@@ -324,12 +342,71 @@ mod line_animation_tests {
         .unwrap();
         let dto = |p: inku_score::ResolvedPaletteColor| serde_json::json!({"abstract_color":p.abstract_color(),"concrete_rgb":p.concrete_rgb(),"oklch_lightness":p.oklch_lightness()});
         let maximum = serde_json::json!({"logical_objects":400,"primitive_marks":400,"object_templates":64,"maximum_per_template_primitive_marks":240,"maximum_resolved_count":2000,"template_nodes":512,"anchor_instances":400,"transform_instances":400,"placement_instances":400,"fill_instances":400});
-        let mut input = serde_json::json!({
+        serde_json::json!({
             "document":{"source":"Place one thin pencil line at the center.\nThe line sways narrowly.\nPlace a circle.","language":"en","macro_locks":[],"saijiki":inku_ddl::SAIJIKI_ASSET_ID},"definitions":[],
             "compiler":{"host":{"canvas_format_id":"square","canvas_format_registry_id":CANVAS_FORMAT_REGISTRY_ID,"canvas_format_registry_digest":canvas_format_registry_digest().unwrap(),"resolved_catalog_id":"default","catalog_mode":"default","background":"white","palette":{"background":dto(palette.background()),"black":dto(palette.black()),"white":dto(palette.white()),"observations":palette.observations().unwrap().iter().copied().map(dto).collect::<Vec<_>>() }},"composition_seed":"17","macro_expansion_limits":{"max_invocations":"16","max_depth":"16","max_evaluation_steps":"1000","max_nodes_per_invocation":"100","max_total_nodes":"500"},"error_policy":"omit_and_continue","hard_resource_policy":{"identity":"animation-test.v1","budget":{"maximum":maximum}},"operational_resource_budget":{"maximum":maximum}},
             "options":{"resolved_color_map":map,"catalog_id":"default","canvas":{"width":1000.0,"height":1000.0},"canvas_aspect_id":"square","svg_profile":"display","render_seed":"5","composition_seed":"17","wild":false,"error_policy":"omit_and_continue"},
             "clip":{"tolerance_pixels":0.25,"max_nodes":"50000","max_path_elements":"200000","max_flattened_points":"200000","max_work":"10000000","max_output_vertices":"200000"},"saved_svg":"older","show_ddl":false,"font_family":"Noto Serif JP","font_files":[]
-        });
+        })
+    }
+
+    fn compiled_score(input: &serde_json::Value) -> inku_score::Score {
+        let parsed: AnimationInput = serde_json::from_value(input.clone()).unwrap();
+        inku_pipeline::core_boundary::compile_committed_with_line_ranges(
+            parsed.document.document().unwrap(),
+            &parsed.definitions,
+            &parsed.compiler,
+        )
+        .unwrap()
+        .0
+        .score
+        .unwrap()
+    }
+
+    #[test]
+    fn animation_replays_saved_score_with_the_child_catalog() {
+        let mut input = animation_input();
+        let score = compiled_score(&input);
+        input["options"]["catalog_id"] = serde_json::json!("ink_season");
+        input["saved_score"] = serde_json::to_value(&score).unwrap();
+        let parsed: AnimationInput = serde_json::from_value(input.clone()).unwrap();
+        let expected = inku_pipeline::core_boundary::render_saved_score(
+            inku_render::types::RenderRequest {
+                score,
+                options: parsed.options.into(),
+            },
+            &parsed.compiler.hard_resource_policy,
+            parsed.compiler.operational_resource_budget,
+            parsed.clip,
+        )
+        .unwrap();
+        input["saved_svg"] = serde_json::json!(expected.svg);
+        let result: serde_json::Value =
+            serde_json::from_slice(&line_animation_bytes(&serde_json::to_vec(&input).unwrap()))
+                .unwrap();
+        assert_eq!(result["source"], "saved_score", "{result}");
+        assert_eq!(result["matches_saved_svg"], true);
+        assert_eq!(
+            result["frames"].as_array().unwrap().last().unwrap()["svg"],
+            input["saved_svg"]
+        );
+    }
+
+    #[test]
+    fn animation_refuses_a_different_saved_score() {
+        let mut input = animation_input();
+        let mut score = compiled_score(&input);
+        score.instructions.swap(0, 1);
+        input["saved_score"] = serde_json::to_value(score).unwrap();
+        let result: serde_json::Value =
+            serde_json::from_slice(&line_animation_bytes(&serde_json::to_vec(&input).unwrap()))
+                .unwrap();
+        assert_eq!(result["error"], "saved_score_mismatch", "{result}");
+    }
+
+    #[test]
+    fn animation_compiles_the_source_and_reports_each_frame() {
+        let mut input = animation_input();
         // One call gives the bytes the two calls give (I-732).
         let compile_input = serde_json::json!({"document": input["document"], "definitions": input["definitions"], "compiler": input["compiler"]});
         let delivery = compile_document(serde_json::to_vec(&compile_input).unwrap());
@@ -354,6 +431,7 @@ mod line_animation_tests {
         let result: serde_json::Value =
             serde_json::from_slice(&line_animation(serde_json::to_vec(&input).unwrap())).unwrap();
         assert!(result.get("error").is_none(), "{result}");
+        assert!(result.get("source").is_none());
         let frames = result["frames"].as_array().unwrap();
         assert_eq!(frames.len(), 3);
         assert!(

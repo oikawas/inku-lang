@@ -948,6 +948,46 @@ pub struct CheckedDeliveryRender<'a> {
 }
 
 impl<'a> CheckedDeliveryRender<'a> {
+    /// Replay a saved Score whose identity matches the compiled line mapping.
+    pub fn for_saved_score(
+        delivery: &CompiledDelivery,
+        score: Score,
+        options: RenderOptions,
+        compiler: &'a CompilerOptions,
+        clip: ClipPolicy,
+    ) -> Result<Self, BoundaryError> {
+        compiler.validate()?;
+        delivery.validate()?;
+        if &delivery.compiler_options != compiler {
+            return Err(BoundaryError::CompilerOptionsMismatch);
+        }
+        let compiled = delivery
+            .score
+            .as_ref()
+            .ok_or(BoundaryError::CompilationHasNoScore)?;
+        let compiled_digest =
+            canonical_score_digest(compiled).map_err(|_| BoundaryError::ScoreSerialization)?;
+        let saved_digest =
+            canonical_score_digest(&score).map_err(|_| BoundaryError::ScoreSerialization)?;
+        if compiled_digest != saved_digest
+            || compiled.instructions.len() != score.instructions.len()
+        {
+            return Err(BoundaryError::SavedScoreMismatch {
+                compiled_digest,
+                saved_digest,
+                compiled_count: compiled.instructions.len(),
+                saved_count: score.instructions.len(),
+            });
+        }
+        check_render_canvas(&options, compiler)?;
+        clip.resolved()?;
+        Ok(Self {
+            request: RenderRequest { score, options },
+            compiler,
+            clip,
+        })
+    }
+
     pub fn new(
         delivery: &CompiledDelivery,
         options: RenderOptions,
@@ -984,16 +1024,7 @@ fn checked_delivery_request(
     if &delivery.compiler_options != compiler {
         return Err(BoundaryError::CompilerOptionsMismatch);
     }
-    if options.canvas_aspect_id != compiler.host.canvas_format_id() {
-        return Err(BoundaryError::RenderIdentityMismatch(
-            RenderIdentityField::CanvasFormat,
-        ));
-    }
-    if !render_canvas_matches_registry(&options, compiler.host.canvas_format_id()) {
-        return Err(BoundaryError::RenderIdentityMismatch(
-            RenderIdentityField::CanvasGeometry,
-        ));
-    }
+    check_render_canvas(&options, compiler)?;
     if options.catalog_id.as_deref() != Some(compiler.host.resolved_catalog_id()) {
         return Err(BoundaryError::RenderIdentityMismatch(
             RenderIdentityField::ResolvedCatalog,
@@ -1034,6 +1065,23 @@ fn checked_delivery_request(
     Ok(RenderRequest { score, options })
 }
 
+fn check_render_canvas(
+    options: &RenderOptions,
+    compiler: &CompilerOptions,
+) -> Result<(), BoundaryError> {
+    if options.canvas_aspect_id != compiler.host.canvas_format_id() {
+        return Err(BoundaryError::RenderIdentityMismatch(
+            RenderIdentityField::CanvasFormat,
+        ));
+    }
+    if !render_canvas_matches_registry(options, compiler.host.canvas_format_id()) {
+        return Err(BoundaryError::RenderIdentityMismatch(
+            RenderIdentityField::CanvasGeometry,
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostOptionsError {
     CanvasRegistryIdMismatch,
@@ -1068,6 +1116,12 @@ pub enum BoundaryError {
     RenderIdentityMismatch(RenderIdentityField),
     CompilationHasNoScore,
     ScoreIdentityMismatch,
+    SavedScoreMismatch {
+        compiled_digest: String,
+        saved_digest: String,
+        compiled_count: usize,
+        saved_count: usize,
+    },
     Render(RenderError),
 }
 
@@ -1091,6 +1145,15 @@ impl fmt::Display for BoundaryError {
             }
             Self::CompilationHasNoScore => formatter.write_str("compilation has no Score"),
             Self::ScoreIdentityMismatch => formatter.write_str("Score identity mismatch"),
+            Self::SavedScoreMismatch {
+                compiled_digest,
+                saved_digest,
+                compiled_count,
+                saved_count,
+            } => write!(
+                formatter,
+                "compiled Score {compiled_digest} ({compiled_count} instructions), saved Score {saved_digest} ({saved_count} instructions)"
+            ),
             Self::Render(error) => error.fmt(formatter),
         }
     }

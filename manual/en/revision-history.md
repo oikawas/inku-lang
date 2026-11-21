@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-21 — The iPhone app guide
+
+- [Using the iPhone App](./iphone-app.md) — Added instructions for home, drawing, viewing, sharing, importing work packs, Settings, and the Making screen.
+
 ## 2026-11-15 — The provenance button on the lineage tab
 
 - "Creating images": the provenance button at the bottom right of the lineage tab, and following a lineage card's selection.

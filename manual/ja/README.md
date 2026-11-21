@@ -4,18 +4,19 @@
 
 ## 対象読者
 
-- 画像作成者: Web 画面または CLI から、短い言葉を入力して SVG / PNG 画像を作成する人
+- 画像作成者: iPhone アプリ、Web 画面、CLI から、短い言葉を入力して SVG / PNG 画像を作成する人
 - システム管理者: サーバーへ inku をインストールし、API、Web UI、DB、ログ、バックアップ、AI 接続を管理する人
 
 ## ドキュメント構成
 
 1. [画像の作成方法](./image-creation.md)
    * [DDL書式・語彙リファレンス](./ddl-reference.md) — 文法の原則、入門例、文法と歳時記の一覧、複雑な例50個
-2. [inku-cliリファレンス](./cli-reference.md)
+2. [iPhone アプリの使い方](./iphone-app.md)
+3. [inku-cliリファレンス](./cli-reference.md)
    * [AI自律運転・テスト用リファレンス](./cli-reference-for-ai.md)
-3. [アプリケーションインストール](./application-install.md)
-4. [サーバー設定方法](./server-configuration.md)
-5. [改訂履歴](./revision-history.md)
+4. [アプリケーションインストール](./application-install.md)
+5. [サーバー設定方法](./server-configuration.md)
+6. [改訂履歴](./revision-history.md)
 
 日々の制作では「画像の作成方法」を参照してください。記述・指示書からの描画、系譜とライブラリ、バッチの再開、レイヤーアニメーション、設定の文字サイズまで説明しています。モデル接続や利用者の権限を管理する場合は「サーバー設定方法」を参照してください。
 

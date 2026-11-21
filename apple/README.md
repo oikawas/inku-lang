@@ -243,7 +243,9 @@ Bounded CLI checks use `apple/scripts/check-core.sh` and `swift run --package-pa
 
 ### The iPad and iPhone app
 
-The iOS app (target `InkuIOS`, bundle ID `app.inku.ios`, iOS 18 or later) installs on iPad and iPhone. On iPad it shows the same screens and menus as the Mac in one full-screen window. On iPhone the work library is the home; its drawing field opens Making or the camera. Tap a work to view it on black, swipe between works, pinch to zoom, or double-tap for 3D. Star, Refine, and Share are available; Share sends a card directly to the iOS share sheet. The top bar offers All / Starred, a menu and settings; pull the list down to reveal search. A back button or a left-edge swipe returns from Making and settings. Photos are drawn with the Image values in Drawing defaults (the iPad's Image tab keeps "Take Photo"). Home shows square thumbnails three to a row and scrolls through every work (the lineage view still pages). The iPhone stays upright; only the work page and the presentation turn with it (the "2026-11-07 The iOS (iPad) app" section of the [Swift specification](SWIFT_SPEC.md)). Run the following from the product repository root to build it, unsigned, for the iOS Simulator. It uses no Apple account, Team, or certificate. Add the iOS targets first with the `rustup target add` command above.
+The iOS app (target `InkuIOS`, bundle ID `app.inku.ios`, iOS 18 or later) installs on iPad and iPhone. On iPad it opens the same screens and menus as the Mac in one window. On iPhone the library is home, and you can draw from words or a photo you take there. From home you can also open the viewer, page through works, switch to 3D, share images, and import work packs. See [Using the iPhone app](../manual/en/iphone-app.md) for instructions and the [Swift specification](SWIFT_SPEC.md) for implementation details.
+
+Run the following from the product repository root to build the app unsigned for the iOS Simulator. The build uses no Apple account, Team, or certificate. Add the iOS targets first with the `rustup target add` command above.
 
 ```sh
 apple/scripts/build-ios.sh Release

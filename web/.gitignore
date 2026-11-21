@@ -25,4 +25,4 @@ vite.config.ts.timestamp-*
 
 # Keep local builds out; commit only the registered distribution.
 /static/experimental/ddl-3d/*
-!/static/experimental/ddl-3d/score-024-paper-fit-c86284be/
+!/static/experimental/ddl-3d/score-024-paper-fit-c6136965/

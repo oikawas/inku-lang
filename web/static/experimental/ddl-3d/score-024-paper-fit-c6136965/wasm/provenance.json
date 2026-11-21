@@ -1,8 +1,8 @@
 {
   "adapterVersion": "0.1.0",
   "mappingVersion": "solid-mapping-v1",
-  "coreBaseSha": "c86284be53af47aa98f4ad56d1473a2a10f3159b",
+  "coreBaseSha": "c6136965dce8ec2afa192e40b45490256b92cf0e",
   "coreTrackedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "coreHasLocalChanges": false,
-  "coreSourceSha256": "456c718beb379f9d858805c0216763575d81800768d7b30adf5f8ec3b8280fb5"
+  "coreSourceSha256": "cc52303274f477211c3bca8a47ee19c163e50a49f365997dc0bac932208946f0"
 }

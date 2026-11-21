@@ -8,6 +8,24 @@ import AppKit
 import UIKit
 #endif
 
+/// A presentation that UIKit accepted stays pending until the activity completes.
+@MainActor
+final class ShareSheetCompletion {
+    private var reply: ((Bool) -> Void)?
+
+    init(_ reply: @escaping (Bool) -> Void) { self.reply = reply }
+
+    func presentationReturned(attached: Bool) {
+        if !attached { finish(false) }
+    }
+
+    func finish(_ completed: Bool) {
+        let callback = reply
+        reply = nil
+        callback?(completed)
+    }
+}
+
 @MainActor
 enum InkuPhoneShare {
     static func present(_ url: URL) async -> Bool {

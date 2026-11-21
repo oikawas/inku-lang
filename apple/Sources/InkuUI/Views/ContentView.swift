@@ -868,7 +868,7 @@ public struct ContentView: View {
                 let previews = try reader.previews()
                 guard request == workPackRequest else { return }
                 workPack = WorkPackSession(reader: reader, decision: decision, previews: previews)
-            } catch { if request == workPackRequest { model.errorText = error.localizedDescription } }
+            } catch { if request == workPackRequest { model.errorText = model.failureMessage(error) } }
         }
     }
 
@@ -920,7 +920,7 @@ public struct ContentView: View {
                             workPackRevision += 1
                             if workPack?.id == session.id { workPack = nil }
                             workPackResult = model.display.label("\(result.workIDs.count) 作品を取り込み、\(result.skipped) 作品を飛ばしました", "Imported \(result.workIDs.count) works; skipped \(result.skipped)")
-                        } catch { model.errorText = error.localizedDescription }
+                        } catch { model.errorText = model.failureMessage(error) }
                     }
                 } label: {
                     Text(model.display.label("取り込む", "Import")).frame(minHeight: phoneLayout ? 44 : 0)
@@ -946,7 +946,7 @@ public struct ContentView: View {
                 #endif
                 try await model.auxiliaryDatabase().exportWorkPack(ids: ids, to: url, host: host, appVersion: version, build: build)
                 _ = await NativeFilePanels.handOff([url], dialogs: fileDialogs, share: true)
-            } catch { model.errorText = error.localizedDescription }
+            } catch { model.errorText = model.failureMessage(error) }
         }
     }
 

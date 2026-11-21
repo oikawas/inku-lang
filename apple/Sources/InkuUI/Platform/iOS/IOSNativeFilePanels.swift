@@ -23,15 +23,31 @@ enum NativeFilePanels {
     static func handOff(_ urls: [URL], dialogs: InkuFileDialogs?, share: Bool = false) async -> [URL]? {
         let folders = Set(urls.map { $0.deletingLastPathComponent().standardizedFileURL }.filter(isTemporaryFolder))
         guard !folders.isEmpty else { return urls }
-        defer { for folder in folders { try? FileManager.default.removeItem(at: folder) } }
+        func cleanup() { for folder in folders { try? FileManager.default.removeItem(at: folder) } }
         let written = urls.filter { FileManager.default.fileExists(atPath: $0.path) }
-        guard !written.isEmpty else { return nil }
-        if share { return await InkuShareSheet.present(written) ? written : nil }
+        guard !written.isEmpty else { cleanup(); return nil }
+        if share {
+            // UIKit owns these URLs until the activity callback, even if its presenter changes.
+            return await InkuShareSheet.present(written, onActivityFinished: cleanup) ? written : nil
+        }
+        defer { cleanup() }
         guard let dialogs else { return nil }
         return await dialogs.move(written)
     }
 
     private static let prefix = "inku-export-"
+
+    static func removeAbandonedExportsAtStartup() {
+        let files = FileManager.default
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
+        guard let entries = try? files.contentsOfDirectory(at: files.temporaryDirectory,
+                                                           includingPropertiesForKeys: Array(keys)) else { return }
+        for folder in entries where isTemporaryFolder(folder) {
+            guard let values = try? folder.resourceValues(forKeys: keys),
+                  values.isDirectory == true, values.isSymbolicLink != true else { continue }
+            try? files.removeItem(at: folder)
+        }
+    }
 
     private static func temporaryFile(named name: String) -> URL? {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(prefix + UUID().uuidString, isDirectory: true)
@@ -41,6 +57,7 @@ enum NativeFilePanels {
 
     private static func isTemporaryFolder(_ folder: URL) -> Bool {
         folder.lastPathComponent.hasPrefix(prefix)
+            && UUID(uuidString: String(folder.lastPathComponent.dropFirst(prefix.count))) != nil
             && folder.deletingLastPathComponent().standardizedFileURL.path == FileManager.default.temporaryDirectory.standardizedFileURL.path
     }
 }

@@ -16,7 +16,7 @@ final class WorkPackTests: XCTestCase {
         let reader = try WorkPackReader(url: fixture())
         XCTAssertEqual(reader.counts["history"], 3)
         let plan = try await db.importWorkPack(reader)
-        XCTAssertEqual(plan.workIDs.count, 3)
+        XCTAssertEqual(plan.workIDs, ["work-0", "work-1", "work-2"])
         XCTAssertEqual(plan.nodeRoots["node-2"], "node-0")
         let duplicate = try await db.importWorkPack(reader)
         XCTAssertEqual(duplicate.skipped, 3)
@@ -25,6 +25,19 @@ final class WorkPackTests: XCTestCase {
         XCTAssertEqual(saved?.score, "{\"instructions\":[]}")
         let output = directory.appendingPathComponent("out.inkupack")
         try await db.exportWorkPack(ids: ["work-0", "work-1", "work-2"], to: output, host: "test", appVersion: "1", build: 1)
+        let lines = try Data(contentsOf: output).split(separator: 10)
+        XCTAssertTrue(lines.contains(Data(#"{"for_revision":1,"history_id":"work-1","kind":"annotation","note":"fixture note"}"#.utf8)))
+        for (index, line) in lines.enumerated() {
+            var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
+            let request: [String: Any]
+            if index == 0 {
+                request = ["kind": "header", "exported_at": try XCTUnwrap(object["exported_at"]),
+                           "producer": try XCTUnwrap(object["producer"]), "counts": try XCTUnwrap(object["counts"])]
+            } else {
+                request = ["kind": try XCTUnwrap(object.removeValue(forKey: "kind")), "record": object]
+            }
+            XCTAssertEqual(try WorkPackWire.encode(request), Data(line), "Core's canonical bytes for line \(index + 1)")
+        }
         let reread = try WorkPackReader(url: output)
         XCTAssertEqual(reread.counts, reader.counts)
         let other = try InkuDatabase(url: directory.appendingPathComponent("other.sqlite"))
@@ -42,15 +55,61 @@ final class WorkPackTests: XCTestCase {
         XCTAssertEqual(subsetResult.edgeIDs, ["edge-2"])
     }
     func testPlannerMissingParentAndCollision() throws {
-        let graph = WorkPackIdentity(works: [.init(id: "child", nodeID: "c"), .init(id: "grandchild", nodeID: "g")],
-            nodes: [.init(id: "c", historyID: "child"), .init(id: "g", historyID: "grandchild")],
-            edges: [.init(id: "missing", parent: "p", child: "c"), .init(id: "edge", parent: "c", child: "g")])
-        let plan = try WorkPackPlanner.decide(graph, existingWorks: [], existingRoots: [:], existingParents: [:])
+        let records: [WorkPackRecordIdentity] = [
+            .init(kind: "history", key: "child", identity: ["id": "child", "node_id": "c"]),
+            .init(kind: "history", key: "grandchild", identity: ["id": "grandchild", "node_id": "g"]),
+            .init(kind: "lineage_node", key: "c", identity: ["id": "c", "history_id": "child"]),
+            .init(kind: "lineage_node", key: "g", identity: ["id": "g", "history_id": "grandchild"]),
+            .init(kind: "lineage_edge", key: "missing", identity: ["id": "missing", "parent": "p", "child": "c"]),
+            .init(kind: "lineage_edge", key: "edge", identity: ["id": "edge", "parent": "c", "child": "g"])
+        ]
+        let counts = ["history": 2, "lineage_node": 2, "lineage_edge": 2, "annotation": 0, "colophon": 0]
+        let plan = try WorkPackWire.plan(counts: counts, records: records, existing: .init())
         XCTAssertEqual(plan.nodeRoots, ["c": "c", "g": "c"])
         XCTAssertEqual(plan.edgeIDs, ["edge"])
-        let duplicate = try WorkPackPlanner.decide(graph, existingWorks: ["child"], existingRoots: ["c": "c"], existingParents: [:])
+        let duplicate = try WorkPackWire.plan(counts: counts, records: records,
+                                              existing: .init(works: ["child"], nodeRoots: ["c": "c"]))
         XCTAssertEqual(duplicate.skipped, 1)
         XCTAssertEqual(duplicate.nodeRoots["g"], "c")
+    }
+
+    func testReadsLegacySwiftEscapesAndOmitsEmptyAnnotationOnExport() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("workpack-legacy-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let lines = try Data(contentsOf: fixture()).split(separator: 10)
+        var legacy = Data()
+        for line in lines {
+            var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
+            if object["kind"] as? String == "annotation" {
+                object["note"] = ""
+                object["for_revision"] = 0
+            }
+            if object["id"] as? String == "work-0" {
+                object["draw_route"] = "must stay local"
+            }
+            legacy.append(try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .fragmentsAllowed]))
+            legacy.append(10)
+        }
+        XCTAssertTrue(String(decoding: legacy, as: UTF8.self).contains(#"\/"#))
+        XCTAssertTrue(String(decoding: legacy, as: UTF8.self).contains(#""note":"""#))
+        let old = directory.appendingPathComponent("legacy.inkupack")
+        try legacy.write(to: old)
+        let reader = try WorkPackReader(url: old)
+        XCTAssertEqual(reader.counts["annotation"], 1)
+        let db = try InkuDatabase(url: directory.appendingPathComponent("test.sqlite"))
+        let imported = try await db.importWorkPack(reader)
+        XCTAssertEqual(imported.workIDs, ["work-0", "work-1", "work-2"])
+        let importedWork = try await db.work(id: "work-0")
+        XCTAssertNil(importedWork?.drawRoute)
+
+        let output = directory.appendingPathComponent("out.inkupack")
+        try await db.exportWorkPack(ids: imported.workIDs, to: output, host: "test", appVersion: "1", build: 1)
+        let exported = try String(contentsOf: output, encoding: .utf8)
+        XCTAssertFalse(exported.contains(#"\/"#))
+        XCTAssertFalse(exported.contains(#""kind":"annotation""#))
+        XCTAssertFalse(exported.contains(#""draw_route""#))
+        XCTAssertEqual(try WorkPackReader(url: output).counts["annotation", default: 0], 0)
     }
 
     func testConstraintFailureRollsBackEveryWork() async throws {
@@ -79,6 +138,13 @@ final class WorkPackTests: XCTestCase {
         catch { }
         let rolledBack = try await db.work(id: "other-work-0")
         XCTAssertNil(rolledBack)
+    }
+
+    func testInvalidWorkPackShowsLocalizedMessageWithoutDiagnosticReason() {
+        let error = WorkPackError.invalid("truncated line")
+        XCTAssertEqual(error.localizedDescription, "作品パックが壊れています。")
+        XCTAssertEqual(error.message(language: "ja"), "作品パックが壊れています。")
+        XCTAssertEqual(error.message(language: "en"), "The work pack is damaged.")
     }
 
     func testRejectsTruncationAndNewerVersion() throws {

@@ -25,31 +25,67 @@ extension WorkPackReader {
             return previews
         }
     }
-    func forEach(kind: String, _ body: ([String: Any]) throws -> Void) throws {
+    func forEach(kind: String, keys: [String], _ body: ([String: Any]) throws -> Void) throws {
         try queue.read { db in
-            let rows = try Row.fetchCursor(db, sql: "SELECT payload FROM records WHERE kind = ? ORDER BY rowid", arguments: [kind])
-            while let row = try rows.next() {
-                let data: Data = row[0]
-                guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw WorkPackError.invalid("record") }
+            let query = try db.cachedStatement(sql: "SELECT payload FROM records WHERE kind = ? AND key = ?")
+            for key in keys {
+                guard let data = try Data.fetchOne(query, arguments: [kind, key]),
+                      let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw WorkPackError.invalid("record")
+                }
                 try body(object)
             }
         }
     }
 }
 
+// Swift's schema uses the portable names as its column names. The extra history
+// columns belong only to this database; core owns validation of the portable fields.
+private func workPackColumns(_ table: String, in db: Database) throws -> [String] {
+    let columns = try db.columns(in: table).map(\.name)
+    guard table == "history" else { return columns }
+    let local = ["draw_route", "sketch_requested", "composition_requested", "catalog_mode"]
+    return columns.filter { !local.contains($0) }
+}
+
 extension InkuDatabase {
     private func packDecision(_ reader: WorkPackReader, db: Database) throws -> WorkPackDecision {
-        let works = Set(try String.fetchAll(db, sql: "SELECT id FROM history"))
-        var roots: [String: String] = [:], parents: [String: String] = [:]
-        for row in try Row.fetchAll(db, sql: "SELECT id, root_node_id FROM lineage_nodes") {
-            let id: String = row[0]; roots[id] = (row[1] as String?) ?? id
+        var workIDs = Set<String>(), nodeIDs = Set<String>(), childIDs = Set<String>()
+        for record in reader.records {
+            switch record.kind {
+            case "history":
+                workIDs.insert(record.key)
+                if let node = record.identity["node_id"] ?? nil { nodeIDs.insert(node) }
+            case "lineage_node":
+                nodeIDs.insert(record.key)
+            case "lineage_edge":
+                if let parent = record.identity["parent"] ?? nil { nodeIDs.insert(parent) }
+                if let child = record.identity["child"] ?? nil { nodeIDs.insert(child); childIDs.insert(child) }
+            default: break
+            }
         }
-        for row in try Row.fetchAll(db, sql: "SELECT id, parent_node_id, child_node_id FROM lineage_edges") {
-            let parent: String = row[1], child: String = row[2]
-            parents[child] = parent
+
+        func lookup(_ ids: Set<String>, prefix: String, each: (Row) -> Void) throws {
+            let ordered = ids.sorted()
+            // Bound SQL parameters even on SQLite builds with a low variable limit.
+            for start in stride(from: 0, to: ordered.count, by: 500) {
+                let batch = ordered[start..<min(ordered.count, start + 500)]
+                let marks = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                let rows = try Row.fetchCursor(db, sql: prefix + "(\(marks))", arguments: StatementArguments(batch))
+                while let row = try rows.next() { each(row) }
+            }
         }
-        return try WorkPackPlanner.decide(reader.identity, existingWorks: works, existingRoots: roots,
-                                          existingParents: parents)
+
+        var existing = WorkPackExisting()
+        try lookup(workIDs, prefix: "SELECT id FROM history WHERE id IN ") { existing.works.append($0[0]) }
+        try lookup(nodeIDs, prefix: "SELECT id,root_node_id FROM lineage_nodes WHERE id IN ") {
+            let id: String = $0[0]
+            existing.nodeRoots[id] = ($0[1] as String?) ?? id
+        }
+        try lookup(childIDs, prefix: "SELECT child_node_id,parent_node_id FROM lineage_edges WHERE child_node_id IN ") {
+            existing.parents[$0[0] as String] = $0[1] as String
+        }
+        return try reader.plan(existing: existing)
     }
 
     public func previewWorkPack(_ reader: WorkPackReader) throws -> WorkPackDecision {
@@ -60,45 +96,51 @@ extension InkuDatabase {
     public func importWorkPack(_ reader: WorkPackReader) throws -> WorkPackDecision {
         try queue.write { db in
             let plan = try packDecision(reader, db: db)
-            func insert(_ object: [String: Any], kind: String, table: String, overrides: [String: DatabaseValue] = [:]) throws {
-                let fields = WorkPackFields.records[kind]!.filter { object[$0.name] != nil || overrides[$0.name] != nil }
-                let columns = fields.map(\.name)
-                var values: [DatabaseValue] = []
-                for field in fields {
-                    if let override = overrides[field.name] { values.append(override); continue }
-                    let item = object[field.name]!
-                    if item is NSNull { values.append(.null) }
-                    else if let string = item as? String { values.append(string.databaseValue) }
-                    else if let number = item as? NSNumber {
-                        values.append(field.encoding == "finite_number" ? number.doubleValue.databaseValue : number.int64Value.databaseValue)
-                    } else { throw WorkPackError.invalid("unsupported value") }
+            func insert(_ object: [String: Any], columns: [String], table: String,
+                        overrides: [String: DatabaseValue] = [:]) throws {
+                let present = columns.filter { object[$0] != nil || overrides[$0] != nil }
+                let values: [DatabaseValue] = try present.map { column in
+                    if let override = overrides[column] { return override }
+                    let item = object[column]
+                    if item is NSNull { return .null }
+                    if let text = item as? String { return text.databaseValue }
+                    if let number = item as? NSNumber {
+                        // The canvas aspect ratio has REAL affinity. Other portable numbers are signed integers.
+                        return column == "render_canvas_aspect_ratio" ? number.doubleValue.databaseValue : number.int64Value.databaseValue
+                    }
+                    throw WorkPackError.invalid("unsupported value")
                 }
-                try db.execute(sql: "INSERT INTO \(table) (\(columns.joined(separator: ","))) VALUES (\(Array(repeating: "?", count: columns.count).joined(separator: ",")))", arguments: StatementArguments(values))
+                let names = present.map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }.joined(separator: ",")
+                let marks = Array(repeating: "?", count: present.count).joined(separator: ",")
+                try db.execute(sql: "INSERT INTO \(table) (\(names)) VALUES (\(marks))", arguments: StatementArguments(values))
             }
-            try reader.forEach(kind: "history") { row in
-                guard let id = row["id"] as? String, plan.workIDs.contains(id) else { return }
-                try insert(row, kind: "history", table: "history")
+
+            let historyColumns = try workPackColumns("history", in: db)
+            let nodeColumns = try workPackColumns("lineage_nodes", in: db)
+            let edgeColumns = try workPackColumns("lineage_edges", in: db)
+            try reader.forEach(kind: "history", keys: plan.workIDs) {
+                try insert($0, columns: historyColumns, table: "history")
             }
-            try reader.forEach(kind: "lineage_node") { row in
-                guard let id = row["id"] as? String, plan.nodeRoots[id] != nil else { return }
-                try insert(row, kind: "lineage_node", table: "lineage_nodes", overrides: ["root_node_id": .null])
+            // The reply's node_roots is an object; preserve the file order from the validated identity rows.
+            let nodeIDs = reader.records.filter { $0.kind == "lineage_node" && plan.nodeRoots[$0.key] != nil }.map(\.key)
+            try reader.forEach(kind: "lineage_node", keys: nodeIDs) {
+                try insert($0, columns: nodeColumns, table: "lineage_nodes", overrides: ["root_node_id": .null])
             }
-            for (id, root) in plan.nodeRoots {
-                try db.execute(sql: "UPDATE lineage_nodes SET root_node_id = ? WHERE id = ?", arguments: [root, id])
+            for id in nodeIDs {
+                try db.execute(sql: "UPDATE lineage_nodes SET root_node_id = ? WHERE id = ?", arguments: [plan.nodeRoots[id], id])
             }
-            try reader.forEach(kind: "lineage_edge") { row in
-                guard let id = row["id"] as? String, plan.edgeIDs.contains(id) else { return }
-                try insert(row, kind: "lineage_edge", table: "lineage_edges")
+            try reader.forEach(kind: "lineage_edge", keys: plan.edgeIDs) {
+                try insert($0, columns: edgeColumns, table: "lineage_edges")
             }
-            try reader.forEach(kind: "annotation") { row in
-                guard let id = row["history_id"] as? String, plan.workIDs.contains(id) else { return }
+            try reader.forEach(kind: "annotation", keys: plan.annotationIDs) { row in
+                let id = row["history_id"] as! String
                 let note = (row["note"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                try db.execute(sql: "INSERT INTO library_annotations (history_id,note,for_revision) VALUES (?,?,?)", arguments: [id, note, WorkPackReader.integer(row["for_revision"])!])
+                try db.execute(sql: "INSERT INTO library_annotations (history_id,note,for_revision) VALUES (?,?,?)", arguments: [id, note, (row["for_revision"] as! NSNumber).int64Value])
             }
-            try reader.forEach(kind: "colophon") { row in
-                guard let target = row["target_node_id"] as? String, plan.nodeRoots[target] != nil else { return }
+            try reader.forEach(kind: "colophon", keys: plan.colophonIDs) { row in
+                let target = row["target_node_id"] as! String
                 let model = row["model"] as! String, language = row["language"] as! String
-                let at = WorkPackReader.integer(row["at"])!
+                let at = (row["at"] as! NSNumber).int64Value
                 let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"
                 formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
                 let date = formatter.string(from: Date(timeIntervalSince1970: Double(at) / 1000))
@@ -126,52 +168,65 @@ extension InkuDatabase {
                 }
                 colophons += try String.fetchAll(db, sql: "SELECT id FROM auxiliary_colophons WHERE target_node_id = ? ORDER BY at,id", arguments: [node])
             }
-            for id in works {
-                if try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM library_annotations WHERE history_id = ?)", arguments: [id]) == true { annotations.append(id) }
+            func annotationLine(_ id: String) throws -> Data? {
+                guard let row = try Row.fetchOne(db, sql: "SELECT note,for_revision FROM library_annotations WHERE history_id = ?", arguments: [id]) else { return nil }
+                let note: String? = row[0]
+                return try WorkPackWire.encode(["kind": "annotation", "record": [
+                    "history_id": id, "note": note as Any? ?? NSNull(), "for_revision": row[1] as Int
+                ]])
             }
+            // Count only rows that core will emit; retain their IDs, not their encoded bodies.
+            for id in works where try annotationLine(id) != nil { annotations.append(id) }
             let counts = ["history": works.count, "lineage_node": nodes.count, "lineage_edge": edges.count, "annotation": annotations.count, "colophon": colophons.count]
-            let header: [String: Any] = ["format": "inku.workpack", "format_version": 1, "persistence_contract_version": 2, "exported_at": Int64(Date().timeIntervalSince1970 * 1000), "producer": ["host": host, "app_version": appVersion, "build": build, "schema_version": Self.currentSchemaVersion], "counts": counts]
+            let header: [String: Any] = ["kind": "header", "exported_at": Int64(Date().timeIntervalSince1970 * 1000), "producer": ["host": host, "app_version": appVersion, "build": build, "schema_version": Self.currentSchemaVersion], "counts": counts]
             guard FileManager.default.createFile(atPath: destination.path, contents: nil) else { throw WorkPackError.invalid("cannot create file") }
             let output = try FileHandle(forWritingTo: destination)
             defer { try? output.close() }
             var written = 0
-            func write(_ object: [String: Any]) throws {
-                let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .fragmentsAllowed])
-                guard data.count <= 64 * 1024 * 1024 else { throw WorkPackError.tooLarge }
+            func write(_ data: Data) throws {
                 written += data.count + 1
                 guard written <= 256 * 1024 * 1024 else { throw WorkPackError.tooLarge }
                 try output.write(contentsOf: data); try output.write(contentsOf: Data([10]))
             }
-            func common(_ kind: String, table: String, id: String) throws {
+            func writeRecord(_ kind: String, _ record: [String: Any]) throws {
+                guard let data = try WorkPackWire.encode(["kind": kind, "record": record]) else {
+                    throw WorkPackError.invalid("missing export record")
+                }
+                try write(data)
+            }
+            func common(_ kind: String, table: String, columns: [String], id: String) throws {
                 guard let row = try Row.fetchOne(db, sql: "SELECT * FROM \(table) WHERE id = ?", arguments: [id]) else { throw WorkPackError.invalid("missing export record") }
-                var object: [String: Any] = ["kind": kind]
-                for field in WorkPackFields.records[kind]! {
-                    let value: DatabaseValue = row[field.name]
+                var object: [String: Any] = [:]
+                for column in columns {
+                    let value: DatabaseValue = row[column]
                     switch value.storage {
-                    case .null: object[field.name] = NSNull()
-                    case .int64(let n): object[field.name] = n
-                    case .double(let n): object[field.name] = n
-                    case .string(let s): object[field.name] = s
+                    case .null: object[column] = NSNull()
+                    case .int64(let n): object[column] = n
+                    case .double(let n): object[column] = n
+                    case .string(let s): object[column] = s
                     case .blob: throw WorkPackError.invalid("unexpected binary field")
                     }
                 }
-                try write(object)
+                try writeRecord(kind, object)
             }
             do {
-                try write(header)
-                for id in works { try common("history", table: "history", id: id) }
-                for id in nodes { try common("lineage_node", table: "lineage_nodes", id: id) }
-                for id in edges { try common("lineage_edge", table: "lineage_edges", id: id) }
+                guard let headerLine = try WorkPackWire.encode(header) else { throw WorkPackError.invalid("header") }
+                try write(headerLine)
+                let historyColumns = try workPackColumns("history", in: db)
+                let nodeColumns = try workPackColumns("lineage_nodes", in: db)
+                let edgeColumns = try workPackColumns("lineage_edges", in: db)
+                for id in works { try common("history", table: "history", columns: historyColumns, id: id) }
+                for id in nodes { try common("lineage_node", table: "lineage_nodes", columns: nodeColumns, id: id) }
+                for id in edges { try common("lineage_edge", table: "lineage_edges", columns: edgeColumns, id: id) }
                 for id in annotations {
-                    guard let row = try Row.fetchOne(db, sql: "SELECT note,for_revision FROM library_annotations WHERE history_id = ?", arguments: [id]) else { continue }
-                    let note: String? = row[0]; let revision: Int = row[1]
-                    try write(["kind": "annotation", "history_id": id, "note": note?.trimmingCharacters(in: .whitespacesAndNewlines) as Any? ?? NSNull(), "for_revision": revision])
+                    guard let line = try annotationLine(id) else { throw WorkPackError.invalid("missing export record") }
+                    try write(line)
                 }
                 for id in colophons {
                     guard let row = try Row.fetchOne(db, sql: "SELECT * FROM auxiliary_colophons WHERE id = ?", arguments: [id]) else { continue }
                     let generated: String = row["generated_body"], adopted: String? = row["adopted_body"]
-                    let object: [String: Any] = ["kind": "colophon", "id": id, "target_node_id": row["target_node_id"] as String, "branch_snapshot": row["branch_snapshot"] as String, "model": row["model"] as String, "at": row["at"] as Int64, "language": row["language"] as String, "body": adopted ?? generated, "generated_body": generated, "adopted_body": adopted as Any? ?? NSNull(), "signature": row["signature"] as String, "warnings_json": row["warnings_json"] as String, "fact_sheet_json": row["fact_sheet_json"] as String]
-                    try write(object)
+                    let object: [String: Any] = ["id": id, "target_node_id": row["target_node_id"] as String, "branch_snapshot": row["branch_snapshot"] as String, "model": row["model"] as String, "at": row["at"] as Int64, "language": row["language"] as String, "body": adopted ?? generated, "generated_body": generated, "adopted_body": adopted as Any? ?? NSNull(), "signature": row["signature"] as String, "warnings_json": row["warnings_json"] as String, "fact_sheet_json": row["fact_sheet_json"] as String]
+                    try writeRecord("colophon", object)
                 }
             } catch { try? FileManager.default.removeItem(at: destination); throw error }
         }

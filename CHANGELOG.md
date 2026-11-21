@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: keeps exported files available until Save to Files or another share-sheet activity finishes. Damaged work packs show a localized message and log the diagnostic reason.
+
+- Swift (macOS and iOS): uses the shared core to validate, plan imports, and export work packs. Export sorts keys, leaves `/` unescaped, and omits annotations with neither a comment nor a revision mark. Earlier Swift work packs still import.
+
 - Adds [Using the iPhone App](manual/en/iphone-app.md) to the manual.
 
 - Swift (macOS and iOS): fixes workspace displacement in Lineage and duplicate comment save buttons in iPhone Work Information. On launch, the app checks the 100 most recent drawing records and marks drawings interrupted by shutdown as stopped.

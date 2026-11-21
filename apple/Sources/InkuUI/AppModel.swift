@@ -481,6 +481,9 @@ public final class AppModel {
     public func initialize() async {
         guard !initialized else { return }
         initialized = true
+        #if os(iOS)
+        NativeFilePanels.removeAbandonedExportsAtStartup()
+        #endif
         do {
             let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: InkuPlatform.hostIdentifier)
             // Opening validates the existing database before allowing writes and can
@@ -3028,6 +3031,9 @@ public final class AppModel {
     }
 
     public func failureMessage(_ error: Error) -> String {
+        if let workPackError = error as? WorkPackError {
+            return workPackError.message(language: display.preferences.language)
+        }
         switch (error as? HostError)?.code {
         case "candidate_not_found": return display.label("案が見つかりません。もう一度作ってください。", "The candidate was not found. Please create it again.")
         case "saijiki_migration_required": return display.label("この作品は旧い歳時記の語で保存されていて、移行が済むまで開けません。", "This work was saved in the words of an older Saijiki and cannot be opened until it is migrated.")

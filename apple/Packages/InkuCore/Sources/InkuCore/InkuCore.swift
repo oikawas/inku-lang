@@ -307,6 +307,19 @@ public enum InkuCore {
         InkuCoreBindings.descriptionGroups(inputBytes: input)
     }
 
+    public static func workpackReadLine(_ line: Data, lineNumber: UInt64) -> Data {
+        InkuCoreBindings.workpackReadLine(line: line, lineNumber: lineNumber)
+    }
+
+    public static func workpackPlan(_ request: Data) -> Data {
+        InkuCoreBindings.workpackPlan(request: request)
+    }
+
+    public static func workpackEncodeLine(_ request: Data) -> (line: Data?, error: Data?) {
+        let result = InkuCoreBindings.workpackEncodeLine(request: request)
+        return (result.line, result.error)
+    }
+
     public static func compositionTheses(_ input: Data) -> Data {
         InkuCoreBindings.compositionTheses(inputBytes: input)
     }

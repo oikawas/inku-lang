@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: drawings started from words on iPhone home open a waiting page with progress and process details. The picture builds up there when ready. Elsewhere, the Drawing finished banner opens the work, and iOS can notify you outside the app.
+
 - iOS: the iPhone home drawing field accepts descriptions and draws parentless works with the defaults. It guides unavailable connections, stops and reviews, and sets first-use and post-sign-in drawing defaults.
 
 - Swift (macOS and iOS): shows and logs the reason when line-by-line animation is refused, explaining mismatches between saved drawing and instruction settings.

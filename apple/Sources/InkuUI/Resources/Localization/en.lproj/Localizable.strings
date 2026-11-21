@@ -1574,3 +1574,14 @@
 "アプリを離れている間に、描画が止まりました。" = "Drawing stopped while the app was away.";
 "画像を読むモデルを使えません。描くときのデフォルトで選び直してください。" = "The image-reading model is unavailable. Choose another in drawing defaults.";
 "画像を読むモデルの接続先に、API キーがありません。" = "The image-reading model's provider has no API key.";
+"記述を受け取りました" = "Description received";
+"楽譜　指示 %d" = "Score · %d instructions";
+"層 %d" = "Layers · %d";
+"続きを読む" = "Read more";
+"描き上がりました" = "Drawing finished";
+"見る" = "View";
+"戻る" = "Back";
+"%@：既定の形で続けました" = "%@: continued with defaults";
+"%@：問い直しました" = "%@: asked again";
+"地：%@" = "Ground: %@";
+"%@（%d 回目）" = "%@ (attempt %d)";

@@ -71,6 +71,7 @@ struct LibraryView: View {
     /// The iPhone's 選択: a tap toggles a work's selection instead of opening it, as in Photos.
     @State private var phoneSelecting = false
     @State private var phoneDrawSheet = false
+    @State private var phoneViewerControls = true
     @State private var phoneDrawFacts = PhoneDrawState.Facts()
     @State private var phoneSearchVisible = false
     @State private var phoneSearchHasDraft = false
@@ -156,6 +157,10 @@ struct LibraryView: View {
             guard phoneLayout, preview.work != nil, let work = phoneSavedWork else { return }
             phoneOrder?.insertFirst(work.id, select: false)
         }
+        .onChange(of: model.phoneWorkToView, initial: true) { _, id in
+            guard phoneLayout, let id else { return }
+            viewPhoneDrawing(id)
+        }
         .onChange(of: phoneRefinementResult?.id) { _, _ in
             guard phoneLayout, preview.work != nil, let work = phoneRefinementResult else { return }
             phoneOrder?.insertFirst(work.id, select: true)
@@ -211,7 +216,8 @@ struct LibraryView: View {
     }
 
     private var phonePath: Binding<[String]> {
-        Binding(get: { preview.work == nil ? [] : ["viewer"] }, set: { if $0.isEmpty { preview.close() } })
+        Binding(get: { preview.work == nil && model.phoneDrawingWait?.visible != true ? [] : ["viewer"] },
+                set: { if $0.isEmpty { closePhoneDrawingWait(); preview.close() } })
     }
 
     private var phoneNavigation: some View {
@@ -220,7 +226,7 @@ struct LibraryView: View {
                 .inkuHidesNavigationBar()
                 .inkuPhoneTabBarHidden()
                 .navigationDestination(for: String.self) { _ in
-                    phoneViewer.inkuInlineNavigationTitle().inkuAllowsLandscape().inkuPhoneTabBarHidden()
+                    phoneDestination.inkuInlineNavigationTitle().inkuAllowsLandscape().inkuPhoneTabBarHidden()
                 }
         }.inkuPhoneTabBarHidden()
     }
@@ -263,14 +269,85 @@ struct LibraryView: View {
             .simultaneousGesture(TapGesture().onEnded {
                 if phoneLayout && library.query.isEmpty && !phoneSearchHasDraft { phoneSearchVisible = false }
             })
-            if phoneLayout { phoneFooter }
+            if phoneLayout {
+                if let completion = model.phoneCompletion {
+                    PhoneDrawingCompletionRow(display: display) { viewPhoneDrawing(completion.id) }
+                }
+                phoneFooter
+            }
         }
     }
 
     private var phoneRunRow: some View {
         PhoneRunStatusRow(model: model, status: phoneRunStatus,
                           mascot: !phoneSelecting && ["description", "image"].contains(model.activeSingleInputMode ?? ""),
-                          onOpen: onPhoneCreate)
+                          onOpen: openPhoneRun)
+    }
+
+    private func openPhoneRun() {
+        if let wait = model.phoneDrawingWait, wait.running { wait.visible = true }
+        else { onPhoneCreate() }
+    }
+
+    private func closePhoneDrawingWait() {
+        if let wait = model.phoneDrawingWait, wait.visible { model.leavePhoneDrawingWait(wait) }
+    }
+
+    @ViewBuilder private var phoneDestination: some View {
+        if let wait = model.phoneDrawingWait, wait.visible {
+            PhoneDrawingWaitView(model: model, wait: wait, onClose: {
+                closePhoneDrawingWait()
+                preview.close()
+            }, onPrevious: {
+                if preview.work != nil { closePhoneDrawingWait() }
+                else if let id = visibleIDs.first {
+                    Task {
+                        guard let work = try? await library.fullWork(id: id), wait.visible else { return }
+                        phoneOrder = PhoneViewingOrder(ids: visibleIDs, currentID: id)
+                        phoneOrderQuery = nil
+                        preview.show(work)
+                        closePhoneDrawingWait()
+                    }
+                }
+            }, onRetry: {
+                closePhoneDrawingWait(); preview.close()
+                model.clearPhoneDrawFailure()
+                phoneDrawSheet = true
+            }, onReview: {
+                closePhoneDrawingWait(); preview.close()
+                model.openPhonePendingReview()
+                onPhoneCreate()
+            }, onFinish: { work, controls in
+                guard wait.visible else { return }
+                showPhoneDrawing(work, controls: controls)
+                wait.visible = false
+                PhoneDrawingNotice.finishPicture()
+            })
+        } else {
+            phoneViewer
+        }
+    }
+
+    private func viewPhoneDrawing(_ id: String) {
+        Task {
+            guard let work = try? await library.fullWork(id: id) else {
+                if model.phoneWorkToView == id { model.phoneWorkToView = nil }
+                return
+            }
+            showPhoneDrawing(work, controls: true)
+            if model.phoneWorkToView == id { model.phoneWorkToView = nil }
+        }
+    }
+
+    private func showPhoneDrawing(_ work: SavedWork, controls: Bool) {
+        phoneViewerControls = controls
+        if phoneOrder == nil || preview.work == nil {
+            phoneOrder = PhoneViewingOrder(ids: visibleIDs, currentID: work.id)
+            phoneOrderQuery = nil
+        }
+        phoneOrder?.insertFirst(work.id, select: true)
+        preview.show(work)
+        if model.phoneCompletion?.id == work.id { model.phoneCompletion = nil }
     }
 
     private var phoneSearchRow: some View {
@@ -367,7 +444,7 @@ struct LibraryView: View {
 
     @ViewBuilder private var phoneFooter: some View {
         if phoneSelecting {
-            if model.hasActiveRun { phoneRunRow }
+            if model.phoneProgressIsActive { phoneRunRow }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     Button(display.webCopy("historySelectAll", "すべて選択")) { library.selectVisible() }
@@ -377,7 +454,7 @@ struct LibraryView: View {
                     selectionActions
                 }.buttonStyle(LibraryGhostButtonStyle()).padding(10)
             }.disabled(library.mutating || model.isBrowsingLocked)
-        } else if model.hasActiveRun {
+        } else if model.phoneProgressIsActive {
             phoneRunRow
         } else {
             HStack(spacing: 12) {
@@ -399,7 +476,7 @@ struct LibraryView: View {
 
     private var phoneDrawState: PhoneDrawState {
         var facts = phoneDrawFacts
-        facts.activeRun = model.hasActiveRun
+        facts.activeRun = model.phoneProgressIsActive
         facts.drawing = ["description", "image"].contains(model.activeSingleInputMode ?? "")
         facts.needsReview = model.phoneNeedsReview
         facts.candidate = model.previewWork != nil
@@ -1353,6 +1430,7 @@ struct LibraryView: View {
     private func openWork(_ work: SavedWork) {
         guard !model.isBrowsingLocked else { return }
         guard phoneLayout else { preview.show(work); return }
+        phoneViewerControls = true
         let token = UUID(), query = library.filter, ids = visibleIDs
         phoneOpening = token
         guard library.continuous && !library.isGrouped else {
@@ -1502,7 +1580,7 @@ struct LibraryView: View {
                 writingLocked: writingDisabled, sharing: phoneShareInProgress, runStatus: phoneRunStatus,
                 onClose: { preview.close() }, onMove: { movePhoneViewer($0) },
                 onFirst: { movePhoneViewerToBoundary(first: true) }, onLast: { movePhoneViewerToBoundary(first: false) },
-                onRun: onPhoneCreate, onShare: sharePhoneWork, onRefine: { phoneRefineWork = $0 },
+                onRun: openPhoneRun, onShare: sharePhoneWork, onRefine: { phoneRefineWork = $0 },
                 onInfo: { work in Task {
                     do { phoneInformationWork = try await library.fullWork(id: work.id) }
                     catch { model.errorText = error.localizedDescription }
@@ -1512,13 +1590,18 @@ struct LibraryView: View {
                     if work.trashed && !permanent {
                         Task { await library.restore(ids: [work.id]); await reconcilePhoneRemoval([work.id]) }
                     } else { deletion = LibraryDeletion(ids: [work.id], movesToTrash: !permanent) }
-                })
+                }, initialControls: phoneViewerControls,
+                onCompletedDrawing: model.phoneCompletion.map { completion in { viewPhoneDrawing(completion.id) } })
         }
     }
 
     private func movePhoneViewer(_ delta: Int) {
         Task { @MainActor in
             guard var order = phoneOrder, let current = order.currentID else { return }
+            if delta < 0, order.ids.first == current, let wait = model.phoneDrawingWait, wait.running {
+                wait.visible = true
+                return
+            }
             if delta > 0, order.ids.last == current, let query = phoneOrderQuery, phoneOrderOffset < phoneOrderTotal {
                 do {
                     let page = try await PhoneViewingPageReader(query: query).page(database: model.auxiliaryDatabase(), offset: phoneOrderOffset, limit: LibraryModel.continuousChunk)

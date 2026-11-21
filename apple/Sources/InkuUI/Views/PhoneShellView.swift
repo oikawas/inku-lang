@@ -35,13 +35,33 @@ struct PhoneShellView<Creation: View, Library: View, Settings: View>: View {
                 .tabItem { Label(model.display.webCopy("historyLibraryTitle", "ライブラリ"), systemImage: "square.grid.3x3") }.tag(PhoneShellTab.library)
             settings()
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if model.hasActiveRun {
-                        PhoneRunStatusRow(model: model, status: runStatus) { tab = PhoneShellTab.creation }
-                            .inkuPhoneFrontText(true, textScale: model.display.preferences.textScale)
+                    VStack(spacing: 0) {
+                        if let completion = model.phoneCompletion {
+                            PhoneDrawingCompletionRow(display: model.display) {
+                                tab = PhoneShellTab.library
+                                model.phoneWorkToView = completion.id
+                            }
+                        }
+                        if model.phoneProgressIsActive {
+                            PhoneRunStatusRow(model: model, status: runStatus) {
+                                if let wait = model.phoneDrawingWait, wait.running {
+                                    tab = PhoneShellTab.library
+                                    wait.visible = true
+                                } else {
+                                    tab = PhoneShellTab.creation
+                                }
+                            }
+                        }
                     }
+                    .inkuPhoneFrontText(true, textScale: model.display.preferences.textScale)
                 }
                 .inkuPhoneTabBarHidden()
                 .tabItem { Label(model.display.webCopy("settingsTitle", "設定"), systemImage: "gearshape") }.tag(PhoneShellTab.settings)
+        }
+        .onChange(of: tab) { _, tab in
+            if tab != PhoneShellTab.library, let wait = model.phoneDrawingWait, wait.visible {
+                model.leavePhoneDrawingWait(wait)
+            }
         }
     }
 }
@@ -67,19 +87,28 @@ struct PhoneRunStatusRow: View {
     let onOpen: () -> Void
     var body: some View {
         HStack(spacing: 10) {
-            if mascot {
-                let kind = model.display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
-                MascotView(kind: kind, accessibilityText: model.display.localized(kind == "yuragi" ? "Yuragiが描画中" : "Incuが描画中"))
-            } else {
-                ProgressView().controlSize(.small)
-            }
-            Text(status.isEmpty ? model.display.localized("描画中") : model.display.message(status))
-                .inkuFont(12).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
-            Button(role: .destructive) { Task { await model.stopEveryRun() } } label: {
+            Button(action: onOpen) {
+                HStack(spacing: 10) {
+                    if mascot {
+                        let kind = model.display.preferences.mascot == "yuragi" ? "yuragi" : "incu"
+                        MascotView(kind: kind, accessibilityText: model.display.localized(kind == "yuragi" ? "Yuragiが描画中" : "Incuが描画中"))
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(status.isEmpty ? model.display.localized("描画中") : model.display.message(status))
+                        .inkuFont(12).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }.frame(minHeight: 44).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            Button(role: .destructive) {
+                Task {
+                    if model.phoneDrawingWait?.running == true { await model.stopPhoneDrawing() }
+                    else { await model.stopEveryRun() }
+                }
+            } label: {
                 Label(model.display.localized("停止"), systemImage: "stop.fill").inkuFont(12).frame(minWidth: 44, minHeight: 44)
             }.buttonStyle(.bordered).controlSize(.small)
         }
         .padding(.horizontal, 14).padding(.vertical, 8).background(InkuColor.bg)
-        .contentShape(Rectangle()).onTapGesture(perform: onOpen)
     }
 }

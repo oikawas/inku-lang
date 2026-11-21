@@ -32,6 +32,8 @@ struct PhoneWorkViewer: View {
     let onLineage: (SavedWork) -> Void
     let onCreate: (SavedWork) -> Void
     let onDelete: (SavedWork, Bool) -> Void
+    var initialControls = true
+    var onCompletedDrawing: (() -> Void)? = nil
     @State private var viewport = CanvasViewport()
     @State private var overlayVisible = true
     @State private var threeDimensional = false
@@ -82,7 +84,8 @@ struct PhoneWorkViewer: View {
                     VStack(spacing: 0) {
                         VStack(spacing: 0) {
                             topBar
-                            if model.hasActiveRun { PhoneRunStatusRow(model: model, status: runStatus, onOpen: onRun) }
+                            if model.phoneProgressIsActive { PhoneRunStatusRow(model: model, status: runStatus, onOpen: onRun) }
+                            if let onCompletedDrawing { PhoneDrawingCompletionRow(display: display, onView: onCompletedDrawing) }
                         }.background { GeometryReader { Color.clear.preference(key: PhoneViewerTopHeight.self, value: $0.size.height) } }
                         Spacer()
                         bottomBar.background { GeometryReader { Color.clear.preference(key: PhoneViewerBottomHeight.self, value: $0.size.height) } }
@@ -96,6 +99,7 @@ struct PhoneWorkViewer: View {
         .onPreferenceChange(PhoneViewerTopHeight.self) { if $0 > 0 { topHeight = $0 } }
         .onPreferenceChange(PhoneViewerBottomHeight.self) { if $0 > 0 { bottomHeight = $0 } }
         .onChange(of: work.id) { _, _ in viewport = CanvasViewport(); threeDimensional = false; starOverride = nil }
+        .onAppear { overlayVisible = initialControls }
         .task(id: work.id) { await model.loadWorkActionState(work) }
     }
 

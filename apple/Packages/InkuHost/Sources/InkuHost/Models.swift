@@ -216,6 +216,8 @@ public struct PipelineView: Sendable {
     public var completionIssues: [HoleCompletionIssue] = []
     public var actionTag: String? = nil
     public var phaseReason: String? = nil
+    /// Decoded process material for the iPhone wait page. Never includes provider IO.
+    public var phoneProcessJSON: Data? = nil
 }
 
 /// One range a completion wrote, as the author has since left it (core `completion_range_states`).

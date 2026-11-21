@@ -86,8 +86,11 @@ struct RunJournalView: View {
         return String(format: template, locale: Locale(identifier: display.preferences.language), arguments: values)
     }
     private static func stage(_ action: String, display: DisplaySettings) -> String {
+        stageName(action, display: display) ?? action
+    }
+    static func stageName(_ action: String, display: DisplaySettings) -> String? {
         let keys = ["select_description_catalog": "runStageCatalog", "read_description": "runStageReading", "compose_description": "runStageComposition", "write_description_ddl": "runStageWriting", "review_description_ddl": "runStageReview", "choose_colors": "runStageColors", "choose_laws": "runStageLaws", "generate_normalized_ddl": "runStageInterpret", "generate_sketch": "runStageSketch", "read_composition": "runStageCompositionReading", "complete_visible_ddl_holes": "runStageCompletion", "select_image_catalog": "runStageImageCatalog", "write_image_ddl": "runStageImageWriting", "review_image_ddl": "runStageImageReview"]
-        return keys[action].map { display.webCopy($0, action) } ?? action
+        return keys[action].map { display.webCopy($0, action) }
     }
     private func finished(_ item: ExactJSON) -> String {
         let action = item["action"].string ?? "", title = Self.stage(action, display: display), facts = item["facts"]

@@ -157,12 +157,13 @@ class Procedure:
 
     def __init__(self, flow: str, input: dict, owner: str | None, *, store: CredentialStore | None = None,
                  check=None, held: tuple[str, ...] = (), soft_http: bool = False,
-                 callback: Callback | None = None, on_write=None, on_end=None):
+                 callback: Callback | None = None, on_write=None, on_end=None, on_wire_busy=None):
         self.flow, self.owner = flow, owner
         self.store = store or CredentialStore()
         self.check = check or (lambda: None)
         self.given, self.soft_http = set(held), soft_http
         self.callback, self.on_write, self.on_end = callback, on_write, on_end
+        self.on_wire_busy = on_wire_busy
         self.locks: dict[str, object] = {}
         self.answer = sign_in("flow_start", flow=flow, input=input, now=time.time())
         self.result, self.stopping = None, False
@@ -220,7 +221,11 @@ class Procedure:
         if kind == "acquire":
             if todo["lock"] in self.given:
                 return {"acquired": True}
-            lock = self.store.lock(self._lock_name(todo["lock"]), _monotonic(todo["deadline"]), self.check)
+            lock_options = {}
+            if todo["lock"] == "wire" and self.on_wire_busy is not None:
+                lock_options["on_busy"] = self.on_wire_busy
+            lock = self.store.lock(self._lock_name(todo["lock"]), _monotonic(todo["deadline"]), self.check,
+                                   **lock_options)
             try:
                 lock.__enter__()
             except TimeoutError:

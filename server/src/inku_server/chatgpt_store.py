@@ -96,7 +96,7 @@ class CredentialStore:
             raise ChatGPTError("chatgpt_storage_unsafe")
 
     @contextmanager
-    def lock(self, name: str, deadline: float | None = None, check=None):
+    def lock(self, name: str, deadline: float | None = None, check=None, *, on_busy=None):
         self._directory()
         path = self.root / (hashlib.sha256(name.encode()).hexdigest() + ".lock")
         fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -112,6 +112,8 @@ class CredentialStore:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
                 except BlockingIOError:
+                    if on_busy is not None:
+                        on_busy()
                     remaining = delay if deadline is None else min(delay, max(0, deadline - time.monotonic()))
                     time.sleep(remaining)
                     delay = min(0.5, delay * 2)

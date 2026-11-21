@@ -122,16 +122,36 @@ class TextSSEDecoder(SSEDecoder):
     mode = "text"
 
 
-async def catalog(owner: str, profile_id: str, generation: int, deadline: float, cancel=None, *, force: bool = False, _wire_held: bool = False) -> list[dict]:
+class _AdmissionCatalogAvailable(Exception):
+    def __init__(self, profile: dict, models: list[dict]):
+        self.profile = profile
+        self.models = models
+
+
+async def catalog(owner: str, profile_id: str, generation: int, deadline: float, cancel=None, *,
+                  force: bool = False, _wire_held: bool = False, _admission: bool = False) -> list[dict]:
     # The core's `catalog` procedure: a current list is local data; a refresh
     # takes the wire slot inference holds (a send passes it held), refreshes the
     # token, asks for the list, pauses the plan on a usage limit, and keeps the
     # list in the registration read again under the edit lock.
     check = session_checker(owner, profile_id, generation, cancel, validate=check_session)
     check()
-    listed = await run_flow("catalog", {"profile_id": profile_id, "generation": generation, "force": force,
-                                        "deadline": time.time() + (deadline - time.monotonic())},
-                            owner, store=CredentialStore(), check=check, held=("wire",) if _wire_held else ())
+
+    def use_saved_catalog():
+        # The core already asked for a refresh. Only actual wire contention
+        # permits this admission to use the last list for the pinned profile.
+        profile = check(force=True)
+        saved = profile.get("catalog")
+        if isinstance(saved, dict) and isinstance(saved.get("models"), list):
+            raise _AdmissionCatalogAvailable(profile, saved["models"])
+
+    try:
+        listed = await run_flow("catalog", {"profile_id": profile_id, "generation": generation, "force": force,
+                                            "deadline": time.time() + (deadline - time.monotonic())},
+                                owner, store=CredentialStore(), check=check, held=("wire",) if _wire_held else (),
+                                on_wire_busy=use_saved_catalog if _admission else None)
+    except _AdmissionCatalogAvailable as saved:
+        return publication(saved.profile, saved.models)["models"]
     return publication(check(), listed["models"])["models"]
 
 
@@ -241,7 +261,7 @@ def offered(owner: str, model: str, *, profile_id: str | None = None, generation
     try:
         if profile_id is None or generation is None:
             profile_id, generation = pin(owner)
-        models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
+        models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15, _admission=True))
         return model_offered(models, model, purpose)
     except (TimeoutError, httpx.TimeoutException):
         # Unable to check is not evidence that a model is absent. Preserve

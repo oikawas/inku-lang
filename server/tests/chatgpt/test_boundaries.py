@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -49,11 +50,12 @@ def seed(store, value):
         store.write("owner", saved)
 
 
-def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(isolated, monkeypatch):
-    from inku_server import chatgpt_provider as provider
+@pytest.mark.parametrize("cache_lifetime", [300, -1], ids=["fresh", "expired"])
+def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(isolated, monkeypatch, cache_lifetime):
+    from inku_server import chatgpt_provider as provider, chatgpt_store
 
     value = profile(published_models=["gpt-6-luna"], catalog={
-        "expires_at": time.time() + 300, "models": [{"id": "gpt-6-luna"}],
+        "expires_at": time.time() + cache_lifetime, "models": [{"id": "gpt-6-luna"}],
     })
     seed(isolated, value)
     original_catalog = provider.catalog
@@ -65,12 +67,16 @@ def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(
     monkeypatch.setattr(provider, "catalog", bounded_catalog)
     monkeypatch.setattr(httpx, "AsyncClient", lambda **_kwargs: pytest.fail("unexpected provider communication"))
     with isolated.lock("wire:owner:" + value["id"], time.monotonic() + 5):
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            checks = [pool.submit(provider.offered, "owner", "gpt-6-luna") for _ in range(4)]
-            assert [check.result(timeout=2) for check in checks] == [True] * 4
-        assert not provider.offered("owner", "not-published")
-        with pytest.raises(ChatGPTError, match="chatgpt_session_changed"):
-            provider.offered("owner", "gpt-6-luna", profile_id=value["id"], generation=2)
+        with monkeypatch.context() as patch:
+            patch.setattr(chatgpt_store, "time", SimpleNamespace(
+                monotonic=time.monotonic, sleep=lambda _: pytest.fail("admission waited for the wire lock"),
+            ))
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                checks = [pool.submit(provider.offered, "owner", "gpt-6-luna") for _ in range(4)]
+                assert [check.result(timeout=2) for check in checks] == [True] * 4
+            assert not provider.offered("owner", "not-published")
+            with pytest.raises(ChatGPTError, match="chatgpt_session_changed"):
+                provider.offered("owner", "gpt-6-luna", profile_id=value["id"], generation=2)
         # Refresh and inference still need the occupied wire slot; the core names
         # a slot not had by the deadline as a time limit.
         with pytest.raises(ChatGPTError, match="chatgpt_transport_timeout"):
@@ -82,7 +88,6 @@ def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(
 
 @pytest.mark.parametrize("case, status, code", [
     ("missing-cache", 503, "chatgpt_transport_unavailable"),
-    ("expired-cache", 503, "chatgpt_transport_unavailable"),
     ("transport", 503, "chatgpt_transport_unavailable"),
     ("catalog-unavailable", 503, "chatgpt_transport_unavailable"),
     ("not-offered", 403, "model_not_offered"),
@@ -103,7 +108,7 @@ def test_pipeline_admission_distinguishes_catalog_failure_from_refusal(isolated,
 
     value = profile(published_models=["gpt-6-luna"])
     if case != "missing-cache":
-        value["catalog"] = {"expires_at": time.time() + (-1 if case in {"expired-cache", "transport", "catalog-unavailable"} else 300),
+        value["catalog"] = {"expires_at": time.time() + (-1 if case in {"transport", "catalog-unavailable"} else 300),
                             "models": [{"id": "gpt-6-luna"}]}
     if case == "quota":
         value["state"] = "quota"
@@ -113,10 +118,15 @@ def test_pipeline_admission_distinguishes_catalog_failure_from_refusal(isolated,
     monkeypatch.setattr(db, "engine", engine)
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     original_catalog = provider.catalog
+    catalog_durations = []
 
     async def bounded_catalog(owner, profile_id, generation, deadline, *args, **kwargs):
-        return await original_catalog(owner, profile_id, generation,
-                                      min(deadline, time.monotonic() + 0.15), *args, **kwargs)
+        started = time.monotonic()
+        try:
+            return await original_catalog(owner, profile_id, generation,
+                                          min(deadline, started + 0.15), *args, **kwargs)
+        finally:
+            catalog_durations.append(time.monotonic() - started)
 
     monkeypatch.setattr(provider, "catalog", bounded_catalog)
     requests = []
@@ -138,7 +148,7 @@ def test_pipeline_admission_distinguishes_catalog_failure_from_refusal(isolated,
     app = FastAPI()
     register_pipeline_errors(app)
     app.include_router(pipeline_router(service, lambda: {"id": "owner"}))
-    slot = isolated.lock("wire:owner:" + value["id"], time.monotonic() + 5) if case in {"missing-cache", "expired-cache"} else nullcontext()
+    slot = isolated.lock("wire:owner:" + value["id"], time.monotonic() + 5) if case == "missing-cache" else nullcontext()
     try:
         with TestClient(app) as client, slot:
             response = client.post("/api/pipeline/variations", json={
@@ -147,6 +157,9 @@ def test_pipeline_admission_distinguishes_catalog_failure_from_refusal(isolated,
                     "catalog_id": "default", "render_seed": "1",
                 },
             })
+        if case == "missing-cache":
+            assert len(catalog_durations) == 1
+            assert catalog_durations[0] >= 0.14
         assert response.status_code == status, response.text
         assert response.json()["detail"]["code"] == code
         assert len(requests) == (1 if case in {"transport", "catalog-unavailable"} else 0)

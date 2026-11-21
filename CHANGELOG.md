@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server: Drawing admission with Sign in with ChatGPT can use an expired model list while the communication lock is busy. This lets requests such as “Draw four versions” through admission. Model availability is checked again when each request is sent.
+
 - iOS: keeps the 2D paper size and center when switching to 3D in the iPhone viewer.
 - Swift (macOS and iOS): uses the saved score and drawing settings for line-by-line animation.
 

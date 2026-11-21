@@ -4,18 +4,19 @@ This manual explains how to use and operate inku. It is intended for first-time 
 
 ## Audience
 
-- Image creators: people who create SVG / PNG images from a few written words using the Web UI or CLI
+- Image creators: people who create SVG / PNG images from a few written words using the iPhone app, Web UI, or CLI
 - System administrators: people who install inku on a server and manage the API, Web UI, database, logs, backups, users, and AI provider connections
 
 ## Documents
 
 1. [Creating Images](./image-creation.md)
    * [DDL Syntax and Vocabulary Reference](./ddl-reference.md) — Grammar principles, introductory examples, grammar and Saijiki reference, and 50 complex examples
-2. [inku-cli Reference](./cli-reference.md)
+2. [Using the iPhone App](./iphone-app.md)
+3. [inku-cli Reference](./cli-reference.md)
    * [AI Autonomous Operation & Testing Reference](./cli-reference-for-ai.md)
-3. [Application Installation](./application-install.md)
-4. [Server Configuration](./server-configuration.md)
-5. [Revision History](./revision-history.md)
+4. [Application Installation](./application-install.md)
+5. [Server Configuration](./server-configuration.md)
+6. [Revision History](./revision-history.md)
 
 For everyday creative work, start with Creating Images. It covers drawing from descriptions and instructions, Lineage and the Library, resuming batches, layer animation, and text-size settings. For provider connections and user permissions, see Server Configuration.
 

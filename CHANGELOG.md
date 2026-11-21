@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Adds [Using the iPhone App](manual/en/iphone-app.md) to the manual.
+
 - Swift (macOS and iOS): fixes workspace displacement in Lineage and duplicate comment save buttons in iPhone Work Information. On launch, the app checks the 100 most recent drawing records and marks drawings interrupted by shutdown as stopped.
 
 - iOS: applies iPhone text scaling to the Making screen and detail screens and enlarges touch targets for key controls.

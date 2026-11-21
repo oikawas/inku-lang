@@ -7,6 +7,7 @@ import InkuHost
 import InkuPersistence
 import InkuExport
 import Observation
+import Synchronization
 import UniformTypeIdentifiers
 
 /// Availability of the author-facing prompt journal, independent of whether a provider was called.
@@ -2092,6 +2093,8 @@ public final class AppModel {
                 if !Task.isCancelled { succeeded = true }
             } catch {
                 if self.generationToken == token && !Task.isCancelled {
+                    // A home drawing with a committed work can still encounter an error reloading the library.
+                    if preserveWorkspace, self.phoneDrawingWait?.completion != nil { return }
                     if background {
                         self.automationFailureMessage = self.failureMessage(error)
                         if !self.stopping { self.providerProgress?.finish(.failed, at: Date()) }
@@ -2119,11 +2122,28 @@ public final class AppModel {
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
+            // The transport reports attempt diagnostics before core decides whether the run can continue.
+            let phoneOutcome = Mutex<(diagnostic: String?, savedAt: ContinuousClock.Instant?)>((nil, nil))
             let view = try await host.generate(request, image: image, onStarted: onExecutionStarted, phoneProcess: wait != nil) { [weak self] progress in
                 let instant = ContinuousClock.now
+                if phoneHome {
+                    switch progress {
+                    case .providerDiagnostic(_, let diagnostic): phoneOutcome.withLock { $0.diagnostic = diagnostic.code }
+                    case .saved: phoneOutcome.withLock { $0.savedAt = instant }
+                    default: break
+                    }
+                }
                 Task { @MainActor in
                     self?.receivePhoneDrawing(progress, wait: wait, at: instant)
-                    self?.receive(progress, token: token, models: request.models)
+                    self?.receive(progress, token: token, models: request.models, presentProviderDiagnostic: !phoneHome)
+                }
+            }
+            if phoneHome {
+                let outcome = phoneOutcome.withLock { $0 }
+                if let id = view.savedWorkID {
+                    self.receivePhoneDrawing(.saved(executionID: view.executionID, workID: id), wait: wait, at: outcome.savedAt ?? .now)
+                } else if view.phase == "failed", let code = outcome.diagnostic {
+                    self.chatGPTFailureCodes[view.executionID] = code
                 }
             }
             if phoneHome && (view.phase == "awaiting_patch_approval" || view.phase == "needs_user_edit" || !view.completionIssues.isEmpty) {
@@ -2131,7 +2151,7 @@ public final class AppModel {
             }
             if self.generationToken == token, !self.stopping {
                 self.activeExecutionID = view.executionID
-                if let message = self.drawingFailureText(view) {
+                if (!phoneHome || view.savedWorkID == nil), let message = self.drawingFailureText(view) {
                     self.automationFailureMessage = message
                     // Background batch failures belong to their original row, not the single-drawing notice.
                     if !background, self.errorText == nil { self.errorText = message }
@@ -2621,7 +2641,8 @@ public final class AppModel {
         default: nil
         }
     }
-    private func receive(_ progress: PipelineProgress, token: UUID, models: ModelSelection? = nil) {
+    private func receive(_ progress: PipelineProgress, token: UUID, models: ModelSelection? = nil,
+                         presentProviderDiagnostic: Bool = true) {
         recordDrawingProgress(progress)
         guard generationToken == token, !stopping else { return }
         receiveProviderProgress(progress, models: models, comparison: false)
@@ -2641,7 +2662,8 @@ public final class AppModel {
             }
             else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）" }
-        case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
+        case .providerDiagnostic(let id, let diagnostic):
+            if presentProviderDiagnostic { receive(diagnostic, executionID: id) }
         case .providerMetric, .runProgress: break
         case .saved(_, _): status = "作品を保存しました"
         }
@@ -2934,7 +2956,7 @@ public final class AppModel {
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
             guard !wait.cancelled else { return nil }
             let work = await runAutomation(request: request, singleInputMode: "description", phoneHome: true)
-            if work == nil && !phoneBackgroundStopped && phonePendingReview == nil {
+            if work == nil && wait.completion == nil && !phoneBackgroundStopped && phonePendingReview == nil {
                 phoneDrawFailure = (automationFailureMessage ?? errorText).map(phoneDrawingFailureText)
                 errorText = nil
             }

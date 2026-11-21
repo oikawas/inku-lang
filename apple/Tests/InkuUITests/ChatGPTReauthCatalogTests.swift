@@ -5,6 +5,35 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class ChatGPTReauthCatalogTests: XCTestCase {
+    func testPhoneDrawSavesAfterAProviderDiagnosticWithoutShowingFailure() async throws {
+        let fixture = try ReauthFixture(existing: true, failure: .recoveredDraw)
+        defer { fixture.remove() }
+        await fixture.app.initialize()
+        var settings = await fixture.app.hostSettings()
+        settings.providers.append(.personalPlan)
+        try await fixture.app.updateHostSettings(settings)
+        await fixture.app.synchronizePersonalPlanModels()
+        var defaults = fixture.app.drawDefaults
+        defaults["describe"]?.models.stage1 = "chatgpt:offered"
+        defaults["describe"]?.models.stage2 = "chatgpt:offered"
+        defaults["describe"]?.route = "read_and_draw"
+        defaults["describe"]?.composition = "off"
+        defaults["describe"]?.sketch = "on"
+        try fixture.app.saveDrawDefaults(defaults)
+        fixture.app.phoneDrawText = "a red circle"
+
+        let work = await fixture.app.drawPhoneDescription()
+        let saved = try XCTUnwrap(work, fixture.app.phoneDrawFailure ?? "")
+        XCTAssertEqual(fixture.app.phoneDrawingWait?.completion?.id, saved.id)
+        let calls = await fixture.http.drawingCalls
+        XCTAssertEqual(calls, 3, "Reading was rejected before writing and review completed")
+        let report = try XCTUnwrap(fixture.app.phoneDrawingWait?.report["finished"].array)
+        XCTAssertEqual(report.first?["action"].string, "read_description")
+        XCTAssertEqual(report.first?["outcome"].string, "fallback")
+        XCTAssertNil(fixture.app.errorText)
+        XCTAssertNil(fixture.app.phoneDrawFailure)
+    }
+
     func testPhoneDrawPinsChatGPTSessionBeforeRunning() async throws {
         let fixture = try ReauthFixture(existing: true, failure: .none)
         defer { fixture.remove() }
@@ -169,12 +198,13 @@ private final class FixtureKeyStore: ChatGPTVaultKeyStore, @unchecked Sendable {
 }
 
 private actor ReauthHTTP: ChatGPTHTTPClient {
-    enum Failure { case none, login, catalog }
+    enum Failure { case none, login, catalog, recoveredDraw }
     let failure: Failure
     let key: P256.Signing.PrivateKey
     var nonce = ""
     private(set) var modelCalls = 0
     private(set) var otherCalls = 0
+    private(set) var drawingCalls = 0
     init(failure: Failure) throws { self.failure = failure; key = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0, count: 31) + Data([1])) }
     func setNonce(_ value: String) { nonce = value }
     func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
@@ -200,6 +230,21 @@ private actor ReauthHTTP: ChatGPTHTTPClient {
             modelCalls += 1
             if failure == .catalog { throw HostError("chatgpt_transport_unavailable") }
             return .init(status: 200, data: Data(#"{"models":[{"visibility":"list","slug":"offered","display_name":"Offered"}]}"#.utf8))
+        case "/v1/responses" where failure == .recoveredDraw:
+            drawingCalls += 1
+            let events: [ExactJSON]
+            if drawingCalls == 1 {
+                events = [.object(["type": .string("response.output_item.added"),
+                                   "item": .object(["type": .string("web_search_call"), "id": .string("fixture")])])]
+            } else {
+                let item: ExactJSON = .object(["type": .string("function_call"), "id": .string("fixture"),
+                    "namespace": .string("inku"), "name": .string("submit_pipeline_response"),
+                    "arguments": .string(#"{"ddl":"place one red circle at center.","figures":[]}"#)])
+                events = [.object(["type": .string("response.output_item.added"), "item": item]),
+                          .object(["type": .string("response.completed"), "response": .object(
+                            ["status": .string("completed"), "output": .array([item])])])]
+            }
+            return .init(status: 200, data: Data(events.map { "data: " + $0.text + "\n\n" }.joined().utf8))
         default: otherCalls += 1; throw HostError("unexpected_fixture_route")
         }
     }

@@ -35,12 +35,46 @@ private struct InkuFontModifier: ViewModifier {
     let size: Double
     let weight: Font.Weight
     let design: Font.Design
+    var fixedSizeOutsidePhone: Double? = nil
+    @Environment(\.inkuPhoneLayout) private var phone
     func body(content: Content) -> some View {
-        content.font(.system(size: InkuTypography.size(size, scale: scale, minimum: minimum), weight: weight, design: design))
+        let fontSize = phone ? nil : fixedSizeOutsidePhone
+        content.font(.system(size: fontSize ?? InkuTypography.size(size, scale: scale, minimum: minimum),
+                             weight: weight, design: design))
+    }
+}
+
+private struct InkuPhoneTarget: ViewModifier {
+    @Environment(\.inkuPhoneLayout) private var phone
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone { content.frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+        else { content }
+    }
+}
+
+private struct InkuPhoneMinimumHeight: ViewModifier {
+    @Environment(\.inkuPhoneLayout) private var phone
+    let height: CGFloat
+
+    func body(content: Content) -> some View {
+        content.frame(height: phone ? nil : height).frame(minHeight: phone ? height : nil)
     }
 }
 
 extension View {
+    /// Apply inside the button label, outside any decorative frame.
+    func inkuPhoneTarget() -> some View { modifier(InkuPhoneTarget()) }
+
+    func inkuPhoneMinimumHeight(_ height: CGFloat) -> some View {
+        modifier(InkuPhoneMinimumHeight(height: height))
+    }
+
+    /// Keeps an existing fixed desktop font while scaling text in the iPhone layout.
+    func inkuFont(_ size: Double, design: Font.Design = .default, fixedSizeOutsidePhone: Double) -> some View {
+        modifier(InkuFontModifier(size: size, weight: .regular, design: design, fixedSizeOutsidePhone: fixedSizeOutsidePhone))
+    }
+
     @ViewBuilder func inkuPhoneFrontText(_ enabled: Bool, textScale: Double) -> some View {
         if enabled {
             self.font(.body)

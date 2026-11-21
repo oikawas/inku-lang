@@ -19,6 +19,7 @@ struct PhoneShellView<Creation: View, Library: View, Settings: View>: View {
         TabView(selection: $tab) {
             NavigationStack {
                 creation()
+                    .inkuPhoneFrontText(true, textScale: model.display.preferences.textScale)
                     .toolbar {
                         ToolbarItem(placement: .navigation) {
                             Button(action: onHome) { Image(systemName: "chevron.left") }

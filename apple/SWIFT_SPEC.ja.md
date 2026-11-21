@@ -121,7 +121,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 ## 2026-11-20 iPhone の手前の画面の文字
 
-iPhone の手前の画面（ホーム、見る画面、作品情報、進みの行とホームのシート）は、inku の文字サイズ設定に 17/14 を掛け、`inkuFont` の最小を 13pt、標準部品の Dynamic Type の下限を xLarge とする。制作画面・Mac・iPad と設定画面の倍率は変えない。
+iPhone のホーム、見る画面、制作画面、作品・生成情報、および制作・ライブラリ・設定から開く共通シートでは、inku の文字サイズ設定に 17/14 を掛け、`inkuFont` の最小を 13pt、標準部品の Dynamic Type の下限を xLarge とする。制作と詳細画面の主な小型操作は、iPhone の形で 44×44pt 以上の押せる範囲を持つ。Mac・iPad と iPhone の設定画面本体は従来の倍率を使う。
 
 ## 2026-11-13 iPhone のライブラリの全件スクロール
 

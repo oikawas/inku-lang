@@ -121,7 +121,7 @@ The author's instruction (2026-11-14: put ChatGPT first in the model settings an
 
 ## 2026-11-20 iPhone front screen text
 
-The iPhone front screens (home, viewer, work information, progress row and home sheets) multiply the inku text-size setting by 17/14, use a 13pt minimum for `inkuFont`, and set an xLarge Dynamic Type minimum for system controls. Making, Mac, iPad and the settings scale remain unchanged.
+The iPhone home, viewer, Making screen, work and generation information, and shared sheets opened from Making, Library, or Settings multiply the inku text-size setting by 17/14, use a 13pt minimum for `inkuFont`, and set an xLarge Dynamic Type minimum for system controls. Key compact controls in Making and detail screens have touch targets of at least 44×44 pt in the iPhone layout. Mac, iPad, and the iPhone Settings screen itself keep their existing text scale.
 
 ## 2026-11-13 The iPhone library scrolls through every work
 

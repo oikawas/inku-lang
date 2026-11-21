@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- iOS: applies iPhone text scaling to the Making screen and detail screens and enlarges touch targets for key controls.
+
 - iOS: saving a drawing started from iPhone home clears its description field. Edits made while drawing are kept.
 
 - Swift (macOS and iOS): records ChatGPT refusal codes and stream event details for each failed attempt, even when provider body capture is off.

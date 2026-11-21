@@ -271,6 +271,7 @@ struct InkuFloatingPillButtonStyle: ButtonStyle {
             .overlay(Capsule().stroke(InkuColor.border2))
             .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
             .contentShape(Capsule())
+            .inkuPhoneTarget()
     }
 }
 
@@ -304,7 +305,7 @@ struct InkuPanelTab: View {
             }
             .inkuFont(12)
             .foregroundStyle(selected || running ? Color.primary : Color.secondary)
-            .frame(maxWidth: .infinity, minHeight: 38)
+            .frame(maxWidth: .infinity, minHeight: 38).inkuPhoneTarget()
             .background(running ? Color.accentColor.opacity(0.08) : Color.clear)
             .overlay(alignment: .bottom) {
                 if running {

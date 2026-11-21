@@ -367,6 +367,7 @@ struct LibrarySelectionBox: View {
         }
         .frame(width: 20, height: 20)
         .shadow(color: .black.opacity(0.16), radius: 1.5, y: 1)
+        .inkuPhoneTarget()
     }
 }
 

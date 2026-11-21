@@ -46,7 +46,7 @@ struct DrawingLogView: View {
                 if phoneDetailShown, let selected {
                     VStack(alignment: .leading, spacing: 0) {
                         Button { phoneDetailShown = false } label: {
-                            Label(model.display.localized("一覧"), systemImage: "chevron.left")
+                            Label(model.display.localized("一覧"), systemImage: "chevron.left").inkuPhoneTarget()
                         }.padding(.horizontal, 14).padding(.vertical, 8)
                         Divider()
                         ScrollView { details(selected).padding(14).frame(maxWidth: .infinity, alignment: .leading) }

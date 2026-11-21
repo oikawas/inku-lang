@@ -26,10 +26,10 @@ struct RefinementDialog<Controls: View, Options: View>: View {
             HStack {
                 Text(model.display.localized(title)).inkuFont(16, weight: .semibold)
                 Spacer()
-                Button(action: onClose) { Image(systemName: "xmark").frame(width: 26, height: 26) }
+                Button(action: onClose) { Image(systemName: "xmark").frame(width: 26, height: 26).inkuPhoneTarget() }
                     .buttonStyle(.bordered).accessibilityLabel(model.display.localized("閉じる"))
                     .disabled(closeDisabled).keyboardShortcut(.cancelAction)
-            }.padding(.horizontal, 16).frame(height: 48)
+            }.padding(.horizontal, 16).inkuPhoneMinimumHeight(48)
             Divider()
             GeometryReader { geometry in
                 ScrollView {
@@ -358,7 +358,7 @@ struct RefinementOptionsGrid: View {
         let symbol = option.saved ? "✔" : (option.selected ? "✓" : "+")
         let label = option.saved ? "保存済み" : (option.selected ? "選択を外す" : "この候補を保存")
         return Button { onSelect(option.id, !option.selected) } label: {
-            Text(symbol).inkuFont(15, weight: .semibold).frame(width: 30, height: 30)
+            Text(symbol).inkuFont(15, weight: .semibold).frame(width: 30, height: 30).inkuPhoneTarget()
         }.buttonStyle(.bordered).buttonBorderShape(.circle)
             .tint(option.selected ? Color.accentColor : Color.secondary).padding(6)
             .disabled(busy || option.saved)

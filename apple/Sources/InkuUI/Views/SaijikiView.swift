@@ -39,7 +39,7 @@ public struct SaijikiView: View {
                 }
                 Spacer(minLength: 0)
                 if let onClose {
-                    Button(action: onClose) { Image(systemName: "xmark").inkuFont(16).frame(width: 24, height: 24) }
+                    Button(action: onClose) { Image(systemName: "xmark").inkuFont(16).frame(width: 24, height: 24).inkuPhoneTarget() }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .accessibilityLabel(model.display.localized("閉じる"))
                 }
@@ -55,7 +55,7 @@ public struct SaijikiView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let preview = selectedPreview {
                 SaijikiPreviewView(svg: preview.svg, imageURL: preview.imageURL, imageData: preview.imageData, renderer: model.renderer)
-                    .frame(width: 216, height: 92).frame(maxWidth: .infinity).id(preview.id)
+                    .frame(height: 92).inkuFixedWidth(216).frame(maxWidth: .infinity).id(preview.id)
                 Text(preview.title).inkuFont(13, weight: .semibold)
                 if !preview.effect.isEmpty { Text(preview.effect).inkuFont(11).foregroundStyle(.secondary) }
                 if !preview.example.isEmpty {

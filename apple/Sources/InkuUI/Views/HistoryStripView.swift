@@ -320,11 +320,12 @@ import SwiftUI
         Button {
             Task { await model.library.toggleStar(work); await library.refresh() }
         } label: {
-            Text("★").font(.system(size: 13 * display.preferences.textScale))
+            Text("★").inkuFont(13, fixedSizeOutsidePhone: 13 * display.preferences.textScale)
                 .foregroundStyle(work.starred ? Color.yellow : Color.secondary)
                 .frame(width: 18, height: 18)
                 .background(.background.opacity(0.85), in: Circle())
                 .overlay(Circle().stroke(LibraryChrome.border))
+                .inkuPhoneTarget()
         }
         .buttonStyle(.plain)
         .disabled(locked || model.isBusy || model.library.mutating)

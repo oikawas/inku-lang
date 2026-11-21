@@ -5,6 +5,37 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class ChatGPTReauthCatalogTests: XCTestCase {
+    func testPhoneDrawPinsChatGPTSessionBeforeRunning() async throws {
+        let fixture = try ReauthFixture(existing: true, failure: .none)
+        defer { fixture.remove() }
+        await fixture.app.initialize()
+        var settings = await fixture.app.hostSettings()
+        settings.providers.append(.personalPlan)
+        try await fixture.app.updateHostSettings(settings)
+        await fixture.app.synchronizePersonalPlanModels()
+        var defaults = fixture.app.drawDefaults
+        defaults["describe"]?.models.stage1 = "chatgpt:offered"
+        defaults["describe"]?.models.stage2 = "chatgpt:offered"
+        defaults["describe"]?.route = "stages"
+        defaults["describe"]?.sketch = "off"
+        try fixture.app.saveDrawDefaults(defaults)
+        fixture.app.phoneDrawText = "a red circle"
+        let fresh = try fixture.app.requestForPhoneDescription(fixture.app.phoneDrawText)
+        XCTAssertNil(fresh.chatGPTSession)
+        let pinned = try await fixture.app.pinPersonalPlanRequests([fresh])[0]
+        XCTAssertEqual(pinned.chatGPTSession?.profileID, fixture.profileID)
+        XCTAssertEqual(pinned.chatGPTSession?.generation, 1)
+        _ = await fixture.app.drawPhoneDescription()
+        let calls = await fixture.http.otherCalls
+        XCTAssertGreaterThan(calls, 0, "The actual home draw must pass pin validation and reach the local HTTP fixture")
+        XCTAssertNotEqual(fixture.app.phoneDrawFailure, "chatgpt_session_pin_required")
+        XCTAssertEqual(fixture.app.phoneDrawingFailureText("chatgpt_session_pin_required"),
+                       ChatGPTStatusCopy.text("chatgpt_session_pin_required", language: fixture.app.display.preferences.language))
+        XCTAssertEqual(fixture.app.phoneDrawingFailureText("chatgpt_session_changed"),
+                       ChatGPTStatusCopy.text("chatgpt_session_changed", language: fixture.app.display.preferences.language))
+        XCTAssertEqual(fixture.app.phoneDrawingFailureText("already localized"), "already localized")
+    }
+
     func testPhoneAdoptsTerraOnlyWhenCurrentDefaultCannotBeUsed() async throws {
         for usable in [false, true] {
             let fixture = try ReauthFixture(existing: true, failure: .none)
@@ -143,6 +174,7 @@ private actor ReauthHTTP: ChatGPTHTTPClient {
     let key: P256.Signing.PrivateKey
     var nonce = ""
     private(set) var modelCalls = 0
+    private(set) var otherCalls = 0
     init(failure: Failure) throws { self.failure = failure; key = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0, count: 31) + Data([1])) }
     func setNonce(_ value: String) { nonce = value }
     func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
@@ -168,7 +200,7 @@ private actor ReauthHTTP: ChatGPTHTTPClient {
             modelCalls += 1
             if failure == .catalog { throw HostError("chatgpt_transport_unavailable") }
             return .init(status: 200, data: Data(#"{"models":[{"visibility":"list","slug":"offered","display_name":"Offered"}]}"#.utf8))
-        default: throw HostError("unexpected_fixture_route")
+        default: otherCalls += 1; throw HostError("unexpected_fixture_route")
         }
     }
     private func b64(_ data: Data) -> String { data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }

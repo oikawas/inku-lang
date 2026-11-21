@@ -2898,14 +2898,21 @@ public final class AppModel {
               (!availability.chatGPT || availability.signedIn), availability.available else { return nil }
         phoneBackgroundStopped = false; phoneDrawFailure = nil; phonePendingReview = nil
         do {
-            let request = try requestForPhoneDescription(phoneDrawText)
+            let freshRequest = try requestForPhoneDescription(phoneDrawText)
+            let request = try await pinPersonalPlanRequests([freshRequest])[0]
             let work = await runAutomation(request: request, singleInputMode: "description", phoneHome: true)
             if work == nil && !phoneBackgroundStopped && phonePendingReview == nil {
-                phoneDrawFailure = automationFailureMessage ?? errorText
+                phoneDrawFailure = (automationFailureMessage ?? errorText).map(phoneDrawingFailureText)
                 errorText = nil
             }
             return work
-        } catch { phoneDrawFailure = failureMessage(error); return nil }
+        } catch { phoneDrawFailure = phoneDrawingFailureText(failureMessage(error)); return nil }
+    }
+    func phoneDrawingFailureText(_ message: String) -> String {
+        let code = message.range(of: #"^[a-z][a-z0-9_]*$"#, options: .regularExpression) != nil
+        guard code else { return message }
+        if message.hasPrefix("chatgpt_") { return ChatGPTStatusCopy.text(message, language: display.preferences.language) }
+        return display.label("描画できませんでした。もう一度お試しください。", "Could not draw. Please try again.")
     }
     var phoneNeedsReview: Bool { phonePendingReview != nil || patchReview != nil || !completionIssues.isEmpty || authoringPhase == "needs_user_edit" }
     func openPhonePendingReview() {

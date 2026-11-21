@@ -14,6 +14,12 @@ public struct ChatGPTPlanDiagnostic: Sendable, Equatable {
     public let requestID: String?
     public let parameter: String?
     public let status: Int?
+    public let reportedCode: String?
+    public let eventCount: Int?
+    public let lastEvent: String?
+    public let toolShapes: [ProviderAttemptDiagnostic.ToolShape]?
+    public let streamedCalls: Int?
+    public let finalizedCalls: Int?
     /// Whether the pipeline may retry (`provider_rejected`, `transport_unavailable`, `transport_timeout`).
     public let pipelineFailure: String
     /// The failure table is the shared core's (`chatgpt_failure`). `temporary` is given only for a failure the
@@ -23,11 +29,18 @@ public struct ChatGPTPlanDiagnostic: Sendable, Equatable {
         self.init(code: code, status: status, requestID: requestID, parameter: parameter,
                   failure: classified.failure, action: classified.action)
     }
-    init(code: String, status: Int?, requestID: String?, parameter: String?, failure: String, action: String) {
+    init(code: String, status: Int?, requestID: String?, parameter: String?, failure: String, action: String,
+         reportedCode: String? = nil, eventCount: Int? = nil, lastEvent: String? = nil,
+         toolShapes: [ProviderAttemptDiagnostic.ToolShape]? = nil, streamedCalls: Int? = nil, finalizedCalls: Int? = nil) {
         self.code = code; self.status = status; self.pipelineFailure = failure; self.action = action
         self.requestID = Self.safe(requestID); self.parameter = Self.safe(parameter)
+        self.reportedCode = Self.safe(reportedCode); self.eventCount = eventCount; self.lastEvent = Self.safe(lastEvent)
+        self.toolShapes = toolShapes?.map {
+            .init(type: Self.safe($0.type), name: Self.safe($0.name), namespace: Self.safe($0.namespace))
+        }
+        self.streamedCalls = streamedCalls; self.finalizedCalls = finalizedCalls
     }
-    private static func safe(_ value: String?) -> String? {
+    static func safe(_ value: String?) -> String? {
         guard let value, value.range(of: "^[A-Za-z0-9_.:\\[\\]-]{1,160}$", options: .regularExpression) != nil else { return nil }
         return value
     }
@@ -284,7 +297,8 @@ public actor ChatGPTPlanRuntime {
             }
             if !(200...299).contains(result.status) { throw try ChatGPTWire.httpFailure(result) }
             // The core reads the whole stream: a failure following a completed frame invalidates that frame.
-            let stream = try ChatGPTWire.read(text: false, answerLimit: argumentLimit, wire: result.data)
+            let stream = try ChatGPTWire.read(text: false, answerLimit: argumentLimit, wire: result.data,
+                                              status: result.status, requestID: result.requestID)
             if let terminal = stream.terminal { recorder?.report(terminal) }
             try Task.checkCancellation()
             let answer = try stream.result.get(); try validate(session, operationEpoch: operationEpoch); return answer
@@ -316,7 +330,8 @@ public actor ChatGPTPlanRuntime {
                 try await self.http.send(boundedRequest, maximumBytes: prepared.wireLimit, errorBytes: prepared.endpoint.errorLimit, onBytes: onBytes)
             }
             if !(200...299).contains(result.status) { throw try ChatGPTWire.httpFailure(result) }
-            let stream = try ChatGPTWire.read(text: true, answerLimit: Self.visionTextLimit, wire: result.data)
+            let stream = try ChatGPTWire.read(text: true, answerLimit: Self.visionTextLimit, wire: result.data,
+                                              status: result.status, requestID: result.requestID)
             try Task.checkCancellation()
             let answer = try stream.result.get(); try validate(session, operationEpoch: operationEpoch); return answer
         } catch {

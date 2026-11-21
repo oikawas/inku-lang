@@ -113,6 +113,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
         guard let resultTag = results[try effect.requiredString("tag")] else { throw HostError("chatgpt_operation_not_supported") }
         let recorder = try observation.map { try ProviderAttemptRecorder(effect: effect, reference: reference, options: $0) }
         var failure: String?
+        var failureDiagnostic: ChatGPTPlanDiagnostic?
         do {
             let answer: String
             if let recorder {
@@ -133,11 +134,12 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
             }
             let diagnostic = ChatGPTPlanRuntime.diagnostic(error)
             onDiagnostic(diagnostic)
+            failureDiagnostic = diagnostic
             failure = diagnostic.pipelineFailure
             result["tag"] = .string("provider_failed"); result["failure"] = .string(diagnostic.pipelineFailure)
         }
         result["elapsed_ms"] = .string(String(max(0, Int64(Date().timeIntervalSince(began) * 1000))))
-        try await recorder?.finish(failure: failure, callback: didFinish)
+        try await recorder?.finish(failure: failure, chatGPTDiagnostic: failureDiagnostic, callback: didFinish)
         return result.data
     }
     public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings, credentials: any CredentialStore,

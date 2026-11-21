@@ -5,6 +5,74 @@ import XCTest
 @testable import InkuUI
 
 @MainActor final class ChatGPTReauthCatalogTests: XCTestCase {
+    func testStoresReportedChatGPTRefusalWithAndWithoutBodyCapture() async throws {
+        let previousMode = ProcessInfo.processInfo.environment["INKU_DEVELOPER_MODE"]
+        setenv("INKU_DEVELOPER_MODE", "1", 1)
+        defer {
+            if let previousMode { setenv("INKU_DEVELOPER_MODE", previousMode, 1) }
+            else { unsetenv("INKU_DEVELOPER_MODE") }
+        }
+        for capture in [false, true] {
+            let fixture = try ReauthFixture(existing: true, failure: .reportedDrawFailure)
+            defer { fixture.remove() }
+            let app = fixture.app
+            await app.initialize()
+            var settings = await app.hostSettings()
+            settings.providers.append(.personalPlan)
+            try await app.updateHostSettings(settings)
+            await app.synchronizePersonalPlanModels()
+            var defaults = app.drawDefaults
+            defaults["describe"]?.models.stage1 = "chatgpt:offered"
+            defaults["describe"]?.models.stage2 = "chatgpt:offered"
+            defaults["describe"]?.route = "read_and_draw"
+            defaults["describe"]?.composition = "off"
+            defaults["describe"]?.sketch = "on"
+            try app.saveDrawDefaults(defaults)
+            var request = try app.requestForPhoneDescription("a red circle")
+            request.descriptionReview = false
+            request.captureProviderIO = capture
+            let pinned = try await app.pinPersonalPlanRequests([request])[0]
+
+            let work = await app.runAutomation(request: pinned)
+            let saved = try XCTUnwrap(work, app.errorText ?? "")
+            let attempts = try await savedAttempts(app, workID: saved.id)
+            let failed = try XCTUnwrap(attempts.first { $0.metric.action == "read_description" })
+            XCTAssertEqual(failed.metric.outcome, .failed)
+            XCTAssertEqual(failed.metric.failure, "provider_rejected")
+            XCTAssertEqual(failed.raw?.responseBody != nil, capture)
+            let diagnostic = try XCTUnwrap(failed.metric.diagnostic)
+            XCTAssertEqual(diagnostic.hostCode, "chatgpt_response_failed")
+            XCTAssertEqual(diagnostic.providerCode, "server_error")
+            XCTAssertEqual(diagnostic.httpStatus, 200)
+            XCTAssertEqual(diagnostic.providerParameter, "tool.choice")
+            XCTAssertEqual(diagnostic.requestID, "req_fixture")
+            XCTAssertEqual(diagnostic.eventCount, 2)
+            XCTAssertEqual(diagnostic.lastEvent, "response.failed")
+            XCTAssertNil(diagnostic.providerMessage)
+            XCTAssertNil(diagnostic.toolShapes)
+            XCTAssertTrue(attempts.contains { $0.metric.action == "write_description_ddl" && $0.metric.outcome == .completed })
+        }
+    }
+
+    func testLegacyProviderDiagnosticDecodesWithoutChatGPTStreamFields() throws {
+        let data = Data(#"{"kind":"host","reason":"Legacy diagnostic","hostCode":"credentials_unavailable"}"#.utf8)
+        let diagnostic = try JSONDecoder().decode(ProviderAttemptDiagnostic.self, from: data)
+        XCTAssertEqual(diagnostic.hostCode, "credentials_unavailable")
+        XCTAssertNil(diagnostic.requestID)
+        XCTAssertNil(diagnostic.eventCount)
+        XCTAssertNil(diagnostic.lastEvent)
+        XCTAssertNil(diagnostic.toolShapes)
+        XCTAssertNil(diagnostic.streamedCalls)
+        XCTAssertNil(diagnostic.finalizedCalls)
+    }
+
+    private func savedAttempts(_ app: AppModel, workID: String) async throws -> [ProviderAttemptObservation] {
+        struct Snapshot: Decodable { let providerObservations: [ProviderAttemptObservation] }
+        let id = try WorkIdentity.location(workID).executionID
+        let record = try await app.auxiliaryDatabase().loadExecution(id: id)
+        return try JSONDecoder().decode(Snapshot.self, from: XCTUnwrap(record).snapshot).providerObservations
+    }
+
     func testPhoneDrawSavesAfterAProviderDiagnosticWithoutShowingFailure() async throws {
         let fixture = try ReauthFixture(existing: true, failure: .recoveredDraw)
         defer { fixture.remove() }
@@ -30,6 +98,12 @@ import XCTest
         let report = try XCTUnwrap(fixture.app.phoneDrawingWait?.report["finished"].array)
         XCTAssertEqual(report.first?["action"].string, "read_description")
         XCTAssertEqual(report.first?["outcome"].string, "fallback")
+        let attempts = try await savedAttempts(fixture.app, workID: saved.id)
+        let diagnostic = try XCTUnwrap(attempts.first { $0.metric.action == "read_description" }?.metric.diagnostic)
+        XCTAssertEqual(diagnostic.hostCode, "chatgpt_unexpected_tool")
+        XCTAssertEqual(diagnostic.toolShapes?.first?.type, "web_search_call")
+        XCTAssertEqual(diagnostic.streamedCalls, 0)
+        XCTAssertEqual(diagnostic.finalizedCalls, 0)
         XCTAssertNil(fixture.app.errorText)
         XCTAssertNil(fixture.app.phoneDrawFailure)
     }
@@ -198,7 +272,7 @@ private final class FixtureKeyStore: ChatGPTVaultKeyStore, @unchecked Sendable {
 }
 
 private actor ReauthHTTP: ChatGPTHTTPClient {
-    enum Failure { case none, login, catalog, recoveredDraw }
+    enum Failure { case none, login, catalog, recoveredDraw, reportedDrawFailure }
     let failure: Failure
     let key: P256.Signing.PrivateKey
     var nonce = ""
@@ -230,8 +304,18 @@ private actor ReauthHTTP: ChatGPTHTTPClient {
             modelCalls += 1
             if failure == .catalog { throw HostError("chatgpt_transport_unavailable") }
             return .init(status: 200, data: Data(#"{"models":[{"visibility":"list","slug":"offered","display_name":"Offered"}]}"#.utf8))
-        case "/v1/responses" where failure == .recoveredDraw:
+        case "/v1/responses" where failure == .recoveredDraw || failure == .reportedDrawFailure:
             drawingCalls += 1
+            if failure == .reportedDrawFailure && drawingCalls == 1 {
+                let wire = """
+                    data: {"type":"response.created"}
+
+                    data: {"type":"response.failed","response":{"error":{"code":"server_error","param":"tool.choice","message":"private fixture body"}}}
+
+
+                    """
+                return .init(status: 200, requestID: "req_fixture", data: Data(wire.utf8))
+            }
             let events: [ExactJSON]
             if drawingCalls == 1 {
                 events = [.object(["type": .string("response.output_item.added"),

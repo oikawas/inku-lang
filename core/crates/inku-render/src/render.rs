@@ -248,7 +248,7 @@ fn background_rect(paper: CanvasSize, color: &str) -> Element {
 /// The content canvas of a Score fitted into its paper (render engine 93): the
 /// largest frame of the declared ratio, centred, with the paper's margins as
 /// its bleed. `None` draws on the paper itself, as every other Score does.
-fn fitted_canvas(score: &Score, paper: CanvasSize) -> Option<CanvasSize> {
+pub(crate) fn fitted_canvas(score: &Score, paper: CanvasSize) -> Option<CanvasSize> {
     let Canvas::Spec(CanvasSpec {
         declared_ratio: Some(ratio),
         fit: Some(CanvasFit::Contain),
@@ -275,7 +275,7 @@ fn fitted_canvas(score: &Score, paper: CanvasSize) -> Option<CanvasSize> {
 }
 
 /// A fitted Score's content, moved from its frame's origin to the paper's.
-fn on_paper(content: Element, canvas: CanvasSize) -> Element {
+pub(crate) fn on_paper(content: Element, canvas: CanvasSize) -> Element {
     if canvas.bleed.is_none() {
         return content;
     }

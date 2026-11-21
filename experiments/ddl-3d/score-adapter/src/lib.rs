@@ -286,6 +286,36 @@ mod tests {
         assert_eq!(result["scene"]["marks"].as_array().unwrap().len(), 9);
     }
 
+    #[test]
+    fn contained_score_places_geometry_and_paint_in_the_same_paper_frame() {
+        let mut value: Value = serde_json::from_str(SOLIDS).unwrap();
+        value["render_canvas_aspect_id"] = json!("square");
+        value["render_canvas_aspect_ratio"] = json!(1);
+        let full = convert(&value.to_string()).unwrap();
+        value["score"]["canvas"] = json!({
+            "aspect": "square", "declared_ratio": {"width_units": 2, "height_units": 1},
+            "fit": "contain"
+        });
+        let fitted = convert(&value.to_string()).unwrap();
+        assert_eq!(fitted["scene"]["canvas"], json!([1.0, 1.0]));
+        let mark = &fitted["scene"]["marks"][0];
+        assert_eq!(
+            mark["shape"],
+            json!({"kind":"round","center":[0.2,0.125],"radii":[0.06,0.06]})
+        );
+        assert_eq!(mark["transform"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.25]));
+        let full_center = &full["scene"]["marks"][0]["appearance"]["center"];
+        let fitted_center = &mark["appearance"]["center"];
+        assert!(
+            (fitted_center[0].as_f64().unwrap() - full_center[0].as_f64().unwrap()).abs() < 1e-10
+        );
+        assert!(
+            (fitted_center[1].as_f64().unwrap() - (0.25 + full_center[1].as_f64().unwrap() / 2.0))
+                .abs()
+                < 1e-10
+        );
+    }
+
     // Failure: macro/placement is expanded twice or arc-pair interiors disappear.
     #[test]
     fn placed_saved_score_has_one_expansion_and_closed_pair_interiors() {

@@ -189,10 +189,10 @@ fn mark_appearance(
             // Noise depends on canvas coordinates only, so the canvas-wide
             // region narrows to this mark's bounds without moving the touch.
             let canvas = context.canvas;
-            let left = bounds[0].max(-0.02 * canvas.width);
-            let top = bounds[1].max(-0.02 * canvas.height);
-            let right = (bounds[0] + bounds[2]).min(1.02 * canvas.width);
-            let bottom = (bounds[1] + bounds[3]).min(1.02 * canvas.height);
+            let left = bounds[0].max(-0.02 * canvas.width - canvas.bleed.x);
+            let top = bounds[1].max(-0.02 * canvas.height - canvas.bleed.y);
+            let right = (bounds[0] + bounds[2]).min(1.02 * canvas.width + canvas.bleed.x);
+            let bottom = (bounds[1] + bounds[3]).min(1.02 * canvas.height + canvas.bleed.y);
             if right > left && bottom > top {
                 filter.set_attr("x", format_number(left));
                 filter.set_attr("y", format_number(top));
@@ -235,11 +235,15 @@ fn mark_appearance(
     let mut crop = Element::new("clipPath")
         .attr("id", "appearance-canvas")
         .attr("clipPathUnits", "userSpaceOnUse");
-    crop.push(
-        Element::new("rect")
-            .attr("width", format_number(context.canvas.width))
-            .attr("height", format_number(context.canvas.height)),
-    );
+    let [left, top, right, bottom] = context.canvas.paper();
+    let mut paper_crop = Element::new("rect")
+        .attr("width", format_number(right - left))
+        .attr("height", format_number(bottom - top));
+    if !context.canvas.bleed.is_none() {
+        paper_crop.set_attr("x", format_number(left));
+        paper_crop.set_attr("y", format_number(top));
+    }
+    crop.push(paper_crop);
     document.push_definition(crop);
     mark = Element::new("g")
         .attr("clip-path", "url(#appearance-canvas)")
@@ -342,11 +346,14 @@ pub fn export_geometry(
     budget: OperationalResourceBudget,
     maximum_marks: usize,
 ) -> Result<GeometryScene, String> {
-    let canvas = request.options.canvas;
-    let unit = canvas.unit();
-    if !unit.is_finite() || unit <= 0.0 {
+    let paper = request.options.canvas;
+    let paper_unit = paper.unit();
+    if !paper_unit.is_finite() || paper_unit <= 0.0 {
         return Err("invalid_canvas".into());
     }
+    let frame = crate::render::fitted_canvas(&request.score, paper);
+    let canvas = frame.unwrap_or(paper);
+    let unit = canvas.unit();
     request
         .score
         .validate_work_ranges()
@@ -411,13 +418,13 @@ pub fn export_geometry(
         );
     }
     let mut scene = GeometryScene {
-        canvas: [canvas.width / unit, canvas.height / unit],
+        canvas: [paper.width / paper_unit, paper.height / paper_unit],
         background,
         ground: ground.is_some(),
         presence_svg: crate::layers::render_presence_layer(&plan.score, canvas, &assignment).map(
             |layer| {
-                let mut document = crate::svg::Document::new(canvas);
-                document.push(layer);
+                let mut document = crate::svg::Document::new(paper);
+                document.push(crate::render::on_paper(layer, canvas));
                 document.serialize()
             },
         ),
@@ -816,9 +823,58 @@ pub fn export_geometry(
     if scene.marks.is_empty() && !scene.ground && scene.presence_svg.is_none() {
         return Err("no_drawable_content".into());
     }
+    if let Some(frame) = frame {
+        place_fitted_marks_on_paper(&mut scene.marks, frame, paper_unit);
+    }
     scene.diagnostics.sort();
     scene.diagnostics.dedup();
     Ok(scene)
+}
+
+fn place_fitted_marks_on_paper(marks: &mut [GeometryMark], frame: CanvasSize, paper_unit: f64) {
+    let scale = frame.unit() / paper_unit;
+    let offset = [frame.bleed.x / paper_unit, frame.bleed.y / paper_unit];
+    let local = |[x, y]: [f64; 2]| [x * scale, y * scale];
+    let on_paper = |[x, y]: [f64; 2]| [x * scale + offset[0], y * scale + offset[1]];
+    let place_appearance = |appearance: &mut GeometryAppearance| {
+        let [x, y, width, height] = appearance.bounds;
+        let [x, y] = on_paper([x, y]);
+        appearance.bounds = [x, y, width * scale, height * scale];
+        appearance.center = on_paper(appearance.center);
+    };
+    for mark in marks {
+        match &mut mark.shape {
+            GeometryShape::Round { center, radii } => {
+                *center = local(*center);
+                *radii = local(*radii);
+            }
+            GeometryShape::Contour { points } | GeometryShape::Path { points } => {
+                for point in points {
+                    *point = local(*point);
+                }
+            }
+        }
+        let [.., x, y] = mark.transform;
+        [mark.transform[4], mark.transform[5]] = on_paper([x, y]);
+        mark.width *= scale;
+        for dash in &mut mark.dash {
+            *dash *= scale;
+        }
+        for point in mark.clips.iter_mut().flatten() {
+            *point = on_paper(*point);
+        }
+        if let Some(appearance) = &mut mark.appearance {
+            place_appearance(appearance);
+        }
+        if let Some(fill) = &mut mark.pair_fill {
+            for point in &mut fill.points {
+                *point = on_paper(*point);
+            }
+            if let Some(appearance) = &mut fill.appearance {
+                place_appearance(appearance);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

@@ -49,6 +49,12 @@ test('raster-sized SVG changes only the root width and height', () => {
   assert.equal(rasterSizedSvg(unsized, 341, 236), unsized);
 });
 
+test('a wide glass mark fills its square raster before projection onto the layer', () => {
+  const svg = '<svg width="800" height="300" viewBox="0 0 800 300" preserveAspectRatio="xMidYMid meet"><rect width="800" height="300"/></svg>';
+  assert.equal(rasterSizedSvg(svg, 512, 512, true),
+    '<svg width="512" height="512" viewBox="0 0 800 300" preserveAspectRatio="none"><rect width="800" height="300"/></svg>');
+});
+
 // Failure: painting expands every triangle corner into its own vertex, or the
 // worker already expanded a tube, multiplying GPU memory, GLB size and depth work.
 test('painted surfaces keep shared vertices and the same corners', () => {

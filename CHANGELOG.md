@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server: Work pack exports use the shared core's line encoder.
-
-- Shared core: added work pack APIs to validate lines, select imports and lineage roots, and encode JSON lines with sorted keys.
-
 - Adds [Using the iPhone App](manual/en/iphone-app.md) to the manual.
 
 - Swift (macOS and iOS): fixes workspace displacement in Lineage and duplicate comment save buttons in iPhone Work Information. On launch, the app checks the 100 most recent drawing records and marks drawings interrupted by shutdown as stopped.
@@ -793,6 +789,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.384 (2026-11-21 / Build 1460)
+
+- Server: Work pack exports use the shared core's line encoder.
+- Shared core: added work pack APIs to validate lines, select imports and lineage roots, and encode JSON lines with sorted keys.
 
 ## v2.15.383 (2026-11-21 / Build 1459)
 

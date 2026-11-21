@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -90,15 +91,33 @@ def test_route_returns_attachment(pack_db, monkeypatch):
     assert json.loads(response.content.splitlines()[0])["counts"]["history"] == 1
 
 
+def test_export_matches_legacy_fixture_bytes(pack_db, monkeypatch):
+    from inku_server import workpack_export
+
+    factory, _ = pack_db
+    # Timestamp and SHA-256 from the pre-core fixture export on 2026-11-20.
+    monkeypatch.setattr(workpack_export.time, "time", lambda: 1795132150.761)
+    with factory.begin() as session:
+        session.get(HistoryRow, "work-0").note = " \t "
+        annotated = session.get(HistoryRow, "work-1")
+        annotated.note = " \t" + annotated.note + "\n "
+    data = export_workpack(factory, {"id": "owner", "permission_groups": []},
+                           ["work-0", "work-1", "work-2"], app_version="test", build=1)
+    assert hashlib.sha256(data).hexdigest() == "aa0c6918c9252d46ebf8cf3b823d65df6c1f3788f3917f287652621578522eb7"
+
+
 def test_limits_and_nonfinite_values_are_refused(pack_db, monkeypatch):
+    import inku_render
     from inku_server import workpack_export
 
     factory, _ = pack_db
     actor = {"id": "owner", "permission_groups": []}
-    monkeypatch.setattr(workpack_export, "MAX_LINE", 32)
-    with pytest.raises(ValueError, match="64 MiB"):
-        export_workpack(factory, actor, ["work-0"], app_version="test", build=1)
-    monkeypatch.setattr(workpack_export, "MAX_LINE", 64 * 1024 * 1024)
+    with monkeypatch.context() as patch:
+        patch.setattr(inku_render, "pipeline_workpack_encode_line", lambda _: {
+            "line": None, "error": b'{"outcome":"refused","code":"too_large","reason":"too_large"}',
+        })
+        with pytest.raises(ValueError, match="64 MiB"):
+            export_workpack(factory, actor, ["work-0"], app_version="test", build=1)
     monkeypatch.setattr(workpack_export, "MAX_PACK", 32)
     with pytest.raises(ValueError, match="256 MiB"):
         export_workpack(factory, actor, ["work-0"], app_version="test", build=1)

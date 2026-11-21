@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server: Work pack exports use the shared core's line encoder.
+
 - Shared core: added work pack APIs to validate lines, select imports and lineage roots, and encode JSON lines with sorted keys.
 
 - Adds [Using the iPhone App](manual/en/iphone-app.md) to the manual.

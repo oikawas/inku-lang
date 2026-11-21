@@ -4296,7 +4296,8 @@ uniform sampler2DArray uLayers;
 uniform float uLayerSize;
 uniform int uSlots;
 uniform vec4 uPlane[SLOTS];   // z = c + gx x + gy y: gx, gy, c, opacity
-uniform int uPresence;        // 1 when slot 0 is the presence plane (no sheen)uniform vec4 uRect[SLOTS];    // content rectangle in world x, y: x0, y0, x1, y1
+uniform int uPresence;        // 1 when slot 0 is the presence plane (no sheen)
+uniform vec4 uRect[SLOTS];    // content rectangle in world x, y: x0, y0, x1, y1
 uniform vec3 uSigma[SLOTS];   // absorption of the glass in front of slot k (between k and k+1)
 uniform float uPulse[SLOTS];
 uniform vec4 uBox[6];         // outward normal, offset: dot(n, p) <= d inside

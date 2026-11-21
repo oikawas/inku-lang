@@ -251,35 +251,21 @@ mod tests {
     fn recovered_score_keeps_drawable_content_and_reports_each_recovery() {
         let result = convert(RECOVERED).unwrap();
         let marks = result["scene"]["marks"].as_array().unwrap();
-        assert_eq!(
-            marks
-                .iter()
-                .map(|m| m["sourceIndex"].as_u64().unwrap())
-                .collect::<Vec<_>>(),
-            vec![0, 0, 1]
-        );
-        assert_eq!(
-            result["scene"]["recoveries"],
-            json!([{
-                "kind": "execution", "instruction_index": 1, "dependency_instruction_index": 0,
-                "reason": "unsupported_joint_geometry", "disposition": "relation_omitted"
-            }])
-        );
+        assert_eq!(marks.iter().map(|m| m["sourceIndex"].as_u64().unwrap()).collect::<Vec<_>>(), vec![0, 0, 1]);
+        assert_eq!(result["scene"]["recoveries"], json!([{
+            "kind": "execution", "instruction_index": 1, "dependency_instruction_index": 0,
+            "reason": "unsupported_joint_geometry", "disposition": "relation_omitted"
+        }]));
 
         let mut value: Value = serde_json::from_str(RECOVERED).unwrap();
-        value["score"]["resource_policy"]["operational_budget"]["maximum"]["primitive_marks"] =
-            json!(1);
+        value["score"]["resource_policy"]["operational_budget"]["maximum"]["primitive_marks"] = json!(1);
         let limited = convert(&value.to_string()).unwrap();
         let marks = limited["scene"]["marks"].as_array().unwrap();
         assert_eq!(marks.len(), 1);
         assert_eq!(marks[0]["sourceIndex"], json!(1));
         let recoveries = limited["scene"]["recoveries"].as_array().unwrap();
         assert!(recoveries.iter().any(|d| d["kind"] == "resource_omitted"));
-        assert!(
-            recoveries
-                .iter()
-                .any(|d| d["kind"] == "relation_omitted" && d["instruction_index"] == 1)
-        );
+        assert!(recoveries.iter().any(|d| d["kind"] == "relation_omitted" && d["instruction_index"] == 1));
     }
 
     // Failure: saved ratio/seed are replaced by current defaults or rounded in JS.

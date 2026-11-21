@@ -140,6 +140,13 @@ final class WorkPackTests: XCTestCase {
         XCTAssertNil(rolledBack)
     }
 
+    func testInvalidWorkPackShowsLocalizedMessageWithoutDiagnosticReason() {
+        let error = WorkPackError.invalid("truncated line")
+        XCTAssertEqual(error.localizedDescription, "作品パックが壊れています。")
+        XCTAssertEqual(error.message(language: "ja"), "作品パックが壊れています。")
+        XCTAssertEqual(error.message(language: "en"), "The work pack is damaged.")
+    }
+
     func testRejectsTruncationAndNewerVersion() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("workpack-invalid-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }

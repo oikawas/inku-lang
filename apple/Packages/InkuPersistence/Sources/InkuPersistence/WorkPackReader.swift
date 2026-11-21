@@ -1,16 +1,24 @@
 import Foundation
 import InkuCore
 import GRDB
+import OSLog
 
 public enum WorkPackError: Error, LocalizedError {
     case invalid(String)
     case newerVersion
     case tooLarge
-    public var errorDescription: String? {
+    public var errorDescription: String? { message(language: "ja") }
+
+    public func message(language: String) -> String {
         switch self {
-        case .newerVersion: return "新しい inku で書き出したファイルです。アプリを更新してください。"
-        case .tooLarge: return "作品パックが大きすぎます。"
-        case .invalid(let reason): return "作品パックが壊れています: \(reason)"
+        case .newerVersion:
+            return language == "en" ? "This file was exported by a newer version of inku. Update the app."
+                : "新しい inku で書き出したファイルです。アプリを更新してください。"
+        case .tooLarge:
+            return language == "en" ? "The work pack is too large." : "作品パックが大きすぎます。"
+        case .invalid(let reason):
+            Logger(subsystem: "app.inku", category: "work-pack").error("Invalid work pack: \(reason, privacy: .public)")
+            return language == "en" ? "The work pack is damaged." : "作品パックが壊れています。"
         }
     }
 }

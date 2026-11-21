@@ -29,14 +29,29 @@ def _is_render_hash_prefix_search(search: str) -> bool:
     return bool(_RENDER_HASH_PREFIX.fullmatch(search))
 
 
-def _is_history_id_prefix_search(search: str) -> bool:
-    """Only prefixes of the canonical UUID spelling, including partial groups."""
+def _is_history_id_fragment(search: str, start: int) -> bool:
+    """Check a fragment against the canonical UUID's hexadecimal and hyphen positions."""
     if not 1 <= len(search) <= 36:
         return False
     return all(
         character == "-" if position in (8, 13, 18, 23) else character.lower() in "0123456789abcdef"
-        for position, character in enumerate(search)
+        for position, character in enumerate(search, start)
     )
+
+
+def _is_history_id_prefix_search(search: str) -> bool:
+    return _is_history_id_fragment(search, 0)
+
+
+def _is_history_id_suffix_search(search: str) -> bool:
+    return _is_history_id_fragment(search, 36 - len(search))
+
+
+def _history_id_edge_clauses(search: str):
+    if _is_history_id_prefix_search(search):
+        yield HistoryRow.id.ilike(f"{search}%")
+    if _is_history_id_suffix_search(search):
+        yield HistoryRow.id.ilike(f"%{search}")
 
 
 def _is_render_hash_suffix_search(search: str) -> bool:
@@ -72,13 +87,12 @@ def _history_search_clause(search: str):
             # The digest begins after a version delimiter, or at the start of
             # an unversioned legacy hash. Neither is indexed by text FTS.
             clauses.append(HistoryRow.render_hash.ilike(f"%:{search}%"))
-    if _is_history_id_prefix_search(search):
-        clauses.append(HistoryRow.id.ilike(f"{search}%"))
+    clauses.extend(_history_id_edge_clauses(search))
     return or_(*clauses)
 
 
 def _canvas_history_search_clause(search: str):
-    if re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", search, re.IGNORECASE):
+    if len(search) == 36 and _is_history_id_prefix_search(search):
         return func.lower(HistoryRow.id) == search.lower()
     literal = search.replace("/", "//").replace("%", "/%").replace("_", "/_")
     clauses = [func.coalesce(HistoryRow.source_text, HistoryRow.input).ilike(f"%{literal}%", escape="/")]
@@ -89,6 +103,7 @@ def _canvas_history_search_clause(search: str):
         ])
         if ":" not in search:
             clauses.append(column.ilike(f"%:{literal}%", escape="/"))
+    clauses.extend(_history_id_edge_clauses(search))
     return or_(*clauses)
 
 
@@ -100,6 +115,7 @@ def _use_history_fts(search: str, *, fts_enabled: bool, dialect_name: str) -> bo
         and not _is_render_hash_suffix_search(search)
         and not _is_render_hash_prefix_search(search)
         and not _is_history_id_prefix_search(search)
+        and not _is_history_id_suffix_search(search)
     )
 
 

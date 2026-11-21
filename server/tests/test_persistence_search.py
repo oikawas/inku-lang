@@ -342,7 +342,7 @@ def test_quote_hash_clause_and_fts_selection_behavior_remains_exact() -> None:
     assert _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("1234-5678")
 
 
-def test_identifier_prefixes_find_sqlite_history_without_losing_text_or_visibility(tmp_path) -> None:
+def test_identifier_edges_find_sqlite_history_without_losing_text_or_visibility(tmp_path) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'search.sqlite3'}")
     HistoryRow.__table__.create(engine)
     sessions = sessionmaker(bind=engine)
@@ -375,7 +375,8 @@ def test_identifier_prefixes_find_sqlite_history_without_losing_text_or_visibili
             ("rh3:abcde", {ids[0]}), ("RH2:ABCDE", {ids[1]}), ("rh3:a", {ids[0]}),
             (digest, set(ids[:3])), ("rh3:" + digest, {ids[0]}), ("a1b2", set(ids[:3])),
             (ids[0], {ids[0]}), (ids[0].upper(), {ids[0]}), ("12345678", set(ids[:3])),
-            ("12345678-", set(ids[:3])), ("12345678-1234-4", set(ids[:3])), ("1", set(ids[:3])),
+            ("12345678-", set(ids[:3])), ("12345678-1234-4", set(ids[:3])), ("1", {*ids[:3], text_id}),
+            ("000002", {ids[1]}), ("8000-000000000003", {ids[2]}), ("1234-4000", set()),
             ("cabed", {text_id}), ("quiet", set(ids[:3])), ("draw shapes", set(ids[:3])),
             ("model-blue", set(ids[:3])), ("artist", set(ids[:3])), ("sea_stone", set(ids[:3])),
         )
@@ -385,11 +386,14 @@ def test_identifier_prefixes_find_sqlite_history_without_losing_text_or_visibili
             assert total == len(expected), query
         assert service.list_items("reader", query_text="abcde", offset=1, limit=1) == ([{"id": ids[1]}], 3)
         assert service.list_items("other", query_text="abcde") == ([{"id": ids[3]}], 1)
+        with sessions() as session:
+            positioned = session.query(HistoryRow.id).filter(service.position_search_clause("8000-000000000003")).all()
+            assert [work_id for (work_id,) in positioned] == [ids[2]]
     finally:
         engine.dispose()
 
 
-def test_canvas_search_matches_exact_uuid_description_substrings_and_hash_edges(tmp_path) -> None:
+def test_canvas_search_matches_uuid_edges_description_substrings_and_hash_edges(tmp_path) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'canvas-search.sqlite3'}")
     HistoryRow.__table__.create(engine)
     sessions = sessionmaker(bind=engine)
@@ -418,7 +422,9 @@ def test_canvas_search_matches_exact_uuid_description_substrings_and_hash_edges(
     try:
         for query, expected in (
             (wanted, {wanted}), (wanted.upper(), {wanted}),
-            (wanted[:8], {shadow}), ("青い円", {wanted, "lineage-only"}),
+            (wanted[:8], {wanted, shadow}), (wanted[:11], {wanted, shadow}),
+            ("789ABC", {wanted, shadow}), ("8321-123456789ABC", {shadow}),
+            ("4321-8321", set()), ("青い円", {wanted, "lineage-only"}),
             ("ABCDE", {wanted, "lineage-only"}), ("rh3:abcde", {wanted, "lineage-only"}), ("cba123", {wanted, "lineage-only"}),
             (digest, {wanted, "lineage-only"}), ("rh3:" + digest, {wanted, "lineage-only"}), ("000000", set()),
             ("beef1", {wanted}), ("abcdef9", {wanted}), (description_digest, {wanted}),

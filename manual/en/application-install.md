@@ -214,7 +214,7 @@ Check in the Web UI:
 - Color catalog, model, canvas, and Lift the stroke limit selection
 - Refinement and model comparison
 - Provenance Details, Prompts, and JSON
-- Timeline and By lineage history modes; search by a whole render hash, its prefix or last four characters, and by a whole work UUID or its prefix
+- Timeline and By lineage history modes; search by a whole render hash, its prefix or last four characters, and by a whole work UUID, its prefix or its suffix
 - Choose a save location in `Export`, then export SVG, PNG, contact sheets, and animation. The location remains only in the browser that chose it; without one, exports use the browser default download location.
 - As an administrator, switch Settings between `Standard` and `Detailed`, then open and save `Limits` and `Other (server)` in Detailed mode
 - Review backup status in `DB settings` and retention settings in `Log retention`

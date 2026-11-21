@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: The Library and history strip can find works by the beginning or end of their UUID.
+
 - iOS: saving a drawing started from iPhone home clears its description field. Edits made while drawing are kept.
 
 - Swift (macOS and iOS): records ChatGPT refusal codes and stream event details for each failed attempt, even when provider body capture is off.

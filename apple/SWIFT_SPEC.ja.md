@@ -1142,7 +1142,7 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 ChatGPT の失敗試行は、本文記録の設定にかかわらず、core の診断名、プロバイダが報告した安全な識別子、HTTP 状態、要求 ID、通知数と最後の通知、tool の種類・名前・名前空間と件数を取得できた範囲で保存する。診断に要求や応答の本文は含めない。旧記録は追加欄が無いまま読める。
 
-通信本文は、`INKU_DEVELOPER_MODE=1`で起動し、設定の「生成時の送受信を記録」を有効にした場合だけ端末内へ保存する。独立したdefault-offの設定を開始時requestへ固定し、通常環境での明示要求と記録に対応しないtransportは送信前に拒否する。実request本文の耐久記録を送信前にSQLiteへ保存し、保存失敗時はHTTP要求を出さない。送信後の記録失敗を成功や通常のprovider retryへ読み替えない。共通coreのprompt／schema／有限retry／fallbackと結果のidentityを変更しない。
+通信の記録は、`INKU_DEVELOPER_MODE=1`で起動し、設定の「生成時の送受信を記録」を有効にした場合だけ端末内へ保存する。独立したdefault-offの設定を開始時requestへ固定し、通常環境での明示要求と記録に対応しないtransportは送信前に拒否する。画像を扱う試行では要求と応答をそれぞれ SHA-256 とバイト数で記録する。要求の耐久記録を送信前にSQLiteへ保存し、保存失敗時はHTTP要求を出さない。送信後の記録失敗を成功や通常のprovider retryへ読み替えない。共通coreのprompt／schema／有限retry／fallbackと結果のidentityを変更しない。
 
 private executionの`ProviderAttemptObservation`は本文を任意に持ち、通常の履歴・prompt欄・結果logへ露出させない。開発者向けの折りたたみ欄を明示して開いた時だけ読み出し、処理中に開いた記録は「記録を更新」で再読込できる。request／response本文はそれぞれ16MiB以内で、途中切断・上限超過・取消しは不完全／省略の事実を残し、完全な記録とは表示しない。Swiftでは同じexecutionの本文UTF-8 byte合計を64MiB以内とし、送信前に応答16MiB分の余地を確保する。超過は送信前に拒否し、以前の記録を削除・省略しない。この予算は本文の合計であり、encoded snapshotやapp memory全体の上限ではない。接続先URL、header、認証情報、接続設定、例外本文は保存せず、既知のcredentialが本文へ返された場合も除く。画面は先頭32KiBのpreviewを表示し、保存されている本文全体の共有は開発者が明示した操作だけで行う。通常生成情報のAPIはraw本文を返さず、開発者モード外ではraw読出しを拒否する。
 

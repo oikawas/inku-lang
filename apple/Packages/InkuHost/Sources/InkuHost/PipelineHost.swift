@@ -902,7 +902,6 @@ private actor ExecutionDriver {
         self.state.historyVisibility = request.historyVisibility
         self.state.chatGPTSession = request.chatGPTSession
         self.state.captureProviderIO = request.captureProviderIO
-        if case .image = request.authoring { self.state.captureProviderIO = false }
         self.state.disabledPluginNames = request.disabledPluginNames
         self.state.provenance = request.provenance
         self.state.imageProvenance = request.imageProvenance
@@ -1157,7 +1156,7 @@ private actor ExecutionDriver {
                             throw HostError("pipeline_schema_violation")
                         }
                         let id = try executionID(); let transport = self.transport; let credentials = self.credentials
-                        let observation = ProviderObservationOptions(captureRaw: state.captureProviderIO == true && sendAction["_transient_images"] == .null)
+                        let observation = ProviderObservationOptions(captureRaw: state.captureProviderIO == true)
                         task = Task {
                             if delayMS > 0 {
                                 guard delayMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }

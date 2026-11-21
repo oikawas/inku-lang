@@ -84,6 +84,62 @@ import XCTest
         return try JSONDecoder().decode(Snapshot.self, from: XCTUnwrap(record).snapshot).providerObservations
     }
 
+    func testImageReviewSavesDigestsBeforeSendingAndAfterReceiving() async throws {
+        let previousMode = ProcessInfo.processInfo.environment["INKU_DEVELOPER_MODE"]
+        setenv("INKU_DEVELOPER_MODE", "1", 1)
+        defer {
+            if let previousMode { setenv("INKU_DEVELOPER_MODE", previousMode, 1) }
+            else { unsetenv("INKU_DEVELOPER_MODE") }
+        }
+        let fixture = try ReauthFixture(existing: true, failure: .observedDraw)
+        defer { fixture.remove() }
+        let app = fixture.app
+        await app.initialize()
+        var settings = await app.hostSettings()
+        settings.providers.append(.personalPlan)
+        try await app.updateHostSettings(settings)
+        await app.synchronizePersonalPlanModels()
+        var defaults = app.drawDefaults
+        defaults["describe"]?.models.stage1 = "chatgpt:offered"
+        defaults["describe"]?.models.stage2 = "chatgpt:offered"
+        defaults["describe"]?.route = "read_and_draw"
+        defaults["describe"]?.composition = "off"
+        defaults["describe"]?.sketch = "off"
+        try app.saveDrawDefaults(defaults)
+        var request = try app.requestForPhoneDescription("a red circle")
+        request.descriptionReview = true
+        request.captureProviderIO = true
+        let pinned = try await app.pinPersonalPlanRequests([request])[0]
+        let http = fixture.http
+        let work = await app.runAutomation(request: pinned, onExecutionStarted: { [app] id in
+            await http.verifyImageRequest { [weak app] body in
+                guard let app else { throw HostError("fixture_app_unavailable") }
+                let observations = try await app.providerObservations(executionID: id)
+                guard let saved = observations.first(where: { $0.metric.action == "review_description_ddl" }),
+                      saved.metric.outcome == .requestSaved, let requestBody = saved.raw?.requestBody,
+                      try ExactJSON(data: Data(requestBody.utf8)) == captureDigest(body) else {
+                    throw HostError("fixture_missing_durable_image_digest")
+                }
+            }
+        })
+        let savedWork = try XCTUnwrap(work, app.errorText ?? "")
+        let execution = try WorkIdentity.location(savedWork.id).executionID
+        let observations = try await app.providerObservations(executionID: execution)
+        let review = try XCTUnwrap(observations.first { $0.metric.action == "review_description_ddl" })
+        XCTAssertEqual(review.metric.outcome, .completed)
+        XCTAssertEqual(review.metric.httpStatus, 200)
+        let imageExchange = await http.imageExchange
+        let exchange = try XCTUnwrap(imageExchange)
+        let requestBody = try XCTUnwrap(review.raw?.requestBody)
+        XCTAssertEqual(try ExactJSON(data: Data(requestBody.utf8)), captureDigest(exchange.request))
+        let responseBody = try XCTUnwrap(review.raw?.responseBody)
+        XCTAssertEqual(try ExactJSON(data: Data(responseBody.utf8)), captureDigest(exchange.response))
+        XCTAssertTrue(String(decoding: exchange.response, as: UTF8.self).contains("data:image/png;base64,"))
+        let writing = try XCTUnwrap(observations.first { $0.metric.action == "write_description_ddl" })
+        XCTAssertNotNil(writing.raw?.requestBody)
+        XCTAssertTrue(writing.raw?.responseBody?.contains("response.completed") == true)
+    }
+
     func testPhoneDrawSavesAfterAProviderDiagnosticWithoutShowingFailure() async throws {
         let fixture = try ReauthFixture(existing: true, failure: .recoveredDraw)
         defer { fixture.remove() }
@@ -282,16 +338,24 @@ private final class FixtureKeyStore: ChatGPTVaultKeyStore, @unchecked Sendable {
     func remove() { try? FileManager.default.removeItem(at: folder) }
 }
 
+private func captureDigest(_ body: Data) -> ExactJSON {
+    .object(["capture": .string("digest_only"), "byte_len": .integer(body.count),
+             "sha256": .string(SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined())])
+}
+
 private actor ReauthHTTP: ChatGPTHTTPClient {
-    enum Failure { case none, login, catalog, recoveredDraw, reportedDrawFailure }
+    enum Failure { case none, login, catalog, recoveredDraw, reportedDrawFailure, observedDraw }
     let failure: Failure
     let key: P256.Signing.PrivateKey
     var nonce = ""
     private(set) var modelCalls = 0
     private(set) var otherCalls = 0
     private(set) var drawingCalls = 0
+    private(set) var imageExchange: (response: Data, request: Data)?
+    private var imageRequestVerifier: (@Sendable (Data) async throws -> Void)?
     init(failure: Failure) throws { self.failure = failure; key = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0, count: 31) + Data([1])) }
     func setNonce(_ value: String) { nonce = value }
+    func verifyImageRequest(_ verify: @escaping @Sendable (Data) async throws -> Void) { imageRequestVerifier = verify }
     func send(_ request: URLRequest, maximumBytes: Int, errorBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
         switch request.url?.path {
         case "/api/accounts/oauth/token":
@@ -315,7 +379,7 @@ private actor ReauthHTTP: ChatGPTHTTPClient {
             modelCalls += 1
             if failure == .catalog { throw HostError("chatgpt_transport_unavailable") }
             return .init(status: 200, data: Data(#"{"models":[{"visibility":"list","slug":"offered","display_name":"Offered"}]}"#.utf8))
-        case "/v1/responses" where failure == .recoveredDraw || failure == .reportedDrawFailure:
+        case "/v1/responses" where failure == .recoveredDraw || failure == .reportedDrawFailure || failure == .observedDraw:
             drawingCalls += 1
             if failure == .reportedDrawFailure && drawingCalls == 1 {
                 let wire = """
@@ -328,20 +392,30 @@ private actor ReauthHTTP: ChatGPTHTTPClient {
                 return .init(status: 200, requestID: "req_fixture", data: Data(wire.utf8))
             }
             let events: [ExactJSON]
-            if drawingCalls == 1 {
+            if failure == .recoveredDraw && drawingCalls == 1 {
                 events = [.object(["type": .string("response.output_item.added"),
                                    "item": .object(["type": .string("web_search_call"), "id": .string("fixture")])])]
             } else {
                 let item: ExactJSON = .object(["type": .string("function_call"), "id": .string("fixture"),
                     "namespace": .string("inku"), "name": .string("submit_pipeline_response"),
                     "arguments": .string(#"{"ddl":"place one red circle at center.","figures":[]}"#)])
+                let body = request.httpBody ?? Data()
+                let containsImage = String(decoding: body, as: UTF8.self).contains("data:image/png;base64,")
+                var response: ExactJSON = .object(["status": .string("completed"), "output": .array([item])])
+                if containsImage {
+                    try await imageRequestVerifier?(body)
+                    response["echo"] = .string(String(decoding: body, as: UTF8.self))
+                }
                 events = [.object(["type": .string("response.output_item.added"), "item": item]),
-                          .object(["type": .string("response.completed"), "response": .object(
-                            ["status": .string("completed"), "output": .array([item])])])]
+                          .object(["type": .string("response.completed"), "response": response])]
+                if containsImage { imageExchange = (response: encode(events), request: body) }
             }
-            return .init(status: 200, data: Data(events.map { "data: " + $0.text + "\n\n" }.joined().utf8))
+            return .init(status: 200, data: encode(events))
         default: otherCalls += 1; throw HostError("unexpected_fixture_route")
         }
+    }
+    private func encode(_ events: [ExactJSON]) -> Data {
+        Data(events.map { "data: " + $0.text + "\n\n" }.joined().utf8)
     }
     private func b64(_ data: Data) -> String { data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }
 }

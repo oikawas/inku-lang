@@ -9,6 +9,7 @@ This file records changes chronologically. If a historical note conflicts with t
 ## Unreleased
 
 - Swift (macOS and iOS): records ChatGPT refusal codes and stream event details for each failed attempt, even when provider body capture is off.
+- Swift (macOS and iOS): fixes image review when developer provider capture is on. Image attempts record the SHA-256 digest and byte count of each request and response.
 
 - iOS: keeps the 2D paper size and center when switching to 3D in the iPhone viewer.
 - Swift (macOS and iOS): uses the saved score and drawing settings for line-by-line animation.

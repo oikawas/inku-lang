@@ -18,7 +18,7 @@ const BLUR_SIDE = 16;
 
 /** Give the root <svg> the raster's pixel size, keeping its viewBox. WebKit
  * otherwise runs the filters at the SVG's own, larger size before scaling. */
-export function rasterSizedSvg(svg: string, width: number, height: number): string {
+export function rasterSizedSvg(svg: string, width: number, height: number, stretch = false): string {
   const root = /<svg[\s>]/.exec(svg);
   if (!root) return svg;
   const end = svg.indexOf('>', root.index);
@@ -26,7 +26,10 @@ export function rasterSizedSvg(svg: string, width: number, height: number): stri
   const tag = svg.slice(root.index, end);
   const size = /\s(width|height)\s*=\s*("[^"]*"|'[^']*')/g;
   if ((tag.match(size) ?? []).length !== 2) return svg;
-  const sized = tag.replace(size, (_, name: string) => ` ${name}="${name === 'width' ? width : height}"`);
+  let sized = tag.replace(size, (_, name: string) => ` ${name}="${name === 'width' ? width : height}"`);
+  if (stretch) {
+    sized = sized.replace(/\spreserveAspectRatio\s*=\s*("[^"]*"|'[^']*')/, '') + ' preserveAspectRatio="none"';
+  }
   return svg.slice(0, root.index) + sized + svg.slice(end);
 }
 

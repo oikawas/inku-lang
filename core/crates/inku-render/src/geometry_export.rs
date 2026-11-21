@@ -189,10 +189,10 @@ fn mark_appearance(
             // Noise depends on canvas coordinates only, so the canvas-wide
             // region narrows to this mark's bounds without moving the touch.
             let canvas = context.canvas;
-            let left = bounds[0].max(-0.02 * canvas.width);
-            let top = bounds[1].max(-0.02 * canvas.height);
-            let right = (bounds[0] + bounds[2]).min(1.02 * canvas.width);
-            let bottom = (bounds[1] + bounds[3]).min(1.02 * canvas.height);
+            let left = bounds[0].max(-0.02 * canvas.width - canvas.bleed.x);
+            let top = bounds[1].max(-0.02 * canvas.height - canvas.bleed.y);
+            let right = (bounds[0] + bounds[2]).min(1.02 * canvas.width + canvas.bleed.x);
+            let bottom = (bounds[1] + bounds[3]).min(1.02 * canvas.height + canvas.bleed.y);
             if right > left && bottom > top {
                 filter.set_attr("x", format_number(left));
                 filter.set_attr("y", format_number(top));
@@ -235,11 +235,15 @@ fn mark_appearance(
     let mut crop = Element::new("clipPath")
         .attr("id", "appearance-canvas")
         .attr("clipPathUnits", "userSpaceOnUse");
-    crop.push(
-        Element::new("rect")
-            .attr("width", format_number(context.canvas.width))
-            .attr("height", format_number(context.canvas.height)),
-    );
+    let [left, top, right, bottom] = context.canvas.paper();
+    let mut paper_crop = Element::new("rect")
+        .attr("width", format_number(right - left))
+        .attr("height", format_number(bottom - top));
+    if !context.canvas.bleed.is_none() {
+        paper_crop.set_attr("x", format_number(left));
+        paper_crop.set_attr("y", format_number(top));
+    }
+    crop.push(paper_crop);
     document.push_definition(crop);
     mark = Element::new("g")
         .attr("clip-path", "url(#appearance-canvas)")

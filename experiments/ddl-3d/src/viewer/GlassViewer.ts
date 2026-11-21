@@ -357,7 +357,9 @@ export class GlassViewer {
     const failures = await paintInTurn(marks.map((_, i) => i), 4, async i => {
       try {
         const [, , w, h] = geometry[i];
-        const url = URL.createObjectURL(new Blob([rasterSizedSvg(marks[i].svg, Math.ceil(w), Math.ceil(h))], { type: 'image/svg+xml' }));
+        // The cropped layer occupies a square texture. Its world-space
+        // rectangle restores the aspect ratio, so the raster must fill the slot.
+        const url = URL.createObjectURL(new Blob([rasterSizedSvg(marks[i].svg, Math.ceil(w), Math.ceil(h), true)], { type: 'image/svg+xml' }));
         const image = new Image();
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {

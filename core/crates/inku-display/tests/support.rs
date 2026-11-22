@@ -5,7 +5,9 @@
 
 use std::collections::BTreeMap;
 
-use inku_ddl::MacroDefinition;
+use inku_ddl::{
+    MacroDefinition, SAIJIKI_ASSET_ID, SAIJIKI_V3_ASSET_ID, migrate_document_from_saijiki_v3,
+};
 use inku_display::{DisplayError, Rewrites, display_svg};
 use inku_pipeline::core_boundary::{
     ClipPolicy, CompilerOptions, compile_committed, render_delivery,
@@ -316,13 +318,20 @@ fn draw(
     let mut compiler = shared["compiler"].clone();
     compiler["host"] = work["host"].clone();
     let compiler: CompilerOptions = serde_json::from_value(compiler).expect("compiler options");
-    let document: VisibleDocument = serde_json::from_value(serde_json::json!({
+    let mut document: VisibleDocument = serde_json::from_value(serde_json::json!({
         "source": source,
         "language": work["language"],
         "macro_locks": shared["macro_locks"],
         "saijiki": shared["saijiki"],
     }))
     .expect("visible document");
+    if document.saijiki == SAIJIKI_V3_ASSET_ID {
+        document.saijiki = SAIJIKI_ASSET_ID.to_owned();
+        let old_source = document.document().expect("document metadata");
+        document.source = migrate_document_from_saijiki_v3(&old_source)
+            .unwrap_or_else(|error| panic!("{id}: Saijiki migration: {error:?}"))
+            .source;
+    }
     let delivery = compile_committed(
         document.document().expect("current document"),
         definitions,

@@ -5,7 +5,7 @@ import InkuHost
     @Bindable var model: AppModel
     @State private var draft: [String: DrawOptions] = [:]
     @State private var pickerTab: String?
-    @State private var saved = false
+    @State private var savedTab: String?
     @State private var failed = false
     @State private var providers: [ProviderSettings] = []
     @State private var loaded = false
@@ -20,7 +20,8 @@ import InkuHost
     private func binding<T>(_ tab: String, _ path: WritableKeyPath<DrawOptions, T>) -> Binding<T> {
         Binding(get: { options(tab)[keyPath: path] }, set: { value in
             if draft[tab] == nil { draft[tab] = options(tab) }
-            draft[tab]?[keyPath: path] = value; commit()
+            draft[tab]?[keyPath: path] = value
+            commit(tab)
         })
     }
     private func options(_ tab: String) -> DrawOptions {
@@ -53,7 +54,6 @@ import InkuHost
         // tab, which only its own row opens.
         if phone {
             phoneSections
-            if saved || failed { phoneSaveSection }
         } else {
             presenters(wideBody)
         }
@@ -84,7 +84,7 @@ import InkuHost
                 if draft[tab] == nil { draft[tab] = options(tab) }
                 if imageTab(tab) { draft[tab]?.models.vision = reference }
                 else { draft[tab]?.models.stage1 = reference; draft[tab]?.models.stage2 = reference }
-                commit()
+                commit(tab)
             })
     }
 
@@ -131,23 +131,30 @@ import InkuHost
                 if tab == tabs[0] { Text(tabTitle(tab)).modifier(loader) }
                 else { Text(tabTitle(tab)) }
             } footer: {
-                Text(hint(tab))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(hint(tab))
+                    saveMessage(tab)
+                }
             }
             // The first read, on whichever row shows first (handed to every row; it reads once).
             .onAppear { if !loaded { draft = model.drawDefaults; loaded = true } }
         }
     }
 
-    private var phoneSaveSection: some View {
-        Section {
-            if saved { Text(copy("drawDefaultsSaved", "保存しました。記述と記述のバッチは次に「新規作成」を押すと反映されます。")) }
-            if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
+    @ViewBuilder private func saveMessage(_ tab: String) -> some View {
+        if savedTab == tab {
+            if failed {
+                Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red)
+            } else {
+                Text(copy("drawDefaultsSaved", "保存しました。記述と記述のバッチは次に「新規作成」を押すと反映されます。"))
+            }
         }
     }
 
-    private func commit() {
-        do { try model.saveDrawDefaults(draft); saved = true; failed = false }
-        catch { failed = true; saved = false }
+    private func commit(_ tab: String) {
+        savedTab = tab
+        do { try model.saveDrawDefaults(draft); failed = false }
+        catch { failed = true }
     }
 
     private func switchBinding(_ tab: String, _ path: WritableKeyPath<DrawOptions, String>) -> Binding<Bool> {
@@ -163,7 +170,7 @@ import InkuHost
             if draft[tab] == nil { draft[tab] = options(tab) }
             draft[tab]?.catalog.mode = value == "auto" ? "auto" : "fixed"
             if value != "auto" { draft[tab]?.catalog.id = value }
-            commit()
+            commit(tab)
         })) {
             Text(copy("colorCatalogAuto", "記述から自動選択")).tag("auto")
             ForEach(model.catalogs) { Text($0.name).tag($0.id) }
@@ -192,22 +199,8 @@ import InkuHost
                         togglePicker(copy("drawDefaultsComposition", "構図・法則・配色"), tab: tab, path: \.composition)
                         togglePicker(copy("wildButton", "筆致制限を外す"), tab: tab, path: \.wild)
                     }
-                    Picker(copy("colorCatalogButton", "色カタログ"), selection: Binding(get: {
-                        let catalog = options(tab).catalog
-                        return catalog.mode == "auto" ? "auto" : catalog.id
-                    }, set: { value in
-                        if draft[tab] == nil { draft[tab] = options(tab) }
-                        draft[tab]?.catalog.mode = value == "auto" ? "auto" : "fixed"
-                        if value != "auto" { draft[tab]?.catalog.id = value }
-                        commit()
-                    })) {
-                        Text(copy("colorCatalogAuto", "記述から自動選択")).tag("auto")
-                        ForEach(model.catalogs) { Text($0.name).tag($0.id) }
-                    }
-                    Picker(copy("drawDefaultsCanvas", "キャンバス"), selection: binding(tab, \.canvasAspect)) {
-                        if imageTab(tab) { Text(copy("imageCanvasAspect", "画像に合わせる")).tag("image") }
-                        ForEach(model.canvases) { Text($0.name).tag($0.id) }
-                    }
+                    catalogPicker(tab)
+                    canvasPicker(tab)
                     HStack {
                         Text(imageTab(tab) ? copy("drawDefaultsVision", "画像を読むモデル") : copy("drawDefaultsModel", "描画モデル"))
                         Spacer()
@@ -215,10 +208,9 @@ import InkuHost
                             .foregroundStyle(.secondary)
                         Button(copy("editButton", "変更")) { pickerTab = tab }
                     }
+                    saveMessage(tab)
                 }.padding(.vertical, 8)
             }
-            if saved { Text(copy("drawDefaultsSaved", "保存しました。記述と記述のバッチは次に「新規作成」を押すと反映されます。")) }
-            if failed { Text(copy("drawDefaultsSaveFailed", "デフォルトを保存できませんでした。")).foregroundStyle(.red) }
         }
     }
     /// The model the tab draws with: its unsaved edit, or else the saved or release default the other rows show.

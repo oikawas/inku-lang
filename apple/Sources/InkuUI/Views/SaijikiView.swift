@@ -68,7 +68,7 @@ public struct SaijikiView: View {
                         .inkuFont(10).foregroundStyle(.secondary)
                 }
             } else {
-                Text(model.display.webCopy("saijikiPreviewPlaceholder", "語を選ぶと、描画への効き方と作例を表示します。"))
+                Text(previewPlaceholder)
                     .inkuFont(11).foregroundStyle(.secondary)
             }
         }
@@ -156,9 +156,21 @@ public struct SaijikiView: View {
     private var copy: ProductReferenceCopy? { model.productReference?.localized(language: uiLanguage) }
     private var hint: String {
         if onInsertWord != nil {
+            #if os(iOS)
+            return model.display.localized("語をタップすると作例を表示し、挿入できる語を編集中の指示書に入れます。")
+            #else
             return model.display.localized("語にマウスを重ねると作例を表示します。クリックすると、挿入できる語を編集中の指示書に入れます。")
+            #endif
         }
         return model.display.webCopy("saijikiHint", "語彙を選ぶと、描画への効き方と作例を表示します。")
+    }
+
+    private var previewPlaceholder: String {
+        #if os(iOS)
+        model.display.localized("語をタップすると、描画への効き方を表示します。")
+        #else
+        model.display.webCopy("saijikiPreviewPlaceholder", "語を選ぶと、描画への効き方と作例を表示します。")
+        #endif
     }
 
     private var wordList: some View {
@@ -248,8 +260,8 @@ public struct SaijikiView: View {
                             Text(referenceOnlyHint)
                                 .inkuFont(12).foregroundStyle(.secondary)
                         }
-                    } else if let copy {
-                        Text(copy.text("saijikiPreviewPlaceholder"))
+                    } else {
+                        Text(previewPlaceholder)
                             .inkuFont(13).foregroundStyle(.secondary)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)

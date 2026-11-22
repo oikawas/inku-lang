@@ -72,7 +72,10 @@ jobs:
           echo "INKU_METER_TEST_RESOURCES=$GITHUB_WORKSPACE/apple/Packages/InkuHost/Sources/InkuHost/Resources/description-meter" >> "$GITHUB_ENV"
       - name: Rust tests
         working-directory: core
-        run: rustup run 1.99.1 cargo test --locked --workspace
+        run: |
+          python_lib="$("$PYO3_PYTHON" -c 'import sys; from pathlib import Path; print(Path(sys.base_prefix) / "lib")')"
+          LD_LIBRARY_PATH="$python_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+            rustup run 1.99.1 cargo test --locked --workspace
       - name: Rust lint
         working-directory: core
         run: rustup run 1.99.1 cargo-clippy clippy --locked --workspace --all-targets -- -D warnings

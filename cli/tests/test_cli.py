@@ -116,6 +116,47 @@ def test_config_roundtrip(tmp_path):
     assert not path.exists()
 
 
+def test_login_uses_and_preserves_the_configured_ca_file(tmp_path, monkeypatch):
+    path = tmp_path / "config.json"
+    monkeypatch.setenv("INKU_CLI_CONFIG", str(path))
+    monkeypatch.setenv("INKU_CA_FILE", "~/fallback.pem")
+    assert cli.load_config().ca_file == str(Path("~/fallback.pem").expanduser())
+    root_ca = str(Path("~/inku-ca.pem").expanduser())
+    path.write_text(json.dumps({"base_url": "https://inku.example", "ca_file": "~/inku-ca.pem"}))
+    expected_context = object()
+
+    def load_context(*, cafile):
+        assert cafile == root_ca
+        return expected_context
+
+    class Response(io.BytesIO):
+        headers = {"set-cookie": "inku_session=fixture; Secure"}
+
+    def send(request, *, timeout, context):
+        assert request.full_url == "https://inku.example/api/auth/login"
+        assert request.get_header("Authorization") is None
+        assert context is expected_context
+        return Response(b'{"user":{"username":"admin"}}')
+
+    monkeypatch.setattr(cli.ssl, "create_default_context", load_context)
+    monkeypatch.setattr(cli.urllib.request, "urlopen", send)
+    assert cli.main(["login", "--username", "admin", "--password", "fixture"]) == 0
+    stored = json.loads(path.read_text())
+    assert stored["ca_file"] == root_ca
+    assert cli.load_config().ca_file == root_ca
+
+
+@pytest.mark.parametrize("malformed", [False, True])
+def test_unusable_ca_file_is_reported_before_sending(tmp_path, monkeypatch, malformed):
+    ca_file = tmp_path / "ca.pem"
+    if malformed:
+        ca_file.write_text("not a certificate")
+    monkeypatch.setattr(cli.urllib.request, "urlopen", lambda *a, **kw: pytest.fail("request should not be sent"))
+    client = cli.ApiClient("https://inku.example", ca_file=str(ca_file))
+    with pytest.raises(cli.CliError, match="failed to load ca_file" if malformed else "ca_file not found"):
+        client.request("GET", "/api/info")
+
+
 def test_paint_payload_drops_none_values():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "一滴の墨", "--save-history", "--stage1-model", "gemma"])

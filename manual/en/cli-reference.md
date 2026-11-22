@@ -45,7 +45,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 
 Commands that call the server accept `--base-url` (default http://127.0.0.1:8100) and `--timeout-seconds` (HTTP timeout in seconds, default 600).
 
-Settings live in `~/.config/inku-cli/config.json` (`INKU_CLI_CONFIG` names another path; `XDG_CONFIG_HOME` moves the directory) and hold the base URL, the login token, the default models and color catalog, and the timeout. When the file does not exist, `INKU_BASE_URL`, `INKU_CLI_TIMEOUT_SECONDS` and `INKU_COLOR_CATALOG` are read (when it exists, only `INKU_BASE_URL` is read, and only if the file holds no base URL). To keep separate Servers apart, point `INKU_CLI_CONFIG` at a different file for each (the token in the file is sent whatever `--base-url` names).
+Settings live in `~/.config/inku-cli/config.json` (`INKU_CLI_CONFIG` names another path; `XDG_CONFIG_HOME` moves the directory) and hold the base URL, the login token, the default models and color catalog, the timeout, and the CA file (`ca_file`) for TLS verification. When the file does not exist, `INKU_BASE_URL`, `INKU_CLI_TIMEOUT_SECONDS` and `INKU_COLOR_CATALOG` are read (`INKU_BASE_URL` and `INKU_CA_FILE` also apply when their respective settings are unset). To keep separate Servers apart, point `INKU_CLI_CONFIG` at a different file for each (the token in the file is sent whatever `--base-url` names).
 
 `inku-cli activity` returns JSON. Batches include planned and completed counts, state and the last heartbeat. An expired lease does not prove the client stopped. Drawings are limited to the responding Server process; unregistered older batches and drawings in other processes are outside that observation.
 

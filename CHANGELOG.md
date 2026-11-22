@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- CLI: Set `ca_file` in the connection config to verify an HTTPS server with a custom CA.
+
 - iOS: keeps share cards and export files available after the share sheet closes. On iPhone, filled stars appear yellow on Home and in the work viewer.
 
 - Rust verification commands run without creating an incremental compilation cache.

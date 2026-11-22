@@ -12,6 +12,7 @@ import json
 import math
 import os
 import re
+import ssl
 import sys
 import threading
 import time
@@ -161,6 +162,7 @@ class CliConfig:
     vision_model: str | None = None
     timeout_seconds: int | None = None
     color_catalog: str | None = None
+    ca_file: str | None = None
 
 def _config_path() -> Path:
     env_path = os.getenv("INKU_CLI_CONFIG")
@@ -168,6 +170,14 @@ def _config_path() -> Path:
         return Path(env_path).expanduser()
     config_home = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config")).expanduser()
     return config_home / "inku-cli" / "config.json"
+
+def _ca_file(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return str(Path(value).expanduser())
+    except (TypeError, RuntimeError) as exc:
+        raise CliError("ca_file must be a certificate file path") from exc
 
 def load_config(path: Path | None = None) -> CliConfig:
     path = path or _config_path()
@@ -178,6 +188,7 @@ def load_config(path: Path | None = None) -> CliConfig:
             base_url=os.getenv("INKU_BASE_URL", DEFAULT_BASE_URL),
             timeout_seconds=int(timeout_env) if timeout_env else None,
             color_catalog=catalog_env or None,
+            ca_file=_ca_file(os.getenv("INKU_CA_FILE")),
         )
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -195,6 +206,7 @@ def load_config(path: Path | None = None) -> CliConfig:
         vision_model=raw.get("vision_model") or None,
         timeout_seconds=int(raw["timeout_seconds"]) if raw.get("timeout_seconds") is not None else None,
         color_catalog=raw.get("color_catalog") or None,
+        ca_file=_ca_file(raw.get("ca_file") or os.getenv("INKU_CA_FILE")),
     )
 
 def save_config(config: CliConfig, path: Path | None = None) -> None:
@@ -211,6 +223,8 @@ def save_config(config: CliConfig, path: Path | None = None) -> None:
         "timeout_seconds": config.timeout_seconds,
         "color_catalog": config.color_catalog,
     }
+    if config.ca_file is not None:
+        data["ca_file"] = config.ca_file
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     try:
         path.chmod(0o600)
@@ -247,10 +261,12 @@ class ApiClient:
         token: str | None = None,
         *,
         timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        ca_file: str | None = None,
     ) -> None:
         self.base_url = base_url
         self.token = token
         self.timeout_seconds = timeout_seconds
+        self.ca_file = ca_file
 
     def request(
         self,
@@ -313,8 +329,16 @@ class ApiClient:
             if self.token:
                 request_headers["Authorization"] = f"Bearer {self.token}"
         req = urllib.request.Request(url, data=body, headers=request_headers, method=method.upper())
+        tls_options = {}
+        if self.ca_file is not None:
+            try:
+                tls_options["context"] = ssl.create_default_context(cafile=self.ca_file)
+            except FileNotFoundError as exc:
+                raise CliError(f"ca_file not found: {self.ca_file}") from exc
+            except (OSError, ValueError) as exc:
+                raise CliError(f"failed to load ca_file: {self.ca_file}: {exc}") from exc
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+            with urllib.request.urlopen(req, timeout=self.timeout_seconds, **tls_options) as response:
                 raw = response.read()
                 return raw, response
         except urllib.error.HTTPError as exc:
@@ -449,6 +473,15 @@ def _resolved_stage2_model(args: argparse.Namespace, config: CliConfig) -> str |
 
 def _resolved_timeout_seconds(args: argparse.Namespace, config: CliConfig) -> int:
     return args.timeout_seconds or config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS
+
+def _configured_client(args: argparse.Namespace, config: CliConfig, *, login: bool = False) -> ApiClient:
+    ca_options = {"ca_file": config.ca_file} if config.ca_file is not None else {}
+    return ApiClient(
+        args.base_url or config.base_url,
+        None if login else config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+        **ca_options,
+    )
 
 def _resolved_color_catalog(args: argparse.Namespace, config: CliConfig, catalog_data: dict[str, Any]) -> str:
     requested = getattr(args, "color_catalog", None) or getattr(args, "catalog_id", None) or config.color_catalog
@@ -2131,11 +2164,7 @@ def _read_ddl_export(text: str) -> tuple[str, list[dict[str, Any]]]:
 
 def command_ddl_export(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     exported, _ = client.request("GET", f"/api/pipeline/history/{args.work_id}/ddl-export")
     if not isinstance(exported, dict) or exported.get("schema") != DDL_EXPORT_SCHEMA:
         raise CliError("the server did not return a DDL export")
@@ -2332,7 +2361,7 @@ def command_login(args: argparse.Namespace) -> int:
     existing = load_config()
     base_url = args.base_url or existing.base_url
     timeout_seconds = _resolved_timeout_seconds(args, existing)
-    client = ApiClient(base_url, timeout_seconds=timeout_seconds)
+    client = _configured_client(args, existing, login=True)
     data, response = client.request(
         "POST",
         "/api/auth/login",
@@ -2353,6 +2382,7 @@ def command_login(args: argparse.Namespace) -> int:
         vision_model=existing.vision_model,
         timeout_seconds=timeout_seconds,
         color_catalog=existing.color_catalog,
+        ca_file=existing.ca_file,
     ))
     print(f"logged in as {username}")
     return 0
@@ -2360,11 +2390,7 @@ def command_login(args: argparse.Namespace) -> int:
 def command_logout(args: argparse.Namespace) -> int:
     config = load_config()
     if config.token:
-        client = ApiClient(
-            args.base_url or config.base_url,
-            config.token,
-            timeout_seconds=_resolved_timeout_seconds(args, config),
-        )
+        client = _configured_client(args, config)
         try:
             client.request("POST", "/api/auth/logout")
         except CliError:
@@ -2375,11 +2401,7 @@ def command_logout(args: argparse.Namespace) -> int:
 
 def command_me(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     data, _ = client.request("GET", "/api/auth/me")
     _print_json(data)
     return 0
@@ -2387,7 +2409,7 @@ def command_me(args: argparse.Namespace) -> int:
 def command_models(args: argparse.Namespace) -> int:
     config = load_config()
     timeout_seconds = _resolved_timeout_seconds(args, config)
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
+    client = _configured_client(args, config)
     catalog_data = _fetch_color_catalogs(client)
     if (
         args.stage1_provider is not None
@@ -2410,6 +2432,7 @@ def command_models(args: argparse.Namespace) -> int:
             vision_model=args.vision_model if args.vision_model is not None else config.vision_model,
             timeout_seconds=timeout_seconds,
             color_catalog=color_catalog,
+            ca_file=config.ca_file,
         )
         save_config(config)
     data = {
@@ -2591,7 +2614,7 @@ def _command_paint_image(args: argparse.Namespace) -> int:
     else:
         provenance = (args.provenance or "").strip()
     timeout_seconds = _resolved_timeout_seconds(args, config)
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
+    client = _configured_client(args, config)
     started_at = int(time.time() * 1000)
     catalog_data = _fetch_color_catalogs(client)
     color_catalog = _resolved_color_catalog(args, config, catalog_data)
@@ -2662,7 +2685,7 @@ def command_paint(args: argparse.Namespace) -> int:
         raise CliError("--provenance, --provenance-file and --vision-model are for --image")
     config = load_config()
     timeout_seconds = _resolved_timeout_seconds(args, config)
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
+    client = _configured_client(args, config)
     text = _read_text_argument(args.text, args.file)
     started = int(time.time() * 1000)
     stage1_provider = _resolved_stage1_provider(args, config)
@@ -2843,7 +2866,7 @@ def command_batch(args: argparse.Namespace) -> int:
 def _command_batch(args: argparse.Namespace) -> int:
     config = load_config()
     timeout_seconds = _resolved_timeout_seconds(args, config)
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
+    client = _configured_client(args, config)
     raw = _read_text_argument(None, args.file)
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
     if getattr(args, "input_mode", "paint") == "ddl":
@@ -3269,11 +3292,7 @@ def command_analyze(args: argparse.Namespace) -> int:
         if args.input_dir:
             raise CliError("INPUT_DIR cannot be combined with --history")
         config = load_config()
-        client = ApiClient(
-            args.base_url or config.base_url,
-            config.token,
-            timeout_seconds=_resolved_timeout_seconds(args, config),
-        )
+        client = _configured_client(args, config)
         summary = _motif_census_from_history(
             _fetch_all_history(client),
             base_url=client.base_url,
@@ -3302,11 +3321,7 @@ def command_analyze(args: argparse.Namespace) -> int:
     catalog_data = None
     color_catalog = getattr(args, "color_catalog", None) or DEFAULT_COLOR_CATALOG_ID
     if args.replay and args.replay > 1:
-        client = ApiClient(
-            args.base_url or config.base_url,
-            config.token,
-            timeout_seconds=_resolved_timeout_seconds(args, config),
-        )
+        client = _configured_client(args, config)
         catalog_data = _fetch_color_catalogs(client)
         color_catalog = _resolved_color_catalog(args, config, catalog_data)
     summary = _diversity_summary(
@@ -3358,11 +3373,7 @@ def command_render_local(args: argparse.Namespace) -> int:
 
 def command_render_score(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     raw = _read_text_argument(args.score, args.file)
     try:
         score = json.loads(raw)
@@ -3490,11 +3501,7 @@ def command_replay(args: argparse.Namespace) -> int:
     refuses if it no longer matches the hashes reported here.
     """
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     work = _saved_work(client, args.work_id)
     if not isinstance(work.get("score"), dict):
         raise CliError("the saved work has no Score to replay")
@@ -3588,11 +3595,7 @@ def command_replay(args: argparse.Namespace) -> int:
 
 def command_demo_instruction(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     data, _ = client.request(
         "POST",
         "/api/demo/instruction",
@@ -3608,11 +3611,7 @@ def command_demo_instruction(args: argparse.Namespace) -> int:
 
 def command_history(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     data, _ = client.request(
         "GET",
         "/api/history",
@@ -3641,11 +3640,7 @@ def command_history_state(args: argparse.Namespace) -> int:
     read off a formatted body.
     """
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     raw, _ = client.request_raw("GET", "/api/history/state")
     state = json.loads(raw.decode("utf-8")) if raw else {}
     _print_json({"bytes": len(raw), "state": state} if args.bytes else state)
@@ -3653,11 +3648,7 @@ def command_history_state(args: argparse.Namespace) -> int:
 
 def command_unread_words(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     path = "/api/admin/unread-words" if args.all_users else "/api/feedback/unread-words"
     if args.all_pages and args.all_users:
         raise CliError("--all-pages is available for the current user only")
@@ -3683,11 +3674,7 @@ def command_unread_words(args: argparse.Namespace) -> int:
 
 def command_history_export(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     items = _fetch_all_history(
         client, starred=args.starred, for_revision=args.for_revision,
         for_share=args.for_share, query=args.query,
@@ -3715,11 +3702,7 @@ def command_export_card(args: argparse.Namespace) -> int:
     the web export produces; the CLI adds nothing to it but the destination.
     """
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     items = _fetch_all_history(client)
     item = _resolve_history_hash(items, args.hash)
     payload = {"id": item["id"], "layout": args.layout, "seal": not args.no_seal}
@@ -3766,11 +3749,7 @@ def _svg_long_edge_size(svg: str, long_edge: int) -> dict[str, int]:
 def command_history_show(args: argparse.Namespace) -> int:
     """Print one work's description, DDL and JSON Score, named by its UUID."""
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     item = _fetch_history_item_by_id(client, args.item_id, include_svg=False)
     # The author's own words; works saved before source_text was stored fall
     # back to input, as the history listing does.
@@ -3801,11 +3780,7 @@ def command_history_png(args: argparse.Namespace) -> int:
     if args.size < 64:
         raise CliError("--size must be at least 64")
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     item = _fetch_history_item_by_id(client, args.item_id)
     svg = str(item.get("svg") or "")
     if not svg.strip():
@@ -3834,11 +3809,7 @@ def command_history_png(args: argparse.Namespace) -> int:
 
 def command_lineage(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.lineage_cmd == "show":
         try:
             data, _ = client.request(
@@ -3898,11 +3869,7 @@ def command_colophon(args: argparse.Namespace) -> int:
     import uuid
 
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     node_id = args.target
     try:
         lineage, _ = client.request("GET", f"/api/history/{args.target}/lineage", query={"descendant_depth": 0})
@@ -4050,11 +4017,7 @@ def _refinement_history_body(target: dict[str, Any], data: dict[str, Any], kind:
 def command_refine(args: argparse.Namespace) -> int:
     import uuid
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.refine_cmd in {"perform", "generate"}:
         history_data, _ = client.request("GET", "/api/history", query={"limit": 100})
         items = history_data.get("items", [])
@@ -4142,11 +4105,7 @@ def command_refine(args: argparse.Namespace) -> int:
 
 def command_inspect(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     models = [m.strip() for m in args.models.split(",") if m.strip()]
     if not models:
         raise CliError("at least one model is required for inspection")
@@ -4191,11 +4150,7 @@ def command_inspect(args: argparse.Namespace) -> int:
 
 def command_review(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.review_cmd == "evaluate":
         api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NVIDIA_NIM_API_KEY")
         if not api_key:
@@ -4262,11 +4217,7 @@ def _api_json_body(args: argparse.Namespace) -> Any:
         raise CliError(f"invalid JSON request body: {exc}") from exc
 def command_user(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.user_action == "list":
         data, _ = client.request("GET", "/api/users")
         _print_json(data)
@@ -4312,11 +4263,7 @@ def command_history_share(args: argparse.Namespace) -> int:
     everyone else.
     """
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.history_action == "peers":
         # Sharing needs an id, and only a member manager may read /api/users.
         # This answers with the caller's own organisation, which is who they
@@ -4352,11 +4299,7 @@ def command_history_share(args: argparse.Namespace) -> int:
 
 def command_single_user(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.single_user_action == "show":
         data, _ = client.request("GET", "/api/settings/single-user")
     else:
@@ -4369,11 +4312,7 @@ def command_single_user(args: argparse.Namespace) -> int:
 
 def command_group(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.group_action == "list":
         data, _ = client.request("GET", "/api/user-groups")
         _print_json(data)
@@ -4393,11 +4332,7 @@ def command_group(args: argparse.Namespace) -> int:
 
 def command_config(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.config_action == "show":
         settings, _ = client.request("GET", "/api/settings/status")
         try:
@@ -4481,11 +4416,7 @@ def command_api(args: argparse.Namespace) -> int:
     if path != "/health" and not path.startswith("/api/"):
         raise CliError("path must be /health or start with /api/")
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     raw, response = client.request_raw(
         args.method,
         path,
@@ -4653,7 +4584,7 @@ def command_plugin_preview(args: argparse.Namespace) -> int:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     config = load_config()
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=_resolved_timeout_seconds(args, config))
+    client = _configured_client(args, config)
     rows, failed = [], 0
     for number, (label, ddl) in enumerate(cases, start=1):
         for seed in seeds:
@@ -4702,11 +4633,7 @@ def command_plugin(args: argparse.Namespace) -> int:
     if args.plugin_action == "preview":
         return command_plugin_preview(args)
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.plugin_action == "list":
         data, _ = client.request("GET", "/api/plugins")
     elif args.plugin_action == "validate":
@@ -4727,11 +4654,7 @@ def command_plugin(args: argparse.Namespace) -> int:
 
 def command_reference(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     if args.json:
         data, _ = client.request("GET", "/api/reference", query={"format": "json"})
         text = json.dumps(data, ensure_ascii=False, indent=2)
@@ -4748,11 +4671,7 @@ def command_reference(args: argparse.Namespace) -> int:
 
 def command_version(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(
-        args.base_url or config.base_url,
-        config.token,
-        timeout_seconds=_resolved_timeout_seconds(args, config),
-    )
+    client = _configured_client(args, config)
     server_info: dict[str, Any] | None = None
     try:
         server_info, _ = client.request("GET", "/api/info", auth=False)
@@ -4901,8 +4820,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
 
 def command_activity(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(args.base_url or config.base_url, config.token,
-                       timeout_seconds=_resolved_timeout_seconds(args, config))
+    client = _configured_client(args, config)
     data, _ = client.request("GET", "/api/pipeline/activity", query={"all_users": "true"} if args.all else None)
     _print_json(data)
     return 0

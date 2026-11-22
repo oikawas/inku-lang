@@ -45,7 +45,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 
 サーバーへ接続するコマンドは共通に `--base-url`（既定 http://127.0.0.1:8100）と `--timeout-seconds`（HTTP のタイムアウト秒。既定 600）を受け付けます。
 
-設定は`~/.config/inku-cli/config.json`（`INKU_CLI_CONFIG`で別のパス、`XDG_CONFIG_HOME`で場所を変更）に、接続先、ログインのtoken、既定のモデル・色カタログ、タイムアウトを保存します。ファイルが無い時は`INKU_BASE_URL`・`INKU_CLI_TIMEOUT_SECONDS`・`INKU_COLOR_CATALOG`を読みます（ファイルがあるときに読むのは、ファイルに接続先が無い場合の`INKU_BASE_URL`だけです）。接続先のServerごとに設定を分けたい時は`INKU_CLI_CONFIG`を変えてください（tokenは接続先の`--base-url`に関わらず設定ファイルのものが送られます）。
+設定は`~/.config/inku-cli/config.json`（`INKU_CLI_CONFIG`で別のパス、`XDG_CONFIG_HOME`で場所を変更）に、接続先、ログインのtoken、既定のモデル・色カタログ、タイムアウト、TLS 検証用の CA ファイル（`ca_file`）を保存します。ファイルが無い時は`INKU_BASE_URL`・`INKU_CLI_TIMEOUT_SECONDS`・`INKU_COLOR_CATALOG`を読みます（設定値が無い場合は`INKU_BASE_URL`と`INKU_CA_FILE`にフォールバックします）。接続先のServerごとに設定を分けたい時は`INKU_CLI_CONFIG`を変えてください（tokenは接続先の`--base-url`に関わらず設定ファイルのものが送られます）。
 
 `inku-cli activity` は実行状態をJSONで返します。バッチには予定数・完了数・状態・最後の生存通知を示します。実行権の期限切れはクライアントが停止した証明ではありません。描画の一覧は応答したServer process内に限り、未登録の古いバッチや他processの描画は分かりません。
 

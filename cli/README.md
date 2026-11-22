@@ -2,6 +2,21 @@
 
 Command line client for controlling an inku API server.
 
+[日本語](README.ja.md)
+
+## Connection settings
+
+The default config is `~/.config/inku-cli/config.json`. Use a separate file
+per server by setting `INKU_CLI_CONFIG`.
+
+| Setting | Environment fallback | Purpose |
+|---|---|---|
+| `base_url` | `INKU_BASE_URL` | Server URL, including the scheme and port, with no trailing `/api` |
+| `ca_file` | `INKU_CA_FILE` | PEM CA file used to verify the server certificate. A leading `~` is expanded |
+
+The config file takes precedence. Without a CA setting, Python uses its
+normal certificate verification, including `SSL_CERT_FILE` if set.
+
 ## Observe current drawing activity
 
 `inku-cli activity` reports this account's live pipeline executions and batches as JSON.

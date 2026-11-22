@@ -421,10 +421,12 @@ test('personal publication picker exposes Vision use; the shared assessments are
 	} }).body;
 	const body = picker(true);
 	assert.match(body, /<option value="vision">/);
-	assert.match(body, /aria-label="Vision model LLM \/ Vision"/);
+	assert.match(body, /aria-label="vision-model LLM \/ Vision"/);
 	assert.match(body, /aria-pressed="true"[^>]*>Vision<\/button>/);
-	const unused = body.slice(body.indexOf('Unused model') - 150, body.indexOf('Unused model'));
-	assert.match(unused, /disabled/);
+	const unused = [...body.matchAll(/<article class="model-picker-entry">[\s\S]*?<\/article>/g)]
+		.find(([row]) => row.includes('<strong>no-purpose</strong>'))?.[0];
+	assert.ok(unused);
+	assert.match(unused, /<input type="checkbox"[^>]*\bdisabled\b/);
 	// Assessments are shared model settings (2026-10-13): a person publishes, an administrator assesses.
 	assert.doesNotMatch(body, /<details class="model-metadata-editor">/);
 	const administrator = picker(false);

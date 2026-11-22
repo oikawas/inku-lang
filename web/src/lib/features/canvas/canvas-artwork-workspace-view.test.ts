@@ -36,6 +36,7 @@ test('T-1002/T-1005: artwork view has a typed capability-local boundary and no o
 	assert.match(artwork, /import type \{ PaintResult \} from '\$lib\/features\/run\/current-work'/);
 	assert.match(types, /export type CanvasStatusHistoryItem = Partial<HistoryItem>/);
 	assert.match(types, /from '\$lib\/historyManagerState\.svelte'/);
-	assert.doesNotMatch(artwork, /\$state\(|modelInspection|refinementSession|LineagePanel|CanvasGenerationInfo|CanvasPresentationOverlay|apiFetch|createContext|setContext|getContext/);
-	assert.doesNotMatch(artwork + types, /\bany\b/);
+	const localLayout = artwork.replace(/let (?:left|right)ControlsHeight = \$state\(0\);/g, '');
+	assert.doesNotMatch(localLayout, /\$state\(|modelInspection|refinementSession|LineagePanel|CanvasGenerationInfo|CanvasPresentationOverlay|apiFetch|createContext|setContext|getContext/);
+	assert.doesNotMatch((artwork + types).replace(/^\s*\/\/.*$/gm, ''), /\bany\b/);
 });

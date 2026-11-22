@@ -19,8 +19,8 @@ test('the batch tab has a switch, and the description side is the panel it alway
 
 test('the switch sits at the right end of each side heading line', () => {
 	const BATCH_PANEL = readFileSync(new URL('./BatchPanel.svelte', import.meta.url), 'utf8');
-	assert.match(INPUT_PANEL, /<ImageFolderBatchPanel\s+sourceSwitch=\{batchSourceSwitch\}/);
-	assert.match(INPUT_PANEL, /<BatchPanel\s+sourceSwitch=\{batchSourceSwitch\}/);
+	assert.match(INPUT_PANEL, /<ImageFolderBatchPanel\b[^>]*\bsourceSwitch=\{batchSourceSwitch\}/);
+	assert.match(INPUT_PANEL, /<BatchPanel\b[^>]*\bsourceSwitch=\{batchSourceSwitch\}/);
 	for (const panel of [BATCH_PANEL, FOLDER_PANEL]) {
 		assert.match(panel, /<div class="batch-label">[\s\S]*?<span class="batch-label-end">[\s\S]*?\{@render sourceSwitch\?\.\(\)\}\s*<\/span>\s*<\/div>/);
 		assert.match(panel, /\.batch-label-end \{[^}]*margin-left: auto;/);

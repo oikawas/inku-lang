@@ -73,6 +73,8 @@ class FakePipeline:
             return self.view(phase={"tag": "performed"}, delivery={"score": {}}, result=result), None
         if (method, path) == ("POST", "/api/pipeline/executions/e1/commands"):
             return self.view(busy=True), None
+        if (method, path) == ("POST", "/api/pipeline/executions/e1/discard"):
+            return {}, None
         raise AssertionError(f"unexpected request {method} {path}")
 
 
@@ -134,6 +136,7 @@ def test_without_save_history_the_image_run_asks_the_server_not_to_save(monkeypa
 
     [start] = _sent(server, "POST", "/api/pipeline/variations")
     assert start["options"]["save_history"] is False
+    assert _sent(server, "POST", "/api/pipeline/executions/e1/discard") == [{"revision": None}]
     assert start["text"] == ""
     assert json.loads(capsys.readouterr().out)["history_id"] is None
 

@@ -30,7 +30,7 @@ test('the shared stepper owns the compact box and grouped text field', () => {
 });
 
 test('database, limits, and retry count all use the one shared number box', () => {
-	assert.equal((DATABASE.match(/<NumberStepper/g) ?? []).length, 4);
+	assert.equal((DATABASE.match(/<NumberStepper/g) ?? []).length, 5);
 	assert.equal((LIMITS.match(/<NumberStepper/g) ?? []).length, 1);
 	assert.equal((APPEARANCE.match(/<NumberStepper/g) ?? []).length, 1);
 	assert.match(DATABASE, /\.db-backup-time-fields :global\(\.number-stepper\) \{ flex: 0 1 136px; \}/);

@@ -78,7 +78,8 @@ test('box and modal settings choose line numbers and commit complete drafts', as
 });
 
 test('the drawer inserts at the box caret, appends before focus, and only previews when editing is unavailable', async () => {
-	const { setup } = await harness(`export function setup(ddlViewer, canEditCurrentDdl, rangeEditingLocked, ddlDialogOpen) {
+	const { setup } = await harness(`export function setup(ddlViewer, canEditCurrentDdl, rangeEditingLocked, ddlDialogOpen, toolsVisible = true) {
+		const session = { uiVisibility: { ddl_tools: toolsVisible } };
 		${actualFunction('../../../routes/+page.svelte', 'insertDdlWordFromDrawer')}
 		return insertDdlWordFromDrawer;
 	}`);
@@ -125,11 +126,14 @@ test('the drawer inserts at the box caret, appends before focus, and only previe
 		assert.equal(editor.value(), raw);
 		assert.equal(reference.preview(), preview);
 	}
+	const hidden = box(EditorSelection.cursor(raw.length));
+	drawer(setup(hidden, true, false, false, false)).selectWord('円', preview);
+	assert.equal(hidden.value(), raw, 'hidden DDL tools prevent insertion');
 	const standalone = drawer(undefined);
 	standalone.selectWord('円', preview);
 	assert.equal(standalone.preview(), preview);
 	const component = read('../../components/SaijikiDrawer.svelte');
-	assert.match(component, /selectWord\(word, previewForWord\(/, 'a built-in click inserts its displayed word');
+	assert.match(component, /selectWord\(word, preview\(cat.key, canonicalWord, word\)\)/, 'a built-in click inserts its displayed word');
 	assert.match(component, /selectWord\(pluginDisplayName\(entry, wordLang\), previewForPlugin\(/, 'a Macro click inserts its displayed name');
 	assert.equal((component.match(/onpointerdown=\{\(e\) => e\.preventDefault\(\)\}/g) ?? []).length, 2, 'clicking keeps the box selection');
 });

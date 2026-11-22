@@ -25,6 +25,6 @@ history、lineage_node、lineage_edge の欄は [contract.json](contract.json) �
 
 annotation は `history_id`、`note`（null または前後の空白を除く 240 字以内の文字列）、`for_revision`（0/1）。旧 `for_share` は運ばない。colophon は `id`、`target_node_id`、`branch_snapshot`（JSON 文字列）、`model`、`at`、`language`（ja/en）、`body`、`warnings_json`、`fact_sheet_json`。Swift は任意で `generated_body`、`adopted_body`、`signature` を追加できる。body は採用文があればそれ、無ければ生成文。読めない host は annotation と colophon を飛ばせる。
 
-同じ作品または節点の ID が既存なら作品を飛ばし、既存の印とコメントを保持する。作品のない節点は入れない。両端が存在し子に親がない辺だけを入れ、起点は取り込み先で決め直す。全行の検証後、取り込みは一つの transaction で行う。暫定上限はファイル 256 MiB、行 64 MiB。書き出しにはごみ箱の作品を含めない。取り込みは `trashed` を保存する。接続情報、設定、実行記録、サムネイルは含めない。
+同じ作品または節点の ID が既存なら作品を飛ばし、既存の印とコメントを保持する。作品のない節点は入れない。両端が存在し子に親がない辺だけを入れ、起点は取り込み先で決め直す。全行の検証後、取り込みは一つの transaction で行う。上限は 1 ファイルあたり 256 MiB、1 行あたり 64 MiB。書き出しにはごみ箱の作品を含めない。取り込みは `trashed` を保存する。接続情報、設定、実行記録、サムネイルは含めない。
 
 共通 fixture は [workpack-minimal.inkupack](fixtures/workpack-minimal.inkupack)。

@@ -36,7 +36,8 @@ inku-render = { path = "crates/inku-render" }
 inku-svg-raster = { path = "crates/inku-svg-raster" }
 jni = "=0.21.1"
 libm = { version = "=0.2.16", default-features = false }
-pyo3 = { version = "=0.29.2", features = ["abi3-py312", "extension-module"] }
+# Maturin sets PYO3_BUILD_EXTENSION_MODULE for wheel builds. Cargo tests link libpython.
+pyo3 = { version = "=0.29.2", features = ["abi3-py312"] }
 resvg = { version = "=0.48.1", path = "vendor/resvg", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }

@@ -115,13 +115,34 @@ only. Apply a change with `docker compose pull && docker compose up -d`.
 
 ## Serving over HTTPS / HTTPS で公開する
 
-Put a reverse proxy in front, then set `INKU_ORIGIN` to the public URL and
-`INKU_SESSION_COOKIE_SECURE=1`. `INKU_ORIGIN` must match the URL browsers
-actually use, otherwise the web UI rejects form submissions.
+Put a reverse proxy in front, then set `INKU_ORIGIN` to the HTTPS URL
+browsers use and set `INKU_SESSION_COOKIE_SECURE=1` for the API.
+Compose passes `INKU_ORIGIN` to SvelteKit as `ORIGIN`.
 
-リバースプロキシを前段に置き、`INKU_ORIGIN` に公開 URL を、
-`INKU_SESSION_COOKIE_SECURE=1` を設定します。`INKU_ORIGIN` はブラウザが実際に
-使う URL と一致していなければならず、ずれると Web UI が送信を拒否します。
+リバースプロキシを前段に置き、`INKU_ORIGIN` にブラウザで開く HTTPS URL を、
+API に `INKU_SESSION_COOKIE_SECURE=1` を設定します。Compose は
+`INKU_ORIGIN` を SvelteKit の `ORIGIN` に渡します。
+
+### LAN access by IP / LAN の IP アドレスで開く
+
+Public CAs do not issue certificates for private LAN addresses. Use a reverse
+proxy that can issue a certificate for that IP from a private CA. With Caddy,
+use `local_certs` and set
+`default_sni` to the LAN IP clients open, for clients that omit SNI.
+To accept HTTP on the same port and redirect it to HTTPS, configure
+`listener_wrappers` with `http_redirect` before `tls`.
+Install and trust the CA's root certificate on each client device.
+Copying an image to the clipboard and choosing an export folder require HTTPS
+or localhost and browser support. See [Caddy's global options](https://caddyserver.com/docs/caddyfile/options).
+
+LAN のプライベート IP アドレスには公開 CA の証明書を使えないため、その IP の
+証明書を独自の CA で発行できるリバースプロキシを使います。Caddy では `local_certs` を使い、
+SNI を送らない接続のために `default_sni` にブラウザで開く LAN の IP を設定します。
+同じポートで HTTP を受けて HTTPS へ転送するには、`listener_wrappers` で
+`http_redirect` を `tls` の前に置きます。各端末に CA のルート証明書を導入して
+信頼させます。画像のクリップボードへのコピーと書き出し先フォルダの選択には、
+HTTPS または localhost と、対応するブラウザが必要です。
+[Caddy のグローバル設定](https://caddyserver.com/docs/caddyfile/options)を参照してください。
 
 ## Logs and health / ログと死活
 

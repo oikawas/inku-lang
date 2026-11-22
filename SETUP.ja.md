@@ -176,7 +176,7 @@ npm run dev
 
 開発サーバーは既定で `http://127.0.0.1:5173` を使う。Vite設定により、Web UIからの `/api` リクエストは `http://127.0.0.1:8100` のAPIサーバーへ転送される。
 
-HTTPS リバースプロキシが Vite と異なるポートで公開する場合は、Vite の起動環境で `INKU_VITE_HMR_CLIENT_PORT` に公開ポートを設定する。
+HTTPS リバースプロキシを使う場合は、`INKU_ORIGIN` に公開の HTTPS URL を指定し、API に `INKU_SESSION_COOKIE_SECURE=1` を設定する。公開ポートが Vite の待受ポートと異なる場合は、Vite の起動環境で `INKU_VITE_HMR_CLIENT_PORT` に公開ポートを設定する。
 
 本番相当のビルド確認:
 
@@ -264,6 +264,7 @@ uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
 PNG出力には共有coreのwheelが必要である。coreを更新したときも作り直す。
 
 CLIは既定で `http://127.0.0.1:8100` に接続する。別のAPIへ接続する場合は `--base-url` または `INKU_BASE_URL` を使う。
+独自の CA を使う HTTPS へ接続する場合は、CA の PEM ファイルを CLI 設定の `ca_file` または `INKU_CA_FILE` で指定する。
 
 ```sh
 uv run inku-cli --base-url http://127.0.0.1:8100 me
@@ -293,6 +294,8 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い円を右上に置
 | `INKU_SERVER_HOST` | `inku-server` のlisten host |
 | `INKU_SERVER_PORT` | `inku-server` のlisten port |
 | `INKU_BASE_URL` | `inku-cli` の既定API URL |
+| `INKU_CA_FILE` | `inku-cli` の CA ファイル。設定の `ca_file` が優先 |
+| `INKU_VITE_HMR_CLIENT_PORT` | 開発時の Vite HMR の公開ポート（1〜65535） |
 | `INKU_PIPELINE_CONFIG` | 共有pipelineのmanifest（JSON）の場所。未指定時は組込みの既定を使う。worker数・保持execution数などのhost上限もここで変えられる |
 | `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | 共有pipelineのcatalog選択・hole補完と従来のLLM要求の上限秒。既定は120。通常DDLを作るStage 1は下記の専用上限を使う |
 | `INKU_LLM_RETRY_ATTEMPTS` | 一つのLLM段で許す最大試行数。既定は4。総時間上限を越えて試行を増やさない |

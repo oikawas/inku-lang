@@ -9,6 +9,7 @@ User=inku
 Group=inku
 WorkingDirectory=/opt/inku/inku-lang/web
 Environment=NODE_ENV=development
+# Use --host 127.0.0.1 behind an HTTPS reverse proxy on the same host.
 ExecStart=/usr/bin/npm run dev -- --host 0.0.0.0 --port 5173
 Restart=on-failure
 RestartSec=5

@@ -35,8 +35,9 @@ Rendering, history redraws, and account administration return 4xx for invalid in
 | `INKU_LOGIN_RATE_ATTEMPTS` | Login failures allowed per window | 10 |
 | `INKU_LOGIN_RATE_WINDOW_SECONDS` | Login rate window in seconds | 60 |
 | `INKU_CORS_ORIGINS` | Comma-separated allowed origins | localhost only |
-| `INKU_LISTEN_HOST` | uvicorn listen host | `0.0.0.0` |
-| `INKU_LISTEN_PORT` | uvicorn listen port | `INKU_SERVER_PORT`, else `8100` |
+| `INKU_LISTEN_HOST` | Listen address shown in the API startup banner | `0.0.0.0` |
+| `INKU_LISTEN_PORT` | Listen port shown in the API startup banner | `INKU_SERVER_PORT`, else `8100` |
+| `INKU_VITE_HMR_CLIENT_PORT` | Browser-side Vite HMR port, 1–65535 | unset |
 | `INKU_ENV` | Run mode displayed at startup | The value of `ENVIRONMENT`, or `development` if unset |
 | `INKU_ANYIO_THREAD_TOKENS` | Ceiling on threads running synchronous endpoints (**for tuning**: raise it only if `/health` and the like stall while heavy renders wait; at least 1) | `100` |
 | `INKU_TIMEZONE` | Timezone used for DB backup scheduling and similar | `Asia/Tokyo` |
@@ -45,7 +46,7 @@ Rendering, history redraws, and account administration return 4xx for invalid in
 
 When both encryption variables are set, direct key material has priority. A persistent key file is recommended for production.
 
-`INKU_LISTEN_HOST` and `INKU_LISTEN_PORT` are read by uvicorn directly; `INKU_SERVER_HOST` and `INKU_SERVER_PORT` belong to the `inku-server` CLI. The names are close, so do not swap them.
+`INKU_LISTEN_HOST` and `INKU_LISTEN_PORT` are used by the API startup banner. Set the actual listen address and port using the launch options in [§11](#11-reverse-proxy-and-cookies).
 
 `INKU_REDIS_URL` takes effect only when redis-py is installed. Without it, shared state lives in the process, so set it for any configuration that runs the backend in more than one process.
 
@@ -444,7 +445,17 @@ Minimum routes:
 - `/api/` -> `http://127.0.0.1:8100/api/`
 - Optional `/health` -> `http://127.0.0.1:8100/health`
 
-Terminate HTTPS and set `INKU_SESSION_COOKIE_SECURE=1` for public deployment. LLM generation may be long-running, so do not configure proxy timeouts shorter than provider timeouts without intent.
+When the reverse proxy runs on the same host as the development services, bind Vite (5173) and the API (8100) to `127.0.0.1` and expose the proxy. Start Vite with `npm run dev -- --host 127.0.0.1 --port 5173`. The API bind settings depend on the launch command.
+
+| API launch command | Listen address and port |
+|---|---|
+| `inku-server` (including the supplied API systemd template) | `INKU_SERVER_HOST=127.0.0.1` and `INKU_SERVER_PORT=8100` |
+| Direct `uvicorn inku_server.api:app` | `--host 127.0.0.1 --port 8100` |
+| `python -m inku_server.chatgpt_cli serve` | `--host 127.0.0.1 --port 8100` |
+
+Terminate HTTPS at the proxy, set `INKU_ORIGIN` to the public HTTPS URL, and set `INKU_SESSION_COOKIE_SECURE=1` for the API. Compose passes `INKU_ORIGIN` to SvelteKit as `ORIGIN`. If the public port differs from Vite's development port, set `INKU_VITE_HMR_CLIENT_PORT` (1–65535) to the public port in Vite's startup environment. Allow long-running draws by keeping proxy timeouts at least as long as provider timeouts.
+
+For access by a private LAN IP address, use a private CA and trust its root certificate on each client as described in [the HTTPS deployment guide](../../deploy/README.md#lan-access-by-ip--lan-の-ip-アドレスで開く). When Python does not use the OS trust store, point `inku-cli` to the CA's PEM file with `ca_file` or `INKU_CA_FILE`. See the [inku-cli reference](cli-reference.md).
 
 ## 12. Health Checks and Monitoring
 

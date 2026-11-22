@@ -35,8 +35,9 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_LOGIN_RATE_ATTEMPTS` | login失敗許容回数／window | 10 |
 | `INKU_LOGIN_RATE_WINDOW_SECONDS` | login rate window秒 | 60 |
 | `INKU_CORS_ORIGINS` | 許可originのcomma区切り | localhostのみ |
-| `INKU_LISTEN_HOST` | uvicorn listen host | `0.0.0.0` |
-| `INKU_LISTEN_PORT` | uvicorn listen port | `INKU_SERVER_PORT`、無ければ`8100` |
+| `INKU_LISTEN_HOST` | API の起動バナーに表示する待受アドレス | `0.0.0.0` |
+| `INKU_LISTEN_PORT` | API の起動バナーに表示する待受ポート | `INKU_SERVER_PORT`、無ければ`8100` |
+| `INKU_VITE_HMR_CLIENT_PORT` | Vite のブラウザ側 HMR ポート。1〜65535 | 未設定 |
 | `INKU_ENV` | 起動時に表示する動作モード | `ENVIRONMENT`の値、未設定なら`development` |
 | `INKU_ANYIO_THREAD_TOKENS` | 同期処理に使うスレッド数の上限（**調整用**。重い描画の待ちで`/health`などが止まる時だけ上げる。1以上） | `100` |
 | `INKU_TIMEZONE` | DB backupの時刻判定などに使うtimezone | `Asia/Tokyo` |
@@ -45,7 +46,7 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 
 `INKU_SECRET_KEY`と`INKU_SECRET_KEY_FILE`を同時に設定した場合は直接鍵を優先します。本番では永続的な鍵ファイルを推奨します。
 
-`INKU_LISTEN_HOST`／`INKU_LISTEN_PORT`はuvicornが直接読む値、`INKU_SERVER_HOST`／`INKU_SERVER_PORT`は`inku-server` CLIの値です。名前が似ているので取り違えないでください。
+`INKU_LISTEN_HOST`／`INKU_LISTEN_PORT` は API の起動バナーの表示用です。実際の待受先は [§11](#11-reverse-proxyとcookie) の起動方法ごとの設定で決まります。
 
 `INKU_REDIS_URL`はredis-pyが入っている場合にだけ有効です。設定しなければ共有状態はプロセス内に置かれるので、backendを複数プロセスで動かす構成では設定してください。
 
@@ -433,7 +434,17 @@ sudo systemctl status inku-server.service --no-pager
 - `/api/` -> `http://127.0.0.1:8100/api/`
 - 必要なら`/health` -> `http://127.0.0.1:8100/health`
 
-公開環境ではHTTPSを終端し、`INKU_SESSION_COOKIE_SECURE=1`を設定します。LLM生成は長時間になる場合があるため、proxy timeoutをprovider timeoutより短くしすぎないでください。
+中継と開発サーバーを同じホストで動かす場合は、Vite（5173）と API（8100）を `127.0.0.1` で待たせ、中継を外部からの入口にします。Vite は `npm run dev -- --host 127.0.0.1 --port 5173` で起動します。API の待受設定は起動方法で変わります。
+
+| API の起動方法 | 待受アドレスとポート |
+|---|---|
+| `inku-server`（同梱の API 用 systemd テンプレートを含む） | `INKU_SERVER_HOST=127.0.0.1` と `INKU_SERVER_PORT=8100` |
+| `uvicorn inku_server.api:app` を直接起動 | `--host 127.0.0.1 --port 8100` |
+| `python -m inku_server.chatgpt_cli serve` | `--host 127.0.0.1 --port 8100` |
+
+中継で HTTPS を終端し、公開の HTTPS URL を `INKU_ORIGIN` に指定し、API に `INKU_SESSION_COOKIE_SECURE=1` を設定します。Compose は `INKU_ORIGIN` を SvelteKit の `ORIGIN` に渡します。Vite の開発構成で公開ポートが Vite の待受ポートと異なる場合は、Vite の起動環境で `INKU_VITE_HMR_CLIENT_PORT`（1〜65535）に公開ポートを指定します。描画に時間がかかる場合に備え、中継のタイムアウトは提供元のタイムアウトを下回らないようにします。
+
+LAN のプライベート IP で開く場合は、[HTTPS の導入手順](../../deploy/README.md#lan-access-by-ip--lan-の-ip-アドレスで開く)に従い、独自の CA を使って各端末にルート証明書を信頼させます。OS の信頼ストアを参照しない Python 環境で `inku-cli` を使う場合は、CA の PEM ファイルを `ca_file` または `INKU_CA_FILE` で指定します。[inku-cli リファレンス](cli-reference.md)を参照してください。
 
 ## 12. health checkと監視
 

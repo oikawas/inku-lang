@@ -2,6 +2,11 @@
 
 この履歴は`manual/`配下の利用・運用文書の改訂を記録します。製品機能そのものの詳細な変更履歴は`SPEC.ja.md`を参照してください。
 
+## 2026-11-22 — HTTPS の中継と保存先
+
+- [アプリケーションのインストール方法](application-install.md)と[サーバー設定](server-configuration.md)に、HTTPS の中継、待受先と CA の設定を追記しました。
+- [画像の作成方法](image-creation.md)にフォルダを選べる接続条件を、[AI 用 CLI リファレンス](cli-reference-for-ai.md)に `ca_file` と `INKU_CA_FILE` を追記しました。
+
 ## 2026-11-21 — iPhone アプリの頁
 
 - [iPhone アプリの使い方](./iphone-app.md) — ホーム、描く、見る、共有、作品パックの取り込み、設定、制作の頁の使い方を足しました。

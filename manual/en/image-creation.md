@@ -559,7 +559,7 @@ Only a saved work is exported. A picture that is not saved (one drawn by the dem
 
 `DDL (with plugin definitions)` in `Export` (shown when one work is the target) saves the work's DDL, with the definitions and notes selected by its saved locks, as `inku.ddl-export.v2` JSON (`inku-ddl.json`), for carrying it to another environment (the same form as the CLI's `ddl-export`).
 
-Set the download folder under `Settings` → `Export`, page `File saving` → `Save location`. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
+Choose the download folder under `Settings` → `Export` → `File saving` → `Save location` → `Choose folder`. This requires a supporting browser and a page opened over HTTPS or on localhost. On HTTP at a LAN IP address, the button is hidden and the page says “This browser cannot choose a folder. Exports go to the browser default.” To set up HTTPS, see [Server Configuration §11](server-configuration.md#11-reverse-proxy-and-cookies). The browser's default folder is also used when you have not chosen a folder or writing is denied. Each browser or device needs its own folder choice.
 
 ### 14.1 Contact Sheets
 
@@ -613,7 +613,7 @@ For one work, the finished picture appears first, then the animation returns to 
 | Play back and forth | Reverse from the finished work to the ground, then repeat forwards |
 | Play once and hold | Build up once and stop at the finished work |
 
-For several works, choose the transition pattern and display hold for each work. Format, resolution, and destination are common to both types. When you start an export, its chosen format, motion, and other settings are saved per user in this browser for the next export. You can also change them under animation in `Settings`. A destination chosen in the dialog applies only to that export. In supported browsers, `Choose save location` chooses a folder; other browsers use their download settings.
+For several works, choose the transition pattern and display hold for each work. Format, resolution, and destination are common to both types. When you start an export, its chosen format, motion, and other settings are saved per user in this browser for the next export. You can also change them under animation in `Settings`. A destination chosen in the dialog applies only to that export. In a supporting browser over HTTPS or on localhost, use `Choose save location` to pick a folder. When folder selection is unavailable (including HTTP at a LAN IP address), the button is disabled and the file follows the browser's download settings.
 
 From Library the order is oldest to newest; from the lineage it runs from the origin to the selected work.
 

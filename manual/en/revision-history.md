@@ -2,6 +2,11 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-11-22 — HTTPS reverse proxy and export folders
+
+- [Application Installation](application-install.md) and [Server Configuration](server-configuration.md) now explain HTTPS reverse proxies, listen addresses, and CA setup.
+- [Creating Images](image-creation.md) now explains when the browser can choose an export folder. The [CLI reference for AI](cli-reference-for-ai.md) covers `ca_file` and `INKU_CA_FILE`.
+
 ## 2026-11-21 — The iPhone app guide
 
 - [Using the iPhone App](./iphone-app.md) — Added instructions for home, drawing, viewing, sharing, importing work packs, Settings, and the Making screen.

@@ -26,6 +26,8 @@ The standard operational procedure for an AI agent to refine a work step by step
 ### Step 1: Establish Connection and Verify Session
 Verify that the API server is reachable and inspect the permission groups of the current session.
 
+For HTTPS with a private CA, specify the CA's PEM file with the `ca_file` setting or the `INKU_CA_FILE` environment variable. See the [inku-cli reference](cli-reference.md) for per-server settings.
+
 ```sh
 uv run inku-cli me
 ```

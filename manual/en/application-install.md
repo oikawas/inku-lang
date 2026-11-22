@@ -154,6 +154,8 @@ cd /opt/inku/inku-lang/web
 sudo -u inku npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
+When serving through an HTTPS reverse proxy on the same host, use `--host 127.0.0.1`. See [Server Configuration §11](server-configuration.md#11-reverse-proxy-and-cookies).
+
 ```sh
 curl -sS -I --max-time 5 http://127.0.0.1:5173/
 ```
@@ -293,6 +295,6 @@ The existing uv, npm, and systemd development and operating procedures remain su
 
 The Web service publishes port 5173. Its Node server proxies same-origin /api requests to the internal FastAPI container. SQLite, backups, and artifacts persist in the inku-data volume. The API container runs as a non-root user.
 
-Do not leave bootstrap credentials or provider keys in shell history. In production, supply them through Compose secrets or a permission-restricted environment file. At a TLS endpoint, set INKU_ORIGIN to the public HTTPS URL and INKU_SESSION_COOKIE_SECURE to 1.
+Do not leave bootstrap credentials or provider keys in shell history. In production, supply them through Compose secrets or a permission-restricted environment file. At a TLS endpoint, set `INKU_ORIGIN` to the public HTTPS URL and `INKU_SESSION_COOKIE_SECURE` to `1`. See [Server Configuration §11](server-configuration.md#11-reverse-proxy-and-cookies).
 
 Use docker compose down to stop services and docker compose up -d --build to rebuild while retaining data. Never run docker compose down -v without a verified backup because it destroys the data volume.

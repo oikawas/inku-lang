@@ -177,7 +177,7 @@ npm run dev
 
 The development server uses `http://127.0.0.1:5173` by default. The Vite configuration proxies Web UI `/api` requests to the API server at `http://127.0.0.1:8100`.
 
-If an HTTPS reverse proxy exposes Vite on a different port, set `INKU_VITE_HMR_CLIENT_PORT` to the public port in Vite's startup environment.
+For an HTTPS reverse proxy, set `INKU_ORIGIN` to the public HTTPS URL and set `INKU_SESSION_COOKIE_SECURE=1` for the API. If the public port differs from Vite's listen port, set `INKU_VITE_HMR_CLIENT_PORT` to the public port in Vite's startup environment.
 
 Production-like checks:
 
@@ -265,6 +265,7 @@ uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
 PNG export requires the shared core wheel. Rebuild it whenever the core changes.
 
 The CLI connects to `http://127.0.0.1:8100` by default. Use `--base-url` or `INKU_BASE_URL` for another API URL.
+For HTTPS with a private CA, point the CLI to its PEM file with the `ca_file` setting or `INKU_CA_FILE`.
 
 ```sh
 uv run inku-cli --base-url http://127.0.0.1:8100 me
@@ -294,6 +295,8 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 | `INKU_SERVER_HOST` | `inku-server` listen host |
 | `INKU_SERVER_PORT` | `inku-server` listen port |
 | `INKU_BASE_URL` | Default API URL for `inku-cli` |
+| `INKU_CA_FILE` | CA file for `inku-cli`. The `ca_file` setting takes precedence |
+| `INKU_VITE_HMR_CLIENT_PORT` | Public port for Vite HMR in development (1–65535) |
 | `INKU_PIPELINE_CONFIG` | Location of the shared pipeline manifest (JSON). Without it, the built-in default is used. Host limits such as the worker count and retained executions can be changed there |
 | `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Deadline in seconds for shared-pipeline catalog selection and hole completion, and for legacy LLM requests. Defaults to 120. Normalized-DDL Stage 1 uses the dedicated limits below |
 | `INKU_LLM_RETRY_ATTEMPTS` | Maximum attempts within one LLM stage. Defaults to 4; the total time budget still stops further attempts |

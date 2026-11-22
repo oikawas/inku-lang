@@ -154,6 +154,8 @@ cd /opt/inku/inku-lang/web
 sudo -u inku npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
+同じホストの HTTPS リバースプロキシ経由で公開する場合は、`--host 127.0.0.1` を指定します。[サーバー設定 §11](server-configuration.md#11-reverse-proxyとcookie)を参照してください。
+
 ```sh
 curl -sS -I --max-time 5 http://127.0.0.1:5173/
 ```
@@ -293,6 +295,6 @@ DB、暗号化鍵、出力artifactを削除すると復旧できません。保�
 
 Webは5173番portで公開し、Node serverが同一originの /api requestを内部FastAPI containerへproxyします。SQLite、backup、artifactは inku-data volumeに永続化されます。API containerは非root userで動作します。
 
-初回admin作成に必要な環境変数やprovider keyはshell historyへ残さず、productionではCompose secretsまたは権限制限したenv fileから渡してください。TLS終端時は INKU_ORIGIN を公開HTTPS URLへ、INKU_SESSION_COOKIE_SECURE を1へ設定します。
+初回admin作成に必要な環境変数やprovider keyはshell historyへ残さず、productionではCompose secretsまたは権限制限したenv fileから渡してください。TLS 終端時は `INKU_ORIGIN` を公開 HTTPS URL に、`INKU_SESSION_COOKIE_SECURE` を `1` に設定します。[サーバー設定 §11](server-configuration.md#11-reverse-proxyとcookie)を参照してください。
 
 停止は docker compose down、volumeを残した再作成は docker compose up -d --build です。docker compose down -v はDBを含むvolumeを破棄するため、backup確認なしに実行しないでください。

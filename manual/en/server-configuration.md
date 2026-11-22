@@ -455,7 +455,7 @@ When the reverse proxy runs on the same host as the development services, bind V
 
 Terminate HTTPS at the proxy, set `INKU_ORIGIN` to the public HTTPS URL, and set `INKU_SESSION_COOKIE_SECURE=1` for the API. Compose passes `INKU_ORIGIN` to SvelteKit as `ORIGIN`. If the public port differs from Vite's development port, set `INKU_VITE_HMR_CLIENT_PORT` (1–65535) to the public port in Vite's startup environment. Allow long-running draws by keeping proxy timeouts at least as long as provider timeouts.
 
-For access by a private LAN IP address, use a private CA and trust its root certificate on each client as described in [the HTTPS deployment guide](../../deploy/README.md#lan-access-by-ip--lan-の-ip-アドレスで開く). When Python does not use the OS trust store, point `inku-cli` to the CA's PEM file with `ca_file` or `INKU_CA_FILE`. See the [inku-cli reference](cli-reference.md).
+For access by a private LAN IP address, use a private CA and trust its root certificate on each client as described in [the HTTPS deployment guide](../../deploy/README.md#serving-over-https--https-で公開する). When Python does not use the OS trust store, point `inku-cli` to the CA's PEM file with `ca_file` or `INKU_CA_FILE`. See the [inku-cli reference](cli-reference.md).
 
 ## 12. Health Checks and Monitoring
 

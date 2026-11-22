@@ -285,6 +285,8 @@ Deleting the DB, encryption key, or artifacts can make recovery impossible. Conf
 
 The existing uv, npm, and systemd development and operating procedures remain supported. Container deployment is an additional path driven by the root compose.yaml.
 
+The released-image `deploy/compose.yaml` publishes the API on `127.0.0.1:8100` by default. Other devices can use the Web service's `/api/`. See the [deployment guide](../../deploy/README.md#serving-over-https--https-で公開する) to enable HTTPS.
+
     export INKU_ORIGIN=http://localhost:5173
     export INKU_BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-long-secret'
     docker compose build

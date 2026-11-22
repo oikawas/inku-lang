@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Released Compose: Add `compose.https.yaml` to enable HTTPS with Caddy. The API now binds to `127.0.0.1:8100` by default. From another machine, use the Web service's `/api/` or explicitly publish the API with `INKU_API_PORT=0.0.0.0:8100`. An existing `INKU_API_PORT=8100` still publishes on all interfaces.
+
 - Swift drawing defaults show the save result below the section that changed and are restored before the works database opens. Saijiki on iPhone and iPad describes tap gestures.
 - Swift bundles retry settings for the sketch, composition, laws and colors readers.
 

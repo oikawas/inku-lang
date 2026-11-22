@@ -86,7 +86,7 @@ $EDITOR .env   # Fill in INKU_BOOTSTRAP_ADMIN_PASSWORD (8 characters or more) an
 docker compose up -d
 ```
 
-The web UI answers on `http://localhost:5173` and the API on `http://localhost:8100`. Sign in as `admin` with the password from `.env`.
+The web UI answers on `http://localhost:5173`. By default, the API is published on the host's `http://127.0.0.1:8100` only. Sign in as `admin` with the password from `.env`. For HTTPS with released images, see the [deployment guide](deploy/README.md#serving-over-https--https-で公開する).
 
 ### Build from this source
 
@@ -317,8 +317,8 @@ Used only when running in containers:
 | Variable | Purpose |
 | --- | --- |
 | `INKU_IMAGE_TAG` | The image tag `deploy/compose.yaml` pulls. Defaults to `latest`; set it to pin a version |
-| `INKU_WEB_PORT` | The host port the web UI is published on. Defaults to `5173` |
-| `INKU_API_PORT` | The host port the API is published on. Defaults to `8100` in `deploy/compose.yaml` and to `8101` in the `compose.yaml` that builds from source |
+| `INKU_WEB_PORT` | Web UI bind address and port. In `deploy/compose.yaml` it accepts `[IP:]port` and defaults to `5173`. The HTTPS override removes this direct binding |
+| `INKU_API_PORT` | API bind address and port. In `deploy/compose.yaml` it accepts `[IP:]port` and defaults to `127.0.0.1:8100`. The source-build `compose.yaml` defaults to `8101` |
 | `INKU_ORIGIN` | The web UI origin. Defaults to `http://localhost:5173` |
 
 ## Notes

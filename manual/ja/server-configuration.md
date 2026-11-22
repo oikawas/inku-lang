@@ -444,7 +444,7 @@ sudo systemctl status inku-server.service --no-pager
 
 中継で HTTPS を終端し、公開の HTTPS URL を `INKU_ORIGIN` に指定し、API に `INKU_SESSION_COOKIE_SECURE=1` を設定します。Compose は `INKU_ORIGIN` を SvelteKit の `ORIGIN` に渡します。Vite の開発構成で公開ポートが Vite の待受ポートと異なる場合は、Vite の起動環境で `INKU_VITE_HMR_CLIENT_PORT`（1〜65535）に公開ポートを指定します。描画に時間がかかる場合に備え、中継のタイムアウトは提供元のタイムアウトを下回らないようにします。
 
-LAN のプライベート IP で開く場合は、[HTTPS の導入手順](../../deploy/README.md#lan-access-by-ip--lan-の-ip-アドレスで開く)に従い、独自の CA を使って各端末にルート証明書を信頼させます。OS の信頼ストアを参照しない Python 環境で `inku-cli` を使う場合は、CA の PEM ファイルを `ca_file` または `INKU_CA_FILE` で指定します。[inku-cli リファレンス](cli-reference.md)を参照してください。
+LAN のプライベート IP で開く場合は、[HTTPS の導入手順](../../deploy/README.md#serving-over-https--https-で公開する)に従い、独自の CA を使って各端末にルート証明書を信頼させます。OS の信頼ストアを参照しない Python 環境で `inku-cli` を使う場合は、CA の PEM ファイルを `ca_file` または `INKU_CA_FILE` で指定します。[inku-cli リファレンス](cli-reference.md)を参照してください。
 
 ## 12. health checkと監視
 

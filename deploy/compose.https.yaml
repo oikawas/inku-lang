@@ -1,0 +1,28 @@
+services:
+  api:
+    environment:
+      INKU_SESSION_COOKIE_SECURE: "1"
+
+  web:
+    environment:
+      ORIGIN: "https://${INKU_PUBLIC_HOST:?set INKU_PUBLIC_HOST in .env}:${INKU_HTTPS_PORT:-443}"
+    ports: !override []
+
+  caddy:
+    image: caddy:2.11.9-alpine
+    depends_on:
+      - web
+    environment:
+      INKU_PUBLIC_HOST: "${INKU_PUBLIC_HOST:?set INKU_PUBLIC_HOST in .env}"
+      INKU_HTTP_PORT: "${INKU_HTTP_PORT:-80}"
+      INKU_HTTPS_PORT: "${INKU_HTTPS_PORT:-443}"
+    ports:
+      - "${INKU_HTTP_PORT:-80}:${INKU_HTTP_PORT:-80}"
+      - "${INKU_HTTPS_PORT:-443}:${INKU_HTTPS_PORT:-443}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - inku-caddy:/data
+    restart: unless-stopped
+
+volumes:
+  inku-caddy:

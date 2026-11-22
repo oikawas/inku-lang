@@ -87,7 +87,7 @@ $EDITOR .env   # INKU_BOOTSTRAP_ADMIN_PASSWORD（8文字以上）とLLMのAPIキ
 docker compose up -d
 ```
 
-Web UIは `http://localhost:5173`、APIは `http://localhost:8100` で応答する。`admin` と `.env` に書いたパスワードでログインする。
+Web UI は `http://localhost:5173`、API の既定の公開先はホスト自身の `http://127.0.0.1:8100`。`admin` と `.env` に書いたパスワードでログインする。配布 Compose の HTTPS は [配置ガイド](deploy/README.md#serving-over-https--https-で公開する)を参照。
 
 ### このソースからビルドする
 
@@ -316,8 +316,8 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い円を右上に置
 | 変数 | 用途 |
 | --- | --- |
 | `INKU_IMAGE_TAG` | `deploy/compose.yaml` が取得するイメージのタグ。未指定時は `latest`。版を固定する場合に使う |
-| `INKU_WEB_PORT` | ホスト側へ公開するWeb UIのport。未指定時は `5173` |
-| `INKU_API_PORT` | ホスト側へ公開するAPIのport。未指定時は `deploy/compose.yaml` で `8100`、ソースからビルドする `compose.yaml` で `8101` |
+| `INKU_WEB_PORT` | Web UI の公開先。`deploy/compose.yaml` では `[IP:]port`、既定は `5173`。HTTPS の上書き設定では直接公開しない |
+| `INKU_API_PORT` | API の公開先。`deploy/compose.yaml` では `[IP:]port`、既定は `127.0.0.1:8100`。ソースからビルドする `compose.yaml` の既定は `8101` |
 | `INKU_ORIGIN` | Web UIのorigin。未指定時は `http://localhost:5173` |
 
 ## 注意

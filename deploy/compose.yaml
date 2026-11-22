@@ -49,7 +49,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${INKU_API_PORT:-8100}:8100"
+      - "${INKU_API_PORT:-127.0.0.1:8100}:8100"
     volumes:
       - inku-data:/data
     restart: unless-stopped

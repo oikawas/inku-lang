@@ -285,6 +285,8 @@ DB、暗号化鍵、出力artifactを削除すると復旧できません。保�
 
 従来のuv、npm、systemd開発・運用手順は維持されています。コンテナ実行はrootの compose.yaml を使う追加経路です。
 
+リリースイメージ用の `deploy/compose.yaml` では、API の既定の公開先は `127.0.0.1:8100` です。別の端末からは Web の `/api/` を使えます。HTTPS の有効化は [配置ガイド](../../deploy/README.md#serving-over-https--https-で公開する)を参照してください。
+
     export INKU_ORIGIN=http://localhost:5173
     export INKU_BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-long-secret'
     docker compose build

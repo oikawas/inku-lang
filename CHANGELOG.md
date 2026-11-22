@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Web: Drawing defaults shows the save result just below the fields for the tab you changed.
-
 - iOS: keeps share cards and export files available after the share sheet closes. On iPhone, filled stars appear yellow on Home and in the work viewer.
 
 - Rust verification commands run without creating an incremental compilation cache.
@@ -801,6 +799,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.386 (2026-11-22 / Build 1462)
+
+- Web: Drawing defaults shows the save result just below the fields for the tab you changed.
 
 ## v2.15.385 (2026-11-22 / Build 1461)
 

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web development server: `INKU_VITE_HMR_CLIENT_PORT` sets the public port for hot reload behind an HTTPS reverse proxy.
+
 - iOS: keeps share cards and export files available after the share sheet closes. On iPhone, filled stars appear yellow on Home and in the work viewer.
 
 - Rust verification commands run without creating an incremental compilation cache.

@@ -177,6 +177,8 @@ npm run dev
 
 The development server uses `http://127.0.0.1:5173` by default. The Vite configuration proxies Web UI `/api` requests to the API server at `http://127.0.0.1:8100`.
 
+If an HTTPS reverse proxy exposes Vite on a different port, set `INKU_VITE_HMR_CLIENT_PORT` to the public port in Vite's startup environment.
+
 Production-like checks:
 
 ```sh

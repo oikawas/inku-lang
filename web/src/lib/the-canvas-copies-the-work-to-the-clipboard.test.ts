@@ -30,7 +30,7 @@ test('a stored choice is kept, and a height out of range is brought into it', ()
 });
 
 test('an insecure page is told why it cannot copy', () => {
-	// The page the author uses (http://192.168.0.89:5173) is this case.
+	// Plain HTTP on a LAN address is an insecure browser context.
 	assert.equal(clipboardUnavailableReason({ isSecureContext: false, canWrite: false, hasClipboardItem: false }), 'insecure');
 	assert.equal(clipboardUnavailableReason({ isSecureContext: true, canWrite: false, hasClipboardItem: true }), 'unsupported');
 	assert.equal(clipboardUnavailableReason({ isSecureContext: true, canWrite: true, hasClipboardItem: true }), null);

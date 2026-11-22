@@ -10,8 +10,14 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 
 const nodeRuntime = (globalThis as typeof globalThis & {
-	process: { version: string; platform: string; arch: string };
+	process: { version: string; platform: string; arch: string; env: Record<string, string | undefined> };
 }).process;
+
+const hmrClientPortValue = nodeRuntime.env.INKU_VITE_HMR_CLIENT_PORT;
+const hmrClientPort = hmrClientPortValue === undefined ? undefined : Number(hmrClientPortValue);
+if (hmrClientPort !== undefined && (!Number.isInteger(hmrClientPort) || hmrClientPort < 1 || hmrClientPort > 65535)) {
+	throw new Error('INKU_VITE_HMR_CLIENT_PORT must be a port between 1 and 65535');
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const buildNumberFile = resolve(__dirname, 'BUILD_NUMBER');
@@ -88,6 +94,7 @@ export default defineConfig({
 	server: {
 		host: '0.0.0.0',
 		port: 5173,
+		...(hmrClientPort === undefined ? {} : { ws: { clientPort: hmrClientPort } }),
 		proxy: {
 			'/api': {
 				target: 'http://127.0.0.1:8100',

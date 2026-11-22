@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from .saijiki_generated import BUNDLES, CATEGORIES, RELATIONS_BUNDLE, RELATION_DESCRIPTIONS
 
 __all__ = [
+    "BUNDLES",
     "SaijikiWord",
     "SaijikiCategory",
     "RelationWord",

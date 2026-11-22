@@ -122,7 +122,7 @@ def test_a_provider_an_operator_added_follows_the_catalog_that_names_it():
     shown = next(group for group in model_provider_catalog(stored) if group["id"] == "local-mlx")
     assert all(model["label"] == model["id"] for model in shown["models"])
     labels = {model["id"]: model["labels"] for model in shown["models"]}
-    assert labels == {"mlx-community/gemma-4-12B-it-4bit": [], "someone/unmeasured-4bit": ["unmeasured"]}
+    assert labels == {"mlx-community/gemma-4-12B-it-4bit": [], "someone/unmeasured-4bit": []}
     # A provider the catalog does not name keeps what the installation stored.
     other = normalize_model_settings({"model_catalog_version": "2.5.0", "providers": {"my-box": {
         "models": [{"id": "mlx-community/gemma-4-12B-it-4bit", "label": "x", "comment_ja": "手元"}]}}})
@@ -160,7 +160,7 @@ def test_every_listed_model_carries_its_labels_its_fold_and_the_old_marks():
     shown = {model["id"]: model for model in openai["models"]}
     assert (shown["gpt-4o"]["labels"], shown["gpt-4o"]["fold"], shown["gpt-4o"]["legacy"]) == (["legacy"], "legacy", True)
     assert (shown["dall-e-3"]["fold"], shown["dall-e-3"]["eol"]) == ("eol", True)
-    assert (shown["brand-new"]["labels"], shown["brand-new"]["fold"]) == (["unmeasured"], "unmeasured")
+    assert (shown["brand-new"]["labels"], shown["brand-new"]["fold"]) == ([], None)
 
 
 def test_a_model_first_met_in_a_fetched_list_takes_what_the_catalog_knows(monkeypatch):

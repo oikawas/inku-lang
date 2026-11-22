@@ -124,7 +124,7 @@ PUBLIC = {  # every entry needs a reason
 #   -2 for retiring POST /api/me/chatgpt/profiles/{profile_id}/select and
 #   POST /api/me/chatgpt/profiles/{profile_id}/delete: the host keeps one
 #   registration and OpenAI has no way to delete one (the author, 2026-11-14).
-EXPECTED_ROUTE_COUNT = 154
+EXPECTED_ROUTE_COUNT = 156
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

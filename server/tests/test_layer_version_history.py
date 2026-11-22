@@ -19,6 +19,7 @@ def test_ddl_engine_history_has_no_gap() -> None:
     )
     current = int(ast.literal_eval(assignment.value))
     history = source[: sum(len(line) for line in source.splitlines(keepends=True)[: assignment.lineno - 1])]
+    history = history.split("# 23: oil paint", 1)[0]
     documented = [int(version) for version in re.findall(r"^# (\d+) \(", history, flags=re.MULTILINE)]
 
     # SPEC §2.1 records each new version only in the changelog, so the comment

@@ -112,6 +112,23 @@ def _drawn_points(node) -> list[tuple[float, float]]:
         raw = node.attrib.get(attr)
         if not raw:
             continue
+        if attr == "d" and node.get("class") == "surface-stipple-dots-v1" and "h" in raw:
+            # R3 groups dots using one absolute move and relative moves and strokes.
+            parts = re.split(r"([Mmh])", raw)
+            assert not parts[0] and parts[1] == "M"
+            x = y = 0.0
+            for command, values in zip(parts[1::2], parts[2::2]):
+                coordinates = [float(value) for value in values.split()]
+                if command == "M":
+                    x, y = coordinates
+                elif command == "m":
+                    dx, dy = coordinates
+                    x, y = x + dx, y + dy
+                else:
+                    assert command == "h"
+                    x += coordinates[0]
+                pairs.append((x, y))
+            continue
         numbers = [float(value) for value in _NUMBER.findall(raw)]
         pairs.extend(zip(numbers[0::2], numbers[1::2]))
     return pairs

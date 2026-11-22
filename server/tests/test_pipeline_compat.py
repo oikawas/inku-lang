@@ -338,9 +338,8 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
             },
             None,
         )
-        view = pipeline_runtime.get_service().get(
-            "author-1", result["pipeline_variation_id"]
-        )
+        with pytest.raises(HTTPException, match="variation_not_found"):
+            pipeline_runtime.get_service().get("author-1", result["pipeline_variation_id"])
     finally:
         pipeline_runtime.shutdown()
         engine.dispose()
@@ -367,9 +366,6 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
     assert result["score"]["instructions"]
     assert result["svg"].startswith("<svg ")
     assert 'xmlns="http://www.w3.org/2000/svg"' in result["svg"]
-    assert view["phase"]["tag"] == "completed"
-    assert view["busy"] is False
-    assert view["result"]["svg"] == result["svg"]
 
 
 def test_a_supplementing_sketch_reaches_stage1_and_is_saved(tmp_path, monkeypatch) -> None:

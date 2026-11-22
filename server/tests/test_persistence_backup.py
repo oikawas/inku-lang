@@ -213,12 +213,15 @@ def test_db_facade_observes_runtime_monkeypatch_seams(
     with sqlite3.connect(second_path) as connection:
         assert connection.execute("SELECT marker FROM evidence").fetchone() == ("two",)
     assert db.get_db_backup_settings()["interval_days"] == 9
+    last_cleanup = second_store.writes[-1][1]["last_cleanup"]
+    assert last_cleanup["backup"] == second_path.name
     db.update_db_backup_settings(6, 3, 11, 12)
     assert second_store.writes[-1][1] == _defaults(
         interval_days=6,
         max_generations=3,
         backup_hour=11,
         backup_minute=12,
+        last_cleanup=last_cleanup,
     )
 
     monkeypatch.setattr(db, "engine", SimpleNamespace(dialect=SimpleNamespace(name="postgresql")))
@@ -357,6 +360,9 @@ def test_listing_and_status_keep_order_generations_aggregates_limit_and_keys(tmp
         "backups",
         "backups_total_count",
         "backups_total_size_bytes",
+        "cleanup_grace_days",
+        "cleanup_unlinked_drafts",
+        "last_cleanup",
     }
     assert status["supported"] is True
     assert status["backup_dir"] == str(tmp_path / "backups")

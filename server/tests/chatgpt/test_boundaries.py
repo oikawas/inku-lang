@@ -1036,14 +1036,25 @@ def test_an_unhashable_oauth_error_code_is_an_unavailable_sign_in_server(isolate
 
 def test_a_cancelled_sign_in_stops_listening_and_stays_cancelled(isolated, monkeypatch):
     signing_server(monkeypatch)
+    closed = threading.Event()
+    sockets = []
+    listen, close = auth.Callback.listen, auth.Callback.close
+
+    def record_socket(callback):
+        result = listen(callback)
+        sockets.append(callback.server)
+        return result
+
+    def record_close(callback):
+        close(callback)
+        closed.set()
+
+    monkeypatch.setattr(auth.Callback, "listen", record_socket)
+    monkeypatch.setattr(auth.Callback, "close", record_close)
     coordinator = auth.AuthorizationAttempts()
-    started = coordinator.begin("owner", False,lambda: runtime.check_owner("owner"))
-    callback = parse_qs(urlsplit(started["authorization_url"]).query)["redirect_uri"][0]
+    started = coordinator.begin("owner", False, lambda: runtime.check_owner("owner"))
     assert coordinator.cancel("owner", started["attempt_id"])["status"] == "cancelled"
-    listener = next(thread for thread in threading.enumerate() if thread.name == "inku-chatgpt-callback")
-    listener.join(timeout=2)
-    assert not listener.is_alive()
+    assert closed.wait(timeout=2)
+    assert len(sockets) == 1 and sockets[0].fileno() == -1
     assert coordinator.public("owner", started["attempt_id"]) == {
         "id": started["attempt_id"], "status": "cancelled", "code": "chatgpt_cancelled", "profile_id": started["profile_id"]}
-    with httpx.Client() as client, pytest.raises(httpx.ConnectError):
-        client.get(callback)

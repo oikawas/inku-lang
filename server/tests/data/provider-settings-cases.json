@@ -8172,7 +8172,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8187,7 +8187,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8255,7 +8255,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8270,7 +8270,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8343,7 +8343,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "ollama:x",
               "stage2": "ollama:x"
@@ -8358,7 +8358,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "ollama:x",
               "stage2": "ollama:x"
@@ -8437,7 +8437,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8452,7 +8452,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8534,7 +8534,7 @@
               "id": "default",
               "mode": "auto"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8549,7 +8549,7 @@
               "id": "default",
               "mode": "auto"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8621,7 +8621,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8636,7 +8636,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8706,7 +8706,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"
@@ -8721,7 +8721,7 @@
               "id": "default",
               "mode": "fixed"
             },
-            "composition": "off",
+            "composition": "on",
             "models": {
               "stage1": "nvidia:google/gemma-4-31b-it",
               "stage2": "nvidia:google/gemma-4-31b-it"

@@ -174,7 +174,7 @@ def test_old_catalog_purposes_do_not_override_unset_profile_choices():
     models = publication(profile)["models"]
     assert [{key: value for key, value in model.items() if key != "selection"} for model in models] == [
         {"id": "fixture-model", "label": "Fixture", "purposes": ["llm", "vision"],
-         "enabled": True, "labels": ["unmeasured"], "fold": "unmeasured"},
+         "enabled": True, "labels": [], "fold": None},
     ]
     assert models[0]["selection"]["unselectable"] is False
 

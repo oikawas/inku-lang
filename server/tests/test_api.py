@@ -981,7 +981,7 @@ def test_fetch_models_keeps_retired_models_as_eol(monkeypatch, request):
     }
     # 提供が続くモデルは EOL 印が付かず、整えたラベルと評価が残る。
     assert models["google/gemma-4-31b-it"].get("eol") is not True
-    assert models["google/gemma-4-31b-it"]["label"] == "Google Gemma 4 31B Instruct"
+    assert models["google/gemma-4-31b-it"]["label"] == "google/gemma-4-31b-it"
     assert models["google/gemma-4-31b-it"]["purposes"] == ["vision"]
     assert models["google/gemma-4-31b-it"]["unsupported_purposes"] == ["llm"]
     assert models["google/gemma-4-31b-it"]["speed_vision_seconds"] == 224.5
@@ -2728,7 +2728,7 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
             "openai": {
                 "models": [
                     {"id": "fetched-model", "label": "Previous Fetched Model"},
-                    {"id": "removed-model", "label": "Removed Model"},
+                    {"id": "removed-model", "label": "removed-model"},
                 ],
                 "enabled_models": {"fetched-model": True, "removed-model": True},
             }
@@ -2768,13 +2768,13 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     # v1.98: 提供元から消えたモデルは削除せず EOL として末尾に残す。
     today = datetime.now(timezone.utc).date().isoformat()
     assert openai_catalog["models"] == [
-        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": True,
-         "labels": ["unmeasured"], "fold": "unmeasured"},
-        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False,
-         "labels": ["unmeasured"], "fold": "unmeasured"},
+        {"id": "fetched-model", "label": "fetched-model", "purposes": ["llm"], "enabled": True,
+         "labels": [], "fold": None},
+        {"id": "new-fetched-model", "label": "new-fetched-model", "purposes": ["llm"], "enabled": False,
+         "labels": [], "fold": None},
         {
             "id": "removed-model",
-            "label": "Removed Model",
+            "label": "removed-model",
             "purposes": ["llm"],
             "enabled": False,
             "labels": ["eol"],
@@ -2798,13 +2798,13 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     assert all("selection" in model for model in openai_catalog["models"])
     openai_catalog["models"] = [{k: v for k, v in model.items() if k != "selection"} for model in openai_catalog["models"]]
     assert openai_catalog["models"] == [
-        {"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False,
-         "labels": ["unmeasured"], "fold": "unmeasured"},
-        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": False,
+        {"id": "new-model", "label": "new-model", "purposes": ["llm"], "enabled": False,
+         "labels": [], "fold": None},
+        {"id": "fetched-model", "label": "fetched-model", "purposes": ["llm"], "enabled": False,
          "eol": True, "eol_date": today, "labels": ["eol"], "fold": "eol"},
-        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False,
+        {"id": "new-fetched-model", "label": "new-fetched-model", "purposes": ["llm"], "enabled": False,
          "eol": True, "eol_date": today, "labels": ["eol"], "fold": "eol"},
-        {"id": "removed-model", "label": "Removed Model", "purposes": ["llm"], "enabled": False,
+        {"id": "removed-model", "label": "removed-model", "purposes": ["llm"], "enabled": False,
          "eol": True, "eol_date": today, "labels": ["eol"], "fold": "eol"},
     ]
 
@@ -3098,7 +3098,7 @@ def test_model_references_are_resolved_by_core(auth_context):
     rows = response.json()['results']
     assert (rows[0]['provider'], rows[0]['model']) == ('ollama', 'qwen3.5:4b-q4_K_M')
     assert rows[1]['ref'] == 'ollama:qwen3.5:4b-q4_K_M'
-    assert (rows[2]['provider_label'], rows[2]['model_label']) == ('Intel OVMS', 'Google Gemma 3 4B Instruct')
+    assert (rows[2]['provider_label'], rows[2]['model_label']) == ('Intel OVMS', 'gemma3-4b-api')
 
 
 def test_models_api_returns_core_user_defaults(auth_context):

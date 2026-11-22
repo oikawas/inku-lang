@@ -106,6 +106,7 @@ def sent(monkeypatch):
 def test_a_composed_description_is_printed_with_the_laws_its_reader_chose(author, sent):
     painted = client.post("/api/paint", json={
         "description": DESCRIPTION, "stage1_model": "nvidia:poolside/laguna-xs-2.1",
+        "save_history": True,
     }, headers=author)
     assert painted.status_code == 200, painted.text
     assert [action["tag"] for action in sent] == [

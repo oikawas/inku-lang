@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 155,
-  "operation_count": 155,
-  "schema_count": 220,
+  "endpoint_count": 156,
+  "operation_count": 156,
+  "schema_count": 221,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -597,6 +597,20 @@
         "header:authorization:opt"
       ],
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/CardExportBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/history/export-workpack",
+      "method": "POST",
+      "operationId": "api_history_export_workpack_api_history_export_workpack_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/WorkPackExportBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
@@ -2513,7 +2527,8 @@
     "UserSettingsBody": "{\"properties\":{\"download_folder_enabled\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"description\":\"Whether downloads are saved into a named folder. Null or omitted leaves it unchanged.\",\"title\":\"Download Folder Enabled\"},\"download_folder_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Name of the download folder, up to 240 characters. Null or omitted leaves it unchanged.\",\"title\":\"Download Folder Name\"},\"history_strip_fields\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"Fields printed under each history thumbnail, in display order. Allowed values are generation, model, engine_version and bytes, at most three, with no repeats. An empty list hides them all. Null or omitted leaves it unchanged; an invalid list is rejected with 400.\",\"title\":\"History Strip Fields\"},\"model_settings\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Model settings for the account. Null or omitted leaves them unchanged.\",\"title\":\"Model Settings\"},\"settings_tab\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Settings tab to open by default: chatgpt, models, db, plugins, users, export, demo, misc, server_misc, logs or limits. Null or omitted leaves it unchanged; other values are rejected with 400.\",\"title\":\"Settings Tab\"},\"tooltips_enabled\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"description\":\"Whether tooltips are shown. Null or omitted leaves it unchanged.\",\"title\":\"Tooltips Enabled\"},\"ui_custom\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"boolean\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Custom interface switches, as a map from area name to true or false. Accepted keys are input_modes, drawing_settings, ddl_tools, detail_status, work_tools, history and auxiliary. Null or omitted leaves it unchanged.\",\"title\":\"Ui Custom\"},\"ui_mode\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Interface mode, `simple`, `full` or `custom`. Null or omitted leaves it unchanged; other values are rejected with 400.\",\"title\":\"Ui Mode\"},\"ui_theme\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Interface theme, `light` or `dark`. Null or omitted leaves it unchanged; other values are rejected with 400.\",\"title\":\"Ui Theme\"}},\"title\":\"UserSettingsBody\",\"type\":\"object\"}",
     "ValidationError": "{\"properties\":{\"ctx\":{\"title\":\"Context\",\"type\":\"object\"},\"input\":{\"title\":\"Input\"},\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"title\":\"Location\",\"type\":\"array\"},\"msg\":{\"title\":\"Message\",\"type\":\"string\"},\"type\":{\"title\":\"Error Type\",\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"title\":\"ValidationError\",\"type\":\"object\"}",
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=小さく / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
-    "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
+    "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}",
+    "WorkPackExportBody": "{\"properties\":{\"ids\":{\"items\":{\"type\":\"string\"},\"maxItems\":1000,\"minItems\":1,\"title\":\"Ids\",\"type\":\"array\"}},\"required\":[\"ids\"],\"title\":\"WorkPackExportBody\",\"type\":\"object\"}"
   },
-  "digest": "73c588da7287131aa765935acd4ecb9bc92a0e093baabad7e4f4c74b8fd0f452"
+  "digest": "d0bfe3a61c8f44ba362936f1b6770a6f88af296f7da01d1c3363b4721f242071"
 }

@@ -486,15 +486,21 @@ public final class AppModel {
         #endif
         do {
             let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: InkuPlatform.hostIdentifier)
+            let directory = url.deletingLastPathComponent()
+            let store = ProviderSettingsStore(url: directory.appendingPathComponent("providers.json"))
+            let bootstrap = try Bootstrap(pluginDataDirectory: directory)
+            let settings = try await store.loadNormalized()
+            display.connect(directory: directory)
+            self.settings = settings
+            self.catalogs = bootstrap.catalogs
+            self.canvases = bootstrap.canvases
+            restoreNextConditions()
             // Opening validates the existing database before allowing writes and can
             // take significant time. Keep that blocking work off the UI executor.
             let openDatabase = self.openDatabase
             let database = try await Task.detached(priority: .userInitiated) {
                 try openDatabase(url)
             }.value
-            let store = ProviderSettingsStore(url: url.deletingLastPathComponent().appendingPathComponent("providers.json"))
-            let bootstrap = try Bootstrap(pluginDataDirectory: url.deletingLastPathComponent())
-            let settings = try await store.loadNormalized()
             self.database = database
             // A derived store: without it thumbnails are drawn and kept in memory, and nothing else stops.
             await thumbnails.connect(store: try? ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url)), database: database)
@@ -517,7 +523,6 @@ public final class AppModel {
             await host.cancelInterruptedExecutionsAtStartup()
             self.host = host
             self.settingsStore = store
-            self.settings = settings
             updateStageDefaultProviderID()
             synchronizeNextDrawingModel(previousSettings: nil)
             pruneComparisonModels()
@@ -525,11 +530,7 @@ public final class AppModel {
             self.productReference = bootstrap.productReference
             self.saijikiBundles = bootstrap.saijikiBundles
             self.drawingLimitDefinition = bootstrap.drawingLimitDefinition
-            display.connect(directory: url.deletingLastPathComponent())
             descriptionMeter.connect(directory: url.deletingLastPathComponent())
-            self.catalogs = bootstrap.catalogs
-            self.canvases = bootstrap.canvases
-            restoreNextConditions()
             self.saijiki = bootstrap.saijiki
             self.pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
             var startupCatalogError: Error?

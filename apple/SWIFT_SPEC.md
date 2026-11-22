@@ -2,6 +2,8 @@
 
 ## 2026-11-17 Saijiki v4 and DB v10
 
+On iPhone and iPad, Saijiki explains how to tap a word to see its example. If an instruction draft is open, the same tap inserts a word that can be inserted.
+
 The Saijiki window and description editor read bundle order, labels and category order from the shared asset and show categories under their bundles. The asset's `relations_bundle` places relations (currently `where`); an unknown bundle is refused. Aspect ratio is last in the `ground` category. A word's asset `description` takes precedence over the Web preview effect, which remains the fallback. Plugin words come last.
 
 macOS and iOS use Saijiki v4. DB v10 first creates a verified backup, then migrates v3 saved works through the shared core and records refusals, approximated word locations, and approximated reference paths in definitions. Score, SVG, historical executions, and effect digests remain unchanged. Import also migrates v3 DDL exports and retains the edit count, approximated word locations, and the number of approximated references in definitions. Approximations are not displayed.
@@ -135,6 +137,8 @@ The author's instruction (2026-11-13): the iPhone library shows every work in on
 - The lineage view still pages (eight lineages). The iPad's and the Mac's screens and behavior do not change.
 
 ## 2026-11-13 Saving Drawing defaults on iPhone
+
+Drawing defaults show the save result below the last changed section. On startup, the app restores the defaults before opening the works database.
 
 The author's report (2026-11-13): on iPhone, the model chosen in Drawing defaults was not saved. Reproduced on the simulator: before the page was scrolled to the bottom, a model row opened no sheet, which appeared late once the bottom was reached; values changed above (such as "Composition, laws and colors") also went back to the saved ones at the first scroll to the bottom.
 

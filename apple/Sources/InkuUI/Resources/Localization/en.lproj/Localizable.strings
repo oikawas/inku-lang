@@ -1506,6 +1506,8 @@
 "支持体の候補を用意中" = "Preparing ground options";
 "歳時記で語の作例と説明を確認します。語をクリックすると、編集中の指示書に挿入します。" = "Open Saijiki to see word examples and explanations. Click a word to insert it into the instruction draft.";
 "語にマウスを重ねると作例を表示します。クリックすると、挿入できる語を編集中の指示書に入れます。" = "Hover over a word to see its example. Click to insert the word into the instruction draft if its definition is available.";
+"語をタップすると作例を表示し、挿入できる語を編集中の指示書に入れます。" = "Tap a word to see its example and insert the word into the instruction draft if its definition is available.";
+"語をタップすると、描画への効き方を表示します。" = "Tap a word to preview how it affects the drawing.";
 "画面比が異なります" = "Different aspect ratio";
 "画面比の宣言は、比の数を添えてDDLの先頭に書きます。" = "Write the ratio numbers in a declaration at the start of the DDL.";
 "はめ込み" = "Fit";

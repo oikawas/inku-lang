@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Released Compose: Add `compose.https.yaml` to enable HTTPS with Caddy. The API now binds to `127.0.0.1:8100` by default. From another machine, use the Web service's `/api/` or explicitly publish the API with `INKU_API_PORT=0.0.0.0:8100`. An existing `INKU_API_PORT=8100` still publishes on all interfaces.
-
 - Swift drawing defaults show the save result below the section that changed and are restored before the works database opens. Saijiki on iPhone and iPad describes tap gestures.
 - Swift bundles retry settings for the sketch, composition, laws and colors readers.
 
@@ -806,6 +804,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.387 (2026-11-22 / Build 1463)
+
+- Composition, laws, and colors are enabled by default for new users drawing from text or batches of descriptions.
+- Released Compose: Add `compose.https.yaml` to enable HTTPS with Caddy. The API now binds to `127.0.0.1:8100` by default. From another machine, use the Web service's `/api/` or explicitly publish the API with `INKU_API_PORT=0.0.0.0:8100`. An existing `INKU_API_PORT=8100` still publishes on all interfaces.
 
 ## v2.15.386 (2026-11-22 / Build 1462)
 

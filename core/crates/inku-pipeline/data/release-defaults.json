@@ -1,11 +1,11 @@
 {
   "schema": "inku.release-draw-defaults.v1",
-  "reviewed_for_version": "v2.15.332",
+  "reviewed_for_version": "v2.15.387",
   "tabs": {
     "describe": {
       "route": "read_and_draw",
       "sketch": "on",
-      "composition": "off",
+      "composition": "on",
       "wild": "off",
       "catalog": {"id": "default", "mode": "fixed"},
       "canvas_aspect": "square",
@@ -23,7 +23,7 @@
     "batch_text": {
       "route": "read_and_draw",
       "sketch": "on",
-      "composition": "off",
+      "composition": "on",
       "wild": "off",
       "catalog": {"id": "default", "mode": "fixed"},
       "canvas_aspect": "square",

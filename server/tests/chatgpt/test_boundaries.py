@@ -1037,24 +1037,31 @@ def test_an_unhashable_oauth_error_code_is_an_unavailable_sign_in_server(isolate
 def test_a_cancelled_sign_in_stops_listening_and_stays_cancelled(isolated, monkeypatch):
     signing_server(monkeypatch)
     closed = threading.Event()
-    sockets = []
+    listeners = []
     listen, close = auth.Callback.listen, auth.Callback.close
 
     def record_socket(callback):
         result = listen(callback)
-        sockets.append(callback.server)
+        listeners.append((callback, callback.server))
         return result
 
     def record_close(callback):
         close(callback)
-        closed.set()
+        if listeners and callback is listeners[0][0]:
+            closed.set()
 
     monkeypatch.setattr(auth.Callback, "listen", record_socket)
     monkeypatch.setattr(auth.Callback, "close", record_close)
     coordinator = auth.AuthorizationAttempts()
     started = coordinator.begin("owner", False, lambda: runtime.check_owner("owner"))
+    assert len(listeners) == 1
+    listener = listeners[0][1]
+    # Another sign-in thread can finish while this attempt is still listening.
+    auth.Callback(None).close()
+    assert not closed.is_set()
+    assert listener.fileno() >= 0
     assert coordinator.cancel("owner", started["attempt_id"])["status"] == "cancelled"
     assert closed.wait(timeout=2)
-    assert len(sockets) == 1 and sockets[0].fileno() == -1
+    assert listener.fileno() == -1
     assert coordinator.public("owner", started["attempt_id"]) == {
         "id": started["attempt_id"], "status": "cancelled", "code": "chatgpt_cancelled", "profile_id": started["profile_id"]}

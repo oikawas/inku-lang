@@ -1,7 +1,6 @@
 #if os(iOS)
 import UIKit
 import OSLog
-import UniformTypeIdentifiers
 
 /// The system share sheet for files the app wrote (iOS plan step 2, author's choice 2026-11-08): "Save Image" puts an
 /// exported picture in Photos, "Save to Files" and AirDrop take any format.
@@ -14,12 +13,22 @@ enum InkuShareSheet {
         defer { NativeFilePanels.endSharing(folders) }
         // UIKit can take several seconds to construct the activity controller. A presenter selected before that
         // work can have left the window by the time presentation begins.
-        let items: [Any] = pngCard ? urls.map { PNGShareItem(url: $0) } : urls
+        let logger = Logger(subsystem: "app.inku", category: "share-sheet")
+        let items: [Any]
+        if pngCard {
+            let cards = urls.compactMap { PNGShareItem(url: $0, logger: logger) }
+            guard cards.count == urls.count else {
+                logger.error("Could not load the share card image")
+                return false
+            }
+            items = cards
+        } else {
+            items = urls
+        }
         let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
         guard let top = await frontmost() else { return false }
         return await withCheckedContinuation { continuation in
             let completion = ShareSheetCompletion { continuation.resume(returning: $0) }
-            let logger = Logger(subsystem: "app.inku", category: "share-sheet")
             sheet.completionWithItemsHandler = { activityType, completed, _, error in
                 let activity = activityType?.rawValue ?? "none"
                 let activityError = error.map { $0 as NSError }
@@ -90,24 +99,31 @@ enum InkuShareSheet {
         }
     }
 }
-/// Provides the original named file with an explicit image type for share extensions and Photos.
+/// Shares a decoded image, with the original named PNG for file destinations.
 private final class PNGShareItem: NSObject, UIActivityItemSource {
-    let url: URL
+    private let url: URL
+    private let image: UIImage
+    private let logger: Logger
 
-    init(url: URL) { self.url = url }
+    init?(url: URL, logger: Logger) {
+        guard let image = UIImage(contentsOfFile: url.path) else { return nil }
+        self.url = url
+        self.image = image
+        self.logger = logger
+    }
 
     func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
-        url
+        image
     }
 
     func activityViewController(_ activityViewController: UIActivityViewController,
                                 itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
-        url
-    }
-
-    func activityViewController(_ activityViewController: UIActivityViewController,
-                                dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String {
-        UTType.png.identifier
+        let activity = activityType?.rawValue ?? "none"
+        let usesFile = activityType == .airDrop || activity == "com.apple.DocumentManagerUICore.SaveToFiles"
+        let payload = usesFile ? "url" : "image"
+        logger.notice("Share card item (activityType: \(activity, privacy: .public), payload: \(payload, privacy: .public))")
+        if usesFile { return url }
+        return image
     }
 }
 #endif

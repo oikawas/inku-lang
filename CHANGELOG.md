@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: Drawing defaults shows the save result just below the fields for the tab you changed.
+
 - iOS: keeps share cards and export files available after the share sheet closes. On iPhone, filled stars appear yellow on Home and in the work viewer.
 
 - Rust verification commands run without creating an incremental compilation cache.

@@ -283,6 +283,8 @@ Open `Settings` from the application rail. The top `Standard` / `Detailed` switc
 
 `Drawing defaults` are each input tab's first drawing conditions (drawing, sketch, composition, stroke limit, color catalog, canvas and model). Until a member saves them, they are the shipped defaults (`core/crates/inku-pipeline/data/release-defaults.json`, reviewed at each public release) with the drawing model, Vision model and color catalog the member chose in an earlier version laid over them, and saving another setting never writes them. The old per-member canvas (plugin storage `canvas-aspect`) is not carried over and is removed the next time settings are saved.
 
+The Web saves each change and shows the result just below the fields for the tab you changed.
+
 `Model selection` is a separate drawing-time screen for choosing the drawing and Vision models. The model chosen there is the input tab's current choice and is not saved as a setting. Opened from Settings, it has `LLM` and `Vision` tabs; the change buttons on the making screen show only the relevant model. Both drawing stages use the same model. The administrator's `Models` screen manages connection services, Base URLs, API keys encrypted for storage, models visible to members, and LLM / Vision purpose. Adding or changing a connection does not by itself make its models visible to members.
 
 For a connection that requires an API key and has none, `Connection settings` opens expanded; you can still open or close it yourself. An administrator can use `Open connection settings` in the drawing notice to open the corresponding connection.

@@ -71,3 +71,12 @@ test('settings expose a separate page and use the existing model picker', () => 
 	assert.match(settings, /\{#if !image\}[^]*data-draw-option="route"[^]*data-draw-option="wild"[^]*\{\/if\}/);
 	assert.match(settings, /<option value="auto">\{t\(\)\.colorCatalogAuto\}<\/option>/);
 });
+
+test('drawing defaults show the latest save result below its tab fields only', () => {
+	assert.match(settings, /pendingTab = tab;\s*message = null;/);
+	assert.match(settings, /const savingTab = pendingTab;[^]*if \(pendingTab === null && message === null\) message = \{ tab: savingTab, failed \};/);
+	assert.match(settings, /data-draw-tab=\{tab\}[^]*class="db-backup-grid" onchange=\{\(\) => void save\(tab\)\}[^]*\n\t\t<\/div>\s*\{#if message\?\.tab === tab\}[^]*role="alert"[^]*drawDefaultsSaveFailed[^]*drawDefaultsSaved[^]*\n\t<\/div>\s*\{\/each\}/);
+	assert.equal(settings.match(/drawDefaultsSaved\b/g)?.length, 1);
+	assert.equal(settings.match(/drawDefaultsSaveFailed\b/g)?.length, 1);
+	assert.doesNotMatch(settings, /settings-inline-actions/);
+});

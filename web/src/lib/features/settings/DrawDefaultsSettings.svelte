@@ -18,9 +18,8 @@
 	let { defaults, catalogs, canvases, providerGroups, visionProviderGroups, onSave, onDraftChange }: Props = $props();
 	let draft = $state<DrawDefaults>(untrack(() => copyDrawDefaults(defaults)));
 	let saving = $state(false);
-	let pending = false;
-	let saved = $state(false);
-	let failed = $state(false);
+	let pendingTab: DrawTab | null = null;
+	let message = $state<{ tab: DrawTab; failed: boolean } | null>(null);
 	let pickerTab = $state<DrawTab | null>(null);
 	let pickerProvider = $state<Provider>('');
 	let pickerModel = $state('');
@@ -28,39 +27,48 @@
 	const tabs: DrawTab[] = ['describe', 'image', 'batch_text', 'batch_image'];
 	const tabName = (tab: DrawTab) => tab === 'describe' ? t().drawDefaultsDescribe : tab === 'image' ? t().drawDefaultsImage
 		: tab === 'batch_text' ? t().drawDefaultsBatchText : t().drawDefaultsBatchImage;
-	async function save() {
+	async function save(tab: DrawTab) {
 		onDraftChange(copyDrawDefaults(draft));
-		pending = true; failed = false; saved = false;
+		pendingTab = tab;
+		message = null;
 		if (saving) return;
 		saving = true;
 		try {
-			while (pending) {
-				pending = false;
-				try { await onSave(copyDrawDefaults(draft)); if (!pending) saved = true; }
-				catch { if (!pending) failed = true; }
+			while (pendingTab !== null) {
+				const savingTab = pendingTab;
+				pendingTab = null;
+				let failed = false;
+				try { await onSave(copyDrawDefaults(draft)); }
+				catch { failed = true; }
+				if (pendingTab === null && message === null) message = { tab: savingTab, failed };
 			}
 		} finally { saving = false; }
 	}
 	async function chooseModel(tab: DrawTab) {
 		const ref = (isImageTab(tab) ? draft[tab].models.vision : draft[tab].models.stage1) ?? '';
-		failed = false;
+		if (message?.failed) message = null;
 		try { await loadModelReferences([{ action: 'split_ref', ref }]); }
-		catch { failed = true; return; }
+		catch { message = { tab, failed: true }; return; }
 		const parsed = splitModelReference(ref);
 		pickerProvider = parsed.provider ?? '';
 		pickerModel = parsed.model;
 		pickerTab = tab;
 	}
 	async function confirmModel() {
-		if (!pickerTab) return;
+		const tab = pickerTab;
+		if (!tab) return;
 		try { await loadModelReferences([{ action: 'qualify_ref', provider: pickerProvider, ref: pickerModel }]); }
-		catch { failed = true; return; }
+		catch {
+			if (pickerTab === tab) message = { tab, failed: true };
+			return;
+		}
+		if (pickerTab !== tab) return;
 		const ref = qualifiedModelRef(pickerProvider, pickerModel);
 		if (!ref) return;
-		if (isImageTab(pickerTab)) draft[pickerTab].models.vision = ref;
-		else draft[pickerTab].models.stage1 = draft[pickerTab].models.stage2 = ref;
+		if (isImageTab(tab)) draft[tab].models.vision = ref;
+		else draft[tab].models.stage1 = draft[tab].models.stage2 = ref;
 		pickerTab = null;
-		void save();
+		void save(tab);
 	}
 	function chooseCatalog(tab: DrawTab, selected: string) {
 		draft[tab].catalog.mode = selected === 'auto' ? 'auto' : 'fixed';
@@ -74,7 +82,7 @@
 		<div class="popover-group-label">{tabName(tab)}</div>
 		<div class="db-test-result">{tab === 'describe' ? t().drawDefaultsHintDescribe : tab === 'image' ? t().drawDefaultsHintImage
 			: tab === 'batch_text' ? t().drawDefaultsHintBatchText : t().drawDefaultsHintBatchImage}</div>
-		<div class="db-backup-grid" onchange={() => void save()}>
+		<div class="db-backup-grid" onchange={() => void save(tab)}>
 			{#if !image}
 			<label data-draw-option="route"><span>{t().drawDefaultsRoute}</span><select bind:value={draft[tab].route}><option value="read_and_draw">{t().drawDefaultsRead}</option><option value="stages">{t().drawDefaultsStages}</option></select></label>
 			<label data-draw-option="sketch"><span>{t().sketchLabel}</span><select bind:value={draft[tab].sketch}><option value="off">{t().drawDefaultsOff}</option><option value="on">{t().drawDefaultsOn}</option></select></label>
@@ -91,12 +99,15 @@
 				</div>
 			</div>
 		</div>
+		{#if message?.tab === tab}
+			{#if message.failed}
+				<div class="inline-message error-text" role="alert">{t().drawDefaultsSaveFailed}</div>
+			{:else}
+				<div class="inline-message">{t().drawDefaultsSaved}</div>
+			{/if}
+		{/if}
 	</div>
 {/each}
-<div class="settings-inline-actions">
-	{#if saved}<div class="inline-message">{t().drawDefaultsSaved}</div>{/if}
-	{#if failed}<div class="inline-message error-text" role="alert">{t().drawDefaultsSaveFailed}</div>{/if}
-</div>
 
 {#if pickerTab}
 	<div class="picker-backdrop" role="presentation" onclick={() => (pickerTab = null)}></div>
